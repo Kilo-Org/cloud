@@ -46,10 +46,12 @@ work, work after the upstream request starts, and exceptional paths may use it.
   not a committed row or debit; the writer persists idempotently by usage ID, so
   redelivery does not create a second debit. Selection changes accounting
   transport only, not inference routing or compute location.
-- Direct accounting remains for unselected FRA and the existing SFO
-  `recordUsageInPrimaryRegion` handoff, which falls back to a local write when
-  the handoff is unavailable. Selected queue usage falls back to a direct write
-  only in the two pre-publication cases where nothing was sent:
+- Direct accounting remains for FRA deployments other than staging and
+  production `fra1`, for production FRA requests without a payer identity, and
+  for the existing SFO `recordUsageInPrimaryRegion` handoff, which falls back
+  to a local write when the handoff is unavailable. Selected queue usage falls
+  back to a direct write only in the two pre-publication cases where nothing was
+  sent:
   missing/unparseable publisher configuration and failed lifetime registration.
   It does not fall back after any publication attempt, including timeout or an
   ambiguous failure, because the event may already be queued.
@@ -60,10 +62,11 @@ work, work after the upstream request starts, and exceptional paths may use it.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
-The queue launch/exposure controls and rollback are documented in
+The queue launch and SFO exposure controls and rollback are documented in
 [`ENVIRONMENT.md`](../../ENVIRONMENT.md) and
 [`services/usage-ingest/README.md`](../../services/usage-ingest/README.md).
-Source defaults do not establish the deployed FRA or SFO cohorts.
+Source defaults do not establish the deployed SFO cohort; production FRA
+selection follows the deployed source.
 
 ## Data collection versus ZDR
 

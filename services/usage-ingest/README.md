@@ -8,17 +8,20 @@ matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
 The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
-and `VERCEL_ENV` not `production`) or for production regional cohorts controlled by
-`USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
-The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
-exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
-accounting transport, not request routing.
-Unselected events keep direct accounting or the existing SFO handoff. Background
-shadow publication and its flag have been removed. Reconcile and drain historically
+and `VERCEL_ENV` not `production`), for eligible production Frankfurt
+deployments, or for the production SFO cohort controlled by
+`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). The optional
+`USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Production Frankfurt accounting
+has no exposure control; it queues every payer with an identity. FRA deployments
+other than staging and production `fra1`, and SFO payers outside the cohort,
+keep direct accounting or the existing SFO handoff. Background shadow
+publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before deploying processing; this change does not remove
-old messages. Keep production selection off until the processing consumer is
-independently verified. Selection being off does not stop processing of queued
-events. Follow the [production merge gates](eu-queues.md#production-merge-gate).
+old messages. Keep SFO production selection off until the processing consumer is
+independently verified. Production FRA has no exposure switch, so do not deploy
+this gateway source to production until then. Selection being off does not stop
+processing of queued events. Follow the
+[production merge gates](eu-queues.md#production-merge-gate).
 
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
@@ -459,10 +462,11 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
 Provision and verify the Worker-side publisher secret before selecting staging
-or FRA/SFO cohorts; a missing Worker secret returns 503.
-The HTTP address alone selects no traffic: production selection still requires
-both production environment labels, a trusted function region and its applicable
-FRA or SFO cohort controls above.
+or the SFO cohort; a missing Worker secret returns 503.
+The HTTP address alone selects no traffic: production SFO selection still requires
+both production environment labels, a trusted `sfo1` function region and the SFO
+cohort control above; production FRA selection requires both production labels and
+`fra1`.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.

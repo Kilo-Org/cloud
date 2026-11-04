@@ -40,11 +40,12 @@ const REPLACED_BODY_KEY_FRAGMENTS = [
 const BODY_MASK = '[REDACTED]';
 
 /**
- * A PEM label line. The optional words before `PRIVATE KEY` cover the typed
+ * A PEM label line. RFC 7468 labels are uppercase, so the match stays
+ * case-sensitive. The optional words before `PRIVATE KEY` cover the typed
  * labels (`RSA`, `EC`, `OPENSSH`, `ENCRYPTED`) and the `PGP PRIVATE KEY BLOCK`
  * form, while `PUBLIC KEY` and certificate labels stay unmatched.
  */
-const PRIVATE_KEY_MATERIAL_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY/iu;
+const PRIVATE_KEY_MATERIAL_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY/u;
 
 const matchesAnyFragment = (name: string, fragments: readonly string[]): boolean => {
   const folded = name.toLowerCase();
@@ -103,10 +104,8 @@ interface JsonObject {
 }
 type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 
-const jsonStringSchema = z.string();
-
 const jsonValueUnion = z.union([
-  jsonStringSchema,
+  z.string(),
   z.number(),
   z.boolean(),
   z.null(),
@@ -123,9 +122,10 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => jsonValueUnion as z.Z
 const isJsonContainer = (value: JsonValue): value is Exclude<JsonValue, null> =>
   value !== null && (Array.isArray(value) || value instanceof Object);
 
-/** A parsed JSON string, as opposed to a number, boolean, null, array, or object. */
+/** A parsed JSON string leaf, as opposed to a number, boolean, null, array, or object. */
 const isJsonString = (value: JsonValue): value is string =>
-  jsonStringSchema.safeParse(value).success;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a value that already passed jsonValueSchema; the walk branches on the leaf kind and a schema parse per value would allocate for every string in the body
+  typeof value === 'string';
 
 /** A redacted rendering plus whether the walk replaced any value. */
 interface RedactedBody {
@@ -343,13 +343,24 @@ const redactMultipartBody = (text: string): string | undefined => {
 
     if (disposition !== null) {
       // Skip the part's header lines to the blank separator, then the value
-      // Region up to the next delimiter line, keeping the delimiter.
+      // Region up to the next delimiter line, keeping the delimiter. The header
+      // Scan stops at a delimiter too, so a part without a separator line cannot
+      // Consume the next part's header.
       let valueIndex = index + 1;
 
-      while (valueIndex < lines.length && lines[valueIndex] !== '') {
+      while (
+        valueIndex < lines.length &&
+        lines[valueIndex] !== '' &&
+        !isDelimiter(lines[valueIndex] ?? '')
+      ) {
         valueIndex += 1;
       }
-      valueIndex += 1;
+
+      const hasSeparator = lines[valueIndex] === '';
+
+      if (hasSeparator) {
+        valueIndex += 1;
+      }
 
       let endIndex = valueIndex;
 
@@ -357,7 +368,7 @@ const redactMultipartBody = (text: string): string | undefined => {
         endIndex += 1;
       }
 
-      const hasValue = endIndex > valueIndex;
+      const hasValue = hasSeparator && endIndex > valueIndex;
 
       if (
         hasValue &&

@@ -367,6 +367,32 @@ describe('body redaction', () => {
     );
   });
 
+  it('keeps a following part masked when an earlier part has no blank separator', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="username"',
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      'hunter2',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="username"',
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
   });

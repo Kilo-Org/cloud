@@ -11,7 +11,6 @@ import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertCloudAgentParentAuthority,
-  assertCloudAgentIsolatedAllocation,
   authorizeCloudAgentChild,
   issueCloudAgentMcpGrant,
   resolveCloudAgentMcpUrl,
@@ -97,14 +96,6 @@ describe('Cloud Agent spawn authority', () => {
     expect(workspaceMcpAnchorSessionId(worktreeId, childSessionId)).toBe(parentSessionId);
     expect(workspaceMcpAnchorSessionId(undefined, childSessionId)).toBe(childSessionId);
     expect(workspaceMcpAnchorSessionId('worktree_invalid', childSessionId)).toBeUndefined();
-  });
-
-  it('rejects shared allocation for opted-in parents and scoped children after saved-settings resolution', () => {
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'cloudflare-shared')).toThrow(
-      'isolated sandbox'
-    );
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'vercel-small')).not.toThrow();
-    expect(() => assertCloudAgentIsolatedAllocation(false, 'cloudflare-shared')).not.toThrow();
   });
 
   it('refuses grants from already-persisted shared sandbox parents', () => {

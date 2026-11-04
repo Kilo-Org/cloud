@@ -396,7 +396,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.WS_ALLOWED_ORIGINS).toBe(
       'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000'
     );
-    expect(config.vars.PER_SESSION_SANDBOX_ORG_IDS).toBe('*');
+    expect(config.vars).not.toHaveProperty('PER_SESSION_SANDBOX_ORG_IDS');
     expect(config.vars.TOOL_CGROUP_ORG_IDS).toBe('*');
     expect(config.vars.TOOL_CGROUP_MODE).toBe('enforce');
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');
@@ -435,14 +435,9 @@ describe('buildE2eWorkerConfig', () => {
     });
   });
 
-  it('pins the e2e KV namespace id and leaves no KV binding unpinned', () => {
+  it('renders no KV binding', () => {
     const { config } = render();
-    expect(config.kv_namespaces).toEqual([
-      { binding: 'SHARED_SANDBOX_OVERRIDES', id: '4d5f651fb14b4de682204eaa9fa60a7d' },
-    ]);
-    for (const kvNamespace of config.kv_namespaces as { id?: string }[]) {
-      expect(kvNamespace.id).toBeTruthy();
-    }
+    expect(config.kv_namespaces ?? []).toEqual([]);
   });
 
   it('removes dev, env and routes while keeping triggers', () => {

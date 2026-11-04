@@ -49,10 +49,6 @@ PREVIEW_ENABLED_IDS=*
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
-# Per-session Cloudflare sandbox org IDs (optional)
-# Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
-PER_SESSION_SANDBOX_ORG_IDS=
-
 # Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
 CODE_REVIEW_CONTAINERS_ORG_IDS=*

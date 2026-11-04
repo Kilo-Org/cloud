@@ -323,11 +323,6 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  "kv_namespaces": [
-    {
-      "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-  ],
 
   /**
    * Queue Bindings
@@ -378,11 +373,6 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "SHARED_SANDBOX_OVERRIDES",
-        },
-      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
@@ -397,7 +387,6 @@
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
-        "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",

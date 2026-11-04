@@ -675,13 +675,14 @@ async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<v
   if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
 }
 
+/**
+ * A source on a retired runtime, including a legacy shared sandbox, never loads
+ * (`loadSourceMetadata`), so the sandbox needs no check here.
+ */
 function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
   return (
     source.metadata.allowSubagentSessions !== false &&
-    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform) &&
-    source.workspace.sandboxAllocation !== 'cloudflare-shared' &&
-    source.workspace.sandboxKind !== 'shared' &&
-    source.workspace.sandboxRoute?.kind !== 'shared'
+    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform)
   );
 }
 

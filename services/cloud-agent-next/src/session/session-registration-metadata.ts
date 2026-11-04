@@ -1,8 +1,11 @@
 /** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { sessionReferenceOf, type EnvironmentScope } from '../environment-build/reference.js';
-import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
-import { deriveSharedSandboxId } from '../sandbox-id.js';
+import {
+  isLegacySharedSandboxWorkspace,
+  serializeSessionMetadata,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { BUILTIN_AGENT_MODES } from '../schema.js';
 import { isRepositoryAgentOrigin } from '../shared/agent-modes.js';
@@ -42,7 +45,6 @@ export type GroupedRegisterSessionInput = {
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
-    | 'sandboxRoute'
     | 'sandboxKind'
     | 'sandboxProvider'
     | 'sandboxProviderBinding'
@@ -109,24 +111,6 @@ function repositoryMetadataFromRegistrationInput(
   }
 
   throw new Error('repository.type must be github, gitlab, bitbucket, or git');
-}
-
-export async function validateSharedSandboxRouteAssignment(workspace: {
-  sandboxId?: string;
-  sandboxRoute?: NonNullable<SessionMetadata['workspace']>['sandboxRoute'];
-}): Promise<string | null> {
-  const route = workspace.sandboxRoute;
-  if (!route) return null;
-  try {
-    const expectedSandboxId = route.suffix
-      ? await deriveSharedSandboxId(route.routeKey, route.suffix)
-      : route.routeKey;
-    return workspace.sandboxId === expectedSandboxId
-      ? null
-      : 'Shared sandbox assignment does not match its route suffix';
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
 }
 
 export function validateModeAgainstRuntimeAgents(
@@ -222,9 +206,10 @@ export async function buildSessionMetadataFromRegistration(
   input: GroupedRegisterSessionInput,
   now = Date.now()
 ): Promise<BuildSessionMetadataResult> {
-  const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
-  if (routeAssignmentError) {
-    return { ok: false, error: `Invalid metadata: ${routeAssignmentError}` };
+  // Every sandbox serves one workspace: a registration never places a session
+  // on a retired shared sandbox.
+  if (isLegacySharedSandboxWorkspace(input.workspace)) {
+    return { ok: false, error: 'Invalid metadata: shared sandboxes are retired' };
   }
 
   let repository: SessionMetadata['repository'];

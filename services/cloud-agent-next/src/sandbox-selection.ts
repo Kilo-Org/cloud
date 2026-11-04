@@ -28,6 +28,15 @@ export const RETIRED_SANDBOX_ALLOCATION_MESSAGE =
   'This sandbox allocation has been retired. Choose Cloudflare Containers or Vercel BYOC.';
 
 /**
+ * Retired allocations a new session cannot choose. `cloudflare-shared` is gone
+ * because every sandbox serves one workspace. `cloudflare-single` is not here:
+ * it is the compatibility alias for the native containers default.
+ */
+export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boolean {
+  return allocation === 'cloudflare-shared' || allocation === 'isolated-standard';
+}
+
+/**
  * Provider tool capability a session needs from its sandbox image. `review`
  * publishes code-review output (gh/glab/bb and the GitHub review publisher MCP);
  * `remediation` opens security-remediation pull requests (gh/glab/bb). The
@@ -161,7 +170,7 @@ export function assertSandboxAllocationAvailable(
 ): void {
   // Retired explicit choices are rejected with a specific reason; a saved value
   // is skipped before this check and falls through to the default.
-  if (allocation === 'cloudflare-shared' || allocation === 'isolated-standard') {
+  if (isRetiredSandboxAllocation(allocation)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
   }
   const capabilities = getSandboxSelectionCapabilities(env, owner, {

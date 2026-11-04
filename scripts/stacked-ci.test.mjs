@@ -18,8 +18,6 @@ const mobilePathFragments = [
   /packages\/trpc\//,
   /apps\/web\/src\/routers\//,
   /packages\/app-shared\//,
-  /packages\/kilo-chat\//,
-  /packages\/kilo-chat-hooks\//,
   /packages\/event-service\//,
   /packages\/notifications\//,
   /packages\/cloud-agent-sdk\//,

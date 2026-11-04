@@ -23,11 +23,9 @@ function makeQueryClient(): QueryClient {
 
 function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
   return {
-    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
     agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
@@ -45,11 +43,9 @@ describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
   it('lists the categories rendered on the dedicated screen including balance, spend and security', () => {
     expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
-      'chatMessages',
       'agentAttention',
       'agentUpdates',
       'sessionStatus',
-      'kiloclawActivity',
       'balanceAlerts',
       'spendAlerts',
       'securityFindings',
@@ -132,21 +128,17 @@ describe('readAgentPushPreference', () => {
   it('returns the cached value for each category when the full row is present', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, {
-      chatMessages: true,
       agentAttention: false,
       agentUpdates: true,
       sessionStatus: false,
-      kiloclawActivity: true,
       balanceAlerts: false,
       spendAlerts: false,
       securityFindings: true,
       agentPushEnabled: true,
     });
-    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'agentAttention')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
-    expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
@@ -158,7 +150,6 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(false);
     // Non-agentUpdates categories fall back to the default when only the
     // legacy field is present.
-    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
@@ -204,9 +195,9 @@ describe('readAgentPushPreferenceIfLoaded', () => {
 
   it('reports the stored value instead of defaulting to ON once the row is cached', () => {
     const qc = makeQueryClient();
-    qc.setQueryData(key, fullRow({ agentAttention: false, chatMessages: true }));
+    qc.setQueryData(key, fullRow({ agentAttention: false, agentUpdates: true }));
     expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(false);
-    expect(readAgentPushPreferenceIfLoaded(qc, key, 'chatMessages')).toBe(true);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(true);
   });
 
   it('keeps the legacy `agentPushEnabled` mapping for a legacy snapshot', () => {

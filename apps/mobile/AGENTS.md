@@ -48,14 +48,6 @@ git diff --check
   `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
   soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
   clears `minimumReleaseAge`.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
-
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
-
-  Then restart Metro and force-quit the app.
 
 ## Library First
 
@@ -89,7 +81,7 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import english from '@/i18n/locales/en.json';
 
 import {
   classifyDeviceSessionsState,
@@ -18,11 +19,12 @@ function makeSession(overrides: Partial<DeviceSession> & { id: string }): Device
 }
 
 describe('deviceSessionLabel', () => {
-  it('falls back to Unknown device for a missing or empty user agent', () => {
-    expect(deviceSessionLabel(null)).toBe('Unknown device');
-    expect(deviceSessionLabel(undefined)).toBe('Unknown device');
-    expect(deviceSessionLabel('')).toBe('Unknown device');
-    expect(deviceSessionLabel('   ')).toBe('Unknown device');
+  it('uses the device sessions fallback for a missing or empty user agent', () => {
+    expect(english.deviceSessions.unknownDevice).toBe('Unknown device');
+    expect(deviceSessionLabel(null)).toBe(english.deviceSessions.unknownDevice);
+    expect(deviceSessionLabel(undefined)).toBe(english.deviceSessions.unknownDevice);
+    expect(deviceSessionLabel('')).toBe(english.deviceSessions.unknownDevice);
+    expect(deviceSessionLabel('   ')).toBe(english.deviceSessions.unknownDevice);
   });
 
   it('maps browser requests to Web browser', () => {

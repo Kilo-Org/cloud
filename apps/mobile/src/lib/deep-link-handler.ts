@@ -2,6 +2,7 @@ import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
 import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { isRemovedMobileDeepLink } from './deep-link-policy';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
 
@@ -48,6 +49,9 @@ export function redirectSystemPath({
   initial: boolean;
 }): string | null {
   try {
+    if (isRemovedMobileDeepLink(path)) {
+      return initial ? '/' : null;
+    }
     const resume = resolveIncomingResume(path);
     // Not a universal-link route: only the app's own route namespace reaches the
     // navigator. Anything else (a bare `kiloapp:///`, an unknown path, another

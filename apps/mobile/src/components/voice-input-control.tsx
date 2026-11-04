@@ -52,7 +52,6 @@ const SIZE_STYLES = {
   }
 >;
 
-// Default (no prop) preserves the original kilo-chat look.
 const DEFAULT_STYLE = {
   className: 'h-10 w-10 rounded-md',
   hitSlop: { top: 2, bottom: 2, left: 2, right: 2 },

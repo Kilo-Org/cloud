@@ -541,12 +541,6 @@ importers:
       '@kilocode/harness-sdk':
         specifier: workspace:*
         version: link:../../packages/harness-sdk
-      '@kilocode/kilo-chat':
-        specifier: workspace:*
-        version: link:../../packages/kilo-chat
-      '@kilocode/kilo-chat-hooks':
-        specifier: workspace:*
-        version: file:packages/kilo-chat-hooks(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -694,18 +688,12 @@ importers:
       expo-localization:
         specifier: ~58.0.4
         version: 58.0.4(patch_hash=790ed1623bb21bc6af1bfe44cacd8f383a128e62d0572669c5568fb8f3676b73)(expo@58.0.10)(react@19.3.0)
-      expo-location:
-        specifier: ~58.0.16
-        version: 58.0.16(expo-task-manager@58.0.11(patch_hash=05751bac2af36f12610d6f5ac31c99cacf897d842d26a3f14f48d4ee36ad7866)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)))(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-notifications:
         specifier: ~58.1.4
         version: 58.1.4(patch_hash=4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-router:
         specifier: ~58.0.19
         version: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(a13ae7c8f7d19ac8ab8b5d6de9ef50f2)
-      expo-screen-corner-radius:
-        specifier: 1.1.0
-        version: 1.1.0(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.10)
@@ -841,9 +829,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
-    dependenciesMeta:
-      '@kilocode/kilo-chat-hooks':
-        injected: true
     devDependencies:
       '@expo/plist':
         specifier: 0.10.1
@@ -6672,12 +6657,6 @@ packages:
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
-
-  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks':
-    resolution: {directory: packages/kilo-chat-hooks, type: directory}
-    peerDependencies:
-      '@tanstack/react-query': '*'
-      react: '*'
 
   '@kilocode/plugin@7.2.52':
     resolution: {integrity: sha512-ivFOFH2oY4QU3NVyA2Z5mD5jPBoqvwCjXK5f6lUGBJtrI+diDcA9BLHeXlXgwNvuMbO49xw3mOKSyLlyqGpeUg==}
@@ -15798,17 +15777,6 @@ packages:
       expo: '*'
       react: '*'
 
-  expo-location@58.0.16:
-    resolution: {integrity: sha512-oGIsK2HvJtotqPEoP9U+WczEEkErMRpyaF/McIln1+AZ3QNW32HJnI3fhJ4sEb7NmZb+6A+PDVgbKrZKr8EvEA==}
-    peerDependencies:
-      expo: '*'
-      expo-task-manager: '*'
-      react: '*'
-      react-native: '*'
-    peerDependenciesMeta:
-      expo-task-manager:
-        optional: true
-
   expo-manifests@58.0.1:
     resolution: {integrity: sha512-fVeJJ71Fj8FJgcAUggn6QIsm7CTxsXFgekLl4pEPHgON6fmcxog63FGO0sisQ3F6yUWFR4nn8iJmgBp1Exs7ew==}
     peerDependencies:
@@ -15881,13 +15849,6 @@ packages:
         optional: true
       react-server-dom-webpack:
         optional: true
-
-  expo-screen-corner-radius@1.1.0:
-    resolution: {integrity: sha512-haF5BW/c72WKINNwtjW8OT9MoVIHQci9jrTBAqG/Omrr8DqCXnPg1RuhsVblRpeUXFCEuTC0NQlY+qS0taaYLA==}
-    peerDependencies:
-      expo: '*'
-      react: '*'
-      react-native: '*'
 
   expo-secure-store@58.0.2:
     resolution: {integrity: sha512-VupWWEuQF6IiQ06McSymtn7/tehs8ifThhFwAU4UK8poomZcaa2S0UVt/y7G2XozBdkI3xpiPSx+r0pS2zsuYQ==}
@@ -27321,13 +27282,6 @@ snapshots:
       '@jsonjoy.com/codegen': 17.67.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks(@tanstack/react-query@5.104.3(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      '@kilocode/event-service': link:packages/event-service
-      '@kilocode/kilo-chat': link:packages/kilo-chat
-      '@tanstack/react-query': 5.104.3(react@19.3.0)
-      react: 19.3.0
-
   '@kilocode/plugin@7.2.52':
     dependencies:
       '@kilocode/sdk': 7.2.52
@@ -37397,18 +37351,6 @@ snapshots:
       react: 19.3.0
       rtl-detect: 1.1.2
 
-  expo-location@58.0.16(expo-task-manager@58.0.11(patch_hash=05751bac2af36f12610d6f5ac31c99cacf897d842d26a3f14f48d4ee36ad7866)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)))(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
-    dependencies:
-      '@expo/image-utils': 0.12.5(typescript@7.0.2)
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      react: 19.3.0
-      react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
-    optionalDependencies:
-      expo-task-manager: 58.0.11(patch_hash=05751bac2af36f12610d6f5ac31c99cacf897d842d26a3f14f48d4ee36ad7866)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   expo-manifests@58.0.1(expo@58.0.10):
     dependencies:
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
@@ -37599,12 +37541,6 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
     optional: true
-
-  expo-screen-corner-radius@1.1.0(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0):
-    dependencies:
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      react: 19.3.0
-      react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
 
   expo-secure-store@58.0.2(expo@58.0.10):
     dependencies:

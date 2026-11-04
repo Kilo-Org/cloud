@@ -31,7 +31,7 @@ export type RequestLoggingParams = {
   session_id: string | null;
   vercel_request_id: string | null;
   request: GatewayRequest;
-  enkrypt?: () => Promise<EnkryptRequestLog[]>;
+  enkrypt?: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>;
 };
 
 export type LogUnrewrittenResponseParams = {
@@ -94,6 +94,7 @@ async function createRequestLogCapture(
     organizationId: organization_id,
   });
   if (loggingMode === null) {
+    if (logging.enkrypt) after(async () => void (await logging.enkrypt?.(false)));
     return null;
   }
   const status = response.status;
@@ -135,6 +136,7 @@ async function createRequestLogCapture(
       const detectedError =
         extraError === null ? responseError : { ...(responseError ?? {}), ...extraError };
       if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
+        await logging.enkrypt?.(false);
         return;
       }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({

@@ -28,6 +28,8 @@ export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 30_000;
 
 const MAX_ATTEMPTS = 2;
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
+const ERROR_BODY_TIMEOUT_MS = 1_000;
 
 /**
  * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
@@ -108,6 +110,7 @@ export type EnkryptDetectDependencies = {
   requestLog?: {
     guardrail: EnkryptRequestLog['guardrail'];
     capture: (entry: Promise<EnkryptRequestLog>) => void;
+    captureResponse?: Promise<boolean>;
   };
 };
 
@@ -185,6 +188,57 @@ function abortError(signal: AbortSignal, deps: EnkryptDetectDependencies): Detec
   return signal.aborted ? 'timeout' : null;
 }
 
+async function captureErrorBody(
+  response: Response,
+  requestLog: EnkryptRequestLog,
+  signal: AbortSignal,
+  captureResponse: Promise<boolean> = Promise.resolve(true)
+): Promise<void> {
+  const aborted = Promise.withResolvers<boolean>();
+  const onAbort = () => aborted.resolve(false);
+  signal.addEventListener('abort', onAbort, { once: true });
+  let shouldCapture: boolean;
+  try {
+    shouldCapture = !signal.aborted && (await Promise.race([captureResponse, aborted.promise]));
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+  if (!shouldCapture) {
+    if (signal.aborted) requestLog.response_truncated = true;
+    void response.body?.cancel().catch(() => {});
+    return;
+  }
+  const reader = response.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  const timeout = setTimeout(() => {
+    requestLog.response_truncated = true;
+    void reader.cancel().catch(() => {});
+  }, ERROR_BODY_TIMEOUT_MS);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value.subarray(0, MAX_ERROR_BODY_BYTES - bytes);
+      bytes += chunk.byteLength;
+      text += decoder.decode(chunk, { stream: true });
+      if (chunk.byteLength < value.byteLength) {
+        requestLog.response_truncated = true;
+        break;
+      }
+    }
+  } catch {
+    requestLog.response_truncated = true;
+  } finally {
+    clearTimeout(timeout);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+    requestLog.response = text + decoder.decode();
+  }
+}
+
 async function detectOnce(
   body: string,
   signal: AbortSignal,
@@ -219,11 +273,11 @@ async function detectOnce(
   const creditsCost = parseCreditsCost(response);
   if (!response.ok) {
     if (requestLog) {
-      capturedBody = response.text().then(
-        text => {
-          requestLog.response = text;
-        },
-        () => {}
+      capturedBody = captureErrorBody(
+        response,
+        requestLog,
+        signal,
+        deps.requestLog?.captureResponse
       );
     } else {
       await response.body?.cancel().catch(() => {});

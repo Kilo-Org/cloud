@@ -26,7 +26,6 @@ import {
   type EnkryptOutputScan,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
 import type { EnkryptOutputGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 type RespondInput = {
   upstream: Extract<Awaited<ReturnType<typeof sendUpstreamAttempt>>, { type: 'success' }>;
@@ -154,13 +153,13 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     return errorResponse;
   }
 
-  let outputRequestLogs: (() => Promise<EnkryptRequestLog[]>) | undefined;
+  let outputRequestLogs: RequestLoggingParams['enkrypt'];
   const logging: RequestLoggingParams = {
     ...input.logging,
-    enkrypt: async () => {
+    enkrypt: async captureResponse => {
       const [inputLogs, outputLogs] = await Promise.all([
-        input.logging.enkrypt?.(),
-        outputRequestLogs?.(),
+        input.logging.enkrypt?.(captureResponse),
+        outputRequestLogs?.(captureResponse),
       ]);
       return [...(inputLogs ?? []), ...(outputLogs ?? [])];
     },

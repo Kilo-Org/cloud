@@ -283,7 +283,7 @@ type GuardEnkryptOutputParams = {
   onReject: (rejection: NextResponse, verdict: EnkryptGuardrailVerdict) => Promise<void>;
   /** Receives the guardrail's report, to read after the response like `after()` work. */
   captureReport?: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
-  captureRequestLogs?: (logs: () => Promise<EnkryptRequestLog[]>) => void;
+  captureRequestLogs?: (logs: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>) => void;
 };
 
 /**
@@ -319,6 +319,7 @@ export async function guardEnkryptOutput({
   const { blocking, logOnly } = splitEnkryptInputGuardrail(scan.config);
   const format = bodyFormat(response);
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
+  const captureResponse = Promise.withResolvers<boolean>();
   const deps = {
     apiKey: ENKRYPT_API_KEY,
     fetch,
@@ -329,6 +330,7 @@ export async function guardEnkryptOutput({
       capture: (entry: Promise<EnkryptRequestLog>) => {
         requestLogs.push(entry);
       },
+      captureResponse: captureResponse.promise,
     },
   };
   const logFields = {
@@ -416,7 +418,8 @@ export async function guardEnkryptOutput({
       })();
       const logged = scanned.then(records => recordEnkryptUsageRecords(records ?? []));
       after(logged);
-      captureRequestLogs?.(async () => {
+      captureRequestLogs?.(async (shouldCaptureResponse = true) => {
+        captureResponse.resolve(shouldCaptureResponse);
         await scanned;
         return Promise.all(requestLogs);
       });
@@ -503,7 +506,8 @@ export async function guardEnkryptOutput({
   })();
   const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords);
   after(recorded);
-  captureRequestLogs?.(async () => {
+  captureRequestLogs?.(async (shouldCaptureResponse = true) => {
+    captureResponse.resolve(shouldCaptureResponse);
     const { usageRecords } = await scanned;
     await usageRecords;
     return Promise.all(requestLogs);

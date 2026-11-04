@@ -19,6 +19,7 @@ export const enkryptRequestLogSchema = z.object({
     user_metadata: z.object({ organization_id: z.string() }),
   }),
   response: z.string().nullable(),
+  response_truncated: z.boolean().optional(),
   status_code: z.number().nullable(),
   error: z.string().nullable(),
 });

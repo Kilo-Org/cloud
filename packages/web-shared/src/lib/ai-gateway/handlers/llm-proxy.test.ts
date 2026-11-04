@@ -5154,9 +5154,9 @@ describe('Enkrypt output guardrail', () => {
         ...params,
         logging: {
           ...params.logging,
-          enkrypt: () => {
+          enkrypt: captureResponse => {
             getterStarted.resolve();
-            return getEnkrypt();
+            return getEnkrypt(captureResponse);
           },
         },
       });
@@ -6039,6 +6039,151 @@ describe('Enkrypt input guardrail', () => {
         .from(api_request_log)
         .where(eq(api_request_log.vercel_request_id, vercelRequestId));
     }
+
+    describe.each(['input', 'output'] as const)('%s error body capture', guardrail => {
+      const failedBody = '{ "detail": "unavailable", "vendor_detail": "raw failure" }';
+
+      function configureGuardrail(action: 'block' | 'log') {
+        if (guardrail === 'input') {
+          const detectors = createKiloDefaultEnkryptInputDetectors();
+          detectors.injection_attack.enabled = false;
+          detectors.pii.action = action;
+          setOrganization({ enkrypt: { input_guardrail: { enabled: true, detectors } } });
+        } else {
+          setOrganization({
+            enkrypt: {
+              output_guardrail: {
+                enabled: true,
+                detectors: {
+                  ...createEmptyEnkryptOutputDetectors(),
+                  pii: { enabled: true, action, entities: ['secrets'] },
+                },
+              },
+            },
+          });
+        }
+        mockedUpstreamRequest.mockResolvedValue({
+          type: 'success',
+          response: upstreamJsonResponse({
+            model: 'openai/gpt-4o',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'hello back' } }],
+          }),
+        });
+      }
+
+      function failedResponse(status: number) {
+        const pull = jest.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
+          controller.enqueue(new TextEncoder().encode(failedBody));
+          controller.close();
+        });
+        const cancel = jest.fn();
+        return {
+          response: new Response(new ReadableStream({ pull, cancel }, { highWaterMark: 0 }), {
+            status,
+            headers: { 'content-type': 'application/json' },
+          }),
+          pull,
+          cancel,
+        };
+      }
+
+      it.each(
+        ([null, 'errors_only'] as const).flatMap(mode =>
+          (['retry succeeds', 'log-only fails'] as const).map(outcome => ({ mode, outcome }))
+        )
+      )(
+        'does not read or persist a failed body when $outcome with mode $mode',
+        async ({ mode, outcome }) => {
+          mockedGetDynamicRequestLoggingMode.mockResolvedValue(mode);
+          configureGuardrail(outcome === 'retry succeeds' ? 'block' : 'log');
+          const failed = failedResponse(outcome === 'retry succeeds' ? 503 : 402);
+          fetchSpy
+            .mockResolvedValueOnce(failed.response)
+            .mockImplementation(async () =>
+              Response.json({ summary: { injection_attack: 0, pii: 0 } })
+            );
+          const actual = jest.requireActual<typeof RewriteModelResponseModule>(
+            '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse'
+          );
+          mockedRewriteModelResponse.mockImplementationOnce(actual.rewriteModelResponse);
+
+          const response = await handleLlmProxyRequest(
+            makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
+          );
+
+          expect(response.status).toBe(200);
+          expect(await response.json()).toMatchObject({
+            choices: [{ message: { content: 'hello back' } }],
+          });
+          expect(failed.pull).not.toHaveBeenCalled();
+          await Promise.all(
+            jest
+              .mocked(after)
+              .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+          );
+
+          expect(fetchSpy).toHaveBeenCalledTimes(outcome === 'retry succeeds' ? 2 : 1);
+          expect(failed.pull).not.toHaveBeenCalled();
+          expect(failed.cancel).toHaveBeenCalledTimes(1);
+          expect(send).not.toHaveBeenCalled();
+          expect(fakeR2.objects.size).toBe(0);
+          expect(await loggedRows()).toEqual([]);
+        }
+      );
+
+      it.each([null, 'errors_only'] as const)(
+        'captures a gateway failure body only when opted in (mode %s)',
+        async mode => {
+          mockedGetDynamicRequestLoggingMode.mockResolvedValue(mode);
+          configureGuardrail('block');
+          const failed = failedResponse(402);
+          fetchSpy.mockResolvedValueOnce(failed.response);
+
+          const response = await handleLlmProxyRequest(
+            makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
+          );
+
+          expect(response.status).toBe(503);
+          const body = await response.json();
+          expect(body).toMatchObject({ error_type: 'guardrail_unavailable' });
+          expect(failed.pull).not.toHaveBeenCalled();
+          await Promise.all(
+            jest
+              .mocked(after)
+              .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+          );
+
+          if (mode === null) {
+            expect(failed.pull).not.toHaveBeenCalled();
+            expect(failed.cancel).toHaveBeenCalledTimes(1);
+            expect(send).not.toHaveBeenCalled();
+            expect(fakeR2.objects.size).toBe(0);
+            expect(await loggedRows()).toEqual([]);
+            return;
+          }
+
+          const rows = await loggedRows();
+          expect(rows).toEqual([expect.objectContaining({ status_code: 503 })]);
+          const archived =
+            fakeR2.objects.get(`test-api-request-log/${rows[0].request_r2_key}`) ?? '';
+          const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
+          expect(record.response).toBe(JSON.stringify(body));
+          expect(record.enkrypt).toEqual([
+            expect.objectContaining({
+              guardrail,
+              scan: 'blocking',
+              response: failedBody,
+              status_code: 402,
+              error: 'http_402',
+            }),
+          ]);
+          expect(fetchSpy).toHaveBeenCalledTimes(1);
+          expect(failed.pull).toHaveBeenCalledTimes(1);
+          expect(send).toHaveBeenCalledTimes(1);
+          expect(fakeR2.objects.size).toBe(1);
+        }
+      );
+    });
 
     it.each([
       {

@@ -48,7 +48,7 @@ export type EnkryptInputGuardrail = {
    * for every scan and verdict cache write, so call it after the response, like `after()` work.
    */
   report(): Promise<EnkryptGuardrailReport | null>;
-  requestLogs(): Promise<EnkryptRequestLog[]>;
+  requestLogs(captureResponse?: boolean): Promise<EnkryptRequestLog[]>;
 };
 
 type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
@@ -101,6 +101,7 @@ export function startEnkryptInputGuardrail(
   signal: AbortSignal
 ): EnkryptInputGuardrail {
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
+  const captureResponse = Promise.withResolvers<boolean>();
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null
   ): Promise<EnkryptCachedScanResult> =>
@@ -111,7 +112,11 @@ export function startEnkryptInputGuardrail(
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
           signal,
           store: verdictCacheStore,
-          requestLog: { guardrail: 'input', capture: entry => requestLogs.push(entry) },
+          requestLog: {
+            guardrail: 'input',
+            capture: entry => requestLogs.push(entry),
+            captureResponse: captureResponse.promise,
+          },
         })
       : notScanned;
   const scans = scan.then(splitScan);
@@ -174,7 +179,8 @@ export function startEnkryptInputGuardrail(
     );
   });
   return {
-    async requestLogs() {
+    async requestLogs(shouldCaptureResponse = true) {
+      captureResponse.resolve(shouldCaptureResponse);
       await Promise.all([blockingResult, logOnlyResult]);
       return Promise.all(requestLogs);
     },

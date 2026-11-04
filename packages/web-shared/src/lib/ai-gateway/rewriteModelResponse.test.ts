@@ -3204,10 +3204,12 @@ describe('api_request_log storage', () => {
   });
 
   test.each([null, 'errors_only'] as const)(
-    'does not invoke the Enkrypt getter for a successful response with logging mode %s',
+    'disables Enkrypt response capture in after() for a successful response with logging mode %s',
     async mode => {
       const send = jest.spyOn(fakeR2, 'send');
-      const enkrypt = jest.fn(async (): Promise<EnkryptRequestLog[]> => []);
+      const enkrypt = jest.fn(
+        async (_captureResponse?: boolean): Promise<EnkryptRequestLog[]> => []
+      );
       mockedOptIn.mockResolvedValueOnce(mode);
       const response = await rewriteModelResponse({
         response: jsonResponse({ model: 'upstream-model', choices: [] }),
@@ -3221,13 +3223,15 @@ describe('api_request_log storage', () => {
         responseTransforms: null,
       });
       await response.text();
-      if (mode !== null) await runScheduledLogInsert();
 
       expect(enkrypt).not.toHaveBeenCalled();
+      await runScheduledLogInsert();
+
+      expect(enkrypt).toHaveBeenCalledTimes(1);
+      expect(enkrypt).toHaveBeenCalledWith(false);
       expect(send).not.toHaveBeenCalled();
       expect(await selectLoggedRows()).toEqual([]);
       expect(fakeR2.objects.size).toBe(0);
-      if (mode === null) expect(mockedAfter).not.toHaveBeenCalled();
     }
   );
 

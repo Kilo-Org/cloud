@@ -10,9 +10,9 @@ import type {
   OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { ai_gateway_config } from '@kilocode/db/schema';
+import { ai_gateway_config, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -60,6 +60,28 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   getOrganizationFeatures: adminProcedure.query(async () => {
     return readOrganizationFeatures(db);
   }),
+
+  previewOrganizationFeatures: adminProcedure
+    .input(OrganizationFeaturesInputSchema)
+    .query(async ({ input }) => {
+      const organizationIds = [...new Set(Object.values(input).flat())];
+      if (organizationIds.length === 0) return [];
+
+      const rows = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+          deleted_at: organizations.deleted_at,
+        })
+        .from(organizations)
+        .where(inArray(organizations.id, organizationIds));
+
+      return rows.map(({ id, name, deleted_at }) => ({
+        id,
+        name,
+        isDeleted: deleted_at !== null,
+      }));
+    }),
 
   setOrganizationFeatures: adminProcedure
     .input(OrganizationFeaturesInputSchema)

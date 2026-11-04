@@ -115,6 +115,9 @@ export function clearArtifactMirror(): void {
  * Write the index through `manifest.json.part` and rename it into place, so a
  * reader holding `manifest.json` never sees a half-written document. An
  * unchanged index is left alone, keeping the bytes (and the mtime) identical.
+ * The iOS provider uses this published file generation as its sync anchor and
+ * retains that generation while enumerating its page. Atomic replacement and
+ * leaving an unchanged index untouched keep those two callbacks coherent.
  */
 function writeManifest(root: Directory, manifest: ArtifactMirrorManifest): void {
   const bytes = serializeArtifactMirrorManifest(manifest);

@@ -1,3 +1,4 @@
+import Darwin
 import FileProvider
 import UniformTypeIdentifiers
 
@@ -422,30 +423,58 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
 }
 
 /**
- Enumerates one container from the manifest.
+ Enumerates one immutable manifest generation. The anchor is requested before
+ the first page, so both callbacks retain the same snapshot even if the app
+ atomically replaces its manifest between them.
 
- The mirror has no change log, so a change request reports the sync anchor as
- expired: the system discards the anchor and re-enumerates the container from
- scratch, which is exactly what the app's `signalEnumerator(for: .rootContainer)`
- asks for after a sync. An empty container is an empty enumeration, so a session
- with no artifacts is an empty folder in the Files app, never an error.
+ An unchanged generation completes change observation. A different generation
+ expires the old anchor and requests a full enumeration, including the empty
+ generation after sign-out removes the mirror.
+ See `NSFileProviderEnumerator.currentSyncAnchor(completionHandler:)`: the
+ framework requests the anchor before enumerating pages, then observes changes
+ from that anchor. The app's atomic manifest replacement is the generation
+ boundary; an unchanged file keeps its anchor and completes without a reset.
  */
 final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
-  private let mirror = ArtifactMirror()
+  private let mirror: ArtifactMirror
   private let container: ArtifactItemIdentifier
+  private let lock = NSLock()
+  private var preparedSnapshot: ArtifactMirror.Snapshot?
 
-  init(container: ArtifactItemIdentifier) {
+  init(container: ArtifactItemIdentifier, mirror: ArtifactMirror = ArtifactMirror()) {
     self.container = container
+    self.mirror = mirror
     super.init()
   }
 
   func invalidate() {}
 
+  func currentSyncAnchor(
+    completionHandler: @escaping @Sendable (NSFileProviderSyncAnchor?) -> Void
+  ) {
+    let snapshot = mirror.snapshot()
+    lock.lock()
+    preparedSnapshot = snapshot
+    lock.unlock()
+    completionHandler(snapshot.anchor)
+  }
+
+  private func enumerationSnapshot() -> ArtifactMirror.Snapshot {
+    lock.lock()
+    defer { lock.unlock() }
+    if let snapshot = preparedSnapshot {
+      return snapshot
+    }
+    let snapshot = mirror.snapshot()
+    preparedSnapshot = snapshot
+    return snapshot
+  }
+
   func enumerateItems(
     for observer: NSFileProviderEnumerationObserver,
     startingAt page: NSFileProviderPage
   ) {
-    observer.didEnumerate(mirror.items(in: container))
+    observer.didEnumerate(mirror.items(in: container, snapshot: enumerationSnapshot()))
     observer.finishEnumerating(upTo: nil)
   }
 
@@ -453,9 +482,16 @@ final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
     for observer: NSFileProviderChangeObserver,
     from anchor: NSFileProviderSyncAnchor
   ) {
-    // `syncAnchorExpired` is what tells the system to discard the anchor it
-    // holds and re-enumerate; `pageExpired` only expires an enumeration page
-    // and would leave the system asking for changes from the same anchor.
+    let current = mirror.snapshot().anchor
+    guard anchor != current else {
+      observer.finishEnumeratingChanges(upTo: current, moreComing: false)
+      return
+    }
+    lock.lock()
+    preparedSnapshot = nil
+    lock.unlock()
+    // A complete replacement has no change log. Expiring the anchor lets the
+    // system remove entries absent from the next full enumeration.
     observer.finishEnumeratingWithError(NSFileProviderError(.syncAnchorExpired))
   }
 }
@@ -467,11 +503,11 @@ final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
  `artifact-mirror-manifest.ts`: `artifacts/manifest.json` plus
  `artifacts/sessions/<sessionId>/<fileId>`. Move the three together.
 
- A reference type because the decoded index outlives one lookup: every lookup
- funnels through `manifest()`, and the system asks for one item at a time, so a
- session folder with N files would otherwise read and decode the whole index up
- to N times on the extension's main thread. The decode is memoized against the
- index file's own modification date and size, which change with every rewrite.
+ A reference type because the decoded index outlives one lookup. The app
+ atomically replaces the manifest and leaves an unchanged index untouched.
+ The cache and sync anchor therefore use the identity and modification stamp
+ of the opened file whose bytes were decoded, not metadata from another path
+ lookup that might observe a newer generation.
 
  Reading the shared app group is the capability iOS has and Android does not:
  Android has no app group. Android's counterpart,
@@ -488,57 +524,80 @@ final class ArtifactMirror: @unchecked Sendable {
   static let manifestFileName = "manifest.json"
   static let supportedManifestVersion = 1
 
-  /**
-   The identity of the manifest file a cache entry was read from.
+  struct Snapshot {
+    let manifest: ArtifactManifest?
+    let anchor: NSFileProviderSyncAnchor
 
-   The app rewrites the index wholesale (`.part` + rename), so the modification
-   date and size together change whenever the content does: an equal stamp means
-   the cached decode is still the file on disk.
-   */
-  private struct ManifestStamp: Equatable {
-    let modified: Date?
-    let size: Int?
+    static let empty = Snapshot(
+      manifest: nil,
+      anchor: NSFileProviderSyncAnchor(rawValue: Data("empty".utf8))
+    )
   }
 
+  private struct ManifestStamp: Equatable {
+    let inode: UInt64
+    let modifiedSeconds: Int64
+    let modifiedNanoseconds: Int64
+    let size: Int64
+
+    var anchor: NSFileProviderSyncAnchor {
+      NSFileProviderSyncAnchor(
+        rawValue: Data("\(inode):\(modifiedSeconds):\(modifiedNanoseconds):\(size)".utf8)
+      )
+    }
+  }
+
+  private let root: URL?
   private let lock = NSLock()
-  private var cachedManifest: ArtifactManifest?
+  private var cachedSnapshot: Snapshot?
   private var cachedStamp: ManifestStamp?
 
-  /**
-   The manifest, or nil when there is none (signed out, or a first run that has
-   not mirrored yet). An unreadable or unknown-version index reads as absent:
-   the mirror is derived data, so a reader shows nothing rather than failing.
+  convenience init() {
+    self.init(root: Self.rootURL())
+  }
 
-   The decoded index is memoized on the stamp of the file it was read from. A
-   cache hit needs a stamp of its own, so an absent file — which has none — can
-   never compare equal to the stamp a decode was stored under. Every path that
-   does not end in a manifest that passed the version gate clears the entry, so
-   a first run that has not mirrored yet never pins an empty location, and no
-   decode is ever served for a file nothing backs.
-   */
-  func manifest() -> ArtifactManifest? {
+  init(root: URL?) {
+    self.root = root
+  }
+
+  /** The decoded manifest and anchor of one opened, atomically published index. */
+  func snapshot() -> Snapshot {
     lock.lock()
     defer { lock.unlock() }
-    guard let url = Self.manifestURL() else {
-      cachedManifest = nil
+    guard let url = root?.appendingPathComponent(Self.manifestFileName, isDirectory: false),
+      let handle = try? FileHandle(forReadingFrom: url)
+    else {
+      cachedSnapshot = nil
       cachedStamp = nil
-      return nil
+      return .empty
     }
-    let stamp = Self.stamp(of: url)
-    if let cached = cachedManifest, let stamp, cachedStamp == stamp {
+    defer { try? handle.close() }
+    guard let stamp = Self.stamp(of: handle) else {
+      cachedSnapshot = nil
+      cachedStamp = nil
+      return .empty
+    }
+    if let cached = cachedSnapshot, cachedStamp == stamp {
       return cached
     }
-    guard let data = try? Data(contentsOf: url),
+    let snapshot: Snapshot
+    if let data = try? handle.readToEnd(),
       let manifest = try? JSONDecoder().decode(ArtifactManifest.self, from: data),
       manifest.version == Self.supportedManifestVersion
-    else {
-      cachedManifest = nil
-      cachedStamp = nil
-      return nil
+    {
+      snapshot = Snapshot(manifest: manifest, anchor: stamp.anchor)
+    } else {
+      // Preserve the mirror's existing absent-index behavior for unreadable,
+      // malformed, or unsupported derived data; the empty anchor is non-nil.
+      snapshot = .empty
     }
-    cachedManifest = manifest
+    cachedSnapshot = snapshot
     cachedStamp = stamp
-    return manifest
+    return snapshot
+  }
+
+  func manifest() -> ArtifactManifest? {
+    snapshot().manifest
   }
 
   func session(id: String) -> ArtifactManifest.Session? {
@@ -552,7 +611,7 @@ final class ArtifactMirror: @unchecked Sendable {
   /** The bytes a manifest entry addresses, or nil when they are not on disk. */
   func fileURL(sessionId: String, fileId: String) -> URL? {
     guard ArtifactPath.isSafePath(sessionId: sessionId, fileId: fileId),
-      let root = Self.rootURL()
+      let root
     else {
       return nil
     }
@@ -566,12 +625,12 @@ final class ArtifactMirror: @unchecked Sendable {
   }
 
   /** What one enumerated container holds, in the manifest's own order. */
-  func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {
+  func items(in container: ArtifactItemIdentifier, snapshot: Snapshot) -> [ArtifactItem] {
     switch container {
     case .root:
-      return (manifest()?.sessions ?? []).map { ArtifactItem(session: $0) }
+      return (snapshot.manifest?.sessions ?? []).map { ArtifactItem(session: $0) }
     case .session(let sessionId):
-      guard let session = session(id: sessionId) else {
+      guard let session = snapshot.manifest?.sessions.first(where: { $0.id == sessionId }) else {
         return []
       }
       // Names are sanitized and deduplicated here, so the item the
@@ -621,21 +680,18 @@ final class ArtifactMirror: @unchecked Sendable {
     return container.appendingPathComponent(directoryName, isDirectory: true)
   }
 
-  private static func manifestURL() -> URL? {
-    rootURL()?.appendingPathComponent(manifestFileName, isDirectory: false)
-  }
-
-  /**
-   The stamp of the manifest file, or nil when it cannot be read — including
-   when it is not there, which is the signed-out and first-run case.
-   */
-  private static func stamp(of url: URL) -> ManifestStamp? {
-    guard
-      let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-    else {
+  /** Metadata and bytes share this descriptor even when the app renames a new index into place. */
+  private static func stamp(of handle: FileHandle) -> ManifestStamp? {
+    var metadata = stat()
+    guard fstat(handle.fileDescriptor, &metadata) == 0 else {
       return nil
     }
-    return ManifestStamp(modified: values.contentModificationDate, size: values.fileSize)
+    return ManifestStamp(
+      inode: metadata.st_ino,
+      modifiedSeconds: Int64(metadata.st_mtimespec.tv_sec),
+      modifiedNanoseconds: Int64(metadata.st_mtimespec.tv_nsec),
+      size: metadata.st_size
+    )
   }
 }
 

@@ -357,7 +357,7 @@ Before rendering, an operator must obtain and review all of the following:
    Record only the store ID and entry names in configuration. Never copy a
    production auth secret, share the two values, print values, or put them in the
    resource manifest. The first signs synthetic Kilo credentials; the second
-   signs only this staging deployment's one-minute sync grants.
+   signs only this staging deployment's five-minute sync grants.
 5. Confirm that `session-sync-staging` is a dedicated Worker identity, with no
    existing production deployment or production routes. Its SQLite namespace is
    created by the eventual separately authorized deployment's `v1` and `v2` migrations;

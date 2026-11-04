@@ -66,9 +66,10 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         </Text>
       </View>
       {/* The control box hugs its 16 pt glyph: a 44 dp box centred the glyph,
-          14 dp inside the card's padding, while the leading tile sat on that
-          padding and the card read lopsided. At 28 dp the glyph's outer edge
-          is 6 dp inside it, and 8 dp of hit slop keeps the 44 dp touch target. */}
+          14 dp inside the card's 10.5 dp padding, while the leading tile sat
+          on that padding and the card read lopsided. At 28 dp the glyph's
+          outer edge is 6 dp inside the card's 14 dp padding, and 8 dp of hit
+          slop keeps the 44 dp touch target. */}
       <Pressable
         onPress={() => {
           onPress(session);

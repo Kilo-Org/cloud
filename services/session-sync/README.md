@@ -128,6 +128,9 @@ Abort, commit, and cleanup operations can affect only their own attempt.
 Cleanup claims a bounded page before external I/O and retains unfinished deadlines through deletion.
 Failed uploads retain their reservation until cleanup finishes.
 
+The Worker declares its database and worker-utility workspace dependencies directly.
+It does not depend on the application-shared package.
+
 The initial storage policy is explicit:
 
 | Resource | Bound |

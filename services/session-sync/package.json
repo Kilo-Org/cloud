@@ -13,7 +13,6 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-sync/src services/session-sync/test services/session-sync/scripts"
   },
   "dependencies": {
-    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",

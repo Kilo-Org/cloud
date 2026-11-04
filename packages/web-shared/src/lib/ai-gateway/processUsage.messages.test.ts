@@ -572,7 +572,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
 
       expect(captureException).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(
-        'Messages API stream error: JSON error injected into SSE stream',
+        'Messages API stream error',
         expect.objectContaining({
           source: 'messages_sse_processing',
           error_type: 'provider_unavailable',
@@ -588,7 +588,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
 
       expect(warn).not.toHaveBeenCalled();
       expect(captureException).toHaveBeenCalledWith(
-        new Error('Messages API stream error: invalid x-api-key'),
+        new Error('Messages API stream error'),
         expect.objectContaining({ tags: { source: 'messages_sse_processing' } })
       );
     });
@@ -600,6 +600,108 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
 
       expect(captureException).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    test('excludes empty event payloads from Sentry extras', async () => {
+      const sensitive = 'synthetic prompt for alice@example.com';
+      const stream = streamFromText(`event: ${sensitive}\nid: ${sensitive}\ndata: null\n\n`);
+
+      await parseMessagesMicrodollarUsageFromStream(
+        stream,
+        'opaque-user-id',
+        undefined,
+        'openrouter',
+        200,
+        false
+      );
+
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('SUSPICIOUS: No JSON in SSE event'),
+        expect.objectContaining({
+          extra: {
+            kiloUserId: 'opaque-user-id',
+            provider: 'openrouter',
+            api_kind: 'messages',
+            messageId: null,
+            model: null,
+          },
+        })
+      );
+      expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(sensitive);
+    });
+
+    test('excludes upstream message and event payloads from Sentry', async () => {
+      const sensitive = 'synthetic prompt for alice@example.com';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const messageStart = {
+        type: 'message_start',
+        message: { id: 'msg_1', model: 'test-model', usage: { input_tokens: 1, output_tokens: 1 } },
+      };
+      const stream = streamFromText(
+        `data: ${JSON.stringify(messageStart)}\n\n` +
+          `event: ${sensitive}\nid: ${sensitive}\ndata: ${JSON.stringify({
+            type: 'error',
+            error: { type: 'authentication_error', message: sensitive },
+          })}\n\n`
+      );
+
+      await parseMessagesMicrodollarUsageFromStream(
+        stream,
+        'opaque-user-id',
+        undefined,
+        'openrouter',
+        200,
+        false
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Messages API stream error'),
+        expect.objectContaining({
+          tags: { source: 'messages_sse_processing' },
+          extra: expect.objectContaining({
+            kiloUserId: 'opaque-user-id',
+            provider: 'openrouter',
+            api_kind: 'messages',
+            messageId: 'msg_1',
+            model: 'test-model',
+            type: 'authentication_error',
+          }),
+        })
+      );
+      expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(sensitive);
+    });
+
+    test('excludes upstream message and event payloads from console logs', async () => {
+      const sensitive = 'synthetic prompt for alice@example.com';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const stream = streamFromText(
+        `event: ${sensitive}\nid: ${sensitive}\ndata: ${JSON.stringify({
+          type: 'error',
+          error: { type: 'authentication_error', message: sensitive },
+        })}\n\n`
+      );
+
+      await parseMessagesMicrodollarUsageFromStream(
+        stream,
+        'opaque-user-id',
+        undefined,
+        'openrouter',
+        200,
+        true
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Messages API stream error',
+        expect.objectContaining({
+          source: 'messages_sse_processing',
+          type: 'authentication_error',
+          error_type: 'authentication_error',
+          provider: 'openrouter',
+        })
+      );
+      expect(JSON.stringify(jest.mocked(warn).mock.calls)).not.toContain(sensitive);
     });
   });
 });

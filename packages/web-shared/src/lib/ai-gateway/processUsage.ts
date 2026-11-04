@@ -103,6 +103,7 @@ import {
   readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { usageContextSentryExtra } from '@kilocode/web-shared/lib/ai-gateway/usage-context-sentry';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
@@ -146,7 +147,7 @@ export function extractPromptInfo(body: OpenRouterChatCompletionRequest): Prompt
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
-      extra: { body },
+      extra: { errorType: e instanceof Error ? e.name : typeof e, api_kind: 'chat_completions' },
     });
     return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
   }
@@ -1357,7 +1358,7 @@ export async function parseMicrodollarUsageFromStream(
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
+        extra: { kiloUserId, provider, api_kind: 'chat_completions', messageId, model },
       });
       return;
     }
@@ -1383,7 +1384,7 @@ export async function parseMicrodollarUsageFromStream(
           messageId: json.id ?? messageId,
           model: json.model ?? model,
         },
-        sentryExtra: { json, event },
+        sentryExtra: { kiloUserId, provider, api_kind: 'chat_completions' },
       });
     }
 
@@ -1463,7 +1464,14 @@ export function parseMicrodollarUsageFromString(
   ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
-      extra: { responseJson },
+      extra: {
+        kiloUserId,
+        provider,
+        api_kind: 'chat_completions',
+        status_code: statusCode,
+        messageId: responseJson.id,
+        model: responseJson.model,
+      },
     });
   }
   const finish_reason = choice?.finish_reason ?? null;
@@ -1509,7 +1517,7 @@ export async function processTokenData(
     captureMessage('SUSPICIOUS: No usage information', {
       level: 'error',
       tags: { source: 'usage_processing' },
-      extra: { usageContext },
+      extra: usageContextSentryExtra(usageContext),
     });
     return null;
   }

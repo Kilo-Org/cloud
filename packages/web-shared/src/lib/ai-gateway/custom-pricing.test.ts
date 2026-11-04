@@ -132,19 +132,20 @@ describe('custom model pricing', () => {
     const captureMessageMock = jest.mocked(captureMessage);
     captureMessageMock.mockClear();
 
-    const cost_mUsd = calculateCustomCost_mUsd(
-      config,
-      'google/gemini-3.8-flash',
-      makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
-    );
+    const usage = {
+      ...makeUsage({ inputTokens: 10, cacheHitTokens: 20 }),
+      responseContent: 'private generated text',
+    };
+    const cost_mUsd = calculateCustomCost_mUsd(config, 'google/gemini-3.8-flash', usage);
 
     expect(cost_mUsd).toBe(Math.round(20 * 0.075));
     expect(captureMessageMock).toHaveBeenCalledWith(
       'SUSPICIOUS: negative uncached input tokens for custom pricing',
-      expect.objectContaining({
+      {
         level: 'error',
-        extra: expect.objectContaining({ model: 'google/gemini-3.8-flash' }),
-      })
+        tags: { source: 'usage_processing' },
+        extra: { model: 'google/gemini-3.8-flash' },
+      }
     );
   });
 

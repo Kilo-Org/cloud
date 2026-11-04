@@ -79,7 +79,7 @@ export function computeOpenRouterCosts(
  */
 export function computeOpenRouterCostFields(
   usage: OpenRouterCostFields,
-  coreProps: NotYetCostedUsageStats,
+  coreProps: NotYetCostedUsageStats & { kiloUserId?: string },
   source: string,
   requireIsByok: boolean,
   provider: ProviderType
@@ -96,12 +96,15 @@ export function computeOpenRouterCostFields(
     // Without the upstream cost, a BYOK request bills no inference at all.
     (is_byok && openrouterCost_USD > 0 && usage.cost_details?.upstream_inference_cost == null)
   ) {
-    const { responseContent: _ignore, ...corePropsCopy } = coreProps;
     captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {
       level: 'error',
       tags: { source },
       extra: {
-        ...corePropsCopy,
+        ...(coreProps.kiloUserId === undefined ? {} : { kiloUserId: coreProps.kiloUserId }),
+        messageId: coreProps.messageId,
+        model: coreProps.model,
+        upstream_id: coreProps.upstream_id,
+        status_code: coreProps.status_code,
         provider,
         cost_mUsd,
         nonInferenceCost_mUsd,
@@ -283,6 +286,22 @@ function isAccountError(error: UpstreamStreamError): boolean {
   );
 }
 
+function safeErrorClassificationValue(value: unknown): string | number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  return typeof value === 'string' && /^[a-zA-Z0-9_.-]{1,64}$/.test(value) ? value : undefined;
+}
+
+function getSafeErrorClassification(error: UpstreamStreamError): Record<string, string | number> {
+  const fields: Record<string, string | number> = {};
+  const code = safeErrorClassificationValue(error.code);
+  const type = safeErrorClassificationValue(error.type);
+  const errorType = safeErrorClassificationValue(error.error_type ?? error.metadata?.error_type);
+  if (code !== undefined) fields.code = code;
+  if (type !== undefined) fields.type = type;
+  if (errorType !== undefined) fields.error_type = errorType;
+  return fields;
+}
+
 /**
  * Reports an error event received inside an upstream SSE stream. Transient
  * upstream failures (timeouts, overloads, dropped streams) are only logged, since
@@ -301,15 +320,18 @@ export function reportUpstreamStreamError(params: {
   sentryExtra: Record<string, unknown>;
 }) {
   const { label, source, error, usesUserCredentials, logContext, sentryExtra } = params;
-  const message = `${label}: ${error.message ?? 'unknown'}`;
+  const errorClassification = getSafeErrorClassification(error);
   if (!usesUserCredentials && isAccountError(error)) {
-    captureException(new Error(message), { tags: { source }, extra: sentryExtra });
+    captureException(new Error(label), {
+      tags: { source },
+      extra: { ...sentryExtra, ...errorClassification },
+    });
     return;
   }
-  console.warn(message, {
+  console.warn(label, {
     source,
-    code: error.code,
-    error_type: error.error_type ?? error.metadata?.error_type ?? error.type,
+    ...errorClassification,
+    error_type: errorClassification.error_type ?? errorClassification.type,
     uses_user_credentials: usesUserCredentials,
     ...logContext,
   });
@@ -392,7 +414,9 @@ export async function drainSseStream(
       sseStreamParser.feed(text);
     }
   } catch (error) {
-    errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
+    const errorType =
+      error instanceof Error ? (safeErrorClassificationValue(error.name) ?? 'Error') : typeof error;
+    errorExceptInTest('[processUsage] treating stream processing error as aborted', { errorType });
     wasAborted = true;
   } finally {
     reader.releaseLock();

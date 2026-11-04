@@ -130,7 +130,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
     if (!json) {
       captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: { event },
+        extra: { kiloUserId, provider, api_kind: 'responses', messageId, model },
       });
       return;
     }
@@ -146,7 +146,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
         error: json.error,
         usesUserCredentials,
         logContext: { provider, inference_provider, messageId, model },
-        sentryExtra: { json, event },
+        sentryExtra: { kiloUserId, provider, api_kind: 'responses', messageId, model },
       });
     }
 

@@ -4,6 +4,7 @@ import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUs
 import type { GatewayRequest, VercelProviderConfig } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
+import { usageContextSentryExtra } from './usage-context-sentry';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -72,6 +73,45 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
+
+describe('missing usage diagnostics', () => {
+  it.each([
+    ['fim_completions', countAndStoreFimUsage, 'No FIM', 'fim_usage_processing'],
+    ['edit_completions', countAndStoreEditUsage, 'No edit', 'edit_usage_processing'],
+    ['embeddings', countAndStoreEmbeddingUsage, 'No embedding', 'embedding_usage_processing'],
+    [
+      'audio_transcriptions',
+      countAndStoreTranscriptionUsage,
+      'No transcription',
+      'transcription_usage_processing',
+    ],
+  ] as const)(
+    'uses the shared identifier allowlist for %s',
+    async (api_kind, countUsage, label, source) => {
+      jest.mocked(captureMessage).mockClear();
+      const context = {
+        ...createMockUsageContext('user-1', 'synthetic@example.com', 0),
+        api_kind,
+        usageId: 'usage-1',
+        organizationId: 'org-1',
+        promptInfo: {
+          system_prompt_prefix: 'private organization prompt',
+          system_prompt_length: 27,
+          user_prompt_prefix: 'private user prompt',
+        },
+      };
+
+      countUsage(new Response(null), context, undefined);
+      await waitForUsageWrite();
+
+      expect(captureMessage).toHaveBeenCalledWith(`SUSPICIOUS: ${label} usage information`, {
+        level: 'error',
+        tags: { source },
+        extra: usageContextSentryExtra(context),
+      });
+    }
+  );
+});
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -644,14 +684,14 @@ describe('countAndStoreFimUsage', () => {
 
   it('reports a malformed successful response instead of rejecting', async () => {
     jest.mocked(captureException).mockClear();
-    const response = new Response('not JSON');
+    const response = new Response('private response for synthetic@example.com');
 
     countAndStoreFimUsage(response, makeUsageContext(), undefined);
     await waitForUsageWrite();
 
-    expect(captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
+    expect(captureException).toHaveBeenCalledWith(new Error('FIM usage processing failed'), {
       tags: { source: 'fim_usage_processing' },
-      extra: { statusCode: 200 },
+      extra: { ...usageContextSentryExtra(makeUsageContext()), errorType: 'SyntaxError' },
     });
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
@@ -1372,8 +1412,8 @@ describe('captureProxyError', () => {
       expect(await capturedErrorData()).toMatchObject({
         status,
         model: 'vendor/model',
-        first4kOfResponse: '{"error":"upstream unavailable"}',
       });
+      expect(await capturedErrorData()).not.toHaveProperty('first4kOfResponse');
       expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
         `openrouter returned error ${status}`,
         expect.anything()
@@ -1397,7 +1437,7 @@ describe('captureProxyError', () => {
           { role: 'assistant', content: 'hi', reasoning: 'secret thoughts' },
         ],
       },
-      response: new Response('{"error":"unknown field"}', {
+      response: new Response('{"error":"unknown field","prompt":"secret echoed prompt"}', {
         status: 400,
         statusText: 'Bad Request',
         headers: { 'content-type': 'application/json' },
@@ -1416,9 +1456,37 @@ describe('captureProxyError', () => {
       byokProviderIds: 'opencode-go',
       requestFields: 'messages,model,reasoning',
       messageFields: 'content,reasoning,role',
-      first4kOfResponse: '{"error":"unknown field"}',
     });
+    expect(data).not.toHaveProperty('first4kOfResponse');
     expect(JSON.stringify(data)).not.toContain('secret');
+  });
+
+  it('keeps echoed request content out of Sentry and console diagnostics', async () => {
+    const response = Response.json(
+      { error: 'private prompt for synthetic@example.com from 192.0.2.1' },
+      { status: 400 }
+    );
+    await captureProxyError({
+      errorMessage: 'openrouter returned error 400',
+      user: { id: 'user-1' },
+      request: { messages: [{ role: 'user', content: 'private prompt' }] },
+      response,
+      organizationId: 'org-1',
+      model: 'vendor/model',
+      trackInSentry: true,
+    });
+
+    const extra = await capturedErrorData();
+    expect(captureMessage).toHaveBeenCalledWith('openrouter returned error 400', {
+      level: 'error',
+      extra,
+      tags: { source: 'openrouter-proxy' },
+      user: { id: 'user-1' },
+    });
+    for (const value of ['private prompt', 'synthetic@example.com', '192.0.2.1']) {
+      expect(JSON.stringify(extra)).not.toContain(value);
+    }
+    expect(response.bodyUsed).toBe(false);
   });
 
   it('omits optional fields that add no information', async () => {

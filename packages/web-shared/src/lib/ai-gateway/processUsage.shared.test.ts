@@ -1,5 +1,6 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   drainSseStream,
   readResponseText,
@@ -12,6 +13,11 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
   captureMessage: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/utils.server'),
+  errorExceptInTest: jest.fn(),
 }));
 
 const span = { end: () => {} } as Span;
@@ -82,6 +88,25 @@ describe('drainSseStream', () => {
     );
 
     expect(result.timing).toEqual({ latency: null, generation_time: 50 });
+  });
+
+  test('logs only the stream error type when event processing fails', async () => {
+    const sensitive = 'synthetic prompt for alice@example.com';
+    jest.mocked(errorExceptInTest).mockClear();
+
+    const result = await drainSseStream(
+      bodyArrivingAt([[100, `data: {"prompt":"${sensitive}", broken}\n\n`]]),
+      event => JSON.parse(event.data),
+      span,
+      0
+    );
+
+    expect(result.wasAborted).toBe(true);
+    expect(errorExceptInTest).toHaveBeenCalledWith(
+      '[processUsage] treating stream processing error as aborted',
+      { errorType: 'SyntaxError' }
+    );
+    expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toContain(sensitive);
   });
 });
 
@@ -270,6 +295,48 @@ describe('selectUsageCostFields', () => {
       expected: { cost_mUsd: 0, is_byok: null },
     },
   ];
+
+  test('limits suspicious accounting diagnostics to safe fields', () => {
+    const sensitive = 'synthetic prompt for alice@example.com';
+    jest.mocked(captureMessage).mockClear();
+    const unsafeCoreProps = {
+      ...coreProps,
+      kiloUserId: 'opaque-user-id',
+      email: sensitive,
+      prompt: sensitive,
+    };
+
+    selectUsageCostFields(
+      { cost: 0.0005, is_byok: true, cost_details: { upstream_inference_cost: 0.02 } },
+      null,
+      unsafeCoreProps,
+      'test_source',
+      'openrouter'
+    );
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+      {
+        level: 'error',
+        tags: { source: 'test_source' },
+        extra: {
+          kiloUserId: 'opaque-user-id',
+          messageId: 'test-message-id',
+          model: 'test-model',
+          upstream_id: null,
+          status_code: 200,
+          provider: 'openrouter',
+          cost_mUsd: 20_000,
+          nonInferenceCost_mUsd: 0,
+          is_byok: true,
+          openrouterCost_USD: 0.0005,
+          upstream_inference_cost_USD: 0.02,
+          fee_USD: 0.001,
+        },
+      }
+    );
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(sensitive);
+  });
 
   test.each(cases)(
     '$name',

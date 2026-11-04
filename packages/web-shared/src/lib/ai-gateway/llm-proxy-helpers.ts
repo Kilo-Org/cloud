@@ -7,6 +7,7 @@ import {
   processTokenData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
+import { usageContextSentryExtra } from '@kilocode/web-shared/lib/ai-gateway/usage-context-sentry';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
@@ -485,8 +486,6 @@ export async function makeErrorReadable({
     const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
       if (specificByokMessage !== undefined) {
-        // Log only the fixed text so this line stays stable to search on;
-        // captureProxyError already logs the upstream body.
         warnExceptInTest(`Responding with ${response.status} ${specificByokMessage}`);
       }
       return NextResponse.json(
@@ -796,13 +795,6 @@ export async function captureProxyError(params: {
         ...(organizationId && { organizationId }),
         ...describeRequestFields(request),
       };
-
-      const clonedReponse = response.clone();
-      try {
-        extraErrorData.first4kOfResponse = (await clonedReponse.text()).slice(0, 4096);
-      } catch {
-        // ignore errors when already handling errors...
-      }
 
       errorExceptInTest(errorMessage, extraErrorData);
       if (trackInSentry) {
@@ -1152,7 +1144,7 @@ async function parseMistralFimUsageFromStream(
           error: json.error,
           usesUserCredentials,
           logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
-          sentryExtra: { json, event },
+          sentryExtra: { provider, api_kind: 'fim_completions' },
         });
       }
 
@@ -1168,9 +1160,14 @@ async function parseMistralFimUsageFromStream(
     } catch (e) {
       reportedError = true;
       if (statusCode < 400) {
-        captureException(e, {
+        captureException(new Error('FIM stream parsing failed'), {
           tags: { source: 'fim_sse_parsing' },
-          extra: { eventData: event.data },
+          extra: {
+            provider,
+            api_kind: 'fim_completions',
+            status_code: statusCode,
+            errorType: e instanceof Error ? e.name : typeof e,
+          },
         });
       }
     }
@@ -1243,9 +1240,12 @@ export function countAndStoreFimUsage(
           }))
           .catch(error => {
             if (statusCode < 400) {
-              captureException(error, {
+              captureException(new Error('FIM usage processing failed'), {
                 tags: { source: 'fim_usage_processing' },
-                extra: { statusCode },
+                extra: {
+                  ...usageContextSentryExtra(usageContext),
+                  errorType: error instanceof Error ? error.name : typeof error,
+                },
               });
             }
             return null;
@@ -1258,7 +1258,7 @@ export function countAndStoreFimUsage(
           captureMessage('SUSPICIOUS: No FIM usage information', {
             level: 'error',
             tags: { source: 'fim_usage_processing' },
-            extra: { usageContext },
+            extra: usageContextSentryExtra(usageContext),
           });
         }
         return;
@@ -1385,9 +1385,12 @@ export function countAndStoreEditUsage(
         }))
         .catch(error => {
           if (statusCode < 400) {
-            captureException(error, {
+            captureException(new Error('Edit usage processing failed'), {
               tags: { source: 'edit_usage_processing' },
-              extra: { statusCode },
+              extra: {
+                ...usageContextSentryExtra(usageContext),
+                errorType: error instanceof Error ? error.name : typeof error,
+              },
             });
           }
           return null;
@@ -1401,7 +1404,7 @@ export function countAndStoreEditUsage(
           captureMessage('SUSPICIOUS: No edit usage information', {
             level: 'error',
             tags: { source: 'edit_usage_processing' },
-            extra: { usageContext },
+            extra: usageContextSentryExtra(usageContext),
           });
         }
         return;
@@ -1622,7 +1625,7 @@ export function countAndStoreEmbeddingUsage(
           captureMessage('SUSPICIOUS: No embedding usage information', {
             level: 'error',
             tags: { source: 'embedding_usage_processing' },
-            extra: { usageContext },
+            extra: usageContextSentryExtra(usageContext),
           });
         }
         return;
@@ -1671,7 +1674,7 @@ export function countAndStoreTranscriptionUsage(
           captureMessage('SUSPICIOUS: No transcription usage information', {
             level: 'error',
             tags: { source: 'transcription_usage_processing' },
-            extra: { usageContext },
+            extra: usageContextSentryExtra(usageContext),
           });
         }
         return;

@@ -29,6 +29,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   defineMicrodollarUsage,
   insertUsageWithOverrides,
+  createMockUsageContext,
 } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
@@ -68,6 +69,7 @@ import {
   OPENROUTER,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { createUserVercelAiGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { usageContextSentryExtra } from './usage-context-sentry';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -581,7 +583,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         },
       ]);
 
-      expect(console.warn).toHaveBeenCalledWith(`OpenRouter error: ${error.message}`, {
+      expect(console.warn).toHaveBeenCalledWith('OpenRouter error', {
         source: 'sse_processing',
         code: error.code,
         error_type: error.metadata?.error_type,
@@ -613,13 +615,16 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
       expect(console.warn).not.toHaveBeenCalled();
       expect(captureException).toHaveBeenCalledTimes(1);
-      expect(captureException).toHaveBeenCalledWith(
-        new Error(`OpenRouter error: ${error.message}`),
-        {
-          tags: { source: 'sse_processing' },
-          extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
-        }
-      );
+      expect(captureException).toHaveBeenCalledWith(new Error('OpenRouter error'), {
+        tags: { source: 'sse_processing' },
+        extra: {
+          kiloUserId: 'fake-user-id',
+          provider: 'openrouter',
+          api_kind: 'chat_completions',
+          code: error.code,
+          ...(error.metadata ? { error_type: error.metadata.error_type } : {}),
+        },
+      });
     });
 
     test('only logs account errors on user credentials', async () => {
@@ -627,7 +632,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
       expect(captureException).not.toHaveBeenCalled();
       expect(console.warn).toHaveBeenCalledWith(
-        'OpenRouter error: Invalid API key',
+        'OpenRouter error',
         expect.objectContaining({ code: 401, uses_user_credentials: true })
       );
     });
@@ -650,7 +655,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
       expect(console.warn).toHaveBeenCalledTimes(2);
       expect(console.warn).toHaveBeenLastCalledWith(
-        'OpenRouter error: Upstream idle timeout exceeded',
+        'OpenRouter error',
         expect.objectContaining({ messageId: 'gen-partial', model: 'test-model', code: 504 })
       );
       expect(captureException).not.toHaveBeenCalled();
@@ -763,6 +768,22 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
 const sampleReqDir = join(process.cwd(), 'src/tests/req_sample');
 describe('extractPromptInfo approval tests', () => {
+  test('reports prompt extraction failures without the request body', () => {
+    jest.mocked(captureException).mockClear();
+    const body = { messages: 'private prompt for synthetic@example.com' };
+
+    expect(extractPromptInfo(body as never)).toEqual({
+      system_prompt_prefix: '',
+      system_prompt_length: -1,
+      user_prompt_prefix: '',
+    });
+    expect(captureException).toHaveBeenCalledWith(expect.any(TypeError), {
+      level: 'warning',
+      tags: { source: 'prompt_extraction' },
+      extra: { errorType: 'TypeError', api_kind: 'chat_completions' },
+    });
+  });
+
   const anthropicFile = 'anthropic-claude37.log.req.json';
   test(anthropicFile, async () => {
     const inputFile = join(sampleReqDir, anthropicFile);
@@ -791,6 +812,18 @@ describe('extractPromptInfo approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.extractPromptInfo.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+test('reports missing token usage with identifier-only context', async () => {
+  jest.mocked(captureMessage).mockClear();
+  const context = createMockUsageContext('user-1', 'synthetic@example.com', 0);
+
+  expect(await processTokenData(null, context)).toBeNull();
+  expect(captureMessage).toHaveBeenCalledWith('SUSPICIOUS: No usage information', {
+    level: 'error',
+    tags: { source: 'usage_processing' },
+    extra: usageContextSentryExtra(context),
   });
 });
 
@@ -2195,7 +2228,7 @@ describe('logMicrodollarUsage', () => {
           undefined
         );
 
-        const authError = new Error('Responses API error: Incorrect API key provided');
+        const authError = new Error('Responses API error');
         const authErrorContext = expect.objectContaining({
           tags: { source: 'responses_sse_processing' },
         });
@@ -2204,7 +2237,7 @@ describe('logMicrodollarUsage', () => {
         } else {
           expect(captureException).not.toHaveBeenCalledWith(authError, authErrorContext);
           expect(warn).toHaveBeenCalledWith(
-            'Responses API error: Incorrect API key provided',
+            'Responses API error',
             expect.objectContaining({ uses_user_credentials: true })
           );
         }

@@ -1,4 +1,5 @@
-import { test, describe, expect } from '@jest/globals';
+import { test, describe, expect, afterEach } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import {
   extractResponsesPromptInfo,
   parseResponsesMicrodollarUsageFromStream,
@@ -12,7 +13,21 @@ import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import type { GatewayResponsesRequest } from './providers/openrouter/types';
 
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
+
 const sampleDir = join(process.cwd(), 'src/tests/sample');
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+}
 
 describe('extractResponsesPromptInfo', () => {
   test('extracts system and developer input messages', () => {
@@ -398,6 +413,122 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.responseContent).toBe('Hello world');
     expect(result.hasError).toBe(true);
+  });
+});
+
+describe('Responses API upstream error reporting', () => {
+  afterEach(() => {
+    jest.mocked(captureException).mockClear();
+    jest.restoreAllMocks();
+  });
+
+  test('excludes empty event payloads from Sentry extras', async () => {
+    const sensitive = 'synthetic prompt for alice@example.com';
+    const stream = streamFromText(`event: ${sensitive}\nid: ${sensitive}\ndata: null\n\n`);
+
+    await parseResponsesMicrodollarUsageFromStream(
+      stream,
+      'opaque-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('SUSPICIOUS: No JSON in SSE event'),
+      expect.objectContaining({
+        extra: {
+          kiloUserId: 'opaque-user-id',
+          provider: 'openrouter',
+          api_kind: 'responses',
+          messageId: null,
+          model: null,
+        },
+      })
+    );
+    expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(sensitive);
+  });
+
+  test('excludes upstream message and event payloads from Sentry', async () => {
+    const sensitive = 'synthetic prompt for alice@example.com';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const responseCreated = {
+      type: 'response.created',
+      response: {
+        id: 'resp_1',
+        model: 'test-model',
+        status: 'in_progress',
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+      },
+    };
+    const stream = streamFromText(
+      `data: ${JSON.stringify(responseCreated)}\n\n` +
+        `event: ${sensitive}\nid: ${sensitive}\ndata: ${JSON.stringify({
+          type: 'error',
+          error: { code: '401', type: 'authentication_error', message: sensitive },
+        })}\n\n`
+    );
+
+    await parseResponsesMicrodollarUsageFromStream(
+      stream,
+      'opaque-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Responses API error'),
+      expect.objectContaining({
+        tags: { source: 'responses_sse_processing' },
+        extra: expect.objectContaining({
+          kiloUserId: 'opaque-user-id',
+          provider: 'openrouter',
+          api_kind: 'responses',
+          messageId: 'resp_1',
+          model: 'test-model',
+          code: '401',
+          type: 'authentication_error',
+        }),
+      })
+    );
+    expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(sensitive);
+  });
+
+  test('excludes upstream message and event payloads from console logs', async () => {
+    const sensitive = 'synthetic prompt for alice@example.com';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const stream = streamFromText(
+      `event: ${sensitive}\nid: ${sensitive}\ndata: ${JSON.stringify({
+        type: 'error',
+        error: { code: '401', type: 'authentication_error', message: sensitive },
+      })}\n\n`
+    );
+
+    await parseResponsesMicrodollarUsageFromStream(
+      stream,
+      'opaque-user-id',
+      undefined,
+      'openrouter',
+      200,
+      true
+    );
+
+    expect(captureException).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      'Responses API error',
+      expect.objectContaining({
+        source: 'responses_sse_processing',
+        code: '401',
+        type: 'authentication_error',
+        error_type: 'authentication_error',
+        provider: 'openrouter',
+      })
+    );
+    expect(JSON.stringify(jest.mocked(warn).mock.calls)).not.toContain(sensitive);
   });
 });
 

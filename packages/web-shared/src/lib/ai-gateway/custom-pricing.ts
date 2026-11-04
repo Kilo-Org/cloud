@@ -118,7 +118,7 @@ export function calculateTieredCost_mUsd(
     captureMessage('SUSPICIOUS: negative uncached input tokens for custom pricing', {
       level: 'error',
       tags: { source: 'usage_processing' },
-      extra: { model: modelId, usage },
+      extra: { model: modelId },
     });
   }
 

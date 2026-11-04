@@ -433,7 +433,10 @@ repository.
     learns its own session id from the `cloud-agent-context` line in its turns.
     A `workspace:new-chat` callback starts the new chat with the child result as
     its first message, and every workspace callback MUST be idempotent for the
-    persisted callback message ID.
+    persisted callback message ID. A child completion callback MUST render as a
+    distinct child session message that identifies the child session, shows its
+    reported result or failure, and links to that session. It MUST NOT render
+    the serialized callback envelope as the user's message.
 
 ### Watch PR (Observation-Only Pilot)
 

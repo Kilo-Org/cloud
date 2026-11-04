@@ -16,6 +16,7 @@
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
+    "./cloud-agent-child-callback": "./src/cloud-agent-child-callback.ts",
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",

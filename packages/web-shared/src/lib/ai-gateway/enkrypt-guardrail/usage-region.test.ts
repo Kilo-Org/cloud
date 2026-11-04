@@ -94,9 +94,11 @@ describe('recordEnkryptUsage region routing', () => {
       'content-type': 'application/json',
       'x-internal-api-key': 'test-internal-secret',
     });
+    expect(JSON.parse(String(init?.body))).not.toHaveProperty('guardrail');
     const body = EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body)));
     expect(body).toEqual({
       ...usageRecord,
+      guardrail: 'input',
       id: expect.any(String),
       occurredAt: expect.any(String),
     });

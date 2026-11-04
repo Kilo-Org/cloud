@@ -81,7 +81,8 @@ export function invalidPathResponse() {
     {
       error: 'Invalid path',
       error_type: ProxyErrorType.invalid_path,
-      message: 'This endpoint only accepts the path `/chat/completions`.',
+      message:
+        'This endpoint only accepts the paths `/chat/completions`, `/responses` and `/messages`.',
     },
     { status: 400 }
   );

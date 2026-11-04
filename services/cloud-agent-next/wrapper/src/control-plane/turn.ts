@@ -627,6 +627,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             : { variant: pending.payload.agent.variant }),
           ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
+          ...(pending.payload.context === undefined ? {} : { context: pending.payload.context }),
           ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
         });
       } else if (pending.payload.turn.command === 'compact') {

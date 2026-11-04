@@ -26,8 +26,9 @@ async function mintCode(email = testEmail, forExportId = exportId) {
   return created;
 }
 
-function wrongCodeFor(code: string): string {
-  const shifted = (Number(code) + 1) % 10 ** DOWNLOAD_CODE_LENGTH;
+/** A code `offset` away from `code`. */
+function wrongCodeFor(code: string, offset: number): string {
+  const shifted = (Number(code) + offset) % 10 ** DOWNLOAD_CODE_LENGTH;
   return String(shifted).padStart(DOWNLOAD_CODE_LENGTH, '0');
 }
 
@@ -81,7 +82,7 @@ describe('data export download codes', () => {
 
   it('spends the attempt budget on wrong codes and then locks the challenge', async () => {
     const { code, challengeId } = await mintCode();
-    const wrong = wrongCodeFor(code);
+    const wrong = wrongCodeFor(code, 1);
 
     for (let attempt = 0; attempt < __test__.CODE_MAX_ATTEMPTS; attempt++) {
       await expect(
@@ -92,6 +93,39 @@ describe('data export download codes', () => {
     // The budget is exhausted, so even the correct code is refused.
     await expect(
       reserveDataExportDownloadCode(testEmail, exportId, code, challengeId)
+    ).resolves.toBe('too_many_attempts');
+  });
+
+  it('counts every wrong code for a challenge against its attempt budget', async () => {
+    const { code, challengeId } = await mintCode();
+    const batchSize = 20;
+
+    const results = await Promise.all(
+      Array.from({ length: batchSize }, (_, index) =>
+        reserveDataExportDownloadCode(
+          testEmail,
+          exportId,
+          wrongCodeFor(code, index + 1),
+          challengeId
+        )
+      )
+    );
+
+    // The budget covers every comparison made against this challenge.
+    expect(results.filter(result => result === 'invalid')).toHaveLength(__test__.CODE_MAX_ATTEMPTS);
+    expect(results.filter(result => result === 'too_many_attempts')).toHaveLength(
+      batchSize - __test__.CODE_MAX_ATTEMPTS
+    );
+    expect(results).not.toContain('ok');
+
+    const [row] = await db
+      .select({ attempts: magic_link_tokens.attempts })
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(row.attempts).toBe(__test__.CODE_MAX_ATTEMPTS);
+
+    await expect(
+      reserveDataExportDownloadCode(testEmail, exportId, wrongCodeFor(code, 1), challengeId)
     ).resolves.toBe('too_many_attempts');
   });
 
@@ -110,6 +144,13 @@ describe('data export download codes', () => {
     await expect(
       reserveDataExportDownloadCode(testEmail, exportId, code, challengeId)
     ).resolves.toBe('ok');
+
+    // A correct code spends no attempt, and neither does releasing its reservation.
+    const [row] = await db
+      .select({ attempts: magic_link_tokens.attempts })
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+    expect(row.attempts).toBe(0);
   });
 
   it('refuses an expired code', async () => {

@@ -816,150 +816,164 @@ export function NotificationsScreen() {
           )}
         </View>
 
-        {/* Categories */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('notifications.categories')}
-          </Text>
-          {preferencesLoading && (
-            <>
-              {visibleCategoryMeta.map(meta => (
-                <View
-                  key={meta.key}
-                  className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
-                >
-                  {/* The leading cell reserves the loaded CategoryRow's 30 dp
-                      tile frame, so the rows do not move when the preferences
-                      arrive. */}
-                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
+        {/* Everything below waits for the master gate. The gate's settled
+            height is only known once it settles: the Push row grows by its
+            description line and the Enable card mounts when push is off, which
+            is about 111 dp of content that would otherwise arrive after the
+            reader has already seen the sections below it (design gate
+            `layout-shift` on this screen). Holding them for the gate keeps the
+            first frame that can rest identical to the final one. */}
+        {gateSettled && (
+          <>
+            {/* Categories */}
+            <View className="gap-3">
+              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                {t('notifications.categories')}
+              </Text>
+              {preferencesLoading && (
+                <>
+                  {visibleCategoryMeta.map(meta => (
+                    <View
+                      key={meta.key}
+                      className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                    >
+                      {/* The leading cell reserves the loaded CategoryRow's
+                          30 dp tile frame, so the rows do not move when the
+                          preferences arrive. */}
+                      <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
+                      <View className="flex-1">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="mt-0.5 h-4 w-40" />
+                      </View>
+                      <Skeleton className="h-[31px] w-[51px] rounded-full" />
+                    </View>
+                  ))}
+                </>
+              )}
+              {preferencesError && (
+                <View className="rounded-lg bg-secondary p-3">
+                  <InlineRetry
+                    label={t('notifications.retryCategories')}
+                    color={colors.destructive}
+                    onPress={() => void refetchPreferences()}
+                  />
+                </View>
+              )}
+              {preferences && (
+                <>
+                  {visibleCategoryMeta.map(meta => (
+                    <CategoryRow
+                      key={meta.key}
+                      meta={meta}
+                      queryKey={preferencesQueryKey}
+                      queryClient={queryClient}
+                      preferences={preferences}
+                      capability={
+                        // The server type marks `capabilities` required, but a
+                        // backend that predates the field returns none. The guard
+                        // keeps the old response on the always-available path.
+                        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+                        preferences.capabilities?.[meta.key] ?? {
+                          available: true,
+                          unavailableReasonCode: null,
+                        }
+                      }
+                      disabled={!notificationsEnabled}
+                      isPending={pendingCategories.has(meta.key)}
+                      onChange={next => {
+                        handleCategoryChange(meta.key, next);
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+              <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+            </View>
+
+            {/* Message previews */}
+            <View className="gap-3">
+              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+                {t('notifications.messagePreviews')}
+              </Text>
+              {preferencesLoading && (
+                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
                   <View className="flex-1">
                     <Skeleton className="h-5 w-24" />
                     <Skeleton className="mt-0.5 h-4 w-40" />
                   </View>
                   <Skeleton className="h-[31px] w-[51px] rounded-full" />
                 </View>
-              ))}
-            </>
-          )}
-          {preferencesError && (
-            <View className="rounded-lg bg-secondary p-3">
-              <InlineRetry
-                label={t('notifications.retryCategories')}
-                color={colors.destructive}
-                onPress={() => void refetchPreferences()}
-              />
-            </View>
-          )}
-          {preferences && (
-            <>
-              {visibleCategoryMeta.map(meta => (
-                <CategoryRow
-                  key={meta.key}
-                  meta={meta}
-                  queryKey={preferencesQueryKey}
-                  queryClient={queryClient}
-                  preferences={preferences}
-                  capability={
-                    // The server type marks `capabilities` required, but a
-                    // backend that predates the field returns none. The guard
-                    // keeps the old response on the always-available path.
-                    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
-                    preferences.capabilities?.[meta.key] ?? {
-                      available: true,
-                      unavailableReasonCode: null,
-                    }
-                  }
-                  disabled={!notificationsEnabled}
-                  isPending={pendingCategories.has(meta.key)}
-                  onChange={next => {
-                    handleCategoryChange(meta.key, next);
-                  }}
-                />
-              ))}
-            </>
-          )}
-          <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
-        </View>
-
-        {/* Message previews */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('notifications.messagePreviews')}
-          </Text>
-          {preferencesLoading && (
-            <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-              <View className="flex-1">
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="mt-0.5 h-4 w-40" />
-              </View>
-              <Skeleton className="h-[31px] w-[51px] rounded-full" />
-            </View>
-          )}
-          {preferencesError && (
-            <View className="rounded-lg bg-secondary p-3">
-              <InlineRetry
-                label={t('notifications.retryPreviews')}
-                color={colors.destructive}
-                onPress={() => void refetchPreferences()}
-              />
-            </View>
-          )}
-          {preferences && (
-            <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-              <View className="flex-1">
-                <Text
-                  className={cn('text-sm font-medium', previewDisabled && 'text-muted-foreground')}
-                >
-                  {previewIsFull
-                    ? t('notifications.previewAlways')
-                    : t('notifications.previewWhenUnlocked')}
-                </Text>
-                <Text variant="muted" className="mt-0.5 text-xs">
-                  {previewIsFull
-                    ? t('notifications.previewFullDescription')
-                    : t('notifications.previewGenericDescription')}
-                </Text>
-              </View>
-              {isPreviewPending && (
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
               )}
-              {previewErrorCode !== undefined && !previewTerminal && (
+              {preferencesError && (
+                <View className="rounded-lg bg-secondary p-3">
+                  <InlineRetry
+                    label={t('notifications.retryPreviews')}
+                    color={colors.destructive}
+                    onPress={() => void refetchPreferences()}
+                  />
+                </View>
+              )}
+              {preferences && (
+                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+                  <View className="flex-1">
+                    <Text
+                      className={cn(
+                        'text-sm font-medium',
+                        previewDisabled && 'text-muted-foreground'
+                      )}
+                    >
+                      {previewIsFull
+                        ? t('notifications.previewAlways')
+                        : t('notifications.previewWhenUnlocked')}
+                    </Text>
+                    <Text variant="muted" className="mt-0.5 text-xs">
+                      {previewIsFull
+                        ? t('notifications.previewFullDescription')
+                        : t('notifications.previewGenericDescription')}
+                    </Text>
+                  </View>
+                  {isPreviewPending && (
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  )}
+                  {previewErrorCode !== undefined && !previewTerminal && (
+                    <InlineRetry
+                      label={t('notifications.retrySavingPreviews')}
+                      color={colors.destructive}
+                      onPress={() => {
+                        handlePreviewChange(previewIntent);
+                      }}
+                    />
+                  )}
+                  <Switch
+                    value={previewIsFull}
+                    disabled={previewDisabled}
+                    accessibilityLabel={t('notifications.showFullPreviews')}
+                    accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
+                    onValueChange={value => {
+                      if (previewDisabled) {
+                        return;
+                      }
+                      handlePreviewChange(value ? 'full' : 'generic');
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Device-token / pushTokens error retry block */}
+            {(deviceTokenError || pushTokensError) && !permissionError && (
+              <View className="rounded-lg bg-secondary p-3">
                 <InlineRetry
-                  label={t('notifications.retrySavingPreviews')}
+                  label={t('notifications.retryDeviceRegistration')}
                   color={colors.destructive}
                   onPress={() => {
-                    handlePreviewChange(previewIntent);
+                    void refetchDeviceToken();
+                    void refetchPushTokens();
                   }}
                 />
-              )}
-              <Switch
-                value={previewIsFull}
-                disabled={previewDisabled}
-                accessibilityLabel={t('notifications.showFullPreviews')}
-                accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
-                onValueChange={value => {
-                  if (previewDisabled) {
-                    return;
-                  }
-                  handlePreviewChange(value ? 'full' : 'generic');
-                }}
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Device-token / pushTokens error retry block */}
-        {(deviceTokenError || pushTokensError) && !permissionError && (
-          <View className="rounded-lg bg-secondary p-3">
-            <InlineRetry
-              label={t('notifications.retryDeviceRegistration')}
-              color={colors.destructive}
-              onPress={() => {
-                void refetchDeviceToken();
-                void refetchPushTokens();
-              }}
-            />
-          </View>
+              </View>
+            )}
+          </>
         )}
       </TabScreenScrollView>
     </View>

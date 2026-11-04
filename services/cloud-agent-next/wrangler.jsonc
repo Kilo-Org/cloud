@@ -73,7 +73,6 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
-    "CREDENTIAL_CONTAINMENT_ENABLED": "true",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
     "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",
@@ -324,11 +323,6 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  "kv_namespaces": [
-    {
-      "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-  ],
 
   /**
    * Queue Bindings
@@ -379,11 +373,6 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "SHARED_SANDBOX_OVERRIDES",
-        },
-      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
@@ -398,8 +387,6 @@
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
-        "PER_SESSION_SANDBOX_ORG_IDS": "*",
-        "CREDENTIAL_CONTAINMENT_ENABLED": "true",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",

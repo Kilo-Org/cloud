@@ -250,7 +250,7 @@ async function createSharedScope(
 ) {
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const creatorId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, creatorId);
+  const sandboxId = await generateSandboxId(creatorId);
   const provider = createProvider();
   const sandbox = await installSandbox(sandboxId, provider);
 

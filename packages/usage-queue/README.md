@@ -26,7 +26,7 @@ The external integration points are deliberately small:
 | Existing owner | Queue integration |
 |---|---|
 | Shared `usage-publisher.ts` | Import the package selector/publisher and delegate only on exact staging opt-in; existing Cloudflare code stays here |
-| Shared `config.server.ts` | OR the isolated selector into the existing queue-only choice; the package owns the selector logic |
+| Shared `processUsage.ts` | Select queued accounting with inline staging environment checks; the package selector chooses Vercel publication only |
 | Gateway `vercel.mjs` / `package.json` | Compose the queue deployment settings and run the queue prepare/test commands |
 | Gateway/shared manifests | Workspace dependency on this package; no direct Vercel SDK dependency |
 | Existing writer route/diagnostics/client | Recognize `queue_vercel` for caller correlation; no queue SDK dependency or persistence change |
@@ -47,9 +47,9 @@ deployments and compatible writer while they drain. If later work requires a
 selective cleanup instead, a cleanup PR can:
 
 1. Delete `packages/usage-queue` and `apps/ai-gateway/src/usage-queue`.
-2. Remove the package imports and delegation branch from shared `usage-publisher.ts`,
-   and remove the selector import/OR from `config.server.ts`. Their existing CF,
-   direct and production SFO behavior remains owned by those files.
+2. Remove the package imports and delegation branch from shared `usage-publisher.ts`.
+   Its existing Cloudflare publication remains; accounting selection stays in
+   `processUsage.ts`.
 3. Remove `usageQueueDeployment` from the gateway root config, restore its build
    command to `next build`, and remove the queue test script/CI step and the two
    workspace dependency entries. Remove the generated-route `.gitignore` entry.
@@ -70,7 +70,7 @@ ordinary-route checks after cleanup.
 
 **One runtime switch:** set `USAGE_QUEUE_TRANSPORT=vercel` on the gateway's
 **staging** environment and redeploy. It also selects queue-only accounting in
-staging; `USAGE_QUEUE_ONLY_ENABLED=true` is not additionally required. Production
+staging. Production
 ignores this selector and deploys neither the callback nor its queue trigger.
 
 There is still a one-time setup: supply the gateway's existing staging writer
@@ -81,15 +81,15 @@ cap; no separate queue publish endpoint or manual topic-creation script is part 
 prerequisites have not been inspected or activated on the hosted project here.
 
 Before the first deployment of this change, verify the staging selector is not
-already `vercel`: that value activates immediately even if the legacy queue-only
-flag is false. Deploy with the selector absent until hosted readiness is verified.
+already `vercel`: that value activates Vercel publication immediately under the
+staging guard. An absent selector selects Cloudflare; verify that publisher and
+writer too before deployment.
 
 Before load, complete the private-ingress gate and one ordinary small gateway
 smoke request, checking persistence and actual ACK/drain. Then use the bounded
 10/25/50/100rps stages below. To stop new Vercel publication, remove/change the
 transport selector and redeploy; keep old staging deployments consuming until
-accepted work drains. The legacy queue-only flag determines whether the restored
-path is Cloudflare or existing direct accounting.
+accepted work drains. The restored staging path is Cloudflare.
 
 ## Readiness boundaries
 
@@ -206,7 +206,6 @@ never pasted into commands, PRs, logs or manifests.
 |---|---|---|---|
 | Gateway / staging | `VERCEL_TARGET_ENV` | Vercel supplied `staging` | Platform; verify target |
 | Gateway / staging | `VERCEL_ENV` | Vercel supplied, must not be `production` | Platform; verify |
-| Gateway / staging | `USAGE_QUEUE_ONLY_ENABLED` | Not required for Vercel; retain the existing CF/direct choice | Legacy CF flag; does not override exact `vercel` |
 | Gateway / staging | `USAGE_QUEUE_TRANSPORT` | Exact `vercel` | Ordinary selector; redeploy |
 | Gateway / staging | `USAGE_WRITER_URL` | `https://staging-app.kilo.ai/api/internal/usage/record` | Ordinary URL; verify destination, redeploy |
 | Gateway / staging | `USAGE_WRITER_SECRET` | Match the existing staging writer's `INTERNAL_API_SECRET`; also signs/verifies the scoped queue envelope | Existing credential; secure workflow, redeploy |
@@ -218,12 +217,10 @@ never pasted into commands, PRs, logs or manifests.
 | Gateway deployment | Topic / storage / callback region / cap | `usage-staging` / FRA / FRA / omitted `maxConcurrency` | Static config; requires deployment |
 
 Exact `vercel` alone selects Vercel plus queue-only accounting under the staging
-guard, including when the legacy queue-only flag is absent/false. Setting only
-that legacy flag false does not turn Vercel off: remove/change the selector.
-Absent, misspelled or case-mismatched transport values restore the existing
-Cloudflare/direct choice controlled by the existing flags. Production
-excludes Vercel even if the selector is accidentally copied. Effective queue-only
-mode selects one transport, so no dual publication. Missing writer config fails consumption and retries; it does not
+guard. To turn Vercel off, remove/change the selector and redeploy.
+Absent, misspelled or case-mismatched transport values select Cloudflare for
+staging accounting. Production excludes Vercel even if the selector is accidentally
+copied. Effective queue-only mode selects one transport, so no dual publication. Missing writer config fails consumption and retries; it does not
 redirect an accepted event to Cloudflare or the gateway billing writer.
 
 ## Negative-ingress gate before the first hosted smoke
@@ -403,12 +400,12 @@ Receiving/deleting/republishing with queue tools is a separately authorized muta
 
 ## Switchback without stranding accepted work
 
-For **new events only**, set `USAGE_QUEUE_TRANSPORT=cloudflare` (or remove it),
-set `USAGE_QUEUE_ONLY_ENABLED=true`, and redeploy staging to select the existing
-CF processing path. For existing direct accounting, remove/change the Vercel selector **and** set
-`USAGE_QUEUE_ONLY_ENABLED=false`, then redeploy. That flag alone cannot disable
-an exact `vercel` selector. The removed shadow-publishing flag has no effect. Verify the chosen
+For **new events only**, set `USAGE_QUEUE_TRANSPORT=cloudflare` (or remove it)
+and redeploy staging to select the existing CF processing path. Staging remains
+queue-selected when `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` is not
+`production`. There is no staging direct-accounting selector. Verify the chosen
 destination and writer before switching; never dual-publish a billed event.
+The removed shadow-publishing flag has no effect.
 
 Retain old Vercel deployments/consumers and compatible writer credentials/schema
 until their pinned work ACKs/drains. Publishing opt-out does not disable the

@@ -396,7 +396,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.WS_ALLOWED_ORIGINS).toBe(
       'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000'
     );
-    expect(config.vars.PER_SESSION_SANDBOX_ORG_IDS).toBe('*');
+    expect(config.vars).not.toHaveProperty('PER_SESSION_SANDBOX_ORG_IDS');
     expect(config.vars.TOOL_CGROUP_ORG_IDS).toBe('*');
     expect(config.vars.TOOL_CGROUP_MODE).toBe('enforce');
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');
@@ -405,7 +405,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
-    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+    expect(config.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 
@@ -435,14 +435,9 @@ describe('buildE2eWorkerConfig', () => {
     });
   });
 
-  it('pins the e2e KV namespace id and leaves no KV binding unpinned', () => {
+  it('renders no KV binding', () => {
     const { config } = render();
-    expect(config.kv_namespaces).toEqual([
-      { binding: 'SHARED_SANDBOX_OVERRIDES', id: '4d5f651fb14b4de682204eaa9fa60a7d' },
-    ]);
-    for (const kvNamespace of config.kv_namespaces as { id?: string }[]) {
-      expect(kvNamespace.id).toBeTruthy();
-    }
+    expect(config.kv_namespaces ?? []).toEqual([]);
   });
 
   it('removes dev, env and routes while keeping triggers', () => {
@@ -484,7 +479,7 @@ describe('local e2e worker config', () => {
           (entry: { class_name: string }) => entry.class_name === 'SandboxContainers'
         ).images.app.dockerfile
       ).toBe('../Dockerfile.containers');
-      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBe('true');
+      expect(environment.vars.CREDENTIAL_CONTAINMENT_ENABLED).toBeUndefined();
       expect(environment.vars.CODE_REVIEW_CONTAINERS_ORG_IDS).toBe('*');
     }
   });

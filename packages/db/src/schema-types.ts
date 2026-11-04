@@ -1124,8 +1124,9 @@ export const ENKRYPT_RULE_FRAMEWORKS = [
 export const ENKRYPT_POLICY_FORMATS = ['policy_text', 'rules'] as const;
 
 /**
- * What a revise-type detector does when it fires. Enkrypt answers these detectors with rewritten
- * text instead of a block message, so the organization chooses whether a detection blocks.
+ * What a revise-type input detector, or any output detector, does when it fires. Enkrypt answers
+ * revise-type detectors with rewritten text instead of a block message, so the organization chooses
+ * whether a detection blocks.
  */
 export const ENKRYPT_REVISE_DETECTOR_ACTIONS = ['log', 'block'] as const;
 
@@ -1192,6 +1193,128 @@ export const EnkryptPolicyRuleSchema = z.strictObject({
 
 export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
 
+const enkryptPiiEntitiesSchema = z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length);
+
+const enkryptBannedKeywordsSchema = z
+  .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
+  .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`);
+
+const enkryptTopicsSchema = z
+  .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
+  .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`);
+
+const enkryptPolicyFields = {
+  format: z.enum(ENKRYPT_POLICY_FORMATS),
+  policy_text: z
+    .string()
+    .trim()
+    .max(
+      enkryptLimits.policyTextLength,
+      `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
+    ),
+  rules: z
+    .array(EnkryptPolicyRuleSchema)
+    .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
+};
+
+const EnkryptPiiDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  entities: enkryptPiiEntitiesSchema,
+});
+
+const EnkryptKeywordDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+  banned_keywords: enkryptBannedKeywordsSchema,
+});
+
+const EnkryptActionDetectorSchema = z.strictObject({
+  enabled: z.boolean(),
+  action: EnkryptReviseDetectorActionSchema,
+});
+
+type EnkryptConfigurableDetectors = {
+  pii: { enabled: boolean; entities: EnkryptPiiEntity[] };
+  keyword_detector: { enabled: boolean; banned_keywords: string[] };
+  topic_detector: { enabled: boolean; topic: string[] };
+  policy_violation: {
+    enabled: boolean;
+    format: (typeof ENKRYPT_POLICY_FORMATS)[number];
+    policy_text: string;
+    rules: EnkryptPolicyRule[];
+  };
+};
+
+function refineEnkryptDetectors(
+  detectors: EnkryptConfigurableDetectors,
+  ctx: z.core.$RefinementCtx
+) {
+  const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
+  if (pii.enabled && pii.entities.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select at least one type of data to detect.',
+    });
+  }
+  if (new Set(pii.entities).size !== pii.entities.length) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['pii', 'entities'],
+      message: 'Select each type of data once.',
+    });
+  }
+  if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['keyword_detector', 'banned_keywords'],
+      message: 'Add at least one keyword.',
+    });
+  }
+  if (topic_detector.enabled && topic_detector.topic.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['topic_detector', 'topic'],
+      message: 'Add at least one topic.',
+    });
+  }
+  if (policy_violation.enabled) {
+    if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'policy_text'],
+        message: 'Enter the policy text.',
+      });
+    }
+    if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules'],
+        message: 'Add at least one rule.',
+      });
+    }
+  }
+  const seenRuleIds = new Set<string>();
+  policy_violation.rules.forEach((rule, index) => {
+    if (seenRuleIds.has(rule.id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['policy_violation', 'rules', index, 'id'],
+        message: 'Rule IDs must be unique.',
+      });
+    }
+    seenRuleIds.add(rule.id);
+  });
+  if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [],
+      message: 'This detector configuration is too large. Remove some keywords, topics, or rules.',
+    });
+  }
+}
+
 /**
  * An organization's Enkrypt input detectors, stored in `settings.enkrypt.input_guardrail.detectors`
  * and turned into the `detectors` object of `POST /guardrails/detect` by the gateway. Disabled detectors keep
@@ -1201,109 +1324,16 @@ export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
 export const EnkryptInputDetectorsSchema = z
   .strictObject({
     injection_attack: EnkryptToggleDetectorSchema,
-    pii: z.strictObject({
-      enabled: z.boolean(),
-      action: EnkryptReviseDetectorActionSchema,
-      entities: z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length),
-    }),
-    keyword_detector: z.strictObject({
-      enabled: z.boolean(),
-      action: EnkryptReviseDetectorActionSchema,
-      banned_keywords: z
-        .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
-        .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`),
-    }),
-    topic_detector: z.strictObject({
-      enabled: z.boolean(),
-      topic: z
-        .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
-        .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`),
-    }),
-    policy_violation: z.strictObject({
-      enabled: z.boolean(),
-      format: z.enum(ENKRYPT_POLICY_FORMATS),
-      policy_text: z
-        .string()
-        .trim()
-        .max(
-          enkryptLimits.policyTextLength,
-          `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
-        ),
-      rules: z
-        .array(EnkryptPolicyRuleSchema)
-        .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
-    }),
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({ enabled: z.boolean(), topic: enkryptTopicsSchema }),
+    policy_violation: z.strictObject({ enabled: z.boolean(), ...enkryptPolicyFields }),
     toxicity: EnkryptToggleDetectorSchema,
     nsfw: EnkryptToggleDetectorSchema,
-    bias: z.strictObject({ enabled: z.boolean(), action: EnkryptReviseDetectorActionSchema }),
+    bias: EnkryptActionDetectorSchema,
     sponge_attack: EnkryptToggleDetectorSchema,
   })
-  .superRefine((detectors, ctx) => {
-    const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
-    if (pii.enabled && pii.entities.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['pii', 'entities'],
-        message: 'Select at least one type of data to detect.',
-      });
-    }
-    if (new Set(pii.entities).size !== pii.entities.length) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['pii', 'entities'],
-        message: 'Select each type of data once.',
-      });
-    }
-    if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['keyword_detector', 'banned_keywords'],
-        message: 'Add at least one keyword.',
-      });
-    }
-    if (topic_detector.enabled && topic_detector.topic.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['topic_detector', 'topic'],
-        message: 'Add at least one topic.',
-      });
-    }
-    if (policy_violation.enabled) {
-      if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'policy_text'],
-          message: 'Enter the policy text.',
-        });
-      }
-      if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'rules'],
-          message: 'Add at least one rule.',
-        });
-      }
-    }
-    const seenRuleIds = new Set<string>();
-    policy_violation.rules.forEach((rule, index) => {
-      if (seenRuleIds.has(rule.id)) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['policy_violation', 'rules', index, 'id'],
-          message: 'Rule IDs must be unique.',
-        });
-      }
-      seenRuleIds.add(rule.id);
-    });
-    if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [],
-        message:
-          'This detector configuration is too large. Remove some keywords, topics, or rules.',
-      });
-    }
-  });
+  .superRefine(refineEnkryptDetectors);
 
 export type EnkryptInputDetectors = z.infer<typeof EnkryptInputDetectorsSchema>;
 
@@ -1320,6 +1350,47 @@ export const ENKRYPT_DETECTOR_IDS = [
   'bias',
   'sponge_attack',
 ] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * An organization's Enkrypt output detectors, stored in `settings.enkrypt.output_guardrail.detectors`.
+ * They are the input detectors that apply to model output: prompt injection and sponge attacks
+ * describe prompts, and a response is scanned as input on the next request anyway. Every output
+ * detector chooses block or log, because a blocking detector makes the gateway hold back the whole
+ * response until it is scanned.
+ */
+export const EnkryptOutputDetectorsSchema = z
+  .strictObject({
+    pii: EnkryptPiiDetectorSchema,
+    keyword_detector: EnkryptKeywordDetectorSchema,
+    topic_detector: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      topic: enkryptTopicsSchema,
+    }),
+    policy_violation: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      ...enkryptPolicyFields,
+    }),
+    toxicity: EnkryptActionDetectorSchema,
+    nsfw: EnkryptActionDetectorSchema,
+    bias: EnkryptActionDetectorSchema,
+  })
+  .superRefine(refineEnkryptDetectors);
+
+export type EnkryptOutputDetectors = z.infer<typeof EnkryptOutputDetectorsSchema>;
+
+export type EnkryptOutputDetectorId = keyof EnkryptOutputDetectors;
+
+export const ENKRYPT_OUTPUT_DETECTOR_IDS = [
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+] as const satisfies readonly (EnkryptOutputDetectorId & EnkryptDetectorId)[];
 
 /**
  * Blocking Enkrypt AI input scan of each gateway chat request. Flagged requests are always
@@ -1339,8 +1410,23 @@ export const EnkryptInputGuardrailSettingsSchema = z.object({
 
 export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
 
+/**
+ * Enkrypt AI scan of each gateway chat response, off unless an admin enables it. While a detector
+ * blocks, the gateway holds back the whole upstream response until the scan allows it, so a
+ * streamed response arrives all at once. Log-only detectors scan a copy without delaying it.
+ * Without saved `detectors` no detector applies. `detectors` is validated with
+ * `EnkryptOutputDetectorsSchema` where it is written and read, like the input guardrail's.
+ */
+export const EnkryptOutputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  detectors: z.unknown().optional(),
+});
+
+export type EnkryptOutputGuardrailSettings = z.infer<typeof EnkryptOutputGuardrailSettingsSchema>;
+
 export const OrganizationEnkryptSettingsSchema = z.object({
   input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+  output_guardrail: EnkryptOutputGuardrailSettingsSchema.optional(),
 });
 
 export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
@@ -2498,6 +2584,9 @@ export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
 
 export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
+/** Which guardrail made an Enkrypt call: the request scan or the response scan. */
+export type EnkryptGuardrailDirection = 'input' | 'output';
 
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 

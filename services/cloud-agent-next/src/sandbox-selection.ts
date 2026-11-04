@@ -28,6 +28,15 @@ export const RETIRED_SANDBOX_ALLOCATION_MESSAGE =
   'This sandbox allocation has been retired. Choose Cloudflare Containers or Vercel BYOC.';
 
 /**
+ * Retired allocations a new session cannot choose. `cloudflare-shared` is gone
+ * because every sandbox serves one workspace. `cloudflare-single` is not here:
+ * it is the compatibility alias for the native containers default.
+ */
+export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boolean {
+  return allocation === 'cloudflare-shared' || allocation === 'isolated-standard';
+}
+
+/**
  * Provider tool capability a session needs from its sandbox image. `review`
  * publishes code-review output (gh/glab/bb and the GitHub review publisher MCP);
  * `remediation` opens security-remediation pull requests (gh/glab/bb). The
@@ -84,21 +93,6 @@ export function sandboxAllocationUnavailableReason(
   }
 }
 
-/**
- * Repository-compatibility gate for an allocation. Contained Vercel resolves
- * Git credentials only for GitHub, so a saved Vercel choice is ineligible for a
- * GitLab/Bitbucket/Git repository and must fall through to the next candidate.
- */
-export function sandboxAllocationRepositoryUnavailableReason(
-  allocation: SandboxAllocation,
-  repositoryType: SessionRepositoryType
-): string | undefined {
-  if (getSandboxAllocationProvider(allocation) === 'vercel' && repositoryType !== 'github') {
-    return 'Vercel sandboxes support GitHub repositories only';
-  }
-  return undefined;
-}
-
 export function getSandboxSelectionCapabilities(
   env: Env,
   owner: SelectionOwner,
@@ -121,7 +115,6 @@ export function getSandboxSelectionCapabilities(
     };
   }
 
-  const repositoryType = options?.repositoryType;
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
@@ -133,13 +126,9 @@ export function getSandboxSelectionCapabilities(
       capability,
       options?.vercelUnavailableReason
     );
-    const repositoryUnavailableReason = repositoryType
-      ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
-      : undefined;
     return {
       allocation: getSandboxAllocationRequest(allocation),
       ...(unavailableReason ? { unavailableReason } : {}),
-      ...(repositoryUnavailableReason ? { repositoryUnavailableReason } : {}),
     };
   });
   return {
@@ -181,7 +170,7 @@ export function assertSandboxAllocationAvailable(
 ): void {
   // Retired explicit choices are rejected with a specific reason; a saved value
   // is skipped before this check and falls through to the default.
-  if (allocation === 'cloudflare-shared' || allocation === 'isolated-standard') {
+  if (isRetiredSandboxAllocation(allocation)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
   }
   const capabilities = getSandboxSelectionCapabilities(env, owner, {

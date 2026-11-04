@@ -7,18 +7,21 @@ always processes queued events through the existing Frankfurt writer. Only a
 matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
-The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
-for staging or for the production regional cohorts controlled independently by
-`USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
-The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
-exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
-accounting transport, not request routing.
-Unselected events keep direct accounting or the existing SFO handoff. Background
-shadow publication and its flag have been removed. Reconcile and drain historically
+The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
+and `VERCEL_ENV` not `production`), for eligible production Frankfurt
+deployments, or for the production SFO cohort controlled by
+`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). The optional
+`USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Production Frankfurt accounting
+has no exposure control; it queues every payer with an identity. FRA deployments
+other than staging and production `fra1`, and SFO payers outside the cohort,
+keep direct accounting or the existing SFO handoff. Background shadow
+publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before deploying processing; this change does not remove
-old messages. Keep production selection off until the processing consumer is
-independently verified. Selection being off does not stop processing of queued
-events. Follow the [production merge gates](eu-queues.md#production-merge-gate).
+old messages. Keep SFO production selection off until the processing consumer is
+independently verified. Production FRA has no exposure switch, so do not deploy
+this gateway source to production until then. Selection being off does not stop
+processing of queued events. Follow the
+[production merge gates](eu-queues.md#production-merge-gate).
 
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
@@ -36,7 +39,7 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Each environment connects only its EU pair. Production uses batch6/parallelism2/cap200 (up to 400 writer calls);
+Each environment connects only its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
@@ -178,8 +181,8 @@ Redirects are terminal 3xx failures; their targets are never followed.
 ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
 `usageId` and categorical `reason`; accounting returns null and emits no gateway
 persistence completion. This is not durable recovery: unaccepted events may be
-lost, and ambiguous failures may still be recorded later by the consumer. With
-queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
+lost, and ambiguous failures may still be recorded later by the consumer. For
+unselected events, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -225,10 +228,19 @@ two writer slots per invocation:
 |---|---|---|
 | `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `200` in both environments | Parallelism 2 allows at most `200 × 2 = 400` concurrent queue writer calls per environment. |
+| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
+
+The production cap `225` is an intentional single-knob trial from the previous
+`200`. Batch size 6, fill timeout 0, parallelism 2, retries, staging settings and
+the writer pool/admission limits are unchanged. `225 × 2 = 450` is a theoretical
+maximum writer HTTP call ceiling versus `400`; it is not 450 database
+connections, guaranteed active consumers or measured throughput. The trial
+window, measurement and rollback are operator decisions. Merging this source
+enables the existing scheduled production deployment but does not itself start a
+hosted trial or support a latency claim.
 
 ### Native congestion retries and launch budget
 
@@ -299,9 +311,9 @@ actual lifecycle. Increasing the configured count does not reset existing attemp
 
 Deploy and verify this retry consumer **before merging/deploying default-on
 writer admission PR #9241**. Merging both ahead of one deployment is insufficient:
-the production workflow promotes web before Workers. Keep pool 10, batch 6/par 2,
-consumer cap 200 and exposure unchanged initially; admission is per-runtime and
-does not establish aggregate database capacity for larger settings.
+the production workflow promotes web before Workers. That rollout kept pool 10,
+batch 6/par 2, consumer cap 200 and exposure unchanged; admission is per-runtime
+and does not establish aggregate database capacity for larger settings.
 
 Persistent failures still reach the configured DLQ after the finite retry budget;
 a DLQ is a recovery queue, not proof the payload is poison. Before guard rollout,
@@ -342,8 +354,8 @@ reserved connections** or a measured global capacity bound. Other traffic can
 compete after the snapshot, a writer may perform several database operations,
 background work can outlive the awaited call, and each runtime instance has its
 own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
-consumer concurrency at 200, parallelism at 2, and batch size at 6 in production and
-2 in staging; retry settings also stay unchanged.
+consumer concurrency at 225 in production (200 in staging), parallelism at 2, and
+batch size at 6 in production and 2 in staging; retry settings also stay unchanged.
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
@@ -363,7 +375,7 @@ do not establish hosted throughput, spare capacity, or latency improvements.
 
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`
 and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
-parallelism 2 and invocation cap 200. Production selects processing at cap 200
+parallelism 2 and invocation cap 200. Production selects processing at cap 225
 with batch 6 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
 
 `USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
@@ -394,15 +406,16 @@ The first test sequence is diagnostics → EU → batching. Diagnostics and EU a
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
 the parallelism variable, and the writer target. Keep one
-consumer per environment at cap 200 / parallelism 2, with production batch 6 and
-staging batch 2 (at most 400 writer calls each); do not reconnect a
+consumer per environment at parallelism 2, with production cap 225 and staging cap
+200; production batch 6 and staging batch 2 give at most 450 and 400 writer calls
+respectively. Do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
 checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
-timeout 0 and cap 200 for the same single queue. Preserve the current writer
+timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
 route, retry delay/budget and per-message dispositions.
 
 ## Deploy
@@ -424,7 +437,7 @@ attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
 environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production uses its EU pair with batch6/parallelism2/cap200 and the existing retry policy.
+Production uses its EU pair with batch6/parallelism2/cap225 and the existing retry policy.
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
@@ -448,10 +461,12 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before enabling the launch
-or FRA/SFO cohort controls; a missing Worker secret returns 503.
-The HTTP address alone selects no traffic: production selection still requires
-`USAGE_QUEUE_ONLY_ENABLED` and the applicable FRA or SFO cohort controls above.
+Provision and verify the Worker-side publisher secret before selecting staging
+or the SFO cohort; a missing Worker secret returns 503.
+The HTTP address alone selects no traffic: production SFO selection still requires
+both production environment labels, a trusted `sfo1` function region and the SFO
+cohort control above; production FRA selection requires both production labels and
+`fra1`.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
@@ -518,3 +533,29 @@ writer credentials and stable identity, ACK after writer completion, duplicate
 ACK, and retry on transport/response failures. No hosted latency or placement
 improvement is claimed. EU routing rollback remains a separate operation in the
 [EU setup](eu-queues.md).
+
+### Authenticated HTTP 400 diagnostics
+
+`usage_ingest_rejected` emits one best-effort warning for each authenticated
+HTTP 400: `missing_body`, `body_read_failure`, `invalid_utf8`, `malformed_json`,
+or `schema_failure`. Statuses, response bodies, validation and queue behavior
+are unchanged. Failed authentication never reads the body or emits this event.
+
+Schema diagnostics contain at most eight issues and an omitted count. Each issue
+has an allowlisted code, a schema-owned path (at most four segments; unknown
+segments stop at `[redacted]`), and allowlisted expected/received type labels.
+Labels are at most 17 characters and path segments at most 26 characters.
+`unknown` covers unsupported expected types, including enum contents; values,
+validator messages, unrecognized-key lists and exception text are never logged.
+Received types use bounded own data-property traversal of parsed JSON only.
+A usage ID is included only after independent validation by the contract's UUID
+schema; body/JSON failures have no usage ID. Log sink/formatting failure is isolated.
+
+In Cloudflare Workers Logs, open the warning's invocation (or join using the
+platform request ID). Read the executing revision from the same invocation's
+`$workers.scriptVersion.id` metadata. This is the deployed Worker version,
+not a Git source SHA; no version binding or configuration change is required.
+The log's own fields intentionally contain no raw request/headers or request ID.
+After a separately authorized rollout, an operator still needs to capture an
+actual rejection and its invocation/version to establish a production cause.
+This diagnostic does not recover missing usage or explain HTTP 409 responses.

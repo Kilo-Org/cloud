@@ -53,8 +53,9 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 
 ## 3. Topology and identities
 
-- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. A shared sandbox
-  (`usr-`, `org-`, `bot-`, `ubt-`) hosts many sessions and worktrees; an isolated sandbox hosts one.
+- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. One sandbox
+  serves one workspace: it hosts the sibling chats and worktrees of that workspace and of no other.
+  Legacy shared keys (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them.
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
@@ -552,7 +553,8 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   HMAC credential (input only while the build is `preparing`; no route accepts it after the build
   ends), reports events and its result
   over the same authenticated routes, clones the default
-  branch into `/workspace/app`, runs setup with the directory HOME, removes credentials and
+  branch into `/workspace/app`, runs setup with the directory HOME and `KILO_ENVIRONMENT_BUILD=1`
+  (setup commands may use the rest of the build deadline), removes credentials and
   reflogs, and writes the workspace stamp. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
@@ -1102,6 +1104,169 @@ and a 30-second total read deadline. GitHub git replay is capped at 1 MiB; boots
 inspection is capped at 16,000 bytes. An unavailable replay body keeps the single-forward path.
 The reader inspects a clone and preserves the original request body for forwarding.
 
+### Managed SCM containment inventory
+
+The shared core in `src/scm-broker/` parses carriers, redeems capabilities, forwards requests,
+and emits bounded diagnostics. `git-token-service` still owns authorization and credential selection.
+`admission.ts` owns active grant selection, target admission, alias matching, renewal, and
+post-await checks for every provider. SandboxControl supplies current allocation, owner, routes,
+and scope grants. It serializes admission and persists renewed grants. It stores no second cache.
+Vercel verifies BYOC ownership and OIDC identity outside that queue. Its adapter supplies a bound
+identity and rechecks expiry inside admission. Cloudflare supplies trusted platform container
+identity through its outbound handler. Logical sandbox IDs and forwarded headers are never authority.
+The native wrapper keeps Kilo handling and credential-free or caller-owned credential forwarding. `forwardResolvedScmCapability` accepts a resolved capability, a token-service
+binding, and trusted container identity. It cannot route an alias through a Sandbox DO.
+
+The tables describe broker admission, not successful upstream operations. Upstream token permissions
+remain decisive. No inspected validator enforces task-branch names or parses receive-pack bodies.
+
+**Supported**
+
+| Case | Current authority and transport |
+|---|---|
+| GitHub `kgh2` | HTTPS on `api.github.com`, `github.com`, `uploads.github.com`, and `npm.pkg.github.com`; default port only. No broker method, repository-path, or body restriction. |
+| GitHub operations | REST/PR, GraphQL, identity, upload/npm, Git read/write, LFS, archive requests, and runner operations pass destination validation. Redirects still need separate admission. |
+| GitHub credential selection | Native installation and selected-user sources retain their current identity pins and renewal checks. User-source failure never falls back to installation authority. Installation tokens select repository names but do not narrow App permissions, including organization-level permissions. Selected-user tokens have no broker-side cross-repository path fence. |
+| Legacy GitHub `kgh1` | Repository-bound refs, upload/receive-pack, LFS batch/verify, and enumerated PR/review/comment operations retain the narrower legacy validator. |
+| GitLab `kgl2` | Exact configured HTTPS origin and base path, including configured non-default ports. Project REST accepts the encoded project path; numeric selectors require the matching project-source capability. Matching REST subpaths have no method restriction. |
+| GitLab Git/LFS | Enumerated refs, upload/receive-pack, batch, locks, verify, and unlock paths. Modern validation does not constrain their methods or queries. Legacy `kgl1` keeps narrower Git/LFS and review operations. |
+| Bitbucket `kbb1` | Exact Git/API origins and repository path boundaries. No method/body policy. Encoded slashes remain valid in query data, not paths. Credential-source and repository identity fences remain unchanged. |
+| Carriers | Canonical Basic uses `x-access-token`, `oauth2`, or `x-token-auth` for its provider. API `Bearer`/`token` supports existing casing and whitespace; GitLab permits only `Bearer` or `PRIVATE-TOKEN`. Matching duplicate GitLab carriers redeem once. |
+| Header replacement | Managed requests replace `Authorization` and use manual redirects. GitLab replaces both authorization surfaces. Mixed managed and caller-owned carriers fail closed before resolution or forwarding. |
+| Native adapters | SDK containment classes register `MANAGED_SCM_OUTBOUND_HANDLER` through the inherited setter. Other SDK classes keep HTTPS interception disabled. Native Containers passes trusted identity through unchanged props, after installing HTTPS `*` and all-HTTP interception before contained startup. |
+| Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy. Containment does not require restricted general egress. |
+| Retry and bounds | Only eligible GitHub upload-pack reads retry 429 responses: three retries, 30 seconds per scheduled wait, and 60 seconds of total scheduled waits. An excessive next wait returns the current response. POST replay includes exactly 1 MiB; over-cap or unavailable bodies forward once. This is not a total request deadline. Diagnostics read at most 2 KiB within 100 milliseconds. |
+
+**Intentionally denied**
+
+| Case | Existing decision |
+|---|---|
+| Managed credentials | Unsupported versions/carriers, wrong Basic usernames, malformed aliases, and conflicting managed carriers fail closed. Capability expiry, container binding, source replacement, and revocation remain with their current owners. |
+| GitHub destinations | Non-HTTPS URLs, URL credentials/fragments, non-default ports, raw IPs, and hosts outside the four-host set cannot redeem `kgh2`. Legacy `kgh1` additionally denies identity, GraphQL, upload/npm, runner, and non-enumerated API paths. |
+| GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
+| Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
+| Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
+| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress remains native-only. |
+
+**Changed**
+
+Vercel forwarding uses the verified `https://oidc.vercel.com/<team-id>` issuer and
+physical session ID. Creation persists the resolved team/project/runtime locator
+before contacting the provider. Admission rejects absent or mismatched identity.
+BYOC credential lookup and JWKS verification run outside the lifecycle queue. Current-allocation
+admission, alias resolution, bounded capability renewal, and persistence remain one serial operation.
+Already admitted requests may finish after retirement. Later requests must pass admission again.
+
+Cloudflare retains direct encrypted capability compatibility, including supported legacy versions.
+Vercel accepts aliases only and always requires verified provider identity. Both use the same
+carrier classifier and forwarding pipeline. Cloudflare resolves aliases once and forwards the
+resolved capability without re-entering admission. Native restricted-egress rules still apply
+before SCM handling, including their non-default-port restriction. Vercel reconstructs the exact
+configured GitLab origin and port before shared target admission.
+
+The prepared forwarder preserves caller-owned authorization on unmanaged requests. Managed requests
+use only the admitted capability, without another alias lookup. Both paths remove forwarding metadata,
+canonicalize Host, stream bodies, and return redirects without following them. Tests cover a
+2,097,169-byte upload-pack request above the 1 MiB replay cap; it forwards once.
+
+Contained SCM grants have one shape on every provider: a bound GitHub, GitLab, or Bitbucket
+capability behind a control-plane alias. Vercel no longer has native-token rows, header-injection
+rules for SCM, or legacy Kilo token injection; Kilo always uses the runtime-credential facade.
+Issuance and renewal use the existing Cloudflare policy for every compute provider.
+GitHub uses the stored user-authorization fallback setting. No compute provider overrides the
+permission scope. Integration pins, configured denials, and source authorization remain unchanged.
+With a verified contract, new managed Vercel scopes prepare bound
+capabilities and compose forwarding through the normal create/update policy paths. Without it,
+preparation fails specifically with `provider_identity_mismatch` and never falls back to credential
+injection.
+GitLab retains its integration, account identity, instance, and project metadata. Bitbucket retains
+organization and repository UUIDs; encrypted capabilities pin integration and credential identity.
+Vercel domain rules use the GitLab hostname; admission and redemption retain the configured HTTPS port.
+Native restricted egress still denies non-default ports. Live Vercel interception on those ports remains unverified.
+Mixed token/capability rows and wrong allocation bindings are invalid. Tokenless generic Git remains
+available. Compute selection preserves BYOC ownership/readiness and review/remediation tool exclusions.
+Without a verified contract, selection reports Vercel unavailable for non-Git repositories.
+Selection availability does not establish that managed forwarding is ready.
+
+The token service still supports optional `permissionScope: repository` for other callers.
+That policy narrows installation App permissions with an explicit repository-permission allowlist.
+It uses separate cache entries and fails closed when permissions are unavailable.
+Cloud Agent uses the same existing default policy for every compute provider, including configured
+GitHub selected-user fallback. It does not select the optional repository-permission override.
+Upstream token permissions remain authoritative. Synthetic upstream tests do not prove live GitHub
+permissions or remote operation success. The shared refactor has local test evidence only.
+The registered route accepts both the exact configured locator and appended original paths. Only
+validated forwarding metadata reconstructs the upstream path/query; the URL suffix cannot select
+another locator or change the configured OIDC audience. This matches the official SDK's
+[`normalizeForwardUrl` handling](https://github.com/vercel/sandbox/blob/main/packages/vercel-sandbox/src/proxy.ts),
+but does not establish live provider path behavior.
+
+Local Workers tests exercise both adapters through alias resolution and real token-service redemption,
+with synthetic credential stores and upstream responses. They verify registered Vercel routes, GitLab project REST/Git/LFS,
+Bitbucket Git/API, traversal and identity denials, manual redirects, and a 2,097,169-byte GitLab push.
+GitLab cases cover configured HTTPS port 8443 and wrong-port denial without widening other SCM origins.
+Native cases run with and without optional egress restrictions.
+The lifecycle suite uses real DO storage and a synthetic identity contract. It covers reconstruction,
+all-request admission, mixed scopes in both orders, sibling release, and failed policy publication.
+These are handler/runtime proofs, not provider interception or successful remote Git transfers.
+
+**Unverified**
+
+SDK-double tests prove registration structure, not live interception. Live provider identity mapping,
+forwarded paths/queries, ingress limits, SNI/Host mismatch, raw-IP and alternate-protocol bypass behavior,
+and redirect chains require provider evidence. Complete archive/LFS transfers can use additional hosts;
+admission of the first request does not prove end-to-end support. Actual production App permissions
+and upstream endpoint success are not established by unit tests. This boundary protects managed
+credentials; it does not deny all direct upstream access or constrain caller-owned credentials.
+
+Policy sources: [token-service validators and redemption](../../git-token-service/src/index.ts),
+[GitLab paths](../../git-token-service/src/gitlab-session-capability.ts),
+[installation token generation](../../git-token-service/src/github-token-service.ts),
+[native wrapper](../src/sandbox-outbound.ts),
+[Vercel transforms](../src/sandbox-control/vercel-network-policy.ts),
+[Vercel firewall](https://vercel.com/docs/sandbox/concepts/firewall#requests-proxying), and
+[Cloudflare outbound handling](https://developers.cloudflare.com/containers/configuration/outbound-traffic/).
+Vercel forwarding matchers do not deny unmatched traffic; a catch-all permits domain-less bypass.
+Cloudflare outbound handlers cover HTTP(S), not arbitrary protocols or ports.
+
+Before activation, use a disposable non-persistent development sandbox and an operator-owned HTTPS
+capture endpoint. The account needs Sandbox create, exec, network-policy update, and stop access
+for one selected Vercel team/project. Production access is not required. Capture only sanitized
+`iss`, `aud`, `team_id`, `project_id`, `sandbox_id`, optional `sandbox_name`, physical REST IDs,
+and original path/query. Never retain the JWT or authorization headers. Compare a GET probe and
+a POST with 2,097,169 synthetic bytes against the provider session ID; stop the sandbox afterward.
+Verify path/query propagation, request byte count, forwarding duration, and replacement rejection.
+Do not infer immutable identity from the physical name.
+
+Use the existing `VercelSandboxRestClient` with a development account token supplied only through
+the environment. Create a runtime-source sandbox with `timeoutMs: 120000` (the client sends
+`persistent: false`) and this policy, replacing the capture origin with the operator's endpoint:
+
+```json
+{"allow":{"github.com":[{"forwardURL":"https://capture.example/scm/vercel/ses-probe01"}],"api.github.com":[{"forwardURL":"https://capture.example/scm/vercel/ses-probe01"}],"*":[]}}
+```
+
+Execute these synthetic requests inside that allocation. The capture endpoint must drain bodies,
+return a fixed response, verify signatures, and retain only the sanitized fields listed above.
+Never proxy these probe requests upstream or log incoming headers. Compare observed `aud` against
+the configured URL, not the appended path. Repeat after replacement with the same physical name.
+
+```sh
+curl --max-time 30 'https://github.com/acme/probe.git/info/refs?service=git-upload-pack'
+curl --max-time 30 'https://api.github.com/repos/acme/probe/issues?state=open'
+head -c 2097169 /dev/zero | curl --max-time 90 --data-binary @- 'https://github.com/acme/probe.git/git-receive-pack?probe=1'
+```
+
+Stop the exact returned session in a `finally` block. Record failures and elapsed times without
+tokens. The development probe and GitHub session checks passed on 2026-11-02.
+See [local verification evidence](../scripts/setup-local-vercel.md). No deployment was performed.
+
+Cloudflare's public Worker ingress limit depends on the account plan: 100 MB, 200 MB, or up to
+5 GB. An edge 413 can occur before this handler runs. Streaming cannot remove that restriction.
+Workers HTTP duration has no fixed limit while connected, but Vercel forwarding duration remains
+unverified beyond the tested 8 MiB transfers and Git operations. Before production rollout,
+confirm ingress and duration compatibility and resolve any confirmed reduction. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
 ### Compatibility and rollout
 
 Persisted sessions and credential grants without modern runtime authorization remain readable
@@ -1215,8 +1380,14 @@ The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktre
 the canonical workspace parent, the original root chat that remains the authorization anchor for
 the existing child-session API. Every grant renewal checks that root's authorization and its owner,
 organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and parent callbacks belong to that root, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity. Built-in credential
+becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
+invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
+either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
+existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
+as the new chat's first message and derives its operation and session identity from the persisted
+callback message ID. The session form checks that the target is a root or sibling chat with the
+same owner, organization and workspace, and that it is still accessible; the invoking chat learns
+its own session id from the `cloud-agent-context` line in its turns. Built-in credential
 refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
 the workspace's MCP set.
 
@@ -1360,7 +1531,7 @@ Request and response bodies stream; there is no body-size cap.
   on 4096 or a random port, so a preview can reach it; the wrapper starts every `kilo serve` with
   its own random `KILO_SERVER_PASSWORD` and sends Basic auth on each of its own connections, so a
   preview request to that port gets 401 from Kilo. The physical boundary is still the
-  sandbox/workspace (owner scope for shared sandboxes), not the individual chat. An entry ticket
+  sandbox/workspace, not the individual chat. An entry ticket
   is single use and expires after 60 seconds, so a stolen ticket yields a session only if the thief
   uses it before its owner does. Service workers are not blocked, so an app on a stable
   `(session, port)` origin can register one. Established WebSockets are not re-authorised after
@@ -1596,3 +1767,17 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
   the retired legacy plane.
+
+
+### Mandatory credential containment
+
+All sandbox providers require credential containment, including local development.
+The former environment opt-out no longer changes execution.
+Sandbox processes receive aliases and scoped proxy handles; upstream tokens stay in trusted services.
+Provider adapters own interception and identity verification. Shared brokers own authorization and forwarding.
+Direct grants remain readable for cleanup but cannot execute or renew.
+On activation, saved non-contained allocations stop and their grants retire before replacement.
+A new preparation after stop creates a contained allocation. Sessions retain their logical identities.
+Earlier branch work recorded live Vercel identity and GitHub checks.
+The shared admission refactor has local tests only; those earlier checks do not verify this change.
+Maximum payload and duration compatibility still require verification before production rollout.

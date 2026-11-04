@@ -196,13 +196,7 @@ type ColdSession = {
 
 /** A session DO and sandbox allocation with no session compute requested yet. */
 async function openColdSession(): Promise<ColdSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   const meter = createRecordingMeter();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter, meter);

@@ -478,7 +478,6 @@ describe('sandbox selection Worker API', () => {
     async kilocodeOrganizationId => {
       const ctx = createInternalApiContext({});
       ctx.env.SANDBOX_SELECTION_IDS = '*';
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
       const caller = appRouter.createCaller(ctx);
       const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
       expect(normal.defaultDestination).toEqual(
@@ -1162,11 +1161,9 @@ describe('prepareSession endpoint', () => {
   });
 
   it('rejects the retired shared allocation before allocation or registration', async () => {
-    const overrideStore = { get: vi.fn().mockResolvedValue('shared-slot-v1'), put: vi.fn() };
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     context.env.SANDBOX_SELECTION_IDS = '*';
-    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
 
     await expect(
@@ -1181,7 +1178,6 @@ describe('prepareSession endpoint', () => {
       message: expect.stringContaining('has been retired'),
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(overrideStore.get).not.toHaveBeenCalled();
   });
 
   it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
@@ -1274,13 +1270,12 @@ describe('prepareSession endpoint', () => {
     [`sbx-${'b'.repeat(48)}`, 'cloudflare-single', undefined],
     [`sbx-${'c'.repeat(48)}`, undefined, 'code-review'],
   ] as const)(
-    'persists the generated %s identity unchanged with containment disabled',
+    'persists the generated %s identity unchanged with mandatory containment',
     async (sandboxId, sandboxAllocation, createdOnPlatform) => {
       selectControlPlaneSandboxMock.mockResolvedValueOnce({
         sandboxKind: createdOnPlatform === 'code-review' ? 'code-review' : 'isolated',
         sandboxId,
-        provider:
-          sandboxAllocation === 'cloudflare-single' ? 'cloudflare-containers' : 'cloudflare',
+        provider: createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
       });
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
@@ -1300,17 +1295,15 @@ describe('prepareSession endpoint', () => {
             workspace: expect.objectContaining({
               sandboxId,
               sandboxProvider:
-                sandboxAllocation === 'cloudflare-single' ? 'cloudflare-containers' : 'cloudflare',
-              ...(sandboxAllocation === 'cloudflare-single'
+                createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
+              ...(sandboxAllocation
                 ? { sandboxAllocation: 'cloudflare-containers-standard-3' }
-                : sandboxAllocation
-                  ? { sandboxAllocation }
-                  : {}),
+                : {}),
               credentialContainment: {
-                github: false,
+                github: true,
                 gitlab: false,
                 bitbucket: false,
-                kilocode: false,
+                kilocode: true,
               },
             }),
           }),
@@ -1319,7 +1312,7 @@ describe('prepareSession endpoint', () => {
     }
   );
 
-  it('disables all containment when the global flag is false', async () => {
+  it('ignores the obsolete containment opt-out', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(
       createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
@@ -1337,10 +1330,10 @@ describe('prepareSession endpoint', () => {
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
             credentialContainment: {
-              github: false,
+              github: true,
               gitlab: false,
               bitbucket: false,
-              kilocode: false,
+              kilocode: true,
             },
           }),
         }),
@@ -1833,7 +1826,7 @@ describe('start endpoint', () => {
     },
     { type: 'git', url: 'https://git.example.com/acme/repo.git' },
   ] as const)(
-    'disables all containment for $type grouped starts when the global flag is false',
+    'requires containment for $type grouped starts when the global flag is false',
     async repository => {
       const doStub = createMockDOStub();
       const caller = appRouter.createCaller(
@@ -1852,10 +1845,10 @@ describe('start endpoint', () => {
           metadata: expect.objectContaining({
             workspace: expect.objectContaining({
               credentialContainment: {
-                github: false,
-                gitlab: false,
-                bitbucket: false,
-                kilocode: false,
+                github: repository.type === 'github',
+                gitlab: repository.type === 'gitlab',
+                bitbucket: repository.type === 'bitbucket',
+                kilocode: true,
               },
             }),
           }),
@@ -2185,7 +2178,6 @@ describe('start endpoint', () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
-      PER_SESSION_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_TOKEN: 'private-vercel-token',
       VERCEL_TEAM_ID: 'team-id',

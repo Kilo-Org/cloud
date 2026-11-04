@@ -2234,6 +2234,7 @@
       "actionFailed": "Ni chafodd y weithred hon ei chwblhau. Ceisiwch eto.",
       "actionBlocked": "Ni chafodd y weithred hon ei chwblhau. Rhaid trwsio'r broblem yn gyntaf.",
       "syncNoRepositories": "Nid oes unrhyw ystorfeydd yng nghwmpas cydsynio. Dewiswch yr ystorfeydd y mae'r Asiant diogelwch yn eu monitro, yna cydsyniwch eto.",
+      "syncNoRepositoriesNoManage": "Nid oes unrhyw ystorfeydd yng nghwmpas cydsynio. Rhaid i berchennog, gweinyddwr neu reolwr bilio'r sefydliad gysylltu ystorfeydd cyn y gellir cydsynio.",
       "syncIntegrationInactive": "Nid yw'r cysylltiad GitHub ar gyfer yr Asiant diogelwch yn weithredol. Ailgysylltwch ap GitHub Kilo, yna cydsyniwch eto.",
       "syncMissingPermission": "Nid yw ap GitHub Kilo yn gallu darllen hysbysiadau bregusrwydd. Rhowch y caniatâd hwnnw yn GitHub, yna cydsyniwch eto.",
       "configConflict": "Mae gosodiadau'r Asiant diogelwch wedi newid yn rhywle arall. Adolygwch y gosodiadau diweddaraf a chadw eto."

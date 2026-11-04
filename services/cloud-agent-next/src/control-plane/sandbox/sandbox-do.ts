@@ -12,6 +12,16 @@ import {
   runtimeSpecForContract,
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
+import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
+import { admitScmRequest } from '../../scm-broker/admission.js';
+import {
+  verifiedVercelSandboxIdentityContract,
+  VercelScmContainmentError,
+} from '../../scm-broker/vercel-identity.js';
+import type {
+  ControlPlaneScmForwardAdmission,
+  ControlPlaneScmForwardAdmissionResult,
+} from '../../shared/control-plane-protocol.js';
 import { z } from 'zod';
 import {
   readSessionSnapshotAllocation,
@@ -61,7 +71,6 @@ import {
   createRetiredCloudflareProviderAdapter,
   RetiredSandboxProviderError,
 } from '../../sandbox-control/retired-cloudflare-provider.js';
-import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
@@ -91,7 +100,6 @@ import {
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
-import { grantScmAliases } from '../../sandbox-control/session-credential-members.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
@@ -1566,43 +1574,80 @@ export class SandboxControlV2 extends DurableObject<Env> {
     outboundContainerId: string;
     url: string;
     method: string;
-  }): Promise<{ credential: string; organizationId?: string } | null> {
+  }): Promise<{ credential: string } | null> {
     await this.initialized;
-    return this.enqueue(async () => {
-      try {
-        const state = await this.readAllocation();
-        if (!this.sandboxCanResolveCredentials(state)) return null;
-        const ownerId = await this.requireOwner();
-        if (ownerId === null) return null;
-        const alias = parseControlPlaneCredential(input.credential);
-        if (alias === null || alias.sandboxId !== this.sandboxId) return null;
-        const expectedOutbound = this.outboundContainerIdFor();
-        if (expectedOutbound === null || input.outboundContainerId !== expectedOutbound) {
-          return null;
+    try {
+      const result = await admitScmRequest(
+        {
+          target: { url: input.url, method: input.method },
+          authorization: { authorization: `Bearer ${input.credential}` },
+        },
+        {
+          ...this.scmAdmissionDependencies(),
+          readContext: async () => {
+            const context = await this.readScmAdmissionContext();
+            return {
+              ...context,
+              available: providerUsesOutboundCredentialProxy(context.provider),
+              identityBinding: '',
+            };
+          },
+          // Only the platform outbound handler supplies this container identity.
+          authenticate: async context =>
+            context.outboundContainerId === input.outboundContainerId
+              ? { ok: true, isCurrent: () => true }
+              : { ok: false, status: 403, code: 'invalid_identity' },
         }
-        for (const grant of listScopeGrants(this.db)) {
-          if (grant.userId !== ownerId) continue;
-          if (!(await this.grantMatchesAlias(grant, input.credential))) continue;
-          const resolved = await resolveSessionCredential({ env: this.env, grant, ...input });
-          if (!resolved) return null;
-          const current = await this.readAllocation();
-          if (
-            !this.sandboxCanResolveCredentials(current) ||
-            Date.now() >= resolved.grant.expiresAt
-          ) {
-            return null;
-          }
-          writeScopeGrant(this.db, resolved.grant);
-          return {
-            credential: resolved.credential,
-            ...(alias.purpose === 'kilo' ? { organizationId: resolved.organizationId ?? '' } : {}),
-          };
-        }
-        return null;
-      } catch {
-        return null;
-      }
+      );
+      return result.ok && result.authority.type === 'managed'
+        ? { credential: result.authority.capability }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async admitScmForward(
+    input: ControlPlaneScmForwardAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult> {
+    await this.initialized;
+    return admitVercelScmForward(input, {
+      ...this.scmAdmissionDependencies(),
+      env: this.env,
+      contract: verifiedVercelSandboxIdentityContract,
+      readContext: () => this.readScmAdmissionContext(),
     });
+  }
+
+  private scmAdmissionDependencies() {
+    return {
+      serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
+      resolve: (request: Omit<Parameters<typeof resolveSessionCredential>[0], 'env'>) =>
+        resolveSessionCredential({ ...request, env: this.env }),
+      persist: (grant: SessionCredentialGrant) => writeScopeGrant(this.db, grant),
+    };
+  }
+
+  private async readScmAdmissionContext() {
+    const allocation = await this.readAllocation();
+    return {
+      sandboxId: this.sandboxId,
+      ownerId: await this.requireOwner(),
+      provider: this.currentProvider(),
+      containmentEnabled: this.credentialContainmentEnabled(),
+      allocation,
+      outboundContainerId:
+        allocation.kind === 'stopped' || allocation.kind === 'stopping'
+          ? null
+          : this.outboundContainerIdFor(),
+      physicalName: this.providerPin?.allocationName ?? this.sandboxId,
+      byoc: this.providerPin?.byoc,
+      locator: this.providerPin?.locator ?? null,
+      grants: listScopeGrants(this.db),
+      liveSessionIds: (await listRoutes(this.db))
+        .filter(route => route.state !== 'failed')
+        .map(route => route.sessionId),
+    };
   }
 
   /**
@@ -2133,6 +2178,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let state = rowToState(row);
     const routes = this.db.select().from(routesTable).all();
     if (
+      (pin.containment && (!pin.containment.kilocode || !pin.containment.github)) ||
+      listScopeGrants(this.db).some(grant => grant.containmentEnabled === false) ||
       routes.some(
         route =>
           route.grant?.trimStart().startsWith('{') ||
@@ -2239,7 +2286,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       configuration: input.configuration ?? { provider },
       locator: input.locator ?? null,
       billing: input.byoc ? null : (input.billing ?? null),
-      containment: input.containment ?? null,
+      containment: getWorktreeCredentialContainment(),
       ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
       ...(policy.data.egressMode !== 'allowlist'
         ? {}
@@ -2594,7 +2641,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       containment: this.credentialContainmentEnabled() ? 'enabled' : 'disabled',
     });
     const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
-    const outboundContainerId = this.outboundContainerIdFor() ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -2609,6 +2655,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const existing = scopes.find(
       grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
+    const outboundContainerId = this.outboundContainerIdFor() ?? undefined;
     if (
       runtimeContract !== 'legacy' &&
       !scopes.some(
@@ -3205,6 +3252,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
     if (provider === 'cloudflare') return null;
+    if (provider === 'vercel') return this.sandboxId;
     if (!providerUsesOutboundCredentialProxy(provider)) return null;
     return (
       getManagedOutboundContainerId(provider, this.env, {
@@ -3214,39 +3262,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  private sandboxCanResolveCredentials(state: AllocationState): boolean {
-    return (
-      state.kind !== 'stopped' &&
-      state.kind !== 'stopping' &&
-      state.providerRef !== null &&
-      providerUsesOutboundCredentialProxy(this.currentProvider())
-    );
-  }
-
-  private async grantMatchesAlias(
-    grant: SessionCredentialGrant,
-    credential: string
-  ): Promise<boolean> {
-    const alias = parseControlPlaneCredential(credential);
-    if (alias === null) return false;
-    const expected = alias.purpose === 'kilo' ? [grant.kilo.alias] : grantScmAliases(grant);
-    // Constant-time comparison of a secret-bearing alias (B3 review 5).
-    for (const candidate of expected) {
-      if (candidate === undefined) continue;
-      if (await sandboxCredentialMatchesHash(credential, await hashSandboxCredential(candidate))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * The one containment decision for this sandbox. The Worker-selected
-   * per-requirement containment (H2) owns it; the environment default applies
-   * only when no selection was stored. Never derived from the session plane, so
-   * a local `CREDENTIAL_CONTAINMENT_ENABLED=false` control session stays on
-   * direct credentials.
-   */
+  /** Saved requirements remain authoritative until the old allocation stops. */
   private credentialContainmentEnabled(): boolean {
     const containment = this.resolvedContainment();
     return containment.kilocode || containment.github;
@@ -3259,10 +3275,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * container class and the grant can never disagree.
    */
   private resolvedContainment(): CredentialContainmentRequirements {
-    return (
-      this.providerPin?.containment ??
-      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false')
-    );
+    return this.providerPin?.containment ?? getWorktreeCredentialContainment();
   }
 
   private matchesContainment(required: CredentialContainmentRequirements): boolean {
@@ -3452,6 +3465,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     previous: AllocationState,
     next: AllocationState
   ): Promise<void> {
+    const pin = this.providerPin;
+    if (pin?.containment && (!pin.containment.kilocode || !pin.containment.github)) {
+      const upgraded = { ...pin, containment: getWorktreeCredentialContainment() };
+      await this.writeProviderPin(upgraded);
+      this.providerPin = upgraded;
+      this.provider = this.createProviderAdapter(upgraded);
+    }
     const ctx = this.routeContext(next);
     this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
@@ -4565,7 +4585,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           return;
         }
         if (await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId))) return;
-        if (error instanceof ByocVercelProviderError) {
+        if (
+          error instanceof ByocVercelProviderError ||
+          error instanceof VercelScmContainmentError
+        ) {
           await this.failCreationRoutes(allocationId, false, error.reason);
           return;
         }
@@ -5502,6 +5525,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sandboxName: allocationName,
             resources,
             locator: pin.locator,
+            persistRuntimeLocator: locator =>
+              this.enqueue(async () => {
+                if (
+                  this.providerPin?.allocationName !== allocationName ||
+                  JSON.stringify(this.providerPin.byoc) !== JSON.stringify(pin.byoc)
+                ) {
+                  throw new Error('Vercel allocation changed during runtime resolution');
+                }
+                const resolved = { ...this.providerPin, locator };
+                await this.writeProviderPin(resolved);
+                this.providerPin = resolved;
+              }),
             // Authoritative live grants: read at create and on every credential
             // refresh, never frozen into the adapter at construction.
             readContainedGrants: () => this.activeGrants(Date.now()),

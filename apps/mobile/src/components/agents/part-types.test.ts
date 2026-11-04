@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
 
 import { assistantMessage } from './message-bubble-test-utils';
 import {
+  firstHumanText,
   hasNonWhitespaceText,
+  humanTextParts,
   isPartStreaming,
   isPatchPart,
   isSnapshotProgressPart,
@@ -63,6 +65,17 @@ function makeToolPart(): ToolPart {
   };
 }
 
+function makeFilePart(): FilePart {
+  return {
+    id: 'file-1',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'file',
+    mime: 'text/plain',
+    url: 'file:///a.txt',
+  };
+}
+
 function storedMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
   return { info: assistantMessage(id).info, parts };
 }
@@ -86,6 +99,36 @@ describe('isSnapshotProgressPart', () => {
   it('is false for non-text parts', () => {
     const part = makeReasoningPart('thinking');
     expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+});
+
+describe('humanTextParts', () => {
+  const contextText =
+    'Cloud Agent session context.\n<cloud-agent-context session-id="workspace_123" />';
+
+  it('skips a synthetic server context part when a human prompt exists', () => {
+    const context = { ...makeTextPart(contextText, true), id: 'context' };
+    const prompt = { ...makeTextPart('Fix the bug'), id: 'prompt' };
+    expect(humanTextParts([context, prompt]).map(part => part.text)).toEqual(['Fix the bug']);
+    expect(firstHumanText([context, prompt])).toBe('Fix the bug');
+  });
+
+  it('does not fall back to server context for an attachment-only row', () => {
+    const context = { ...makeTextPart(contextText, true), id: 'context' };
+    expect(humanTextParts([context, makeFilePart()])).toEqual([]);
+    expect(firstHumanText([context, makeFilePart()])).toBe('');
+  });
+
+  it('keeps a synthetic-only optimistic prompt', () => {
+    const prompt = makeTextPart('Fix the bug', true);
+    expect(humanTextParts([prompt]).map(part => part.text)).toEqual(['Fix the bug']);
+    expect(firstHumanText([prompt])).toBe('Fix the bug');
+  });
+
+  it('skips ignored text parts', () => {
+    const ignored = { ...makeTextPart('hidden'), ignored: true };
+    const prompt = makeTextPart('Fix the bug');
+    expect(humanTextParts([ignored, prompt]).map(part => part.text)).toEqual(['Fix the bug']);
   });
 });
 

@@ -228,21 +228,6 @@ describe('allowsSubagentSessions', () => {
     ).toBe(false);
   });
 
-  it('denies spawn permission on a shared sandbox', () => {
-    expect(
-      allowsSubagentSessions({
-        options: { createdOnPlatform: 'cloud-agent-web' },
-        runtime: { sandboxAllocation: 'cloudflare-shared' },
-      })
-    ).toBe(false);
-    expect(
-      allowsSubagentSessions({
-        options: { createdOnPlatform: 'cloud-agent-web' },
-        savedSandboxAllocation: 'cloudflare-shared',
-      })
-    ).toBe(false);
-  });
-
   it('allows spawn permission on an isolated allocation', () => {
     expect(
       allowsSubagentSessions({

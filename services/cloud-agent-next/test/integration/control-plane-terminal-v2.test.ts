@@ -186,7 +186,7 @@ async function startTerminalSandbox(): Promise<{
   provider: FakeProvider;
   wrapper: FakeWrapper;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const stub = await injectProvider(sandboxId, provider);
   await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -266,7 +266,7 @@ describe('control-plane terminals on the Sandbox DO (B10)', () => {
   });
 
   it('returns a retryable not_ready when no wrapper is connected', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
     await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
@@ -361,7 +361,7 @@ async function startTerminalSession(): Promise<{
   wrapper: FakeWrapper;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const provider = createFakeProvider();
   await injectProvider(sandboxId, provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
@@ -445,7 +445,7 @@ describe('control-plane terminals on the Session DO (B10)', () => {
 
   it('refuses a terminal before the route is ready', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));

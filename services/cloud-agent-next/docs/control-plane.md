@@ -1216,8 +1216,14 @@ The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktre
 the canonical workspace parent, the original root chat that remains the authorization anchor for
 the existing child-session API. Every grant renewal checks that root's authorization and its owner,
 organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and parent callbacks belong to that root, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity. Built-in credential
+becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
+invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
+either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
+existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
+as the new chat's first message and derives its operation and session identity from the persisted
+callback message ID. The session form checks that the target is a root or sibling chat with the
+same owner, organization and workspace, and that it is still accessible; the invoking chat learns
+its own session id from the `cloud-agent-context` line in its turns. Built-in credential
 refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
 the workspace's MCP set.
 

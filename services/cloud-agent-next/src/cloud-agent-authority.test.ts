@@ -13,6 +13,7 @@ import {
   assertCloudAgentParentAuthority,
   assertCloudAgentIsolatedAllocation,
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   resolveCloudAgentMcpUrl,
   validateScopedWorkerPreparation,
@@ -330,6 +331,64 @@ describe('Cloud Agent spawn authority', () => {
     expect(record.source).toEqual(authorization.source);
     expect(result.seal).toBe('private-child-authorization-seal');
     expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+  });
+
+  it('mints an independent sibling authorization in the parent workspace only', async () => {
+    const { context, authorization } = fixture();
+    const result = await authorizeCloudAgentWorkspaceSibling({
+      parentSessionId,
+      siblingSessionId: childSessionId,
+      ...context,
+    });
+    const record = renew.mock.calls[0][0].authorization;
+    expect(record).toMatchObject({
+      ...authorization,
+      id: expect.any(String),
+      resourceId: childSessionId,
+      issuedAt: now.toISOString(),
+      delegationExpiresAt: authorization.delegationExpiresAt,
+    });
+    expect(record.id).not.toBe(authorization.id);
+    expect(record.bindings).toEqual(authorization.bindings);
+    expect(result.seal).toBe('private-child-authorization-seal');
+    expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+    expect(jwt.decode(result.token)).not.toHaveProperty('parentCloudAgentSessionId');
+  });
+
+  it('refuses sibling authorization for a self target or a disabled parent', async () => {
+    const { context, metadata } = fixture();
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: parentSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('independent workspace session');
+    metadata.allowSubagentSessions = false;
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('refuses sibling authorization when the parent is revoked during minting', async () => {
+    const { context, authorization } = fixture();
+    renew.mockImplementationOnce(async () => {
+      authorization.state = 'revoked';
+      return { token: 'must-not-escape' };
+    });
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(seal).not.toHaveBeenCalled();
   });
 
   it.each([

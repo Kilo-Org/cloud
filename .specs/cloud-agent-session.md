@@ -417,7 +417,16 @@ repository.
     MUST check current canonical-parent authorization and persisted child
     lineage, owner and organization. It MUST NOT manage the parent itself,
     sibling chats or unrelated sessions. Child completion callbacks MUST target
-    the canonical workspace parent, not an arbitrary invoking sibling.
+    either a new chat created in the parent's workspace
+    (`workspace:new-chat`) or one existing chat in that workspace
+    (`workspace:<session-id>`). The server MUST verify that a session target is
+    a root or sibling chat with the same owner, organization and workspace, and
+    that it is still accessible; it MUST reject a target outside the spawning
+    parent's workspace or any target that is a child session. The target chat
+    learns its own session id from the `cloud-agent-context` line in its turns.
+    A `workspace:new-chat` callback starts the new chat with the child result as
+    its first message, and every workspace callback MUST be idempotent for the
+    persisted callback message ID.
 
 ### Watch PR (Observation-Only Pilot)
 

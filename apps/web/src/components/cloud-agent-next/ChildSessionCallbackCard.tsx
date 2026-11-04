@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import {
   AlertCircle,
-  ArrowUpRight,
   Bot,
   CheckCircle2,
   GitBranch,
@@ -62,9 +61,19 @@ export function ChildSessionCallbackCard({ callback }: { callback: ChildSessionC
       </div>
 
       <div className="text-muted-foreground mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span className="min-w-0 truncate font-mono" title={sessionId}>
-          {sessionId}
-        </span>
+        {sessionHref ? (
+          <Link
+            href={sessionHref}
+            className="text-foreground hover:text-foreground/80 focus-visible:ring-ring min-w-0 truncate rounded-sm font-mono underline underline-offset-2 focus-visible:ring-2 focus-visible:outline-none"
+            title={sessionId}
+          >
+            {sessionId}
+          </Link>
+        ) : (
+          <span className="min-w-0 truncate font-mono" title={sessionId}>
+            {sessionId}
+          </span>
+        )}
         {callback.branch && (
           <span className="flex min-w-0 items-center gap-1">
             <GitBranch className="size-3 shrink-0" aria-hidden="true" />
@@ -90,18 +99,6 @@ export function ChildSessionCallbackCard({ callback }: { callback: ChildSessionC
       {callback.resultTruncated && (
         <p className="text-muted-foreground mt-1 text-xs">Result truncated.</p>
       )}
-
-      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        {sessionHref && (
-          <Link
-            href={sessionHref}
-            className="text-foreground hover:text-foreground/80 focus-visible:ring-ring inline-flex min-h-6 items-center gap-1 rounded-sm underline underline-offset-2 focus-visible:ring-2 focus-visible:outline-none"
-          >
-            Open child session
-            <ArrowUpRight className="size-3.5" aria-hidden="true" />
-          </Link>
-        )}
-      </div>
     </div>
   );
 }

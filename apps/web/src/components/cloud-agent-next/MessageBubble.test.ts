@@ -298,7 +298,8 @@ describe('MessageBubble', () => {
     expect(html).toContain(
       'href="/cloud/sessions/ses_e5c884bceffff2tD0tPYMXMdbi?at=msg_1a37a0bcd000D1kD5ytWNBYC9D"'
     );
-    expect(html).toContain('Open child session');
+    expect(html).toContain('>ses_e5c884bceffff2tD0tPYMXMdbi</a>');
+    expect(html).not.toContain('Open child session');
     expect(html).not.toContain('"cloudAgentSessionId"');
     expect(html).not.toContain('"version":1');
     expect(html).not.toContain('A child Cloud Agent task finished');

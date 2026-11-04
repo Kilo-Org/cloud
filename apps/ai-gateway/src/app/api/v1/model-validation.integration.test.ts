@@ -89,7 +89,7 @@ type TestSessionMetadata = {
   identity: { sessionId: string; userId: string };
   auth: { kilocodeToken: string };
   agent: { model: string };
-  workspace: Record<string, never>;
+  workspace: { sandboxProvider: 'cloudflare-containers' };
   lifecycle: { version: number; timestamp: number };
 };
 const { assertKiloModelAvailable } = jest.requireActual<{
@@ -260,7 +260,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         identity: { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', userId: user.id },
         auth: { kilocodeToken: (await sign(new Date(now - 7200000))).token },
         agent: { model: privateModel },
-        workspace: {},
+        workspace: { sandboxProvider: 'cloudflare-containers' },
         lifecycle: { version: 1, timestamp: now },
       };
       const record: RuntimeAuthorization = {

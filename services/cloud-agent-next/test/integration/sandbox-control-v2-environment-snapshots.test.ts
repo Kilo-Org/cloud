@@ -573,7 +573,8 @@ describe('environment snapshot launch', () => {
         }),
       });
     });
-    await stub.prepare(prepareInput());
+    // No environment: a snapshot candidate would extend the create deadline.
+    await stub.prepare(prepareInput({ environment: null }));
     await waitFor(() => expect(provider.stopRefs.length).toBeGreaterThan(0));
     const allocationId = provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID;
     await waitFor(async () =>

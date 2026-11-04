@@ -106,6 +106,7 @@ import {
   createKiloDefaultEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
+import { EnkryptOutputGuardrailReportSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 
 jest.mock('next/server', () => {
   return {
@@ -4810,6 +4811,113 @@ describe('Enkrypt output guardrail', () => {
     expect(mockedLogUnrewrittenResponse).toHaveBeenCalledWith(
       expect.objectContaining({ error: { guardrail_rejection: 'block', guardrail: 'output' } })
     );
+  });
+
+  describe('provider metadata archive', () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'organization',
+      steps: [
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'openrouter',
+          bounded_spending: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'openrouter',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    };
+
+    async function archivedRecord(settings: OrganizationSettings) {
+      fakeR2.objects.clear();
+      const env = jest.replaceProperty(process, 'env', {
+        ...process.env,
+        R2_ACCOUNT_ID: 'test-metadata-account',
+        R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+        R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+        R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+      });
+      setOrganization(settings);
+      respondUpstream('chat_completions', true);
+      enkryptAnswers(piiDetected);
+      mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+        onDecision?.(decision);
+        return {
+          kind: 'provider',
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        };
+      });
+
+      let text: string;
+      try {
+        const response = await sendRequest('chat_completions', true);
+        text = await response.text();
+        await runAfterTasks();
+      } finally {
+        env.restore();
+      }
+
+      const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+      const key = `test-provider-metadata/${usageId}.json`;
+      expect([...fakeR2.objects.keys()]).toEqual([key]);
+      const archived = fakeR2.objects.get(key) ?? '';
+      return { text, archived, record: JSON.parse(archived) as Record<string, unknown> };
+    }
+
+    it('archives the output report of a blocked streamed response without its text', async () => {
+      const { text, archived, record } = await archivedRecord(outputGuardrailSettings('block'));
+
+      expect(sseEvents(afterKeepAlive(text))).toEqual(
+        expectedStreamErrorEvents(
+          'chat_completions',
+          expect.stringContaining("blocked the model's response"),
+          'guardrail_blocked'
+        )
+      );
+      expect(archived).not.toContain(secret);
+      expect(record).toMatchObject({ usage_id: expect.any(String), ...decision });
+      const report = EnkryptOutputGuardrailReportSchema.parse(record.enkrypt_output);
+      expect(report).toMatchObject({
+        held_back: true,
+        verdict: 'block',
+        not_scanned_reason: null,
+        scans: [
+          {
+            scan: 'blocking',
+            decision: 'blocked',
+            detectors_fired: ['pii'],
+            verdict_cache: 'off',
+            credits_cost: 2,
+          },
+        ],
+      });
+    });
+
+    it('archives no output report when the output guardrail is off', async () => {
+      const { record } = await archivedRecord({
+        enkrypt: { input_guardrail: { enabled: false } },
+      });
+
+      expect(record).toMatchObject({ usage_id: expect.any(String), ...decision });
+      expect(record).not.toHaveProperty('enkrypt_output');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
   });
 
   it('streams the response without waiting for a log-only scan, which never rejects', async () => {

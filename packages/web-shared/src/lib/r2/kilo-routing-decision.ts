@@ -1,4 +1,7 @@
-import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type {
+  EnkryptGuardrailReport,
+  EnkryptOutputGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type {
   KiloRoutingDecisionRecord,
   ProviderRoutingDecision,
@@ -17,6 +20,8 @@ export type AiProviderMetadataCapture = {
   captureVercelMetadata: (value: unknown) => void;
   /** Called at upload time, after the response. */
   captureEnkryptReport: (report: () => Promise<EnkryptGuardrailReport | null>) => void;
+  /** Called at upload time, after the response. */
+  captureEnkryptOutputReport: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
   waitFor: (promise: Promise<unknown>) => void;
 };
 
@@ -30,6 +35,15 @@ export function createAiProviderMetadataCapture(
   let record: KiloRoutingDecisionRecord | undefined;
   let parsing: Promise<void> | undefined;
   let enkryptReport: (() => Promise<EnkryptGuardrailReport | null>) | undefined;
+  let enkryptOutputReport: (() => Promise<EnkryptOutputGuardrailReport>) | undefined;
+  const readReport = async <T>(name: string, report: (() => Promise<T>) | undefined) =>
+    report?.().catch((error: unknown) => {
+      errorExceptInTest(`[${LOG_SOURCE}] ${name} failed; archived without it`, {
+        usageId,
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+      return null;
+    });
 
   return {
     captureRoutingDecision(decision) {
@@ -48,17 +62,15 @@ export function createAiProviderMetadataCapture(
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();
-          const enkrypt = await enkryptReport?.().catch((error: unknown) => {
-            errorExceptInTest(`[${LOG_SOURCE}] Enkrypt report failed; archived without it`, {
-              usageId,
-              errorType: error instanceof Error ? error.name : 'unknown',
-            });
-            return null;
-          });
+          const [enkrypt, enkryptOutput] = await Promise.all([
+            readReport('Enkrypt report', enkryptReport),
+            readReport('Enkrypt output report', enkryptOutputReport),
+          ]);
           return JSON.stringify({
             ...record,
             ...(metadata ? { vercel: { metadata } } : {}),
             ...(enkrypt ? { enkrypt } : {}),
+            ...(enkryptOutput ? { enkrypt_output: enkryptOutput } : {}),
           });
         },
       });
@@ -68,6 +80,9 @@ export function createAiProviderMetadataCapture(
     },
     captureEnkryptReport(report) {
       enkryptReport = report;
+    },
+    captureEnkryptOutputReport(report) {
+      enkryptOutputReport = report;
     },
     waitFor(promise) {
       parsing = promise.then(

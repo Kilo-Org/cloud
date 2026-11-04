@@ -10,7 +10,13 @@ import {
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanCoverage,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import {
+  guardrailSettings,
+  type EnkryptOutputGuardrailReport,
+  type EnkryptScanReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { usageRecordsWithAddedLatency } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import {
   extractResponseText,
@@ -33,7 +39,7 @@ import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /** The request a response scan belongs to. The scanned text is the response. */
-export type EnkryptOutputScan = Omit<EnkryptGuardrailScan, 'text'>;
+export type EnkryptOutputScan = Omit<EnkryptGuardrailScan, 'text' | 'coverage'>;
 
 /** The response scan of an organization member's request, or null without an output guardrail. */
 export function resolveEnkryptOutputScan(
@@ -58,9 +64,15 @@ const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail 
 
 const OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-const outputTooLarge: EnkryptGuardrailScanResult = {
+type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
+  /** Null when Enkrypt was not asked. */
+  report: EnkryptScanReport | null;
+};
+
+const outputTooLarge: OutputScanResult = {
   verdict: { action: 'block', message: OUTPUT_TOO_LARGE_MESSAGE },
   usageRecords: [],
+  report: null,
 };
 
 /** Responses that `scanRequest` would reject as too large never reach it, so it is not billed. */
@@ -93,7 +105,22 @@ type OutputDecision =
   | { action: 'release'; response: Response }
   | { action: 'reject'; response: NextResponse; verdict: EnkryptGuardrailVerdict };
 
-const notScanned: EnkryptGuardrailScanResult = { verdict: { action: 'skip' }, usageRecords: [] };
+const notScanned: OutputScanResult = {
+  verdict: { action: 'skip' },
+  usageRecords: [],
+  report: null,
+};
+
+/** A response is scanned whole; output scans never use the verdict cache. */
+function wholeResponseCoverage(text: string): EnkryptScanCoverage {
+  return {
+    cache: 'off',
+    totalCharacters: text.length,
+    totalSegments: text.length > 0 ? 1 : 0,
+    cachedCharacters: 0,
+    cachedSegments: 0,
+  };
+}
 
 async function readBody(body: ReadableStream<Uint8Array>): Promise<BufferedBody> {
   const reader = body.getReader();
@@ -253,6 +280,8 @@ type GuardEnkryptOutputParams = {
   release: (response: Response) => Promise<NextResponse>;
   /** Called before a rejection replaces the response. */
   onReject: (rejection: NextResponse, verdict: EnkryptGuardrailVerdict) => Promise<void>;
+  /** Receives the guardrail's report, to read after the response like `after()` work. */
+  captureReport?: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
 };
 
 /**
@@ -279,6 +308,7 @@ export async function guardEnkryptOutput({
   signal,
   release,
   onReject,
+  captureReport,
 }: GuardEnkryptOutputParams): Promise<NextResponse> {
   // Upstream error bodies are not model output.
   if (!scan || !response.ok || !response.body) return release(response);
@@ -293,107 +323,146 @@ export async function guardEnkryptOutput({
     client_request_id: scan.clientRequestId,
     api_kind: scan.apiKind,
   };
-  const scanOutput = (config: EnkryptOutputScan['config'], text: string) =>
-    scanRequest({ ...scan, config, text }, deps);
+  const report: EnkryptOutputGuardrailReport = {
+    settings: guardrailSettings(scan.config),
+    held_back: blocking !== null,
+    held_bytes: null,
+    held_ms: null,
+    upstream_read_failed: false,
+    output_characters: null,
+    not_scanned_reason: null,
+    verdict: 'skip',
+    unavailable_reason: null,
+    added_latency_ms: null,
+    scans: [],
+  };
+  const scanOutput = async (
+    config: EnkryptOutputScan['config'],
+    text: string
+  ): Promise<OutputScanResult> => {
+    const result = await scanRequest(
+      { ...scan, config, text, coverage: wholeResponseCoverage(text) },
+      deps
+    );
+    report.scans.push(result.report);
+    return result;
+  };
   const finish = async (decision: OutputDecision): Promise<NextResponse> => {
     if (decision.action === 'release') return release(decision.response);
     await onReject(decision.response, decision.verdict);
     return decision.response;
   };
-  const reject = (verdict: EnkryptGuardrailVerdict): OutputDecision => {
+  const decide = (verdict: EnkryptGuardrailVerdict, allowed: Response): OutputDecision => {
+    report.verdict = verdict.action;
+    report.unavailable_reason = verdict.action === 'unavailable' ? verdict.reason : null;
+    if (verdict.action === 'allow' || verdict.action === 'skip') {
+      return { action: 'release', response: allowed };
+    }
     warnExceptInTest('[enkrypt-guardrail] output withheld', {
       ...logFields,
       verdict: verdict.action,
-      reason: verdict.action === 'unavailable' ? verdict.reason : undefined,
+      reason: report.unavailable_reason ?? report.not_scanned_reason ?? undefined,
     });
     const rejection = enkryptOutputGuardrailRejectionResponse(kind, verdict, stream);
     return rejection
       ? { action: 'reject', response: rejection, verdict }
-      : { action: 'release', response };
+      : { action: 'release', response: allowed };
+  };
+  const finalReport = (): EnkryptOutputGuardrailReport => ({
+    ...report,
+    scans: report.scans.toSorted(
+      (a, b) => Number(a.scan !== 'blocking') - Number(b.scan !== 'blocking')
+    ),
+  });
+  const notScannedBecause = (reason: EnkryptOutputGuardrailReport['not_scanned_reason']) => {
+    report.not_scanned_reason = reason;
+    warnExceptInTest('[enkrypt-guardrail] output not scanned', { ...logFields, reason });
   };
 
   if (!blocking) {
     const copy = logOnly && response.clone().body;
     if (logOnly && copy) {
-      after(
-        (async () => {
-          try {
-            const copied = await readBody(copy);
-            if (copied.overLimit) {
-              warnExceptInTest('[enkrypt-guardrail] output too large to scan; not logged', {
-                ...logFields,
-                max_bytes: MAX_HELD_OUTPUT_BYTES,
-              });
-              return;
-            }
-            const text = extractResponseText(kind, format, bodyText(copied));
-            if (isTooLargeToScan(text)) {
-              warnExceptInTest('[enkrypt-guardrail] output too large to scan; not logged', {
-                ...logFields,
-                scanned_characters: text.length,
-              });
-              return;
-            }
-            const result = await scanOutput(logOnly, text);
-            await recordEnkryptUsageRecords(outputUsageRecords([], result.usageRecords, 0));
-          } catch (error) {
-            console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
-              ...logFields,
-              error: errorMessage(error),
-            });
-          }
-        })()
-      );
+      const logged = (async () => {
+        try {
+          const copied = await readBody(copy);
+          report.upstream_read_failed = copied.readError !== null;
+          if (copied.overLimit) return notScannedBecause('held_output_too_large');
+          const text = extractResponseText(kind, format, bodyText(copied));
+          report.output_characters = text.length;
+          if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
+          const result = await scanOutput(logOnly, text);
+          await recordEnkryptUsageRecords(outputUsageRecords([], result.usageRecords, 0));
+        } catch (error) {
+          console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
+            ...logFields,
+            error: errorMessage(error),
+          });
+        }
+      })();
+      after(logged);
+      captureReport?.(async () => {
+        await logged;
+        return finalReport();
+      });
     }
     return release(response);
   }
 
   if (scan.config.status === 'invalid') {
     void body.cancel().catch(() => {});
-    warnExceptInTest('[enkrypt-guardrail] decision', {
-      ...logFields,
-      decision: 'error_fail_closed',
-      error: 'invalid_config',
-    });
-    return finish(reject({ action: 'unavailable', reason: 'failed' }));
+    report.held_back = false;
+    notScannedBecause('invalid_config');
+    captureReport?.(async () => finalReport());
+    return finish(decide({ action: 'unavailable', reason: 'failed' }, response));
   }
 
   const scanned = (async () => {
     const bufferStartedAt = performance.now();
     const buffered = await readBody(body);
+    report.held_ms = Math.round(performance.now() - bufferStartedAt);
+    report.held_bytes = bufferedBytes(buffered);
+    report.upstream_read_failed = buffered.readError !== null;
     console.debug('[enkrypt-guardrail] output held back', {
       ...logFields,
-      held_ms: Math.round(performance.now() - bufferStartedAt),
-      held_bytes: bufferedBytes(buffered),
-      read_failed: buffered.readError !== null,
+      held_ms: report.held_ms,
+      held_bytes: report.held_bytes,
+      read_failed: report.upstream_read_failed,
       over_limit: buffered.overLimit,
     });
     if (buffered.overLimit) {
+      notScannedBecause('held_output_too_large');
       return {
-        decision: reject({ action: 'block', message: HELD_OUTPUT_TOO_LARGE_MESSAGE }),
+        decision: decide({ action: 'block', message: HELD_OUTPUT_TOO_LARGE_MESSAGE }, response),
         usageRecords: Promise.resolve([]),
       };
     }
 
-    const text = Promise.resolve().then(() =>
-      extractResponseText(kind, format, bodyText(buffered))
-    );
+    const text = Promise.resolve().then(() => {
+      const extracted = extractResponseText(kind, format, bodyText(buffered));
+      report.output_characters = extracted.length;
+      if (isTooLargeToScan(extracted)) notScannedBecause('output_too_large');
+      return extracted;
+    });
     const blockingResult = text
       .then(scannedText =>
         isTooLargeToScan(scannedText) ? outputTooLarge : scanOutput(blocking, scannedText)
       )
-      .catch((error: unknown): EnkryptGuardrailScanResult => {
+      .catch((error: unknown): OutputScanResult => {
         console.error('[enkrypt-guardrail] output scan failed unexpectedly; response withheld', {
           ...logFields,
           error: errorMessage(error),
         });
-        return { verdict: { action: 'unavailable', reason: 'failed' }, usageRecords: [] };
+        return {
+          verdict: { action: 'unavailable', reason: 'failed' },
+          usageRecords: [],
+          report: null,
+        };
       });
     const logOnlyResult = text
       .then(scannedText =>
         logOnly && !isTooLargeToScan(scannedText) ? scanOutput(logOnly, scannedText) : notScanned
       )
-      .catch((error: unknown): EnkryptGuardrailScanResult => {
+      .catch((error: unknown): OutputScanResult => {
         console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
           ...logFields,
           error: errorMessage(error),
@@ -404,17 +473,20 @@ export async function guardEnkryptOutput({
     const waitStartedAt = performance.now();
     const { verdict, usageRecords } = await blockingResult;
     const addedLatencyMs = Math.round(performance.now() - waitStartedAt);
+    report.added_latency_ms = addedLatencyMs;
     return {
-      decision:
-        verdict.action === 'allow' || verdict.action === 'skip'
-          ? ({ action: 'release', response: replayedResponse(response, buffered) } as const)
-          : reject(asResponseVerdict(verdict)),
+      decision: decide(asResponseVerdict(verdict), replayedResponse(response, buffered)),
       usageRecords: logOnlyResult.then(logOnlyScan =>
         outputUsageRecords(usageRecords, logOnlyScan.usageRecords, addedLatencyMs)
       ),
     };
   })();
-  after(scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords));
+  const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords);
+  after(recorded);
+  captureReport?.(async () => {
+    await recorded;
+    return finalReport();
+  });
 
   const released = scanned.then(({ decision }) => finish(decision));
   if (!stream || format !== 'sse') return released;

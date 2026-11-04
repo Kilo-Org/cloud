@@ -1368,6 +1368,7 @@ export async function handleLlmProxyRequest(
         logging: requestLogging,
         responseTransforms: effectiveProviderContext.provider.responseTransforms,
       }),
+    captureReport: report => providerMetadataCapture?.captureEnkryptOutputReport(report),
     onReject: async (rejection, verdict) => {
       if (request.signal.aborted) return;
       await logUnrewrittenResponse({

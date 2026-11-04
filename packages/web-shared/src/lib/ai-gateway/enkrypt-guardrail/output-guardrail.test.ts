@@ -7,6 +7,10 @@ import {
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  EnkryptOutputGuardrailReportSchema,
+  type EnkryptOutputGuardrailReport,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { resolveEnkryptOutputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { recordEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -262,7 +266,8 @@ async function guard(
   response: Response,
   scan: EnkryptOutputScan | null,
   kind: GatewayChatApiKind = 'chat_completions',
-  stream = true
+  stream = true,
+  captureReport?: (report: () => Promise<EnkryptOutputGuardrailReport>) => void
 ) {
   const release = jest.fn(
     async (released: Response) =>
@@ -283,8 +288,54 @@ async function guard(
     signal: new AbortController().signal,
     release,
     onReject,
+    captureReport,
   });
   return { client, release, onReject };
+}
+
+function reportCapture() {
+  return jest.fn((_report: () => Promise<EnkryptOutputGuardrailReport>) => {});
+}
+
+async function capturedReport(
+  captureReport: ReturnType<typeof reportCapture>
+): Promise<EnkryptOutputGuardrailReport> {
+  expect(captureReport).toHaveBeenCalledTimes(1);
+  const [readReport] = captureReport.mock.calls[0];
+  const report = EnkryptOutputGuardrailReportSchema.parse(await readReport());
+  expect(JSON.stringify(report)).not.toContain(SECRET);
+  return report;
+}
+
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+const blockingPiiSettings = {
+  status: 'ready',
+  scan_tool_results: false,
+  detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
+};
+
+function scanReport(overrides: Record<string, unknown>) {
+  return {
+    scan: 'blocking',
+    detectors_enabled: ['pii'],
+    detectors_blocking: ['pii'],
+    verdict_cache: 'off',
+    total_characters: MODEL_OUTPUT.length,
+    total_segments: 1,
+    cached_characters: 0,
+    cached_segments: 0,
+    scanned_characters: MODEL_OUTPUT.length,
+    decision: 'allowed',
+    error: null,
+    detectors_fired: [],
+    attempts: 1,
+    credits_cost: 2,
+    latency_ms: expect.any(Number),
+    ...overrides,
+  };
 }
 
 function releasedResponse(release: { mock: { calls: [Response][] } }): Response {
@@ -994,6 +1045,296 @@ describe('guardEnkryptOutput', () => {
           }),
         ],
       ]);
+    });
+  });
+
+  describe('report', () => {
+    it('reports a held-back stream that a blocking detector allows', async () => {
+      mockEnkrypt(allowAll);
+      const body = UPSTREAM_BODIES.chat_completions.sse;
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(body, 'sse'),
+        outputScan(blockingPii),
+        'chat_completions',
+        true,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: blockingPiiSettings,
+        held_back: true,
+        held_bytes: byteLength(body),
+        held_ms: expect.any(Number),
+        upstream_read_failed: false,
+        output_characters: MODEL_OUTPUT.length,
+        not_scanned_reason: null,
+        verdict: 'allow',
+        unavailable_reason: null,
+        added_latency_ms: expect.any(Number),
+        scans: [scanReport({})],
+      });
+    });
+
+    it('reports both scans when a blocking detector fires alongside a log-only detector', async () => {
+      mockEnkrypt(request =>
+        'pii' in request.detectors ? detected({ pii: 1 }) : detected({ toxicity: 0 })
+      );
+      const body = UPSTREAM_BODIES.messages.sse;
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(body, 'sse'),
+        outputScan(blockingPiiWithLogOnlyToxicity, 'messages'),
+        'messages',
+        true,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: {
+          status: 'ready',
+          scan_tool_results: false,
+          detectors: [
+            { detector: 'pii', action: 'block', pii_entities: ['secrets'] },
+            { detector: 'toxicity', action: 'log' },
+          ],
+        },
+        held_back: true,
+        held_bytes: byteLength(body),
+        held_ms: expect.any(Number),
+        upstream_read_failed: false,
+        output_characters: MODEL_OUTPUT.length,
+        not_scanned_reason: null,
+        verdict: 'block',
+        unavailable_reason: null,
+        added_latency_ms: expect.any(Number),
+        scans: [
+          scanReport({ decision: 'blocked', detectors_fired: ['pii'] }),
+          scanReport({
+            scan: 'log_only',
+            detectors_enabled: ['toxicity'],
+            detectors_blocking: [],
+          }),
+        ],
+      });
+    });
+
+    it('reports a transient Enkrypt failure', async () => {
+      mockEnkrypt(() => new Response('upstream error', { status: 500 }));
+      const body = UPSTREAM_BODIES.chat_completions.json;
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(body, 'json'),
+        outputScan(blockingPii),
+        'chat_completions',
+        false,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: blockingPiiSettings,
+        held_back: true,
+        held_bytes: byteLength(body),
+        held_ms: expect.any(Number),
+        upstream_read_failed: false,
+        output_characters: MODEL_OUTPUT.length,
+        not_scanned_reason: null,
+        verdict: 'unavailable',
+        unavailable_reason: 'transient',
+        added_latency_ms: expect.any(Number),
+        scans: [
+          scanReport({
+            decision: 'error_fail_closed',
+            error: 'http_500',
+            attempts: 2,
+            credits_cost: null,
+          }),
+        ],
+      });
+    });
+
+    it('reports invalid saved detectors without reading the response', async () => {
+      const fetchSpy = mockEnkrypt(allowAll);
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(UPSTREAM_BODIES.chat_completions.json, 'json'),
+        outputScan({ pii: 'bad' }),
+        'chat_completions',
+        false,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: { status: 'invalid', scan_tool_results: false, detectors: [] },
+        held_back: false,
+        held_bytes: null,
+        held_ms: null,
+        upstream_read_failed: false,
+        output_characters: null,
+        not_scanned_reason: 'invalid_config',
+        verdict: 'unavailable',
+        unavailable_reason: 'failed',
+        added_latency_ms: null,
+        scans: [],
+      });
+    });
+
+    it('reports output too large to scan', async () => {
+      mockEnkrypt(allowAll);
+      const content = `${SECRET}${'x'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS)}`;
+      const body = JSON.stringify({ choices: [{ index: 0, message: { content } }] });
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(body, 'json'),
+        outputScan(blockingPii),
+        'chat_completions',
+        false,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: blockingPiiSettings,
+        held_back: true,
+        held_bytes: byteLength(body),
+        held_ms: expect.any(Number),
+        upstream_read_failed: false,
+        output_characters: content.length,
+        not_scanned_reason: 'output_too_large',
+        verdict: 'block',
+        unavailable_reason: null,
+        added_latency_ms: expect.any(Number),
+        scans: [],
+      });
+    });
+
+    it('reports held output over the limit', async () => {
+      mockEnkrypt(allowAll);
+      const { stream } = lazyStream(ONE_MIB, OVER_LIMIT_CHUNKS);
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(stream, 'sse'),
+        outputScan(blockingPii),
+        'chat_completions',
+        false,
+        captureReport
+      );
+      await client.text();
+      await runAfterTasks();
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: blockingPiiSettings,
+        held_back: true,
+        held_bytes: MAX_HELD_OUTPUT_BYTES,
+        held_ms: expect.any(Number),
+        upstream_read_failed: false,
+        output_characters: null,
+        not_scanned_reason: 'held_output_too_large',
+        verdict: 'block',
+        unavailable_reason: null,
+        added_latency_ms: null,
+        scans: [],
+      });
+    });
+
+    it('reports a log-only scan once the copied response has been read', async () => {
+      mockEnkrypt(allowAll);
+      const body = UPSTREAM_BODIES.responses.sse;
+      const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+      void writer.write(encoder.encode(body.slice(0, 10)));
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(readable, 'sse'),
+        outputScan(logOnlyPii, 'responses'),
+        'responses',
+        true,
+        captureReport
+      );
+
+      expect(captureReport).toHaveBeenCalledTimes(1);
+      let settled = false;
+      const pending = captureReport.mock.calls[0][0]().finally(() => {
+        settled = true;
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(settled).toBe(false);
+
+      void writer.write(encoder.encode(body.slice(10)));
+      void writer.close();
+      expect(await client.text()).toBe(body);
+      await runAfterTasks();
+      await pending;
+
+      expect(await capturedReport(captureReport)).toEqual({
+        settings: {
+          status: 'ready',
+          scan_tool_results: false,
+          detectors: [{ detector: 'pii', action: 'log', pii_entities: ['secrets'] }],
+        },
+        held_back: false,
+        held_bytes: null,
+        held_ms: null,
+        upstream_read_failed: false,
+        output_characters: MODEL_OUTPUT.length,
+        not_scanned_reason: null,
+        verdict: 'skip',
+        unavailable_reason: null,
+        added_latency_ms: null,
+        scans: [scanReport({ scan: 'log_only', detectors_blocking: [] })],
+      });
+    });
+
+    it('captures no report without an output guardrail', async () => {
+      const captureReport = reportCapture();
+
+      const { client } = await guard(
+        upstreamResponse(UPSTREAM_BODIES.chat_completions.sse, 'sse'),
+        null,
+        'chat_completions',
+        true,
+        captureReport
+      );
+      await client.text();
+
+      expect(captureReport).not.toHaveBeenCalled();
+    });
+
+    it('captures no report for an upstream error response', async () => {
+      const captureReport = reportCapture();
+      const response = new Response(JSON.stringify({ error: { message: 'overloaded' } }), {
+        status: 529,
+        headers: { 'content-type': 'application/json' },
+      });
+
+      const { client } = await guard(
+        response,
+        outputScan(blockingPii),
+        'chat_completions',
+        false,
+        captureReport
+      );
+      await client.text();
+
+      expect(captureReport).not.toHaveBeenCalled();
     });
   });
 });

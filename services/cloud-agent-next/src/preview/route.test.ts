@@ -2,9 +2,7 @@ import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
-import { getSandbox } from '@cloudflare/sandbox';
 import { mintPreviewSessionToken, type PreviewClaims } from '../auth.js';
 import type {
   PreviewProviderCoordinates,
@@ -16,7 +14,6 @@ import { PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
 import {
   PREVIEW_ENTER_PATH,
   PREVIEW_TICKET_USED_TEXT,
-  defaultFetchUpstream,
   handlePreviewOpen,
   handlePreviewRequest,
   type PreviewRouteDeps,
@@ -33,15 +30,6 @@ const HOST = `${LABEL}.${SUFFIX}`;
 const ORIGIN = `http://${HOST}`;
 
 const env = { NEXTAUTH_SECRET: SECRET, PREVIEW_HOST_SUFFIX: SUFFIX } as unknown as Env;
-
-const CLOUDFLARE_TARGET: ResolvedPreviewTarget = {
-  status: 'ok',
-  coordinates: {
-    provider: 'cloudflare',
-    allocationName: 'ses-11111111111141118111111111111111',
-    containment: false,
-  },
-};
 
 const CONTAINERS_TARGET: ResolvedPreviewTarget = {
   status: 'ok',
@@ -84,7 +72,7 @@ function fixture(input: { target?: ResolvedPreviewTarget; accessError?: unknown 
   const validateAccess = vi.fn(async () => {
     if (input.accessError !== undefined) throw input.accessError;
   });
-  const resolvePreviewTarget = vi.fn(async () => input.target ?? CLOUDFLARE_TARGET);
+  const resolvePreviewTarget = vi.fn(async () => input.target ?? CONTAINERS_TARGET);
   const stub: PreviewSessionStub = { resolvePreviewTarget };
   const getSessionStub = vi.fn(() => stub);
   const usedNonces = new Set<string>();
@@ -523,17 +511,6 @@ describe('preview proxy denials that never reach the resolver or stub', () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
-  it('answers 410 without Retry-After when the upstream runtime is retired', async () => {
-    const { deps } = fixture();
-    deps.fetchUpstream = defaultFetchUpstream;
-    const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
-    expect(response.status).toBe(410);
-    expect(response.headers.get('Retry-After')).toBeNull();
-    await expect(response.text()).resolves.toBe(
-      'This sandbox runtime has been retired. Start a new session.'
-    );
-  });
-
   it('leaves the reserved-port refusal to the physical DO', async () => {
     const { deps, fetchUpstream } = fixture();
     const host = `p3000-${HEX}.${SUFFIX}`;
@@ -753,7 +730,7 @@ describe('preview Origin policy', () => {
 });
 
 describe('preview upstream forwarding', () => {
-  it('sends the cloudflare marker without a client marker', async () => {
+  it('ignores a client allocation marker and sends the owned allocation', async () => {
     const { deps, fetchUpstream } = fixture();
     await handlePreviewRequest(
       proxyRequest(sessionToken(), {
@@ -764,8 +741,8 @@ describe('preview upstream forwarding', () => {
     );
     const upstream = upstreamRequestOf(fetchUpstream);
     expect(upstream.headers.get('x-kilo-preview-port')).toBe(String(PORT));
-    expect(upstream.headers.get('x-kilo-preview-allocation')).toBeNull();
-    expect(coordinatesOf(fetchUpstream)).toEqual(CLOUDFLARE_TARGET.coordinates);
+    expect(upstream.headers.get('x-kilo-preview-allocation')).toBe('allocation-ref');
+    expect(coordinatesOf(fetchUpstream)).toEqual(CONTAINERS_TARGET.coordinates);
   });
 
   it('adds the allocation marker for a cloudflare-containers target', async () => {
@@ -867,80 +844,5 @@ describe('preview upstream forwarding', () => {
     );
     expect(response.status).toBe(200);
     expect(fetchUpstream).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('default upstream namespace', () => {
-  const namespaces = {
-    SandboxContainment: { name: 'SandboxContainment' },
-    SandboxSmallContainment: { name: 'SandboxSmallContainment' },
-  };
-  const namespaceEnv = { ...env, ...namespaces } as unknown as Env;
-  const PLACED_KEY = `sbx-${'a'.repeat(48)}`;
-
-  async function namespaceFor(coordinates: PreviewProviderCoordinates): Promise<unknown> {
-    const sandboxFetch = vi.fn(async () => new Response('ok'));
-    const mocked = vi.mocked(getSandbox);
-    mocked.mockReset();
-    mocked.mockReturnValue({ fetch: sandboxFetch } as unknown as ReturnType<typeof getSandbox>);
-    const response = await defaultFetchUpstream(
-      namespaceEnv,
-      coordinates,
-      new Request(`${ORIGIN}/`)
-    );
-    expect(response.status).toBe(200);
-    expect(sandboxFetch).toHaveBeenCalledTimes(1);
-    const [namespace, sandboxId] = mocked.mock.calls[0] ?? [];
-    expect(sandboxId).toBe(
-      coordinates.provider === 'cloudflare' ? coordinates.allocationName : undefined
-    );
-    return namespace;
-  }
-
-  it('routes a placed contained key through its pinned kind', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: true,
-        sandboxKind: 'isolated',
-      })
-    ).resolves.toBe(namespaces.SandboxSmallContainment);
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: true,
-        sandboxKind: 'shared',
-      })
-    ).resolves.toBe(namespaces.SandboxContainment);
-  });
-
-  it('rejects a placed key in the retired non-contained pool', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: false,
-        sandboxKind: 'isolated',
-      })
-    ).rejects.toThrow('sandbox runtime has been retired');
-  });
-
-  it('keeps routing a legacy prefixed key by its prefix', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: 'ses-11111111111141118111111111111111',
-        containment: false,
-      })
-    ).rejects.toThrow('sandbox runtime has been retired');
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: 'ses-11111111111141118111111111111111',
-        containment: true,
-      })
-    ).resolves.toBe(namespaces.SandboxSmallContainment);
   });
 });

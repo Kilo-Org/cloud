@@ -1,4 +1,4 @@
-import type { Env, SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
+import type { Env, SandboxId, SessionId, SessionContext } from '../types.js';
 
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
@@ -119,4 +119,4 @@ export type PersistenceEnv = Pick<
 >;
 
 // Re-export commonly used types for convenience
-export type { SessionContext, SandboxId, SessionId, ExecutionSession };
+export type { SessionContext, SandboxId, SessionId };

@@ -179,7 +179,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -432,7 +432,7 @@ export async function handleLlmProxyRequest(
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
-        text: extractRequestText(requestBodyParsed, {
+        segments: extractRequestSegments(requestBodyParsed, {
           includeToolResults: config.scanToolResults,
         }),
         config,
@@ -935,6 +935,7 @@ export async function handleLlmProxyRequest(
 
   const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
+  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -945,7 +946,7 @@ export async function handleLlmProxyRequest(
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-    getAllowedProviders: accessCheckResolver.getAllowedProviders,
+    getAllowedProviders: async () => accessCheckResolver.getAllowedProviders?.(),
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
     onDecision: decision => providerMetadataCapture?.captureRoutingDecision(decision),

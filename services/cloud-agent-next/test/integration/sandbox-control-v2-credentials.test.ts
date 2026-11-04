@@ -22,7 +22,7 @@ import { readScopeGrant, listScopeGrants } from '../../src/control-plane/sandbox
 import { deleteRoute } from '../../src/control-plane/sandbox/routes.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
 import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
-import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -980,7 +980,10 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const view = await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     expect(view).toMatchObject({ state: 'failed', reason: 'credential_upgrade_required' });
 
@@ -1002,8 +1005,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     });
     await runInDurableObject(stub, instance => {
       const mutableEnv = instance.env as Record<string, unknown>;
-      delete mutableEnv.SandboxContainment;
-      delete mutableEnv.SandboxSmallContainment;
+      delete mutableEnv.SANDBOX_CONTAINERS;
     });
     const source = credentialsSource(SESSION, {
       kiloToken: runtimeAuthorizedKiloToken(),
@@ -1013,7 +1015,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const input = {
       ...prepareInput(SESSION, source),
       sandboxSelection: {
-        provider: 'cloudflare' as const,
+        provider: 'cloudflare-containers' as const,
         containment: { kilocode: false, github: false },
       },
     };
@@ -1050,7 +1052,10 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: true, github: true } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: true, github: true },
+      },
     });
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
@@ -1207,7 +1212,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const view = await stub.prepare({
       ...prepareInput(SESSION, source, spec),
       sandboxSelection: {
-        provider: 'cloudflare',
+        provider: 'cloudflare-containers',
         containment: { kilocode: false, github: false },
       },
     });
@@ -1256,7 +1261,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     });
   });
 
-  it('derives the outbound container id from a custom allocation name while stopped', async () => {
+  it('derives the outbound container id from the logical sandbox key while stopped', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
@@ -1275,8 +1280,9 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       outboundContainerId?: string;
     };
-    // Must match the name create will use for this same pin (N1), not sandboxId.
-    expect(grant.outboundContainerId).toBe(fakeOutboundContainerId('custom_alloc'));
+    // The native outbound id follows the logical key, not the pin's allocation
+    // name: the containers provider must address the same sandbox identity.
+    expect(grant.outboundContainerId).toBe(fakeOutboundContainerId(SANDBOX_ID));
   });
 
   it('sends issued aliases in session.prepare and never the credential source', async () => {
@@ -2257,14 +2263,14 @@ function failedAttemptId(view: ControlPlaneRouteView): string {
 }
 
 describe('SandboxControlV2 cold grant rejection diagnostics', () => {
-  it('labels an unbound containment namespace as configuration', async () => {
+  it('fails the route when the native containers namespace is unbound', async () => {
     const provider = createFakeProvider();
     const broker = createGrantBroker();
     const stub = await setup(provider);
-    // The selected containment namespace is missing, not redirected to a
+    // The native containers namespace is missing, not redirected to a
     // stand-in that throws. The original idFromName call still raises.
     await installGrantBroker(stub, broker.service, env => {
-      delete env.SandboxContainment;
+      delete env.SANDBOX_CONTAINERS;
     });
 
     const capture = captureRouteFailed();
@@ -2282,9 +2288,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       diagnosticEvent: 'route_failed',
       stage: 'credential_grant_failed',
       reason: 'workspace_setup_failed',
-      grantPhase: 'configuration',
-      grantFailureReason: 'namespace_unbound',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
     });
     expect(broker.calls).toEqual({ kilo: 0, github: 0, gitlab: 0, authorize: 0 });
     const row = await readRouteRow(stub, SESSION);
@@ -2313,7 +2317,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(events[0]).toMatchObject({
       grantPhase: 'configuration',
       grantFailureReason: 'runtime_proxy_targets_unavailable',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       containment: 'enabled',
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
@@ -2387,7 +2391,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       reason: 'workspace_setup_failed',
       grantPhase: 'broker_issuance',
       grantFailureReason: 'repository_not_installed',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       containment: 'enabled',
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
@@ -2568,7 +2572,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       grantFailureReason: 'issuance_timeout',
       stage: 'credential_grant_failed',
       reason: 'workspace_setup_failed',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       containment: 'enabled',
     });
     const eventBeforeLateSettlement = structuredClone(timeoutEvents[0]);
@@ -2676,7 +2680,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     // A synthetic user secret genuinely carried through the credential source.
     const source = credentialsSource(SESSION, { userId: USER_SECRET });
     const containmentOff = {
-      provider: 'cloudflare' as const,
+      provider: 'cloudflare-containers' as const,
       containment: { kilocode: false, github: false },
     };
     // Past the 128-char production string cap and still all allowed-charset
@@ -2752,7 +2756,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       stage: 'credential_grant_failed',
       grantPhase: 'broker_issuance',
       grantFailureReason: 'unknown',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       containment: 'disabled',
       repositoryKind: 'github',
       tokenClass: 'runtime_authorized',
@@ -2785,7 +2789,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       stage: 'credential_grant_failed',
       grantPhase: 'validation',
       grantFailureReason: 'invalid_member',
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       containment: 'disabled',
       sessionId: 'redacted',
     });
@@ -2843,8 +2847,8 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(ceilingFor(oversizedEvent)).toBe(1209);
     // Measured UTF-8 bytes of the captured payloads. `attemptId` is a fixed-length
     // UUID and every other value is pinned above, so these are deterministic.
-    expect(actualBytes(brokerEvent)).toBe(412);
-    expect(actualBytes(oversizedEvent)).toBe(316);
+    expect(actualBytes(brokerEvent)).toBe(423);
+    expect(actualBytes(oversizedEvent)).toBe(327);
     expect(actualBytes(brokerEvent)).toBeLessThan(ceilingFor(brokerEvent));
     expect(actualBytes(brokerEvent)).toBeLessThanOrEqual(2048);
     expect(actualBytes(oversizedEvent)).toBeLessThan(ceilingFor(oversizedEvent));
@@ -2961,7 +2965,10 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     const events = capture.forAttempt(failedAttemptId(view));
     capture.restore();
@@ -3017,7 +3024,10 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     capture.forAttempt(failedAttemptId(view));
     capture.restore();
@@ -3058,7 +3068,10 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     const events = capture.forAttempt(failedAttemptId(view));
     capture.restore();
@@ -3097,7 +3110,10 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...prepareInput(SESSION),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     const events = capture.forAttempt(failedAttemptId(view));
     capture.restore();
@@ -3180,7 +3196,10 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
 
     const view = await stub.prepare({
       ...prepareInput(SESSION, source),
-      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+      sandboxSelection: {
+        provider: 'cloudflare-containers',
+        containment: { kilocode: false, github: false },
+      },
     });
     expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
 
@@ -3198,16 +3217,9 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
 
 describe('SandboxControlV2 placed sandbox keys', () => {
   const PLACED_ID = `sbx-${'d'.repeat(48)}`;
-  const smallPool = { idFromName: (name: string) => ({ toString: () => `small_${name}` }) };
-  const codeReviewPool = { idFromName: (name: string) => ({ toString: () => `review_${name}` }) };
 
   function setupPlaced(provider: FakeProvider) {
-    return setup(
-      provider,
-      createFakeCredentialBroker(),
-      { SandboxSmallContainment: smallPool, SandboxCodeReviewContainment: codeReviewPool },
-      PLACED_ID
-    );
+    return setup(provider, createFakeCredentialBroker(), {}, PLACED_ID);
   }
 
   function readPin(stub: DurableObjectStub<SandboxControlV2>) {
@@ -3221,14 +3233,14 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     });
   }
 
-  it('pins the kind and names the outbound container in its pool', async () => {
+  it('pins the kind and names the outbound container from the logical key', async () => {
     const provider = createFakeProvider();
     const stub = await setupPlaced(provider);
 
     await stub.prepare({
       ...prepareInput(SESSION),
       sandboxSelection: {
-        provider: 'cloudflare',
+        provider: 'cloudflare-containers',
         sandboxKind: 'isolated',
         containment: WORKTREE_CREDENTIAL_CONTAINMENT,
       },
@@ -3237,8 +3249,9 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       outboundContainerId?: string;
     };
-    // A placed key never reaches the prefix table, which would have chosen SandboxContainment.
-    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    // A placed key names the container directly; it never falls through to a
+    // sandbox-id prefix pool.
+    expect(grant.outboundContainerId).toBe(fakeOutboundContainerId(PLACED_ID));
     expect((await readPin(stub))?.sandboxKind).toBe('isolated');
   });
 
@@ -3248,7 +3261,7 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     await stub.prepare({
       ...prepareInput(SESSION),
       sandboxSelection: {
-        provider: 'cloudflare',
+        provider: 'cloudflare-containers',
         sandboxKind: 'isolated',
         containment: WORKTREE_CREDENTIAL_CONTAINMENT,
       },
@@ -3258,7 +3271,7 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     await stub.prepare({
       ...prepareInput(SESSION_NEXT),
       sandboxSelection: {
-        provider: 'cloudflare',
+        provider: 'cloudflare-containers',
         sandboxKind: 'code-review',
         containment: WORKTREE_CREDENTIAL_CONTAINMENT,
       },
@@ -3267,7 +3280,7 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     const grant = JSON.parse((await readRouteRow(stub, SESSION_NEXT))?.grant ?? '{}') as {
       outboundContainerId?: string;
     };
-    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    expect(grant.outboundContainerId).toBe(fakeOutboundContainerId(PLACED_ID));
     expect((await readPin(stub))?.sandboxKind).toBe('isolated');
   });
 
@@ -3281,7 +3294,7 @@ describe('SandboxControlV2 placed sandbox keys', () => {
         instance.prepare({
           ...prepareInput(SESSION),
           sandboxSelection: {
-            provider: 'cloudflare',
+            provider: 'cloudflare-containers',
             containment: WORKTREE_CREDENTIAL_CONTAINMENT,
           },
         })
@@ -3299,7 +3312,7 @@ describe('SandboxControlV2 placed sandbox keys', () => {
         instance.prepare({
           ...prepareInput(SESSION),
           sandboxSelection: {
-            provider: 'cloudflare',
+            provider: 'cloudflare-containers',
             sandboxKind: 'isolated',
             containment: WORKTREE_CREDENTIAL_CONTAINMENT,
           },

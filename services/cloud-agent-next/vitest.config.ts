@@ -32,7 +32,7 @@ export default defineConfig({
     },
     server: {
       deps: {
-        external: ['@cloudflare/sandbox', '@cloudflare/containers'],
+        external: ['@cloudflare/containers'],
       },
     },
   },

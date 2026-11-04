@@ -12,7 +12,6 @@ import {
   runtimeSpecForContract,
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
-import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import {
   readSessionSnapshotAllocation,
@@ -34,7 +33,6 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
-  forceDestroyControlPlaneSandbox,
   parseSandboxBillingInput,
   SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
@@ -60,9 +58,9 @@ import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admiss
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
-  createCloudflareProviderAdapter,
-  decodeCloudflareProviderRef,
-} from '../../sandbox-control/cloudflare-provider.js';
+  createRetiredCloudflareProviderAdapter,
+  RetiredSandboxProviderError,
+} from '../../sandbox-control/retired-cloudflare-provider.js';
 import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
 import {
   sandboxProviderConfigurationSchema,
@@ -97,7 +95,6 @@ import { grantScmAliases } from '../../sandbox-control/session-credential-member
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
-  resolveSandboxNamespace,
   resolveSandboxIdClass,
   sandboxKindMatchesKey,
   type SandboxKind,
@@ -738,7 +735,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
     this.db = drizzle(ctx.storage, { logger: false });
-    this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
+    this.provider = this.createProviderAdapter(this.defaultPin('cloudflare-containers'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -1462,8 +1459,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       allocationKind: allocation.kind,
       providerRef: allocation.providerRef,
       provider: this.currentProvider(),
-      pinnedAllocationName: this.providerPin?.allocationName ?? this.sandboxId,
-      sandboxKind: this.providerPin?.sandboxKind,
       logicalSandboxId: this.sandboxId,
     });
   }
@@ -1581,7 +1576,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (ownerId === null) return null;
         const alias = parseControlPlaneCredential(input.credential);
         if (alias === null || alias.sandboxId !== this.sandboxId) return null;
-        const expectedOutbound = this.outboundContainerIdFor(state);
+        const expectedOutbound = this.outboundContainerIdFor();
         if (expectedOutbound === null || input.outboundContainerId !== expectedOutbound) {
           return null;
         }
@@ -2102,13 +2097,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
           retainedBilling.set(key, value);
         }
       }
+      // Build the adapter before erasing anything. A construction failure must
+      // leave the persisted IDs, provider ref and pin available for a retry.
+      const pin = this.cutoverPin(cutover);
+      const provider = this.createProviderAdapter(pin);
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
       for (const [key, value] of retainedBilling) await this.ctx.storage.put(key, value);
-      const pin = this.cutoverPin(cutover);
       this.providerPin = pin;
-      this.provider = this.createProviderAdapter(pin);
+      this.provider = provider;
       const state: AllocationState = {
         ...initialAllocationState(),
         ...(cutover.providerRef === null
@@ -2187,7 +2185,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private currentProvider(): AgentSandboxProvider {
-    return this.providerPin?.provider ?? 'cloudflare';
+    return this.providerPin?.provider ?? 'cloudflare-containers';
   }
 
   private cutoverPin(cutover: LegacyCutover): StoredProviderPin {
@@ -2222,7 +2220,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
-    const provider = input.provider ?? 'cloudflare';
+    const provider = input.provider ?? 'cloudflare-containers';
     if (
       (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
       (provider !== 'cloudflare-containers' ||
@@ -2258,19 +2256,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  /** The Cloudflare Sandbox namespace for a physical sandbox: the pinned kind, else the legacy prefix. */
-  private sandboxNamespace(
-    pin: StoredProviderPin | null,
-    physicalSandboxId: string,
-    contained: boolean
-  ): DurableObjectNamespace<Sandbox> {
-    return resolveSandboxNamespace(this.env, {
-      sandboxId: physicalSandboxId,
-      sandboxKind: pin?.sandboxKind,
-      contained,
-    });
-  }
-
   private async readLegacyCutover(): Promise<LegacyCutover> {
     const [kindRaw, configRaw, locatorRaw, allocationRaw, billingRaw] = await Promise.all([
       this.ctx.storage.get<unknown>('provider_kind'),
@@ -2279,7 +2264,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.ctx.storage.get<unknown>('sandbox_allocation_state'),
       this.ctx.storage.get<unknown>('billing_input'),
     ]);
-    let provider: AgentSandboxProvider = 'cloudflare';
+    // A fresh DO has no legacy state and starts on the current native runtime.
+    // Any legacy storage keeps its historical default (cloudflare) so the
+    // factory can refuse it instead of silently migrating the allocation.
+    const hasLegacyStorage = [kindRaw, configRaw, locatorRaw, allocationRaw, billingRaw].some(
+      value => value !== undefined
+    );
+    let provider: AgentSandboxProvider = hasLegacyStorage ? 'cloudflare' : 'cloudflare-containers';
     let configuration: SandboxProviderConfiguration | null = null;
     const parsedConfiguration = sandboxProviderConfigurationSchema.safeParse(configRaw);
     if (parsedConfiguration.success) {
@@ -2603,7 +2594,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       containment: this.credentialContainmentEnabled() ? 'enabled' : 'disabled',
     });
     const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
-    const outboundContainerId = this.outboundContainerIdFor(allocation, diagnostic) ?? undefined;
+    const outboundContainerId = this.outboundContainerIdFor() ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -3207,41 +3198,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /** The managed outbound container id for the current provider/allocation. */
-  private outboundContainerIdFor(
-    state: AllocationState,
-    diagnostic?: GrantDiagnostic
-  ): string | null {
+  private outboundContainerIdFor(): string | null {
     // The container is the containment boundary. When containment is off there
     // is no proxy container to name, and the environment may not even bind the
     // containment namespaces (the e2e Worker strips them).
     if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
+    if (provider === 'cloudflare') return null;
     if (!providerUsesOutboundCredentialProxy(provider)) return null;
-    if (provider === 'cloudflare-containers') {
-      return (
-        getManagedOutboundContainerId(provider, this.env, {
-          logicalSandboxId: this.sandboxId,
-          physicalSandboxId: this.sandboxId,
-        }) ?? null
-      );
-    }
-    // The physical id is knowable before `create`: the provider builds its ref
-    // from `intent.allocationName ?? sandboxId`. Use the current pin even when
-    // stopped, because the ensure for this same queued operation will create the
-    // sandbox with that pin's allocation name (B3 review 1, N1).
-    const physicalSandboxId =
-      decodeCloudflareProviderRef(state.providerRef)?.sandboxId ??
-      this.providerPin?.allocationName ??
-      this.sandboxId;
-    const selected: DurableObjectNamespace<Sandbox> | null | undefined = this.sandboxNamespace(
-      this.providerPin,
-      physicalSandboxId,
-      true
+    return (
+      getManagedOutboundContainerId(provider, this.env, {
+        logicalSandboxId: this.sandboxId,
+        physicalSandboxId: this.sandboxId,
+      }) ?? null
     );
-    if (selected === null || selected === undefined) {
-      diagnostic?.record({ grantPhase: 'configuration', grantFailureReason: 'namespace_unbound' });
-    }
-    return selected.idFromName(physicalSandboxId).toString();
   }
 
   private sandboxCanResolveCredentials(state: AllocationState): boolean {
@@ -4374,7 +4344,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        const pin = this.providerPin;
+        if (pin === null) throw new ProviderCreationError('invalid_configuration');
         const selection = selectStartup(this.env, pin.provider, {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
@@ -4428,18 +4399,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
         createdRef = created.providerRef;
-        if (pin.provider === 'cloudflare' || pin.provider === 'cloudflare-containers') {
+        if (pin.provider === 'cloudflare-containers') {
           try {
-            const containerInstanceId =
-              pin.provider === 'cloudflare-containers'
-                ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
-                : this.sandboxNamespace(
-                    pin,
-                    intent.allocationName ?? this.sandboxId,
-                    this.credentialContainmentEnabled()
-                  )
-                    .idFromName(intent.allocationName ?? this.sandboxId)
-                    .toString();
+            const containerInstanceId = this.env.SANDBOX_CONTAINERS.idFromName(
+              this.sandboxId
+            ).toString();
             logControlDiagnostic('container_launch_identity', {
               sandboxId: this.sandboxId,
               allocationId,
@@ -4585,6 +4549,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        if (error instanceof RetiredSandboxProviderError) {
+          logControlDiagnostic(
+            'create_failed',
+            {
+              allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+              stage: createdRef === null ? 'create' : 'launch',
+              permanentReason: 'invalid_configuration',
+              errorName: diagnosticCause(error.name),
+              cause: diagnosticCause(error.message),
+            },
+            'warn'
+          );
+          await this.failCreationRoutes(allocationId, false, 'invalid_configuration');
+          return;
+        }
         if (await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId))) return;
         if (error instanceof ByocVercelProviderError) {
           await this.failCreationRoutes(allocationId, false, error.reason);
@@ -4939,11 +4918,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async runStop(stopAttempt: number): Promise<void> {
     const state = await this.readAllocation();
     if (state.kind !== 'stopping' || state.stopAttempt !== stopAttempt || state.stopPending) return;
-    const pin = this.providerPin ?? this.defaultPin('cloudflare');
     const intent: ProviderAllocationIntent = {
       intentId: state.allocationId ?? '',
       createdAt: Date.now(),
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
     let confirmed = false;
     try {
@@ -4958,7 +4936,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     logControlDiagnostic('stop_origin', {
       origin: 'ladder',
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
       allocationId: state.allocationId,
       stopAttempt,
       confirmed,
@@ -4980,11 +4958,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     providerRef: string | null,
     allocationId: string | null
   ): Promise<boolean> {
-    const pin = this.providerPin ?? this.defaultPin('cloudflare');
     const intent: ProviderAllocationIntent = {
       intentId: allocationId ?? '',
       createdAt: Date.now(),
-      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
     try {
       return (
@@ -5549,16 +5526,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
       }
       case 'cloudflare':
-        return createCloudflareProviderAdapter({
-          sandboxId: allocationName,
-          billingContainment: this.credentialContainmentEnabled(),
-          getSandbox: (id, options) =>
-            getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
-          destroy: (id, options) =>
-            forceDestroyControlPlaneSandbox(
-              this.sandboxNamespace(pin, id, options.containment).getByName(id)
-            ),
-        });
+        return createRetiredCloudflareProviderAdapter();
       default: {
         void (pin.provider satisfies never);
         throw new ProviderCreationError('invalid_configuration');

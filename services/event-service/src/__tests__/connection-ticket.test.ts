@@ -13,7 +13,7 @@ function ticketNamespace(): DurableObjectNamespace<ConnectionTicketDO> {
     .CONNECTION_TICKET_DO;
 }
 
-type StoredTicket = { userId: string; expiresAt: number };
+type StoredTicket = { userId: string; deviceSessionId?: string; expiresAt: number };
 
 /** Stores a ticket the way `/connect-ticket` does and returns its wire form. */
 async function storeTicket(state: StoredTicket): Promise<{
@@ -105,6 +105,35 @@ describe('event-service WebSocket connection tickets', () => {
     const replay = await connect(ticket);
     expect(replay.status).toBe(401);
   });
+
+  it.each([undefined, '11111111-1111-4111-8111-111111111111'])(
+    'stores only ticket-derived device context (%s)',
+    async deviceSessionId => {
+      const userId = `user-ticket-context-${deviceSessionId ?? 'none'}`;
+      const { ticket } = await storeTicket({
+        userId,
+        deviceSessionId,
+        expiresAt: Date.now() + 30_000,
+      });
+      const response = await SELF.fetch(
+        `https://events.test/connect?ticket=${ticket}&deviceSessionId=client-value`,
+        { headers: { Upgrade: 'websocket' } }
+      );
+      expect(response.status).toBe(101);
+      response.webSocket!.accept();
+      try {
+        const stub = env.USER_SESSION_DO.get(env.USER_SESSION_DO.idFromName(userId));
+        const attachment = await runInDurableObject(
+          stub,
+          async (_instance, state) =>
+            state.getWebSockets()[0].deserializeAttachment() as { deviceSessionId?: string }
+        );
+        expect(attachment.deviceSessionId).toBe(deviceSessionId);
+      } finally {
+        response.webSocket!.close();
+      }
+    }
+  );
 
   it('rejects invalid tickets', async () => {
     const res = await connect('not-a-real-ticket');

@@ -1,13 +1,16 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Helper: connect a WebSocket to a DO stub for a given userId
 async function connectWs(
-  userId: string
+  userId: string,
+  deviceSessionId?: string
 ): Promise<{ ws: WebSocket; stub: ReturnType<typeof env.USER_SESSION_DO.get> }> {
   const id = env.USER_SESSION_DO.idFromName(userId);
   const stub = env.USER_SESSION_DO.get(id);
-  const res = await stub.fetch('https://do/connect', {
+  const url = new URL('https://do/connect');
+  if (deviceSessionId) url.searchParams.set('deviceSessionId', deviceSessionId);
+  const res = await stub.fetch(url.toString(), {
     headers: { Upgrade: 'websocket' },
   });
   const ws = res.webSocket!;
@@ -382,4 +385,53 @@ describe('UserSessionDO', () => {
       ws.close();
     }
   );
+});
+
+describe('UserSessionDO device session closure', () => {
+  function closeEvent(ws: WebSocket): Promise<{ code: number; reason: string }> {
+    return new Promise(resolve => {
+      ws.addEventListener('close', event => resolve({ code: event.code, reason: event.reason }));
+    });
+  }
+
+  it('closes only sockets minted from the revoked device session', async () => {
+    const userId = 'user-device-close';
+    const revokedDevice = '11111111-1111-4111-8111-111111111111';
+    const otherDevice = '22222222-2222-4222-8222-222222222222';
+    const first = await connectWs(userId, revokedDevice);
+    const second = await connectWs(userId, otherDevice);
+
+    const firstClosed = closeEvent(first.ws);
+    const secondClosed = vi.fn();
+    second.ws.addEventListener('close', secondClosed);
+
+    const closed = await first.stub.closeDeviceSockets(revokedDevice);
+
+    expect(closed).toBe(1);
+    await expect(firstClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'device session revoked',
+    });
+    expect(secondClosed).not.toHaveBeenCalled();
+    second.ws.close();
+  });
+
+  it('closes legacy sockets when all user sockets are revoked', async () => {
+    const userId = 'user-device-close-all';
+    const withDevice = await connectWs(userId, '11111111-1111-4111-8111-111111111111');
+    const legacy = await connectWs(userId);
+
+    const withDeviceClosed = closeEvent(withDevice.ws);
+    const legacyClosed = closeEvent(legacy.ws);
+
+    expect(await withDevice.stub.closeAllSockets()).toBe(2);
+    await expect(withDeviceClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'device session revoked',
+    });
+    await expect(legacyClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'device session revoked',
+    });
+  });
 });

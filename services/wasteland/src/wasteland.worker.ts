@@ -11,9 +11,7 @@ import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { AuthVariables } from './middleware/auth.middleware';
-import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
-import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { resolveSecret } from './util/secret.util';
+import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { debugAccessMiddleware, authorizeDebugUserAction } from './middleware/debug.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
@@ -34,12 +32,6 @@ export type WastelandEnv = {
 };
 
 const app = new Hono<WastelandEnv>();
-
-const kiloAuthMiddleware = createKiloAuthMiddleware<WastelandEnv>({
-  resolveSecret,
-  audiencePolicy: { audience: WASTELAND_AUDIENCE, mode: 'allow-legacy' },
-  onAuthenticated: payload => logger.setTags({ userId: payload.kiloUserId }),
-});
 
 // Capture high-resolution start timestamp before any other middleware.
 

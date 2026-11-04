@@ -6,7 +6,6 @@ import {
 } from '@kilocode/worker-utils';
 import { type KiloUserPepperResult } from '@kilocode/worker-utils/kilo-token-auth';
 import { type AuthEnv, authenticateToken } from '../auth';
-
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const currentPepperByUserId = new Map<string, KiloUserPepperResult>();
 
@@ -246,6 +245,63 @@ describe('authenticateToken', () => {
     await expect(
       authenticateToken(token, makeEnv(), {
         getUserPepper: async () => Promise.reject(new Error('lookup unavailable')),
+      })
+    ).rejects.toThrow('lookup unavailable');
+  });
+
+  it('accepts a token whose device session is active and returns the session id', async () => {
+    const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: EVENT_SERVICE_AUDIENCE,
+      extra: { deviceSessionId },
+    });
+    const lookup = vi.fn(async () => true);
+
+    await expect(
+      authenticateToken(token, makeEnv(), { getUserPepper, getActiveDeviceSession: lookup })
+    ).resolves.toEqual({ userId: 'user-xyz-789', deviceSessionId });
+    expect(lookup).toHaveBeenCalledWith('postgres://test', deviceSessionId, 'user-xyz-789');
+  });
+
+  it('rejects a token whose device session is no longer active', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: EVENT_SERVICE_AUDIENCE,
+      extra: { deviceSessionId: '11111111-1111-4111-8111-111111111111' },
+    });
+
+    await expect(
+      authenticateToken(token, makeEnv(), {
+        getUserPepper,
+        getActiveDeviceSession: async () => false,
+      })
+    ).resolves.toBeNull();
+  });
+
+  it('propagates a device-session lookup failure', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: EVENT_SERVICE_AUDIENCE,
+      extra: { deviceSessionId: '11111111-1111-4111-8111-111111111111' },
+    });
+
+    await expect(
+      authenticateToken(token, makeEnv(), {
+        getUserPepper,
+        getActiveDeviceSession: async () => Promise.reject(new Error('lookup unavailable')),
       })
     ).rejects.toThrow('lookup unavailable');
   });

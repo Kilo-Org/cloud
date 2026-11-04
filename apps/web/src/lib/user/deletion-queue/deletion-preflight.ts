@@ -5,6 +5,7 @@ import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { persistPreflightOutcomeTx } from '@/lib/user/deletion-queue/deletion-outcomes';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { classifyCloudSubject } from '@/lib/user/deletion-queue/deletion-enqueue';
 import {
   deletionAdvisoryLockKey,
@@ -56,7 +57,8 @@ export async function runDeletionPreflight(requestId: string): Promise<Preflight
     resolvedTicketEmail = resolved.email;
   }
 
-  return db.transaction(async tx => {
+  let accessDisabledUserId: string | undefined;
+  const result: PreflightResult = await db.transaction(async tx => {
     const [request] = await tx
       .select()
       .from(user_deletion_requests)
@@ -72,6 +74,9 @@ export async function runDeletionPreflight(requestId: string): Promise<Preflight
       const applied = await applyResolvedTicketEmail(tx, request, resolvedTicketEmail);
       if (applied.kind !== 'applied') {
         const persisted = await persistPreflightOutcomeTx(tx, request, applied);
+        if (persisted.kind === 'applied') {
+          accessDisabledUserId = persisted.accessDisabledUserId;
+        }
         return toPreflightResult(persisted.kind === 'skipped' ? persisted : applied);
       }
     }
@@ -85,8 +90,16 @@ export async function runDeletionPreflight(requestId: string): Promise<Preflight
 
     const outcome = await evaluateDeletionPreflight(tx, fresh);
     const persisted = await persistPreflightOutcomeTx(tx, fresh, outcome);
+    if (persisted.kind === 'applied') {
+      accessDisabledUserId = persisted.accessDisabledUserId;
+    }
     return toPreflightResult(persisted.kind === 'skipped' ? persisted : outcome);
   });
+
+  if (accessDisabledUserId) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: accessDisabledUserId });
+  }
+  return result;
 }
 
 async function persistOutcome(

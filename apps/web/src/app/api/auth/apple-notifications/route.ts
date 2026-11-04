@@ -8,6 +8,7 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APPLE_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
@@ -34,6 +35,7 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
   if (type === 'consent-revoked' || type === 'account-delete') {
     // Compatibility: the old handler deleted the provider row only. Keep the
     // extra web/device revocation until Apple stops sending these events.
+    const revokedUserIds: string[] = [];
     await db.transaction(async tx => {
       const deletedProviders = await tx
         .delete(user_auth_provider)
@@ -48,6 +50,7 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
 
       const now = new Date().toISOString();
       for (const { kilo_user_id } of deletedProviders) {
+        revokedUserIds.push(kilo_user_id);
         await revokeWebSessions(kilo_user_id, tx);
 
         await tx
@@ -73,6 +76,9 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
           );
       }
     });
+    for (const kiloUserId of revokedUserIds) {
+      await scheduleDeviceSessionRealtimeClose({ kiloUserId });
+    }
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
   }
   // email-disabled and email-enabled are informational — no action needed

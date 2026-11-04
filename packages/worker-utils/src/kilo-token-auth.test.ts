@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignJWT } from 'jose';
 
 import { clearSecretCacheForTest } from './cached-secret';
@@ -533,27 +533,79 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
 });
 
 describe('C15 deviceSessionId compatibility', () => {
+  const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+
   beforeEach(() => {
     clearSecretCacheForTest();
     userResultByUserId.clear();
     userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
   });
 
-  it('accepts a token carrying deviceSessionId claim', async () => {
-    const now = Math.floor(Date.now() / 1000);
-    const token = await new SignJWT({
-      version: 3,
-      kiloUserId: 'user-xyz-789',
-      apiTokenPepper: 'pepper-current',
+  async function signDeviceToken(id: string) {
+    return signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
       env: 'production',
-      tokenSource: 'kilo-chat',
-      deviceSessionId: 'session-abc-123',
-    })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt(now)
-      .setExpirationTime(now + 3600)
-      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+      extra: { deviceSessionId: id },
+    });
+  }
 
-    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  function verifyDeviceToken(
+    token: string,
+    getActiveDeviceSession: (connection: string, id: string, userId: string) => Promise<boolean>
+  ) {
+    return verifyKiloBearerAgainstCurrentPepper({
+      token,
+      nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+      getUserPepper,
+      getActiveDeviceSession,
+    });
+  }
+
+  it('accepts a token whose device session is active and returns the session id', async () => {
+    const { token } = await signDeviceToken(deviceSessionId);
+    const lookup = vi.fn(async () => true);
+
+    await expect(verifyDeviceToken(token, lookup)).resolves.toEqual({
+      userId: 'user-xyz-789',
+      deviceSessionId,
+    });
+    expect(lookup).toHaveBeenCalledWith('postgres://test', deviceSessionId, 'user-xyz-789');
+  });
+
+  it('rejects missing, revoked and foreign-owner sessions', async () => {
+    const { token } = await signDeviceToken(deviceSessionId);
+
+    await expect(verifyDeviceToken(token, async () => false)).resolves.toBeNull();
+  });
+
+  it('rejects a malformed device session id without querying', async () => {
+    const { token } = await signDeviceToken('not-a-uuid');
+    const lookup = vi.fn(async () => true);
+
+    await expect(verifyDeviceToken(token, lookup)).resolves.toBeNull();
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('propagates a device-session lookup failure instead of reporting an invalid token', async () => {
+    const { token } = await signDeviceToken(deviceSessionId);
+
+    await expect(
+      verifyDeviceToken(token, async () => {
+        throw new Error('connection refused');
+      })
+    ).rejects.toThrow('connection refused');
+  });
+
+  it('does not query a device session for a token without the claim', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+    const lookup = vi.fn(async () => true);
+
+    await expect(verifyDeviceToken(token, lookup)).resolves.toEqual({ userId: 'user-xyz-789' });
+    expect(lookup).not.toHaveBeenCalled();
   });
 });

@@ -49,6 +49,20 @@ function sortCreditLots<T extends ExpiringTransaction>(transactions: T[]) {
     });
 }
 
+export function earliestUnexpiredExpiry(
+  transactions: ReadonlyArray<Pick<ExpiringTransaction, 'id' | 'expiry_date'>>,
+  expiredTransactionIds: ReadonlySet<string | null | undefined>
+): string | null {
+  let earliest: string | null = null;
+  for (const transaction of transactions) {
+    if (expiredTransactionIds.has(transaction.id)) continue;
+    const expiry = transaction.expiry_date;
+    if (expiry === null) continue;
+    if (earliest === null || expiry < earliest) earliest = expiry;
+  }
+  return earliest;
+}
+
 function lotExposure(transaction: ExpiringTransaction) {
   return Math.max(
     0,
@@ -218,12 +232,7 @@ export async function reconcileCreditExpirationsInTransaction(
   const expiredIds = new Set(
     result.newTransactions.map(transaction => transaction.original_transaction_id)
   );
-  const nextExpiration =
-    transactions
-      .filter(transaction => !expiredIds.has(transaction.id))
-      .map(transaction => transaction.expiry_date)
-      .filter((expiry): expiry is string => expiry !== null)
-      .sort()[0] ?? null;
+  const nextExpiration = earliestUnexpiredExpiry(transactions, expiredIds);
   const adjustment = result.newTransactions.reduce(
     (sum, transaction) => sum + (transaction.amount_microdollars ?? 0),
     0

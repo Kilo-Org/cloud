@@ -19,6 +19,7 @@ import {
   selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -86,7 +87,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -120,6 +122,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
@@ -131,6 +134,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const eventProviderMetadata = json.response?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if ('error' in json && json.error) {
       reportedError = true;
@@ -158,10 +164,10 @@ export async function parseResponsesMicrodollarUsageFromStream(
       if (response.usage) {
         usage = response.usage as ResponsesApiUsage;
       }
-      const meta = response.provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+      if (eventProviderMetadata) {
+        providerMetadata = eventProviderMetadata;
+        inference_provider =
+          eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
       }
       finish_reason = response.status ?? finish_reason;
     }
@@ -209,12 +215,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderType
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
-
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;
+  metadataCapture?.captureVercelMetadata(responseJson);
 
   const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
 

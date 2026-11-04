@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
-import { appliesImplicitProfiles } from '@kilocode/cloud-agent-profile';
 import {
   AlertCircle,
   Brain,
@@ -538,14 +537,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Prefers an explicit selection; otherwise falls back to the effective
   // default (personal default wins over org default). This mirrors the
   // server-side resolution in mergeProfileConfiguration for a useful preview.
-  // A V2 environment applies no implicit default, only an explicit selection.
   const effectiveAgentProfileId =
     selectedProfileId ??
-    (!appliesImplicitProfiles(repositoryEnvironment)
-      ? null
-      : organizationId
-        ? combinedProfilesData?.effectiveDefaultId
-        : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
+    (organizationId
+      ? combinedProfilesData?.effectiveDefaultId
+      : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
     null;
   const effectiveAgentProfileOrg =
     effectiveAgentProfileId && organizationId

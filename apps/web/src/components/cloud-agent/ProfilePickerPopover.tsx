@@ -26,7 +26,7 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
-  /** The session's environment. A V2 environment skips the binding and the implicit default. */
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
 };
 

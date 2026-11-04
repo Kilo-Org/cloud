@@ -50,7 +50,7 @@ export function scheduleAiProviderMetadataArchive({
   logSource: string;
   logContext: ArchiveLogContext;
   key: string;
-  body: () => string;
+  body: () => string | Promise<string>;
 }): void {
   const reportFailure = (stage: 'registration' | 'upload', error: unknown) =>
     errorExceptInTest(`[${logSource}] failed to archive metadata`, {
@@ -71,12 +71,13 @@ export function scheduleAiProviderMetadataArchive({
     console.debug(`[${logSource}] scheduling archive`, { ...logContext, bucket });
     after(async () => {
       try {
+        const serializedBody = await body();
         client ??= createR2Client({ accessKeyId, secretAccessKey });
         await client.send(
           new PutObjectCommand({
             Bucket: bucket,
             Key: key,
-            Body: body(),
+            Body: serializedBody,
             ContentType: 'application/json',
           })
         );

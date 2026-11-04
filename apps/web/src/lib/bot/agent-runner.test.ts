@@ -129,7 +129,7 @@ jest.mock('@/lib/auth/cloud-agent-workflow-user', () => ({
   prepareCloudAgentWorkflowUser: async (user: User) => user,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: async () => false,
+  isFreeModel: () => false,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock(

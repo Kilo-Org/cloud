@@ -540,8 +540,8 @@ describe('mergeProfileConfiguration', () => {
     });
 
     describe('a V2 environment', () => {
-      // One repository is enough: any V2 environment skips the binding and the
-      // implicit default.
+      // Any V2 environment skips the repository binding, but the implicit
+      // default profile still applies.
       const v2Environment = {
         envVars: { FROM_ENV: 'env' },
         setupCommands: ['env-cmd'],
@@ -554,14 +554,16 @@ describe('mergeProfileConfiguration', () => {
         ],
       };
 
-      test('ignores the repository binding and the implicit default profile', async () => {
+      test('keeps the implicit default but ignores the repository binding', async () => {
         const user = await insertTestUser();
         const owner: ProfileOwner = { type: 'user', id: user.id };
         const repoProfileId = await createProfile(owner, 'repo-profile');
         await addVar(repoProfileId, 'FROM_BINDING', 'bound');
+        await addCommands(repoProfileId, ['binding-cmd']);
         await bindRepo(owner, 'org/repo', 'github', repoProfileId);
         const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
         await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+        await addCommands(defaultProfileId, ['default-cmd']);
 
         const result = await mergeProfileConfiguration(db, {
           owner,
@@ -570,12 +572,12 @@ describe('mergeProfileConfiguration', () => {
           environment: v2Environment,
         });
 
-        expect(result.envVars).toEqual({ FROM_ENV: 'env' });
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_DEFAULT: 'default-val' });
         expect(result.setupCommands).toEqual(['env-cmd']);
-        expect(result.resolvedProfileId).toBeUndefined();
+        expect(result.resolvedProfileId).toBe(defaultProfileId);
       });
 
-      test('ignores the organization and personal default profiles for an organization owner', async () => {
+      test('applies the personal default over the org default for an organization owner', async () => {
         const user = await insertTestUser();
         const org = await createTestOrganization('v2-org', user.id, 0);
         const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
@@ -598,16 +600,37 @@ describe('mergeProfileConfiguration', () => {
           environment: v2Environment,
         });
 
-        expect(result.envVars).toEqual({ FROM_ENV: 'env' });
-        expect(result.resolvedProfileId).toBeUndefined();
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_PERSONAL_DEFAULT: 'personal' });
+        expect(result.resolvedProfileId).toBe(personalDefaultId);
       });
 
-      test('applies an explicitly selected profile and the request overrides', async () => {
+      test('falls back to the org default when the user has no personal default', async () => {
+        const user = await insertTestUser();
+        const org = await createTestOrganization('v2-org', user.id, 0);
+        const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+        const orgDefaultId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+        await addVar(orgDefaultId, 'FROM_ORG_DEFAULT', 'org');
+
+        const result = await mergeProfileConfiguration(db, {
+          owner: orgOwner,
+          userId: user.id,
+          repoFullName: 'org/repo',
+          platform: 'github',
+          environment: v2Environment,
+        });
+
+        expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_ORG_DEFAULT: 'org' });
+        expect(result.resolvedProfileId).toBe(orgDefaultId);
+      });
+
+      test('applies an explicitly selected profile over the default and keeps request overrides', async () => {
         const user = await insertTestUser();
         const owner: ProfileOwner = { type: 'user', id: user.id };
         const repoProfileId = await createProfile(owner, 'repo-profile');
         await addVar(repoProfileId, 'FROM_BINDING', 'bound');
         await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+        const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+        await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
         const pickedProfileId = await createProfile(owner, 'picked');
         await addVar(pickedProfileId, 'FROM_PICKED', 'picked-val');
         await addCommands(pickedProfileId, ['picked-cmd']);

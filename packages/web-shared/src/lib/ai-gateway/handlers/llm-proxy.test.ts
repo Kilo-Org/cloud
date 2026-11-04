@@ -892,15 +892,184 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(usageId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
-    expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/kilo/${usageId}.json`]);
-    expect(
-      JSON.parse(fakeR2.objects.get(`test-provider-metadata/kilo/${usageId}.json`) ?? '')
-    ).toEqual({
+    expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${usageId}.json`]);
+    expect(JSON.parse(fakeR2.objects.get(`test-provider-metadata/${usageId}.json`) ?? '')).toEqual({
       schema_version: 1,
       usage_id: usageId,
       created_at: expect.any(String),
       ...decision,
     });
+  });
+
+  it('archives Vercel metadata captured during accounting with the routing decision', async () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    fakeR2.objects.clear();
+    const env = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_ACCOUNT_ID: 'test-metadata-account',
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'user',
+      steps: [
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'vercel',
+          bounded_spending: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'vercel',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    };
+    const vercelFrame = {
+      provider_metadata: { request_id: 'vercel-request-456', region: 'iad1' },
+    };
+    mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+      onDecision?.(decision);
+      return {
+        kind: 'provider',
+        provider: { ...provider, type: 'vercel' },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
+    });
+    mockedAccountForMicrodollarUsage.mockImplementation(async (_response, usageContext) => {
+      const capture = usageContext.providerMetadataCapture;
+      capture?.captureVercelMetadata(vercelFrame);
+      capture?.waitFor(Promise.resolve());
+      return null;
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    let response: Response;
+    try {
+      response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+      expect(fakeR2.objects.size).toBe(0);
+      await Promise.all(
+        jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+      );
+    } finally {
+      env.restore();
+    }
+
+    expect(response.status).toBe(200);
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
+    expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+    expect(usageContext?.providerMetadataCapture).toEqual(
+      expect.objectContaining({
+        captureRoutingDecision: expect.any(Function),
+        captureVercelMetadata: expect.any(Function),
+        waitFor: expect.any(Function),
+      })
+    );
+    const usageId = usageContext?.usageId;
+    expect(usageId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    const key = `test-provider-metadata/${usageId}.json`;
+    expect([...fakeR2.objects.keys()]).toEqual([key]);
+    expect(JSON.parse(fakeR2.objects.get(key) ?? '')).toEqual({
+      schema_version: 1,
+      usage_id: usageId,
+      created_at: expect.any(String),
+      ...decision,
+      vercel: {
+        metadata: vercelFrame.provider_metadata,
+      },
+    });
+  });
+
+  it('archives only the routing decision when the selected provider rejects the API kind', async () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    fakeR2.objects.clear();
+    const env = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_ACCOUNT_ID: 'test-metadata-account',
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'messages',
+      owner_type: 'user',
+      steps: [
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'openrouter',
+          bounded_spending: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'openrouter',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+    };
+    mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+      onDecision?.(decision);
+      return {
+        kind: 'provider',
+        provider: { ...provider, supportedChatApis: ['responses'] },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      };
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    let response: Response;
+    try {
+      response = await handleLlmProxyRequest(
+        makeRequest({ ...makeBody(), max_tokens: 100 }, undefined, '/messages') as never
+      );
+      expect(fakeR2.objects.size).toBe(0);
+      await Promise.all(
+        jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+      );
+    } finally {
+      env.restore();
+    }
+
+    expect(response.status).toBe(400);
+    expect(mockedAccountForMicrodollarUsage).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(fakeR2.objects.size).toBe(1);
+    const [key] = [...fakeR2.objects.keys()];
+    expect(key).toMatch(/^test-provider-metadata\/[0-9a-f-]+\.json$/);
+    const archived = JSON.parse(fakeR2.objects.get(key ?? '') ?? '');
+    expect(archived).toEqual({
+      schema_version: 1,
+      usage_id: key?.split('/').at(-1)?.replace('.json', ''),
+      created_at: expect.any(String),
+      ...decision,
+    });
+    expect(archived).not.toHaveProperty('vercel');
   });
 
   it('passes the Vercel request ID to request logging', async () => {
@@ -1916,15 +2085,15 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     }
   );
 
-  it('applies free-model rate limiting to a public custom LLM', async () => {
+  it('applies free-model rate limiting to a public custom LLM with a free id', async () => {
     mockedIsCustomLlm.mockResolvedValue(true);
-    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('acme/public-model', true));
+    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('acme/public-model-free', true));
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     try {
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(
-        makeRequest(makeBody('acme/public-model')) as never
+        makeRequest(makeBody('acme/public-model-free')) as never
       );
 
       expect(response.status).toBe(429);
@@ -1935,7 +2104,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     }
   });
 
-  it('rate-limits anonymous callers of a private custom LLM with a free model id', async () => {
+  it('asks anonymous callers of a private custom LLM with a free model id to sign in', async () => {
     setAnonymousAuth();
     mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('stealth/private-alpha', false));
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
@@ -1946,7 +2115,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         makeRequest(makeBody('stealth/private-alpha')) as never
       );
 
-      expect(response.status).toBe(429);
+      expect(response.status).toBe(401);
+      expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
       expect(mockedGetProvider).not.toHaveBeenCalled();
     } finally {
       mockedFindCustomLlm.mockResolvedValue(null);
@@ -3498,7 +3668,21 @@ describe('custom LLM requests', () => {
     });
   });
 
-  it('serves a public custom LLM to an anonymous caller', async () => {
+  it('serves a public custom LLM with a free id to an anonymous caller', async () => {
+    setAnonymousAuth();
+    mockCustomLlm(customLlm('acme/public-model-free', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model-free')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ isAnonymous: true }) })
+    );
+  });
+
+  it('requires an anonymous caller to sign in for an unpriced public custom LLM without a free id', async () => {
     setAnonymousAuth();
     mockCustomLlm(customLlm('acme/public-model', true));
 
@@ -3506,10 +3690,12 @@ describe('custom LLM requests', () => {
       makeRequest(makeBody('acme/public-model')) as never
     );
 
-    expect(response.status).toBe(200);
-    expect(mockedGetProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ isAnonymous: true }) })
-    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'paid_model_auth_required',
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -3523,16 +3709,16 @@ describe('custom LLM requests', () => {
     expect(mockedGetProvider).toHaveBeenCalledWith(expect.objectContaining({ countryCode }));
   });
 
-  it('serves a public custom LLM to a user without balance', async () => {
+  it('serves a public custom LLM with a free id to a user without balance', async () => {
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 0,
       settings: undefined,
       plan: undefined,
     });
-    mockCustomLlm(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model-free', true));
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('acme/public-model')) as never
+      makeRequest(makeBody('acme/public-model-free')) as never
     );
 
     expect(response.status).toBe(200);
@@ -3626,13 +3812,13 @@ describe('custom LLM requests', () => {
     );
   });
 
-  it('serves a private custom LLM without pricing to a user without balance', async () => {
+  it('serves a private custom LLM with a free id to a user without balance', async () => {
     setBalance(0);
-    mockCustomLlm(customLlm('acme/private-model', false));
+    mockCustomLlm(customLlm('acme/private-model-free', false));
     resolveCustomProvider(true, true);
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('acme/private-model')) as never
+      makeRequest(makeBody('acme/private-model-free')) as never
     );
 
     expect(response.status).toBe(200);
@@ -4687,7 +4873,7 @@ describe('Enkrypt input guardrail', () => {
         ]);
         expect(
           JSON.parse(fakeR2.objects.get(`test-api-request-log/${rows[0].response_r2_key}`) ?? '')
-        ).toEqual(body);
+        ).toMatchObject({ version: 1, response: JSON.stringify(body) });
       }
     );
 

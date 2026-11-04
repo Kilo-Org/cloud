@@ -108,6 +108,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Verify artifacts File Provider enumeration
+        run: |
+          xcrun swiftc -swift-version 5 \
+            apps/mobile/targets/ArtifactsFileProvider/ArtifactsFileProviderExtension.swift \
+            apps/mobile/tests/artifacts-file-provider/main.swift \
+            -o "$RUNNER_TEMP/artifacts-file-provider-tests"
+          "$RUNNER_TEMP/artifacts-file-provider-tests"
+
       # The probe runs tsx over the local dev/local scripts, so it needs only
       # the root project's dependencies. A duplicate that reaches this job
       # after another run published pays this filtered install instead of the

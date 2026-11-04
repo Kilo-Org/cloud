@@ -21,6 +21,151 @@ function createRequest(
 }
 
 describe('repairChatCompletionsTools', () => {
+  describe('legacy function calling diagnostics', () => {
+    let debugSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      debugSpy.mockRestore();
+    });
+
+    it.each([
+      {
+        name: 'assistant function call',
+        overrides: {
+          messages: [
+            {
+              role: 'assistant',
+              content: null,
+              function_call: { name: 'lookup', arguments: '{}' },
+            },
+          ],
+        },
+        expected: { legacyFunctionCallMessageCount: 1 },
+      },
+      {
+        name: 'function result',
+        overrides: { messages: [{ role: 'function', name: 'lookup', content: 'private result' }] },
+        expected: { legacyFunctionResultMessageCount: 1 },
+      },
+      {
+        name: 'function definitions',
+        overrides: { functions: [{ name: 'lookup', description: 'private description' }] },
+        expected: { legacyFunctionDefinitionCount: 1 },
+      },
+      {
+        name: 'function choice',
+        overrides: { function_call: { name: 'private_function' } },
+        expected: { hasLegacyFunctionChoice: true },
+      },
+    ] satisfies {
+      name: string;
+      overrides: Partial<OpenRouterChatCompletionRequest>;
+      expected: Record<string, number | boolean>;
+    }[])('logs structural metadata for a legacy $name without changing the request', testCase => {
+      const request = createRequest(testCase.overrides);
+      const original = structuredClone(request);
+
+      repairChatCompletionsTools(request);
+
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[repairChatCompletionsTools] legacy function calling detected',
+        {
+          model: 'test-model',
+          messageCount: request.messages.length,
+          legacyFunctionCallMessageCount: 0,
+          legacyFunctionResultMessageCount: 0,
+          legacyFunctionDefinitionCount: 0,
+          hasLegacyFunctionChoice: false,
+          ...testCase.expected,
+        }
+      );
+      expect(request).toEqual(original);
+    });
+
+    it('logs one summary for multiple legacy calls without exposing names, arguments, or content', () => {
+      const request = createRequest({
+        functions: [{ name: 'private_function', description: 'private description' }],
+        function_call: { name: 'private_function' },
+        messages: [
+          { role: 'user', content: 'private prompt' },
+          {
+            role: 'assistant',
+            content: null,
+            function_call: { name: 'private_function', arguments: '{"secret":"private argument"}' },
+          },
+          { role: 'function', name: 'private_function', content: 'private result' },
+          {
+            role: 'assistant',
+            content: null,
+            function_call: { name: 'another_private_function', arguments: '{}' },
+          },
+          { role: 'function', name: 'another_private_function', content: 'another private result' },
+        ],
+      });
+      const original = structuredClone(request);
+
+      repairChatCompletionsTools(request);
+
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[repairChatCompletionsTools] legacy function calling detected',
+        {
+          model: 'test-model',
+          messageCount: 5,
+          legacyFunctionCallMessageCount: 2,
+          legacyFunctionResultMessageCount: 2,
+          legacyFunctionDefinitionCount: 1,
+          hasLegacyFunctionChoice: true,
+        }
+      );
+      expect(JSON.stringify(debugSpy.mock.calls)).not.toContain('private');
+      expect(request).toEqual(original);
+    });
+
+    it('does not log for modern tool calls', () => {
+      const request = createRequest({
+        tools: [{ type: 'function', function: { name: 'lookup', parameters: {} } }],
+        messages: [
+          { role: 'user', content: 'Hello' },
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              { id: 'call_1', type: 'function', function: { name: 'lookup', arguments: '{}' } },
+            ],
+          },
+          { role: 'tool', tool_call_id: 'call_1', content: 'Result' },
+        ],
+      });
+      const original = structuredClone(request);
+
+      repairChatCompletionsTools(request);
+
+      expect(debugSpy).not.toHaveBeenCalled();
+      expect(request).toEqual(original);
+    });
+
+    it('does not log for ordinary messages or empty legacy definitions', () => {
+      repairChatCompletionsTools(createRequest());
+      repairChatCompletionsTools(
+        createRequest({
+          functions: [],
+          messages: [
+            { role: 'user', content: 'Hello' },
+            { role: 'assistant', content: 'Hi' },
+          ],
+        })
+      );
+
+      expect(debugSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('spurious tool result removal', () => {
     it('should remove tool results without matching tool calls', () => {
       const request = createRequest({

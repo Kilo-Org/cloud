@@ -7138,6 +7138,7 @@ export type CloudAgentRunContainer = {
   snapshotId?: string;
   runtimeBuildId?: string;
   startSource?: 'image' | 'snapshot';
+  runtimeHarness?: 'kilo' | 'kilo2';
 };
 
 export const cloud_agent_session_runs = pgTable(

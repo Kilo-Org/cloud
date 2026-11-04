@@ -279,7 +279,7 @@ async function setup(
 async function connectAndHello(
   provider: FakeProvider,
   wrapperId = 'wr_1',
-  options: { workspaceConfiguration?: boolean } = {}
+  options: { workspaceConfiguration?: boolean; runtimeHarness?: string } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -371,6 +371,49 @@ describe('SandboxControlV2 routes and forwarding', () => {
         await stub.deliver({ sessionId: SESSION, allocationId, messages: [promptPayload('m1')] })
       ).toBe('sent');
       expect(await wrapper.next()).toMatchObject({ type: 'session.prompt' });
+      wrapper.close();
+    }
+  );
+
+  it.each([
+    ['kilo2', { runtimeHarness: 'kilo2' }],
+    ['kilo', { runtimeHarness: 'kilo' }],
+    ['unknown', {}],
+    [undefined, {}],
+  ] as const)(
+    'records the wrapper runtime harness header %s in the run container',
+    async (header, expected) => {
+      const provider = createFakeProvider();
+      provider.adapter.describeRuntime = ref => ({
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        instanceId: ref.slice('mem_'.length),
+      });
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION));
+      const { wrapper, allocationId } = await connectAndHello(
+        provider,
+        'wr_1',
+        header === undefined ? {} : { runtimeHarness: header }
+      );
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      const container = {
+        provider: 'cloudflare-containers',
+        sandboxId: SANDBOX_ID,
+        allocationId,
+        instanceId: allocationId,
+        startSource: 'image',
+        ...expected,
+      };
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'ready', container })
+        )
+      );
+      expect((await stub.status({ sessionId: SESSION })).view).toEqual(
+        expect.objectContaining({ container })
+      );
       wrapper.close();
     }
   );

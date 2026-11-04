@@ -11,6 +11,7 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { RUNTIME_HARNESSES } from './control-plane-runtime-contract.js';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -240,6 +241,7 @@ export const controlPlaneRunContainerSchema = z
     snapshotId: controlPlaneRunContainerIdentifierSchema.optional(),
     runtimeBuildId: controlPlaneRunContainerIdentifierSchema.optional(),
     startSource: z.enum(['image', 'snapshot']).optional(),
+    runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   })
   .strict();
 export type ControlPlaneRunContainer = z.infer<typeof controlPlaneRunContainerSchema>;

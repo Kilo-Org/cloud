@@ -13,6 +13,7 @@ declare global {
     KILO_WEB_API_BASE_URL: string;
     NEXTAUTH_SECRET: SecretsStoreSecret;
     INTERNAL_API_SECRET: SecretsStoreSecret;
+    GLANCEABLE_SNAPSHOT_SIGNING_SECRET: SecretsStoreSecret;
     EXPO_ACCESS_TOKEN: SecretsStoreSecret;
     RECEIPTS_QUEUE: Queue;
     NOTIFICATION_CHANNEL_DO: DurableObjectNamespace<NotificationChannelDO>;

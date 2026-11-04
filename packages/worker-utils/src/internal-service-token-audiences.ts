@@ -8,6 +8,8 @@ export const NOTIFICATIONS_AUDIENCE = 'notifications';
 export const CLOUD_AGENT_NEXT_AUDIENCE = 'cloud-agent-next';
 export const KILOCLAW_AUDIENCE = 'kiloclaw';
 export const SESSION_INGEST_AUDIENCE = 'session-ingest';
+export const SESSION_INGEST_INVALIDATION_AUDIENCE = 'session-ingest:session-access-invalidate';
+export const GLANCEABLE_SNAPSHOT_AUDIENCE = 'glanceable-agents-snapshot';
 export const AI_ATTRIBUTION_AUDIENCE = 'ai-attribution';
 export const HTML_DEPLOY_AUDIENCE = 'deploy-builder:html-deploy';
 

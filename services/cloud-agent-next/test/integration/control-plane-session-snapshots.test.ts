@@ -53,6 +53,7 @@ async function setup(
     directory?: string;
     shared?: boolean;
     origin?: string;
+    startCommands?: string[];
   } = {}
 ) {
   const sessionId = `workspace_${crypto.randomUUID()}`;
@@ -117,6 +118,7 @@ async function setup(
       kiloSessionId: KILO,
       directory: options.directory ?? '/workspace/app',
       attemptId: 'requested',
+      ...(options.startCommands === undefined ? {} : { startCommands: options.startCommands }),
     },
     credentials: {
       userId: USER,
@@ -570,6 +572,43 @@ describe('idle session disk checkpoint', () => {
         }),
       ])
     );
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('fails a start-command snapshot restore on a wrapper that predates start commands', async () => {
+    const test = await setup({ startCommands: ['serve'] });
+    const fields = vi.spyOn(logger, 'withFields');
+    await test.checkpoint();
+    await test.cold();
+    await test.session.send(prompt('m2'));
+    await waitFor(() => expect(test.launchEnvs).toHaveLength(2));
+    const launch = test.launchEnvs[1];
+    const wrapper = await FakeWrapper.connect({
+      sandboxId: test.registration.sandboxId,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    test.wrappers.push(wrapper);
+    expect(
+      await wrapper.hello({
+        wrapperId: 'old',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        sessionSnapshots: true,
+      })
+    ).toMatchObject({ type: 'welcome' });
+    await waitFor(async () => {
+      const route = await runInDurableObject(test.sandbox, instance =>
+        readRoute(instance['db'], test.sessionId)
+      );
+      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    });
+    expect(fields.mock.calls.map(call => call[0])).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        stage: 'wrapper_start_commands_unsupported',
+      })
+    );
+    expect(await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary'], 250)).toBeNull();
+    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 

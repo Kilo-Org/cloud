@@ -764,8 +764,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * else is cloned. An adopt failure fails the preparation; it never clears the
    * root to clone over the snapshot. Setup and start commands run once, at the
    * route directory, after every root is in place. A workspace restored entirely
-   * from the environment snapshot skips setup, because the build ran it; it and
-   * a session disk snapshot restore run only the start commands. Each root is
+   * from the environment snapshot skips the environment's setup, but still runs
+   * the session's setup and start commands. A session disk snapshot restore runs
+   * only start commands. Each root is
    * stamped, never the route directory. A session never captures.
    */
   async function prepareWorkspace(
@@ -905,11 +906,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const fromEnvironmentSnapshot = reconciled.inspections.every(
       inspection => inspection === 'foreign'
     );
-    const setupCommands = fromEnvironmentSnapshot ? [] : (spec.setupCommands ?? []);
+    const skippedSetupCommands = fromEnvironmentSnapshot
+      ? (spec.environmentSetupCommandCount ?? 0)
+      : 0;
+    const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
     log(
       `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} setupCommands=${setupCommands.length} startCommands=${spec.startCommands?.length ?? 0}`
     );
-    if (fromEnvironmentSnapshot && (spec.setupCommands?.length ?? 0) > 0) {
+    if (skippedSetupCommands > 0) {
       emitProgress(spec.sessionId, 'setup', 'Setup already ran in the environment snapshot');
     }
     await runPreparationCommands(

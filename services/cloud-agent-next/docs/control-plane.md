@@ -559,12 +559,16 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
 - **Setup skip.** A workspace whose every root is `foreign` was restored from the environment
-  snapshot, and the build already ran setup there, so the wrapper runs only `startCommands`. A
+  snapshot, and the build already ran the environment's setup there. The wrapper skips only the
+  leading `environmentSetupCommandCount` commands, runs any request-supplied setup, then runs
+  `startCommands`. Without the count it conservatively runs all setup. A
   clone or a mixed workspace runs setup, then `startCommands`. A snapshot of an older revision is
   not re-set-up: changed setup commands take effect after the next build. Only a wrapper whose
   hello advertised `startCommands` receives `startCommands`; an older wrapper receives them
   appended to `setupCommands` (`startCommandsForWrapper`), so admission bounds the combined list
-  by the setup-command limit.
+  by the setup-command limit. An older wrapper restoring a session disk snapshot cannot run
+  these commands; preparation fails immediately with `wrapper_start_commands_unsupported`
+  rather than silently skipping them. The restored disk and snapshot descriptor remain intact.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
@@ -754,8 +758,8 @@ Adopt preserves each prepared root and selects the route's starting ref explicit
 3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
 4. Check out the target directly, without an intermediate checkout or deleting other local branches.
    Review refs retain their dedicated fetch and checkout path. Set the git author.
-5. Run the setup commands once for the workspace, except when every root came from the
-   environment snapshot (see "Setup skip" above), then the start commands, then write the stamp of each root.
+5. Run the setup commands once for the workspace, skipping only the environment's commands when
+   every root came from its snapshot (see "Setup skip" above), then the start commands, then write the stamp of each root.
 
 Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
 use the bounded git retry policy; missing branches, authentication failures and checkout conflicts

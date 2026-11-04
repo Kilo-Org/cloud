@@ -173,8 +173,9 @@ repository.
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
 5. Setup commands MUST run on the first prepare and again on every rebuild,
-   except when restoring a private session disk snapshot or starting from an
-   environment snapshot. Start commands MUST run each time a workspace starts:
+    except when restoring a private session disk snapshot. An environment snapshot
+    skips only the environment's setup; request-supplied commands MUST still run.
+    Start commands MUST run each time a workspace starts:
    on the first prepare, on every rebuild, after an environment snapshot start
    and after a private session disk snapshot restore. They MUST NOT run when a
    chat joins a workspace that is already running. A failing or timed-out setup or start command
@@ -206,8 +207,9 @@ repository.
    the base image. The lookup MUST NOT delay the start by more than 15 seconds
    and MUST NOT wait for a build.
 3. A workspace that starts from an environment snapshot, at any revision, MUST
-   NOT run setup commands, because the build already ran them. It MUST run the
-   start commands. A workspace that starts from the base image, or that is not
+   NOT run the environment's setup commands, because the build already ran them.
+   It MUST run any request-supplied setup commands, then the start commands.
+   A workspace that starts from the base image, or that is not
    entirely restored from the snapshot, MUST run setup with the configuration
    admitted for that session, then the start commands. Changed setup commands
    take effect after the next build. Cached files MAY retain earlier values,
@@ -700,7 +702,8 @@ The following use SHOULD and are not enforced today:
   starts, after setup or from a snapshot. It is not part of a build, and a chat
   that joins a running workspace does not run it.
 - A workspace that starts from an environment snapshot, at any revision, skips
-  setup. Changed setup commands take effect after the next build.
+  the environment's setup, but still runs request-supplied setup. Changed
+  environment setup commands take effect after the next build.
 - Start commands also run after a session disk snapshot restore, because no
   process survives a snapshot.
 

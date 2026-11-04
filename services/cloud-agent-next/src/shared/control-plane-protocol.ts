@@ -1,4 +1,4 @@
-import { setupCommandsSchema } from './setup-script.js';
+import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -368,12 +368,18 @@ const routeSpecObjectSchema = z
     setupCommands: setupCommandsSchema.optional(),
     /**
      * The environment's workspace start commands. The wrapper runs them each
-     * time it starts a workspace: after setup, or alone when the workspace comes
-     * from an environment or session snapshot. Only a wrapper that advertised
+     * time it starts a workspace: after remaining setup, or alone when the workspace
+     * comes from a session snapshot. Only a wrapper that advertised
      * `startCommands` receives them; for an older one the Sandbox DO appends
-     * them to `setupCommands`.
+     * them to `setupCommands`, or fails a session snapshot restore that cannot run them.
      */
     startCommands: setupCommandsSchema.optional(),
+    /**
+     * How many leading `setupCommands` are the repository environment's own.
+     * An adopted environment snapshot already ran them; the rest are the
+     * session's own setup commands.
+     */
+    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -427,6 +433,7 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -441,6 +448,7 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     secretEnvKeys: true,
     setupCommands: true,
     startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -957,9 +965,9 @@ const controlPlaneHelloFrameSchema = z
     installsSkillsSh: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper runs `startCommands` when it starts a
-     * workspace, and skips setup for a workspace restored from an environment
-     * snapshot. A wrapper that did not advertise it receives the start commands
-     * appended to `setupCommands`.
+     * workspace, and skips only the environment's setup commands when all roots
+     * came from its snapshot. Older wrappers receive start commands appended to
+     * `setupCommands`; session disk restores that cannot run them fail preparation.
      */
     startCommands: z.literal(true).optional(),
   })

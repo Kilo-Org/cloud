@@ -128,6 +128,9 @@ export function controlPlaneRouteSpecFromAttachPayload(
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
     ...(payload.startCommands ? { startCommands: payload.startCommands } : {}),
+    ...(payload.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
     ...(runtimeIsolation ? { runtimeIsolation } : {}),
     // The Sandbox DO replaces this with its own route attempt id; the field is
     // only a protocol placeholder until an attempt starts.

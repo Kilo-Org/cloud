@@ -43,6 +43,7 @@ function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneR
     branch: 'kilo/generated',
     branchMode: 'working',
     setupCommands: ['npm install'],
+    environmentSetupCommandCount: 1,
     roots: [
       {
         directory: API,
@@ -424,8 +425,24 @@ describe('preparing a route with several git roots', () => {
     }
     expect(harness.clones()).toEqual([]);
     expect([...harness.repos]).toEqual([API, WEB]);
-    // The environment build already ran setup in the snapshot.
     expect(harness.setups).toEqual([]);
+    expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
+  });
+
+  it('runs inline setup once at the cwd after adopting all environment roots', async () => {
+    const harness = rootsHarness({
+      repos: [API, WEB],
+      stamps: { [API]: FOREIGN, [WEB]: FOREIGN },
+    });
+
+    await harness.manager.prepare(
+      rootSpec({ setupCommands: ['npm install', 'inline extra'], startCommands: ['serve'] })
+    );
+
+    expect(harness.setups).toEqual([
+      { command: 'inline extra', directory: CWD },
+      { command: 'serve', directory: CWD },
+    ]);
     expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
   });
 

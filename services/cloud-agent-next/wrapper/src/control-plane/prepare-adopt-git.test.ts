@@ -337,7 +337,12 @@ describe('adopting an environment snapshot against a real repository', () => {
       await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
       const restored = manager('alloc-restored');
       await restored.prepared.prepare(
-        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
       );
 
       expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
@@ -351,9 +356,42 @@ describe('adopting an environment snapshot against a real repository', () => {
       );
     });
 
+    it.each([
+      { count: 1, setup: ['install', 'inline extra'], expected: ['inline extra', 'serve'] },
+      { count: 0, setup: ['inline extra'], expected: ['inline extra', 'serve'] },
+      {
+        count: undefined,
+        setup: ['install', 'inline extra'],
+        expected: ['install', 'inline extra', 'serve'],
+      },
+    ])(
+      'preserves session setup when the environment command count is $count',
+      async ({ count, setup, expected }) => {
+        await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
+        const restored = manager('alloc-restored');
+        await restored.prepared.prepare(
+          spec({
+            sessionId: 'ses_b',
+            setupCommands: [...setup],
+            environmentSetupCommandCount: count,
+            startCommands: ['serve'],
+          })
+        );
+
+        expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+        expect(setupRun(restored.runSetup.mock.calls)).toEqual([...expected]);
+      }
+    );
+
     it('runs setup and start commands after a fresh clone', async () => {
       const fresh = manager('alloc-image');
-      await fresh.prepared.prepare(spec({ setupCommands: ['install'], startCommands: ['serve'] }));
+      await fresh.prepared.prepare(
+        spec({
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
 
       expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
       expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);

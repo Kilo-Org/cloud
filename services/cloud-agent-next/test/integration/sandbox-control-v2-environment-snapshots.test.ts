@@ -181,6 +181,7 @@ type RouteOverrides = {
   env?: Record<string, string>;
   setupCommands?: string[];
   startCommands?: string[];
+  environmentSetupCommandCount?: number;
   userId?: string;
   orgId?: string | null;
   sessionId?: string;
@@ -202,6 +203,9 @@ function prepareInput(overrides: RouteOverrides = {}) {
     ...(overrides.env === undefined ? {} : { env: overrides.env }),
     ...(overrides.setupCommands === undefined ? {} : { setupCommands: overrides.setupCommands }),
     ...(overrides.startCommands === undefined ? {} : { startCommands: overrides.startCommands }),
+    ...(overrides.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: overrides.environmentSetupCommandCount }),
   };
   return {
     spec,
@@ -615,6 +619,26 @@ describe('environment snapshot launch', () => {
     );
   });
 
+  it('sends the environment setup command boundary in the snapshot prepare frame', async () => {
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const { stub } = await setup('sbx__env_launch_setup_boundary', provider);
+    await stub.prepare(
+      prepareInput({
+        setupCommands: ['env-install', 'inline-build'],
+        environmentSetupCommandCount: 1,
+      })
+    );
+    const { wrapper } = await connect('sbx__env_launch_setup_boundary', provider, 1, {
+      startCommands: true,
+    });
+    const frame = await prepareFrameOf(wrapper);
+
+    expect(frame.spec).toMatchObject({
+      setupCommands: ['env-install', 'inline-build'],
+      environmentSetupCommandCount: 1,
+    });
+  });
+
   it('sends start commands apart from setup to a start-command wrapper', async () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__env_launch_start_phases', provider);
@@ -630,12 +654,19 @@ describe('environment snapshot launch', () => {
   it('appends start commands to setup for a wrapper that predates them', async () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const { stub } = await setup('sbx__env_launch_old_wrapper_phases', provider);
-    await stub.prepare(prepareInput({ setupCommands: ['npm install'], startCommands: ['serve'] }));
+    await stub.prepare(
+      prepareInput({
+        setupCommands: ['npm install'],
+        startCommands: ['serve'],
+        environmentSetupCommandCount: 1,
+      })
+    );
     const { wrapper } = await connect('sbx__env_launch_old_wrapper_phases', provider);
     const frame = await prepareFrameOf(wrapper);
 
     expect(frame.spec.setupCommands).toEqual(['npm install', 'serve']);
     expect(frame.spec).not.toHaveProperty('startCommands');
+    expect(frame.spec).not.toHaveProperty('environmentSetupCommandCount');
   });
 
   it('starts from the image without a lookup when the session has no environment', async () => {

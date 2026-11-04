@@ -81,15 +81,16 @@ cap; no separate queue publish endpoint or manual topic-creation script is part 
 prerequisites have not been inspected or activated on the hosted project here.
 
 Before the first deployment of this change, verify the staging selector is not
-already `vercel`: that value activates immediately even if the legacy queue-only
-flag is false. Deploy with the selector absent until hosted readiness is verified.
+already `vercel`: that value activates Vercel publication immediately under the
+staging guard. An absent selector selects Cloudflare; verify that publisher and
+writer too before deploying the launch-gate retirement.
 
 Before load, complete the private-ingress gate and one ordinary small gateway
 smoke request, checking persistence and actual ACK/drain. Then use the bounded
 10/25/50/100rps stages below. To stop new Vercel publication, remove/change the
 transport selector and redeploy; keep old staging deployments consuming until
-accepted work drains. The legacy queue-only flag determines whether the restored
-path is Cloudflare or existing direct accounting.
+accepted work drains. The restored staging path is Cloudflare; the retired
+launch gate no longer selects direct accounting.
 
 ## Readiness boundaries
 
@@ -217,10 +218,9 @@ never pasted into commands, PRs, logs or manifests.
 | Gateway deployment | Topic / storage / callback region / cap | `usage-staging` / FRA / FRA / omitted `maxConcurrency` | Static config; requires deployment |
 
 Exact `vercel` alone selects Vercel plus queue-only accounting under the staging
-guard, including when the legacy queue-only flag is absent/false. Setting only
-that legacy flag false does not turn Vercel off: remove/change the selector.
-Absent, misspelled or case-mismatched transport values restore the existing
-Cloudflare/direct choice controlled by the existing flags. Production
+guard. To turn Vercel off, remove/change the selector and redeploy.
+Absent, misspelled or case-mismatched transport values select Cloudflare for
+staging accounting. The retired launch gate has no effect. Production
 excludes Vercel even if the selector is accidentally copied. Effective queue-only
 mode selects one transport, so no dual publication. Missing writer config fails consumption and retries; it does not
 redirect an accepted event to Cloudflare or the gateway billing writer.

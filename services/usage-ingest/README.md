@@ -178,8 +178,8 @@ Redirects are terminal 3xx failures; their targets are never followed.
 ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
 `usageId` and categorical `reason`; accounting returns null and emits no gateway
 persistence completion. This is not durable recovery: unaccepted events may be
-lost, and ambiguous failures may still be recorded later by the consumer. With
-queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
+lost, and ambiguous failures may still be recorded later by the consumer. For
+unselected events, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across

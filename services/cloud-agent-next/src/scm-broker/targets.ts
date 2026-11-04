@@ -48,35 +48,61 @@ export function managedScmForwardingTargets(
       continue;
     const scm = grant.scm;
     if (!scm) continue;
-    if (scm.purpose !== 'gitlab') {
-      for (const host of SCM_HOSTS[scm.purpose]) targets.add(host);
-      continue;
-    }
-    try {
-      const instance = new URL(scm.gitlab?.instanceOrigin ?? '');
-      const git = new URL(scm.gitUrl);
-      if (
-        instance.protocol !== 'https:' ||
-        instance.username ||
-        instance.password ||
-        instance.search ||
-        instance.hash ||
-        instance.host !== scm.gitlab?.instanceHost ||
-        instance.origin !== git.origin ||
-        git.username ||
-        git.password ||
-        !scm.gitlab?.projectPath ||
-        !scm.gitlab.integrationId ||
-        !scm.gitlab.authType ||
-        !scm.gitlab.identity
-      )
-        continue;
-      targets.add(instance.host);
-    } catch {
-      continue;
+    for (const host of scmForwardingHosts(scm)) targets.add(host);
+    for (const entry of grant.additionalRepositories ?? []) {
+      if (!additionalEntryProjectsHosts(grant, entry)) continue;
+      for (const host of scmForwardingHosts(entry.scm)) targets.add(host);
     }
   }
   return [...targets].sort();
+}
+
+function scmForwardingHosts(scm: NonNullable<SessionCredentialGrant['scm']>): string[] {
+  if (scm.purpose !== 'gitlab') return [...SCM_HOSTS[scm.purpose]];
+  try {
+    const instance = new URL(scm.gitlab?.instanceOrigin ?? '');
+    const git = new URL(scm.gitUrl);
+    if (
+      instance.protocol !== 'https:' ||
+      instance.username ||
+      instance.password ||
+      instance.search ||
+      instance.hash ||
+      instance.host !== scm.gitlab?.instanceHost ||
+      instance.origin !== git.origin ||
+      git.username ||
+      git.password ||
+      !scm.gitlab?.projectPath ||
+      !scm.gitlab.integrationId ||
+      !scm.gitlab.authType ||
+      !scm.gitlab.identity
+    )
+      return [];
+    return [instance.host];
+  } catch {
+    return [];
+  }
+}
+
+function additionalEntryProjectsHosts(
+  grant: SessionCredentialGrant,
+  entry: NonNullable<SessionCredentialGrant['additionalRepositories']>[number]
+): boolean {
+  const scm = entry.scm;
+  const alias = scm.alias && parseControlPlaneCredential(scm.alias);
+  if (entry.repository.type === 'github' && entry.repository.authentication !== 'managed') {
+    return false;
+  }
+  return Boolean(
+    entry.repository.type === scm.purpose &&
+    scm.nativeToken === undefined &&
+    scm.capability?.credential.startsWith(CURRENT_CAPABILITY_PREFIX[scm.purpose]) &&
+    grant.outboundContainerId &&
+    scm.capability.outboundContainerId === grant.outboundContainerId &&
+    alias &&
+    alias.sandboxId === grant.sandboxId &&
+    alias.purpose === scm.purpose
+  );
 }
 
 export function configuredVercelForwardUrl(

@@ -13,7 +13,8 @@ import type {
   ControlPlaneScmForwardAdmissionResult,
 } from '../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider } from '../types.js';
-import { classifyScmAuthorization } from './authorization.js';
+import { grantScmEntries, selectScmEntry } from '../sandbox-control/session-credential-members.js';
+import { classifyScmAuthorization, type ResolvedScmCapability } from './authorization.js';
 import { hasManagedScmCapability, managedScmForwardingTargets } from './targets.js';
 
 export type ScmAdmissionContext = {
@@ -75,6 +76,23 @@ function activeGrants(context: ScmAdmissionContext, now: number) {
       grant.members.some(member => context.liveSessionIds.includes(member.sessionId)) &&
       (context.organizationId === undefined || grant.orgId === context.organizationId)
   );
+}
+
+async function grantForPresentedAlias(
+  grants: readonly SessionCredentialGrant[],
+  alias: string,
+  provider: ResolvedScmCapability['provider']
+): Promise<SessionCredentialGrant | undefined> {
+  for (const candidate of grants) {
+    if (!hasManagedScmCapability(candidate)) continue;
+    for (const entry of grantScmEntries(candidate)) {
+      if (entry.scm.purpose !== provider || !entry.scm.alias) continue;
+      if (await sandboxCredentialMatchesHash(alias, await hashSandboxCredential(entry.scm.alias))) {
+        return candidate;
+      }
+    }
+  }
+  return undefined;
 }
 
 function admittedTarget(url: URL, grants: readonly SessionCredentialGrant[], now: number) {
@@ -141,21 +159,7 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
     const alias = authorization.value.capability;
     const parsedAlias = parseControlPlaneCredential(alias);
     if (parsedAlias?.sandboxId !== context.sandboxId) return deny('credential_denied');
-    let grant: SessionCredentialGrant | undefined;
-    for (const candidate of grants) {
-      if (
-        hasManagedScmCapability(candidate) &&
-        candidate.scm?.purpose === authorization.value.provider &&
-        candidate.scm.alias &&
-        (await sandboxCredentialMatchesHash(
-          alias,
-          await hashSandboxCredential(candidate.scm.alias)
-        ))
-      ) {
-        grant = candidate;
-        break;
-      }
-    }
+    const grant = await grantForPresentedAlias(grants, alias, authorization.value.provider);
     if (!grant?.scm?.alias || !grant.outboundContainerId) return deny('credential_denied');
     if (!admittedTarget(url, [grant], now())) return deny('target_denied');
     // Capture before renewal. A resolver must not mutate the authoritative input in place.
@@ -166,12 +170,15 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
       ...input.target,
       outboundContainerId: grant.outboundContainerId,
     });
+    const selected = resolved ? selectScmEntry(resolved.grant, alias, url) : null;
     if (
       !resolved ||
+      !selected ||
       !hasManagedScmCapability(resolved.grant) ||
-      resolved.grant.scm?.alias !== alias ||
-      !resolved.grant.scm.capability ||
-      resolved.credential !== resolved.grant.scm.capability.credential ||
+      selected.scm.purpose !== authorization.value.provider ||
+      selected.scm.alias !== alias ||
+      !selected.scm.capability ||
+      resolved.credential !== selected.scm.capability.credential ||
       resolved.grant.expiresAt <= now()
     )
       return deny('credential_denied');
@@ -183,7 +190,7 @@ export async function admitScmRequest<C extends ScmAdmissionContext>(
       ok: true,
       authority: {
         type: 'managed',
-        provider: resolved.grant.scm.purpose,
+        provider: selected.scm.purpose,
         capability: resolved.credential,
         outboundContainerId: grant.outboundContainerId,
       },

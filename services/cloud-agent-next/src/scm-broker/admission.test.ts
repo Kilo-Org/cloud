@@ -177,6 +177,107 @@ describe.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
       expect(f.persist).not.toHaveBeenCalled();
     });
 
+    it('admits the capability of the additional repository the request URL names', async () => {
+      const f = fixture(provider);
+      const memberCapability = 'kgh2.member';
+      f.scope.additionalRepositories = [
+        {
+          repository: {
+            type: 'github',
+            repo: 'acme/other',
+            authentication: 'managed',
+            allowUserAuthorization: false,
+          },
+          scm: {
+            ...f.scope.scm!,
+            gitUrl: 'https://github.com/acme/other.git',
+            capability: { ...f.scope.scm!.capability!, credential: memberCapability },
+          },
+        },
+      ];
+      f.request.target.url = 'https://github.com/acme/other.git/info/refs';
+      f.resolve.mockImplementationOnce(async ({ grant: current }) => ({
+        grant: current,
+        credential: memberCapability,
+      }));
+
+      expect(await admitScmRequest(f.request, f.deps)).toMatchObject({
+        ok: true,
+        authority: { type: 'managed', provider: 'github', capability: memberCapability },
+      });
+    });
+
+    it('denies a launch capability when the request URL names another member', async () => {
+      const f = fixture(provider);
+      f.scope.additionalRepositories = [
+        {
+          repository: {
+            type: 'github',
+            repo: 'acme/other',
+            authentication: 'managed',
+            allowUserAuthorization: false,
+          },
+          scm: {
+            ...f.scope.scm!,
+            gitUrl: 'https://github.com/acme/other.git',
+            capability: { ...f.scope.scm!.capability!, credential: 'kgh2.member' },
+          },
+        },
+      ];
+      f.request.target.url = 'https://github.com/acme/other.git/info/refs';
+      f.resolve.mockImplementationOnce(async ({ grant: current }) => ({
+        grant: current,
+        credential: current.scm!.capability!.credential,
+      }));
+
+      expect(await admitScmRequest(f.request, f.deps)).toMatchObject({
+        ok: false,
+        code: 'credential_denied',
+      });
+      expect(f.persist).not.toHaveBeenCalled();
+    });
+
+    it('admits an additional GitLab alias on its own host', async () => {
+      const f = fixture(provider);
+      const alias = createControlPlaneCredential(logicalId, 'gitlab');
+      f.scope.additionalRepositories = [
+        {
+          repository: { type: 'gitlab', url: 'https://gitlab.com/group/project.git' },
+          scm: {
+            purpose: 'gitlab',
+            alias,
+            gitUrl: 'https://gitlab.com/group/project.git',
+            capability: {
+              credential: 'kgl2.member',
+              outboundContainerId: 'allocation-binding',
+              issuedAt: time - 1000,
+              expiresAt: time + 300_000,
+            },
+            gitlab: {
+              instanceOrigin: 'https://gitlab.com',
+              instanceHost: 'gitlab.com',
+              projectPath: 'group/project',
+              integrationId: 'integration-test',
+              authType: 'pat',
+              identity: { accountId: '42', accountLogin: 'bot' },
+              glabIsOAuth2: false,
+            },
+          },
+        },
+      ];
+      f.request.target.url = 'https://gitlab.com/group/project.git/info/refs';
+      f.request.authorization.authorization = `Bearer ${alias}`;
+      f.resolve.mockImplementationOnce(async ({ grant: current }) => ({
+        grant: current,
+        credential: 'kgl2.member',
+      }));
+
+      expect(await admitScmRequest(f.request, f.deps)).toMatchObject({
+        ok: true,
+        authority: { type: 'managed', provider: 'gitlab', capability: 'kgl2.member' },
+      });
+    });
+
     it('rejects expired identity evidence before grant persistence', async () => {
       const f = fixture(provider);
       let identityCurrent = true;

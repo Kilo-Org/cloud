@@ -244,7 +244,8 @@ const sessionCredentialGrantShape = z
 
 function refinePersistedSessionCredentialGrant(
   grant: z.infer<typeof sessionCredentialGrantShape>,
-  context: z.RefinementCtx
+  context: z.RefinementCtx,
+  options?: { allowStaleCapabilityBinding?: boolean }
 ): void {
   const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
   if (
@@ -339,7 +340,7 @@ function refinePersistedSessionCredentialGrant(
     outboundContainerId: grant.outboundContainerId,
     orgId: grant.orgId,
   };
-  assertScmGrantValid(grant.scm, grant.repository, scmContext, reject);
+  assertScmGrantValid(grant.scm, grant.repository, scmContext, reject, options);
   if (grant.additionalRepositories) {
     // Only a contained grant that the outbound proxy serves can hold several
     // repositories. Vercel forwards the launch capability only.
@@ -347,7 +348,9 @@ function refinePersistedSessionCredentialGrant(
     const aliasByPurpose = new Map([[grant.scm.purpose, grant.scm.alias]]);
     for (const { repository, scm } of grant.additionalRepositories) {
       if (scm.purpose !== repository.type) reject();
-      assertScmGrantValid(scm, repository, scmContext, reject);
+      assertScmGrantValid(scm, repository, scmContext, reject, {
+        allowStaleCapabilityBinding: true,
+      });
       // One alias for each purpose, and a different alias for each other purpose.
       if (aliasByPurpose.has(scm.purpose) && aliasByPurpose.get(scm.purpose) !== scm.alias) {
         reject();
@@ -373,7 +376,8 @@ function assertScmGrantValid(
     outboundContainerId: string | undefined;
     orgId: string | undefined;
   },
-  reject: () => void
+  reject: () => void,
+  options?: { allowStaleCapabilityBinding?: boolean }
 ): void {
   if ((scm.author || scm.githubAppType) && scm.purpose !== 'github') reject();
   if (!context.contained) {
@@ -395,7 +399,8 @@ function assertScmGrantValid(
     scm.nativeToken ||
     !scm.capability?.credential.startsWith(CURRENT_CAPABILITY_PREFIX[scm.purpose]) ||
     !context.outboundContainerId ||
-    scm.capability?.outboundContainerId !== context.outboundContainerId ||
+    (!options?.allowStaleCapabilityBinding &&
+      scm.capability?.outboundContainerId !== context.outboundContainerId) ||
     (repository.type === 'github' && repository.authentication !== 'managed') ||
     (scm.purpose === 'bitbucket' && !context.orgId) ||
     (scm.purpose === 'gitlab') !== (scm.gitlab !== undefined) ||
@@ -417,6 +422,24 @@ export const persistedSessionCredentialGrantSchema = sessionCredentialGrantShape
 
 export const sessionCredentialGrantSchema = persistedSessionCredentialGrantSchema.superRefine(
   (grant, context) => {
+    if (!hasRuntimeCredentialProxy(grant)) {
+      context.addIssue({ code: 'custom', message: 'Runtime credential proxy required' });
+    }
+    // A readable grant may carry a stale member binding until redeem refreshes it.
+    if (
+      grant.additionalRepositories?.some(
+        entry => entry.scm.capability?.outboundContainerId !== grant.outboundContainerId
+      )
+    ) {
+      context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
+    }
+  }
+);
+
+/** A stored grant may name a previous container so redeem can re-issue that capability. */
+const refreshableSessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
+  (grant, context) => {
+    refinePersistedSessionCredentialGrant(grant, context, { allowStaleCapabilityBinding: true });
     if (!hasRuntimeCredentialProxy(grant)) {
       context.addIssue({ code: 'custom', message: 'Runtime credential proxy required' });
     }
@@ -1571,7 +1594,7 @@ export async function resolveSessionCredential(input: {
   now?: number;
 }): Promise<{ grant: SessionCredentialGrant; credential: string } | null> {
   const now = input.now ?? Date.now();
-  const parsed = sessionCredentialGrantSchema.safeParse(input.grant);
+  const parsed = refreshableSessionCredentialGrantSchema.safeParse(input.grant);
   if (!parsed.success || !timestampSchema.safeParse(now).success) return null;
   let grant = parsed.data;
   const alias = parseControlPlaneCredential(input.credential);
@@ -1603,7 +1626,10 @@ export async function resolveSessionCredential(input: {
       entry.scm
     );
     grant = withEntryScm(grant, entry.additionalIndex, scm);
-    return scm.capability ? { grant, credential: scm.capability.credential } : null;
+    const refreshed = sessionCredentialGrantSchema.safeParse(grant);
+    return refreshed.success && scm.capability
+      ? { grant: refreshed.data, credential: scm.capability.credential }
+      : null;
   } catch {
     return null;
   }

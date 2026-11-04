@@ -2139,18 +2139,15 @@ describe('explicit sandbox session creation', () => {
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     });
 
-    it('fails a ledger create whose credentials would be direct, before admission', async () => {
+    it('starts a V2 environment when the obsolete containment flag is off', async () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
 
-      await expect(runCreate(ctx, environmentRequest(v2Environment))).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('contained credentials'),
+      await expect(runCreate(ctx, environmentRequest(v2Environment))).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
       });
-      expect(admitOperationMock).not.toHaveBeenCalled();
-      expectNoAllocation(doStub);
     });
 
     it.each([

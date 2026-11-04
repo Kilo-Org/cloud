@@ -3824,7 +3824,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
               projectPath: 'group/sub/project',
               integrationId: 'integration-1',
               authType: 'pat',
-              identity: { accountId: null, accountLogin: null },
+              identity: { accountId: '42', accountLogin: 'group-bot' },
               glabIsOAuth2: false,
             };
           },
@@ -4036,14 +4036,13 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(events[0]).toMatchObject({ stage: 'credential_grant_failed' });
   });
 
-  it('fails a V2 start whose grant would be direct, before the sandbox starts', async () => {
+  it('starts a contained V2 grant when selection asks to disable containment', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, {
       CREDENTIAL_CONTAINMENT_ENABLED: 'false',
       WORKER_URL: 'https://api.kilo.ai',
     });
-    const capture = captureRouteFailed();
     const view = await stub.prepare({
       ...environmentInput([WIDGETS, GADGETS]),
       sandboxSelection: {
@@ -4051,16 +4050,17 @@ describe('SandboxControlV2 environment repository credentials', () => {
         containment: { kilocode: false, github: false },
       },
     });
-    const events = capture.forAttempt(failedAttemptId(view));
-    capture.restore();
 
-    expect(events[0]).toMatchObject({
-      stage: 'credential_grant_failed',
-      grantPhase: 'validation',
-      grantFailureReason: 'invalid_grant',
-    });
-    expect(broker.githubIssued()).toBe(0);
-    expect(provider.intents).toHaveLength(0);
+    expect(view).toMatchObject({ state: 'preparing' });
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      containmentEnabled?: boolean;
+      scm?: { alias?: string };
+      additionalRepositories?: unknown[];
+    };
+    expect(grant.containmentEnabled).toBeUndefined();
+    expect(grant.scm?.alias).toEqual(expect.any(String));
+    expect(grant.additionalRepositories).toHaveLength(1);
+    expect(broker.githubIssued()).toBeGreaterThan(0);
   });
 
   it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {

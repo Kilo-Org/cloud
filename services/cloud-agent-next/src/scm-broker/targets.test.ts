@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { grant, time } from './test-fixtures.js';
+import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
+import { grant, logicalId, time } from './test-fixtures.js';
 import {
   configuredVercelForwardUrl,
   hasManagedScmCapability,
@@ -40,6 +41,43 @@ describe('managed SCM forwarding targets', () => {
     expect(
       managedScmForwardingTargets([legacy, explicit, direct, expired, memberless], time)
     ).toEqual([]);
+  });
+  it('projects the host of an additional GitLab repository', () => {
+    const scope = grant();
+    const outboundContainerId = scope.outboundContainerId;
+    if (!outboundContainerId) throw new Error('fixture grant has no outbound container');
+    scope.additionalRepositories = [
+      {
+        repository: { type: 'gitlab', url: 'https://gitlab.com/group/project.git' },
+        scm: {
+          purpose: 'gitlab',
+          alias: createControlPlaneCredential(logicalId, 'gitlab'),
+          gitUrl: 'https://gitlab.com/group/project.git',
+          capability: {
+            credential: 'kgl2.member',
+            outboundContainerId,
+            issuedAt: time - 1000,
+            expiresAt: time + 300_000,
+          },
+          gitlab: {
+            instanceOrigin: 'https://gitlab.com',
+            instanceHost: 'gitlab.com',
+            projectPath: 'group/project',
+            integrationId: 'integration-test',
+            authType: 'pat',
+            identity: { accountId: '42', accountLogin: 'bot' },
+            glabIsOAuth2: false,
+          },
+        },
+      },
+    ];
+    expect(managedScmForwardingTargets([scope], time)).toEqual([
+      'api.github.com',
+      'github.com',
+      'gitlab.com',
+      'npm.pkg.github.com',
+      'uploads.github.com',
+    ]);
   });
   it('does not project unvalidated GitLab instances or inconsistent bindings', () => {
     const mismatched = grant('gitlab');

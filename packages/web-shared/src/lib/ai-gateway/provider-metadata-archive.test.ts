@@ -244,9 +244,6 @@ beforeEach(() => {
     ...process.env,
     VERCEL_TARGET_ENV: 'staging',
     VERCEL_ENV: 'preview',
-  });
-  jest.replaceProperty(process, 'env', {
-    ...process.env,
     R2_ACCOUNT_ID: 'test-metadata-account',
     R2_AI_PROVIDER_METADATA_BUCKET_NAME: BUCKET,
     R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',

@@ -31,7 +31,7 @@ export const KNOWN_PLATFORMS = ['ios', 'android'] as const;
 export type KnownPlatform = (typeof KNOWN_PLATFORMS)[number];
 
 export function isKnownPlatform(value: string | null | undefined): value is KnownPlatform {
-  return value === 'ios' || value === 'android';
+  return value != null && KNOWN_PLATFORMS.some(platform => platform === value);
 }
 
 /** The accepted app version shape: dot-separated numbers, e.g. `1.0.4`. */

@@ -494,6 +494,10 @@ it('retains R2 cleanup backoff across mutations and early alarm invocations', as
     state.storage.get<number>('purgeRetryAt')
   );
   expect(retryAt).toBeGreaterThan(Date.now());
+  const retry = await stub.beginBlob({ principal, sessionID, blob: upload.input.blob });
+  expect(retry).toMatchObject({ ok: false, error: { code: 'upload_in_progress' } });
+  if (retry.ok) throw new Error('A failed cleanup must keep its claim');
+  expect(retry.error.details?.retryAt).toBeGreaterThanOrEqual(retryAt!);
   expect(
     (
       await api.apply(
@@ -517,4 +521,22 @@ it('retains R2 cleanup backoff across mutations and early alarm invocations', as
     expect(await state.storage.getAlarm()).toBeGreaterThanOrEqual(retryAt!);
     expect(await state.storage.get('purgeRetryAt')).toBe(retryAt);
   });
+});
+
+it('keeps aborted-upload retries beyond the remaining cleanup margin', async () => {
+  const { principal, sessionID, stub } = await fixture();
+  const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('abort margin'));
+  expect((await stub.abortBlob(upload.input)).ok).toBe(true);
+  const deadline = Date.now() - 10_000;
+  await runInDurableObject(stub, (_instance, state) => {
+    drizzle(state.storage)
+      .update(blobs)
+      .set({ deadline })
+      .where(eq(blobs.hash, upload.input.blob.hash))
+      .run();
+  });
+  const retry = await stub.beginBlob({ principal, sessionID, blob: upload.input.blob });
+  expect(retry).toMatchObject({ ok: false, error: { code: 'upload_in_progress' } });
+  if (retry.ok) throw new Error('An aborted upload must wait for cleanup');
+  expect(retry.error.details?.retryAt).toBeGreaterThanOrEqual(deadline + blobOps.SWEEP_MARGIN_MS);
 });

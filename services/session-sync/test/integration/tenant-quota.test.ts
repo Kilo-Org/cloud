@@ -3,11 +3,43 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { expect, it } from 'vitest';
 
 import { session } from '../../src/db/sqlite-schema';
-import { getSessionSyncDOStub } from '../../src/dos/SessionSyncDO';
+import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
-import { LIMITS } from '../../src/protocol';
+import { LIMITS, type Tenant } from '../../src/protocol';
 import { batch, client, newSessionID, personal, testEnv } from '../helpers';
+
+async function loseTenantResponse(
+  stub: DurableObjectStub<SessionSyncDO>,
+  tenant: Tenant,
+  operation: 'reserve' | 'release' = 'reserve'
+) {
+  await runInDurableObject(stub, instance => {
+    const exposed = instance as unknown as { env: Env; reservationFaultInjected: boolean };
+    const namespace = exposed.env.SESSION_SYNC_TENANT_DO;
+    const realTenant = getTenantStub(testEnv, tenant);
+    let lost = false;
+    const invoke = async (method: 'reserve' | 'release', input: unknown) => {
+      const result = await realTenant[method](input);
+      if (method === operation && !lost) {
+        lost = true;
+        throw new Error('Synthetic lost tenant response after commit');
+      }
+      return result;
+    };
+    exposed.reservationFaultInjected = true;
+    exposed.env = {
+      ...exposed.env,
+      SESSION_SYNC_TENANT_DO: {
+        idFromName: namespace.idFromName.bind(namespace),
+        get: () => ({
+          reserve: (input: unknown) => invoke('reserve', input),
+          release: (input: unknown) => invoke('release', input),
+        }),
+      } as unknown as Env['SESSION_SYNC_TENANT_DO'],
+    };
+  });
+}
 
 it('admits a session idempotently and rejects a new session at the tenant limit', async () => {
   const tenant = personal(`quota-${crypto.randomUUID()}`).tenant;
@@ -198,30 +230,9 @@ it.each([false, true])(
         .update(session)
         .set({ tenant_lease: 3 * LIMITS.tenantLeaseBytes })
         .run();
-      const exposed = instance as unknown as { env: Env; lostShrinkInjected: boolean };
-      const namespace = exposed.env.SESSION_SYNC_TENANT_DO;
-      const realTenant = getTenantStub(exposed.env, principal.tenant);
-      let lost = false;
-      exposed.lostShrinkInjected = true;
-      exposed.env = {
-        ...exposed.env,
-        SESSION_SYNC_TENANT_DO: {
-          idFromName: namespace.idFromName.bind(namespace),
-          get: () => ({
-            reserve: async (input: unknown) => {
-              const result = await realTenant.reserve(input);
-              if (!lost) {
-                lost = true;
-                throw new Error('Synthetic lost shrink response after tenant commit');
-              }
-              return result;
-            },
-            release: (input: unknown) => realTenant.release(input),
-          }),
-        } as unknown as Env['SESSION_SYNC_TENANT_DO'],
-      };
       return state.storage.setAlarm(Date.now() + 60_000);
     });
+    await loseTenantResponse(stub, principal.tenant);
     expect(await runDurableObjectAlarm(stub)).toBe(true);
     await runInDurableObject(stub, async (_instance, state) => {
       expect(drizzle(state.storage).select().from(session).get()!.tenant_lease).toBe(0);
@@ -240,7 +251,7 @@ it.each([false, true])(
       ).rejects.toThrow();
       stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
       await runInDurableObject(stub, async (instance, state) => {
-        expect('lostShrinkInjected' in instance).toBe(false);
+        expect('reservationFaultInjected' in instance).toBe(false);
         expect(await state.storage.get('leaseReconcilePending')).toBe(true);
         expect(await state.storage.getAlarm()).not.toBeNull();
       });
@@ -273,3 +284,159 @@ it.each([false, true])(
     });
   }
 );
+
+it.each([false, true])(
+  'reconciles a committed growth with a lost response without more client writes (restart: %s)',
+  async restart => {
+    const principal = personal(`lost-growth-${crypto.randomUUID()}`);
+    const api = client(principal);
+    const sessionID = newSessionID();
+    const sourceID = crypto.randomUUID();
+    await (await api.register(sessionID, sourceID)).json();
+    let stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    await loseTenantResponse(stub, principal.tenant);
+    const response = await api.apply(
+      sessionID,
+      batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'm', value: 'uncommitted' }])
+    );
+    expect(response.status).toBe(503);
+    await response.json();
+    const tenantStub = getTenantStub(testEnv, principal.tenant);
+    await runInDurableObject(tenantStub, (_instance, state) => {
+      expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
+        LIMITS.tenantLeaseBytes
+      );
+    });
+    if (restart) {
+      await expect(
+        runInDurableObject(stub, (_instance, state) => state.abort('Synthetic growth restart'))
+      ).rejects.toThrow();
+      stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    }
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('leaseReconcilePending')).toBe(true);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      expect(drizzle(state.storage).select().from(session).get()).toMatchObject({
+        tenant_lease: 0,
+        position: 0,
+        inline_bytes: 0,
+      });
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await runInDurableObject(tenantStub, (_instance, state) => {
+      expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
+        0
+      );
+    });
+    expect(await (await api.state(sessionID)).json()).toMatchObject({
+      position: 0,
+      usage: { entities: 0, inlineBytes: 0 },
+    });
+  }
+);
+
+it.each([false, true])(
+  'releases abandoned registrations without releasing a retry that won the gate (restart: %s)',
+  async restart => {
+    for (const retryFirst of [false, true]) {
+      const principal = personal(`lost-register-${crypto.randomUUID()}`);
+      const api = client(principal);
+      const sessionID = newSessionID();
+      const sourceID = crypto.randomUUID();
+      let stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+      await loseTenantResponse(stub, principal.tenant);
+      const failed = await api.register(sessionID, sourceID);
+      expect(failed.status).toBe(503);
+      await failed.json();
+      const tenantStub = getTenantStub(testEnv, principal.tenant);
+      if (restart) {
+        await expect(
+          runInDurableObject(stub, (_instance, state) => state.abort('Synthetic admission restart'))
+        ).rejects.toThrow();
+        stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+      }
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.get('pendingRegistration')).toEqual({
+          tenant: principal.tenant,
+          sessionID,
+        });
+        expect(await state.storage.getAlarm()).not.toBeNull();
+        expect(drizzle(state.storage).select().from(session).get()).toBeUndefined();
+      });
+      if (retryFirst) {
+        const accepted = await api.register(sessionID, sourceID);
+        expect(accepted.status).toBe(201);
+        await accepted.json();
+      }
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+      await runInDurableObject(tenantStub, (_instance, state) => {
+        expect(
+          state.storage.sql.exec<{ sessions: number }>('SELECT sessions FROM usage').one().sessions
+        ).toBe(retryFirst ? 1 : 0);
+      });
+      if (!retryFirst) {
+        const accepted = await api.register(sessionID, sourceID);
+        expect(accepted.status).toBe(201);
+        await accepted.json();
+      }
+      expect(await (await api.state(sessionID)).json()).toMatchObject({
+        deleted: false,
+        sourceID,
+        position: 0,
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.get('pendingRegistration')).toBeUndefined();
+      });
+    }
+  }
+);
+
+it('adopts a registration after orphan release commits but loses its response', async () => {
+  const principal = personal(`lost-release-${crypto.randomUUID()}`);
+  const api = client(principal);
+  const sessionID = newSessionID();
+  const sourceID = crypto.randomUUID();
+  const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+  await loseTenantResponse(stub, principal.tenant);
+  const failed = await api.register(sessionID, sourceID);
+  expect(failed.status).toBe(503);
+  await failed.json();
+  await loseTenantResponse(stub, principal.tenant, 'release');
+  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  const accepted = await api.register(sessionID, sourceID);
+  expect(accepted.status).toBe(201);
+  await accepted.json();
+  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  const tenantStub = getTenantStub(testEnv, principal.tenant);
+  await runInDurableObject(tenantStub, (_instance, state) => {
+    expect(
+      state.storage.sql.exec<{ sessions: number }>('SELECT sessions FROM usage').one().sessions
+    ).toBe(1);
+  });
+});
+
+it('does not release a session adopted before an orphan intent was cleared', async () => {
+  const principal = personal(`adopted-orphan-${crypto.randomUUID()}`);
+  const api = client(principal);
+  const sessionID = newSessionID();
+  await (await api.register(sessionID, crypto.randomUUID())).json();
+  let stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+  await runInDurableObject(stub, async (_instance, state) => {
+    await state.storage.put('pendingRegistration', { tenant: principal.tenant, sessionID });
+    await state.storage.setAlarm(Date.now() + 60_000);
+  });
+  await expect(
+    runInDurableObject(stub, (_instance, state) => state.abort('Synthetic adoption restart'))
+  ).rejects.toThrow();
+  stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+  expect(await runDurableObjectAlarm(stub)).toBe(true);
+  const tenantStub = getTenantStub(testEnv, principal.tenant);
+  await runInDurableObject(tenantStub, (_instance, state) => {
+    expect(
+      state.storage.sql.exec<{ sessions: number }>('SELECT sessions FROM usage').one().sessions
+    ).toBe(1);
+  });
+  await runInDurableObject(stub, async (_instance, state) => {
+    expect(await state.storage.get('pendingRegistration')).toBeUndefined();
+  });
+});

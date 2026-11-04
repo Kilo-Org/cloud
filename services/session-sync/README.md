@@ -175,6 +175,11 @@ an epoch-ms `error.retryAt`; alarm-driven releases and shrinks retry without res
 Before a shrink can release tenant capacity, the session durably lowers its local lease.
 A persisted reconciliation intent retries an uncertain shrink after an outage or object eviction;
 new writes cannot consume capacity that the tenant may already have released.
+Growth reservations also persist reconciliation intent before the tenant call; an unconfirmed
+reservation never increases the local lease and is reconciled against committed usage on alarm.
+First-registration intent records its tenant and session before admission. An alarm releases
+an abandoned admission only while the session row is still absent, under the same mutation gate
+as registration retries; an already-created session adopts that admission instead.
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.

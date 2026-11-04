@@ -84,6 +84,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   private quotaGate: Promise<void> = Promise.resolve();
   private purgeRetryAt = 0;
   private leaseReconcilePending = false;
+  private pendingRegistration: { tenant: Tenant; sessionID: string } | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -93,6 +94,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
       this.leaseReconcilePending =
         (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
+      this.pendingRegistration = await ctx.storage.get('pendingRegistration');
       await this.scheduleSweep();
     });
   }
@@ -133,6 +135,17 @@ export class SessionSyncDO extends DurableObject<Env> {
     }
   }
 
+  private async markLeaseReconcile(): Promise<void> {
+    await this.ctx.storage.put('leaseReconcilePending', true);
+    this.leaseReconcilePending = true;
+    await this.scheduleSweep();
+  }
+
+  private async clearLeaseReconcile(): Promise<void> {
+    await this.ctx.storage.delete('leaseReconcilePending');
+    this.leaseReconcilePending = false;
+  }
+
   /** Rolls back an over-lease mutation before obtaining capacity outside SQLite. */
   private async leased<T>(
     principal: z.infer<typeof principalSchema>,
@@ -156,6 +169,7 @@ export class SessionSyncDO extends DurableObject<Env> {
             LIMITS.sessionBlobBytes + LIMITS.sessionInlineBytes,
             Math.ceil(error.bytes / LIMITS.tenantLeaseBytes) * LIMITS.tenantLeaseBytes
           );
+          await this.markLeaseReconcile();
           const lease = await this.tenantCall(() =>
             getTenantStub(this.env, principal.tenant).reserve({
               tenant: principal.tenant,
@@ -165,6 +179,7 @@ export class SessionSyncDO extends DurableObject<Env> {
           );
           if (!lease.ok) return lease;
           session.update(this.db, { tenant_lease: lease.value.bytes });
+          await this.clearLeaseReconcile();
         }
       }
     });
@@ -173,6 +188,19 @@ export class SessionSyncDO extends DurableObject<Env> {
   private async reconcileLease(): Promise<Result<null>> {
     return this.serial(async () => {
       const meta = session.load(this.db);
+      if (this.pendingRegistration) {
+        if (!meta) {
+          const abandoned = this.pendingRegistration;
+          const released = await this.tenantCall(() =>
+            getTenantStub(this.env, abandoned.tenant).release({ ...abandoned, bytes: 0 })
+          );
+          if (!released.ok) return released;
+        }
+        // A successful registration may have adopted the reservation before
+        // its intent was cleared. Never release an admission with a session row.
+        await this.ctx.storage.delete('pendingRegistration');
+        this.pendingRegistration = undefined;
+      }
       if (!meta) return ok(null);
       const tenant = { type: meta.tenant_type, id: meta.tenant_id } as Tenant;
       const input = { tenant, sessionID: meta.session_id, bytes: 0 };
@@ -182,8 +210,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         );
         if (!released.ok) return released;
         session.update(this.db, { tenant_lease: -1 });
-        await this.ctx.storage.delete('leaseReconcilePending');
-        this.leaseReconcilePending = false;
+        await this.clearLeaseReconcile();
       } else if (
         this.leaseReconcilePending ||
         meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes
@@ -194,15 +221,14 @@ export class SessionSyncDO extends DurableObject<Env> {
         // Fence writes before capacity can be released by a tenant RPC whose
         // successful response may be lost. Persist the intent so an eviction
         // cannot strand the tenant's old, larger reservation either.
-        await this.ctx.storage.put('leaseReconcilePending', true);
-        this.leaseReconcilePending = true;
-        session.update(this.db, { tenant_lease: bytes });
+        await this.markLeaseReconcile();
+        session.update(this.db, { tenant_lease: Math.min(meta.tenant_lease, bytes) });
         const shrunk = await this.tenantCall(() =>
           getTenantStub(this.env, tenant).reserve({ ...input, bytes })
         );
         if (!shrunk.ok) return shrunk;
-        await this.ctx.storage.delete('leaseReconcilePending');
-        this.leaseReconcilePending = false;
+        session.update(this.db, { tenant_lease: bytes });
+        await this.clearLeaseReconcile();
       }
       return ok(null);
     });
@@ -224,6 +250,7 @@ export class SessionSyncDO extends DurableObject<Env> {
           Math.ceil((existing.blob_bytes + existing.inline_bytes) / LIMITS.tenantLeaseBytes) *
             LIMITS.tenantLeaseBytes
         );
+        await this.markLeaseReconcile();
         const admitted = await this.tenantCall(() =>
           getTenantStub(this.env, principal.tenant).reserve({
             tenant: principal.tenant,
@@ -233,8 +260,13 @@ export class SessionSyncDO extends DurableObject<Env> {
         );
         if (!admitted.ok) return admitted;
         session.update(this.db, { tenant_lease: bytes });
+        await this.clearLeaseReconcile();
         return registered;
       }
+      const pending = { tenant: principal.tenant, sessionID };
+      await this.ctx.storage.put('pendingRegistration', pending);
+      this.pendingRegistration = pending;
+      await this.scheduleSweep();
       const admitted = await this.tenantCall(() =>
         getTenantStub(this.env, principal.tenant).reserve({
           tenant: principal.tenant,
@@ -243,9 +275,14 @@ export class SessionSyncDO extends DurableObject<Env> {
         })
       );
       if (!admitted.ok) return admitted;
-      return this.tx(() =>
+      const registered = this.tx(() =>
         session.register(this.db, principal, sessionID, request.sourceID, Date.now())
       );
+      if (registered.ok) {
+        await this.ctx.storage.delete('pendingRegistration');
+        this.pendingRegistration = undefined;
+      }
+      return registered;
     });
   }
 
@@ -286,6 +323,13 @@ export class SessionSyncDO extends DurableObject<Env> {
     const begun = await this.leased(principal, sessionID, () =>
       blob.begin(this.db, principal, sessionID, ref, Date.now())
     );
+    if (
+      !begun.ok &&
+      begun.error.code === 'upload_in_progress' &&
+      this.purgeRetryAt > Number(begun.error.details?.retryAt ?? 0)
+    ) {
+      begun.error.details = { ...begun.error.details, retryAt: this.purgeRetryAt };
+    }
     if (begun.ok || begun.error.code === 'upload_in_progress') {
       await this.scheduleSweep();
     }
@@ -434,10 +478,11 @@ export class SessionSyncDO extends DurableObject<Env> {
   private async scheduleSweep(): Promise<void> {
     const meta = session.load(this.db);
     const leaseDue =
-      meta &&
-      (this.leaseReconcilePending ||
-        (meta.deleted_at !== null && meta.tenant_lease >= 0) ||
-        meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes)
+      this.pendingRegistration ||
+      (meta &&
+        (this.leaseReconcilePending ||
+          (meta.deleted_at !== null && meta.tenant_lease >= 0) ||
+          meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes))
         ? Date.now() + PURGE_RETRY_MS
         : null;
     const blobDue = blob.nextSweep(this.db);

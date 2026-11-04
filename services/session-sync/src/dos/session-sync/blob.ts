@@ -57,7 +57,7 @@ export function begin(
         // Cleanup can claim the row only after its deadline plus the margin.
         retryAt:
           row.state === 'cleaning' && row.deadline <= now
-            ? now + 5000
+            ? Math.max(now + 5000, row.deadline + SWEEP_MARGIN_MS)
             : Math.max(now, row.deadline) + SWEEP_MARGIN_MS,
       }
     );

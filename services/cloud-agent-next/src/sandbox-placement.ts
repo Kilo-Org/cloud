@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
   getSandboxAllocationProvider,
@@ -7,6 +8,7 @@ import {
 import {
   classifySandboxId,
   getSandboxNamespace,
+  getSandboxNamespaceForClass,
   hashToSandboxId,
   isPlacedSandboxKey,
   selectDefaultSandboxProvider,
@@ -27,14 +29,7 @@ export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
 
-type SandboxNamespaceEnv = Pick<
-  Env,
-  | 'Sandbox'
-  | 'SandboxContainment'
-  | 'SandboxSmallContainment'
-  | 'SandboxCodeReviewContainment'
-  | 'SandboxDIND'
->;
+type SandboxNamespaceEnv = Pick<Env, 'SandboxContainment' | 'SandboxSmallContainment'>;
 
 /**
  * The legacy key class each kind stands in for, so class-based rules (billing
@@ -47,14 +42,6 @@ const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
   shared: 'shared',
 };
 
-/** The contained pool per kind; the same mapping the legacy prefixes encode. */
-const CONTAINED_NAMESPACE = {
-  isolated: 'SandboxSmallContainment',
-  'isolated-standard': 'SandboxContainment',
-  'code-review': 'SandboxCodeReviewContainment',
-  shared: 'SandboxContainment',
-} as const satisfies Record<SandboxKind, keyof SandboxNamespaceEnv>;
-
 export type ControlPlaneSandboxDecision = {
   sandboxId: SandboxId;
   provider: AgentSandboxProvider;
@@ -63,7 +50,7 @@ export type ControlPlaneSandboxDecision = {
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
 export async function selectControlPlaneSandbox(input: {
-  env: SandboxSelectionEnv & CodeReviewContainersEnv;
+  env: SandboxSelectionEnv & CodeReviewContainersEnv & Pick<Env, 'CREDENTIAL_CONTAINMENT_ENABLED'>;
   sessionId: string;
   userId: string;
   orgId?: string;
@@ -84,6 +71,15 @@ export async function selectControlPlaneSandbox(input: {
             userId: input.userId,
             isolated: sandboxKind === 'isolated',
           });
+  if (
+    provider === 'cloudflare' &&
+    (sandboxKind === 'code-review' || input.env.CREDENTIAL_CONTAINMENT_ENABLED === 'false')
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
+    });
+  }
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
 }
 
@@ -149,6 +145,7 @@ export function resolveSandboxNamespace(
   if (input.sandboxKind === undefined) {
     return getSandboxNamespace(env, input.sandboxId, { managedScmContainment: input.contained });
   }
-  // Every non-contained sandbox runs in the standard pool, as for legacy keys.
-  return input.contained ? env[CONTAINED_NAMESPACE[input.sandboxKind]] : env.Sandbox;
+  return getSandboxNamespaceForClass(env, KIND_SANDBOX_ID_CLASS[input.sandboxKind], {
+    managedScmContainment: input.contained,
+  });
 }

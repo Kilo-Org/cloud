@@ -151,6 +151,106 @@ describe('cloudEnvironmentsRouter', () => {
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
+  test('persists the network policy through create, update, and get', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'limited',
+      repository: { platform: 'github', fullName: GITHUB_REPO },
+      egressMode: 'allowlist',
+      egressAllowlist: ['Z.Example.COM.', 'example.com'],
+    });
+
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com', 'z.example.com'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'unrestricted',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      commands: ['echo kept'],
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+      commands: ['echo kept'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'allowlist',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+  });
+
+  test.each([true, false])('rejects unsupported environment auditing: %s', async egressAudit => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const input = {
+      name: 'audit-unsupported',
+      repository: { platform: 'github' as const, fullName: GITHUB_REPO },
+      egressAudit,
+    };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.create(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.listAll({})).toEqual([]);
+
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'unchanged',
+      repository: input.repository,
+    });
+    const update = { environmentId: id, name: 'must-not-save', egressAudit };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.update(update)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      name: 'unchanged',
+    });
+  });
+
+  test('rejects an allowlist domain without allowlist mode and invalid hostnames', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'no-mode',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressAllowlist: ['api.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'wildcard',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressMode: 'allowlist',
+        egressAllowlist: ['*.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const [row] = await db
+      .select({ id: cloud_agent_environments.id })
+      .from(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.repo_full_name, GITHUB_REPO));
+    expect(row).toBeUndefined();
+  });
+
   test('billing managers cannot create, update, or delete organization environments', async () => {
     const owner = await insertTestUser();
     const billingManager = await insertTestUser();

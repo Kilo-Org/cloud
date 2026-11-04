@@ -116,7 +116,8 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   }),
   // Spend alert push. Carries the owner scope and its id only — never an
   // amount, an email, or the configured threshold: this blob crosses the OS
-  // lock screen, so the generic preview copy above must stay content-free.
+  // lock screen, so the generic preview copy in `genericPushContentForPushData`
+  // (`./push-copy.ts`) must stay content-free.
   // The tap routes by the scope, so the scope and its id must agree: an
   // organization alert without its id would open the personal spend view, and
   // a personal alert naming an organization would open one that did not send.

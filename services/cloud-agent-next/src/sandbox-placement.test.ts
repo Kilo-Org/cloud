@@ -20,13 +20,10 @@ const PLACED_ID = `sbx-${'a'.repeat(48)}` as SandboxId;
 
 /** Each binding is a distinct sentinel so a test can see which pool was chosen. */
 const namespaceEnv = Object.fromEntries(
-  [
-    'Sandbox',
-    'SandboxContainment',
-    'SandboxSmallContainment',
-    'SandboxCodeReviewContainment',
-    'SandboxDIND',
-  ].map(name => [name, { binding: name, idFromName: (id: string) => `${name}:${id}` }])
+  ['SandboxContainment', 'SandboxSmallContainment'].map(name => [
+    name,
+    { binding: name, idFromName: (id: string) => `${name}:${id}` },
+  ])
 ) as unknown as Env;
 
 /** The legacy prefixed key that encoded each kind before the stored kind existed. */
@@ -57,20 +54,26 @@ const CONTAINMENT = [true, false] as const;
 
 describe('placed key parity with the legacy prefix table', () => {
   // The pool sets SKU, capacity and price, so a placed key must land exactly
-  // where its legacy-prefixed equivalent did. Local e2e runs uncontained and
-  // isolated only, so this is the only coverage for contained and shared pools.
+  // where its legacy-prefixed equivalent did. Retired pools must fail for both key formats.
   it.each(KINDS.flatMap(kind => CONTAINMENT.map(contained => ({ kind, contained }))))(
     'routes $kind (contained=$contained) to the legacy pool',
     ({ kind, contained }) => {
-      expect(
+      const placed = () =>
         resolveSandboxNamespace(namespaceEnv, {
           sandboxId: PLACED_ID,
           sandboxKind: kind,
           contained,
-        })
-      ).toBe(
-        getSandboxNamespace(namespaceEnv, LEGACY_KEY[kind], { managedScmContainment: contained })
-      );
+        });
+      const legacy = () =>
+        getSandboxNamespace(namespaceEnv, LEGACY_KEY[kind], {
+          managedScmContainment: contained,
+        });
+      if (!contained || kind === 'code-review') {
+        expect(placed).toThrow('sandbox runtime has been retired');
+        expect(legacy).toThrow('sandbox runtime has been retired');
+      } else {
+        expect(placed()).toBe(legacy());
+      }
     }
   );
 
@@ -140,19 +143,21 @@ describe('selectControlPlaneSandbox', () => {
     expect(personal.sandboxId).toBe(sha256Key('control-shared-v2:user:user-1__user-1'));
   });
 
-  it('isolates code review per session on Cloudflare', async () => {
-    const decision = await selectControlPlaneSandbox({
-      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
-      sessionId: SESSION_ID,
-      userId: 'user-1',
-      orgId: 'org-1',
-      codeReview: true,
-    });
-
-    expect(decision).toEqual({
-      sandboxId: sha256Key(`control-isolated-v1:${SESSION_ID}`),
-      provider: 'cloudflare',
-      sandboxKind: 'code-review',
+  it.each([
+    { codeReview: true, env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' } },
+    { codeReview: false, env: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' } },
+  ])('rejects retired runtime selections: %j', async ({ codeReview, env }) => {
+    await expect(
+      selectControlPlaneSandbox({
+        env,
+        sessionId: SESSION_ID,
+        userId: 'user-1',
+        orgId: 'org-1',
+        codeReview,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
     });
   });
 

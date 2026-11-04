@@ -22,7 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
-  appliesImplicitProfiles,
+  appliesRepoBindings,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,

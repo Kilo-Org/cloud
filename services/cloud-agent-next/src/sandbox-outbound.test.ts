@@ -32,13 +32,8 @@ vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
 import {
   ContainerProxy,
-  Sandbox,
   SandboxContainment,
-  SandboxDIND,
-  SandboxSmall,
   SandboxSmallContainment,
-  SandboxCodeReview,
-  SandboxCodeReviewContainment,
   MANAGED_SCM_OUTBOUND_HANDLER,
   handleManagedScmOutbound,
 } from './sandbox-outbound.js';
@@ -95,49 +90,17 @@ function serializedLogCalls(): string {
 }
 
 describe('managed GitHub sandbox outbound configuration', () => {
-  it('enables HTTPS interception and the named handler only on containment sandboxes', () => {
-    // Existing sandboxes keep internet access but must not intercept HTTPS.
-    expect(new Sandbox({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new Sandbox({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxSmall({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxSmall({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxDIND({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxCodeReview({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxCodeReview({} as never, {} as never).interceptHttps).toBeFalsy();
-
-    // Containment sandboxes intercept HTTPS so the outbound handler can run.
-    expect(new SandboxContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxSmallContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxCodeReviewContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
+  it('keeps HTTPS interception and credential handlers on both remaining sandbox classes', () => {
+    for (const SandboxClass of [SandboxContainment, SandboxSmallContainment]) {
+      expect(new SandboxClass({} as never, {} as never)).toMatchObject({
+        enableInternet: true,
+        interceptHttps: true,
+      });
+      expect(SandboxClass.outboundHandlers).toEqual({
+        [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
+      });
+    }
     expect(ContainerProxy).toBe(sdk.ContainerProxy);
-    expect(Sandbox.outbound).toBeUndefined();
-    expect(SandboxContainment.outbound).toBeUndefined();
-    expect(SandboxSmall.outbound).toBeUndefined();
-    expect(SandboxSmallContainment.outbound).toBeUndefined();
-    expect(SandboxDIND.outbound).toBeUndefined();
-    expect(SandboxContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxSmallContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(Sandbox.outboundHandlers).toBeUndefined();
-    expect(SandboxSmall.outboundHandlers).toBeUndefined();
-    expect(SandboxDIND.outboundHandlers).toBeUndefined();
-    expect(SandboxCodeReviewContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxCodeReview.outboundHandlers).toBeUndefined();
   });
 
   it('wires the named handler to Git and API redemption behavior', async () => {

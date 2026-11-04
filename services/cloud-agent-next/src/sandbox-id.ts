@@ -22,14 +22,7 @@ export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 const CONTROL_PLANE_SHARED_SANDBOX_ID_VERSION = 'shared-control-v1';
 
 type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
-type SandboxNamespaceEnv = Pick<
-  Env,
-  | 'Sandbox'
-  | 'SandboxContainment'
-  | 'SandboxSmallContainment'
-  | 'SandboxDIND'
-  | 'SandboxCodeReviewContainment'
->;
+type SandboxNamespaceEnv = Pick<Env, 'SandboxContainment' | 'SandboxSmallContainment'>;
 
 type SandboxNamespaceOptions = {
   managedScmContainment?: boolean;
@@ -166,14 +159,30 @@ export function getSandboxNamespace(
   if (isPlacedSandboxKey(sandboxId)) {
     throw new Error('A placed sandbox key routes only through its stored kind');
   }
-  // Persisted DIND sessions retain their namespace until operator-verified retirement.
-  if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
-  // Every non-contained sandbox runs in the standard pool; SandboxSmall and
-  // SandboxCodeReview are retired and receive no traffic.
-  if (options.managedScmContainment !== true) return env.Sandbox;
-  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReviewContainment;
-  if (sandboxId.startsWith('ses-')) return env.SandboxSmallContainment;
-  return env.SandboxContainment;
+  return getSandboxNamespaceForClass(env, classifySandboxId(sandboxId), options);
+}
+
+export class RetiredSandboxRuntimeError extends Error {
+  constructor() {
+    super('This sandbox runtime has been retired. Start a new session.');
+    this.name = 'RetiredSandboxRuntimeError';
+  }
+}
+
+/** Resolve only the legacy namespaces that still retain their stored instances. */
+export function getSandboxNamespaceForClass(
+  env: SandboxNamespaceEnv,
+  sandboxIdClass: SandboxIdClass,
+  options: SandboxNamespaceOptions
+): DurableObjectNamespace<Sandbox> {
+  if (
+    options.managedScmContainment !== true ||
+    sandboxIdClass === 'devcontainer' ||
+    sandboxIdClass === 'code-review'
+  ) {
+    throw new RetiredSandboxRuntimeError();
+  }
+  return sandboxIdClass === 'isolated-small' ? env.SandboxSmallContainment : env.SandboxContainment;
 }
 
 export function getManagedOutboundContainerId(
@@ -203,10 +212,6 @@ export async function hashToSandboxId(input: string, prefix: string): Promise<Sa
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   return `${prefix}-${hashHex.substring(0, 48)}` as SandboxId;
-}
-
-export function deriveRetiredDindSandboxId(sessionId: string): Promise<SandboxId> {
-  return hashToSandboxId(sessionId, 'dind');
 }
 
 export async function deriveSharedSandboxId(

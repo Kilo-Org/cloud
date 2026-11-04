@@ -223,6 +223,8 @@ const environmentDetail: EnvironmentResponse = {
   commands: ['pnpm install'],
   configurationRevision: environment.configurationRevision,
   sandboxAllocation: environment.sandboxAllocation,
+  egressMode: null,
+  egressAllowlist: null,
   secretKeys: ['API_KEY'],
 };
 

@@ -695,6 +695,10 @@ cp .dev.vars.example .dev.vars
 # The worker will reuse the Authorization bearer token as the kilo code api token (because thats what it is).
 ```
 
+For existing `.dev.vars` files, set `CREDENTIAL_CONTAINMENT_ENABLED=true`,
+`CLOUDFLARE_CONTAINERS_ORG_IDS=*`, and `CODE_REVIEW_CONTAINERS_ORG_IDS=*`.
+These values select the retained runtimes. Non-contained runtimes have been retired.
+
 3. Run locally:
 
 ```bash
@@ -857,7 +861,7 @@ Cloud-agent sessions are linked to Kilocode CLI sessions:
 
 ### GitHub Integration
 
-- Repository preparation/cloning occurs during wrapper preparation using `src/workspace.ts` helpers. Devcontainer support is retired; stored devcontainer sessions can be stopped or deleted but cannot start or resume.
+- Repository preparation/cloning occurs during wrapper preparation using `src/workspace.ts` helpers. Devcontainer support and its sandbox namespace are retired. Stored devcontainer sessions cannot access that runtime.
 - Branch handling:
   - **Default**: Creates isolated `session/<sessionId>` branches for each session
   - **Upstream branches**: Use `upstreamBranch` to work on existing branches (e.g., `main`, `develop`)

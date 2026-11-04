@@ -729,7 +729,7 @@ describe('getProvider routing decision for custom LLMs', () => {
   }: { countryCode?: string | null; member?: boolean; credentials?: string } = {}) {
     const user = await insertTestUser();
     const organization = await createTestOrganization(`Custom ${crypto.randomUUID()}`, user.id, 0);
-    const publicId = `acme/decision-${crypto.randomUUID()}`;
+    const publicId = `acme/decision-${crypto.randomUUID()}-free`;
     const definition: CustomLlmDefinition = {
       internal_id: 'upstream-model',
       display_name: 'Decision model',

@@ -572,6 +572,13 @@ describe('projectSafeFailure', () => {
     expect(SafeFailureProjectionSchema.parse(failure)).toEqual(failure);
   });
 
+  it('names a blocked account instead of a generic failure', () => {
+    expect(projectSafeFailure({ failureCode: 'account_blocked' })).toEqual({
+      code: 'account_blocked',
+      message: 'This account is blocked.',
+    });
+  });
+
   it('describes no-output failures as a lack of execution progress during the watchdog window', () => {
     expect(projectSafeFailure({ failureCode: 'wrapper_no_output' })?.message).toBe(
       'Agent wrapper made no execution progress during the watchdog window'

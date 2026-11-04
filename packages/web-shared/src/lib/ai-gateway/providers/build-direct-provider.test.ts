@@ -29,18 +29,20 @@ async function transformRequest(
     API_KEY_AUTH
   );
 
+  const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,
     model: 'public-model',
     request,
     originalHeaders: EmptyFraudDetectionHeaders,
-    extraHeaders: {},
+    extraHeaders,
     userByok: null,
     kilo_user_id: 'user-1',
     organization_id: null,
     session_id: null,
   });
   applyReasoningDetailsTransform(provider, request);
+  return extraHeaders;
 }
 
 function makeRequest(): ChatCompletionRequest {
@@ -161,6 +163,82 @@ describe('buildDirectProvider model field', () => {
     });
 
     expect(request.body.model).toBe('configured-model');
+  });
+});
+
+describe('buildDirectProvider Mt-User-Id header', () => {
+  it.each([true, false])('accepts prompt_cache_key_as_mt_user_id=%s', enabled => {
+    const config = {
+      base_url: 'https://llm.example.com/v1',
+      prompt_cache_key_as_mt_user_id: enabled,
+    };
+
+    expect(CustomLlmApiConfigSchema.parse(config)).toEqual(config);
+  });
+
+  it.each<GatewayRequest>([
+    {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], prompt_cache_key: 'task-cache-key' },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'public-model', input: 'hello', prompt_cache_key: 'task-cache-key' },
+    },
+  ])('includes the prompt cache key for $kind when enabled', async request => {
+    const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
+
+    expect(headers['Mt-User-Id']).toBe('task-cache-key');
+    expect(request.body).toHaveProperty('prompt_cache_key', 'task-cache-key');
+  });
+
+  it.each([undefined, false])('does not add the header when the option is %s', enabled => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    return expect(
+      transformRequest(request, { prompt_cache_key_as_mt_user_id: enabled })
+    ).resolves.not.toHaveProperty('Mt-User-Id');
+  });
+
+  it.each([undefined, null, '', 42, '\u4e2d\u6587', 'key\r\nInjected: value', 'key\0', 'key\x7f'])(
+    'does not add the header for invalid cache key %s',
+    async cacheKey => {
+      const request = makeRequest();
+      Object.assign(request.body, { prompt_cache_key: cacheKey });
+
+      const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
+
+      expect(headers).not.toHaveProperty('Mt-User-Id');
+    }
+  );
+
+  it('uses the gateway cache key even when removed from the upstream body', async () => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    const headers = await transformRequest(request, {
+      prompt_cache_key_as_mt_user_id: true,
+      remove_from_body: ['prompt_cache_key'],
+    });
+
+    expect(headers['Mt-User-Id']).toBe('task-cache-key');
+    expect(request.body).not.toHaveProperty('prompt_cache_key');
+  });
+
+  it('overrides static header values case-insensitively', async () => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    const headers = await transformRequest(request, {
+      prompt_cache_key_as_mt_user_id: true,
+      extra_headers: { 'Mt-User-Id': 'static-key', 'mt-user-id': 'other-key', 'x-custom': 'kept' },
+    });
+
+    expect(Object.fromEntries(new Headers(headers))).toEqual({
+      'mt-user-id': 'task-cache-key',
+      'x-custom': 'kept',
+    });
   });
 });
 

@@ -90,7 +90,12 @@ afterEach(async () => {
     .where(eq(container_usage_interval.cloud_billing_sku_id, skuId));
   await writer.db
     .update(kilocode_users)
-    .set({ total_microdollars_acquired: 0, microdollars_used: 0 })
+    .set({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+      blocked_reason: null,
+      blocked_at: null,
+    })
     .where(eq(kilocode_users.id, userId));
   await writer.db
     .update(organizations)
@@ -119,9 +124,10 @@ describe('container capacity against PostgreSQL', () => {
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 4_000_000, microdollars_used: 4_000_000 - balance })
       .where(eq(kilocode_users.id, userId));
-    expect(await readContainerCapacity(reader, request())).toEqual([
-      { subject: { type: 'user', id: userId }, live: 0, limit },
-    ]);
+    expect(await readContainerCapacity(reader, request())).toEqual({
+      blocked: null,
+      checks: [{ subject: { type: 'user', id: userId }, live: 0, limit }],
+    });
   });
 
   it('uses organization balance for a member with zero personal balance', async () => {
@@ -129,14 +135,17 @@ describe('container capacity against PostgreSQL', () => {
       .update(organizations)
       .set({ total_microdollars_acquired: 5_000_000, microdollars_used: 2_000_000 })
       .where(eq(organizations.id, organizationIds[0]));
-    expect(await readContainerCapacity(reader, organizationRequest())).toEqual([
-      { subject: { type: 'user', id: userId }, live: 0, limit: 20 },
-      { subject: { type: 'org', id: organizationIds[0] }, live: 0, limit: 50 },
-    ]);
+    expect(await readContainerCapacity(reader, organizationRequest())).toEqual({
+      blocked: null,
+      checks: [
+        { subject: { type: 'user', id: userId }, live: 0, limit: 20 },
+        { subject: { type: 'org', id: organizationIds[0] }, live: 0, limit: 50 },
+      ],
+    });
     // A funded organization does not raise the allowance for personal starts
     // or starts billed to another, unfunded organization.
-    expect((await readContainerCapacity(reader, request()))[0].limit).toBe(3);
-    expect((await readContainerCapacity(reader, organizationRequest(1)))[0].limit).toBe(3);
+    expect((await readContainerCapacity(reader, request())).checks[0].limit).toBe(3);
+    expect((await readContainerCapacity(reader, organizationRequest(1))).checks[0].limit).toBe(3);
   });
 
   it('does not let personal credit raise an unfunded organization allowance', async () => {
@@ -144,17 +153,20 @@ describe('container capacity against PostgreSQL', () => {
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 10_000_000 })
       .where(eq(kilocode_users.id, userId));
-    expect((await readContainerCapacity(reader, organizationRequest()))[0].limit).toBe(3);
+    expect((await readContainerCapacity(reader, organizationRequest())).checks[0].limit).toBe(3);
   });
 
   it('rejects the fourth low-balance start across personal and two organization accounts', async () => {
     await interval();
     for (const id of organizationIds) await interval({ subject_type: 'org', subject_id: id });
 
-    expect(await readContainerCapacity(reader, organizationRequest())).toEqual([
-      { subject: { type: 'user', id: userId }, live: 3, limit: 3 },
-      { subject: { type: 'org', id: organizationIds[0] }, live: 1, limit: 50 },
-    ]);
+    expect(await readContainerCapacity(reader, organizationRequest())).toEqual({
+      blocked: null,
+      checks: [
+        { subject: { type: 'user', id: userId }, live: 3, limit: 3 },
+        { subject: { type: 'org', id: organizationIds[0] }, live: 1, limit: 50 },
+      ],
+    });
     await expect(assertCapacity(organizationRequest())).rejects.toMatchObject({ limit: 3 });
     await expect(assertCapacity(request())).rejects.toMatchObject({ limit: 3 });
   });
@@ -168,10 +180,13 @@ describe('container capacity against PostgreSQL', () => {
     for (let index = 1; index < 20; index += 1) {
       await interval({ subject_type: 'org', subject_id: organizationIds[0] });
     }
-    expect(await readContainerCapacity(reader, organizationRequest(1))).toEqual([
-      { subject: { type: 'user', id: userId }, live: 20, limit: 20 },
-      { subject: { type: 'org', id: organizationIds[1] }, live: 0, limit: 50 },
-    ]);
+    expect(await readContainerCapacity(reader, organizationRequest(1))).toEqual({
+      blocked: null,
+      checks: [
+        { subject: { type: 'user', id: userId }, live: 20, limit: 20 },
+        { subject: { type: 'org', id: organizationIds[1] }, live: 0, limit: 50 },
+      ],
+    });
     await expect(assertCapacity(organizationRequest(1))).rejects.toMatchObject({ limit: 20 });
   });
 
@@ -197,20 +212,69 @@ describe('container capacity against PostgreSQL', () => {
     // A bot with the same ID must not count as this user.
     await interval({ subject_type: 'org', subject_id: organizationIds[0], actor_type: 'bot' });
 
-    expect(await readContainerCapacity(reader, organizationRequest())).toEqual([
-      { subject: { type: 'user', id: userId }, live: 3, limit: 3 },
-      { subject: { type: 'org', id: organizationIds[0] }, live: 3, limit: 50 },
-    ]);
+    expect(await readContainerCapacity(reader, organizationRequest())).toEqual({
+      blocked: null,
+      checks: [
+        { subject: { type: 'user', id: userId }, live: 3, limit: 3 },
+        { subject: { type: 'org', id: organizationIds[0] }, live: 3, limit: 50 },
+      ],
+    });
   });
 
   it('retains subject limits for bots without treating bot IDs as users', async () => {
     const actor = { type: 'bot', id: 'code-review' } as const;
     await interval({ actor_type: 'bot', actor_id: actor.id });
-    expect(await readContainerCapacity(reader, { ...request(), actor })).toEqual([
-      { subject: { type: 'user', id: userId }, live: 1, limit: 20 },
-    ]);
-    expect(await readContainerCapacity(reader, { ...organizationRequest(), actor })).toEqual([
-      { subject: { type: 'org', id: organizationIds[0] }, live: 0, limit: 50 },
-    ]);
+    expect(await readContainerCapacity(reader, { ...request(), actor })).toEqual({
+      blocked: null,
+      checks: [{ subject: { type: 'user', id: userId }, live: 1, limit: 20 }],
+    });
+    expect(await readContainerCapacity(reader, { ...organizationRequest(), actor })).toEqual({
+      blocked: null,
+      checks: [{ subject: { type: 'org', id: organizationIds[0] }, live: 0, limit: 50 }],
+    });
+  });
+
+  it('reports a blocked acting user for personal, organization and Code Reviewer starts', async () => {
+    await writer.db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'abuse', blocked_at: new Date().toISOString() })
+      .where(eq(kilocode_users.id, userId));
+    const blocked = { type: 'user', id: userId };
+    expect((await readContainerCapacity(reader, request())).blocked).toEqual(blocked);
+    expect((await readContainerCapacity(reader, organizationRequest())).blocked).toEqual(blocked);
+    expect(
+      await readContainerCapacity(reader, { ...request(), instanceId: 'crv-capacity' })
+    ).toEqual({ blocked, checks: [] });
+    for (const checkpoint of ['control-plane-create', 'sandbox-start'] as const) {
+      await expect(assertCapacity({ ...request(), checkpoint })).rejects.toMatchObject({
+        code: 'account_blocked',
+      });
+      await expect(assertCapacity({ ...organizationRequest(), checkpoint })).rejects.toMatchObject({
+        code: 'account_blocked',
+      });
+    }
+  });
+
+  it.each([
+    { blocked_reason: 'abuse', blocked_at: null },
+    { blocked_reason: null, blocked_at: new Date().toISOString() },
+  ])('treats either block column as blocked: %j', async columns => {
+    await writer.db.update(kilocode_users).set(columns).where(eq(kilocode_users.id, userId));
+    expect((await readContainerCapacity(reader, request())).blocked).toEqual({
+      type: 'user',
+      id: userId,
+    });
+  });
+
+  it('reports a blocked user billing subject for a bot start', async () => {
+    await writer.db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'abuse', blocked_at: new Date().toISOString() })
+      .where(eq(kilocode_users.id, userId));
+    const actor = { type: 'bot', id: 'automation' } as const;
+    expect((await readContainerCapacity(reader, { ...request(), actor })).blocked).toEqual({
+      type: 'user',
+      id: userId,
+    });
   });
 });

@@ -27,7 +27,7 @@ export async function checkDirectProviderAccess(params: {
   hasByok: boolean;
 }): Promise<DirectProviderAccessResult> {
   const { user, organizationId, model, provider } = params;
-  const freeRequest = await isFreeModel(model);
+  const freeRequest = isFreeModel(model);
   const { balance, plan, payer } = await getBalanceAndOrgSettings(
     organizationId,
     user,

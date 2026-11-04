@@ -81,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const source = request.headers.get('x-usage-write-source');
   const admission =
     source === 'queue' || source === 'queue_vercel'
-      ? queueWriterAdmission.tryAcquire(source)
+      ? queueWriterAdmission.tryAcquire(source, core.id)
       : null;
   if (admission && !admission.admitted) {
     return NextResponse.json(

@@ -104,4 +104,19 @@ describe('Bitbucket integration UI state', () => {
     expect(html).toContain('Bitbucket OAuth was cancelled');
     expect(html).toContain('No changes were made');
   });
+
+  it('falls back to the connection message for a code outside the map', () => {
+    for (const code of ['unknown_code', '__proto__', 'constructor', 'toString']) {
+      expect(getBitbucketConnectionErrorMessage(code)).toBe(
+        'Bitbucket could not be connected. Try OAuth again.'
+      );
+    }
+
+    const html = renderToStaticMarkup(
+      createElement(BitbucketConnectionRedirectNotice, { error: '__proto__' })
+    );
+
+    expect(html).toContain('Could not connect Bitbucket');
+    expect(html).toContain('Bitbucket could not be connected. Try OAuth again.');
+  });
 });

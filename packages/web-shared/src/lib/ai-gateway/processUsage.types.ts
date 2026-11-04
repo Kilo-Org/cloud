@@ -5,6 +5,7 @@ import type { MicrodollarUsage, Organization } from '@kilocode/db';
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { GatewayApiKind } from '@kilocode/usage-contracts';
 import type { OpenAI } from 'openai';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 export type OpenRouterUsage = {
   cost?: number;
@@ -180,6 +181,13 @@ export type MicrodollarUsageContext = {
    * reports a usage event; absent only on the internal classifier overhead row.
    */
   bouncer?: BouncerUsageContext;
+  /**
+   * The `microdollar_usage` id, chosen before the upstream request so records written outside
+   * usage accounting can be keyed by it. Only a context that yields a single usage row may set
+   * it: a second row with the same id would be dropped as a redelivery and go unbilled.
+   */
+  usageId?: string;
+  providerMetadataCapture?: AiProviderMetadataCapture;
 };
 
 /**

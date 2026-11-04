@@ -169,7 +169,7 @@ describe('POST /api/fim/completions', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
-    jest.mocked(isFreeModel).mockResolvedValue(false);
+    jest.mocked(isFreeModel).mockReturnValue(false);
     mockedDecide.mockResolvedValue(null);
     mockedReleaseDecideLease.mockResolvedValue(undefined);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({

@@ -6,6 +6,7 @@ import {
   type UploadedBotAttachments,
 } from '@/lib/bot/attachments';
 import { botPlatforms } from '@/lib/bot/platforms';
+import type { BotPlatform } from '@/lib/bot/platforms/types';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -111,7 +112,14 @@ async function processMessage({
   // mixed image/document messages share one path and one five-file limit.
   let uploadedAttachments: UploadedBotAttachments | undefined;
   try {
-    uploadedAttachments = await extractAndUploadAttachments(message, user.id);
+    const fetchAttachmentUrl = await resolveAttachmentUrlFetcher({
+      botPlatform,
+      platformIntegration,
+      message,
+    });
+    uploadedAttachments = await extractAndUploadAttachments(message, user.id, {
+      fetchAttachmentUrl,
+    });
   } catch (error) {
     console.error(
       '[KiloBot] Failed to extract/upload attachments, continuing without them:',
@@ -180,5 +188,33 @@ async function processMessage({
     await discarded;
 
     return false;
+  }
+}
+
+/**
+ * The platform's own authorization for its attachment URLs, when it has one and
+ * this message carries attachments. A failure to build it is not a reason to
+ * drop the message's files: the caller then reads them through the adapter's
+ * own fetch.
+ */
+async function resolveAttachmentUrlFetcher({
+  botPlatform,
+  platformIntegration,
+  message,
+}: {
+  botPlatform: BotPlatform;
+  platformIntegration: PlatformIntegration;
+  message: Message;
+}): Promise<((url: string) => Promise<Response>) | undefined> {
+  if (message.attachments.length === 0) return undefined;
+
+  try {
+    return await botPlatform.createAttachmentUrlFetcher?.({ platformIntegration });
+  } catch (error) {
+    console.warn('[KiloBot] Falling back to the adapter attachment fetch:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'create-attachment-url-fetcher' },
+    });
+    return undefined;
   }
 }

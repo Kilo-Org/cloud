@@ -195,13 +195,7 @@ type TestRuntime = MeteredSandbox & {
 function createSandbox(
   rpc = createRpc(),
   containerRunning = false,
-  sandboxClassName:
-    | 'Sandbox'
-    | 'SandboxContainment'
-    | 'SandboxSmall'
-    | 'SandboxSmallContainment'
-    | 'SandboxCodeReview'
-    | 'SandboxDIND' = 'SandboxSmallContainment',
+  sandboxClassName: 'SandboxContainment' | 'SandboxSmallContainment' = 'SandboxSmallContainment',
   heartbeatSeconds?: string
 ) {
   const storage = new MemoryStorage();
@@ -255,8 +249,7 @@ const billingInput = {
 
 describe('MeteredSandbox', () => {
   it.each([
-    ['ses-abcdef', 'SandboxSmall', 'cloud-agent-next-sandbox-small'],
-    ['crv-abcdef', 'SandboxCodeReview', 'cloud-agent-next-sandbox-code-review'],
+    ['ses-abcdef', 'SandboxSmallContainment', 'cloud-agent-next-sandbox-small-containment'],
   ] as const)(
     'preserves billing admission for persisted %s',
     async (sandboxId, className, service) => {
@@ -280,36 +273,6 @@ describe('MeteredSandbox', () => {
           service,
           instanceId: sandboxId,
           sessionId: 'agent_1',
-        })
-      );
-    }
-  );
-
-  it.each(['istd-abcdef', 'ses-abcdef', 'crv-abcdef'] as const)(
-    'admits and meters non-contained isolated identity %s through the concrete Sandbox runtime',
-    async sandboxId => {
-      const { rpc, sandbox, storage, flushShadowTasks } = createSandbox(
-        createRpc(),
-        false,
-        'Sandbox'
-      );
-      await expect(
-        sandbox.ensureBillingAdmission({
-          ...billingInput,
-          sandboxId,
-          enforcementRequested: true,
-          metadata: { origin: sandboxId.startsWith('crv-') ? 'code-review' : 'cloud-agent' },
-        })
-      ).resolves.toEqual({ success: true });
-      await sandbox.onStart();
-      await flushShadowTasks();
-      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
-      expect(rpc.recordStart).toHaveBeenCalledWith(
-        expect.objectContaining({
-          service: 'cloud-agent-next-sandbox',
-          instanceId: sandboxId,
-          sessionId: 'agent_1',
-          metadata: expect.objectContaining({ container_class: 'Sandbox', vcpu: '4' }),
         })
       );
     }
@@ -950,73 +913,6 @@ describe('MeteredSandbox', () => {
     });
   });
 
-  it('records a DIND instance using its Cloudflare instance ID', async () => {
-    const rpc = createRpc();
-    const { sandbox, flushShadowTasks } = createSandbox(rpc, false, 'SandboxDIND');
-    await sandbox.configureBilling({
-      ...billingInput,
-      sandboxId: 'dind-abcdef',
-      metadata: { origin: 'cloud-agent' },
-    });
-    sandbox.mockState = { status: 'healthy' };
-
-    await sandbox.onStart();
-    await flushShadowTasks();
-
-    expect(rpc.recordStart).toHaveBeenCalledWith(
-      expect.objectContaining({
-        service: 'cloud-agent-next-sandbox-dind',
-        instanceId: 'dind-abcdef',
-        sku: 'cloud-agent-dind-2026-07',
-        subject: { type: 'org', id: 'org_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: {
-          container_class: 'SandboxDIND',
-          durable_object_id: 'do-id',
-          vcpu: '2',
-          memory_mib: '6144',
-          disk_mb: '10000',
-          origin: 'cloud-agent',
-        },
-      })
-    );
-  });
-
-  it('uses distinct recorder services for standard and containment namespaces', async () => {
-    const standardRpc = createRpc();
-    const containmentRpc = createRpc();
-    const standard = createSandbox(standardRpc, false, 'Sandbox');
-    const containment = createSandbox(containmentRpc, false, 'SandboxContainment');
-    const sharedInput = {
-      sandboxId: 'usr-abcdef' as const,
-      subject: { type: 'user' as const, id: 'user_1' },
-      actor: { type: 'user' as const, id: 'user_1' },
-    };
-    await standard.sandbox.configureBilling(sharedInput);
-    await containment.sandbox.configureBilling(sharedInput);
-    standard.sandbox.mockState = { status: 'healthy' };
-    containment.sandbox.mockState = { status: 'healthy' };
-
-    await standard.sandbox.onStart();
-    await containment.sandbox.onStart();
-    await standard.flushShadowTasks();
-    await containment.flushShadowTasks();
-
-    expect(standardRpc.recordStart).toHaveBeenCalledWith(
-      expect.objectContaining({
-        service: 'cloud-agent-next-sandbox',
-        instanceId: 'usr-abcdef',
-      })
-    );
-    expect(containmentRpc.recordStart).toHaveBeenCalledWith(
-      expect.objectContaining({
-        service: 'cloud-agent-next-sandbox-containment',
-        instanceId: 'usr-abcdef',
-      })
-    );
-  });
-
   it('does not adopt stale healthy state when no physical container is running', async () => {
     const { rpc, storage, sandbox } = createSandbox();
     sandbox.mockState = { status: 'healthy' };
@@ -1593,14 +1489,6 @@ describe('MeteredSandbox container capacity', () => {
 
     expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
     expect(sandbox.startCalls).toBe(1);
-  });
-
-  it('does not check code review sandboxes', async () => {
-    const { sandbox } = createSandbox(createRpc(), false, 'SandboxCodeReview');
-
-    await sandbox.start();
-
-    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
   });
 
   it('admits a start without attribution', async () => {

@@ -28,6 +28,15 @@ import {
   getPlatformOAuthConnectPath,
 } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+
+const gitlabConnectionErrorMessages: Record<string, string> = {
+  missing_code: 'Authorization code missing from GitLab',
+  connection_failed: 'Failed to connect to GitLab',
+  oauth_init_failed: 'Failed to initiate GitLab OAuth',
+  permission_required: 'You need a billing role to replace this GitLab integration',
+  organization_access_required: 'You do not have access to this organization',
+};
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
@@ -276,14 +285,13 @@ export function GitLabIntegrationDetails({
       toast.success('GitLab connected successfully!');
     }
     if (error) {
-      const errorMessages: Record<string, string> = {
-        missing_code: 'Authorization code missing from GitLab',
-        connection_failed: 'Failed to connect to GitLab',
-        oauth_init_failed: 'Failed to initiate GitLab OAuth',
-        permission_required: 'You need a billing role to replace this GitLab integration',
-        organization_access_required: 'You do not have access to this organization',
-      };
-      toast.error(errorMessages[error] || `Connection failed: ${error}`);
+      toast.error(
+        resolveConnectionErrorMessage(
+          gitlabConnectionErrorMessages,
+          error,
+          `Connection failed: ${error}`
+        )
+      );
     }
   }, [success, error]);
 

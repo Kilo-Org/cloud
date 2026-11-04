@@ -4,7 +4,7 @@ const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: async (...args: unknown[]) => mockIsFreeModel(...args),
+  isFreeModel: (...args: unknown[]) => mockIsFreeModel(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
@@ -26,6 +26,16 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
     mockResolveOrganizationMemberModelDecision(...args),
 }));
 
+const mockGetOpenAiChatGptStoredConnection = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
+  getOpenAiChatGptStoredConnection: (...args: unknown[]) =>
+    mockGetOpenAiChatGptStoredConnection(...args),
+}));
+
+const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
+
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const PAID_MODEL = 'anthropic/claude-sonnet-4';
@@ -40,6 +50,7 @@ beforeEach(() => {
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
   mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
+  mockGetOpenAiChatGptStoredConnection.mockResolvedValue(null);
 });
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
@@ -122,6 +133,40 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(mockGetOrganizationByokProviderIds).toHaveBeenCalledWith(fakeDb, 'org-1');
     expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
+  });
+
+  it('counts a connected ChatGPT connection for an OpenAI model', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockResolvedValue(CONNECTED_CHATGPT);
+
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: 'openai/gpt-5',
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
+    expect(mockGetOpenAiChatGptStoredConnection).toHaveBeenCalledWith({
+      kiloUserId: fakeUser.id,
+      organizationId: null,
+    });
+  });
+
+  it("counts the organization's shared-services ChatGPT connection for service runs", async () => {
+    mockGetOpenAiChatGptStoredConnection.mockImplementation(async (owner: { scope?: string }) =>
+      owner.scope === 'shared_services' ? CONNECTED_CHATGPT : null
+    );
+
+    const eligibility = (includeSharedServicesConnection: boolean) =>
+      computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: 'openai/gpt-5',
+        organizationId: 'org-1',
+        includeSharedServicesConnection,
+      });
+
+    expect(await eligibility(true)).toEqual({ isFree: false, hasUserByokAvailable: true });
+    expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: false });
   });
 
   describe('organization Vercel AI Gateway key', () => {

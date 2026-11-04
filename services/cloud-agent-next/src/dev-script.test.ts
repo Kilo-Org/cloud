@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const serviceDir = path.resolve(testDir, '..');
 const repoRoot = path.resolve(serviceDir, '../..');
-const scriptPath = path.join(serviceDir, 'scripts/dev-with-docker-proxy.sh');
+const scriptPath = path.join(serviceDir, 'scripts/dev.sh');
 const tempDirs: string[] = [];
 
 afterEach(() => {
@@ -22,23 +22,20 @@ function writeExecutable(filePath: string, contents: string) {
   fs.chmodSync(filePath, 0o755);
 }
 
-describe('dev-with-docker-proxy.sh', () => {
+describe('dev.sh', () => {
   it.each([
-    { mode: 'proxy', endpoint: 'socket' },
-    { mode: 'direct', endpoint: 'socket' },
-    { mode: 'direct', endpoint: 'socket-url' },
-    { mode: 'direct', endpoint: 'host' },
-    { mode: 'direct', endpoint: 'context' },
-  ])('preserves Docker routing and ARM support: $mode/$endpoint', ({ mode, endpoint }) => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-agent-docker-proxy-test-'));
+    { endpoint: 'socket' },
+    { endpoint: 'socket-url' },
+    { endpoint: 'host' },
+    { endpoint: 'context' },
+  ])('preserves Docker routing and ARM support: $endpoint', ({ endpoint }) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-agent-dev-script-test-'));
     tempDirs.push(tempDir);
     const binDir = path.join(tempDir, 'bin');
     fs.mkdirSync(binDir);
     const dockerSocket = path.join(tempDir, 'upstream.sock');
-    const proxySocket = path.join(tempDir, 'proxy.sock');
     const wranglerEnvLog = path.join(tempDir, 'wrangler-env.log');
     const dockerProbeLog = path.join(tempDir, 'docker-probe.log');
-    const proxyStartedLog = path.join(tempDir, 'proxy-started.log');
     const expectedDockerHost = endpoint === 'context' ? '' : `unix://${dockerSocket}`;
 
     writeExecutable(
@@ -53,20 +50,6 @@ fi
 `
     );
     writeExecutable(
-      path.join(binDir, 'node'),
-      `#!/bin/sh
-printf '%s\\n' "$$" > "${proxyStartedLog}"
-exec "${process.execPath}" -e '
-const net = require("node:net");
-const socket = process.env.DOCKER_PROXY_SOCKET;
-const server = net.createServer(() => {});
-server.listen(socket);
-process.on("SIGTERM", () => server.close(() => process.exit(0)));
-setTimeout(() => process.exit(0), 5000);
-' >/dev/null 2>&1
-`
-    );
-    writeExecutable(
       path.join(binDir, 'wrangler'),
       `#!/bin/sh
 printf '%s\\n' "MINIFLARE_CONTAINER_EGRESS_IMAGE=$MINIFLARE_CONTAINER_EGRESS_IMAGE" "DOCKER_HOST=$DOCKER_HOST" "$@" > "${wranglerEnvLog}"
@@ -74,41 +57,30 @@ printf '%s\\n' "MINIFLARE_CONTAINER_EGRESS_IMAGE=$MINIFLARE_CONTAINER_EGRESS_IMA
     );
 
     const wranglerArgs = ['--env', 'dev', '--port', '11694', '--var', 'EXAMPLE:two words'];
-    execFileSync(
-      'sh',
-      [scriptPath, ...(mode === 'direct' ? ['--no-proxy'] : []), ...wranglerArgs],
-      {
-        cwd: repoRoot,
-        timeout: 10_000,
-        env: {
-          ...process.env,
-          MINIFLARE_CONTAINER_EGRESS_IMAGE: '',
-          DOCKER_HOST: endpoint.startsWith('socket') ? 'unix:///unused.sock' : expectedDockerHost,
-          DOCKER_PROXY_SOCKET: proxySocket,
-          DOCKER_SOCKET:
-            endpoint === 'socket'
-              ? dockerSocket
-              : endpoint === 'socket-url'
-                ? expectedDockerHost
-                : '',
-          PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
-        },
-      }
-    );
+    execFileSync('sh', [scriptPath, ...wranglerArgs], {
+      cwd: repoRoot,
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        MINIFLARE_CONTAINER_EGRESS_IMAGE: '',
+        DOCKER_HOST: endpoint.startsWith('socket') ? 'unix:///unused.sock' : expectedDockerHost,
+        DOCKER_SOCKET:
+          endpoint === 'socket'
+            ? dockerSocket
+            : endpoint === 'socket-url'
+              ? expectedDockerHost
+              : '',
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      },
+    });
 
-    const proxyStarted = fs.existsSync(proxyStartedLog);
-    if (proxyStarted) {
-      process.kill(Number(fs.readFileSync(proxyStartedLog, 'utf8').trim()), 'SIGTERM');
-    }
-
-    expect(proxyStarted).toBe(mode === 'proxy');
     expect(fs.readFileSync(dockerProbeLog, 'utf8')).toContain(`DOCKER_HOST=${expectedDockerHost}`);
     const wranglerEnv = fs.readFileSync(wranglerEnvLog, 'utf8');
     expect(wranglerEnv).toContain(
       'MINIFLARE_CONTAINER_EGRESS_IMAGE=cloudflare/proxy-everything:3cb1195'
     );
     expect(wranglerEnv.trim().split('\n').slice(1)).toEqual([
-      `DOCKER_HOST=${mode === 'proxy' ? `unix://${proxySocket}` : expectedDockerHost}`,
+      `DOCKER_HOST=${expectedDockerHost}`,
       'dev',
       ...wranglerArgs,
     ]);

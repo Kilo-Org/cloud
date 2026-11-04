@@ -14,7 +14,8 @@ import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { briefingPriceBound } from './summary';
+import { briefingPriceBound, briefingPrompt } from './summary';
+import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -343,5 +344,71 @@ describe('briefing model pricing', () => {
       refusal: expect.stringMatching(/pricing/),
       providerConfig: null,
     });
+  });
+});
+
+function reportRow(excerpt: string, title = 'Captured session'): BriefingReportRow {
+  const source = {
+    id: 'activity:ses_prompt',
+    sessionId: 'ses_prompt',
+    kind: 'activity' as const,
+    title,
+    url: '/cloud/sessions/ses_prompt',
+    occurredAt: '2026-10-28T06:30:00.000Z',
+    excerpt,
+  };
+  return {
+    id: 'report',
+    captured_at: '2026-10-28T07:00:00.000Z',
+    night_start_at: '2026-10-27T22:00:00.000Z',
+    cutoff_at: '2026-10-28T06:00:00.000Z',
+    timezone: 'UTC',
+    language: 'English',
+    facts: {
+      scorecard: { sessions: 1, pullRequests: 0, blockers: 0 },
+      coverage: { activity: 'partial', blockers: 'partial', pullRequests: 'partial' },
+      truncated: false,
+      sessions: [
+        {
+          sessionId: 'ses_prompt',
+          title: 'Captured session',
+          url: '/cloud/sessions/ses_prompt',
+          status: 'idle',
+          sources: [source],
+        },
+      ],
+      sources: [source],
+    },
+  } as unknown as BriefingReportRow;
+}
+
+describe('briefing prompt evidence', () => {
+  const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+
+  it('sends no credential material from stored facts to the model', () => {
+    const prompt = briefingPrompt(
+      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).toContain('[redacted credential]');
+  });
+
+  it('sends only excerpts that screening clears', () => {
+    const prompt = briefingPrompt(
+      reportRow('Stopped at client_' + 'secret: "' + secretKey),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).not.toContain('Stopped at');
+  });
+
+  it('sends only titles that screening clears', () => {
+    const prompt = briefingPrompt(
+      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).toContain('Agent session');
   });
 });

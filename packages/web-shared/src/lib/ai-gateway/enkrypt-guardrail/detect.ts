@@ -10,6 +10,7 @@ import {
   ENKRYPT_SUMMARY_DETECTORS,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 type ReadyEnkryptInputGuardrailConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
@@ -28,17 +29,11 @@ const MAX_ATTEMPTS = 2;
 /**
  * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
  * unscanned remainder, which is where an injected instruction in a large file read would sit.
+ * The limit is about 1M tokens of code, which tokenizes at roughly 3 characters per token.
  */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
+export const ENKRYPT_MAX_SCAN_CHARACTERS = 3_000_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
-
-/**
- * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
- * larger header value is an Enkrypt bug. Clamping keeps the ledger insert and the balance debit
- * within column range instead of failing in the deferred write.
- */
-export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
 const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output or tool definitions, or start a new session, then retry. Retrying the unchanged request will not help.`;
 

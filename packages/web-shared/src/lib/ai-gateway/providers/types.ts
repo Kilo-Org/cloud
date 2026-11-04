@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -10,16 +11,19 @@ import {
 
 export { ReasoningDetailsTransform };
 
-export type ProviderType =
-  | 'openrouter'
-  | 'direct-byok'
-  | 'inception'
-  | 'mistral'
-  | 'vercel'
-  | 'openai-chatgpt'
-  | 'custom'
-  | 'custom-public'
-  | 'dev-tools';
+export const ProviderTypeSchema = z.enum([
+  'openrouter',
+  'direct-byok',
+  'inception',
+  'mistral',
+  'vercel',
+  'openai-chatgpt',
+  'custom',
+  'custom-public',
+  'dev-tools',
+]);
+
+export type ProviderType = z.infer<typeof ProviderTypeSchema>;
 
 export type BYOKResult = {
   decryptedAPIKey: string;
@@ -41,6 +45,12 @@ export type TransformRequestContext = {
 };
 
 export type GatewayChatApiKind = GatewayRequest['kind'];
+
+export const GatewayChatApiKindSchema = z.enum([
+  'chat_completions',
+  'responses',
+  'messages',
+]) satisfies z.ZodType<GatewayChatApiKind>;
 
 export type ProviderApiUrlOverrides = Readonly<Partial<Record<GatewayChatApiKind, string>>>;
 

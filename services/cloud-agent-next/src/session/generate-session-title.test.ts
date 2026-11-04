@@ -73,7 +73,7 @@ describe('generateSessionTitle', () => {
     await generateSessionTitle(env, metadata, turn);
 
     expect(run).toHaveBeenCalledExactlyOnceWith(
-      '@cf/meta/llama-3.2-3b-instruct',
+      '@cf/zai-org/glm-4.7-flash',
       {
         messages: [
           expect.objectContaining({ role: 'system' }),
@@ -81,6 +81,7 @@ describe('generateSessionTitle', () => {
         ],
         max_tokens: 64,
         temperature: 0,
+        chat_template_kwargs: { enable_thinking: false },
       },
       { signal: expect.any(AbortSignal) }
     );
@@ -90,6 +91,62 @@ describe('generateSessionTitle', () => {
       cloudAgentSessionId: metadata.identity.sessionId,
       title: 'Fix login form validation',
     });
+  });
+
+  it('reads a title from an OpenAI-style response', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ choices: [{ message: { content: 'Fix login form validation' } }] });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    expect(persist).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Fix login form validation' })
+    );
+  });
+
+  it('removes a label prefix and surrounding quotes', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ response: '"Coding Workspace Title: Hello World Coding Environment"' });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    expect(persist).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Hello World Coding Environment' })
+    );
+  });
+
+  it('truncates an over-long title instead of rejecting it', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ response: 'x'.repeat(300) });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    expect(persist).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'x'.repeat(200) })
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('truncates without splitting an astral character', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ response: `${'x'.repeat(199)}😀${'y'.repeat(10)}` });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    const title = persist.mock.calls[0]?.[0].title;
+    expect(title).toBe('x'.repeat(199));
+    expect(title).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+
+  it('removes a trailing period', async () => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue({ response: 'Fix login form validation.' });
+
+    await generateSessionTitle(env, metadata, turn);
+
+    expect(persist).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Fix login form validation' })
+    );
   });
 
   it('bounds the first message sent to the title model', async () => {
@@ -139,17 +196,22 @@ describe('generateSessionTitle', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it.each([null, {}, { response: '' }, { response: '""' }, { response: 'x'.repeat(201) }])(
-    'does not persist invalid output %j',
-    async output => {
-      const { env, run, persist } = setup();
-      run.mockResolvedValue(output);
-      await expect(generateSessionTitle(env, metadata, turn)).resolves.toBeUndefined();
-      expect(run).toHaveBeenCalledTimes(1);
-      expect(persist).not.toHaveBeenCalled();
-      expect(warn).toHaveBeenCalledWith('Session title model returned an invalid title');
-    }
-  );
+  it.each([
+    null,
+    {},
+    { response: '' },
+    { response: '""' },
+    { response: 'Coding Workspace Title:' },
+    { choices: [] },
+    { choices: [{ message: { content: '' } }] },
+  ])('does not persist invalid output %j', async output => {
+    const { env, run, persist } = setup();
+    run.mockResolvedValue(output);
+    await expect(generateSessionTitle(env, metadata, turn)).resolves.toBeUndefined();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(persist).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('Session title model returned an invalid title');
+  });
 
   it('bounds stalled inference and ignores a late response', async () => {
     vi.useFakeTimers();

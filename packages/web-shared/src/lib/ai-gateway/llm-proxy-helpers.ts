@@ -16,6 +16,7 @@ import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/ut
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -258,6 +259,23 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
       error: error,
       error_type: ProxyErrorType.provider_not_allowed,
       message: error,
+    },
+    { status: 403 }
+  );
+}
+
+const MANAGED_GATEWAY_NAMES = {
+  openrouter: 'OpenRouter',
+  vercel: 'the Vercel AI Gateway',
+} as const satisfies Record<ManagedGatewayId, string>;
+
+export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
+  const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
     },
     { status: 403 }
   );
@@ -935,6 +953,15 @@ function reasoningBudgetBucket(value: unknown): string | null {
   if (value <= 16_000) return 'le16k';
   if (value <= 64_000) return 'le64k';
   return 'gt64k';
+}
+
+/**
+ * The Vercel inference region set on the upstream request. Clients cannot send `providerOptions`,
+ * so the value always comes from `applyVercelSettings` and stays within the known regions.
+ */
+export function extractInferenceRegion(body: GatewayRequest['body']): string | null {
+  const inferenceRegion = body.providerOptions?.gateway?.inferenceRegion;
+  return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
 }
 
 function isReasoningObject(value: unknown): value is Record<string, unknown> {

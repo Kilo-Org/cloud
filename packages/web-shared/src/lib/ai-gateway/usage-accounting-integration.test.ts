@@ -197,6 +197,7 @@ const context: MicrodollarUsageContext = {
   auto_model: null,
   ttfb_ms: null,
   reasoning_setting: 'medium',
+  inference_region: 'eu',
 };
 let sent: UsageRecordRequest[];
 let info: jest.MockedFunction<typeof console.info>;
@@ -1051,6 +1052,7 @@ describe('gateway accounting integration', () => {
         metadata: {
           is_user_byok: true,
           reasoning_setting: 'medium',
+          inference_region: 'eu',
           market_cost: 1234,
           user_prompt_prefix: null,
           system_prompt_prefix: null,

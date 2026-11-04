@@ -496,6 +496,7 @@ describe('getProvider routing decision', () => {
           outcome: 'selected',
           gateway: 'openrouter',
           bounded_spending: true,
+          organization_disabled_vercel_ai_gateway: false,
           kilo_ignored_providers: ['deepinfra'],
         },
       ],
@@ -509,7 +510,10 @@ describe('getProvider routing decision', () => {
         is_free: false,
       },
     });
-    expect(shouldRouteToVercel).toHaveBeenCalledWith(MODEL, expect.any(Function), true);
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: MODEL, boundedSpending: true }),
+      expect.any(Function)
+    );
   });
 
   test('records provider keys the organization policy excludes', async () => {

@@ -96,6 +96,7 @@ export async function POST(
     mode: null,
     auto_model: null,
     reasoning_setting: null,
+    inference_region: null,
     market_cost: cost_mUsd,
     non_inference_cost: null,
     is_free: false,

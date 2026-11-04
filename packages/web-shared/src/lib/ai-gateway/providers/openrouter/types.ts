@@ -8,6 +8,7 @@ import type {
   VertexCredentials,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
@@ -45,6 +46,8 @@ export type VercelProviderConfig = {
     // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
     sessionId?: string;
     sessionAffinity?: boolean;
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    inferenceRegion?: { scope: 'zone'; geoRegion: OrganizationDataRegion } | { scope: 'global' };
   };
   anthropic?: AnthropicProviderOptions;
 };

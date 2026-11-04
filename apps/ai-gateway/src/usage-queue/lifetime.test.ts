@@ -178,6 +178,7 @@ const context: MicrodollarUsageContext = {
   auto_model: null,
   ttfb_ms: null,
   reasoning_setting: 'medium',
+  inference_region: 'eu',
 };
 let warn: jest.SpyInstance<ReturnType<typeof console.warn>, Parameters<typeof console.warn>>;
 let error: jest.SpyInstance<ReturnType<typeof console.error>, Parameters<typeof console.error>>;

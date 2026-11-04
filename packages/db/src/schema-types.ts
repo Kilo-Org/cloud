@@ -1396,6 +1396,10 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'remote'; url: string }
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
+// The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1440,6 +1444,11 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
+  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
+  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  disable_openrouter: z.boolean().optional(),
+  disable_vercel_ai_gateway: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

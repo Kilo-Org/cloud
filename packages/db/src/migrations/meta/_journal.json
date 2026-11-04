@@ -2325,6 +2325,13 @@
       "when": 1793714439654,
       "tag": "0331_usage_metadata_inference_region",
       "breakpoints": true
+    },
+    {
+      "idx": 332,
+      "version": "7",
+      "when": 1793800860959,
+      "tag": "0332_silly_starhawk",
+      "breakpoints": true
     }
   ]
 }

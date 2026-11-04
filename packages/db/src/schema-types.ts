@@ -1366,9 +1366,56 @@ export const OrganizationSkillGuardrailsSchema = z.object({
 });
 export type OrganizationSkillGuardrails = z.infer<typeof OrganizationSkillGuardrailsSchema>;
 
+export const ORGANIZATION_PERMISSION_TIERS = [
+  'broad_allow',
+  'specific_deny',
+  'narrow_allow',
+  'final_deny',
+] as const;
+export type OrganizationPermissionTier = (typeof ORGANIZATION_PERMISSION_TIERS)[number];
+
+export const ORGANIZATION_PERMISSION_DEFAULT_EFFECTS = ['allow', 'ask', 'deny'] as const;
+export type OrganizationPermissionDefaultEffect =
+  (typeof ORGANIZATION_PERMISSION_DEFAULT_EFFECTS)[number];
+
+export const ORGANIZATION_PERMISSION_EVENT_DECISIONS = ['allowed', 'asked', 'denied'] as const;
+export type OrganizationPermissionEventDecision =
+  (typeof ORGANIZATION_PERMISSION_EVENT_DECISIONS)[number];
+
+/** Permissions checked once per tool call; their rules must use pattern `*`. */
+export const ORGANIZATION_TOOL_LEVEL_PERMISSIONS = [
+  'read',
+  'edit',
+  'glob',
+  'grep',
+  'list',
+  'todowrite',
+  'todoread',
+  'webfetch',
+  'websearch',
+  'codesearch',
+] as const;
+
+export const MAX_ORGANIZATION_PERMISSION_LENGTH = 100;
+export const MAX_ORGANIZATION_PERMISSION_PATTERN_LENGTH = 500;
+export const MAX_ORGANIZATION_PERMISSION_DESCRIPTION_LENGTH = 500;
+
+export type OrganizationPermissionRuleSource = {
+  type: 'admin_ui' | 'event_approval' | 'preset';
+};
+
+export const OrganizationPermissionGuardrailsSchema = z.object({
+  enforcement: OrganizationGuardrailEnforcementSchema,
+  default_effect: z.enum(ORGANIZATION_PERMISSION_DEFAULT_EFFECTS),
+});
+export type OrganizationPermissionGuardrails = z.infer<
+  typeof OrganizationPermissionGuardrailsSchema
+>;
+
 export const OrganizationGuardrailsSettingsSchema = z.object({
   mcp: z.object({ enforcement: OrganizationGuardrailEnforcementSchema }).optional(),
   skill: OrganizationSkillGuardrailsSchema.optional(),
+  permissions: OrganizationPermissionGuardrailsSchema.optional(),
 });
 
 export type OrganizationGuardrailsSettings = z.infer<typeof OrganizationGuardrailsSettingsSchema>;
@@ -1642,6 +1689,9 @@ export const AuditLogAction = z.enum([
   'organization.guardrail.add',
   'organization.guardrail.update',
   'organization.guardrail.remove',
+  'organization.permission_rule.add',
+  'organization.permission_rule.update',
+  'organization.permission_rule.remove',
 ]);
 
 // --- EncryptedData ---

@@ -3,6 +3,7 @@ import {
   isVersionAtLeast,
   normalizeMcpConnectTarget,
   resolveGuardrailsSettings,
+  resolvePermissionSettings,
   type AllowedMcpServer,
 } from './guardrails-policy';
 
@@ -19,6 +20,31 @@ function allowed(
 ): Pick<AllowedMcpServer, 'identityKey' | 'config'> {
   return { identityKey, config };
 }
+
+describe('resolvePermissionSettings', () => {
+  const organization = (settings: object) => ({ settings }) as never;
+  const saved = { permissions: { enforcement: 'enforce', default_effect: 'deny' } };
+
+  it('applies no restriction for organizations without AI Guardrails', () => {
+    expect(resolvePermissionSettings(organization({ guardrails: saved }))).toEqual({
+      enforcement: 'off',
+      defaultEffect: 'allow',
+    });
+  });
+
+  it('defaults to off and allow when nothing is saved', () => {
+    expect(resolvePermissionSettings(organization({ kilo_encrypt: true }))).toEqual({
+      enforcement: 'off',
+      defaultEffect: 'allow',
+    });
+  });
+
+  it('reports saved settings', () => {
+    expect(
+      resolvePermissionSettings(organization({ kilo_encrypt: true, guardrails: saved }))
+    ).toEqual({ enforcement: 'enforce', defaultEffect: 'deny' });
+  });
+});
 
 describe('resolveGuardrailsSettings', () => {
   const organization = (settings: object) => ({ id: 'org-1', settings }) as never;

@@ -68,6 +68,13 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.mcpGuardrails.approveConnection': true,
   'organizations.mcpGuardrails.delete': true,
   'organizations.guardrails.update': true,
+  // Org admins set permission policy in the app only, so an agent cannot loosen the rules
+  // that restrict it. Clients read the policy through /api/organizations/[id]/permissions.
+  'organizations.permissionRules.add': true,
+  'organizations.permissionRules.update': true,
+  'organizations.permissionRules.delete': true,
+  'organizations.permissionRules.setEnforcement': true,
+  'organizations.permissionRules.approveEvent': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
 };

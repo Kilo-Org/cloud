@@ -142,6 +142,14 @@ import type {
   DirectByokModel,
   ByokApiKeySettings,
 } from './schema-types';
+import {
+  ORGANIZATION_PERMISSION_EVENT_DECISIONS,
+  ORGANIZATION_PERMISSION_TIERS,
+  ORGANIZATION_TOOL_LEVEL_PERMISSIONS,
+  MAX_ORGANIZATION_PERMISSION_LENGTH,
+  MAX_ORGANIZATION_PERMISSION_PATTERN_LENGTH,
+  MAX_ORGANIZATION_PERMISSION_DESCRIPTION_LENGTH,
+} from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
   OrganizationModeConfig,
@@ -150,6 +158,9 @@ import type {
   OrganizationGuardrailSource,
   OrganizationMcpConnectDecision,
   OrganizationMcpConnectTarget,
+  OrganizationPermissionTier,
+  OrganizationPermissionEventDecision,
+  OrganizationPermissionRuleSource,
   OrganizationGuardrailStatus,
   OrganizationGuardrailType,
   OrganizationPlan,
@@ -4082,6 +4093,118 @@ export const organization_mcp_connect_events = pgTable(
 
 export type OrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferSelect;
 export type NewOrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferInsert;
+
+function sqlStringList(values: readonly string[]) {
+  return sql.raw(values.map(value => `'${value.replaceAll("'", "''")}'`).join(', '));
+}
+
+export const organization_permission_rules = pgTable(
+  'organization_permission_rules',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    permission: text().notNull(),
+    pattern: text().notNull(),
+    tier: text().$type<OrganizationPermissionTier>().notNull(),
+    description: text(),
+    source: jsonb().$type<OrganizationPermissionRuleSource>().notNull(),
+    created_by_kilo_user_id: text(),
+    updated_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_permission_rules_org_permission_pattern_tier').on(
+      table.organization_id,
+      table.permission,
+      table.pattern,
+      table.tier
+    ),
+    index('IDX_organization_permission_rules_organization_id').on(table.organization_id),
+    check(
+      'organization_permission_rules_tier_check',
+      sql`${table.tier} IN (${sqlStringList(ORGANIZATION_PERMISSION_TIERS)})`
+    ),
+    check(
+      'organization_permission_rules_permission_check',
+      sql`char_length(${table.permission}) BETWEEN 1 AND ${sql.raw(String(MAX_ORGANIZATION_PERMISSION_LENGTH))}`
+    ),
+    check(
+      'organization_permission_rules_pattern_check',
+      sql`char_length(${table.pattern}) BETWEEN 1 AND ${sql.raw(String(MAX_ORGANIZATION_PERMISSION_PATTERN_LENGTH))}`
+    ),
+    check(
+      'organization_permission_rules_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= ${sql.raw(String(MAX_ORGANIZATION_PERMISSION_DESCRIPTION_LENGTH))}`
+    ),
+    check(
+      'organization_permission_rules_tool_level_pattern_check',
+      sql`${table.permission} NOT IN (${sqlStringList(ORGANIZATION_TOOL_LEVEL_PERMISSIONS)}) OR ${table.pattern} = '*'`
+    ),
+  ]
+);
+
+export type OrganizationPermissionRule = typeof organization_permission_rules.$inferSelect;
+export type NewOrganizationPermissionRule = typeof organization_permission_rules.$inferInsert;
+
+/**
+ * Daily per-user aggregate of the organization decision for permission-checked tool uses, as
+ * reported by clients. Reports are untrusted. Rows are deleted after 90 days.
+ */
+export const organization_permission_events_daily = pgTable(
+  'organization_permission_events_daily',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    day: date({ mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    client: text().notNull(),
+    permission: text().notNull(),
+    command_key: text().notNull(),
+    decision: text().$type<OrganizationPermissionEventDecision>().notNull(),
+    count: integer().notNull(),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_rule_id: uuid(),
+    last_tier: text().$type<OrganizationPermissionTier>(),
+    last_policy_revision: integer(),
+  },
+  table => [
+    unique('UQ_org_permission_events_daily_key').on(
+      table.organization_id,
+      table.day,
+      table.kilo_user_id,
+      table.client,
+      table.permission,
+      table.command_key,
+      table.decision
+    ),
+    index('IDX_org_permission_events_daily_org_day').on(table.organization_id, table.day),
+    index('IDX_org_permission_events_daily_org_permission_key').on(
+      table.organization_id,
+      table.permission,
+      table.command_key
+    ),
+    index('IDX_org_permission_events_daily_day').on(table.day),
+    check(
+      'organization_permission_events_daily_decision_check',
+      sql`${table.decision} IN (${sqlStringList(ORGANIZATION_PERMISSION_EVENT_DECISIONS)})`
+    ),
+    check('organization_permission_events_daily_count_check', sql`${table.count} > 0`),
+  ]
+);
+
+export type OrganizationPermissionEventDaily =
+  typeof organization_permission_events_daily.$inferSelect;
+export type NewOrganizationPermissionEventDaily =
+  typeof organization_permission_events_daily.$inferInsert;
 
 export type OrganizationGroup = typeof organization_groups.$inferSelect;
 export type NewOrganizationGroup = typeof organization_groups.$inferInsert;

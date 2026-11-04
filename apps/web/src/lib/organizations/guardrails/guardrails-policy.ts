@@ -1,5 +1,6 @@
 import type {
   OrganizationGuardrailEnforcement,
+  OrganizationPermissionDefaultEffect,
   OrganizationMcpGuardrailConfig,
   OrganizationMcpConnectDecision,
 } from '@kilocode/db/schema-types';
@@ -66,6 +67,28 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
       enabled: guardrailsSettings?.skill?.enabled ?? false,
       scanBeforeUse: guardrailsSettings?.skill?.scan_before_use ?? true,
     },
+  };
+}
+
+export type ResolvedPermissionSettings = {
+  enforcement: OrganizationGuardrailEnforcement;
+  defaultEffect: OrganizationPermissionDefaultEffect;
+};
+
+/**
+ * The tool and command permission settings clients must apply. Organizations without AI
+ * Guardrails (`kilo_encrypt`) get no organization restriction, whatever their saved settings say.
+ */
+export function resolvePermissionSettings(
+  organization: Pick<Organization, 'settings'>
+): ResolvedPermissionSettings {
+  if (!isKiloEncryptEnabled(organization.settings)) {
+    return { enforcement: 'off', defaultEffect: 'allow' };
+  }
+  const permissions = organization.settings.guardrails?.permissions;
+  return {
+    enforcement: permissions?.enforcement ?? 'off',
+    defaultEffect: permissions?.default_effect ?? 'allow',
   };
 }
 

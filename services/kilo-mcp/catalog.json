@@ -16365,7 +16365,10 @@
               "organization.funds.distribute_to_children",
               "organization.guardrail.add",
               "organization.guardrail.update",
-              "organization.guardrail.remove"
+              "organization.guardrail.remove",
+              "organization.permission_rule.add",
+              "organization.permission_rule.update",
+              "organization.permission_rule.remove"
             ]
           }
         },
@@ -25034,6 +25037,199 @@
       "route_model"
     ],
     "searchBlob": "organizations.modes.update Update an organization custom mode's name, slug, configuration, or model route. Use to edit an organization mode. organizations modes update organizationid modeid name slug config route_model organizationId modeId name slug config route_model"
+  },
+  "organizations.permissionRules.eventUsers": {
+    "path": "organizations.permissionRules.eventUsers",
+    "kind": "query",
+    "summary": "Show which organization members used a specific tool permission or command, with per-user client, decision, use counts, and last seen time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "asked",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "enum": [
+            "cli",
+            "cloud_agent",
+            "vscode",
+            "jetbrains",
+            "other"
+          ]
+        },
+        "days": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "permission": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commandKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "organizationId",
+        "permission",
+        "commandKey"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "permissionrules",
+      "eventusers",
+      "organizationid",
+      "decision",
+      "client",
+      "days",
+      "permission",
+      "commandkey"
+    ],
+    "searchBlob": "organizations.permissionRules.eventUsers Show which organization members used a specific tool permission or command, with per-user client, decision, use counts, and last seen time. organizations permissionrules eventusers organizationid decision client days permission commandkey organizationId decision client days permission commandKey"
+  },
+  "organizations.permissionRules.list": {
+    "path": "organizations.permissionRules.list",
+    "kind": "query",
+    "summary": "List an organization's tool and command permission rules with the current permission enforcement mode and default effect. Use this to see which tools and shell commands the organization allows or denies.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "permissionrules",
+      "list",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.permissionRules.list List an organization's tool and command permission rules with the current permission enforcement mode and default effect. Use this to see which tools and shell commands the organization allows or denies. organizations permissionrules list organizationid organizationId"
+  },
+  "organizations.permissionRules.listEvents": {
+    "path": "organizations.permissionRules.listEvents",
+    "kind": "query",
+    "summary": "List reported tool and command usage for an organization grouped by permission and command, with allowed, asked, and denied counts, users, clients, and whether a rule already exists.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "asked",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "enum": [
+            "cli",
+            "cloud_agent",
+            "vscode",
+            "jetbrains",
+            "other"
+          ]
+        },
+        "days": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "cursor": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "permissionrules",
+      "listevents",
+      "organizationid",
+      "decision",
+      "client",
+      "days",
+      "cursor"
+    ],
+    "searchBlob": "organizations.permissionRules.listEvents List reported tool and command usage for an organization grouped by permission and command, with allowed, asked, and denied counts, users, clients, and whether a rule already exists. organizations permissionrules listevents organizationid decision client days cursor organizationId decision client days cursor"
+  },
+  "organizations.permissionRules.preview": {
+    "path": "organizations.permissionRules.preview",
+    "kind": "query",
+    "summary": "Preview the organization permission decision (allow, ask, or deny) for a tool permission and pattern, such as a shell command, and show which rule decides it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "permission": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "organizationId",
+        "permission",
+        "pattern"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "permissionrules",
+      "preview",
+      "organizationid",
+      "permission",
+      "pattern"
+    ],
+    "searchBlob": "organizations.permissionRules.preview Preview the organization permission decision (allow, ask, or deny) for a tool permission and pattern, such as a shell command, and show which rule decides it. organizations permissionrules preview organizationid permission pattern organizationId permission pattern"
   },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",

@@ -172,6 +172,22 @@ describe('mcp-catalog catalog', () => {
       }
     });
 
+    it('withholds every permission policy mutation', () => {
+      const mutations = collectCatalogLeaves(rootRouter).filter(
+        leaf => leaf.path.startsWith('organizations.permissionRules.') && leaf.type === 'mutation'
+      );
+      expect(mutations.map(leaf => leaf.path).sort()).toEqual([
+        'organizations.permissionRules.add',
+        'organizations.permissionRules.approveEvent',
+        'organizations.permissionRules.delete',
+        'organizations.permissionRules.setEnforcement',
+        'organizations.permissionRules.update',
+      ]);
+      for (const leaf of mutations) {
+        expect(isDenylistedPath(leaf.path)).toBe(true);
+      }
+    });
+
     it('withholds paid scheduling consent while exposing scheduled report reads', () => {
       const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
         leaf.path.startsWith('agentBriefing.')

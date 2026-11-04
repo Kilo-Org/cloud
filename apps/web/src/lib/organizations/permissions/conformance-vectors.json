@@ -1,0 +1,1378 @@
+[
+  {
+    "name": "truth table: none/ask x org deny (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: none/ask x org ask (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: none/ask x org allow (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: none/ask x org deny (rule)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "r1",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: none/ask x org allow (lifted)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "r1",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: none/allow x org deny (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: none/allow x org ask (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: none/allow x org allow (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "truth table: none/allow x org deny (rule)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "r1",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: none/allow x org allow (lifted)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "r1",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "truth table: user allow x org deny (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user allow x org ask (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: user allow x org allow (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "truth table: user allow x org deny (rule)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "r1",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user allow x org allow (lifted)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "r1",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "truth table: user ask x org deny (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user ask x org ask (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: user ask x org allow (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: user ask x org deny (rule)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "r1",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user ask x org allow (lifted)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "r1",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "truth table: user deny x org deny (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "deny",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user deny x org ask (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "deny",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user deny x org allow (defaultEffect)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "deny",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user deny x org deny (rule)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "deny",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "r1",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "truth table: user deny x org allow (lifted)",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "ls *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls -la"]
+    },
+    "localResult": "deny",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "r1",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "defaultEffect allow with no rules",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "read",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "defaultEffect allow when no rule matches",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "defaultEffect ask with no rules",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "read",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "defaultEffect ask when no rule matches",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "defaultEffect deny with no rules",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": []
+    },
+    "request": {
+      "permission": "read",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "defaultEffect deny when no rule matches",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "r1",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: broad_allow beats defaultEffect deny",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "ba",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "tier: specific_deny beats broad_allow",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push upstream main"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "sd",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: narrow_allow beats specific_deny",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push origin main"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "na",
+      "tier": "narrow_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "tier: final_deny beats narrow_allow",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push origin main --force"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: rule order within list does not matter",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push origin main --force"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: unmatched falls to defaultEffect deny",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "deny",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "git push * --force*"
+        },
+        {
+          "id": "na",
+          "tier": "narrow_allow",
+          "permission": "bash",
+          "pattern": "git push origin *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        },
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["npm test"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: trailing space-star matches bare command",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "sd",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tier: anchoring prevents prefix match",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "git push"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git push origin"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "redirect-write final_deny",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "*>*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["echo hi > out.txt"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "star matches newlines",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "eval *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["eval 'a\nb'"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "permission matched by glob",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "web*",
+          "pattern": "*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "webfetch",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tool-level permission * rule",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "webfetch",
+          "pattern": "*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "webfetch",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "tool-level allow lifts defaultEffect ask",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "read",
+          "pattern": "*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "read",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "ba",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "tool-level rule does not affect other tools",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "webfetch",
+          "pattern": "*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "read",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "permission * final_deny applies to every tool",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "*",
+          "pattern": "*"
+        }
+      ]
+    },
+    "request": {
+      "permission": "edit",
+      "patterns": ["*"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "multi-pattern: any deny wins",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status", "rm -rf build"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "sd",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "multi-pattern: any ask wins over allow",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status", "npm test"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "multi-pattern: all allowed",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["git status", "git log"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "allow",
+      "ruleId": "ba",
+      "tier": "broad_allow"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "multi-pattern: deny wins regardless of order",
+    "policy": {
+      "enforcement": "enforce",
+      "defaultEffect": "ask",
+      "rules": [
+        {
+          "id": "ba",
+          "tier": "broad_allow",
+          "permission": "bash",
+          "pattern": "git *"
+        },
+        {
+          "id": "sd",
+          "tier": "specific_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["rm x", "npm test", "git log"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "sd",
+      "tier": "specific_deny"
+    },
+    "expectedFinal": "deny"
+  },
+  {
+    "name": "shadow mode: org deny is not applied",
+    "policy": {
+      "enforcement": "shadow",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["rm x"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "shadow mode: org ask is not applied",
+    "policy": {
+      "enforcement": "shadow",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "shadow mode: local ask is kept",
+    "policy": {
+      "enforcement": "shadow",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "ask"
+  },
+  {
+    "name": "off mode: org deny is not applied",
+    "policy": {
+      "enforcement": "off",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "fd",
+          "tier": "final_deny",
+          "permission": "bash",
+          "pattern": "rm *"
+        }
+      ]
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["rm x"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "deny",
+      "ruleId": "fd",
+      "tier": "final_deny"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "off mode: org ask is not applied",
+    "policy": {
+      "enforcement": "off",
+      "defaultEffect": "ask",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "allow",
+    "expectedOrgDecision": {
+      "decision": "ask"
+    },
+    "expectedFinal": "allow"
+  },
+  {
+    "name": "off mode: local ask is kept",
+    "policy": {
+      "enforcement": "off",
+      "defaultEffect": "allow",
+      "rules": []
+    },
+    "request": {
+      "permission": "bash",
+      "patterns": ["ls"]
+    },
+    "localResult": "ask",
+    "expectedOrgDecision": {
+      "decision": "allow"
+    },
+    "expectedFinal": "ask"
+  }
+]

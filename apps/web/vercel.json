@@ -55,6 +55,10 @@
       "schedule": "45 3 * * *"
     },
     {
+      "path": "/api/cron/cleanup-permission-events",
+      "schedule": "50 3 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-pr-watches",
       "schedule": "15 4 * * *"
     },

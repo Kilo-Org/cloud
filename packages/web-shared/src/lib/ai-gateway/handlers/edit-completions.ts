@@ -2,7 +2,7 @@ import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -13,11 +13,10 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreEditUsage,
   extractEditPromptInfo,
-  extractFraudAndProjectHeaders,
   invalidRequestResponse,
+  malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
-  extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -26,6 +25,10 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import {
+  gatewayUsageContextBase,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -77,53 +80,41 @@ const EditRequestBody = z.object({
   stream: z.literal(false).optional(),
 });
 
-type EditRequestBody = z.infer<typeof EditRequestBody>;
-
 export async function handleEditCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
   const requestBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    organizationId,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
   authSpan.end();
-  if (authFailedResponse) return authFailedResponse;
-
-  const user = maybeUser;
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
   const requestBodyText = await requestBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 
-  let requestBody: EditRequestBody;
+  let requestJson: unknown;
   try {
-    const { success, data, error } = EditRequestBody.safeParse(JSON.parse(requestBodyText));
-    if (!success) {
-      if (error.issues.some(issue => issue.path[0] === 'stream')) {
-        return NextResponse.json(
-          {
-            error: 'Streaming is not supported for edit completions',
-            error_type: ProxyErrorType.unsupported_field,
-          },
-          { status: 400 }
-        );
-      }
-      sentryLogger('edit-proxy')('request failed to parse', {
-        extra: { kiloUserId: user.id, error, organizationId },
-        tags: { source: 'edit-proxy' },
-        user: { id: user.id },
-      });
-      return invalidRequestResponse();
-    }
-    requestBody = data;
+    requestJson = JSON.parse(requestBodyText);
   } catch (e) {
-    captureException(e, {
-      extra: { kiloUserId: user.id },
+    return malformedJsonResponse(e);
+  }
+  const { success, data: requestBody, error } = EditRequestBody.safeParse(requestJson);
+  if (!success) {
+    if (error.issues.some(issue => issue.path[0] === 'stream')) {
+      return NextResponse.json(
+        {
+          error: 'Streaming is not supported for edit completions',
+          error_type: ProxyErrorType.unsupported_field,
+        },
+        { status: 400 }
+      );
+    }
+    sentryLogger('edit-proxy')('request failed to parse', {
+      extra: { kiloUserId: user.id, error, organizationId },
       tags: { source: 'edit-proxy' },
       user: { id: user.id },
     });
@@ -149,13 +140,12 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     return temporarilyUnavailableResponse();
   }
 
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(rawClientIp(request)),
-    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
     userId: user.id,
     organizationId,
     feature,
@@ -171,36 +161,20 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const userByokEntry = userByok?.find(entry => entry.providerId === byokProviderKey);
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'edit_completions',
-    kiloUserId: user.id,
     provider: editProvider,
     requested_model: requestBody.model,
     is_free: isFreeModel(requestBody.model),
-    custom_llm_pricing: null,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    session_id: taskId ?? null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
-    requestStartedAt,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // Edit feeds volume rules only, which do not read a prompt hash.

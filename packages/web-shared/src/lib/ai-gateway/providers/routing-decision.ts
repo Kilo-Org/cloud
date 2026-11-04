@@ -133,6 +133,7 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('selected'),
     gateway: z.enum(['vercel', 'openrouter']),
     bounded_spending: z.boolean(),
+    organization_disabled_vercel_ai_gateway: z.boolean(),
     kilo_ignored_providers: z.array(z.string()),
   }),
 ]);

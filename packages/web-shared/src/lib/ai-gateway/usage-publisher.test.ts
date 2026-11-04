@@ -70,6 +70,7 @@ const payload: UsageRecordRequest = {
     mode: null,
     auto_model: null,
     reasoning_setting: 'medium',
+    inference_region: 'eu',
     market_cost: null,
     non_inference_cost: null,
     is_free: null,

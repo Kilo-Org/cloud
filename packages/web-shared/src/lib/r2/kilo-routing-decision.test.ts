@@ -40,6 +40,7 @@ const decision: ProviderRoutingDecision = {
       outcome: 'selected',
       gateway: 'vercel',
       bounded_spending: false,
+      organization_disabled_vercel_ai_gateway: false,
       kilo_ignored_providers: [],
     },
   ],

@@ -34,7 +34,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -215,8 +215,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL,
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,
@@ -374,10 +373,8 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   });
 
   it.each([
-    ['cloudflare', true],
     ['cloudflare-containers', true],
     ['vercel', true],
-    ['cloudflare', false],
     ['cloudflare-containers', false],
   ] as const)(
     '%s contained=%s forwards renewed authorization after JWT expiry and allocation replacement',

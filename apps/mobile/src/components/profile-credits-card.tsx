@@ -25,6 +25,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -90,22 +91,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
-    // The card must stop waiting while the online manager reports offline: a
-    // paused read is pending without fetching, so the skeleton below had no
-    // exit. This one either answers or fails once the control-plane deadline
-    // lands, and `balanceFailed` then offers the retry.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // A paused read left the balance skeleton with no exit.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const { data: personalCreditData, isError: personalCreditsError } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
-    networkMode: 'always',
-    refetchOnReconnect: true,
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const {
@@ -116,8 +109,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
-    networkMode: 'always',
-    refetchOnReconnect: true,
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares

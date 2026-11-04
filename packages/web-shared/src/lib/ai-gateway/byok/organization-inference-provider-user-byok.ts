@@ -8,7 +8,7 @@ import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cust
 import {
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
  * The catalog ids the organization's catalog-mode direct BYOK keys serve under `policy`, as

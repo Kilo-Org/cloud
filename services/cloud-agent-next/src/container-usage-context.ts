@@ -6,14 +6,12 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
-import { getContainerCapacityFailureReason } from './container-concurrency.js';
 import {
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
   type SandboxAllocation,
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { logger } from './logger.js';
 import { isIsolatedSandboxId, isValidSandboxId, type SandboxIdClass } from './sandbox-id.js';
 import { resolveSandboxIdClass, sandboxKindSchema, type SandboxKind } from './sandbox-placement.js';
 import {
@@ -21,8 +19,7 @@ import {
   CODE_REVIEW_CONTAINERS_RESOURCES,
 } from './sandbox-containers/instance-size.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
-import type { SandboxId, SandboxInstance } from './types.js';
-import type { BillingContext } from '@kilocode/container-usage';
+import type { SandboxId } from './types.js';
 
 export const SANDBOX_USAGE_SKUS = {
   SandboxContainment: 'cloud-agent-standard-2026-07',
@@ -193,24 +190,6 @@ export type SandboxBillingAdmissionResult =
       remainingMicrodollars?: number;
       minimumRequiredMicrodollars?: number;
     };
-export type MeteredSandboxInstance = SandboxInstance & {
-  configureBilling(input: unknown): Promise<void>;
-  ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult>;
-  isBillingBlocked(): Promise<boolean>;
-  isContainerRunning(): Promise<boolean>;
-  forceDestroyForControlPlane(): Promise<void>;
-  getBillingRuntimeStatus(): Promise<{
-    sandboxClassName: SandboxClassName;
-    running: boolean;
-    blocked: boolean;
-    context?: BillingContext;
-  }>;
-};
-
-/** Optional while Worker and sandbox runtime deployments roll forward independently. */
-type BillingRuntimeStatusCapability = {
-  getBillingRuntimeStatus?: MeteredSandboxInstance['getBillingRuntimeStatus'];
-};
 
 export const sandboxBillingInputEnvelopeSchema = z
   .object({
@@ -354,41 +333,6 @@ export function assertSandboxBillingAllocation(
   }
 }
 
-export async function configureSandboxBilling(
-  sandbox: SandboxInstance,
-  metadata: SessionMetadata,
-  sandboxId: SandboxId
-): Promise<void> {
-  await configureSandboxBillingInput(sandbox, buildSandboxBillingInput(metadata, sandboxId));
-}
-
-export async function ensureSandboxBillingAdmissionInput(
-  sandbox: SandboxInstance,
-  input: SandboxBillingInput
-): Promise<SandboxBillingAdmissionResult> {
-  const ensureBillingAdmission = (sandbox as Partial<MeteredSandboxInstance>)
-    .ensureBillingAdmission;
-  if (typeof ensureBillingAdmission !== 'function') {
-    return input.enforcementRequested
-      ? {
-          success: false,
-          code: 'meter_unavailable',
-          message: 'Container billing admission is unavailable',
-        }
-      : { success: true };
-  }
-  try {
-    return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
-  } catch (error) {
-    if (getContainerCapacityFailureReason(error)) throw error;
-    return {
-      success: false,
-      code: 'meter_unavailable',
-      message: error instanceof Error ? error.message : 'Container billing admission failed',
-    };
-  }
-}
-
 export function billingAdmissionFailureFromError(error: unknown): SandboxBillingAdmissionResult {
   if (error instanceof ContainerUsageAdmissionError) {
     if (error.code === 'insufficient_credits') {
@@ -410,89 +354,4 @@ export function billingAdmissionFailureFromError(error: unknown): SandboxBilling
     code: 'meter_unavailable',
     message: error instanceof Error ? error.message : 'Container billing meter is unavailable',
   };
-}
-
-export async function isSandboxBillingBlocked(
-  sandbox: SandboxInstance,
-  enforcementRequested = false
-): Promise<boolean> {
-  const isBillingBlocked = (sandbox as Partial<MeteredSandboxInstance>).isBillingBlocked;
-  if (typeof isBillingBlocked !== 'function') return false;
-  try {
-    return await (sandbox as MeteredSandboxInstance).isBillingBlocked();
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .warn('Container billing block check failed');
-    return enforcementRequested;
-  }
-}
-
-/**
- * Whether the sandbox's container is currently running, read over Durable Object RPC.
- *
- * This deliberately avoids any container fetch (`exec`, `listProcesses`, …), because
- * those boot a sleeping container. Callers use it to answer "is there anything running
- * in there?" without paying for a wake-up.
- *
- * Returns `undefined` when the sandbox does not expose the method, so callers can fall
- * back to their existing behaviour rather than treating an unknown state as "stopped".
- */
-export async function isSandboxContainerRunning(
-  sandbox: SandboxInstance
-): Promise<boolean | undefined> {
-  const isContainerRunning = (sandbox as Partial<MeteredSandboxInstance>).isContainerRunning;
-  if (typeof isContainerRunning !== 'function') return undefined;
-  try {
-    return await (sandbox as MeteredSandboxInstance).isContainerRunning();
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .warn('Container running probe failed');
-    return undefined;
-  }
-}
-
-function supportsControlPlaneForceDestroy(
-  sandbox: unknown
-): sandbox is Pick<MeteredSandboxInstance, 'forceDestroyForControlPlane'> {
-  return (
-    typeof sandbox === 'object' &&
-    sandbox !== null &&
-    'forceDestroyForControlPlane' in sandbox &&
-    typeof sandbox.forceDestroyForControlPlane === 'function'
-  );
-}
-
-export async function forceDestroyControlPlaneSandbox(sandbox: unknown): Promise<void> {
-  if (!supportsControlPlaneForceDestroy(sandbox)) {
-    throw new Error('Cloudflare control-plane native destruction is unavailable');
-  }
-  await sandbox.forceDestroyForControlPlane();
-}
-
-export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): Promise<
-  | {
-      sandboxClassName: SandboxClassName;
-      running: boolean;
-      blocked: boolean;
-      context?: BillingContext;
-    }
-  | undefined
-> {
-  const capability = sandbox as BillingRuntimeStatusCapability;
-  if (typeof capability.getBillingRuntimeStatus !== 'function') return undefined;
-  return await capability.getBillingRuntimeStatus();
-}
-
-export async function configureSandboxBillingInput(
-  sandbox: SandboxInstance,
-  input: SandboxBillingInput
-): Promise<void> {
-  const configureBilling = (sandbox as Partial<MeteredSandboxInstance>).configureBilling;
-  if (typeof configureBilling !== 'function') {
-    logger.warn('Container usage shadow metering is unavailable for sandbox');
-    return;
-  }
-  await (sandbox as MeteredSandboxInstance).configureBilling(input);
 }

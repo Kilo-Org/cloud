@@ -1330,13 +1330,12 @@ export async function listSandboxContainers(
     const [id, name, image] = line.split('\t');
     if (!id || !name || !image) continue;
     // Match sandbox DO container names. cloudflare/containers uses a naming
-    // scheme that includes the DO class name; we match on `Sandbox` (covers
-    // the retained sandbox classes) plus the dev worker prefix when
-    // present. Relaxed match keeps the harness robust to wrangler version
-    // changes.
+    // scheme that includes the DO class name, so `Sandbox` covers the native
+    // `SandboxContainers` provider and the retired tombstone names. Keep the
+    // relaxed image fallback so the harness survives wrangler naming changes.
     const isSandbox =
       (name.includes('cloud-agent-next-dev') || name.includes('cloud-agent-next')) &&
-      (name.includes('Sandbox') || image.includes('cloudflare/sandbox'));
+      (name.includes('Sandbox') || image.toLowerCase().includes('sandboxcontainers'));
     if (!isSandbox) continue;
     result.push({ id, name, image, isProxy: name.endsWith('-proxy') });
   }

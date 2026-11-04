@@ -11,14 +11,15 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   decide,
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
-import { after } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
@@ -47,11 +48,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   >),
   isFreeModel: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
-    decision: { allowed: true },
-  }),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
+      decision: { allowed: true },
+    }),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn().mockResolvedValue(null),
@@ -460,6 +464,65 @@ describe('POST /api/fim/completions', () => {
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers malformed JSON without reporting it to Sentry', async () => {
+    setOrganizationAuth();
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      new Request('http://localhost:3000/api/fim/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+        body: '{"model": ',
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes an authentication failure without a rejected credential through', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (not a member of the organization)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      credentialsRejected: false,
+    });
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+    expect(response).toBe(authFailedResponse);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   describe('bouncer wiring', () => {

@@ -263,7 +263,10 @@ describe('getProvider local fake deterministic routing', () => {
           isFree: true,
           bypassAccessCheck: false,
         });
-        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function), false);
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(
+          expect.objectContaining({ requestedModel: modelId }),
+          expect.any(Function)
+        );
       }
     );
   });
@@ -311,9 +314,25 @@ describe('getProvider auto small free model routing', () => {
 
     expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
     expect(shouldRouteToVercel).toHaveBeenCalledWith(
-      'openai/gpt-5-nano',
-      expect.any(Function),
-      true
+      expect.objectContaining({ requestedModel: 'openai/gpt-5-nano', boundedSpending: true }),
+      expect.any(Function)
+    );
+  });
+
+  test('forwards the organization Vercel AI Gateway setting to the Vercel routing decision', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const result = await getProvider(
+      getProviderInput({
+        ...providerInput('openai/gpt-5-nano'),
+        organizationDisabledVercelAiGateway: true,
+      })
+    );
+
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationDisabledVercelAiGateway: true }),
+      expect.any(Function)
     );
   });
 });

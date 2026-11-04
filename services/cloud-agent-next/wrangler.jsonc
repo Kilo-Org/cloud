@@ -191,36 +191,12 @@
       "bucket_name": "kilocode-sessions",
     },
   ],
-  // Keep the two active legacy containment pools and the native containers runtime.
+  // Native Cloudflare Containers is the only sandbox runtime. The retired
+  // SDK-backed sandbox classes keep no container or binding; their historical
+  // migrations and no-op tombstones stay so stored instances and scheduled
+  // alarms remain valid. Drain every retired sandbox before deploying this
+  // configuration.
   "containers": [
-    {
-      "class_name": "SandboxContainment",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 4,
-        "memory_mib": 12288,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.17",
-      },
-      "max_instances": 300,
-      "rollout_active_grace_period": 1800,
-    },
-    {
-      "class_name": "SandboxSmallContainment",
-      "image": "./Dockerfile",
-      "instance_type": {
-        "vcpu": 2,
-        "memory_mib": 6144,
-        "disk_mb": 20000,
-      },
-      "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.17",
-      },
-      "max_instances": 1500,
-      "rollout_active_grace_period": 1800,
-    },
     {
       "class_name": "SandboxContainers",
       "scheduling_policy": "durable_object",
@@ -235,14 +211,6 @@
   ],
   "durable_objects": {
     "bindings": [
-      {
-        "class_name": "SandboxContainment",
-        "name": "SandboxContainment",
-      },
-      {
-        "class_name": "SandboxSmallContainment",
-        "name": "SandboxSmallContainment",
-      },
       {
         "class_name": "StreamTicketNonceDO",
         "name": "STREAM_TICKET_NONCE_DO",
@@ -489,29 +457,6 @@
         },
       ],
       "containers": [
-        // A local sandbox holds about 1.5 GiB. The small classes the e2e matrix boots
-        // are capped to what a 12 GiB Docker VM holds beside the stack, not to the
-        // deployed e2e Worker's 20.
-        {
-          "class_name": "SandboxContainment",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.17",
-          },
-          "max_instances": 10,
-          "rollout_active_grace_period": 60,
-        },
-        {
-          "class_name": "SandboxSmallContainment",
-          "image": "./Dockerfile.dev",
-          "instance_type": "standard-4",
-          "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.17",
-          },
-          "max_instances": 6,
-          "rollout_active_grace_period": 60,
-        },
         {
           "class_name": "SandboxContainers",
           "scheduling_policy": "durable_object",
@@ -526,14 +471,6 @@
       ],
       "durable_objects": {
         "bindings": [
-          {
-            "class_name": "SandboxContainment",
-            "name": "SandboxContainment",
-          },
-          {
-            "class_name": "SandboxSmallContainment",
-            "name": "SandboxSmallContainment",
-          },
           {
             "class_name": "StreamTicketNonceDO",
             "name": "STREAM_TICKET_NONCE_DO",

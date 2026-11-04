@@ -1,6 +1,5 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
-import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -126,11 +125,6 @@ export const envVarsSchema = z
       message: `Cannot set reserved environment variables: ${RESERVED_ENV_VARS.join(', ')}. These are managed by the system.`,
     }
   );
-
-export type SandboxInstance = ReturnType<typeof getSandbox>;
-
-/** Cloudflare Session instance for executing commands within a sandbox */
-export type { ExecutionSession };
 
 /** Unique identifier for a sandbox (container). Covers hash-based prefixes, per-session IDs, and legacy `__`-delimited formats. */
 export type SandboxId =
@@ -527,10 +521,6 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
-  /** Durable Object namespace for shared sandbox containers with SCM credential containment */
-  SandboxContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers with SCM credential containment */
-  SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */

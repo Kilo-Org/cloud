@@ -6,11 +6,15 @@ import {
   generateSandboxRoutingTarget,
   getDefaultSandboxDestination,
   getManagedOutboundContainerId,
-  getOutboundContainerId,
-  getSandboxNamespace,
   isOrgInList,
   selectSandboxForNewSession,
+  selectSandboxProvider,
 } from './sandbox-id.js';
+import {
+  assertSandboxBillingAllocation,
+  parseSandboxBillingInput,
+} from './container-usage-context.js';
+import { CurrentSessionMetadataSchema } from './persistence/session-metadata.js';
 import type { Env, SandboxId } from './types.js';
 
 describe('generateSandboxId', () => {
@@ -891,84 +895,80 @@ describe('selectSandboxForNewSession', () => {
   });
 });
 
-describe('legacy sandbox namespace retirement', () => {
-  const namespaces = {
-    SandboxContainment: { idFromName: (name: string) => ({ toString: () => `standard:${name}` }) },
-    SandboxSmallContainment: {
-      idFromName: (name: string) => ({ toString: () => `small:${name}` }),
-    },
-  } as unknown as Env;
-
+describe('legacy sandbox retirement', () => {
   it.each([
-    ['ses-abcdef', 'SandboxSmallContainment', 'small'],
-    ['istd-abcdef', 'SandboxContainment', 'standard'],
-    ['org-abcdef', 'SandboxContainment', 'standard'],
-    ['usr-abcdef', 'SandboxContainment', 'standard'],
-    ['bot-abcdef', 'SandboxContainment', 'standard'],
-    ['user__legacy', 'SandboxContainment', 'standard'],
-  ] as const)('preserves the contained namespace for %s', (sandboxId, binding, prefix) => {
-    expect(getSandboxNamespace(namespaces, sandboxId, { managedScmContainment: true })).toBe(
-      namespaces[binding]
-    );
-    expect(getOutboundContainerId(namespaces, sandboxId, { managedScmContainment: true })).toBe(
-      `${prefix}:${sandboxId}`
-    );
-  });
-
-  it.each(['ses-abcdef', 'istd-abcdef', 'org-abcdef', 'crv-abcdef', 'dind-abcdef'])(
-    'rejects a retired non-contained namespace for %s',
-    sandboxId => {
-      expect(() => getSandboxNamespace(namespaces, sandboxId)).toThrow(
-        'sandbox runtime has been retired'
-      );
-      expect(() => getOutboundContainerId(namespaces, sandboxId)).toThrow(
-        'sandbox runtime has been retired'
-      );
-    }
-  );
-
-  it.each(['crv-abcdef', 'dind-abcdef'])(
-    'rejects the retired contained namespace for %s',
-    sandboxId => {
-      expect(() =>
-        getSandboxNamespace(namespaces, sandboxId, { managedScmContainment: true })
-      ).toThrow('sandbox runtime has been retired');
+    [undefined, undefined, 'ses-', 'cloudflare-containers'],
+    ['cloudflare-single', undefined, 'ses-', 'cloudflare'],
+    ['isolated-standard', undefined, 'istd-', 'cloudflare'],
+    [undefined, 'code-review', 'crv-', 'cloudflare'],
+  ] as const)(
+    'generates the historical %s / %s sandbox identity',
+    async (sandboxAllocation, createdOnPlatform, prefix, expectedProvider) => {
+      const sessionId = 'workspace_abc123';
+      const sandboxId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
+        sandboxAllocation,
+        createdOnPlatform,
+      });
+      expect(sandboxId.startsWith(prefix)).toBe(true);
+      const provider = selectSandboxProvider({
+        env: {},
+        orgId: 'org-id',
+        userId: 'user-id',
+        sessionId,
+        sandboxId,
+        sandboxAllocation,
+      });
+      expect(provider).toBe(expectedProvider);
+      expect(
+        CurrentSessionMetadataSchema.safeParse({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: 'user-id' },
+          auth: {},
+          lifecycle: { version: 1, timestamp: 1 },
+          workspace: { sandboxId, sandboxProvider: provider, sandboxAllocation },
+        }).success
+      ).toBe(true);
+      const billing = parseSandboxBillingInput({
+        sandboxId,
+        subject: { type: 'user', id: 'user-id' },
+        actor: { type: 'user', id: 'user-id' },
+        sessionId,
+        metadata: { origin: createdOnPlatform ?? 'cloud-agent' },
+        enforcementRequested: true,
+      });
+      const billingClass = sandboxId.startsWith('crv-')
+        ? 'SandboxContainersCodeReview'
+        : sandboxId.startsWith('istd-')
+          ? 'SandboxContainment'
+          : 'SandboxSmallContainment';
+      expect(() => assertSandboxBillingAllocation(billingClass, billing)).not.toThrow();
+      expect(sandboxId.startsWith('crv-')).toBe(createdOnPlatform === 'code-review');
     }
   );
 });
 
 describe('getManagedOutboundContainerId', () => {
-  it('binds containers containment to the containers Durable Object, not the sandbox class', () => {
-    const env = {
-      SANDBOX_CONTAINERS: {
-        idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
-      },
-      SandboxSmallContainment: {
-        idFromName: (name: string) => ({ toString: () => `sandbox:${name}` }),
-      },
-      SandboxContainment: {
-        idFromName: (name: string) => ({ toString: () => `sandbox:${name}` }),
-      },
-    } as unknown as Env;
+  const env = {
+    SANDBOX_CONTAINERS: {
+      idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
+    },
+  } as unknown as Env;
+  const ids = { logicalSandboxId: 'sbx-logical', physicalSandboxId: 'ses-physical' };
 
-    expect(
-      getManagedOutboundContainerId('cloudflare-containers', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBe('containers:ses-logical');
-    expect(
-      getManagedOutboundContainerId('cloudflare', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBe('sandbox:ses-physical');
-    expect(
-      getManagedOutboundContainerId('vercel', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBeUndefined();
+  it('names the native containers Durable Object by the logical sandbox id', () => {
+    expect(getManagedOutboundContainerId('cloudflare-containers', env, ids)).toBe(
+      'containers:sbx-logical'
+    );
+  });
+
+  it('fails closed for the retired Cloudflare Sandbox provider', () => {
+    expect(() => getManagedOutboundContainerId('cloudflare', env, ids)).toThrow(
+      'runtime has been retired'
+    );
+  });
+
+  it('has no outbound proxy for Vercel', () => {
+    expect(getManagedOutboundContainerId('vercel', env, ids)).toBeUndefined();
   });
 });
 

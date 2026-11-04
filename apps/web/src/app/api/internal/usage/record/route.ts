@@ -34,6 +34,8 @@ import {
 // slow write is reported rather than silently truncated into a lost billing row.
 export const maxDuration = 150;
 
+const POOL_WAITING_SAMPLE_INTERVAL_MS = 100;
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const unauthorized = authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
@@ -53,15 +55,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const reportTiming = (usageId: string, outcome: UsageRecordResponse['status']) => {
     const totalMs = timer.totalMs();
     if (!shouldEmitUsageRecordTiming(totalMs)) return;
-    emitUsageRecordTiming({
-      usageId,
-      outcome,
-      totalMs,
-      phases: timer.phases(),
-      poolBefore,
-      poolAfter: samplePool(),
-      poolWaitingPeak,
-    });
+    try {
+      emitUsageRecordTiming({
+        usageId,
+        outcome,
+        totalMs,
+        phases: timer.phases(),
+        poolBefore,
+        poolAfter: samplePool(),
+        poolWaitingPeak,
+      });
+    } catch (error) {
+      // Diagnostics must not turn a committed write into a retryable failure.
+      console.warn('usage record timing emission failed', {
+        usageId,
+        outcome,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+    }
   };
 
   const rawBody: unknown = await request.json().catch(() => null);
@@ -91,6 +102,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Redelivery is handled inside the write, not by a lookup here.
+  // Sample on an interval: waiting peaks during the write, not at its endpoints.
+  const poolSampler = setInterval(samplePool, POOL_WAITING_SAMPLE_INTERVAL_MS);
   let result: Awaited<ReturnType<typeof saveUsageRelatedDataLocally>>;
   try {
     result = await saveUsageRelatedDataLocally(
@@ -108,6 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     );
   } finally {
+    clearInterval(poolSampler);
     // Keep the slot through actual completion, including awaited post-commit work.
     admission?.release();
   }

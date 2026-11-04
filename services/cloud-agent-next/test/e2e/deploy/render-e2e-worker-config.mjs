@@ -31,16 +31,9 @@ const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
 const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
-const E2E_CONTAINER_CLASSES = new Set([
-  'SandboxContainment',
-  'SandboxSmallContainment',
-  'SandboxContainers',
-]);
-// The suite cold-boots a container per scenario and they linger until the
-// 15-minute idle stop, so a whole run keeps far more than 20 alive at once. The
-// old value of 20 pinned the class at the limit and left later cold boots
-// stuck in `preparing`; use a 40-instance cap for each legacy pool.
-const E2E_MAX_INSTANCES = 40;
+// Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
+// same `SandboxContainers` class as production.
+const E2E_CONTAINER_CLASSES = new Set(['SandboxContainers']);
 // Preserve the deployed E2E Worker's old migration history. These namespaces
 // were omitted before v15 and must be created under a new E2E tag.
 const HISTORICALLY_OMITTED_CLASSES = new Set([
@@ -55,6 +48,7 @@ const HISTORICALLY_OMITTED_CLASSES = new Set([
 const E2E_RUNTIME_MIGRATION = {
   tag: 'v15-e2e',
   // This applied migration must stay fixed when the current container set changes.
+  // The retired containment classes stay exported as tombstones, so it remains valid.
   new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
 };
 
@@ -128,16 +122,7 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
 
   config.containers = (config.containers ?? [])
     .filter(entry => E2E_CONTAINER_CLASSES.has(entry.class_name))
-    .map(entry => {
-      const rebased = rebaseContainers([entry])[0];
-      return entry.scheduling_policy === 'durable_object'
-        ? rebased
-        : {
-            ...rebased,
-            max_instances: E2E_MAX_INSTANCES,
-            ssh: { ...(entry.ssh ?? {}), enabled: true },
-          };
-    });
+    .map(entry => rebaseContainers([entry])[0]);
 
   config.durable_objects = {
     ...config.durable_objects,
@@ -184,21 +169,13 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
         0
     );
   config.migrations = insertCallbackMigration(survivingMigrations);
-  const runtimeClasses = E2E_RUNTIME_MIGRATION.new_sqlite_classes.filter(className =>
-    (config.containers ?? []).some(entry => entry.class_name === className)
-  );
-  if (runtimeClasses.length > 0) {
-    const anchorIndex = config.migrations.findIndex(entry => entry.tag === 'v15');
-    if (anchorIndex === -1) {
-      throw new Error(
-        "cannot insert the e2e runtime migration: production anchor tag 'v15' is empty"
-      );
-    }
-    config.migrations.splice(anchorIndex + 1, 0, {
-      ...E2E_RUNTIME_MIGRATION,
-      new_sqlite_classes: runtimeClasses,
-    });
+  const anchorIndex = config.migrations.findIndex(entry => entry.tag === 'v15');
+  if (anchorIndex === -1) {
+    throw new Error(
+      "cannot insert the e2e runtime migration: production anchor tag 'v15' is empty"
+    );
   }
+  config.migrations.splice(anchorIndex + 1, 0, structuredClone(E2E_RUNTIME_MIGRATION));
 
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);

@@ -53,6 +53,15 @@ export class ContainerConcurrencyLimitError extends Error {
   }
 }
 
+export class ContainerAccountBlockedError extends Error {
+  readonly code = 'account_blocked';
+
+  constructor() {
+    super('account_blocked: This account is blocked.');
+    this.name = 'ContainerAccountBlockedError';
+  }
+}
+
 export class ContainerCapacityUnavailableError extends Error {
   readonly code = 'container_capacity_unavailable';
 
@@ -67,8 +76,9 @@ export class ContainerCapacityUnavailableError extends Error {
 /** Recognizes admission failures even after Durable Object RPC flattens them. */
 export function getContainerCapacityFailureReason(
   error: unknown
-): 'container_limit_reached' | 'billing_unavailable' | undefined {
+): 'account_blocked' | 'container_limit_reached' | 'billing_unavailable' | undefined {
   if (typeof error === 'object' && error !== null && 'code' in error) {
+    if (error.code === 'account_blocked') return 'account_blocked';
     if (error.code === 'container_limit_reached') return 'container_limit_reached';
     if (error.code === 'container_capacity_unavailable') return 'billing_unavailable';
   }
@@ -81,6 +91,7 @@ export function getContainerCapacityFailureReason(
           typeof error.message === 'string'
         ? error.message
         : '';
+  if (message.includes('account_blocked:')) return 'account_blocked';
   if (message.includes('container_limit_reached:')) return 'container_limit_reached';
   if (message.includes('container_capacity_unavailable:')) return 'billing_unavailable';
   return undefined;
@@ -119,29 +130,79 @@ export type ContainerCapacityCheck = {
   limit: number;
 };
 
-async function readAccountBalance(
+export type ContainerCapacityState = {
+  /** The blocked user among the acting user and a user billing subject, if any. */
+  blocked: ContainerConcurrencySubject | null;
+  checks: ContainerCapacityCheck[];
+};
+
+type AccountState = {
+  balance: number;
+  blocked: ContainerConcurrencySubject | null;
+};
+
+/** Same rule as runtime authorization: `blocked_at` or `blocked_reason` blocks. */
+function isUserBlocked(userId: string): SQL<boolean | null> {
+  return sql<
+    boolean | null
+  >`(select ${kilocode_users.blocked_at} is not null or ${kilocode_users.blocked_reason} is not null from ${kilocode_users} where ${kilocode_users.id} = ${userId})`;
+}
+
+/** Whether admission reads `kilocode_users` for a human or a user billing subject. */
+function readsAccountState(request: ContainerCapacityRequest): boolean {
+  return request.actor.type === 'user' || request.subject.type === 'user';
+}
+
+/**
+ * One SELECT returns the billing subject's balance and the block state of the
+ * acting user and of a different user billing subject. Organizations have no
+ * block column, so an organization start checks its acting user only. Each
+ * value is a scalar subquery, so a missing row reads as zero balance or not
+ * blocked without hiding the others.
+ */
+async function readAccountState(
   db: WorkerDb,
-  subject: ContainerConcurrencySubject
-): Promise<number> {
+  request: ContainerCapacityRequest
+): Promise<AccountState> {
+  const { subject, actor } = request;
+  const actorUserId = actor.type === 'user' ? actor.id : null;
+  const subjectUserId = subject.type === 'user' && subject.id !== actorUserId ? subject.id : null;
   const account = subject.type === 'org' ? organizations : kilocode_users;
   const [row] = await db
     .select({
-      balance: sql`${account.total_microdollars_acquired} - ${account.microdollars_used}`.mapWith(
-        Number
-      ),
+      balance:
+        sql`(select ${account.total_microdollars_acquired} - ${account.microdollars_used} from ${account} where ${account.id} = ${subject.id})`.mapWith(
+          Number
+        ),
+      actorBlocked: actorUserId === null ? sql<boolean | null>`null` : isUserBlocked(actorUserId),
+      subjectBlocked:
+        subjectUserId === null ? sql<boolean | null>`null` : isUserBlocked(subjectUserId),
     })
-    .from(account)
-    .where(eq(account.id, subject.id));
-  return row?.balance ?? 0;
+    .from(sql`(select 1) as admission`);
+  let blocked: ContainerConcurrencySubject | null = null;
+  if (actorUserId !== null && row?.actorBlocked) {
+    blocked = { type: 'user', id: actorUserId };
+  } else if (subjectUserId !== null && row?.subjectBlocked) {
+    blocked = { type: 'user', id: subjectUserId };
+  }
+  return { balance: row?.balance ?? 0, blocked };
 }
 
 export async function readContainerCapacity(
   db: WorkerDb,
   request: ContainerCapacityRequest
-): Promise<ContainerCapacityCheck[]> {
+): Promise<ContainerCapacityState> {
+  const accountState: Promise<AccountState> = readsAccountState(request)
+    ? readAccountState(db, request)
+    : Promise.resolve({ balance: 0, blocked: null });
+  // Code Reviewer starts are exempt from the counts, not from an account block.
+  if (isContainerConcurrencyExempt(request)) {
+    return { blocked: (await accountState).blocked, checks: [] };
+  }
   const checks: ContainerCapacityCheck[] = [];
+  let blocked: ContainerConcurrencySubject | null;
   if (request.actor.type === 'user') {
-    const [live, balance] = await Promise.all([
+    const [live, account] = await Promise.all([
       countLiveContainers(
         db,
         request.instanceId,
@@ -150,16 +211,19 @@ export async function readContainerCapacity(
           eq(container_usage_interval.actor_id, request.actor.id)
         )
       ),
-      readAccountBalance(db, request.subject),
+      accountState,
     ]);
+    blocked = account.blocked;
     checks.push({
       subject: { type: 'user', id: request.actor.id },
       live,
       limit:
-        balance < FUNDED_CONTAINER_MINIMUM_MICRODOLLARS
+        account.balance < FUNDED_CONTAINER_MINIMUM_MICRODOLLARS
           ? LOW_BALANCE_CONTAINER_LIMIT
           : USER_CONTAINER_LIMIT,
     });
+  } else {
+    blocked = (await accountState).blocked;
   }
   // Bots retain their billing-account limits. Human starts also share the
   // organization's existing cap, in addition to their cross-organization cap.
@@ -177,18 +241,19 @@ export async function readContainerCapacity(
       limit: request.subject.type === 'org' ? ORGANIZATION_CONTAINER_LIMIT : USER_CONTAINER_LIMIT,
     });
   }
-  return checks;
+  return { blocked, checks };
 }
 
 type CapacityDependencies = {
-  readCapacity?: (request: ContainerCapacityRequest) => Promise<ContainerCapacityCheck[]>;
+  readCapacity?: (request: ContainerCapacityRequest) => Promise<ContainerCapacityState>;
 };
 
 /**
- * Soft per-user and per-organization caps on Cloud Agent containers, read
- * from the usage meter's open intervals. Concurrent starts can overshoot by the
- * number in flight. An unavailable database rejects new starts after one
- * bounded retry; running containers do not need a fresh admission check.
+ * Rejects starts for blocked accounts, and applies soft per-user and
+ * per-organization caps on Cloud Agent containers read from the usage meter's
+ * open intervals. Concurrent starts can overshoot by the number in flight. An
+ * unavailable database rejects new starts after one bounded retry; running
+ * containers do not need a fresh admission check.
  */
 export async function assertContainerCapacity(
   env: Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'>,
@@ -196,13 +261,15 @@ export async function assertContainerCapacity(
   dependencies: CapacityDependencies = {}
 ): Promise<void> {
   // Test Workers use fake providers or share one funded test account across
-  // the suite. Production leaves this flag unset and enforces admission.
+  // the suite. Production leaves this flag unset and enforces admission,
+  // including the account block check.
   if (env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true') return;
+  // An exempt bot start billed to an organization has no user to check.
+  if (isContainerConcurrencyExempt(request) && !readsAccountState(request)) return;
   const readCapacity =
     dependencies.readCapacity ?? (input => readContainerCapacity(getPgDb(env), input));
-  let checks: ContainerCapacityCheck[];
+  let state: ContainerCapacityState;
   try {
-    if (isContainerConcurrencyExempt(request)) return;
     const readWithRetry = async () => {
       try {
         return await readCapacity(request);
@@ -211,7 +278,7 @@ export async function assertContainerCapacity(
         return readCapacity(request);
       }
     };
-    checks = await withTimeout(readWithRetry(), COUNT_TIMEOUT_MS, 'Container capacity check');
+    state = await withTimeout(readWithRetry(), COUNT_TIMEOUT_MS, 'Container capacity check');
   } catch (error) {
     logger
       .withTags({ logTag: 'container_limit_check_unavailable', sandboxId: request.instanceId })
@@ -223,7 +290,18 @@ export async function assertContainerCapacity(
       .warn('Container capacity check unavailable; refusing start');
     throw new ContainerCapacityUnavailableError();
   }
-  const exceeded = checks.find(check => check.live >= check.limit);
+  if (state.blocked) {
+    logger
+      .withTags({ logTag: 'container_account_blocked', sandboxId: request.instanceId })
+      .withFields({
+        checkpoint: request.checkpoint,
+        subjectType: state.blocked.type,
+        subjectId: state.blocked.id,
+      })
+      .warn('Container start refused for a blocked account');
+    throw new ContainerAccountBlockedError();
+  }
+  const exceeded = state.checks.find(check => check.live >= check.limit);
   if (!exceeded) return;
   const { subject, live, limit } = exceeded;
   logger

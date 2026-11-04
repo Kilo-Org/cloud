@@ -99,27 +99,31 @@ function createInput() {
 
 function networkPolicy(): VercelSandboxNetworkPolicy {
   return {
-    mode: 'custom',
-    allowedDomains: ['api.kilo.ai', '*'],
-    injectionRules: [
-      {
-        domain: 'api.kilo.ai',
-        headers: {
-          authorization: `Bearer ${injectedCredential}`,
-          host: 'api.kilo.ai',
-        },
-        match: {
-          headers: [
+    allow: {
+      'api.kilo.ai': [
+        {
+          transform: [
             {
-              key: { exact: 'authorization' },
-              value: { exact: 'Bearer harmless-kilo-placeholder' },
+              headers: {
+                authorization: `Bearer ${injectedCredential}`,
+                host: 'api.kilo.ai',
+              },
             },
           ],
-          path: { startsWith: '/api/provider/' },
-          method: ['POST'],
+          match: {
+            headers: [
+              {
+                key: { exact: 'authorization' },
+                value: { exact: 'Bearer harmless-kilo-placeholder' },
+              },
+            ],
+            path: { startsWith: '/api/provider/' },
+            method: ['POST'],
+          },
         },
-      },
-    ],
+      ],
+      '*': [],
+    },
   };
 }
 
@@ -801,6 +805,42 @@ describe('VercelSandboxRestClient', () => {
     expect(new Headers(init.headers).get('content-type')).toBe('application/json');
     expect(JSON.parse(init.body as string)).toEqual(policy);
   });
+
+  it.each(['legacy-normalized', 'omitted'] as const)(
+    'accepts %s policy readback after modern create and replacement requests',
+    async readback => {
+      const returnedSession = {
+        ...session(),
+        ...(readback === 'legacy-normalized'
+          ? {
+              networkPolicy: {
+                mode: 'custom',
+                allowedDomains: ['api.kilo.ai', '*'],
+                injectionRules: [],
+              },
+            }
+          : {}),
+      };
+      const providerFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ sandbox: sandbox(), session: returnedSession, routes: [] })
+        )
+        .mockResolvedValueOnce(jsonResponse({ session: returnedSession }));
+      const client = clientFor(providerFetch);
+      const policy = networkPolicy();
+      const created = await client.createSandbox({ ...createInput(), networkPolicy: policy });
+      const updated = await client.updateNetworkPolicy(sessionId, sandboxName, policy);
+      expect(created.session).toEqual(session());
+      expect(updated).toEqual(session());
+      const createBody = JSON.parse(providerFetch.mock.calls[0][1].body as string);
+      const updateBody = JSON.parse(providerFetch.mock.calls[1][1].body as string);
+      expect(createBody.networkPolicy).toEqual(policy);
+      expect(updateBody).toEqual(policy);
+      expect(Object.keys(createBody.networkPolicy)).toEqual(['allow']);
+      expect(Object.keys(updateBody)).toEqual(['allow']);
+    }
+  );
 
   it.each([
     ['session', session({ id: 'sbox_other' })],

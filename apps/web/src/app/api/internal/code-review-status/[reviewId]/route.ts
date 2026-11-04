@@ -501,6 +501,7 @@ const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
+    terminalReason === 'account_blocked' ||
     terminalReason === 'model_not_found' ||
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||

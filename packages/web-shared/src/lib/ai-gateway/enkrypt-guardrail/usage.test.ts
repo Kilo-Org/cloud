@@ -5,6 +5,7 @@ import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
@@ -15,6 +16,7 @@ import {
   enkryptCreditsToMicrodollars,
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
   recordEnkryptUsage,
+  recordEnkryptUsageLocally,
   type EnkryptUsageRecord,
 } from './usage';
 
@@ -82,9 +84,14 @@ describe('recordEnkryptUsage', () => {
         enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
         charged_microdollars: enkrypt_usage.charged_microdollars,
         added_latency_ms: enkrypt_usage.added_latency_ms,
+        guardrail: enkrypt_usage_guardrail.guardrail,
       })
       .from(enkrypt_usage)
       .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
       .innerJoin(
         enkrypt_usage_decision,
         eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
@@ -99,6 +106,7 @@ describe('recordEnkryptUsage', () => {
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
+        guardrail: 'input',
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -110,6 +118,25 @@ describe('recordEnkryptUsage', () => {
       .from(organization_user_usage)
       .where(eq(organization_user_usage.organization_id, organization.id));
     expect(memberUsage?.microdollarUsage).toBe(7 * MICRODOLLARS_PER_ENKRYPT_CREDIT);
+  });
+
+  it('records an output guardrail call as such and debits it like an input call', async () => {
+    const { user, organization } = await organizationWithMember();
+    await recordEnkryptUsage(usageRecord(organization.id, user.id, { guardrail: 'output' }));
+
+    const rows = await db
+      .select({ guardrail: enkrypt_usage_guardrail.guardrail })
+      .from(enkrypt_usage)
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
+      .where(eq(enkrypt_usage.organization_id, organization.id));
+    expect(rows).toEqual([{ guardrail: 'output' }]);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+    });
   });
 
   it('creates and reuses lookup values for concurrent usage records without losing a debit', async () => {
@@ -276,5 +303,29 @@ describe('recordEnkryptUsage', () => {
         .from(organization_user_usage)
         .where(eq(organization_user_usage.organization_id, organization.id))
     ).toEqual([]);
+  });
+
+  it('records and debits a redelivered usage id only once', async () => {
+    const { user, organization } = await organizationWithMember();
+    const usageWrite = {
+      ...usageRecord(organization.id, user.id),
+      guardrail: 'input' as const,
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+    };
+
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('recorded');
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('duplicate');
+
+    expect(
+      await db
+        .select()
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, organization.id))
+    ).toHaveLength(1);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+    });
   });
 });

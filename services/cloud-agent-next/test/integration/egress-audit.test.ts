@@ -1,7 +1,7 @@
 import { env, evictDurableObject, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SandboxContainers } from '../../src/sandbox-containers/SandboxContainers.js';
-import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type { EgressAuditRequest } from '../../src/shared/egress-audit.js';
 
 const sandboxId = 'sbx__egress_audit';

@@ -2,6 +2,7 @@ import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   kilocode_users,
   organizations,
 } from '@kilocode/db/schema';
@@ -9,8 +10,12 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
 
 const ENKRYPT_USAGE_WINDOW_DAYS = 30;
+
+/** Rows recorded before the output guardrail existed have no guardrail and are input calls. */
+const guardrail = sql<EnkryptGuardrailDirection>`coalesce(${enkrypt_usage_guardrail.guardrail}, 'input')`;
 
 const ListInputSchema = z.object({
   organizationId: z.string().uuid().optional(),
@@ -41,6 +46,7 @@ export const adminEnkryptUsageRouter = createTRPCRouter({
           enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
           charged_microdollars: enkrypt_usage.charged_microdollars,
           added_latency_ms: enkrypt_usage.added_latency_ms,
+          guardrail,
           created_at: enkrypt_usage.created_at,
         })
         .from(enkrypt_usage)
@@ -48,6 +54,10 @@ export const adminEnkryptUsageRouter = createTRPCRouter({
         .innerJoin(
           enkrypt_usage_decision,
           eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+        )
+        .leftJoin(
+          enkrypt_usage_guardrail,
+          eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
         )
         .leftJoin(organizations, eq(organizations.id, enkrypt_usage.organization_id))
         .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
@@ -62,13 +72,22 @@ export const adminEnkryptUsageRouter = createTRPCRouter({
           errors: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'error')::int`,
           total_credits: sql<number>`coalesce(sum(${enkrypt_usage.enkrypt_credits_cost}), 0)::float8`,
           total_charged_microdollars: sql<number>`coalesce(sum(${enkrypt_usage.charged_microdollars}), 0)::float8`,
-          avg_added_latency_ms: sql<number | null>`avg(${enkrypt_usage.added_latency_ms})::float8`,
+          avg_added_latency_ms: sql<
+            number | null
+          >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${guardrail} = 'input'))::float8`,
+          avg_output_added_latency_ms: sql<
+            number | null
+          >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${guardrail} = 'output'))::float8`,
           organizations: sql<number>`count(distinct ${enkrypt_usage.organization_id})::int`,
         })
         .from(enkrypt_usage)
         .innerJoin(
           enkrypt_usage_decision,
           eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+        )
+        .leftJoin(
+          enkrypt_usage_guardrail,
+          eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
         )
         .where(where),
     ]);

@@ -91,7 +91,12 @@ export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organi
   `);
 }
 
-async function getSettingsRow(organizationId: string, client: typeof db | DrizzleTransaction = db) {
+type OrganizationGroupPolicySettingsRow = typeof organization_group_policy_settings.$inferSelect;
+
+async function getSettingsRow(
+  organizationId: string,
+  client: typeof db | DrizzleTransaction = db
+): Promise<OrganizationGroupPolicySettingsRow | undefined> {
   const [settings] = await client
     .select()
     .from(organization_group_policy_settings)
@@ -143,12 +148,16 @@ export async function bumpOrganizationGroupPolicyRevision(
   return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
 }
 
-export async function getOrganizationGroupPolicySettings(
-  organizationId: string,
-  client: typeof db | DrizzleTransaction = db
-): Promise<CanonicalOrganizationGroupPolicySettings> {
-  await assertEnterpriseOrganization(organizationId, client);
-  const settings = await getSettingsRow(organizationId, client);
+/**
+ * The canonical view of an organization's group-policy settings: the stored
+ * row, or the defaults at revision 0 when the organization has none yet. The
+ * read path and the mutation wrapper share it so they cannot disagree about
+ * the defaults or the parse options.
+ */
+function canonicalSettingsFrom(
+  settings: OrganizationGroupPolicySettingsRow | undefined,
+  organizationId: string
+): CanonicalOrganizationGroupPolicySettings {
   if (!settings) {
     return {
       defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
@@ -164,6 +173,14 @@ export async function getOrganizationGroupPolicySettings(
   };
 }
 
+export async function getOrganizationGroupPolicySettings(
+  organizationId: string,
+  client: typeof db | DrizzleTransaction = db
+): Promise<CanonicalOrganizationGroupPolicySettings> {
+  await assertEnterpriseOrganization(organizationId, client);
+  return canonicalSettingsFrom(await getSettingsRow(organizationId, client), organizationId);
+}
+
 export async function withOrganizationGroupPolicyMutation<T>(
   organizationId: string,
   actorUserId: string,
@@ -177,18 +194,7 @@ export async function withOrganizationGroupPolicyMutation<T>(
     await lockOrganizationGroupPolicy(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
     const existingSettings = await getSettingsRow(organizationId, tx);
-    const currentSettings = existingSettings
-      ? {
-          defaultPolicies: parseOrganizationGroupPolicies(existingSettings.default_policies, {
-            organizationId,
-            source: 'default',
-          }),
-          policyRevision: existingSettings.policy_revision,
-        }
-      : {
-          defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
-          policyRevision: 0,
-        };
+    const currentSettings = canonicalSettingsFrom(existingSettings, organizationId);
 
     const policyRevision = await writeOrganizationGroupPolicyRevision(
       tx,

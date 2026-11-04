@@ -79,12 +79,13 @@ export function resolveProfileLayers({
 }
 
 /**
- * Whether the repository binding and the implicit default profile apply to a
- * session. A multi-repository (V2) environment turns both off: it has no single
- * repository to bind, and it applies only an explicitly selected profile. Only a
- * V2 environment, in a session layer or an API response, carries `repositories`.
+ * Whether repository bindings apply to a session. A multi-repository (V2)
+ * environment has no single repository to bind, so bindings do not apply. Only
+ * a V2 environment, in a session layer or an API response, carries
+ * `repositories`. The implicit default profile is independent of the
+ * environment version.
  */
-export function appliesImplicitProfiles(
+export function appliesRepoBindings(
   environment: { repositories?: unknown } | null | undefined
 ): boolean {
   return environment?.repositories === undefined;

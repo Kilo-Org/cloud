@@ -6,7 +6,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
   const auth = await getUserFromAuth({

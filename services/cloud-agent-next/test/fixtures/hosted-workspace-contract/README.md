@@ -31,8 +31,8 @@ consumes.
 ## Consumers
 
 - `test/e2e/scenarios-hosted-workspace-contract.ts` asserts the live behavior
-  this file describes: authorization, idempotent creation, one shared sandbox per
-  workspace, abort isolation, passive no-wake reads, idle shutdown and wake,
+  this file describes: authorization, idempotent creation, one sandbox per workspace
+  that its sibling chats share, abort isolation, passive no-wake reads, idle shutdown and wake,
   separate repository workspaces, and journaled workspace deletion.
 - A future Session Host or generated SDK should pin a version and assert against
   these examples rather than re-deriving shapes from ad-hoc notes.

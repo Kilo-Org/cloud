@@ -90,6 +90,7 @@ describe('bounded spending provider enforcement', () => {
       response: jsonResponse(200, { ok: true }),
     } as never);
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: { provider: { type: providerId }, userByok } as never,
       requestedModel: model.id,
       request: {
@@ -144,6 +145,7 @@ describe('bounded spending provider enforcement', () => {
     } as never);
 
     const result = await sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: { provider: { type: 'openrouter' }, userByok: null } as never,
       requestedModel: model.id,
       request: request as never,
@@ -220,6 +222,7 @@ describe('upstream model catalog validation', () => {
         request.body.model = wireModel;
       });
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: {
         provider: { type: providerId },
         userByok,
@@ -366,6 +369,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
   async function send(response: Response) {
     jest.mocked(upstreamRequest).mockResolvedValue({ type: 'success', response } as never);
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: {
         provider: { type: 'openai-chatgpt', chatGptOwner: owner },
         userByok: null,

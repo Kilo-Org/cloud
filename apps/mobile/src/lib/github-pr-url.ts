@@ -14,10 +14,10 @@ function isValidIdentifier(value: string): boolean {
 /**
  * Parse a GitHub pull request URL into its owner, repo and PR number.
  *
- * Matches `http(s)://(www.)github.com/<owner>/<repo>/pull/<digits>` and
- * tolerates any trailing subpath (e.g. `/files`), query string and trailing
- * slash. Returns `null` for non-PR URLs (issues, tree, plain repo), uppercase
- * host, non-GitHub hosts, or malformed input.
+ * Matches `http(s)://(www.)github.com/<owner>/<repo>/pull/<digits>`
+ * case-insensitively and tolerates any trailing subpath (e.g. `/files`), query
+ * string and trailing slash. Returns `null` for non-PR URLs (issues, tree, plain
+ * repo), non-GitHub hosts, or malformed input.
  */
 export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
   if (href.length === 0) {

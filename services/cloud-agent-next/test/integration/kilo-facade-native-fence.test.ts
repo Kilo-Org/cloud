@@ -19,7 +19,7 @@ import type {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
@@ -70,7 +70,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/native-fence',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -119,7 +119,7 @@ async function installSandbox(
       (instance as unknown as { env: Record<string, unknown> }).env,
       broker,
       {
-        SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+        SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
         WORKER_URL: 'https://control.test',
         KILOCODE_BACKEND_BASE_URL: 'https://control.test',
         KILO_OPENROUTER_BASE: 'https://control.test',
@@ -157,13 +157,7 @@ function startWrapperPump(wrapper: FakeWrapper): () => void {
 }
 
 async function startReadySession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -180,7 +174,7 @@ async function startReadySession(): Promise<ActiveSession> {
       sandboxId,
     }),
     message,
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
 
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -208,13 +202,7 @@ async function startReadySession(): Promise<ActiveSession> {
 }
 
 async function startPreparationFailureSession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -231,7 +219,7 @@ async function startPreparationFailureSession(): Promise<ActiveSession> {
       sandboxId,
     }),
     message,
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
 
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));

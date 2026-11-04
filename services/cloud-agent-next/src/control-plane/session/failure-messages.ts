@@ -20,6 +20,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
     'Container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
@@ -36,6 +37,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   byoc_vercel_forbidden: 'Vercel rejected access to your compute account',
   byoc_vercel_capacity: 'Vercel compute capacity is unavailable',
   byoc_vercel_snapshot_missing: 'The Vercel runtime snapshot is missing. Run setup again.',
+  provider_identity_mismatch:
+    'Vercel Git containment requires verified provider identity and transport support.',
 };
 
 export function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {

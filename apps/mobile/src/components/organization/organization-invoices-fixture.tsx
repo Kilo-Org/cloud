@@ -92,6 +92,7 @@ function organizationEntry(organizationId: string): OrganizationList[number] {
   return {
     organizationId,
     organizationName: 'Invoices fixture org',
+    parentOrganizationId: null,
     role: 'owner',
     memberCount: 3,
     balance: 0,

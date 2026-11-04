@@ -112,6 +112,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'billing_blocked',
   'billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'invalid_configuration',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
@@ -132,6 +133,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'byoc_vercel_forbidden',
   'byoc_vercel_capacity',
   'byoc_vercel_snapshot_missing',
+  'provider_identity_mismatch',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 
@@ -604,6 +606,44 @@ export type ControlPlaneCredentialRepository = z.infer<
 >;
 export type ControlPlaneCredentialSource = z.infer<typeof controlPlaneCredentialSourceSchema>;
 export type ControlPlanePrepareInput = z.infer<typeof controlPlanePrepareInputSchema>;
+
+export const controlPlaneScmForwardAdmissionSchema = z
+  .object({
+    oidcToken: z.string().min(1).max(8192),
+    target: z
+      .object({
+        url: z
+          .string()
+          .url()
+          .max(16 * 1024),
+        method: z
+          .string()
+          .regex(/^[A-Z]+$/)
+          .max(32),
+      })
+      .strict(),
+    authorization: z
+      .object({
+        authorization: z.string().max(8192).optional(),
+        privateToken: z.string().max(8192).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type ControlPlaneScmForwardAdmission = z.infer<typeof controlPlaneScmForwardAdmissionSchema>;
+export type ControlPlaneScmForwardAdmissionResult =
+  | {
+      ok: true;
+      authority:
+        | { type: 'unmanaged' }
+        | {
+            type: 'managed';
+            provider: ControlPlaneGitPlatform;
+            capability: string;
+            outboundContainerId: string;
+          };
+    }
+  | { ok: false; status: 401 | 403 | 503; code: string; retryAfter?: number };
 
 export const controlPlanePromptTurnSchema = z.discriminatedUnion('type', [
   z

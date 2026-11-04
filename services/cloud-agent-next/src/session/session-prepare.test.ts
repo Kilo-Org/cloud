@@ -610,7 +610,7 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it('rejects an inherited allowlist on a retired runtime when no saved allocation selects containers', async () => {
+  it('rejects an inherited allowlist when no saved allocation selects a contained runtime', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
@@ -621,6 +621,9 @@ describe('explicit sandbox session creation', () => {
       runtime: { egressMode: 'allowlist', egressAllowlist: [] },
     });
 
+    // Without containment the resolved control-plane placement is the retired
+    // Cloudflare sandbox, so the create stops there instead of reaching the
+    // egress-policy check that an isolated containers sandbox would satisfy.
     await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',

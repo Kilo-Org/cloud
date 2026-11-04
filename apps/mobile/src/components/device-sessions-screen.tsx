@@ -12,8 +12,10 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isolateBidiText } from '@/lib/bidi';
@@ -42,7 +44,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
 
   return (
     <View className="flex-row items-start gap-3 rounded-lg bg-secondary p-3">
-      <Smartphone size={18} color={colors.secondaryForeground} />
+      <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
       <View className="min-w-0 flex-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-sm font-medium" numberOfLines={1}>
@@ -180,7 +182,7 @@ export function DeviceSessionsScreen() {
     body = (
       <DetailScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
+        contentContainerClassName="gap-6 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {state === 'loading' ? (

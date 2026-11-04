@@ -79,7 +79,10 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/lib/utils', () => ({ parseTimestamp: (value: string) => new Date(value) }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
+  parseTimestamp: (value: string) => new Date(value),
+}));
 vi.mock('@/lib/format', () => ({
   formatDate: (value: Date) => value.toISOString().slice(0, 10),
 }));

@@ -167,7 +167,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName="px-4 gap-6 pt-4"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -675,7 +675,7 @@ function SpendAlertsSkeleton() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.channel.spend')} />
-      <ScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1" contentContainerClassName="px-4 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         {/* The scope group holds two KvRows now (the scope owner and the 24 h
             spend); each row is py-3 (24) plus a text-sm line (20) = 44, so the

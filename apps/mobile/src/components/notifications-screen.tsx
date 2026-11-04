@@ -29,12 +29,14 @@ import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
 import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/briefing-notification-toggle';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useAuth } from '@/lib/auth/auth-context';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
@@ -277,7 +279,7 @@ function CategoryRow({
     'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Icon size={18} color={colors.secondaryForeground} />
+      <IconTile icon={Icon} tint={NEUTRAL_TINT} />
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity: blanket opacity
             drops every label below the 4.5:1 text minimum. The switch carries
@@ -666,7 +668,7 @@ export function NotificationsScreen() {
       <ScreenHeader title={t('common.notifications')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName="px-4 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* The glanceable surface. First on the screen because it is what the
@@ -678,7 +680,7 @@ export function NotificationsScreen() {
             {isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}
           </Text>
           <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            <Smartphone size={18} color={colors.secondaryForeground} />
+            <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
             <View className="flex-1">
               {/* Disabled cue is the muted title, not row opacity — the same
                   pattern as CategoryRow below. */}
@@ -726,9 +728,14 @@ export function NotificationsScreen() {
             {t('notifications.push')}
           </Text>
           <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
-            {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
-            {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
+            {/* The leading cell keeps the tile's 30 dp frame in all three
+                states, so the title never moves when the permission settles
+                into "on" or "off". */}
+            {masterLeading === 'neutral' ? (
+              <IconTile tint={NEUTRAL_TINT} content={<Skeleton className="h-4 w-4 rounded" />} />
+            ) : (
+              <IconTile icon={masterLeading === 'on' ? Bell : BellOff} tint={NEUTRAL_TINT} />
+            )}
             <View className="flex-1">
               <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}

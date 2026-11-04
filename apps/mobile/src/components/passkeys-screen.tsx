@@ -391,7 +391,7 @@ export function PasskeysScreen() {
       <ScreenHeader title={t('profile.passkeysTitle')} />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4"
+        contentContainerClassName="gap-3 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {body}
@@ -402,7 +402,7 @@ export function PasskeysScreen() {
           the query renders skeletons, no rows, or rows. The notice that
           explains a failed or unavailable add shares the slot, beside the
           control it is about. */}
-      <View className="gap-2 px-6 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
+      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
         {footerNotice}
         {addControl}
       </View>

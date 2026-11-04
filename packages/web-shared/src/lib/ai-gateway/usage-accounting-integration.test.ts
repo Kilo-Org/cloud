@@ -35,7 +35,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_QUEUE_STAGING_ENABLED: false,
   USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
   USAGE_QUEUE_FRA_CONFIG: { enabled: false, exposure: 0 },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
@@ -110,7 +109,6 @@ const {
 } = jest.requireActual<typeof UsageProcessing>('./processUsage');
 const publisher = jest.requireMock<typeof UsagePublisher>('./usage-publisher');
 const config = jest.requireMock<{
-  USAGE_QUEUE_STAGING_ENABLED: boolean;
   USAGE_QUEUE_SFO_CONFIG: UsageQueueSfoConfig;
   USAGE_QUEUE_FRA_CONFIG: UsageQueueFraConfig;
   USAGE_INGEST_URL: string;
@@ -251,6 +249,7 @@ function requestLifetime(waitUntilAvailable = true) {
 }
 
 beforeEach(() => {
+  jest.replaceProperty(process, 'env', { ...process.env });
   jest.clearAllMocks();
   jest
     .mocked(publisher.enqueueUsage)
@@ -258,7 +257,8 @@ beforeEach(() => {
       jest.requireActual<typeof UsagePublisher>('./usage-publisher').enqueueUsage
     );
 
-  config.USAGE_QUEUE_STAGING_ENABLED = false;
+  process.env.VERCEL_TARGET_ENV = 'preview';
+  process.env.VERCEL_ENV = 'preview';
   config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
   config.USAGE_QUEUE_FRA_CONFIG = { enabled: false, exposure: 0 };
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
@@ -339,12 +339,16 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
       const actual = jest.requireActual<typeof ServerConfig>(
         '@kilocode/web-shared/lib/config.server'
       );
-      config.USAGE_QUEUE_STAGING_ENABLED = actual.USAGE_QUEUE_STAGING_ENABLED;
       config.USAGE_QUEUE_SFO_CONFIG = actual.USAGE_QUEUE_SFO_CONFIG;
       config.USAGE_QUEUE_FRA_CONFIG = actual.USAGE_QUEUE_FRA_CONFIG;
     });
   } finally {
     process.env = original;
+  }
+  for (const key of ['VERCEL_TARGET_ENV', 'VERCEL_ENV']) {
+    const value = key in overrides ? overrides[key] : 'production';
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
   }
   if ('VERCEL_REGION' in overrides && overrides.VERCEL_REGION === undefined) {
     delete process.env.VERCEL_REGION;
@@ -1045,7 +1049,8 @@ describe('gateway accounting integration', () => {
   test.each(['fra1', 'sfo1'])(
     '%s sends the exact finalized event once, with one ID and complete bouncer data',
     async region => {
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const event = { request_id: 'synthetic-request', payload: { cost: 0 } };
@@ -1166,7 +1171,8 @@ describe('gateway accounting integration', () => {
   test.each([false, true])(
     'processTokenData preserves final free/BYOK costs (BYOK=%s)',
     async byok => {
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = 'sfo1';
       const lifecycle = requestLifetime();
       const ctx = {
@@ -1194,7 +1200,8 @@ describe('gateway accounting integration', () => {
   ])(
     'processTokenData keeps the response finish_reason only when the generation lookup has none ($generationFinishReason)',
     async ({ generationFinishReason, expected }) => {
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = 'sfo1';
       fetchGeneration.mockResolvedValue({
         data: {
@@ -1232,7 +1239,8 @@ describe('queued usage accounting', () => {
     ['', 'unknown'],
     [undefined, 'unknown'],
   ])('logs %s publication failure in execution region %s', async (region, expectedRegion) => {
-    config.USAGE_QUEUE_STAGING_ENABLED = true;
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    process.env.VERCEL_ENV = 'preview';
     if (region === undefined) delete process.env.VERCEL_REGION;
     else process.env.VERCEL_REGION = region;
     jest
@@ -1269,7 +1277,7 @@ describe('queued usage accounting', () => {
     ['true', 'staging', undefined, true],
   ])(
     'retired master %s / target %s / Vercel %s selects staging=%s',
-    (flag, target, vercel, enabled) => {
+    async (flag, target, vercel, enabled) => {
       const original = { ...process.env };
       try {
         for (const [key, value] of Object.entries({
@@ -1281,12 +1289,13 @@ describe('queued usage accounting', () => {
           if (value === undefined) delete process.env[key];
           else process.env[key] = String(value);
         }
-        jest.isolateModules(() => {
-          const actual = jest.requireActual<typeof ServerConfig>(
-            '@kilocode/web-shared/lib/config.server'
-          );
-          expect(actual.USAGE_QUEUE_STAGING_ENABLED).toBe(enabled);
-        });
+        const lifecycle = requestLifetime();
+        const result = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
+        lifecycle.close();
+        await lifecycle.drain();
+        expect(result?.status).toBe(enabled ? 'queued' : 'recorded');
+        expect(publisher.enqueueUsage).toHaveBeenCalledTimes(enabled ? 1 : 0);
+        expect(lifecycle.errors).toEqual([]);
       } finally {
         process.env = original;
       }
@@ -1302,7 +1311,8 @@ describe('queued usage accounting', () => {
   ])(
     '%s confirmed acceptance logs execution region %s and queues once without a direct write',
     async (region, expectedRegion) => {
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
 
       if (region === undefined) delete process.env.VERCEL_REGION;
       else process.env.VERCEL_REGION = region;
@@ -1349,7 +1359,8 @@ describe('queued usage accounting', () => {
     'Next accounting lifetime awaits $region HTTP $status from $mode work',
     async ({ region, mode, status }) => {
       if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const acceptance = Promise.withResolvers<Response>();
@@ -1405,7 +1416,8 @@ describe('queued usage accounting', () => {
       let drain: Promise<void> | undefined;
       try {
         jest.spyOn(Math, 'random').mockReturnValue(0.5);
-        config.USAGE_QUEUE_STAGING_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         const secondAttempt = Promise.withResolvers<void>();
         jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
@@ -1503,7 +1515,8 @@ describe('queued usage accounting', () => {
       async ({ region, failure }) => {
         if (['http_503', 'timeout', 'transport_failure'].includes(failure))
           jest.spyOn(Math, 'random').mockReturnValue(0);
-        config.USAGE_QUEUE_STAGING_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
         if (failure === 'timeout') {
@@ -1640,7 +1653,8 @@ describe('queued usage accounting', () => {
     )(
       '$region / $missing falls back to direct accounting instead of dropping usage',
       async ({ region, missing }) => {
-        config.USAGE_QUEUE_STAGING_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
         const lifecycle = requestLifetime(false);
@@ -1703,7 +1717,8 @@ describe('queued usage accounting', () => {
     'Bouncer $region HTTP $status spendWatch=$spendWatch avoids gateway outbox delivery',
     async ({ region, spendWatch, status }) => {
       if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
-      config.USAGE_QUEUE_STAGING_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       jest.mocked(fetch).mockImplementation(async (_url, init) => {
         sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
@@ -1757,7 +1772,8 @@ describe('queued usage accounting', () => {
 
   test.each(['fra1', 'sfo1'])('queue off keeps %s direct billing', async region => {
     process.env.VERCEL_REGION = region;
-    config.USAGE_QUEUE_STAGING_ENABLED = false;
+    process.env.VERCEL_TARGET_ENV = 'preview';
+    process.env.VERCEL_ENV = 'preview';
 
     const lifecycle = requestLifetime();
     const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
@@ -1771,7 +1787,8 @@ describe('queued usage accounting', () => {
   });
 
   test('queue off retains failed direct accounting and best-effort Bouncer reporting', async () => {
-    config.USAGE_QUEUE_STAGING_ENABLED = false;
+    process.env.VERCEL_TARGET_ENV = 'preview';
+    process.env.VERCEL_ENV = 'preview';
 
     process.env.VERCEL_REGION = 'sfo1';
     writer.mockResolvedValue({ kind: 'ok', result: null });

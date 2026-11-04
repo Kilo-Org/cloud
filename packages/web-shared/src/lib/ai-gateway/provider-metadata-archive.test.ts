@@ -20,7 +20,6 @@ jest.mock('next/server', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-  USAGE_QUEUE_STAGING_ENABLED: true,
 }));
 jest.mock('./usage-publisher', () => ({
   enqueueUsage: jest.fn(async () => ({ kind: 'accepted' })),
@@ -241,6 +240,11 @@ function expectBilling(hasError = false, cost = 2000) {
 }
 
 beforeEach(() => {
+  jest.replaceProperty(process, 'env', {
+    ...process.env,
+    VERCEL_TARGET_ENV: 'staging',
+    VERCEL_ENV: 'preview',
+  });
   jest.replaceProperty(process, 'env', {
     ...process.env,
     R2_ACCOUNT_ID: 'test-metadata-account',

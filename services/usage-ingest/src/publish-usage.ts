@@ -2,6 +2,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
+import { schemaRejectionDetails } from './rejection-diagnostics';
 
 export type Env = Omit<
   CloudflareEnv,
@@ -23,8 +24,12 @@ function errorResponse(error: string, status: number): Response {
 }
 
 async function readUsageBody(request: Request) {
-  if (!request.body) return { error: errorResponse('Invalid JSON', 400) };
+  if (!request.body) {
+    logSafely('warn', () => ({ event: 'usage_ingest_rejected', category: 'missing_body' }));
+    return { error: errorResponse('Invalid JSON', 400) };
+  }
 
+  let category = 'body_read_failure';
   try {
     const result = await readBoundedStream(
       request.body as ReadableStream<Uint8Array>,
@@ -33,10 +38,13 @@ async function readUsageBody(request: Request) {
     if (!result.ok) {
       return { error: errorResponse('Usage payload too large', 413) };
     }
+    category = 'invalid_utf8';
     const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(result.bytes);
+    category = 'malformed_json';
     const value: unknown = JSON.parse(text);
     return { value };
   } catch {
+    logSafely('warn', () => ({ event: 'usage_ingest_rejected', category }));
     return { error: errorResponse('Invalid JSON', 400) };
   }
 }
@@ -56,7 +64,14 @@ async function handlePublishUsage(
   const body = await readUsageBody(request);
   if (body.error) return body.error;
   const result = UsageRecordRequestSchema.safeParse(body.value);
-  if (!result.success) return errorResponse('Invalid usage payload', 400);
+  if (!result.success) {
+    logSafely('warn', () => ({
+      event: 'usage_ingest_rejected',
+      category: 'schema_failure',
+      ...schemaRejectionDetails(result.error, body.value),
+    }));
+    return errorResponse('Invalid usage payload', 400);
+  }
 
   try {
     if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > MAX_USAGE_BYTES) {

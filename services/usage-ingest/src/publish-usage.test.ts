@@ -88,7 +88,17 @@ describe('production ingress timing', () => {
       expect(response.status).toBe(status);
       expect(send).not.toHaveBeenCalled();
       expect(info).not.toHaveBeenCalled();
-      expect(warn).not.toHaveBeenCalled();
+      if (status === 400) {
+        expect(warn).toHaveBeenCalledExactlyOnceWith(
+          JSON.stringify({
+            level: 'warn',
+            event: 'usage_ingest_rejected',
+            category: 'malformed_json',
+          })
+        );
+      } else {
+        expect(warn).not.toHaveBeenCalled();
+      }
     }
   );
 

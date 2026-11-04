@@ -518,3 +518,29 @@ writer credentials and stable identity, ACK after writer completion, duplicate
 ACK, and retry on transport/response failures. No hosted latency or placement
 improvement is claimed. EU routing rollback remains a separate operation in the
 [EU setup](eu-queues.md).
+
+### Authenticated HTTP 400 diagnostics
+
+`usage_ingest_rejected` emits one best-effort warning for each authenticated
+HTTP 400: `missing_body`, `body_read_failure`, `invalid_utf8`, `malformed_json`,
+or `schema_failure`. Statuses, response bodies, validation and queue behavior
+are unchanged. Failed authentication never reads the body or emits this event.
+
+Schema diagnostics contain at most eight issues and an omitted count. Each issue
+has an allowlisted code, a schema-owned path (at most four segments; unknown
+segments stop at `[redacted]`), and allowlisted expected/received type labels.
+Labels are at most 17 characters and path segments at most 26 characters.
+`unknown` covers unsupported expected types, including enum contents; values,
+validator messages, unrecognized-key lists and exception text are never logged.
+Received types use bounded own data-property traversal of parsed JSON only.
+A usage ID is included only after independent validation by the contract's UUID
+schema; body/JSON failures have no usage ID. Log sink/formatting failure is isolated.
+
+In Cloudflare Workers Logs, open the warning's invocation (or join using the
+platform request ID). Read the executing revision from the same invocation's
+`$workers.scriptVersion.id` metadata. This is the deployed Worker version,
+not a Git source SHA; no version binding or configuration change is required.
+The log's own fields intentionally contain no raw request/headers or request ID.
+After a separately authorized rollout, an operator still needs to capture an
+actual rejection and its invocation/version to establish a production cause.
+This diagnostic does not recover missing usage or explain HTTP 409 responses.

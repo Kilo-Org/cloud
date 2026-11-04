@@ -3080,9 +3080,13 @@ describe('api_request_log storage', () => {
     await db.delete(api_request_log).where(eq(api_request_log.vercel_request_id, vercelRequestId));
   });
 
-  test('stores the redacted request and raw response in R2', async () => {
+  test('stores the redacted request and raw response with one R2 upload', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
     await logUpstreamError();
 
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
     expect(fakeR2.credentials).toEqual({
       accessKeyId: 'mock-test-api-request-log-access-key',
       secretAccessKey: 'mock-test-api-request-log-secret-key',
@@ -3095,16 +3099,17 @@ describe('api_request_log storage', () => {
       response: null,
       error: null,
     });
-    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/request\.json$/);
-    expect(row.response_r2_key).toBe(row.request_r2_key?.replace('request.json', 'response.txt'));
+    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/record\.v1\.json$/);
+    expect(row.response_r2_key).toBe(row.request_r2_key);
     expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
-      model: 'kilo-internal/my-model',
-      messages: [{ role: 'user', content: 'hello' }],
-      providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
+      version: 1,
+      request: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
+      },
+      response: JSON.stringify({ error: 'upstream error' }),
     });
-    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
-      JSON.stringify({ error: 'upstream error' })
-    );
   });
 
   test('keeps the log row and records the failure when the R2 upload fails', async () => {
@@ -3118,28 +3123,9 @@ describe('api_request_log storage', () => {
       request_r2_key: null,
       response_r2_key: null,
       error: {
-        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+        r2_upload_error: 'Error: R2 unavailable',
       },
     });
-  });
-
-  test('records the key of a body that was uploaded when the other upload fails', async () => {
-    const send = fakeR2.send.bind(fakeR2);
-    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
-      if (command instanceof PutObjectCommand && command.input.Key?.endsWith('/response.txt')) {
-        throw new Error('R2 unavailable');
-      }
-      return send(command);
-    });
-
-    await logUpstreamError();
-
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      response_r2_key: null,
-      error: { r2_upload_error: 'response: Error: R2 unavailable' },
-    });
-    expect(fakeR2.objects.has(`${bucket}/${row.request_r2_key}`)).toBe(true);
   });
 
   test('logs upstream error statuses for errors-only opt-ins', async () => {
@@ -3147,7 +3133,7 @@ describe('api_request_log storage', () => {
 
     const row = await selectLoggedRow();
     expect(row).toMatchObject({ status_code: 400, error: null });
-    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
+    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`) ?? '').response).toBe(
       JSON.stringify({ error: 'upstream error' })
     );
   });
@@ -3175,6 +3161,14 @@ describe('api_request_log storage', () => {
       status_code: 200,
       error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
     });
+    expect(row.request_r2_key).not.toBeNull();
+    expect(row.response_r2_key).toBe(row.request_r2_key);
+    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toMatchObject({
+      version: 1,
+      request: expect.any(Object),
+      response: null,
+    });
+    expect(fakeR2.objects.size).toBe(1);
   });
 
   test('logs successful responses for opt-ins that log all requests', async () => {
@@ -3208,7 +3202,7 @@ describe('api_request_log storage', () => {
       status_code: 503,
       error: {
         guardrail_rejection: 'unavailable',
-        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+        r2_upload_error: 'Error: R2 unavailable',
       },
     });
   });

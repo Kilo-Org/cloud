@@ -16,7 +16,6 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
-import { verifiedVercelSandboxIdentityContract } from './scm-broker/vercel-identity.js';
 import type { Env } from './types.js';
 
 export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-allocation';
@@ -85,20 +84,6 @@ export function sandboxAllocationUnavailableReason(
   }
 }
 
-export function sandboxAllocationRepositoryUnavailableReason(
-  allocation: SandboxAllocation,
-  repositoryType: SessionRepositoryType
-): string | undefined {
-  if (
-    getSandboxAllocationProvider(allocation) !== 'vercel' ||
-    verifiedVercelSandboxIdentityContract ||
-    repositoryType === 'git'
-  ) {
-    return undefined;
-  }
-  return 'Vercel sandboxes do not support repository credentials yet';
-}
-
 export function getSandboxSelectionCapabilities(
   env: Env,
   owner: SelectionOwner,
@@ -121,7 +106,6 @@ export function getSandboxSelectionCapabilities(
     };
   }
 
-  const repositoryType = options?.repositoryType;
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
@@ -133,13 +117,9 @@ export function getSandboxSelectionCapabilities(
       capability,
       options?.vercelUnavailableReason
     );
-    const repositoryUnavailableReason = repositoryType
-      ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
-      : undefined;
     return {
       allocation: getSandboxAllocationRequest(allocation),
       ...(unavailableReason ? { unavailableReason } : {}),
-      ...(repositoryUnavailableReason ? { repositoryUnavailableReason } : {}),
     };
   });
   return {

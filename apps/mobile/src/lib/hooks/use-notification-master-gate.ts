@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { getDevicePushToken, getNotificationPermissionStatus } from '@/lib/notifications';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 import { deriveGateSettled } from './agent-push-preference';
@@ -58,14 +59,9 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   const pushTokens = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
     enabled: authToken != null,
-    // The history screen shows its push banner above content that must not
-    // move once it has settled, so it waits for this gate. A read started
-    // offline must therefore settle into its error instead of pausing in
-    // `pending`, which would hold that content behind a gate that never
-    // answers; `networkMode: 'always'` also drops the derived reconnect
-    // refetch, so ask for it back.
-    networkMode: 'always',
-    refetchOnReconnect: true,
+    // The history screen waits for this gate, so a paused read would hold its
+    // content behind a gate that never answers.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const settled = deriveGateSettled({

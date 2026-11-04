@@ -37,6 +37,7 @@ import {
   reconcileFirstPage,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /** Rows requested per page; the server defaults to the same 30. */
@@ -73,13 +74,9 @@ export function NotificationHistoryScreen() {
   const preferences = useQuery({
     ...trpc.user.getNotificationPreferences.queryOptions(),
     enabled: authToken != null,
-    // Same reason as the list: a read started offline must settle into its
-    // answer or its error instead of pausing in `pending`, which would hold the
-    // chip skeletons on screen for as long as the device stays offline. A
-    // settled failure falls back to every chip.
-    networkMode: 'always',
-    // `networkMode: 'always'` also drops the derived reconnect refetch.
-    refetchOnReconnect: true,
+    // A paused read holds the filter chip skeletons on screen; a settled
+    // failure falls back to every chip.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const query = useInfiniteQuery(
@@ -95,13 +92,8 @@ export function NotificationHistoryScreen() {
             hasRetentionBudget(pages.length, MAX_PAGES)
               ? (lastPage.nextCursor ?? undefined)
               : undefined,
-          // A first load while offline must settle into the error state and its
-          // retry rather than pausing in `pending`, which would leave the
-          // skeleton on screen for as long as the device stays offline.
-          networkMode: 'always',
-          // `networkMode: 'always'` also drops the derived reconnect refetch,
-          // so ask for it back.
-          refetchOnReconnect: true,
+          // A paused first load leaves the skeleton on screen with no retry.
+          ...SETTLE_WHILE_OFFLINE,
         }
       ),
       MAX_PAGES

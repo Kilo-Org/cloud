@@ -19,6 +19,8 @@ import { MessageBubble } from './assistant-ui/test-renderers';
 import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
 import { CloudThread } from './assistant-ui/CloudThread';
 
+Object.assign(globalThis, { React });
+
 const reviewComment: WorktreeReviewComment = {
   id: 'comment-1',
   anchor: {

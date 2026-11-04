@@ -1,7 +1,7 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   isPublicCustomLlm,
   type CustomLlm,
@@ -25,7 +25,7 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
  * that same provider. It serves anonymous callers, so a custom LLM is a
- * candidate only when it is public, unpriced, unrestricted by country, and
+ * candidate only when it is public, free, unrestricted by country, and
  * serves Chat Completions.
  */
 export function isAutoFreeEligibleModelId(
@@ -38,12 +38,12 @@ export function isAutoFreeEligibleModelId(
   if (customLlm) {
     return (
       isPublicCustomLlm(customLlm.definition) &&
-      !customLlm.definition.pricing &&
+      isFreeModel(customLlm.public_id) &&
       !customLlm.definition.country_deny_list?.length &&
       getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
     );
   }
-  return isFreeModelExcludingCustomLlms(model) && getAiSdkProvider(model, null) === undefined;
+  return isFreeModel(model) && getAiSdkProvider(model, null) === undefined;
 }
 
 export function getIneligibleAutoFreeModelIds(

@@ -1,232 +1,212 @@
-import { after } from 'next/server';
-import { S3ServiceException } from '@aws-sdk/client-s3';
-import { createVercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
-import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 
-jest.mock('next/server', () => ({ after: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/utils.server', () => ({ errorExceptInTest: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
-  jest
-    .requireActual<{
-      createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
-    .createFakeR2ClientModule()
-);
-
-const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
-  '@kilocode/web-shared/lib/r2/create-client'
-);
-const mockedAfter = jest.mocked(after);
-
-async function runScheduledUpload() {
-  const callback = mockedAfter.mock.calls[0]?.[0];
-  if (typeof callback !== 'function') throw new Error('Expected an after callback');
-  await callback();
-}
-
-beforeEach(() => {
-  jest.replaceProperty(process, 'env', {
-    ...process.env,
-    R2_ACCOUNT_ID: 'test-metadata-account',
-    R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
-    R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
-    R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
-  });
-  mockedAfter.mockReset();
-  jest.spyOn(console, 'debug').mockImplementation(() => {});
-  jest.mocked(errorExceptInTest).mockClear();
-  fakeR2.objects.clear();
-});
-
-afterEach(() => jest.restoreAllMocks());
-
-test.each([
-  'R2_ACCOUNT_ID',
-  'R2_AI_PROVIDER_METADATA_BUCKET_NAME',
-  'R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID',
-  'R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY',
-])('disables capture without %s', name => {
-  delete process.env[name];
-  expect(createVercelProviderMetadataCapture()).toBeUndefined();
-  expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).toHaveBeenCalledTimes(1);
-  expect(console.debug).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] capture disabled: missing configuration',
-    {
-      accountConfigured: name !== 'R2_ACCOUNT_ID',
-      bucketConfigured: name !== 'R2_AI_PROVIDER_METADATA_BUCKET_NAME',
-      accessKeyIdConfigured: name !== 'R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID',
-      secretAccessKeyConfigured: name !== 'R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY',
-    }
-  );
-});
-
-test('uploads the latest metadata once, after the response, keyed by generation ID', async () => {
-  const capture = createVercelProviderMetadataCapture();
-  const metadata = {
-    gateway: {
-      routing: {
-        modelAttempts: [
-          {
-            providerAttempts: [
-              { provider: 'openai', success: false, error: { code: 'rate_limit' }, duration: 250 },
-              { provider: 'amazon-bedrock', success: true, duration: 600 },
-            ],
-          },
-        ],
-      },
-      additionalField: { retained: true },
-    },
-    upstream: { additionalField: 'retained' },
+test('walks Chat JSON root then every choice message and preserves the raw object', () => {
+  const collector = createVercelProviderMetadataCollector();
+  const json = {
+    provider_metadata: { root: true },
+    choices: [
+      { message: { provider_metadata: { first: true } } },
+      { message: { providerMetadata: { final: { unknown: [null, false, 'retained'] } } } },
+    ],
   };
+  const original = structuredClone(json);
 
-  capture?.({ gateway: { cost: '0.1' } }, 'gen_test');
-  capture?.(metadata);
-  capture?.(undefined, 'gen_test');
-  expect(mockedAfter).toHaveBeenCalledTimes(1);
-  expect(fakeR2.objects.size).toBe(0);
-  expect(console.debug).toHaveBeenCalledTimes(1);
-  expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] scheduling archive', {
-    generationId: 'gen_test',
-    bucket: 'test-provider-metadata',
-  });
+  collector.capture(json, 'chat_completions');
 
-  await runScheduledUpload();
-
-  expect(fakeR2.credentials).toEqual({
-    accessKeyId: 'test-metadata-access-key',
-    secretAccessKey: 'test-metadata-secret-key',
-  });
-  expect([...fakeR2.objects]).toEqual([
-    ['test-provider-metadata/vercel/gen_test.json', JSON.stringify(metadata)],
-  ]);
-  expect(console.debug).toHaveBeenCalledTimes(2);
-  expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] archived metadata', {
-    generationId: 'gen_test',
-    bucket: 'test-provider-metadata',
-  });
+  expect(collector.snapshot()).toEqual({ final: { unknown: [null, false, 'retained'] } });
+  expect(json).toEqual(original);
 });
 
-test('retains metadata received before the generation ID', async () => {
-  const capture = createVercelProviderMetadataCapture();
-  const metadata = { gateway: { cost: '0.1' } };
-  capture?.(metadata);
-  capture?.(metadata);
-  expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).toHaveBeenCalledTimes(1);
-  expect(console.debug).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] waiting for metadata and generation ID',
-    { generationId: undefined, metadataReceived: true, generationIdReceived: false }
+test('walks every Chat stream delta before the root', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
+    {
+      providerMetadata: { root: true },
+      choices: [
+        { delta: { provider_metadata: { first: true } } },
+        { delta: { provider_metadata: { second: true } } },
+      ],
+    },
+    'chat_completions'
   );
 
-  capture?.(undefined, 'gen_late_id');
-  await runScheduledUpload();
-
-  expect(fakeR2.objects.get('test-provider-metadata/vercel/gen_late_id.json')).toBe(
-    JSON.stringify(metadata)
-  );
+  expect(collector.snapshot()).toEqual({ root: true });
 });
 
-test('does not schedule an upload without an ID and valid metadata', () => {
-  const capture = createVercelProviderMetadataCapture();
-  for (const metadata of [undefined, null, false, 42, 'invalid', []]) {
-    capture?.(metadata, 'gen_test');
+test('retains metadata from a later Chat choice without usage or top-level metadata', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
+    {
+      choices: [
+        { delta: { provider_metadata: { first: true } } },
+        { delta: { providerMetadata: { second: true } } },
+      ],
+    },
+    'chat_completions'
+  );
+
+  expect(collector.snapshot()).toEqual({ second: true });
+});
+
+test('walks Messages start message before root and captures top-level metadata on every event', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
+    {
+      type: 'message_start',
+      message: { provider_metadata: { nested: true } },
+      providerMetadata: { root: true },
+    },
+    'messages'
+  );
+  expect(collector.snapshot()).toEqual({ root: true });
+
+  for (const type of ['content_block_start', 'content_block_delta', 'message_delta']) {
+    collector.capture({ type, provider_metadata: { latest: type } }, 'messages');
+    expect(collector.snapshot()).toEqual({ latest: type });
   }
-  expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).toHaveBeenCalledTimes(1);
-  expect(console.debug).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] waiting for metadata and generation ID',
-    { generationId: 'gen_test', metadataReceived: false, generationIdReceived: true }
-  );
-
-  const captureWithoutId = createVercelProviderMetadataCapture();
-  captureWithoutId?.({ gateway: {} }, '');
-  expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).toHaveBeenCalledTimes(2);
+  collector.capture({ type: 'message_stop', providerMetadata: { stopped: true } }, 'messages');
+  expect(collector.snapshot()).toEqual({ stopped: true });
 });
 
-test('does not log empty stream chunks', () => {
-  const capture = createVercelProviderMetadataCapture();
-  capture?.(undefined);
-  capture?.(undefined);
-  expect(console.debug).not.toHaveBeenCalled();
-});
-
-test('contains upload failures without logging metadata or upstream error text', async () => {
-  jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('sensitive upstream error text'));
-  const capture = createVercelProviderMetadataCapture();
-  capture?.({ gateway: { additionalField: 'private metadata' } }, 'gen_failed');
-
-  await expect(runScheduledUpload()).resolves.toBeUndefined();
-
-  expect(errorExceptInTest).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] failed to archive metadata',
+test('ignores Messages nested message outside message_start', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
     {
-      generationId: 'gen_failed',
-      bucket: 'test-provider-metadata',
-      stage: 'upload',
-      errorType: 'Error',
-    }
+      type: 'message_delta',
+      message: { provider_metadata: { invalid: true } },
+    },
+    'messages'
   );
-  expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
-    /sensitive upstream|private metadata/
-  );
-  expect(console.debug).toHaveBeenCalledTimes(1);
-  expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toMatch(
-    /sensitive upstream|private metadata/
-  );
+  expect(collector.snapshot()).toBeUndefined();
 });
 
-test('includes safe S3 diagnostics without logging the raw service error', async () => {
-  jest.spyOn(fakeR2, 'send').mockRejectedValue(
-    new S3ServiceException({
-      name: 'AccessDenied',
-      $fault: 'client',
-      $metadata: { httpStatusCode: 403, requestId: 'test-r2-request', attempts: 1 },
-      message: 'sensitive upstream error text',
-    })
-  );
-  const capture = createVercelProviderMetadataCapture();
-  capture?.({ gateway: { additionalField: 'private metadata' } }, 'gen_denied');
-
-  await expect(runScheduledUpload()).resolves.toBeUndefined();
-
-  expect(errorExceptInTest).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] failed to archive metadata',
+test('walks every Responses nested response before top-level metadata', () => {
+  const collector = createVercelProviderMetadataCollector();
+  for (const type of ['response.created', 'response.in_progress', 'response.output_text.delta']) {
+    collector.capture(
+      {
+        type,
+        response: { providerMetadata: { nested: true } },
+        provider_metadata: { latest: type },
+      },
+      'responses'
+    );
+    expect(collector.snapshot()).toEqual({ latest: type });
+  }
+  collector.capture(
     {
-      generationId: 'gen_denied',
-      bucket: 'test-provider-metadata',
-      stage: 'upload',
-      errorType: 'AccessDenied',
-      httpStatusCode: 403,
-      requestId: 'test-r2-request',
-      attempts: 1,
-    }
+      type: 'response.completed',
+      response: { provider_metadata: { terminal: { retained: true } } },
+    },
+    'responses'
   );
-  expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
-    /sensitive upstream|private metadata|test-metadata-secret-key|test-metadata-access-key/
-  );
+  expect(collector.snapshot()).toEqual({ terminal: { retained: true } });
 });
 
-test('attempts registration and reports scheduling failures only once per response', () => {
-  mockedAfter.mockImplementation(() => {
-    throw new Error('after unavailable');
-  });
-  const capture = createVercelProviderMetadataCapture();
-  expect(() => capture?.({ gateway: {} }, 'gen_test')).not.toThrow();
-  expect(() => capture?.(undefined, 'gen_test')).not.toThrow();
-  expect(() => capture?.({ gateway: { cost: '0.1' } }, 'gen_test')).not.toThrow();
-  expect(mockedAfter).toHaveBeenCalledTimes(1);
-  expect(errorExceptInTest).toHaveBeenCalledTimes(1);
-  expect(errorExceptInTest).toHaveBeenCalledWith(
-    '[vercel-provider-metadata] failed to archive metadata',
-    {
-      generationId: 'gen_test',
-      bucket: 'test-provider-metadata',
-      stage: 'registration',
-      errorType: 'Error',
-    }
+test.each(['messages', 'responses'] as const)(
+  'captures %s non-stream JSON root metadata',
+  apiKind => {
+    const collector = createVercelProviderMetadataCollector();
+    collector.capture({ provider_metadata: { unknown: 'retained' } }, apiKind);
+    expect(collector.snapshot()).toEqual({ unknown: 'retained' });
+  }
+);
+
+test('replaces metadata instead of merging and retains it across metadata-free frames', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture({ provider_metadata: { first: true } }, 'chat_completions');
+  collector.capture({ providerMetadata: { second: true } }, 'chat_completions');
+  collector.capture({ choices: [] }, 'chat_completions');
+  expect(collector.snapshot()).toEqual({ second: true });
+});
+
+test('prefers valid snake_case metadata to valid camelCase metadata', () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
+    { provider_metadata: { snake: true }, providerMetadata: { camel: true } },
+    'chat_completions'
   );
-  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(collector.snapshot()).toEqual({ snake: true });
+});
+
+test.each([undefined, null, false, 42, 'invalid', []])(
+  'ignores invalid metadata %p without clearing the previous object',
+  invalid => {
+    const collector = createVercelProviderMetadataCollector();
+    collector.capture({ provider_metadata: { retained: true } }, 'chat_completions');
+    collector.capture(
+      { provider_metadata: invalid, providerMetadata: invalid },
+      'chat_completions'
+    );
+    expect(collector.snapshot()).toEqual({ retained: true });
+  }
+);
+
+test.each([undefined, null])(
+  'falls back to valid camelCase metadata when snake_case is %p',
+  invalid => {
+    const collector = createVercelProviderMetadataCollector();
+    collector.capture(
+      { provider_metadata: invalid, providerMetadata: { valid: true } },
+      'chat_completions'
+    );
+    expect(collector.snapshot()).toEqual({ valid: true });
+  }
+);
+
+test.each([false, 42, 'invalid', []])(
+  'does not fall back to camelCase when non-null snake_case is invalid: %p',
+  invalid => {
+    const collector = createVercelProviderMetadataCollector();
+    collector.capture({ provider_metadata: { retained: true } }, 'chat_completions');
+    collector.capture(
+      { provider_metadata: invalid, providerMetadata: { ignored: true } },
+      'chat_completions'
+    );
+    expect(collector.snapshot()).toEqual({ retained: true });
+  }
+);
+
+test('ignores non-object frames, unrelated subtrees, and invalid choice nodes', () => {
+  const collector = createVercelProviderMetadataCollector();
+  for (const value of [undefined, null, true, 42, 'not-json', []]) {
+    collector.capture(value, 'chat_completions');
+  }
+  collector.capture(
+    {
+      output: [{ provider_metadata: { ignored: true } }],
+      choices: [null, 42, {}, { delta: [], message: false }],
+    },
+    'chat_completions'
+  );
+  expect(collector.snapshot()).toBeUndefined();
+});
+
+test('does not treat a finish_reason or mismatched protocol event as metadata completion', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  const completed = jest.fn();
+  void collector.completed.then(completed);
+  collector.capture({ choices: [{ finish_reason: 'stop' }] }, 'chat_completions');
+  collector.capture({ type: 'error' }, 'chat_completions');
+  collector.capture({ type: 'response.completed' }, 'chat_completions');
+  collector.capture({ type: 'message_stop' }, 'responses');
+  await Promise.resolve();
+  expect(completed).not.toHaveBeenCalled();
+
+  collector.capture({ provider_metadata: { retained: true } }, 'chat_completions');
+  collector.capture('[DONE]', 'chat_completions');
+  await collector.completed;
+  expect(completed).toHaveBeenCalledTimes(1);
+  expect(collector.snapshot()).toEqual({ retained: true });
+});
+
+test('captures a terminal error envelope before freezing and ignores all subsequent metadata', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture(
+    { type: 'error', provider_metadata: { error: { unknown: 'retained' } } },
+    'messages'
+  );
+  collector.capture({ provider_metadata: { ignored: true } }, 'messages');
+  await collector.completed;
+  expect(collector.snapshot()).toEqual({ error: { unknown: 'retained' } });
 });

@@ -132,60 +132,23 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     }
   });
 
-  it('answers anonymous callers the same for a custom LLM as for an unknown id', async () => {
+  it('never forwards a custom LLM id for anonymous callers', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
-    await insertCustomLlmForTest('acme/embedding-custom-model');
+    await insertCustomLlmForTest('stealth/embedding-custom-model');
     try {
       const { handleEmbeddingsRequest } = await import('./embeddings');
-      const customResponse = await handleEmbeddingsRequest(
-        makeRequest({ model: 'acme/embedding-custom-model' })
-      );
-      const unknownResponse = await handleEmbeddingsRequest(
-        makeRequest({ model: 'acme/embedding-unknown-model' })
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/embedding-custom-model' })
       );
 
-      expect(customResponse.status).toBe(401);
-      expect(unknownResponse.status).toBe(401);
-      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(response.status).toBe(404);
       expect(mockedFetch).not.toHaveBeenCalled();
     } finally {
-      await deleteCustomLlmForTest('acme/embedding-custom-model');
-    }
-  });
-
-  it('answers anonymous callers the same for a free model id a custom LLM uses', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: null,
-      authFailedResponse: new Response('unauthorized', { status: 401 }),
-      organizationId: undefined,
-    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
-    mockedFetch.mockImplementation(
-      async () =>
-        new Response(JSON.stringify({ error: { message: 'model not found' } }), {
-          status: 400,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-    // Rows created before free model ids were rejected can still use one.
-    await insertCustomLlmForTest('stealth/legacy-alpha');
-    try {
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const customResponse = await handleEmbeddingsRequest(
-        makeRequest({ model: 'stealth/legacy-alpha' })
-      );
-      const unknownResponse = await handleEmbeddingsRequest(
-        makeRequest({ model: 'stealth/unknown-alpha' })
-      );
-
-      expect(customResponse.status).toBe(unknownResponse.status);
-      expect(await customResponse.json()).toEqual(await unknownResponse.json());
-      expect(mockedFetch).toHaveBeenCalledTimes(2);
-    } finally {
-      await deleteCustomLlmForTest('stealth/legacy-alpha');
+      await deleteCustomLlmForTest('stealth/embedding-custom-model');
     }
   });
 

@@ -3,7 +3,6 @@ import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
-  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   customLlmDefinition,
@@ -24,41 +23,42 @@ const pricing: CustomPricingTiers = [
 ];
 
 describe('isFreeModel', () => {
+  test('judges custom LLM ids by the same rules as other ids', () => {
+    expect(isFreeModel('acme/custom-model')).toBe(false);
+    expect(isFreeModel('acme/custom-model-free')).toBe(true);
+    expect(isFreeModel('stealth/custom-model')).toBe(true);
+  });
+});
+
+describe('hasBestEffortGuessDataCollectionRequirement', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest('acme/custom-model');
     await insertCustomLlmForTest('acme/priced-custom-model', customLlmDefinition({ pricing }));
+    await insertCustomLlmForTest(
+      'acme/no-training-model',
+      customLlmDefinition({ pricing, may_train_on_prompts: false })
+    );
+    await insertCustomLlmForTest(
+      'acme/training-model',
+      customLlmDefinition({ pricing, may_train_on_prompts: true })
+    );
   });
 
   afterAll(async () => {
     await deleteCustomLlmForTest('acme/custom-model');
     await deleteCustomLlmForTest('acme/priced-custom-model');
+    await deleteCustomLlmForTest('acme/no-training-model');
+    await deleteCustomLlmForTest('acme/training-model');
   });
 
-  test('treats a custom LLM without pricing as free', async () => {
-    await expect(isFreeModel('acme/custom-model')).resolves.toBe(true);
-    expect(isFreeModelExcludingCustomLlms('acme/custom-model')).toBe(false);
-  });
-
-  test('treats a custom LLM with pricing as not free', async () => {
-    await expect(isFreeModel('acme/priced-custom-model')).resolves.toBe(false);
-    expect(isFreeModelExcludingCustomLlms('acme/priced-custom-model')).toBe(false);
-  });
-
-  test('assumes custom LLMs require data collection, like other free models', async () => {
-    await expect(hasBestEffortGuessDataCollectionRequirement('acme/custom-model')).resolves.toBe(
-      true
-    );
-    await expect(hasBestEffortGuessDataCollectionRequirement('openai/gpt-4o')).resolves.toBe(false);
-  });
-
-  test('assumes priced custom LLMs require data collection too', async () => {
-    await expect(
-      hasBestEffortGuessDataCollectionRequirement('acme/priced-custom-model')
-    ).resolves.toBe(true);
-  });
-
-  test('follows the built-in rules for other models', async () => {
-    await expect(isFreeModel('openrouter/free')).resolves.toBe(true);
-    await expect(isFreeModel('openai/gpt-4o')).resolves.toBe(false);
+  test.each([
+    ['acme/custom-model', true],
+    ['acme/priced-custom-model', true],
+    ['acme/training-model', true],
+    ['acme/no-training-model', false],
+    ['openrouter/free', true],
+    ['openai/gpt-4o', false],
+  ])('%s -> %s', async (model, expected) => {
+    await expect(hasBestEffortGuessDataCollectionRequirement(model)).resolves.toBe(expected);
   });
 });

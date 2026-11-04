@@ -5,7 +5,10 @@ import { api_request_log, kilocode_users } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, like, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
-import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
+import {
+  apiRequestLogBlobSchema,
+  getApiRequestLogBlob,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
 import { canCurrentUserExportApiRequestLogs } from '@/lib/admin/admin-permissions';
 import {
@@ -412,7 +415,31 @@ export async function GET(request: NextRequest) {
       if (rows.length === 0) break;
 
       const bodies = await Promise.all(
-        rows.map(async row => {
+        rows.map(async (row): Promise<{ request: LoadedBody; response: LoadedBody }> => {
+          if (row.request_r2_key !== null && row.request_r2_key === row.response_r2_key) {
+            const body = await loadBody(row.request_r2_key);
+            if ('loadError' in body) {
+              return { request: body, response: body };
+            }
+            if (body.value === null) {
+              const failure = {
+                loadError: `Failed to load ${row.request_r2_key} from R2: Object not found`,
+              };
+              return { request: failure, response: failure };
+            }
+            try {
+              const blob = apiRequestLogBlobSchema.parse(JSON.parse(body.value));
+              return {
+                request: { value: JSON.stringify(blob.request) },
+                response: { value: blob.response },
+              };
+            } catch {
+              const failure = {
+                loadError: `Failed to decode ${row.request_r2_key} from R2: Invalid API request log envelope`,
+              };
+              return { request: failure, response: failure };
+            }
+          }
           const [request, response] = await Promise.all([
             loadBody(row.request_r2_key),
             loadBody(row.response_r2_key),

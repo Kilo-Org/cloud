@@ -98,7 +98,7 @@ import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
@@ -157,6 +157,7 @@ async function directByokProviderResult(
     provider: {
       type: 'direct-byok',
       ...upstream,
+      inferenceProviderId: getDirectByokPolicyProviderId(directByok),
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
@@ -164,7 +165,7 @@ async function directByokProviderResult(
       },
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
-    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    isFree: isFreeModel(requestedModel),
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
@@ -300,7 +301,7 @@ async function isEligibleForCustomLlm(
 ) {
   // An anonymous caller has no balance to bill.
   if (isAnonymousContext(user))
-    return isPublicCustomLlm(customLlm.definition) && !customLlm.definition.pricing;
+    return isPublicCustomLlm(customLlm.definition) && isFreeModel(customLlm.public_id);
   if (isPublicCustomLlm(customLlm.definition)) return true;
   if (!organizationId) return false;
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
@@ -381,7 +382,7 @@ async function resolveCustomLlmProvider(
     kind: 'provider',
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
-    isFree: definition.pricing === undefined,
+    isFree: isFreeModel(customLlm.public_id),
     bypassAccessCheck: !isPublic,
   };
 }
@@ -389,7 +390,7 @@ async function resolveCustomLlmProvider(
 /**
  * A public custom LLM serves anyone on Kilo's credential, so like free models it
  * drops paid server features before the definition's own `extra_body` applies,
- * even when it sets pricing. Private custom LLMs keep them.
+ * even when it sets pricing. Private custom LLMs keep them unless their id is free.
  */
 function withoutPaidServerFeatures(provider: Provider): Provider {
   return {
@@ -574,7 +575,7 @@ function gatewayRoutedByokResult(
           ? createUserVercelAiGatewayProvider(key.decryptedAPIKey)
           : createUserOpenRouterProvider(key.decryptedAPIKey),
     userByok: [key],
-    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    isFree: isFreeModel(requestedModel),
     bypassAccessCheck: false,
   };
 }
@@ -729,7 +730,7 @@ async function selectProvider(
       return null;
     }
     decision.step({ step: 'chatgpt', outcome: 'selected' });
-    return { ...openAiChatGptByok, isFree: isFreeModelExcludingCustomLlms(requestedModel) };
+    return { ...openAiChatGptByok, isFree: isFreeModel(requestedModel) };
   };
 
   const directCandidates = directByok?.candidates ?? [];
@@ -915,7 +916,7 @@ async function selectProvider(
     kind: 'provider',
     provider: kiloRouteUsesVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
     userByok: null,
-    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    isFree: isFreeModel(requestedModel),
     bypassAccessCheck: false,
   };
 }
@@ -1102,7 +1103,7 @@ export async function getEmbeddingProvider(
   organizationId: string | undefined,
   allowedProviders?: ReadonlySet<string>
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
-  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
+  const isFree = isFreeModel(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const inference = await getGatewayRoutedByokKeys(user, requestedModel, organizationId, {
     includeGatewayKeys: false,

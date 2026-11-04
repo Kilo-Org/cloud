@@ -1,5 +1,5 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { sql, eq, and, isNull } from 'drizzle-orm';
+import { sql, eq, and, isNull, type SQL } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
@@ -15,6 +15,37 @@ const SIGN_IN_CODE_RESERVATION_MINUTES = 2;
 
 function hashSignInCode(email: string, code: string): string {
   return createHmac('sha256', NEXTAUTH_SECRET).update(`${email}:${code}`).digest('hex');
+}
+
+/**
+ * The row identity of a redeemable sign-in code, shared by every path that
+ * settles one: the address the code was delivered to, the hash of the code,
+ * the sign-in-code purpose, an unconsumed row, and the challenge when the
+ * caller has one.
+ *
+ * A path that needs more — a live reservation, an unexpired row, attempt
+ * budget — appends its own clauses through `clauses`, so the row identity
+ * itself is never restated and cannot drift between paths.
+ */
+function signInCodeWhere({
+  codeEmail,
+  tokenHash,
+  challengeId,
+  clauses = [],
+}: {
+  codeEmail: string;
+  tokenHash: string;
+  challengeId?: string;
+  clauses?: SQL[];
+}) {
+  return and(
+    eq(magic_link_tokens.token_hash, tokenHash),
+    eq(magic_link_tokens.email, codeEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+    ...(challengeId ? [eq(magic_link_tokens.challenge_id, challengeId)] : []),
+    ...clauses
+  );
 }
 
 export type MagicLinkToken = z.infer<typeof MagicLinkToken>;
@@ -227,15 +258,15 @@ export async function reserveSignInCode(
           reserved_until: sql`NOW() + interval '${sql.raw(String(SIGN_IN_CODE_RESERVATION_MINUTES))} minutes'`,
         })
         .where(
-          and(
-            eq(magic_link_tokens.token_hash, token_hash),
-            eq(magic_link_tokens.email, codeEmail),
-            eq(magic_link_tokens.purpose, 'sign_in_code'),
-            isNull(magic_link_tokens.consumed_at),
-            sql`${magic_link_tokens.expires_at} > NOW()`,
-            sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
-            sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
-          )
+          signInCodeWhere({
+            codeEmail,
+            tokenHash: token_hash,
+            clauses: [
+              sql`${magic_link_tokens.expires_at} > NOW()`,
+              sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
+              sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`,
+            ],
+          })
         )
         .returning();
 
@@ -299,21 +330,17 @@ export async function commitSignInCode(
   const codeEmail = getDeliveredEmailAddress(email);
   const token_hash = hashSignInCode(codeEmail, code);
 
-  const whereClauses = [
-    eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, codeEmail),
-    eq(magic_link_tokens.purpose, 'sign_in_code'),
-    isNull(magic_link_tokens.consumed_at),
-    sql`${magic_link_tokens.reserved_until} > NOW()`,
-  ];
-  if (challengeId) {
-    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
-  }
-
   const committed = await db
     .update(magic_link_tokens)
     .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(and(...whereClauses))
+    .where(
+      signInCodeWhere({
+        codeEmail,
+        tokenHash: token_hash,
+        challengeId,
+        clauses: [sql`${magic_link_tokens.reserved_until} > NOW()`],
+      })
+    )
     .returning();
 
   return committed.length > 0;
@@ -333,20 +360,10 @@ export async function releaseSignInCode(
   const codeEmail = getDeliveredEmailAddress(email);
   const token_hash = hashSignInCode(codeEmail, code);
 
-  const whereClauses = [
-    eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, codeEmail),
-    eq(magic_link_tokens.purpose, 'sign_in_code'),
-    isNull(magic_link_tokens.consumed_at),
-  ];
-  if (challengeId) {
-    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
-  }
-
   await db
     .update(magic_link_tokens)
     .set({ reserved_until: null })
-    .where(and(...whereClauses));
+    .where(signInCodeWhere({ codeEmail, tokenHash: token_hash, challengeId }));
 }
 
 /**
@@ -364,20 +381,10 @@ export async function consumeSignInCode(
   const codeEmail = getDeliveredEmailAddress(email);
   const token_hash = hashSignInCode(codeEmail, code);
 
-  const whereClauses = [
-    eq(magic_link_tokens.token_hash, token_hash),
-    eq(magic_link_tokens.email, codeEmail),
-    eq(magic_link_tokens.purpose, 'sign_in_code'),
-    isNull(magic_link_tokens.consumed_at),
-  ];
-  if (challengeId) {
-    whereClauses.push(eq(magic_link_tokens.challenge_id, challengeId));
-  }
-
   const consumed = await db
     .update(magic_link_tokens)
     .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(and(...whereClauses))
+    .where(signInCodeWhere({ codeEmail, tokenHash: token_hash, challengeId }))
     .returning();
 
   return consumed.length > 0;
@@ -387,14 +394,7 @@ export async function deleteSignInCode(email: string, code: string): Promise<voi
   const codeEmail = getDeliveredEmailAddress(email);
   await db
     .delete(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.token_hash, hashSignInCode(codeEmail, code)),
-        eq(magic_link_tokens.email, codeEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at)
-      )
-    );
+    .where(signInCodeWhere({ codeEmail, tokenHash: hashSignInCode(codeEmail, code) }));
 }
 
 export function getMagicLinkUrl(

@@ -139,13 +139,18 @@ export function hasEnvironmentRoots(
   return roots.length > 0 && roots.every(isEnvironmentRoot);
 }
 
-/** A progress detail that says which repository it is about, when the route has several. */
+/**
+ * A progress detail that says which repository it is about, when the route has
+ * several. The action is always part of the line: a bare repository name does
+ * not say whether it is being cloned, restored or checked out.
+ */
 export function rootProgressDetail(
   root: PrepareRoot,
-  detail: string | undefined
+  detail: string | undefined,
+  action: string
 ): string | undefined {
   if (!root.namesRepositoryInProgress || !isEnvironmentRoot(root)) return detail;
-  return detail === undefined ? root.repoFullName : `${root.repoFullName}: ${detail}`;
+  return `${root.repoFullName}: ${detail ?? action}`;
 }
 
 /**

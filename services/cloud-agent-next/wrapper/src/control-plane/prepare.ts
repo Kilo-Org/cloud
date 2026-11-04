@@ -569,7 +569,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       env,
       redact,
       signal,
-      onProgress: detail => emitProgress(spec.sessionId, 'clone', rootProgressDetail(root, detail)),
+      onProgress: detail =>
+        emitProgress(
+          spec.sessionId,
+          'clone',
+          rootProgressDetail(root, detail, 'Cloning repository')
+        ),
     });
     if (!spec.git) return;
     onCheckout();
@@ -588,7 +593,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     startRef?: string
   ): Promise<void> {
     const { spec, directory } = root;
-    emitProgress(spec.sessionId, 'checkout', rootProgressDetail(root, undefined));
+    emitProgress(
+      spec.sessionId,
+      'checkout',
+      rootProgressDetail(root, undefined, 'Checking out branch')
+    );
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
       runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
@@ -680,7 +689,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           emitProgress(
             spec.sessionId,
             'checkout',
-            rootProgressDetail(root, `Checking out branch... ${progressText}`)
+            rootProgressDetail(
+              root,
+              `Checking out branch... ${progressText}`,
+              'Checking out branch'
+            )
           )
         ),
       });
@@ -720,7 +733,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     await restoreBudget.spend(remainingMs =>
       withinStep('restore', remainingMs, async signal => {
-        emitProgress(spec.sessionId, 'restore', rootProgressDetail(root, undefined));
+        emitProgress(
+          spec.sessionId,
+          'restore',
+          rootProgressDetail(root, undefined, 'Updating repository')
+        );
         const startRef = await refreshAdoptedRepository({
           remoteUrl: credentialFreeGitUrl(git.url),
           route: git.token ? 'managed' : 'direct',

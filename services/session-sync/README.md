@@ -50,16 +50,16 @@ All JSON requests use protocol version `1`.
 Errors have an explicit machine-readable code and an appropriate HTTP status.
 An unavailable authentication dependency produces a retryable service error, not an invalid-credential response.
 
-| Operation            | Route                              | Meaning                                                                         |
-| -------------------- | ---------------------------------- | ------------------------------------------------------------------------------- |
-| Exchange credential  | `POST /v1/auth/exchange`           | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant.    |
-| Inspect session      | `GET /v1/sessions/:id`             | Read producer binding, committed source position, revision, and deletion state. |
-| Register session     | `PUT /v1/sessions/:id`             | Bind a session to its source without replacing an existing owner.               |
-| Apply batch          | `POST /v1/sessions/:id/batches`    | Atomically apply an incremental batch and return its durable receipt.           |
-| Read entities        | `GET /v1/sessions/:id/entities`    | Read bounded pages of the current portable entities.                            |
-| Upload blob          | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes.                       |
-| Read blob            | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization.                              |
-| Remove cloud session | `DELETE /v1/sessions/:id`          | Tombstone the cloud copy and prevent its automatic recreation.                  |
+| Operation | Route | Meaning |
+|---|---|---|
+| Exchange credential | `POST /v1/auth/exchange` | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant. |
+| Inspect session | `GET /v1/sessions/:id` | Read producer binding, committed source position, revision, and deletion state. |
+| Register session | `PUT /v1/sessions/:id` | Bind a session to its source without replacing an existing owner. |
+| Apply batch | `POST /v1/sessions/:id/batches` | Atomically apply an incremental batch and return its durable receipt. |
+| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities. |
+| Upload blob | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes. |
+| Read blob | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization. |
+| Remove cloud session | `DELETE /v1/sessions/:id` | Tombstone the cloud copy and prevent its automatic recreation. |
 
 A cloud tombstone is the service part of delete-everywhere.
 Device propagation belongs to the remote-control delivery, not the initial ingestion client.
@@ -136,17 +136,17 @@ It does not depend on the application-shared package.
 
 The initial storage policy is explicit:
 
-| Resource                                   | Bound   |
-| ------------------------------------------ | ------- |
-| Batch body                                 | 512 KiB |
-| Changes per batch                          | 64      |
-| Inline entity body                         | 64 KiB  |
-| Blob body                                  | 8 MiB   |
+| Resource | Bound |
+|---|---|
+| Batch body | 512 KiB |
+| Changes per batch | 64 |
+| Inline entity body | 64 KiB |
+| Blob body | 8 MiB |
 | Stored and reserved blob bytes per session | 256 MiB |
-| Blob entries per session                   | 10,000  |
-| Inline entity bytes per session            | 64 MiB  |
-| Current entities per session               | 100,000 |
-| Retained batch receipts                    | 256     |
+| Blob entries per session | 10,000 |
+| Inline entity bytes per session | 64 MiB |
+| Current entities per session | 100,000 |
+| Retained batch receipts | 256 |
 
 Verified uploads without a current entity reference enter `unreferenced` for 15 minutes.
 Replacing or removing the last reference sets its cleanup deadline to the batch commit time.
@@ -198,13 +198,13 @@ Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 
 Wrangler rate-limit bindings are tunable per deployment and apply per Cloudflare location:
 
-| Binding                    | Key                                                      | Default per 60 seconds |
-| -------------------------- | -------------------------------------------------------- | ---------------------- |
-| `EXCHANGE_IP_LIMITER`      | Client IP, before credential verification                | 120                    |
-| `EXCHANGE_ACCOUNT_LIMITER` | Verified account, before account SQL                     | 60                     |
-| `USER_REQUEST_LIMITER`     | Authenticated user, registration, deletion, and blob PUT | 1,200                  |
-| `USER_BLOB_LIMITER`        | Authenticated user, blob PUT                             | 300                    |
-| `USER_DATA_BLOCK_LIMITER`  | Authenticated user, prepaid read/batch blocks            | 120 blocks             |
+| Binding | Key | Default per 60 seconds |
+|---|---|---|
+| `EXCHANGE_IP_LIMITER` | Client IP, before credential verification | 120 |
+| `EXCHANGE_ACCOUNT_LIMITER` | Verified account, before account SQL | 60 |
+| `USER_REQUEST_LIMITER` | Authenticated user, registration, deletion, and blob PUT | 1,200 |
+| `USER_BLOB_LIMITER` | Authenticated user, blob PUT | 300 |
+| `USER_DATA_BLOCK_LIMITER` | Authenticated user, prepaid read/batch blocks | 120 blocks |
 
 Each binding uses a distinct namespace, including staging and tests.
 Denial returns retryable `rate_limited` (429), `Retry-After: 60`, and an epoch-ms

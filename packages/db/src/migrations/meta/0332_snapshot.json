@@ -1,5 +1,5 @@
 {
-  "id": "46fa232e-0239-44ce-a03d-4f05d187eb1c",
+  "id": "e4a7e0b8-2d06-4284-8940-b948cf966b3d",
   "prevId": "5dfdae11-7b91-4fe8-bf4e-cdb75cb99643",
   "version": "7",
   "dialect": "postgresql",
@@ -5221,12 +5221,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_operation_key": {
-          "name": "manual_operation_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "review_type": {
           "name": "review_type",
           "type": "text",
@@ -5512,50 +5506,6 @@
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_user_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_user_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_org_manual_operation_key": {
-          "name": "UQ_cloud_agent_code_reviews_org_manual_operation_key",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "manual_operation_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"manual_operation_key\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -6006,6 +5956,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "egress_mode": {
+          "name": "egress_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "egress_allowlist": {
+          "name": "egress_allowlist",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6252,6 +6214,10 @@
         "cloud_agent_environments_identity_check": {
           "name": "cloud_agent_environments_identity_check",
           "value": "(\n        (\n          \"cloud_agent_environments\".\"repositories\" IS NULL AND\n          \"cloud_agent_environments\".\"platform\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"repo_full_name\" IS NOT NULL AND (\n            (\n              \"cloud_agent_environments\".\"platform\" = 'github' AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n            ) OR (\n              \"cloud_agent_environments\".\"platform\" = 'gitlab' AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n            ) OR (\n              \"cloud_agent_environments\".\"platform\" = 'bitbucket' AND\n              \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NOT NULL AND\n              \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL\n            )\n          )\n        ) OR (\n          \"cloud_agent_environments\".\"repositories\" IS NOT NULL AND\n          jsonb_typeof(\"cloud_agent_environments\".\"repositories\") = 'array' AND\n          \"cloud_agent_environments\".\"repositories\" <> '[]'::jsonb AND\n          \"cloud_agent_environments\".\"platform\" IS NULL AND\n          \"cloud_agent_environments\".\"repo_full_name\" IS NULL AND\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
+        },
+        "cloud_agent_environments_egress_policy_check": {
+          "name": "cloud_agent_environments_egress_policy_check",
+          "value": "(\n        (\n          (\"cloud_agent_environments\".\"egress_mode\" IS NULL AND \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) OR\n          (\"cloud_agent_environments\".\"egress_mode\" IS NOT NULL AND \"cloud_agent_environments\".\"egress_mode\" IN ('unrestricted', 'allowlist'))\n        ) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'unrestricted' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'allowlist' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NOT NULL)\n      )"
         }
       },
       "isRLSEnabled": false

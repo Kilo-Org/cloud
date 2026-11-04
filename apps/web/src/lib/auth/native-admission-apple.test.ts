@@ -269,6 +269,34 @@ describe('verifyAppleAttestation certificate chain', () => {
     );
     expect(result).toEqual({ ok: false, error: 'CERT_CHAIN_INVALID' });
   });
+
+  test('accepts only the two documented x5c shapes', async () => {
+    const chains = [
+      [REAL_LEAF_DER],
+      [REAL_LEAF_DER, REAL_INTERMEDIATE_DER, REAL_ROOT_DER, REAL_ROOT_DER],
+    ];
+    for (const chain of chains) {
+      const result = await verifyAppleAttestation(
+        attestationFor(chain),
+        challenge,
+        keyId,
+        bundleId
+      );
+      expect(result).toEqual({ ok: false, error: 'INVALID_ATTEST_FORMAT' });
+    }
+  });
+
+  test('returns RP_ID_MISMATCH for a foreign RP ID', async () => {
+    const wrongRpId = createHash('sha256').update('OTHERTEAM.com.example.app').digest();
+    const authData = buildAuthData({ rpIdHash: wrongRpId, credentialId, coseKey: buildCoseKey() });
+    const result = await verifyAppleAttestation(
+      buildAttestation([REAL_LEAF_DER, REAL_INTERMEDIATE_DER, REAL_ROOT_DER], authData),
+      challenge,
+      keyId,
+      bundleId
+    );
+    expect(result).toEqual({ ok: false, error: 'RP_ID_MISMATCH' });
+  });
 });
 
 // ── Assertion verification ─────────────────────────────────────────────────

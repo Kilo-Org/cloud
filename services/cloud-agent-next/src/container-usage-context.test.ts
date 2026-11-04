@@ -33,7 +33,7 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 describe('container usage context', () => {
   it('invokes billing status as a binding method for RPC proxies', async () => {
     const status = {
-      sandboxClassName: 'SandboxSmall' as const,
+      sandboxClassName: 'SandboxSmallContainment' as const,
       running: true,
       blocked: false,
     };
@@ -147,13 +147,8 @@ describe('container usage context', () => {
       expect(isVercelBillingClassName(className)).toBe(true);
     }
     for (const className of [
-      'Sandbox',
       'SandboxContainment',
-      'SandboxSmall',
       'SandboxSmallContainment',
-      'SandboxDIND',
-      'SandboxCodeReview',
-      'SandboxCodeReviewContainment',
       'SandboxContainersStandard3',
       'SandboxContainersStandard4',
     ] as const) {
@@ -187,7 +182,9 @@ describe('container usage context', () => {
     expect(billingCapacityForSandboxClass('SandboxContainersStandard3')).toEqual(
       CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3
     );
-    expect(billingCapacityForSandboxClass('SandboxSmall')).toEqual(SANDBOX_CAPACITIES.SandboxSmall);
+    expect(billingCapacityForSandboxClass('SandboxSmallContainment')).toEqual(
+      SANDBOX_CAPACITIES.SandboxSmallContainment
+    );
   });
 
   it('accepts both Vercel classes against an isolated `ses` billing ID and rejects others', () => {
@@ -219,15 +216,7 @@ describe('container usage context', () => {
     for (const className of ['SandboxContainersStandard3', 'SandboxContainersStandard4'] as const) {
       expect(isContainersBillingClassName(className)).toBe(true);
     }
-    for (const className of [
-      'Sandbox',
-      'SandboxContainment',
-      'SandboxSmall',
-      'SandboxSmallContainment',
-      'SandboxDIND',
-      'SandboxCodeReview',
-      'SandboxCodeReviewContainment',
-    ] as const) {
+    for (const className of ['SandboxContainment', 'SandboxSmallContainment'] as const) {
       expect(isContainersBillingClassName(className)).toBe(false);
     }
   });
@@ -423,7 +412,6 @@ describe('container usage context', () => {
 
   it.each([
     ['isolated', 'SandboxSmallContainment', true],
-    ['code-review', 'SandboxCodeReviewContainment', true],
     ['code-review', 'SandboxContainersCodeReview', true],
     ['shared', 'SandboxContainment', false],
   ] as const)(
@@ -486,7 +474,7 @@ describe('container usage context', () => {
 
   it('rejects session attribution and extra metadata for shared sandboxes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'org-abcdef',
         subject: { type: 'user', id: 'user_shared' },
         actor: { type: 'user', id: 'user_shared' },
@@ -498,7 +486,7 @@ describe('container usage context', () => {
 
   it('rejects isolated-prefixed legacy IDs for shared sandbox classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'ses-abcdef__legacy',
         subject: { type: 'user', id: 'user_shared' },
         actor: { type: 'user', id: 'user_shared' },
@@ -508,7 +496,7 @@ describe('container usage context', () => {
 
   it('requires bounded isolated attribution for non-shared sandbox classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
@@ -517,7 +505,7 @@ describe('container usage context', () => {
     ).toThrow('Isolated sandbox billing requires session attribution');
   });
 
-  it.each(['Sandbox', 'SandboxContainment'] as const)(
+  it.each(['SandboxContainment'] as const)(
     'accepts isolated Standard attribution for %s',
     sandboxClassName => {
       expect(() =>
@@ -534,7 +522,7 @@ describe('container usage context', () => {
 
   it('requires session attribution for isolated Standard sandboxes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('Sandbox', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'istd-abcdef',
         subject: { type: 'org', id: 'org_standard' },
         actor: { type: 'user', id: 'user_standard' },
@@ -545,7 +533,7 @@ describe('container usage context', () => {
 
   it('rejects unsupported isolated origins at the sandbox RPC boundary', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
@@ -557,26 +545,26 @@ describe('container usage context', () => {
 
   it('rejects a sandbox ID that does not match the concrete container class', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxDIND', {
+      assertSandboxBillingAllocation('SandboxContainment', {
         sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).toThrow('SandboxDIND billing received an incompatible sandbox ID');
+    ).toThrow('SandboxContainment billing received an incompatible sandbox ID');
   });
 
   it('rejects isolated Standard IDs for Small container classes', () => {
     expect(() =>
-      assertSandboxBillingAllocation('SandboxSmall', {
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
         sandboxId: 'istd-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).toThrow('SandboxSmall billing received an incompatible sandbox ID');
+    ).toThrow('SandboxSmallContainment billing received an incompatible sandbox ID');
   });
 
   it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {

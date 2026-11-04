@@ -173,8 +173,8 @@ function createInternalApiContext(options: {
     authToken: effectiveAuthToken,
     request: { headers } as Request,
     env: {
-      Sandbox: {} as TRPCContext['env']['Sandbox'],
-      SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
+      SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+      SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
       SANDBOX_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
@@ -212,6 +212,9 @@ function createInternalApiContext(options: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
       CREDENTIAL_CONTAINMENT_ENABLED: options.credentialContainmentEnabled,
+      CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS:
+        options.credentialContainmentEnabled === 'false' ? '*' : undefined,
     },
   } as TRPCContext;
 }

@@ -120,6 +120,10 @@ it.each(['queue', 'queue_vercel'])(
         reason: 'queue_limit',
       });
       expect(persist).toHaveBeenCalledTimes(8);
+      expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+        reason: 'queue_limit',
+        usage_id: payload.core.id,
+      });
       // Completing one actual writer promise releases one slot while all peers remain pending.
       held.pending[0].resolve(recorded);
       expect((await held.work[0]).status).toBe(200);
@@ -156,6 +160,10 @@ it.each([
   expect(response.status).toBe(429);
   await expect(response.json()).resolves.toEqual({ error: 'Usage writer overloaded', reason });
   expect(persist).not.toHaveBeenCalled();
+  expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+    reason,
+    usage_id: payload.core.id,
+  });
 });
 
 it.each([undefined, 'region_handoff', 'unknown', 'QUEUE', 'sensitive-arbitrary-source'])(
@@ -250,18 +258,27 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
     .filter(line => line?.event === 'usage_writer_admission');
   expect(admission).toHaveLength(2);
   expect(admission.map(line => line.outcome)).toEqual(['admitted', 'rejected']);
-  for (const line of admission)
-    expect(Object.keys(line).sort()).toEqual([
-      'active',
-      'event',
-      'limit',
-      'outcome',
-      'pool',
-      'pool_max',
-      'reason',
-      'sample_rate',
-      'writer_caller',
-    ]);
+  expect(Object.keys(admission[0]).sort()).toEqual([
+    'active',
+    'event',
+    'limit',
+    'outcome',
+    'pool',
+    'pool_max',
+    'reason',
+    'sample_rate',
+    'writer_caller',
+  ]);
+  expect(admission[1]).toEqual({
+    ...admission[0],
+    writer_caller: 'queue_vercel',
+    outcome: 'rejected',
+    reason: 'pool_waiting',
+    active: 0,
+    pool: { total: 0, idle: 0, waiting: 1 },
+    sample_rate: 1,
+    usage_id: payload.core.id,
+  });
   expect(JSON.stringify(admission)).not.toContain('sensitive');
   expect(JSON.stringify(admission)).not.toContain('synthetic-route-secret');
   writerPool.waitingCount = 0;

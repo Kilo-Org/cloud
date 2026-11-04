@@ -178,3 +178,51 @@ test('a run that throws discards the uploads the session never took', async () =
 
   expect(mockDiscardUploadedAttachmentsFn).toHaveBeenCalledWith('user_1', uploadedAttachments);
 });
+
+const messageWithAttachment = {
+  ...message,
+  attachments: [{ type: 'file', name: 'notes.md', mimeType: 'text/plain' }],
+} as unknown as Message;
+
+test('the platform attachment fetcher bounds the message uploads', async () => {
+  const fetchAttachmentUrl = jest.fn(async () => new Response('body'));
+  mockRequireByAdapterFn.mockReturnValue(
+    createBotPlatform({ createAttachmentUrlFetcher: jest.fn(async () => fetchAttachmentUrl) })
+  );
+
+  await processLinkedMessage({
+    thread,
+    message: messageWithAttachment,
+    platformIntegration: integration,
+    user,
+  });
+
+  expect(mockExtractAndUploadAttachmentsFn).toHaveBeenCalledWith(messageWithAttachment, 'user_1', {
+    fetchAttachmentUrl,
+  });
+});
+
+test('a failing platform attachment fetcher still forwards the message files', async () => {
+  mockRequireByAdapterFn.mockReturnValue(
+    createBotPlatform({
+      createAttachmentUrlFetcher: jest.fn(async () => {
+        throw new Error('no installation');
+      }),
+    })
+  );
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(uploadedAttachments);
+
+  await processLinkedMessage({
+    thread,
+    message: messageWithAttachment,
+    platformIntegration: integration,
+    user,
+  });
+
+  expect(mockExtractAndUploadAttachmentsFn).toHaveBeenCalledWith(messageWithAttachment, 'user_1', {
+    fetchAttachmentUrl: undefined,
+  });
+  expect(mockRunBotAgentFn).toHaveBeenCalledWith(
+    expect.objectContaining({ attachments: uploadedAttachments.attachments })
+  );
+});

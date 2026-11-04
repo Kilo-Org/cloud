@@ -116,6 +116,8 @@ const cases: ReadonlyArray<
   ['billing_blocked', 'accepted', 'failed', 'pre_dispatch', 'payment_required'],
   ['container_limit_reached', 'pre_dispatch', 'failed', 'pre_dispatch', 'container_limit_reached'],
   ['container_limit_reached', 'accepted', 'failed', 'pre_dispatch', 'container_limit_reached'],
+  ['account_blocked', 'pre_dispatch', 'failed', 'pre_dispatch', 'account_blocked'],
+  ['account_blocked', 'accepted', 'failed', 'pre_dispatch', 'account_blocked'],
   ['invalid_configuration', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   ['invalid_configuration', 'accepted', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   [
@@ -175,6 +177,21 @@ describe('classifyControlPlaneFailure', () => {
       reportStatus: 'failed',
       responsibility: 'user',
       failureReason: 'container_limit_reached',
+    });
+  });
+  it('attributes a blocked account to the user with its own reason', () => {
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'account_blocked',
+        dispatchState: 'pre_dispatch',
+        status: 'failed',
+      })
+    ).toEqual({
+      stage: 'pre_dispatch',
+      code: 'account_blocked',
+      reportStatus: 'failed',
+      responsibility: 'user',
+      failureReason: 'account_blocked',
     });
   });
   it('attributes Vercel billing credit denial to the user and admission outage to the platform', () => {

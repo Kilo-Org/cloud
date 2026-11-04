@@ -80,6 +80,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
+  'lib/url-authority.ts': 'URL scheme and hostname normalization',
 };
 
 /** The `.toUpperCase(` / `.toLowerCase(` call the class is about. */

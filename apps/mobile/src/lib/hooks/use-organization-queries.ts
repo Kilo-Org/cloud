@@ -109,8 +109,13 @@ export function isInvitedOrgMember(member: OrgMember): member is InvitedOrgMembe
  * Parent organization's Kilo Pass for Orgs summary. The API is restricted to
  * the parent agreement owner (`organizationParentBillingProcedure` rejects
  * child orgs and non-billing roles), so `enabled` must only be true when the
- * user has a billing-capable role AND `withMembers` confirmed
- * `parent_organization_id === null` — children must never fire this query.
+ * user has a billing-capable role AND no payload reports a parent id AND the
+ * membership payload confirmed this organization is top-level
+ * (`parent_organization_id === null` on `withMembers`). A child organization —
+ * from either payload — and one whose parent link is still unknown must never
+ * fire this query. A `null` in an `organizations.list` entry is not
+ * confirmation on its own: that entry can be a persisted value written before
+ * an admin moved the organization under a parent.
  */
 export function useOrgKiloPassSummary(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();

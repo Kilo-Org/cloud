@@ -1,4 +1,5 @@
 import { getScimSyncDOStub, ScimSyncDO } from './dos/ScimSyncDO';
+import { logger } from './util/logger';
 
 export { ScimSyncDO };
 
@@ -18,5 +19,17 @@ export default {
     }
 
     return Response.json({ error: 'Not found' }, { status: 404 });
+  },
+
+  /**
+   * Watchdog. The Durable Object reschedules itself after every poll, so this
+   * only matters when that chain dies — an eviction with exhausted alarm
+   * retries. `ensureScheduled` leaves a live alarm alone.
+   */
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const { armed, nextAlarmAt } = await getScimSyncDOStub(env).ensureScheduled();
+    if (armed) {
+      logger.warn('SCIM sync was not scheduled; cron re-armed it', { nextAlarmAt });
+    }
   },
 };

@@ -182,6 +182,18 @@ export function getLocalScopeKey(): string | null {
 }
 
 /**
+ * Adopt the scope of a frame this process is about to publish, before the sinks
+ * draw it. A publisher records its waiting ask from the same context it draws
+ * for, and the platform sinks draw before the persist sink writes the frame, so
+ * the ask store hands that context over here instead of leaving the fences on
+ * the previous scope until the write lands. Only a live context reaches this:
+ * a restored record does not (see `restorePersistedGlanceable`).
+ */
+export function adoptGlanceableScopeKey(scopeKey: string): void {
+  localScopeKey = scopeKey;
+}
+
+/**
  * One mirror write, issued only after the previous one settled. The snapshot
  * carries its own scope key, so one write is the whole record: a restart can
  * never pair one publish's snapshot with another publish's scope key. The
@@ -285,6 +297,11 @@ export async function restorePersistedGlanceable(): Promise<void> {
       // identity read names that same scope, so a key left behind by another
       // account never becomes this process's scope.
       const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
+      // A live publish that landed during this read owns the scope, the same as
+      // one that landed during either read above.
+      if (persistEpoch !== startEpoch) {
+        return;
+      }
       if (legacyScopeKey !== null && legacyScopeKey === authenticatedScopeKey) {
         localScopeKey = legacyScopeKey;
       }

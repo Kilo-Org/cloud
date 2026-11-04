@@ -337,6 +337,28 @@ describe('restorePersistedGlanceable', () => {
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
   });
 
+  it('does not clobber a publish that lands during the legacy scope-key read', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    const otherScope = buildOpaqueScopeKey({ userId: 'u2', organizationId: null });
+    store.set(SCOPE_KEY, scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStoreMock.getItemAsync.mockImplementation((key: string) => {
+      const value = store.get(key) ?? null;
+      if (key === SCOPE_KEY) {
+        // The live publish lands after the identity read and while the legacy
+        // entry is being read.
+        persistGlanceableSink.publish({ ...snapshotFor([]), scopeKey: otherScope });
+      }
+      return Promise.resolve(value);
+    });
+
+    await restorePersistedGlanceable();
+
+    // The publish owns the scope, the same as one that lands during either
+    // earlier read of the restore.
+    expect(getLocalScopeKey()).toBe(otherScope);
+  });
+
   // The previous release stored the snapshot and the scope key as two records.
   // An install that upgrades with that pair on disk must still restore, and the
   // record's own scope key is what a restart uses from then on.

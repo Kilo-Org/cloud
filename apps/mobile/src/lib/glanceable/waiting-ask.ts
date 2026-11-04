@@ -7,7 +7,11 @@ import { z } from 'zod';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
-import { getAuthenticatedGlanceableScopeKey, getLocalScopeKey } from './persist';
+import {
+  adoptGlanceableScopeKey,
+  getAuthenticatedGlanceableScopeKey,
+  getLocalScopeKey,
+} from './persist';
 
 /**
  * One durable record of the oldest waiting ask: the session the activity's
@@ -247,6 +251,13 @@ export function recordWaitingAsk(ask: WaitingAsk | null): void {
   waitingAskEpoch += 1;
   currentAsk = ask;
   recordedInProcess = true;
+  if (ask !== null) {
+    // A live record carries the context the publisher draws for, and the
+    // platform sinks draw before the persist sink writes the frame: adopt it
+    // here so the draw-time fence judges this ask by the scope it was recorded
+    // for, not by the one still in memory.
+    adoptGlanceableScopeKey(ask.scopeKey);
+  }
   mirrorAsk(ask);
 }
 

@@ -515,6 +515,28 @@ describe('waiting ask store', () => {
     await expect(readWaitingAsk()).resolves.toBeNull();
   });
 
+  // The platform sinks draw a frame before the persist sink writes it, and the
+  // publisher records the ask before it emits: the record's own scope is the
+  // one the frame belongs to, so the first frame of a new scope already offers
+  // the ask it selected.
+  it('draws the ask the next frame records before that frame reaches the sink', () => {
+    recordWaitingAsk(askFor());
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: 'u1',
+        organizationId: null,
+        now: NOW,
+      })
+    );
+
+    const nextCtx = { userId: 'u2', organizationId: null };
+    const next = askFor({ scopeKey: buildOpaqueScopeKey(nextCtx), userId: 'u2' });
+    recordWaitingAsk(next);
+
+    expect(getWaitingAsk()).toEqual(next);
+  });
+
   it('treats a malformed mirror as absent', async () => {
     store.set(ASK_KEY, JSON.stringify({ kiloSessionId: 42 }));
     await expect(readWaitingAsk()).resolves.toBeNull();

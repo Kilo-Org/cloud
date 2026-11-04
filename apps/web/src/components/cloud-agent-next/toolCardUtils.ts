@@ -30,16 +30,7 @@ export function getToolInputPath(input: Record<string, unknown> | undefined): st
   return undefined;
 }
 
-export function getFilename(filePath: string): string {
-  const parts = filePath.split('/');
-  return parts[parts.length - 1] || filePath;
-}
-
-export function getDirectoryName(path: string): string {
-  const cleaned = path.replace(/\/+$/, '');
-  const parts = cleaned.split('/');
-  return parts[parts.length - 1] || path || '.';
-}
+export { getDirectoryName, getFilename } from '@kilocode/app-shared/utils';
 
 export function formatDuration(ms: number): string {
   const seconds = ms / 1000;

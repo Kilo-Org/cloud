@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseTimestamp, timestampMs } from './utils';
+import { getDirectoryName, getFilename, parseTimestamp, timestampMs } from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -87,5 +87,36 @@ describe('timestampMs', () => {
     expect(timestampMs('')).toBeNull();
     expect(timestampMs('2026-02-30')).toBeNull();
     expect(timestampMs('not-a-timestamp')).toBeNull();
+  });
+});
+
+describe('getFilename', () => {
+  it('returns the last path segment', () => {
+    expect(getFilename('/workspace/project/report.pdf')).toBe('report.pdf');
+    expect(getFilename('a/b/c')).toBe('c');
+  });
+
+  it('returns the input when there is no slash', () => {
+    expect(getFilename('plain-name')).toBe('plain-name');
+  });
+
+  it('falls back to the input when the segment is empty', () => {
+    expect(getFilename('')).toBe('');
+    expect(getFilename('a/b/')).toBe('a/b/');
+  });
+});
+
+describe('getDirectoryName', () => {
+  it('returns the last directory name', () => {
+    expect(getDirectoryName('a/b/c')).toBe('c');
+    expect(getDirectoryName('/workspace/app')).toBe('app');
+  });
+
+  it('treats a trailing slash as naming its directory', () => {
+    expect(getDirectoryName('a/b/')).toBe('b');
+  });
+
+  it('renders an empty path as the current directory', () => {
+    expect(getDirectoryName('')).toBe('.');
   });
 });

@@ -66,6 +66,27 @@ export function fromMicrodollars(microdollars: number): number {
   return microdollars / 1000000;
 }
 
+/**
+ * Last path segment of a `/`-separated path, falling back to the whole input
+ * when the segment is empty. Shared by the web and mobile Cloud Agent tool
+ * cards so both render the same file label.
+ */
+export function getFilename(filePath: string): string {
+  const parts = filePath.split('/');
+  return parts[parts.length - 1] || filePath;
+}
+
+/**
+ * Last directory name of a `/`-separated path. A trailing slash names the
+ * directory it terminates rather than an empty segment, and an empty input
+ * renders as `.`.
+ */
+export function getDirectoryName(path: string): string {
+  const cleaned = path.replace(/\/+$/, '');
+  const parts = cleaned.split('/');
+  return parts[parts.length - 1] || path || '.';
+}
+
 export function formatDollars(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

@@ -39,7 +39,11 @@ const secondPageHtml =
   '<!doctype html><html><head><title>Second fixture page</title></head><body><main><h1>Second fixture page</h1></main></body></html>';
 
 const launchFixturePage = async (
-  options: { bodyHtml?: string; pathJson?: Record<string, string> } = {}
+  options: {
+    bodyHtml?: string;
+    pathJson?: Record<string, string>;
+    pathText?: Record<string, string>;
+  } = {}
 ): Promise<{
   context: BrowserContext;
   extensionId: string;
@@ -51,6 +55,7 @@ const launchFixturePage = async (
     bodyHtml: options.bodyHtml ?? fixtureBodyHtml,
     pathHtml: { [secondPath]: secondPageHtml },
     ...(options.pathJson === undefined ? {} : { pathJson: options.pathJson }),
+    ...(options.pathText === undefined ? {} : { pathText: options.pathText }),
     title: fixtureTitle,
   });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -493,9 +498,15 @@ const accountResponseBody = JSON.stringify({
   material: '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
 });
 
+const materialTextBody = [
+  'downloaded material',
+  '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
+].join('\n');
+
 test('safe mode hides private-key material in a captured response body', async () => {
   const { context, extensionId, fixture, page, userDataDir } = await launchFixturePage({
     pathJson: { '/account.json': accountResponseBody },
+    pathText: { '/material.txt': materialTextBody },
   });
 
   try {
@@ -545,6 +556,28 @@ test('safe mode hides private-key material in a captured response body', async (
           },
         ],
         [{ choices: [{ delta: { content: 'The captured body hides the key material.' } }] }],
+        [
+          {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      function: {
+                        arguments: JSON.stringify({ index: 2, part: 'response-body' }),
+                        name: 'kilo_browser_network_request',
+                      },
+                      id: 'call_request_2',
+                      index: 0,
+                      type: 'function',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        [{ choices: [{ delta: { content: 'The downloaded body is hidden too.' } }] }],
       ],
       toolNames: safeToolNames,
     });
@@ -570,6 +603,18 @@ test('safe mode hides private-key material in a captured response body', async (
     await expect(panel).toContainText('"material": "[REDACTED]"');
     await expect(panel).not.toContainText('MIIEfixtureBody');
     await expect(sidePanel.getByText('The captured body hides the key material.')).toBeVisible();
+
+    await page.evaluate(async () => {
+      await fetch('/material.txt').then(response => response.text());
+    });
+
+    await sendMessage(sidePanel, 'Show the second response body.');
+
+    const textPanel = toolPanel(sidePanel, 'Show network request details', 'completed').last();
+    await expect(textPanel).toContainText('downloaded material');
+    await expect(textPanel).toContainText('[REDACTED]');
+    await expect(textPanel).not.toContainText('MIIEfixtureBody');
+    await expect(sidePanel.getByText('The downloaded body is hidden too.')).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

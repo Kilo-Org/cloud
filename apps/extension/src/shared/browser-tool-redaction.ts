@@ -54,6 +54,14 @@ const matchesAnyFragment = (name: string, fragments: readonly string[]): boolean
 };
 
 /**
+ * A PEM private-key block: the BEGIN label line through the matching END line,
+ * or through the end of the text when the block is truncated, so text around
+ * the block survives the replacement.
+ */
+const PRIVATE_KEY_BLOCK_PATTERN =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/gu;
+
+/**
  * Whether the text carries PEM private-key material, whatever the name of the
  * field around it. A value that arrived percent-encoded is tested decoded too,
  * so an urlencoded form stays covered; a malformed escape matches nothing.
@@ -72,6 +80,16 @@ const containsPrivateKeyMaterial = (text: string): boolean => {
   } catch {
     return false;
   }
+};
+
+/**
+ * Replaces each PEM private-key block in text that has no structured body
+ * shape, keeping the text around it, or `undefined` when nothing matched.
+ */
+const redactUnstructuredBody = (text: string): RedactedBody | undefined => {
+  const masked = text.replaceAll(PRIVATE_KEY_BLOCK_PATTERN, BODY_MASK);
+
+  return masked === text ? undefined : { changed: true, text: masked };
 };
 
 /**
@@ -209,22 +227,25 @@ const redactJsonBody = (text: string): RedactedBody | undefined => {
 const redactBodyText = (text: string): RedactedBody | undefined => {
   const trimmed = text.trimStart();
 
+  // A body with no structured shape, such as a plain text or key-file download,
+  // Still gets the block replacement.
+  const block = redactUnstructuredBody(text);
+
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
-      return redactJsonBody(text);
+      return redactJsonBody(text) ?? block;
     } catch {
-      return undefined;
+      return block;
     }
   }
 
   if (trimmed.includes('=')) {
-    // The form passes report a body only when they replaced something.
     const form = redactFormBody(text);
 
-    return form === undefined ? undefined : { changed: true, text: form };
+    return form === undefined ? block : { changed: true, text: form };
   }
 
-  return undefined;
+  return block;
 };
 
 /**
@@ -289,8 +310,10 @@ export const renderResponseBody = (body: string, base64Encoded: boolean | undefi
  * stray non-pair segment never disables the pass.
  */
 const redactFormBody = (text: string): string | undefined => {
-  // A line of `--<boundary>` delimiters marks a multipart body.
-  if (/^--[^\r\n]+\r?$/m.test(text)) {
+  // A line of `--<boundary>` delimiters plus a part header marks a multipart
+  // Body; text whose lines merely start with `--` stays urlencoded and still
+  // Gets the pair pass.
+  if (/^--[^\r\n]+\r?$/m.test(text) && /^content-disposition:/im.test(text)) {
     return redactMultipartBody(text);
   }
 
@@ -321,7 +344,11 @@ const redactFormBody = (text: string): string | undefined => {
   return changed ? masked.join('&') : undefined;
 };
 
-const MULTIPART_FIELD_NAME_PATTERN = /name="([^"]*)"/u;
+/** A part header line: every `form-data` disposition starts a part, named or not. */
+const MULTIPART_PART_PATTERN = /^content-disposition:.*\bform-data\b/iu;
+
+/** The `name` parameter, quoted or as a bare token, so a file part without one is still a part. */
+const MULTIPART_FIELD_NAME_PATTERN = /;\s*name="?([^";\r\n]*)"?/iu;
 
 const redactMultipartBody = (text: string): string | undefined => {
   const lines = text.split('\r\n');
@@ -337,11 +364,14 @@ const redactMultipartBody = (text: string): string | undefined => {
   let index = 0;
 
   while (index < lines.length) {
-    const disposition = (lines[index] ?? '').match(MULTIPART_FIELD_NAME_PATTERN);
+    const line = lines[index] ?? '';
+    const isPart = MULTIPART_PART_PATTERN.test(line);
 
     let nextIndex = index + 1;
 
-    if (disposition !== null) {
+    if (isPart) {
+      const name = MULTIPART_FIELD_NAME_PATTERN.exec(line)?.[1] ?? '';
+
       // Skip the part's header lines to the blank separator, then the value
       // Region up to the next delimiter line, keeping the delimiter. The header
       // Scan stops at a delimiter too, so a part without a separator line cannot
@@ -372,7 +402,7 @@ const redactMultipartBody = (text: string): string | undefined => {
 
       if (
         hasValue &&
-        (matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS) ||
+        (matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS) ||
           containsPrivateKeyMaterial(lines.slice(valueIndex, endIndex).join('\r\n')))
       ) {
         lines.splice(valueIndex, endIndex - valueIndex, BODY_MASK);

@@ -25,11 +25,13 @@ export const startFixtureServer = async ({
   bodyHtml,
   pathHtml,
   pathJson,
+  pathText,
   title = 'Kilo extension fixture',
 }: {
   bodyHtml?: string;
   pathHtml?: Record<string, string>;
   pathJson?: Record<string, string>;
+  pathText?: Record<string, string>;
   title?: string;
 } = {}): Promise<FixtureServer> => {
   const fallbackHtml = `<!doctype html>
@@ -49,6 +51,15 @@ export const startFixtureServer = async ({
     if (json !== undefined) {
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       response.end(json);
+
+      return;
+    }
+
+    const text = pathText?.[requestPath];
+
+    if (text !== undefined) {
+      response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end(text);
 
       return;
     }

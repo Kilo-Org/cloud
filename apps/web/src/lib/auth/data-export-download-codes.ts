@@ -145,7 +145,7 @@ export async function reserveDataExportDownloadCode(
       await tx
         .update(magic_link_tokens)
         .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-        .where(eq(magic_link_tokens.challenge_id, challengeId));
+        .where(challengeFilter(challengeId));
       return 'invalid';
     }
     if (row.reserved) return 'in_progress';
@@ -155,7 +155,7 @@ export async function reserveDataExportDownloadCode(
       .set({
         reserved_until: sql`NOW() + interval '${sql.raw(String(CODE_RESERVATION_MINUTES))} minutes'`,
       })
-      .where(eq(magic_link_tokens.challenge_id, challengeId));
+      .where(challengeFilter(challengeId));
     return 'ok';
   });
 }

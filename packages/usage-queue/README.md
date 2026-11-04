@@ -26,7 +26,7 @@ The external integration points are deliberately small:
 | Existing owner | Queue integration |
 |---|---|
 | Shared `usage-publisher.ts` | Import the package selector/publisher and delegate only on exact staging opt-in; existing Cloudflare code stays here |
-| Shared `config.server.ts` | OR the isolated selector into the existing queue-only choice; the package owns the selector logic |
+| Shared `config.server.ts` | Select queued accounting under the staging environment guard; the package selector chooses Vercel publication only |
 | Gateway `vercel.mjs` / `package.json` | Compose the queue deployment settings and run the queue prepare/test commands |
 | Gateway/shared manifests | Workspace dependency on this package; no direct Vercel SDK dependency |
 | Existing writer route/diagnostics/client | Recognize `queue_vercel` for caller correlation; no queue SDK dependency or persistence change |

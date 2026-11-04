@@ -166,14 +166,17 @@ jest.mock(
     getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
-  ).allowsInferenceProviderUserByok,
-  evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
-  getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
-  isModelAllowedForProviderKey: jest.fn().mockResolvedValue(true),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ).allowsInferenceProviderUserByok,
+    evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
+    getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+    isModelAllowedForProviderKey: jest.fn().mockResolvedValue(true),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
   isNonTrialEnterpriseOrganization: jest.fn(async () => false),
 }));

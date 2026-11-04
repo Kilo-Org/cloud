@@ -78,9 +78,12 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),

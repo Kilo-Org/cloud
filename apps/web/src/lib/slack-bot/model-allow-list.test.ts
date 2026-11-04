@@ -18,19 +18,23 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
 // production deny/allow semantics. Only the two database-backed entry points are
 // stubbed, plus the provider lookup, which is the documented seam that keeps the
 // decision independent of the live model catalog.
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => {
-  const actual = jest.requireActual<typeof EffectiveModelAccess>(
-    '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
-  );
-  return {
-    ...actual,
-    resolveOrganizationDefaultModelPolicy: jest.fn(),
-    getEffectiveModelDecision: (
-      policy: Parameters<typeof actual.getEffectiveModelDecision>[0],
-      modelId: string
-    ) => actual.getEffectiveModelDecision(policy, modelId, async () => new Set(['test-provider'])),
-  };
-});
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => {
+    const actual = jest.requireActual<typeof EffectiveModelAccess>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    );
+    return {
+      ...actual,
+      resolveOrganizationDefaultModelPolicy: jest.fn(),
+      getEffectiveModelDecision: (
+        policy: Parameters<typeof actual.getEffectiveModelDecision>[0],
+        modelId: string
+      ) =>
+        actual.getEffectiveModelDecision(policy, modelId, async () => new Set(['test-provider'])),
+    };
+  }
+);
 
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';

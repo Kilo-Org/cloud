@@ -13,9 +13,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { name: 'primary' },
   readDb: { name: 'replica' },

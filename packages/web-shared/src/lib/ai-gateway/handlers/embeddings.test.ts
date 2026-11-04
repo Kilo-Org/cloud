@@ -27,9 +27,12 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   releaseDecideLease: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
 }));

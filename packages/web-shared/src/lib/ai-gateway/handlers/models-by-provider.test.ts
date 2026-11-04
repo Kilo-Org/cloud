@@ -36,12 +36,15 @@ jest.mock(
     getProviderSlugsForModel: mockProviderLookup,
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  ...(jest.requireActual(
-    '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
-  ) as Record<string, unknown>),
-  resolveOrganizationMemberModelPolicy: mockResolvePolicy,
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    ...(jest.requireActual(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ) as Record<string, unknown>),
+    resolveOrganizationMemberModelPolicy: mockResolvePolicy,
+  })
+);
 
 async function loadHandler() {
   jest.resetModules();

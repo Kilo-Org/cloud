@@ -23,23 +23,26 @@ jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
   isModelRestrictionExempt: jest.fn(async () => false),
   getModelInferenceProviders: jest.fn(async () => undefined),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server', () => ({
-  resolveOrganizationMemberModelPolicy: jest.fn(
-    async (): Promise<EffectiveOrganizationModelPolicy> => ({
-      requireModelInCurrentSnapshot: true,
-      organizationModelDenyList: [],
-      memberGrant: {
-        mode: 'selected',
-        includeOrganizationBaseline: false,
-        modelAllowList: [],
-        providerAllowList: ['alpha'],
-      },
-      policyRevision: 1,
-      customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
-    })
-  ),
-  isModelRouteAllowed: mockIsModelRouteAllowed,
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelPolicy: jest.fn(
+      async (): Promise<EffectiveOrganizationModelPolicy> => ({
+        requireModelInCurrentSnapshot: true,
+        organizationModelDenyList: [],
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: [],
+          providerAllowList: ['alpha'],
+        },
+        policyRevision: 1,
+        customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
+      })
+    ),
+    isModelRouteAllowed: mockIsModelRouteAllowed,
+  })
+);
 
 async function loadHandlers() {
   jest.resetModules();

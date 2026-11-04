@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/icons';
 
 import {
+  BUILTIN_AGENT_MODES,
   type BuiltinAgentMode,
   isBuiltinAgentMode,
   normalizeAgentMode,
@@ -20,33 +21,39 @@ export type BuiltinModeOption = {
   descriptionKey: string;
 };
 
-export const MODE_OPTIONS: readonly BuiltinModeOption[] = [
-  {
-    value: 'code',
+/**
+ * Copy keys per built-in mode. Keyed by the union, so a slug added to
+ * `BUILTIN_AGENT_MODES` without copy is a compile error.
+ */
+const MODE_COPY = {
+  code: {
     labelKey: 'agentChat.modeOptions.code',
     descriptionKey: 'agentChat.modeOptions.codeDescription',
   },
-  {
-    value: 'plan',
+  plan: {
     labelKey: 'agentChat.modeOptions.plan',
     descriptionKey: 'agentChat.modeOptions.planDescription',
   },
-  {
-    value: 'debug',
+  debug: {
     labelKey: 'agentChat.modeOptions.debug',
     descriptionKey: 'agentChat.modeOptions.debugDescription',
   },
-  {
-    value: 'orchestrator',
+  orchestrator: {
     labelKey: 'agentChat.modeOptions.orchestrator',
     descriptionKey: 'agentChat.modeOptions.orchestratorDescription',
   },
-  {
-    value: 'ask',
+  ask: {
     labelKey: 'agentChat.modeOptions.ask',
     descriptionKey: 'agentChat.modeOptions.askDescription',
   },
-];
+} satisfies Record<BuiltinAgentMode, Omit<BuiltinModeOption, 'value'>>;
+
+/** The picker rows, in `BUILTIN_AGENT_MODES` order. */
+export const MODE_OPTIONS: readonly BuiltinModeOption[] = BUILTIN_AGENT_MODES.map(value => ({
+  value,
+  labelKey: MODE_COPY[value].labelKey,
+  descriptionKey: MODE_COPY[value].descriptionKey,
+}));
 
 const MODE_ICONS = {
   code: Code,
@@ -63,16 +70,10 @@ export function getModeIcon(mode: string | null | undefined): LucideIcon {
 
 export function getBuiltinModeLabelKey(mode: string): string | null {
   const normalized = normalizeAgentMode(mode);
-  if (!isBuiltinAgentMode(normalized)) {
-    return null;
-  }
-  return MODE_OPTIONS.find(option => option.value === normalized)?.labelKey ?? null;
+  return isBuiltinAgentMode(normalized) ? MODE_COPY[normalized].labelKey : null;
 }
 
 export function getBuiltinModeDescriptionKey(mode: string): string | null {
   const normalized = normalizeAgentMode(mode);
-  if (!isBuiltinAgentMode(normalized)) {
-    return null;
-  }
-  return MODE_OPTIONS.find(option => option.value === normalized)?.descriptionKey ?? null;
+  return isBuiltinAgentMode(normalized) ? MODE_COPY[normalized].descriptionKey : null;
 }

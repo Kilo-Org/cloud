@@ -96,7 +96,11 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-export const RTL_LANGUAGES = new Set<string>(['ar', 'he', 'fa', 'ur', 'ckb', 'ps']);
+/**
+ * The shipped tags written right to left. Typed as `SupportedLanguage`, so a
+ * tag the app does not ship is a compile error.
+ */
+export const RTL_LANGUAGES = new Set<SupportedLanguage>(['ar', 'he', 'fa', 'ur', 'ckb', 'ps']);
 
 /** Each language's name in its own language, for the picker rows. */
 export const LANGUAGE_ENDONYMS = {

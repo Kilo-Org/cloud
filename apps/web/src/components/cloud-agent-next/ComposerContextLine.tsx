@@ -15,6 +15,7 @@ export function ComposerContextLine({
   reserve,
   repository,
   branch,
+  environmentName,
   contextTokens,
   contextWindow,
   cloudAgentSessionId,
@@ -25,6 +26,7 @@ export function ComposerContextLine({
   reserve: boolean;
   repository: string | undefined;
   branch: string | undefined;
+  environmentName?: string;
   contextTokens: number | undefined;
   contextWindow: number | undefined;
   cloudAgentSessionId?: string;
@@ -42,11 +44,12 @@ export function ComposerContextLine({
   const hasMultipleRepositories = repositories !== undefined && repositories.length > 1;
   const mainRepository = repository || repositories?.[0]?.repoFullName;
   const hasUsage = contextTokens !== undefined && contextWindow !== undefined;
-  if (!reserve && !repository && !branch && !hasUsage && !hasMultipleRepositories) return null;
+  if (!reserve && !repository && !branch && !environmentName && !hasUsage && !hasMultipleRepositories)
+    return null;
 
   return (
     <div className="text-muted-foreground flex min-h-11 items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:min-h-12 md:pb-4">
-      {(mainRepository || branch) && (
+      {(mainRepository || branch || environmentName) && (
         <div className="flex min-w-0 items-center gap-1.5">
           <GitBranch className="h-3 w-3 shrink-0" aria-hidden />
           {hasMultipleRepositories ? (
@@ -79,6 +82,14 @@ export function ComposerContextLine({
             <>
               {mainRepository && <span>·</span>}
               <span className="truncate">{branch}</span>
+            </>
+          )}
+          {environmentName && (
+            <>
+              {(mainRepository || branch) && <span>·</span>}
+              <span className="truncate" title={`Environment: ${environmentName}`}>
+                {environmentName}
+              </span>
             </>
           )}
         </div>

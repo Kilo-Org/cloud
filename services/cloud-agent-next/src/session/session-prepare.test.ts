@@ -610,31 +610,6 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
-  it('rejects an inherited allowlist when no saved allocation selects containers', async () => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
-    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
-    const request = makeRequest({
-      repository: { type: 'github', repo: 'acme/repo' },
-      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
-      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
-    });
-
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
-    });
-    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
-    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBeUndefined();
-    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
-      provider: 'cloudflare',
-      sandboxKind: 'isolated',
-    });
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-  });
-
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-single');

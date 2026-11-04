@@ -448,6 +448,26 @@ describe('body redaction', () => {
     );
   });
 
+  it('replaces a pgp armored block in a plain text body', () => {
+    const block = [
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      'MIIEfixtureBody',
+      '-----END PGP PRIVATE KEY BLOCK-----',
+    ].join('\n');
+
+    expect(redactSensitiveBody(['downloaded material', block, 'trailer'].join('\n'))).toBe(
+      ['downloaded material', '[REDACTED]', 'trailer'].join('\n')
+    );
+  });
+
+  it('replaces a block in a form segment that carries no separator', () => {
+    expect(
+      redactSensitiveBody(
+        'password=hunter2&-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody&flag=true'
+      )
+    ).toBe('password=[REDACTED]&[REDACTED]');
+  });
+
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
   });

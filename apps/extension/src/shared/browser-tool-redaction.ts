@@ -54,12 +54,12 @@ const matchesAnyFragment = (name: string, fragments: readonly string[]): boolean
 };
 
 /**
- * A PEM private-key block: the BEGIN label line through the matching END line,
- * or through the end of the text when the block is truncated, so text around
- * the block survives the replacement.
+ * A private-key block: the BEGIN label line through the matching END line, or
+ * through the end of the text when the block is truncated, so text around the
+ * block survives the replacement. `BLOCK` covers the PGP armor label.
  */
 const PRIVATE_KEY_BLOCK_PATTERN =
-  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/gu;
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|$)/gu;
 
 /**
  * Whether the text carries PEM private-key material, whatever the name of the
@@ -219,33 +219,37 @@ const redactJsonBody = (text: string): RedactedBody | undefined => {
     return undefined;
   }
 
-  const redacted = redactJsonContainer(parsed.data);
+  try {
+    const redacted = redactJsonContainer(parsed.data);
 
-  return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };
+    return { changed: redacted.changed, text: JSON.stringify(redacted.value, null, 2) };
+  } catch {
+    return undefined;
+  }
 };
 
 const redactBodyText = (text: string): RedactedBody | undefined => {
   const trimmed = text.trimStart();
 
-  // A body with no structured shape, such as a plain text or key-file download,
-  // Still gets the block replacement.
-  const block = redactUnstructuredBody(text);
-
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return redactJsonBody(text) ?? block;
-    } catch {
-      return block;
+    const json = redactJsonBody(text);
+
+    if (json !== undefined) {
+      return json;
+    }
+  } else if (trimmed.includes('=')) {
+    const form = redactFormBody(text);
+
+    if (form !== undefined) {
+      // The pair pass leaves a segment without a separator alone, so the block
+      // Pass still runs over its output.
+      return { changed: true, text: redactUnstructuredBody(form)?.text ?? form };
     }
   }
 
-  if (trimmed.includes('=')) {
-    const form = redactFormBody(text);
-
-    return form === undefined ? block : { changed: true, text: form };
-  }
-
-  return block;
+  // A body with no structured shape, such as a plain text or key-file download,
+  // Still gets the block replacement.
+  return redactUnstructuredBody(text);
 };
 
 /**

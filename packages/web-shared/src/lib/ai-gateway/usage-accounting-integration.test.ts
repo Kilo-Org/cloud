@@ -478,7 +478,6 @@ describe('production FRA queued accounting', () => {
     { is_free: true },
     { bouncer: undefined },
     { bouncer: { ...personalBouncer, spendWatch: true } },
-    { botId: 'synthetic-bot' },
   ])('FRA selection remains transport-only for %j', async change => {
     configureFra();
     const lifecycle = requestLifetime();
@@ -645,7 +644,6 @@ describe('production SFO queued accounting', () => {
       name: 'unknown spend-watch status',
       change: { bouncer: { ...personalBouncer, spendWatch: undefined } },
     },
-    { name: 'bot', change: { botId: 'synthetic-bot' } },
     { name: 'missing Bouncer / classifier context', change: { bouncer: undefined } },
     {
       name: 'anonymous Bouncer context',

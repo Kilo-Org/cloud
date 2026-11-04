@@ -147,8 +147,6 @@ export type MicrodollarUsageContext = {
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
-  botId?: string;
-  tokenSource?: string;
   /** Which product feature generated this API call. NULL if header not sent. */
   feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */

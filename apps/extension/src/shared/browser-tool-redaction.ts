@@ -32,14 +32,45 @@ const REPLACED_BODY_KEY_FRAGMENTS = [
   'session',
   'csrf',
   'xsrf',
+  'private_key',
+  'privatekey',
+  'private-key',
 ] as const;
 
 const BODY_MASK = '[REDACTED]';
+
+/**
+ * A PEM label line. The optional words before `PRIVATE KEY` cover the typed
+ * labels (`RSA`, `EC`, `OPENSSH`, `ENCRYPTED`) and the `PGP PRIVATE KEY BLOCK`
+ * form, while `PUBLIC KEY` and certificate labels stay unmatched.
+ */
+const PRIVATE_KEY_MATERIAL_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY/iu;
 
 const matchesAnyFragment = (name: string, fragments: readonly string[]): boolean => {
   const folded = name.toLowerCase();
 
   return fragments.some(fragment => folded.includes(fragment));
+};
+
+/**
+ * Whether the text carries PEM private-key material, whatever the name of the
+ * field around it. A value that arrived percent-encoded is tested decoded too,
+ * so an urlencoded form stays covered; a malformed escape matches nothing.
+ */
+const containsPrivateKeyMaterial = (text: string): boolean => {
+  if (PRIVATE_KEY_MATERIAL_PATTERN.test(text)) {
+    return true;
+  }
+
+  if (!text.includes('%') && !text.includes('+')) {
+    return false;
+  }
+
+  try {
+    return PRIVATE_KEY_MATERIAL_PATTERN.test(decodeURIComponent(text.replaceAll('+', ' ')));
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -72,8 +103,10 @@ interface JsonObject {
 }
 type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 
+const jsonStringSchema = z.string();
+
 const jsonValueUnion = z.union([
-  z.string(),
+  jsonStringSchema,
   z.number(),
   z.boolean(),
   z.null(),
@@ -89,6 +122,10 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => jsonValueUnion as z.Z
 
 const isJsonContainer = (value: JsonValue): value is Exclude<JsonValue, null> =>
   value !== null && (Array.isArray(value) || value instanceof Object);
+
+/** A parsed JSON string, as opposed to a number, boolean, null, array, or object. */
+const isJsonString = (value: JsonValue): value is string =>
+  jsonStringSchema.safeParse(value).success;
 
 /** A redacted rendering plus whether the walk replaced any value. */
 interface RedactedBody {
@@ -106,14 +143,20 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
     let changed = false;
 
     const elements = value.map(element => {
-      if (!isJsonContainer(element)) {
-        return element;
+      if (isJsonContainer(element)) {
+        const nested = redactJsonContainer(element);
+        changed ||= nested.changed;
+
+        return nested.value;
       }
 
-      const nested = redactJsonContainer(element);
-      changed ||= nested.changed;
+      if (isJsonString(element) && containsPrivateKeyMaterial(element)) {
+        changed = true;
 
-      return nested.value;
+        return BODY_MASK;
+      }
+
+      return element;
     });
 
     return { changed, value: elements };
@@ -132,6 +175,9 @@ const redactJsonContainer = (value: Exclude<JsonValue, null>): RedactedJson => {
       const nested = redactJsonContainer(entry);
       changed ||= nested.changed;
       result[key] = nested.value;
+    } else if (isJsonString(entry) && containsPrivateKeyMaterial(entry)) {
+      result[key] = BODY_MASK;
+      changed = true;
     } else {
       result[key] = entry;
     }
@@ -260,7 +306,10 @@ const redactFormBody = (text: string): string | undefined => {
 
     const name = pair.slice(0, separator);
 
-    if (!matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS)) {
+    if (
+      !matchesAnyFragment(name, REPLACED_BODY_KEY_FRAGMENTS) &&
+      !containsPrivateKeyMaterial(pair.slice(separator + 1))
+    ) {
       return pair;
     }
 
@@ -288,14 +337,13 @@ const redactMultipartBody = (text: string): string | undefined => {
   let index = 0;
 
   while (index < lines.length) {
-    const line = lines[index];
-    const disposition = line === undefined ? null : line.match(MULTIPART_FIELD_NAME_PATTERN);
-    const isMatch =
-      disposition !== null && matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS);
+    const disposition = (lines[index] ?? '').match(MULTIPART_FIELD_NAME_PATTERN);
 
-    if (isMatch) {
-      // Skip the part's header lines to the blank separator, then replace the
-      // Whole value region up to the next delimiter line, keeping the delimiter.
+    let nextIndex = index + 1;
+
+    if (disposition !== null) {
+      // Skip the part's header lines to the blank separator, then the value
+      // Region up to the next delimiter line, keeping the delimiter.
       let valueIndex = index + 1;
 
       while (valueIndex < lines.length && lines[valueIndex] !== '') {
@@ -309,16 +357,21 @@ const redactMultipartBody = (text: string): string | undefined => {
         endIndex += 1;
       }
 
-      if (endIndex > valueIndex) {
+      const hasValue = endIndex > valueIndex;
+
+      if (
+        hasValue &&
+        (matchesAnyFragment(disposition[1] ?? '', REPLACED_BODY_KEY_FRAGMENTS) ||
+          containsPrivateKeyMaterial(lines.slice(valueIndex, endIndex).join('\r\n')))
+      ) {
         lines.splice(valueIndex, endIndex - valueIndex, BODY_MASK);
-        index = valueIndex;
         changed = true;
-      } else {
-        index = valueIndex;
       }
-    } else {
-      index += 1;
+
+      nextIndex = valueIndex;
     }
+
+    index = nextIndex;
   }
 
   return changed ? lines.join('\r\n') : undefined;

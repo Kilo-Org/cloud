@@ -82,6 +82,59 @@ describe('body redaction', () => {
     );
   });
 
+  it('replaces every private-key field spelling in JSON bodies', () => {
+    expect(
+      redactSensitiveBody(
+        '{"private_key":"a","privateKey":"b","private-key":"c","client_email":"svc@example.com"}'
+      )
+    ).toBe(
+      JSON.stringify(
+        {
+          private_key: '[REDACTED]',
+          privateKey: '[REDACTED]',
+          'private-key': '[REDACTED]',
+          client_email: 'svc@example.com',
+        },
+        null,
+        2
+      )
+    );
+  });
+
+  it('replaces private-key material whatever its JSON key or array position', () => {
+    const pem = '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody';
+
+    expect(
+      redactSensitiveBody(JSON.stringify({ items: [{ note: 'kept' }, pem], material: pem }))
+    ).toBe(
+      JSON.stringify({ items: [{ note: 'kept' }, '[REDACTED]'], material: '[REDACTED]' }, null, 2)
+    );
+  });
+
+  it('replaces typed private-key labels and leaves public key material', () => {
+    expect(
+      redactSensitiveBody(
+        JSON.stringify({
+          ec: '-----BEGIN EC PRIVATE KEY-----',
+          pgp: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+          public: '-----BEGIN PUBLIC KEY-----',
+          cert: '-----BEGIN CERTIFICATE-----',
+        })
+      )
+    ).toBe(
+      JSON.stringify(
+        {
+          ec: '[REDACTED]',
+          pgp: '[REDACTED]',
+          public: '-----BEGIN PUBLIC KEY-----',
+          cert: '-----BEGIN CERTIFICATE-----',
+        },
+        null,
+        2
+      )
+    );
+  });
+
   it('matches keys case-insensitively and walks arrays', () => {
     expect(redactSensitiveBody('[{"Token":"t1"},{"ok":true}]')).toBe(
       JSON.stringify([{ Token: '[REDACTED]' }, { ok: true }], null, 2)
@@ -266,6 +319,54 @@ describe('body redaction', () => {
     );
   });
 
+  it('replaces a form value that holds private-key material under any name', () => {
+    const pem = '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody';
+
+    expect(redactSensitiveBody(`user=ada&material=${encodeURIComponent(pem)}&flag=true`)).toBe(
+      'user=ada&material=[REDACTED]&flag=true'
+    );
+  });
+
+  it('replaces a form value whose spaces are plus signs', () => {
+    expect(redactSensitiveBody('material=-----BEGIN+OPENSSH+PRIVATE+KEY-----&flag=true')).toBe(
+      'material=[REDACTED]&flag=true'
+    );
+  });
+
+  it('leaves a form value with a malformed escape unmatched instead of throwing', () => {
+    expect(redactSensitiveBody('material=%E0%A4%A&flag=true')).toBeUndefined();
+  });
+
+  it('replaces a multipart part value that holds private-key material under any name', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="username"',
+      '',
+      'ada',
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="material"',
+      '',
+      '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="username"',
+        '',
+        'ada',
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="material"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
   });
@@ -281,6 +382,16 @@ describe('base64 body redaction', () => {
   it('replaces listed pairs in a base64 urlencoded body', () => {
     expect(redactSensitiveBase64Body(encode('user=ada&password=hunter2'))).toBe(
       'user=ada&password=[REDACTED]'
+    );
+  });
+
+  it('replaces private-key material in a base64 JSON body', () => {
+    const body = encode(
+      JSON.stringify({ material: '-----BEGIN ENCRYPTED PRIVATE KEY-----MIIEfixtureBody' })
+    );
+
+    expect(redactSensitiveBase64Body(body)).toBe(
+      JSON.stringify({ material: '[REDACTED]' }, null, 2)
     );
   });
 

@@ -58,7 +58,7 @@ export type AuthResponseClass =
    * pair is dead (a 401 on the refresh route).
    */
   | { readonly kind: 'terminal'; readonly status: number; readonly clearCredential: boolean }
-  /** Retryable: a 408/429 carries the server's own back-off, if it named one. */
+  /** Retryable: a 408, 429 or 5xx carries the server's own back-off, if it named one. */
   | { readonly kind: 'retry'; readonly status: number; readonly retryAfterMs: number | undefined };
 
 /**

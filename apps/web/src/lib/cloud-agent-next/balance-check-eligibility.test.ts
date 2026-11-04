@@ -4,7 +4,7 @@ const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: async (...args: unknown[]) => mockIsFreeModel(...args),
+  isFreeModel: (...args: unknown[]) => mockIsFreeModel(...args),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
@@ -21,10 +21,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: (...args: unknown[]) => mockCanRouteToVercel(...args),
 }));
 
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: (...args: unknown[]) =>
-    mockResolveOrganizationMemberModelDecision(...args),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: (...args: unknown[]) =>
+      mockResolveOrganizationMemberModelDecision(...args),
+  })
+);
 
 const mockGetOpenAiChatGptStoredConnection = jest.fn();
 

@@ -984,5 +984,4 @@ export default {
   },
 };
 
-export { Sandbox } from '@cloudflare/sandbox';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

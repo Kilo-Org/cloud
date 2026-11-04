@@ -295,6 +295,188 @@ describe('GET /admin/api/api-request-log/download', () => {
     }
   });
 
+  it('exports combined request and response bodies with a single R2 GET and DB-sourced error', async () => {
+    const key = '2026-08-01/combined/log.json';
+    const request = { messages: [{ role: 'user', content: 'hello' }] };
+    const response = 'data: {"choices":[]}\n\ndata: [DONE]\n\n';
+    const error = { response_body_read_error: 'upstream disconnected' };
+    fakeR2.objects.set(`${BUCKET}/${key}`, JSON.stringify({ version: 1, request, response }));
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key, error })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toHaveLength(3);
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(response);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
+    expect(send.mock.calls[0][0]).toMatchObject({ input: { Bucket: BUCKET, Key: key } });
+  });
+
+  it('omits the response file for a combined log with a null response', async () => {
+    const key = '2026-08-01/no-response/log.json';
+    fakeR2.objects.set(
+      `${BUCKET}/${key}`,
+      JSON.stringify({ version: 1, request: { request: true }, response: null })
+    );
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_request.json`)]);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ request: true });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports DB errors without R2 reads when upload failure leaves both keys null', async () => {
+    const error = { r2_upload_error: 'R2 unavailable' };
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: null, response_r2_key: null, error })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_error.json`)]);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['invalid JSON', 'private-invalid-json-body'],
+    [
+      'unsupported version',
+      JSON.stringify({ version: 2, request: { content: 'private' }, response: null }),
+    ],
+    ['string request', JSON.stringify({ version: 1, request: 'private', response: null })],
+    ['array request', JSON.stringify({ version: 1, request: ['private'], response: null })],
+    ['null request', JSON.stringify({ version: 1, request: null, response: null })],
+    [
+      'non-string response',
+      JSON.stringify({ version: 1, request: { content: 'private' }, response: {} }),
+    ],
+    ['missing response', JSON.stringify({ version: 1, request: { content: 'private' } })],
+  ])(
+    'records load errors for a combined log with %s without exposing its payload',
+    async (_, body) => {
+      const key = '2026-08-01/malformed/log.json';
+      fakeR2.objects.set(`${BUCKET}/${key}`, body);
+      const [row] = await db
+        .insert(api_request_log)
+        .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      for (const kind of ['request', 'response']) {
+        const content = readEntry(entries, `_${row.id}_${kind}_load-error.txt`);
+        expect(content).toBe(`Failed to decode ${key} from R2: Invalid API request log envelope`);
+        expect(content).not.toContain('private');
+      }
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('records load errors for a missing combined object without aborting other rows', async () => {
+    const key = '2026-08-01/missing/log.json';
+    const error = { response_body_read_error: 'upstream disconnected' };
+    const [missing, present] = await db
+      .insert(api_request_log)
+      .values([
+        { ...baseRow, request_r2_key: key, response_r2_key: key, error },
+        { ...baseRow, request_r2_key: 'legacy/request.json' },
+      ])
+      .returning({ id: api_request_log.id });
+    fakeR2.objects.set(`${BUCKET}/legacy/request.json`, '{"legacy":true}');
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toHaveLength(4);
+    for (const kind of ['request', 'response']) {
+      expect(readEntry(entries, `_${missing.id}_${kind}_load-error.txt`)).toBe(
+        `Failed to load ${key} from R2: Object not found`
+      );
+    }
+    expect(JSON.parse(readEntry(entries, `_${missing.id}_error.json`))).toEqual(error);
+    expect(JSON.parse(readEntry(entries, `_${present.id}_request.json`))).toEqual({ legacy: true });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['GET', 'body read'])(
+    'records a combined object %s failure for both bodies with a single R2 GET',
+    async failure => {
+      const key = '2026-08-01/unreadable/log.json';
+      await db.insert(api_request_log).values({
+        ...baseRow,
+        request_r2_key: key,
+        response_r2_key: key,
+      });
+      const send = fakeR2.send.bind(fakeR2);
+      const sendSpy = jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+        if (command instanceof GetObjectCommand && command.input.Key === key) {
+          if (failure === 'GET') {
+            throw new Error('R2 GET failed');
+          }
+          return {
+            Body: {
+              transformToString: async () => {
+                throw new Error('R2 body read failed');
+              },
+            },
+          };
+        }
+        return send(command);
+      });
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      for (const kind of ['request', 'response']) {
+        expect(readEntry(entries, `_${kind}_load-error.txt`)).toBe(
+          `Failed to load ${key} from R2: Error: R2 ${failure} failed`
+        );
+      }
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['request', 'response'] as const)(
+    'retains the raw legacy %s body when only that key is populated',
+    async kind => {
+      const key = `2026-08-01/partial/${kind}.json`;
+      const body = { version: 1, request: 'legacy body, not an envelope', response: null };
+      fakeR2.objects.set(`${BUCKET}/${key}`, JSON.stringify(body));
+      const [row] = await db
+        .insert(api_request_log)
+        .values({
+          ...baseRow,
+          request_r2_key: kind === 'request' ? key : null,
+          response_r2_key: kind === 'response' ? key : null,
+        })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_${kind}.json`)]);
+      expect(JSON.parse(readEntry(entries, `_${row.id}_${kind}.json`))).toEqual(body);
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('streams a complete ZIP of R2-backed bodies across backpressured DB batches', async () => {
     // The first batch must exceed both the Node and web stream queues. This
     // keeps page two blocked until the test starts consuming the response.

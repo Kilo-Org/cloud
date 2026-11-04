@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
-import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 // The snapshot cache belongs to the handler module, so every test loads its own
 // instance through `loadHandler` and starts from a cold cache. The factories
@@ -36,12 +36,15 @@ jest.mock(
     getProviderSlugsForModel: mockProviderLookup,
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  ...(jest.requireActual(
-    '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
-  ) as Record<string, unknown>),
-  resolveOrganizationMemberModelPolicy: mockResolvePolicy,
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    ...(jest.requireActual(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ) as Record<string, unknown>),
+    resolveOrganizationMemberModelPolicy: mockResolvePolicy,
+  })
+);
 
 async function loadHandler() {
   jest.resetModules();

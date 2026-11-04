@@ -1,8 +1,9 @@
 import * as z from 'zod';
-import type {
-  EnkryptDetectorId,
-  EnkryptGuardrailApiKind,
-  EnkryptGuardrailDecision,
+import {
+  ENKRYPT_DETECTOR_IDS,
+  type EnkryptDetectorId,
+  type EnkryptGuardrailApiKind,
+  type EnkryptGuardrailDecision,
 } from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
@@ -10,6 +11,8 @@ import {
   ENKRYPT_SUMMARY_DETECTORS,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 type ReadyEnkryptInputGuardrailConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
@@ -34,19 +37,24 @@ export const ENKRYPT_MAX_SCAN_CHARACTERS = 3_000_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
-/**
- * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
- * larger header value is an Enkrypt bug. Clamping keeps the ledger insert and the balance debit
- * within column range instead of failing in the deferred write.
- */
-export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
-
 const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output or tool definitions, or start a new session, then retry. Retrying the unchanged request will not help.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
   result_message: z.string().nullish(),
 });
+
+/**
+ * How much of the request `text` covers. With a cached prefix, `text` is only the uncached suffix
+ * plus an overlap of already-scanned text.
+ */
+export type EnkryptScanCoverage = {
+  cache: 'off' | 'miss' | 'hit' | 'error';
+  totalCharacters: number;
+  totalSegments: number;
+  cachedCharacters: number;
+  cachedSegments: number;
+};
 
 export type EnkryptGuardrailScan = {
   sessionId: string | null;
@@ -55,6 +63,7 @@ export type EnkryptGuardrailScan = {
   apiKind: EnkryptGuardrailApiKind;
   clientRequestId: string | null;
   text: string;
+  coverage: EnkryptScanCoverage;
   config: EnkryptInputGuardrailConfig;
 };
 
@@ -87,6 +96,7 @@ function scanKind(config: EnkryptInputGuardrailConfig): EnkryptScanKind {
 export type EnkryptGuardrailScanResult = {
   verdict: EnkryptGuardrailVerdict;
   usageRecords: EnkryptGuardrailCall[];
+  report: EnkryptScanReport;
 };
 
 export type EnkryptDetectDependencies = {
@@ -251,9 +261,25 @@ export function guardrailBlockMessage(
 ): string {
   const enkryptBlocked = detectors.some(detector => ENKRYPT_DETECTOR_TYPES[detector] === 'block');
   const reason =
-    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ??
-    'The request was flagged by your organization policy. Review it and retry.';
-  return `Your organization's Enkrypt AI guardrail blocked this request (detected: ${detectors.join(', ')}). ${reason}`;
+    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? REQUEST_FLAGGED_REASON;
+  return `${REQUEST_BLOCKED} (detected: ${detectors.join(', ')}). ${reason}`;
+}
+
+const REQUEST_BLOCKED = "Your organization's Enkrypt AI guardrail blocked this request";
+const REQUEST_FLAGGED_REASON =
+  'The request was flagged by your organization policy. Review it and retry.';
+const RESPONSE_BLOCKED = "Your organization's Enkrypt AI guardrail blocked the model's response";
+const RESPONSE_FLAGGED_REASON =
+  'The response was flagged by your organization policy. Rephrase the request and retry.';
+
+/**
+ * `scanRequest` words a block for a request; the output guardrail scans the model's response with
+ * it and rewords the block for the response.
+ */
+export function responseBlockMessage(requestBlockMessage: string): string {
+  return requestBlockMessage
+    .replace(REQUEST_BLOCKED, RESPONSE_BLOCKED)
+    .replace(REQUEST_FLAGGED_REASON, RESPONSE_FLAGGED_REASON);
 }
 
 function attemptDecision(
@@ -275,37 +301,46 @@ export async function scanRequest(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
-  const { text, config } = scan;
-  if (text.length === 0) return { verdict: { action: 'allow' }, usageRecords: [] };
-
+  const { text, config, coverage } = scan;
   const kind = scanKind(config);
-  const baseLogFields = {
-    scan: kind,
-    organization_id: scan.organizationId,
-    session_id: scan.sessionId,
-    client_request_id: scan.clientRequestId,
-    api_kind: scan.apiKind,
-    scan_tool_results: config.scanToolResults,
-    scanned_characters: text.length,
+  const scope: ScanScope = {
+    kind,
+    logFields: {
+      organization_id: scan.organizationId,
+      session_id: scan.sessionId,
+      client_request_id: scan.clientRequestId,
+      api_kind: scan.apiKind,
+      scan_tool_results: config.scanToolResults,
+    },
+    report: {
+      scan: kind,
+      detectors_enabled: config.status === 'ready' ? enabledDetectors(config) : [],
+      detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
+      verdict_cache: coverage.cache,
+      total_characters: coverage.totalCharacters,
+      total_segments: coverage.totalSegments,
+      cached_characters: coverage.cachedCharacters,
+      cached_segments: coverage.cachedSegments,
+      scanned_characters: text.length,
+    },
   };
 
-  if (config.status === 'invalid') {
-    return failedVerdict([], baseLogFields, { scan: kind, error: 'invalid_config', latencyMs: 0 });
+  if (text.length === 0) {
+    const report = scanReport(scope, { decision: 'allowed', latencyMs: 0 });
+    if (coverage.cachedSegments > 0) logDecision(scope, report);
+    return { verdict: { action: 'allow' }, usageRecords: [], report };
   }
 
-  const logFields = {
-    ...baseLogFields,
-    detectors_enabled: Object.keys(config.detectors),
-    detectors_blocking: config.blockingDetectors,
-  };
+  if (config.status === 'invalid') {
+    return failedVerdict([], scope, { error: 'invalid_config', latencyMs: 0 });
+  }
 
   if (deps.signal.aborted) {
-    return failedVerdict([], logFields, { scan: kind, error: 'client_aborted', latencyMs: 0 });
+    return failedVerdict([], scope, { error: 'client_aborted', latencyMs: 0 });
   }
 
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    return failedVerdict([], logFields, {
-      scan: kind,
+    return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
       closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
@@ -314,7 +349,7 @@ export async function scanRequest(
 
   const apiKey = deps.apiKey;
   if (!apiKey) {
-    return failedVerdict([], logFields, { scan: kind, error: 'missing_api_key', latencyMs: 0 });
+    return failedVerdict([], scope, { error: 'missing_api_key', latencyMs: 0 });
   }
 
   const body = JSON.stringify({
@@ -347,26 +382,76 @@ export async function scanRequest(
   }));
 
   if (attempt.kind === 'failed') {
-    return failedVerdict(usageRecords, logFields, { scan: kind, error: attempt.error, latencyMs });
+    return failedVerdict(usageRecords, scope, { error: attempt.error, latencyMs });
   }
 
   const blocking = blockingDetectors(attempt.firedDetectors, config);
-  const decided = {
-    ...logFields,
-    detectors_fired: attempt.firedDetectors,
-    latency_ms: latencyMs,
-    attempts: attempts.length,
-    credits_cost: totalCredits(usageRecords),
-  };
-  if (blocking.length === 0) {
-    console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'allowed' });
-    return { verdict: { action: 'allow' }, usageRecords };
-  }
-  console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'blocked' });
-  return {
-    verdict: { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
+  const report = scanReport(scope, {
+    decision: blocking.length === 0 ? 'allowed' : 'blocked',
+    detectorsFired: attempt.firedDetectors,
     usageRecords,
+    latencyMs,
+  });
+  logDecision(scope, report);
+  return {
+    verdict:
+      blocking.length === 0
+        ? { action: 'allow' }
+        : { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
+    usageRecords,
+    report,
   };
+}
+
+type ScanScope = {
+  kind: EnkryptScanKind;
+  logFields: Record<string, unknown>;
+  report: Pick<
+    EnkryptScanReport,
+    | 'scan'
+    | 'detectors_enabled'
+    | 'detectors_blocking'
+    | 'verdict_cache'
+    | 'total_characters'
+    | 'total_segments'
+    | 'cached_characters'
+    | 'cached_segments'
+    | 'scanned_characters'
+  >;
+};
+
+function enabledDetectors(config: ReadyEnkryptInputGuardrailConfig): EnkryptDetectorId[] {
+  return ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined);
+}
+
+function scanReport(
+  scope: ScanScope,
+  outcome: {
+    decision: EnkryptScanReport['decision'];
+    error?: ScanError;
+    detectorsFired?: EnkryptDetectorId[];
+    usageRecords?: EnkryptGuardrailCall[];
+    latencyMs: number;
+  }
+): EnkryptScanReport {
+  const usageRecords = outcome.usageRecords ?? [];
+  return {
+    ...scope.report,
+    decision: outcome.decision,
+    error: outcome.error ?? null,
+    detectors_fired: outcome.detectorsFired ?? [],
+    attempts: usageRecords.length,
+    credits_cost: totalCredits(usageRecords),
+    latency_ms: outcome.latencyMs,
+  };
+}
+
+/** A client disconnect is not an Enkrypt failure, so it is logged at debug level. */
+function logDecision(scope: ScanScope, report: EnkryptScanReport): void {
+  const fields = { ...scope.logFields, ...report };
+  const failed = report.error !== null && report.decision !== 'client_aborted';
+  if (failed) warnExceptInTest('[enkrypt-guardrail] decision', fields);
+  else console.debug('[enkrypt-guardrail] decision', fields);
 }
 
 function totalCredits(usageRecords: EnkryptGuardrailCall[]): number | null {
@@ -382,49 +467,47 @@ function unavailableReason(error: ScanError): EnkryptUnavailableReason {
   return transient ? 'transient' : 'failed';
 }
 
-function failureDecision(failure: { scan: EnkryptScanKind; error: ScanError }) {
-  if (failure.error === 'client_aborted') return 'client_aborted';
-  return failure.scan === 'log_only' ? 'error_logged' : 'error_fail_closed';
+function failureDecision(kind: EnkryptScanKind, error: ScanError): EnkryptScanReport['decision'] {
+  if (error === 'client_aborted') return 'client_aborted';
+  return kind === 'log_only' ? 'error_logged' : 'error_fail_closed';
 }
 
-function failureVerdict(failure: {
-  scan: EnkryptScanKind;
-  error: ScanError;
-  closedVerdict?: EnkryptGuardrailVerdict;
-}): EnkryptGuardrailVerdict {
-  if (failure.scan === 'log_only') return { action: 'allow' };
+function failureVerdict(
+  kind: EnkryptScanKind,
+  failure: { error: ScanError; closedVerdict?: EnkryptGuardrailVerdict }
+): EnkryptGuardrailVerdict {
+  if (kind === 'log_only') return { action: 'allow' };
   return (
     failure.closedVerdict ?? { action: 'unavailable', reason: unavailableReason(failure.error) }
   );
 }
 
 /**
- * A client disconnect is not an Enkrypt failure: it is logged at debug level, and only calls that
- * reported a cost are charged, so cancelled requests do not inflate the guardrail error rate.
+ * Only calls that reported a cost are charged for a client disconnect, so cancelled requests do not
+ * inflate the guardrail error rate.
  */
 function failedVerdict(
   usageRecords: EnkryptGuardrailCall[],
-  logFields: Record<string, unknown>,
+  scope: ScanScope,
   failure: {
-    scan: EnkryptScanKind;
     error: ScanError;
     latencyMs: number;
     closedVerdict?: EnkryptGuardrailVerdict;
   }
 ): EnkryptGuardrailScanResult {
-  const clientAborted = failure.error === 'client_aborted';
-  const recordedUsageRecords = clientAborted
-    ? usageRecords.filter(usageRecord => usageRecord.creditsCost !== null)
-    : usageRecords;
-  const fields = {
-    ...logFields,
-    decision: failureDecision(failure),
+  const report = scanReport(scope, {
+    decision: failureDecision(scope.kind, failure.error),
     error: failure.error,
-    latency_ms: failure.latencyMs,
-    attempts: usageRecords.length,
-    credits_cost: totalCredits(usageRecords),
+    usageRecords,
+    latencyMs: failure.latencyMs,
+  });
+  logDecision(scope, report);
+  return {
+    verdict: failureVerdict(scope.kind, failure),
+    usageRecords:
+      failure.error === 'client_aborted'
+        ? usageRecords.filter(usageRecord => usageRecord.creditsCost !== null)
+        : usageRecords,
+    report,
   };
-  if (clientAborted) console.debug('[enkrypt-guardrail] decision', fields);
-  else warnExceptInTest('[enkrypt-guardrail] decision', fields);
-  return { verdict: failureVerdict(failure), usageRecords: recordedUsageRecords };
 }

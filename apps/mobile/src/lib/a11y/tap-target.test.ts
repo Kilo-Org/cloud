@@ -18,7 +18,9 @@ import {
   compactControlTargetDp,
   COMPOSER_CONTROL_GAP_DP,
   COMPOSER_CONTROL_HIT_SLOP_DP,
+  COMPOSER_VOICE_SEND_GAP_CLASS,
   composerControlClearanceDp,
+  composerFacingHitSlop,
   DENSE_ROW_FRAME_DP,
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
@@ -32,12 +34,15 @@ import {
   INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
+  INLINE_LINK_ROW_MARGIN_DP,
   INLINE_LINK_SENTENCE_LINE_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   inlineLinkHitSlop,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_MIN_DP,
   LEGAL_LINK_ROW_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
   STATE_ACTION_CLASS,
@@ -262,6 +267,10 @@ describe('shared tap-target geometry', () => {
     expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
     expect(INLINE_LINK_LINE_GAP_CLASS).toBe(`gap-y-[${INLINE_LINK_LINE_GAP_DP}px]`);
     expect(INLINE_LINK_ROW_CLASS).toContain(INLINE_LINK_LINE_GAP_CLASS);
+    // The row's own margin is the second literal in that class: it reserves
+    // the gutter the 44pt region needs beyond the line (see the constant's
+    // doc), so it moves with the dp it is spelled from, not on its own.
+    expect(INLINE_LINK_ROW_CLASS).toContain(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
     // The compiled row gap is what the layout applies, not the constant.
     expect(await compiledDp(INLINE_LINK_ROW_CLASS, 'rowGap')).toBe(INLINE_LINK_LINE_GAP_DP);
   });
@@ -344,6 +353,39 @@ describe('standalone legal link geometry', () => {
   });
 });
 
+describe('code-reviewer line-action geometry', () => {
+  it('renders the audit floor box and carries it to the design touch target', async () => {
+    // The regression this guards: the action rendered at `sm`'s 36dp frame,
+    // which overflowed the text line it ends by 11dp and collided with the
+    // copy above it. The class compiler only sees the literal, so the literal
+    // is held to the audit floor beside it.
+    expect(LINE_ACTION_BOX_CLASS).toContain(`min-h-[${MIN_TAP_TARGET_DP}px]`);
+    expect(await compiledDp(LINE_ACTION_BOX_CLASS, 'minHeight')).toBe(MIN_TAP_TARGET_DP);
+    // The box floats over the line it ends: its vertical margin cancels the
+    // half that overflows the `text-xs` line, so it neither grows the row nor
+    // reaches into the copy above it. Losing the margin leaves the 28dp
+    // height intact and still collides.
+    const textLineDp = 14;
+    expect(await compiledDp(LINE_ACTION_BOX_CLASS, 'marginBlock')).toBe(
+      -(MIN_TAP_TARGET_DP - textLineDp) / 2
+    );
+    // A `min-h-[28px]` box measures 27.8dp on Android: 27.8 + 2 * 9 = 45.8dp
+    // holds, while the inline link's 8dp a side would land at 43.8dp.
+    expect(
+      tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // A short label's 36dp width floor at the call site measures 35.81dp on
+    // Android, so the horizontal reach is checked at that width too:
+    // 35.81 + 5 + 5 = 45.81dp holds, while 4dp a side would land at 43.81dp.
+    expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    // The box floats over one line, so neither axis has a shorter side.
+    expect(LINE_ACTION_HIT_SLOP.top).toBe(LINE_ACTION_HIT_SLOP.bottom);
+    expect(LINE_ACTION_HIT_SLOP.left).toBe(LINE_ACTION_HIT_SLOP.right);
+  });
+});
+
 describe('composer input row control separation', () => {
   it('spells the row gap as the rem width of the class the row applies', () => {
     // `ms-3` is 0.75rem, and NativeWind's rem measures 14pt on device, so the
@@ -358,5 +400,34 @@ describe('composer input row control separation', () => {
     expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(
       VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP
     );
+  });
+
+  it('zeroes the slop on the side the nearer control sits on', () => {
+    const slop = COMPOSER_CONTROL_HIT_SLOP_DP;
+    const facing = (left: number, right: number) => ({ top: slop, bottom: slop, left, right });
+    try {
+      // LTR: `start` is the left edge, so the control whose neighbour lies
+      // toward the row's start zeroes its left side. A swapped branch would
+      // let the two tap areas meet across the gap, and a tap at the
+      // microphone's edge would send the message instead.
+      rtl.isRTL = false;
+      expect(composerFacingHitSlop(slop, 'start')).toEqual(facing(0, slop));
+      expect(composerFacingHitSlop(slop, 'end')).toEqual(facing(slop, 0));
+      // RTL: the row mirrors, and the two logical sides swap edges with it.
+      rtl.isRTL = true;
+      expect(composerFacingHitSlop(slop, 'start')).toEqual(facing(slop, 0));
+      expect(composerFacingHitSlop(slop, 'end')).toEqual(facing(0, slop));
+    } finally {
+      rtl.isRTL = false;
+    }
+  });
+
+  it('gaps the voice toggle from the send control below the two facing slops', () => {
+    // `ms-1` is 0.25rem at NativeWind's 14pt rem: 3.5dp, narrower than the
+    // two facing slops, which is why both controls zero their facing side.
+    expect(COMPOSER_VOICE_SEND_GAP_CLASS).toBe('ms-1');
+    const voiceSendGapDp = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length)) * 0.25 * 14;
+    expect(voiceSendGapDp).toBe(3.5);
+    expect(voiceSendGapDp).toBeLessThan(VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 });

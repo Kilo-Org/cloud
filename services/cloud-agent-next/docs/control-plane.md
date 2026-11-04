@@ -552,7 +552,8 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   HMAC credential (input only while the build is `preparing`; no route accepts it after the build
   ends), reports events and its result
   over the same authenticated routes, clones the default
-  branch into `/workspace/app`, runs setup with the directory HOME, removes credentials and
+  branch into `/workspace/app`, runs setup with the directory HOME and `KILO_ENVIRONMENT_BUILD=1`
+  (setup commands may use the rest of the build deadline), removes credentials and
   reflogs, and writes the workspace stamp. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.

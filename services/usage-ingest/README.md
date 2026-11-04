@@ -81,8 +81,33 @@ at the outcome log, including writer wait in processing mode; it is omitted for
 invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
 
+Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
+`usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
+`usage_ingest_processing`) are always emitted; see
+[queue delivery diagnostics](diagnostics.md).
+
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
-of handling that message, independently of writer duration. Shared direct and
+of handling that message, independently of writer duration. Selected existing processing
+outcomes also include `handler_entry_queue_age_ms`, the non-negative wall-clock
+age of the queue message at invocation entry, and `slot_wait_ms`, the rounded
+monotonic time from invocation entry until that message starts processing in a
+slot. Queue age crosses clocks and may include skew; it is not an exact transport
+duration. Slot wait includes local scheduling as well as time behind other messages.
+The fields appear when entry age, queue wait, slot wait, or writer duration reaches
+1,000 ms, or when a stable hash of queue message ID and attempt falls in a nominal
+1% bucket. Actual coverage depends on the message ID distribution.
+This enriches existing outcomes without adding a log stream; the baseline is
+repeatable and is not a uniform random sample of distinct usage IDs.
+
+For an individual delivery, find `usage_ingest_processing` by exact `usage_id`
+and retain `queue_message_id` and `delivery_attempts` to distinguish redeliveries.
+Read its entry age, slot wait, and `writer_duration_ms` together; correlate the
+same usage ID with `usage_record_completion` for the writer's persistence time.
+Multiple attempts may exist; usage ID alone cannot uniquely match a writer attempt.
+Do not subtract subgroup percentiles to infer a
+phase duration, or treat timestamps from different hosts as exact.
+
+Shared direct and
 HTTP-writer persistence attempts emit `usage_record_completion` logs with
 outcome, duration, event age, execution region and finite caller context. See the
 completion sampling policy below and the
@@ -368,7 +393,7 @@ attributing any hosted latency effect.
 The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
-both diagnostics and parallelism variables, and the writer target. Keep one
+the parallelism variable, and the writer target. Keep one
 consumer per environment at cap 200 / parallelism 2, with production batch 6 and
 staging batch 2 (at most 400 writer calls each); do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
@@ -377,8 +402,8 @@ checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
-timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
-writer route, retry delay/budget and per-message dispositions.
+timeout 0 and cap 200 for the same single queue. Preserve the current writer
+route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
@@ -424,9 +449,11 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
 Provision and verify the Worker-side publisher secret before enabling the launch
-or SFO cohort controls; a missing Worker secret returns 503.
+or FRA/SFO cohort controls; a missing Worker secret returns 503.
 The HTTP address alone selects no traffic: production selection still requires
-the existing `USAGE_QUEUE_ONLY_ENABLED` and SFO cohort controls above. No custom
+`USAGE_QUEUE_ONLY_ENABLED` and the applicable FRA or SFO cohort controls above.
+Verify the deployed gateway version and effective settings before drawing conclusions
+about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).

@@ -622,15 +622,8 @@ export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
 }
 
-// Wrangler always pulls its container egress-interceptor sidecar
-// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
-// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
-// available" — its transparent-proxy socket options don't survive Rosetta),
-// which surfaces as "Failed to start container" for every local container.
-// Point wrangler at the same proxy version's linux/arm64 manifest instead:
-// pulling a single-platform manifest digest with --platform amd64 only warns.
-// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
-// the pinned wrangler/miniflare version (tag 3cb1195).
+// Wrangler's amd64 egress proxy crashes under Apple Silicon emulation. Pin its
+// arm64 manifest; keep aligned with the pinned Wrangler/Miniflare proxy version.
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 

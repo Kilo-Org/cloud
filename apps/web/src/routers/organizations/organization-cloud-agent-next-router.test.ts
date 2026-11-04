@@ -1859,7 +1859,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
       enabled: true,
       defaultDestination: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       options: [
-        { allocation: getSandboxAllocationRequest('cloudflare-single') },
+        { allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') },
         {
           allocation: getSandboxAllocationRequest('vercel-large'),
         },
@@ -1886,7 +1886,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it.each([false, true])('ignores retired devcontainer context %s', async devcontainer => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: getSandboxAllocationRequest('cloudflare-shared'),
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       options: [],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
@@ -2380,7 +2380,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     await expect(
       caller.prepareSession({
         ...sandboxInput,
-        sandboxAllocation: 'cloudflare-single',
+        sandboxAllocation: 'cloudflare-containers-standard-3',
         devcontainer: true,
       })
     ).rejects.toThrow('Sandbox selection is not available with dev containers');

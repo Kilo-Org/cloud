@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { appliesImplicitProfiles, resolveProfileLayers } from './profile-resolution';
+import { appliesRepoBindings, resolveProfileLayers } from './profile-resolution';
 
 // Short fake UUIDs, only identity matters in this pure-logic test.
 const REPO_P = 'repo-profile';
@@ -148,15 +148,15 @@ describe('resolveProfileLayers', () => {
   });
 });
 
-describe('appliesImplicitProfiles', () => {
-  test('applies with no environment and for a V1 environment', () => {
-    expect(appliesImplicitProfiles(undefined)).toBe(true);
-    expect(appliesImplicitProfiles(null)).toBe(true);
-    expect(appliesImplicitProfiles({})).toBe(true);
+describe('appliesRepoBindings', () => {
+  test('repository bindings apply with no environment and for a V1 environment', () => {
+    expect(appliesRepoBindings(undefined)).toBe(true);
+    expect(appliesRepoBindings(null)).toBe(true);
+    expect(appliesRepoBindings({})).toBe(true);
   });
 
-  test('does not apply for a V2 environment, whatever its repository count', () => {
-    expect(appliesImplicitProfiles({ repositories: [] })).toBe(false);
-    expect(appliesImplicitProfiles({ repositories: [{}, {}] })).toBe(false);
+  test('repository bindings do not apply for a V2 environment, whatever its repository count', () => {
+    expect(appliesRepoBindings({ repositories: [] })).toBe(false);
+    expect(appliesRepoBindings({ repositories: [{}, {}] })).toBe(false);
   });
 });

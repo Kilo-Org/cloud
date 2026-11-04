@@ -3,8 +3,6 @@ import { parseSessionMetadata } from '../../persistence/session-metadata.js';
 import type { PreviewTargetResult } from '../sandbox/preview-target.js';
 import { createControlPlanePreview } from './preview.js';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
-
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 
@@ -38,9 +36,9 @@ function metadata(
 const COORDINATES: PreviewTargetResult = {
   status: 'ok',
   coordinates: {
-    provider: 'cloudflare',
-    allocationName: SANDBOX_ID,
-    containment: false,
+    provider: 'cloudflare-containers',
+    logicalSandboxId: SESSION_ID,
+    allocationRef: SANDBOX_ID,
   },
 };
 

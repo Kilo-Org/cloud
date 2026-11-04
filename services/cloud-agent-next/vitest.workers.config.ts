@@ -22,8 +22,8 @@ export default defineConfig({
     },
     cloudflareTest({
       wrangler: {
-        // Use test-specific wrangler config that excludes Sandbox DO
-        // (avoids @cloudflare/containers import issues)
+        // Use the test-specific wrangler config with only the Durable Objects
+        // the integration suite needs.
         configPath: './wrangler.test.jsonc',
       },
       miniflare: {
@@ -57,7 +57,7 @@ export default defineConfig({
     deps: {
       optimizer: {
         ssr: {
-          include: ['@cloudflare/sandbox', '@cloudflare/containers'],
+          include: ['@cloudflare/containers'],
         },
       },
     },

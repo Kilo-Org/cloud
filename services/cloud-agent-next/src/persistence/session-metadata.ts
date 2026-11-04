@@ -557,6 +557,21 @@ export function hasRetiredDevcontainerRuntime(metadata: SessionMetadata): boolea
   );
 }
 
+export const CLOUDFLARE_RUNTIME_RETIRED_MESSAGE =
+  'The Cloudflare Sandbox runtime has been retired. This session cannot be started or resumed. Create a new session using the default sandbox.';
+
+/**
+ * The reason a stored session can no longer start compute, or null when its
+ * runtime is still active. A missing workspace is not evidence of a retired
+ * runtime; a workspace without an explicit provider keeps the historical
+ * Cloudflare default.
+ */
+export function retiredRuntimeMessage(metadata: SessionMetadata): string | null {
+  if (hasRetiredDevcontainerRuntime(metadata)) return DEVCONTAINER_RETIRED_MESSAGE;
+  if (metadata.workspace === undefined) return null;
+  return getSandboxProvider(metadata) === 'cloudflare' ? CLOUDFLARE_RUNTIME_RETIRED_MESSAGE : null;
+}
+
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
   return hasCredentialContainment(getEffectiveCredentialContainment(metadata));
 }

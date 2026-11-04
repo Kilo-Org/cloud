@@ -1,17 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
-import type { SandboxId, SandboxInstance } from './types.js';
+import type { SandboxId } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
-  configureSandboxBillingInput,
   parseSandboxBillingInput,
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
-  forceDestroyControlPlaneSandbox,
-  getSandboxBillingRuntimeStatus,
   isContainersBillingClassName,
   isVercelBillingClassName,
   SANDBOX_CAPACITIES,
@@ -31,84 +28,6 @@ function metadata(identity: SessionMetadata['identity']): SessionMetadata {
 }
 
 describe('container usage context', () => {
-  it('invokes billing status as a binding method for RPC proxies', async () => {
-    const status = {
-      sandboxClassName: 'SandboxSmallContainment' as const,
-      running: true,
-      blocked: false,
-    };
-    const getBillingRuntimeStatus = new Proxy(
-      vi.fn(async () => status),
-      {
-        get: (target, property, receiver) => {
-          if (property === 'call')
-            throw new Error('RPC method proxies do not support Function.call');
-          return Reflect.get(target, property, receiver);
-        },
-      }
-    );
-
-    await expect(
-      getSandboxBillingRuntimeStatus({ getBillingRuntimeStatus } as unknown as SandboxInstance)
-    ).resolves.toEqual(status);
-  });
-
-  it('invokes native control-plane destruction as a binding method without SDK fallback', async () => {
-    const forceDestroyForControlPlane = new Proxy(
-      vi.fn(async function (this: { running: boolean }) {
-        this.running = false;
-      }),
-      {
-        get: (target, property, receiver) => {
-          if (property === 'call' || property === 'apply') {
-            throw new Error('RPC method proxies do not support Function.call or Function.apply');
-          }
-          return Reflect.get(target, property, receiver);
-        },
-      }
-    );
-    const sandbox = {
-      running: true,
-      forceDestroyForControlPlane,
-      destroy: vi.fn(),
-    };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).resolves.toBeUndefined();
-
-    expect(sandbox.running).toBe(false);
-    expect(forceDestroyForControlPlane).toHaveBeenCalledOnce();
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, null, 42, {}, { forceDestroyForControlPlane: true }])(
-    'fails closed when native control-plane destruction is unavailable: %j',
-    async sandbox => {
-      await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
-        'Cloudflare control-plane native destruction is unavailable'
-      );
-    }
-  );
-
-  it('does not substitute SDK destruction for a missing native capability', async () => {
-    const sandbox = { destroy: vi.fn(async () => undefined) };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
-      'Cloudflare control-plane native destruction is unavailable'
-    );
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
-  it('propagates native control-plane destruction failures', async () => {
-    const error = new Error('Native destroy acknowledgement lost');
-    const sandbox = {
-      forceDestroyForControlPlane: vi.fn().mockRejectedValue(error),
-      destroy: vi.fn(),
-    };
-
-    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toBe(error);
-    expect(sandbox.destroy).not.toHaveBeenCalled();
-  });
-
   it('bills the code-review containers instance at the code-review capacity', () => {
     expect(containersBillingIdentity('code-review')).toEqual({
       className: 'SandboxContainersCodeReview',
@@ -565,31 +484,5 @@ describe('container usage context', () => {
         metadata: { origin: 'cloud-agent' },
       })
     ).toThrow('SandboxSmallContainment billing received an incompatible sandbox ID');
-  });
-
-  it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
-    await expect(
-      configureSandboxBillingInput({} as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).resolves.toBeUndefined();
-  });
-
-  it('propagates attribution configuration failures before sandbox startup', async () => {
-    const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
-    await expect(
-      configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).rejects.toThrow('meter unavailable');
-    expect(configureBilling).toHaveBeenCalledOnce();
   });
 });

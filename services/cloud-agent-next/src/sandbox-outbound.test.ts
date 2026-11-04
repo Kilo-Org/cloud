@@ -6,11 +6,6 @@ import {
   GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
 } from './github-rate-limit-diagnostics.js';
 
-const sdk = vi.hoisted(() => {
-  class StockSandbox {}
-  class ContainerProxy {}
-  return { StockSandbox, ContainerProxy };
-});
 const logging = vi.hoisted(() => {
   const logger = {
     debug: vi.fn(),
@@ -23,20 +18,9 @@ const logging = vi.hoisted(() => {
   return { logger };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: sdk.StockSandbox,
-  ContainerProxy: sdk.ContainerProxy,
-}));
-vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
-import {
-  ContainerProxy,
-  SandboxContainment,
-  SandboxSmallContainment,
-  MANAGED_SCM_OUTBOUND_HANDLER,
-  handleManagedScmOutbound,
-} from './sandbox-outbound.js';
+import { handleManagedScmOutbound } from './sandbox-outbound.js';
 import {
   createControlPlaneCredential,
   type ControlCredentialPurpose,
@@ -88,48 +72,6 @@ function serializedLogCalls(): string {
     error: logging.logger.error.mock.calls,
   });
 }
-
-describe('managed GitHub sandbox outbound configuration', () => {
-  it('keeps HTTPS interception and credential handlers on both remaining sandbox classes', () => {
-    for (const SandboxClass of [SandboxContainment, SandboxSmallContainment]) {
-      expect(new SandboxClass({} as never, {} as never)).toMatchObject({
-        enableInternet: true,
-        interceptHttps: true,
-      });
-      expect(SandboxClass.outboundHandlers).toEqual({
-        [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-      });
-    }
-    expect(ContainerProxy).toBe(sdk.ContainerProxy);
-  });
-
-  it('wires the named handler to Git and API redemption behavior', async () => {
-    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
-      success: false,
-      reason: 'invalid_capability',
-    });
-    const env = createEnv(redeemGitHubSessionCapability);
-    const handler = SandboxSmallContainment.outboundHandlers?.[MANAGED_SCM_OUTBOUND_HANDLER];
-    if (!handler) throw new Error('Expected configured outbound handler');
-
-    await handler(
-      new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
-        headers: { Authorization: basicCredential(CAPABILITY) },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-    await handler(
-      new Request('https://api.github.com/user', {
-        headers: { Authorization: `token ${CAPABILITY}` },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledTimes(2);
-  });
-});
 
 describe('handleManagedScmOutbound', () => {
   beforeEach(() => {

@@ -6759,41 +6759,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "cloudflare"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "kilo"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "enum": [
-                            "single",
-                            "shared"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -6861,8 +6826,6 @@
                 {
                   "type": "string",
                   "enum": [
-                    "cloudflare-single",
-                    "cloudflare-shared",
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
@@ -7492,41 +7455,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "cloudflare"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "kilo"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "enum": [
-                            "single",
-                            "shared"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -7594,8 +7522,6 @@
                 {
                   "type": "string",
                   "enum": [
-                    "cloudflare-single",
-                    "cloudflare-shared",
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
@@ -8650,8 +8576,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -8718,8 +8642,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -9107,8 +9029,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -9505,8 +9425,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -18202,41 +18120,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "cloudflare"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "kilo"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "enum": [
-                                "single",
-                                "shared"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -18304,8 +18187,6 @@
                     {
                       "type": "string",
                       "enum": [
-                        "cloudflare-single",
-                        "cloudflare-shared",
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",
@@ -18941,41 +18822,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "cloudflare"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "kilo"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "enum": [
-                                "single",
-                                "shared"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -19043,8 +18889,6 @@
                     {
                       "type": "string",
                       "enum": [
-                        "cloudflare-single",
-                        "cloudflare-shared",
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",

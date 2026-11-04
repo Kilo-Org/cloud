@@ -1450,8 +1450,8 @@ describe('cloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it('forwards personal capability discovery with the caller token', async () => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: getSandboxAllocationRequest('cloudflare-single'),
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') }],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
     const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
@@ -1762,7 +1762,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     await expect(
       caller.prepareSession({
         ...sandboxInput,
-        sandboxAllocation: 'cloudflare-single',
+        sandboxAllocation: 'cloudflare-containers-standard-3',
         devcontainer: true,
       })
     ).rejects.toThrow('Sandbox selection is not available with dev containers');

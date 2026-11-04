@@ -1,9 +1,7 @@
 import { Buffer } from 'node:buffer';
-import { ContainerProxy } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { readBoundedRequestBodyBytes } from './bounded-request-body.js';
 import { logger } from './logger.js';
-import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 import {
   isControlPlaneCredential,
   parseControlPlaneCredential,
@@ -11,8 +9,6 @@ import {
 } from './sandbox-control/managed-credential.js';
 import { withDORetry } from './utils/do-retry.js';
 import type { GitTokenService } from './types.js';
-import { MeteredSandbox } from './container-usage.js';
-import type { SandboxClassName } from './container-usage-context.js';
 import {
   GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
   GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS,
@@ -1035,28 +1031,3 @@ export function handleManagedScmOutbound(
   }
   return handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }
-
-const managedScmOutboundHandlers = {
-  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-};
-
-export class SandboxContainment extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxContainment';
-  }
-  enableInternet = true;
-  interceptHttps = true;
-}
-// Assignment invokes the inherited setter that registers the outbound handlers.
-SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxSmallContainment extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmallContainment';
-  }
-  enableInternet = true;
-  interceptHttps = true;
-}
-SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export { ContainerProxy };

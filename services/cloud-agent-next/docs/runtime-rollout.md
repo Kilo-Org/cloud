@@ -8,12 +8,12 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
-| preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
-| downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
+| preinstalled | all-in-one | `Dockerfile.containers` and pinned build variables |
+| downloaded | all-in-one | `Dockerfile.containers`, exact-SHA runtime descriptor |
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+Downloaded startup supports native Cloudflare Containers and BYOC Vercel. Preinstalled is the native default.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
@@ -59,6 +59,10 @@ deployment waits for that handoff. Use a dedicated test organization for real-pr
 the current catalog does not limit downloaded startup to that organization. Record the Worker name,
 exact source SHA, bucket and instance type for each qualification deployment. Broad enrollment does
 not itself establish that the provider checks below passed.
+
+Before deploying a release that removes SDK sandbox bindings, drain every session
+still running on a retired sandbox class. The new Worker cannot stop, inspect or
+reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
    Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that

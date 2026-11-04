@@ -436,15 +436,15 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'sized',
       repository,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     expect((await caller.cloudEnvironments.get({ environmentId: id })).sandboxAllocation).toBe(
-      'cloudflare-single'
+      'cloudflare-containers-standard-3'
     );
 
     await caller.cloudEnvironments.update({ environmentId: id, name: 'still sized' });
     const [summary] = await caller.cloudEnvironments.list({ repository });
-    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
+    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-containers-standard-3' });
 
     const { configurationRevision } = await caller.cloudEnvironments.update({
       environmentId: id,
@@ -458,7 +458,7 @@ describe('cloudEnvironmentsRouter', () => {
     await expect(
       caller.cloudEnvironments.update({
         environmentId: id,
-        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-single',
+        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-containers-standard-3',
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
@@ -484,7 +484,10 @@ describe('cloudEnvironmentsRouter', () => {
     });
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
     await expect(
-      caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: 'cloudflare-single' })
+      caller.cloudEnvironments.update({
+        environmentId: id,
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+      })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'Sandbox selection is not enabled for this owner',
@@ -500,7 +503,7 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'stale',
       repository: { platform: 'github', fullName: GITHUB_REPO },
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
 
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
@@ -508,7 +511,7 @@ describe('cloudEnvironmentsRouter', () => {
     await caller.cloudEnvironments.update({
       environmentId: id,
       commands: ['pnpm install'],
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     await caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: null });
 
@@ -967,7 +970,7 @@ describe('cloudEnvironmentsRouter', () => {
       });
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'create rejects the %s allocation and accepts an isolated one',
       async allocation => {
         const owner = await insertTestUser();
@@ -1012,7 +1015,7 @@ describe('cloudEnvironmentsRouter', () => {
       ).toEqual([GITHUB_REPO, 'acme/api']);
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'update rejects the %s allocation on a V2 environment and accepts it on a V1 one',
       async allocation => {
         const owner = await insertTestUser();
@@ -1066,7 +1069,7 @@ describe('cloudEnvironmentsRouter', () => {
       });
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'conversion rejects the saved %s allocation unless it is replaced',
       async sandboxAllocation => {
         const owner = await insertTestUser();

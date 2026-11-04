@@ -13,6 +13,7 @@ import {
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
 import type { EgressMode } from './egress-allowlist.js';
+import type { SandboxAllocationInput } from './sandbox-allocation.js';
 import {
   GetEgressAuditResponseSchema,
   type GetEgressAuditInput,
@@ -71,7 +72,7 @@ export type CloudAgentPrepareSessionInput = {
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-  sandboxAllocation?: 'isolated-standard';
+  sandboxAllocation?: SandboxAllocationInput;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
   egressAudit?: boolean;

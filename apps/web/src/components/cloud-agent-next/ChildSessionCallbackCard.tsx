@@ -1,14 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  AlertCircle,
-  Bot,
-  CheckCircle2,
-  GitBranch,
-  XCircle,
-  type LucideIcon,
-} from 'lucide-react';
+import { AlertCircle, Bot, CheckCircle2, GitBranch, XCircle, type LucideIcon } from 'lucide-react';
 import type { ChildSessionCallbackPayload } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import { cn } from '@/lib/utils';
 import { TextPartRenderer } from './part-content';

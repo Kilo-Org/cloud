@@ -68,7 +68,8 @@ No deletion endpoint removes workspace files or credentials.
 Credential exchange accepts a personal target or an organization target.
 The service verifies current account status and credential revocation before issuing a grant.
 Organization exchange also verifies current membership using the shared access rules.
-A grant lasts at most a minute, never beyond the original credential, and has the dedicated `session-sync` audience.
+A grant lasts at most five minutes, never beyond the original credential, and has the dedicated `session-sync` audience.
+This bounds how long a revoked or blocked account keeps sync access, and keeps exchange load on the account database low.
 Do not repeat the account-database lookup for every upload packet.
 `ENVIRONMENT` is required and must match the credential's `env` claim. Missing or
 empty configuration returns `auth_unavailable` (503) and logs a configuration error;
@@ -316,11 +317,11 @@ Accept the measured cost envelope before production-scale load.
 
 ## Isolated staging configuration
 
-`wrangler.jsonc` remains local-only. Staging uses a separately rendered
-`.wrangler/wrangler.staging.json`, following the config-rendering pattern in
-`cloud-agent-next/test/e2e/deploy/render-e2e-worker-config.mjs`. Neither rendering
-nor the dry-run command creates resources or deploys. Automatic deployment
-continues to exclude this service.
+The top level of `wrangler.jsonc` is production and `env.local` is local development.
+Staging uses a separately rendered `.wrangler/wrangler.staging.json`, following the
+config-rendering pattern in `cloud-agent-next/test/e2e/deploy/render-e2e-worker-config.mjs`.
+The renderer copies only service code and runtime settings, never the production bindings.
+Neither rendering nor the dry-run command creates resources or deploys.
 
 ### Missing live prerequisites
 
@@ -356,7 +357,7 @@ Before rendering, an operator must obtain and review all of the following:
    Record only the store ID and entry names in configuration. Never copy a
    production auth secret, share the two values, print values, or put them in the
    resource manifest. The first signs synthetic Kilo credentials; the second
-   signs only this staging deployment's one-minute sync grants.
+   signs only this staging deployment's five-minute sync grants.
 5. Confirm that `session-sync-staging` is a dedicated Worker identity, with no
    existing production deployment or production routes. Its SQLite namespace is
    created by the eventual separately authorized deployment's `v1` and `v2` migrations;
@@ -439,8 +440,13 @@ References:
 
 ## Production prerequisites
 
-Provision the Worker, SQLite Durable Object namespace, private R2 bucket, and authentication binding.
-Store shared secrets in the shared engineering vault and Cloudflare Secrets Store.
+Production is provisioned and deploys automatically at `https://session-sync.kiloapps.io`.
+The top level of `wrangler.jsonc` holds the production bindings; `pnpm dev` uses `env.local`.
+Production uses the private R2 bucket `session-sync`, the Hyperdrive configuration
+`session-sync-production`, and the Secrets Store entries `NEXTAUTH_SECRET_PROD` and
+`SESSION_SYNC_SECRET_PROD`. Shared secrets live in the shared engineering vault.
+The Hyperdrive configuration connects as `session_sync_reader`, a read-only role with
+column grants on only the account, device-session, and membership columns that exchange reads.
 Set `ENVIRONMENT=production` explicitly; exchange fails closed if it is absent or
 empty and never accepts a credential from a different environment.
 Do not copy production credentials into local examples or test fixtures.
@@ -455,4 +461,4 @@ cached reads and recommends a cache-disabled binding for authentication and perm
 [Hyperdrive query caching](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/).
 Verify account and organization authorization on an isolated stack before deployment.
 Complete account deletion, backup retention, quota policy, and rollout monitoring before public adoption.
-Automatic deployment excludes this service until its real bindings and secrets are provisioned.
+The CLI has no default destination; users opt in with an explicit `--url`.

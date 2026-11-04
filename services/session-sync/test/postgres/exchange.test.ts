@@ -118,7 +118,7 @@ describe('credential exchange against the account database', () => {
     expect(body).toMatchObject({ userID: user.id, tenant: { type: 'user', id: user.id } });
     const lifetime = Date.parse(body.expiresAt) - Date.now();
     expect(lifetime).toBeGreaterThan(0);
-    expect(lifetime).toBeLessThanOrEqual(60_000);
+    expect(lifetime).toBeLessThanOrEqual(300_000);
 
     const data = new Request('https://session-sync.test/v1/sessions/ses_synthetic', {
       headers: { Authorization: `Bearer ${body.token}` },

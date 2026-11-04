@@ -1,11 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Local development configuration. Production bindings are not provisioned yet;
-  // deploy-workers.yml excludes this service until they are. See README.md.
+  // Top level is production; `wrangler dev --env local` uses the local bindings below.
   "name": "session-sync",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
   "dev": {
     "port": 8817,
     "local_protocol": "http",
@@ -21,8 +23,16 @@
   "observability": {
     "enabled": true,
   },
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "session-sync.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
   "vars": {
-    "ENVIRONMENT": "development",
+    "ENVIRONMENT": "production",
     "USER_TENANT_SESSIONS": "10000",
     "USER_TENANT_BYTES": "107374182400",
     "ORGANIZATION_TENANT_SESSIONS": "200000",
@@ -58,13 +68,24 @@
   "analytics_engine_datasets": [
     { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },
   ],
-  // NEXTAUTH_SECRET and SESSION_SYNC_SECRET come from .dev.vars locally.
+  // Dedicated configuration with query caching disabled, so revocation applies at once.
+  // It connects as the read-only session_sync_reader role.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      // Local-only placeholder, not a provisioned Hyperdrive configuration.
-      "id": "session-sync-local",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+      "id": "2dd5d842a72e432c96b83f8757585ddc",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+    {
+      "binding": "SESSION_SYNC_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "SESSION_SYNC_SECRET_PROD",
     },
   ],
   "durable_objects": {
@@ -86,7 +107,76 @@
   "r2_buckets": [
     {
       "binding": "SESSION_SYNC_R2",
-      "bucket_name": "session-sync-local",
+      "bucket_name": "session-sync",
     },
   ],
+  "env": {
+    // Local development only; no deploy workflow targets this name.
+    // NEXTAUTH_SECRET and SESSION_SYNC_SECRET come from .dev.vars.
+    "local": {
+      "name": "session-sync-local",
+      "workers_dev": false,
+      "routes": [],
+      "vars": {
+        "ENVIRONMENT": "development",
+        "USER_TENANT_SESSIONS": "10000",
+        "USER_TENANT_BYTES": "107374182400",
+        "ORGANIZATION_TENANT_SESSIONS": "200000",
+        "ORGANIZATION_TENANT_BYTES": "2199023255552",
+      },
+      "ratelimits": [
+        {
+          "name": "EXCHANGE_IP_LIMITER",
+          "namespace_id": "1020",
+          "simple": { "limit": 120, "period": 60 },
+        },
+        {
+          "name": "EXCHANGE_ACCOUNT_LIMITER",
+          "namespace_id": "1021",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "USER_REQUEST_LIMITER",
+          "namespace_id": "1022",
+          "simple": { "limit": 1200, "period": 60 },
+        },
+        {
+          "name": "USER_BLOB_LIMITER",
+          "namespace_id": "1023",
+          "simple": { "limit": 300, "period": 60 },
+        },
+        {
+          "name": "USER_DATA_BLOCK_LIMITER",
+          "namespace_id": "1033",
+          "simple": { "limit": 120, "period": 60 },
+        },
+      ],
+      "analytics_engine_datasets": [
+        { "binding": "SESSION_SYNC_METRICS", "dataset": "session_sync_metrics" },
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          // Local-only placeholder, not a provisioned Hyperdrive configuration.
+          "id": "session-sync-local",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SESSION_SYNC_DO",
+            "class_name": "SessionSyncDO",
+          },
+          { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "SESSION_SYNC_R2",
+          "bucket_name": "session-sync-local",
+        },
+      ],
+    },
+  },
 }

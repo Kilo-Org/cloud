@@ -30,8 +30,10 @@ try {
     requireID(manifest[key], key);
   }
   requireValue(
-    manifest.hyperdriveID !== '624ec80650dd414199349f4e217ddb10',
-    'The session-ingest Hyperdrive is not an isolated session-sync staging database'
+    !['624ec80650dd414199349f4e217ddb10', '2dd5d842a72e432c96b83f8757585ddc'].includes(
+      manifest.hyperdriveID
+    ),
+    'Production Hyperdrive configurations are not an isolated session-sync staging database'
   );
   requireValue(
     manifest.bucketName === 'session-sync-staging',

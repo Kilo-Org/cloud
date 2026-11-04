@@ -349,6 +349,51 @@ describe('Slack install callback against the real integration row', () => {
     });
   });
 
+  test('rejects an installation when another owner also records the workspace', async () => {
+    const ownRow = await seedIntegration(otherOwner, PLATFORM.SLACK, 'T0SHARED');
+    await db
+      .update(platform_integrations)
+      .set({ platform_installation_id: null })
+      .where(eq(platform_integrations.id, ownRow.id));
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: owner.id,
+      owned_by_organization_id: null,
+      platform: PLATFORM.SLACK,
+      integration_type: 'oauth',
+      platform_installation_id: null,
+      platform_account_id: 'T0SHARED',
+      platform_account_login: 'Shared Workspace',
+      scopes: [],
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      installed_at: '2026-01-01T00:00:00.000Z',
+    });
+    mockSlackAccess.mockResolvedValue({
+      ok: true,
+      access_token: 'xoxb-new-token',
+      bot_user_id: 'U0BOT',
+      team: { id: 'T0SHARED', name: 'Shared Workspace' },
+      is_enterprise_install: false,
+    });
+
+    const response = await callCallback(
+      'slack',
+      `?code=abc&state=${createProviderState(otherOwner.id, 'slack')}`
+    );
+
+    expect(redirectPath(response)).toBe('/integrations/slack?error=workspace_already_connected');
+    expect(mockSetInstallation).not.toHaveBeenCalled();
+
+    const [unchanged] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, ownRow.id));
+    expect(unchanged).toMatchObject({
+      platform_installation_id: null,
+      platform_account_id: 'T0SHARED',
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+    });
+  });
+
   test('re-connects a workspace to the owner that holds it', async () => {
     const canonicalRow = await seedIntegration(otherOwner, PLATFORM.SLACK, 'T0TEAM');
     const [detached] = await db

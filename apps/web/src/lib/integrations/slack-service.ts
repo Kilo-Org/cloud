@@ -251,15 +251,15 @@ export async function getConflictingSlackInstallation(
     return isOwnedBy(canonical, owner) ? null : canonical;
   }
 
-  const [legacy] = await database
+  const legacy = await database
     .select()
     .from(platform_integrations)
     .where(
       and(eq(platform_integrations.platform, PLATFORM.SLACK), legacySlackWorkspaceCondition(teamId))
     )
-    .limit(1);
+    .limit(2);
 
-  return legacy && !isOwnedBy(legacy, owner) ? legacy : null;
+  return legacy.find(integration => !isOwnedBy(integration, owner)) ?? null;
 }
 
 function isSlackWorkspaceUniqueViolation(error: unknown): boolean {

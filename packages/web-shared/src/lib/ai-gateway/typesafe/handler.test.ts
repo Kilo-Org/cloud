@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { z } from 'zod';
+import { checkRateLimit } from '@vercel/firewall';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
@@ -15,6 +17,7 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import type * as GatewayAccountRateLimit from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -55,6 +58,11 @@ import { handleSystemOneRequest } from './handler';
 jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
+}));
+jest.mock('@vercel/firewall', () => ({ checkRateLimit: jest.fn() }));
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@sentry/nextjs'),
+  captureMessage: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: jest.fn(),
@@ -271,6 +279,7 @@ function mockMeteredClock() {
 describe('handleSystemOneRequest', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    rateLimitTest.resetReportThrottle();
     globalThis.fetch = mockedFetch;
     setAuth();
     mockVerdict(null);
@@ -620,6 +629,34 @@ describe('handleSystemOneRequest', () => {
     expect(getUserFromAuth).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });
+
+  it.each(['blocked', 'rejected'] as const)(
+    'continues normal processing when the account firewall check is %s',
+    async failure => {
+      const actualRateLimit = jest.requireActual<typeof GatewayAccountRateLimit>(
+        '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit'
+      );
+      jest
+        .mocked(isGatewayAccountRateLimited)
+        .mockImplementation(actualRateLimit.isGatewayAccountRateLimited);
+      if (failure === 'blocked') {
+        jest.mocked(checkRateLimit).mockResolvedValue({ rateLimited: true, error: 'blocked' });
+      } else {
+        jest.mocked(checkRateLimit).mockRejectedValue(new Error('firewall unavailable'));
+      }
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(upstreamBody);
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        'gateway-inference',
+        expect.objectContaining({ rateLimitKey: 'gateway-inference:test-rate-limit-key' })
+      );
+      expect(getUserFromAuth).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },

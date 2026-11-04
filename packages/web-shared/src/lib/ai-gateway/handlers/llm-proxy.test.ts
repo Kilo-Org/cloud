@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
+import { checkRateLimit } from '@vercel/firewall';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { eq } from 'drizzle-orm';
 import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
@@ -120,6 +122,8 @@ jest.mock('next/server', () => {
     after: jest.fn(),
   };
 });
+
+jest.mock('@vercel/firewall', () => ({ checkRateLimit: jest.fn() }));
 
 jest.mock('@sentry/nextjs', () => ({
   setTag: jest.fn(),
@@ -317,6 +321,11 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   reportUsageEvent: jest.fn(async () => undefined),
   releaseDecideLease: jest.fn(async () => undefined),
 }));
+
+beforeEach(() => {
+  jest.mocked(checkRateLimit).mockReset().mockResolvedValue({ rateLimited: false });
+  rateLimitTest.resetReportThrottle();
+});
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
@@ -814,6 +823,36 @@ describe('POST /api/v1/chat/completions request handling', () => {
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+  });
+
+  describe.each(['blocked', 'rejected'] as const)('account firewall check %s', failure => {
+    it.each([
+      ['/chat/completions', { messages: makeBody().messages }],
+      ['/responses', { input: 'hello' }],
+      ['/messages', { messages: makeBody().messages, max_tokens: 100 }],
+    ])('continues normal processing on %s', async (path, input) => {
+      if (failure === 'blocked') {
+        jest.mocked(checkRateLimit).mockResolvedValueOnce({ rateLimited: true, error: 'blocked' });
+      } else {
+        jest.mocked(checkRateLimit).mockRejectedValueOnce(new Error('firewall unavailable'));
+      }
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(
+          { model: 'openai/gpt-4o', ...input },
+          { authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}` },
+          path
+        ) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        'gateway-inference',
+        expect.objectContaining({ rateLimitKey: 'gateway-inference:user-123' })
+      );
+      expect(mockedGetUserFromAuth).toHaveBeenCalledTimes(1);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {

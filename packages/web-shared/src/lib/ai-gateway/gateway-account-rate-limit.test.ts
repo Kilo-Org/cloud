@@ -8,6 +8,7 @@ import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { NextRequest } from 'next/server';
+import { __test__ as rateLimitTest } from '@kilocode/web-shared/lib/firewall-rate-limit';
 import { gatewayRateLimitKey, isGatewayAccountRateLimited } from './gateway-account-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
@@ -72,7 +73,8 @@ describe('gatewayRateLimitKey', () => {
 
 describe('isGatewayAccountRateLimited', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    rateLimitTest.resetReportThrottle();
   });
 
   it('counts the account, not the address', async () => {
@@ -131,6 +133,26 @@ describe('isGatewayAccountRateLimited', () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
 
     await expect(isGatewayAccountRateLimited(request, 'user-123')).resolves.toBe(true);
+  });
+
+  it('fails open when the firewall library marks a failed check as blocked', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true, error: 'blocked' });
+
+    await expect(isGatewayAccountRateLimited(request, 'user-123')).resolves.toBe(false);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'gateway-inference' could not be evaluated",
+      { level: 'error', tags: { source: 'gateway_inference' } }
+    );
+  });
+
+  it('fails open when the firewall check rejects', async () => {
+    mockCheckRateLimit.mockRejectedValue(new Error('firewall unavailable'));
+
+    await expect(isGatewayAccountRateLimited(request, 'user-123')).resolves.toBe(false);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'gateway-inference' could not be evaluated",
+      { level: 'error', tags: { source: 'gateway_inference' } }
+    );
   });
 
   it('reports a missing rule to Sentry, but not once per request', async () => {

@@ -1833,6 +1833,10 @@ describe('setupNotificationBackgroundHandler', () => {
     _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
     secureStore.clear();
+    // The restore reads the identity beside the record it adopts, as the one
+    // keychain does on the device.
+    secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
     mockSecureStoreKeys();
     mocks.defineTask.mockReset();
     mocks.registerTaskAsync.mockResolvedValue(null);

@@ -70,13 +70,8 @@ beforeEach(() => {
 describe('sandbox selection policy', () => {
   it.each([
     {
-      name: 'isolated Cloudflare without an allowlist',
+      name: 'isolated Cloudflare by default',
       overrides: {},
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
-      name: 'isolated Cloudflare with an empty allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
@@ -89,11 +84,6 @@ describe('sandbox selection policy', () => {
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: '*',
       },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
-      name: 'isolated Cloudflare outside the former allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
@@ -119,9 +109,8 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'Cloudflare containers when the isolated owner is enrolled',
+      name: 'Cloudflare containers when the owner is enrolled',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
@@ -525,7 +514,6 @@ describe('sandbox selection policy', () => {
   it('offers Cloudflare containers to an enrolled owner under enforced organization billing', () => {
     const env = {
       ...configured,
-      PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
       CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,

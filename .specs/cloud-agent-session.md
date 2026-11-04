@@ -22,7 +22,8 @@ revised 2026-10-07 to add the optional repository environment; revised
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
 show profile conflicts before saving; revised 2026-10-29 to allow several
 repositories in one environment; revised 2026-10-31 to define worktree-owned
-shared runtime and MCP configuration.
+shared runtime and MCP configuration; revised 2026-11-04 to state that one
+sandbox serves one workspace.
 
 ## Conventions
 
@@ -35,6 +36,9 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Sandbox**: the compute that hosts one Environment. One sandbox serves one
+  workspace only: the sibling chats of that workspace share it, and no other
+  workspace uses it.
 - **Repository environment**: an optional saved setup for one or several
   repositories -- setup commands, plaintext variables, secrets, and a sandbox
   size -- distinct from the sandbox Environment. A repository MAY belong to
@@ -141,10 +145,13 @@ repository.
     at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
     Setup MUST run once. Each additional repository MAY have its own branch;
     otherwise it MUST use the session's generated branch.
-19. Saving a multi-repository environment with the shared or a Vercel sandbox
-    MUST fail, and so MUST a session request for one. A saved default of that
-    kind (repository or owner) MUST be skipped, and the session MUST start on
-    another sandbox.
+19. Saving a multi-repository environment with a Vercel sandbox MUST fail, and
+    so MUST a session request for one. A saved default of that kind (repository
+    or owner) MUST be skipped, and the session MUST start on another sandbox.
+20. A new session MUST NOT start on a sandbox that another workspace uses. The
+    picker MUST NOT offer a shared sandbox. A request for the retired shared
+    sandbox MUST fail with a specific message, and a saved shared default MUST
+    be skipped so that the session starts on another sandbox.
 
 ### Preparation
 
@@ -480,8 +487,9 @@ are not a complete recovery mechanism. Exact recovery limits are documented in
    provider information rather than an arbitrary provider string. When present,
    `runtime` MUST contain only nullable `sandboxType`, `kiloCliVersion`,
    `wrapperVersion`, `startedAt`, and `stoppedAt` fields. Sandbox types MUST be
-   bounded to shared, isolated-small, isolated-standard, code-review,
-   devcontainer, containers-standard-3, containers-standard-4, or unknown.
+   bounded to shared (legacy sessions only), isolated-small,
+   isolated-standard, code-review, devcontainer, containers-standard-3,
+   containers-standard-4, or unknown.
    Versions MUST be bounded, validated values reported
    by the relevant runtime, not inferred from the current deployment. Runtime
    identifiers, owner identifiers, infrastructure addresses or regions,
@@ -656,12 +664,19 @@ The following use SHOULD and are not enforced today:
    - A repository that cannot be authorized fails the start with a generic
      message that does not name it. A timeout while authorizing fails as a
      workspace setup failure.
-   - The sandbox picker does not know the environment. It can show a shared
+   - The sandbox picker does not know the environment. It can show a Vercel
      default that the session skips.
    - With several repositories, the agent runs at `/workspace` and does not
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-04 -- One sandbox per workspace
+
+- One sandbox serves one workspace only. The shared sandbox is retired: new
+  sessions cannot request it, and a saved shared default is skipped.
+- Stored sessions, settings and triggers that name the shared sandbox still
+  load. A session on it does not resume and needs a new session.
 
 ### 2026-11-03 -- Environment selection preferences
 

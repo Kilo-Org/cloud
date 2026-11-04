@@ -879,7 +879,6 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      context.env.PER_SESSION_SANDBOX_ORG_IDS = '';
       Object.assign(context.env, {
         VERCEL_SANDBOX_ORG_IDS: sandboxAllocation.startsWith('vercel-') ? '' : '*',
       });

@@ -52,7 +52,7 @@ async function setup() {
       repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
       callback: { target: { url: 'https://callback.test/hook' } },
       workspace: {
-        sandboxId: await generateSandboxId('*', undefined, 'user_transport', sessionId),
+        sandboxId: await generateSandboxId(sessionId),
         sandboxProvider: 'cloudflare-containers',
         branchName: 'kilo/test',
       },

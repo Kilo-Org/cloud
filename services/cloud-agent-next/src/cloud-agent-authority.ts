@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
 import {
   CloudAgentAuthoritySchema,
   cloudAgentAuthorityProcedure,
@@ -19,20 +18,12 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { backendUrlForSandbox } from './kilo/kilo-targets.js';
-import type { SessionMetadata } from './persistence/session-metadata.js';
+import {
+  isLegacySharedSandboxWorkspace,
+  type SessionMetadata,
+} from './persistence/session-metadata.js';
 
 export const CLOUD_AGENT_PARENT_AUTHORITY_DENIED = 'Cloud Agent parent authority denied';
-
-export function assertCloudAgentIsolatedAllocation(
-  scoped: boolean,
-  allocation: string | undefined
-): void {
-  if (scoped && allocation === 'cloudflare-shared')
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Cloud Agent spawn authority requires an isolated sandbox',
-    });
-}
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
 
@@ -127,9 +118,7 @@ export function assertCloudAgentParentAuthority(
     !metadata ||
     !isWorkspaceAnchorMetadata(metadata) ||
     metadata.allowSubagentSessions !== true ||
-    metadata.workspace?.sandboxAllocation === 'cloudflare-shared' ||
-    metadata.workspace?.sandboxRoute?.kind === 'shared' ||
-    metadata.workspace?.sandboxKind === 'shared' ||
+    isLegacySharedSandboxWorkspace(metadata.workspace) ||
     !metadata.identity.sessionId.startsWith('workspace_') ||
     metadata.identity.sessionId !== scope.parentSessionId ||
     metadata.identity.userId !== scope.ownerId ||

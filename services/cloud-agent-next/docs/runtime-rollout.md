@@ -25,13 +25,13 @@ fixed Node path. Native image selection does not change the Vercel snapshot.
 
 A downloaded target can optionally scope its startup to an `interactiveOrgIds` list, rendered as
 `RUNTIME_INTERACTIVE_ORG_IDS`. No current target sets this restriction, so new native and BYOC Vercel
-allocations use downloaded startup for every organization and personal account, including code reviews
-and shared native sandboxes. SDK pins always stay preinstalled.
+allocations use downloaded startup for every organization and personal account, including code reviews.
+SDK pins always stay preinstalled.
 
 When a list is configured, a new allocation selects downloaded startup only when all its preparing
 routes belong to one listed organization, whatever their origin (web, webhook, Slack and other
 automation). Native allocations must also be isolated; Vercel allocations use the same organization
-rule. Other organizations, personal sessions, shared native sandboxes, and missing or mixed route
+rule. Other organizations, personal sessions, legacy native sandboxes that are not isolated, and missing or mixed route
 identities then retain preinstalled startup on `app`. These identity values are rollout metadata,
 not an authorization boundary.
 

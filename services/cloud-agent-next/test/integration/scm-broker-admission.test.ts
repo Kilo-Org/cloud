@@ -24,6 +24,51 @@ afterEach(async () => {
   await reset();
 });
 
+async function seedVercelAllocation(
+  stub: DurableObjectStub<SandboxControlV2>,
+  kind: 'starting' | 'stopped'
+) {
+  await runInDurableObject(stub, async (instance, state) => {
+    await instance.getAllocationState();
+    await state.storage.put('control_plane_owner', 'owner-test');
+    const pin: StoredProviderPin = {
+      provider: 'vercel',
+      allocationName: 'physical-test',
+      configuration: null,
+      billing: null,
+      byoc: { userId: 'owner-test', credentialId: 'credential-test' },
+      containment: { kilocode: true, github: true },
+      locator: {
+        teamId: 'team-test',
+        projectId: 'project-test',
+        snapshotId: 'snapshot-test',
+        runtimeBuildId: 'runtime-test',
+        runtime: 'node24',
+      },
+    };
+    Object.assign(instance, {
+      providerPin: pin,
+      env: { ...instance.env, WORKER_URL: 'https://worker.test' },
+    });
+    const db = drizzle(state.storage);
+    const current = {
+      state: kind,
+      allocation_id: 'allocation-test',
+      provider_ref: JSON.stringify({
+        sandboxName: 'physical-test',
+        sessionId: 'provider-test',
+      }),
+      stop_attempt: 0,
+      stop_pending: false,
+      provider_pin: JSON.stringify(pin),
+    };
+    db.insert(allocation)
+      .values({ id: 'current', ...current })
+      .onConflictDoUpdate({ target: allocation.id, set: current })
+      .run();
+  });
+}
+
 describe('SCM admission in Workers', () => {
   it('does not expose the production router in the minimal integration worker', async () => {
     const response = await SELF.fetch('https://worker.test/scm/vercel/sbx-runtime-dormant');
@@ -82,6 +127,7 @@ describe('SCM admission in Workers', () => {
 
   it('rejects a stopped allocation through the real DO RPC', async () => {
     const stub = namespace.getByName('sbx-runtime-stopped');
+    await seedVercelAllocation(stub, 'stopped');
     expect(await stub.admitScmForward(request)).toEqual({
       ok: false,
       status: 403,
@@ -91,45 +137,7 @@ describe('SCM admission in Workers', () => {
 
   it('leaves active allocations unchanged when customer credentials cannot be resolved', async () => {
     const stub = namespace.getByName('sbx-runtime-dormant');
-    await runInDurableObject(stub, async (instance, state) => {
-      await instance.getAllocationState();
-      await state.storage.put('control_plane_owner', 'owner-test');
-      const pin: StoredProviderPin = {
-        provider: 'vercel',
-        allocationName: 'physical-test',
-        configuration: null,
-        billing: null,
-        byoc: { userId: 'owner-test', credentialId: 'credential-test' },
-        containment: { kilocode: true, github: true },
-        locator: {
-          teamId: 'team-test',
-          projectId: 'project-test',
-          snapshotId: 'snapshot-test',
-          runtimeBuildId: 'runtime-test',
-          runtime: 'node24',
-        },
-      };
-      Object.assign(instance, {
-        providerPin: pin,
-        env: { ...instance.env, WORKER_URL: 'https://worker.test' },
-      });
-      const db = drizzle(state.storage);
-      const current = {
-        state: 'starting' as const,
-        allocation_id: 'allocation-test',
-        provider_ref: JSON.stringify({
-          sandboxName: 'physical-test',
-          sessionId: 'provider-test',
-        }),
-        stop_attempt: 0,
-        stop_pending: false,
-        provider_pin: JSON.stringify(pin),
-      };
-      db.insert(allocation)
-        .values({ id: 'current', ...current })
-        .onConflictDoUpdate({ target: allocation.id, set: current })
-        .run();
-    });
+    await seedVercelAllocation(stub, 'starting');
     const before = await stub.getAllocationState();
     expect(await stub.admitScmForward(request)).toEqual({
       ok: false,

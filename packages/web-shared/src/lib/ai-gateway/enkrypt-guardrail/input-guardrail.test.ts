@@ -502,6 +502,31 @@ describe('startEnkryptInputGuardrail', () => {
     });
   });
 
+  it('reports an NX cache write no-op as skipped while retaining the scan usage', async () => {
+    mockedScanRequest.mockResolvedValue({
+      verdict: { action: 'allow' },
+      report: scanReport,
+      usageRecords: [call()],
+    });
+    mockedRedisSet.mockResolvedValue(null);
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
+    await runAfterTasks();
+
+    expect(mockedScanRequest).toHaveBeenCalledTimes(1);
+    expect(mockedRedisSet).toHaveBeenCalledWith(finalKey(scan), 'allow', {
+      ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+      nx: true,
+    });
+    expect((await guardrail.report())?.scans).toEqual([
+      { ...scanReport, verdict_cache_write: 'skipped' },
+    ]);
+    expect(mockedRecordUsage).toHaveBeenCalledTimes(1);
+    expect(mockedRecordUsage).toHaveBeenCalledWith(expect.objectContaining(call()));
+  });
+
   it('reports a failed cache write', async () => {
     mockedScanRequest.mockResolvedValue({
       verdict: { action: 'allow' },

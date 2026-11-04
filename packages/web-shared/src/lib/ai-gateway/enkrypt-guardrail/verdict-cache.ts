@@ -11,6 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { joinRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /** When false, every request is scanned in full. */
@@ -255,11 +256,10 @@ export async function scanRequestWithVerdictCache(
   return { ...result, cacheEntry };
 }
 
-/** Returns whether the entry was stored. */
 export async function rememberRequestVerdict(
   { key, verdict }: EnkryptVerdictCacheEntry,
   store: EnkryptVerdictCacheStore
-): Promise<boolean> {
+): Promise<EnkryptGuardrailReport['scans'][number]['verdict_cache_write']> {
   try {
     const result = await store.set(
       key,
@@ -268,11 +268,11 @@ export async function rememberRequestVerdict(
         ? { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS, nx: true }
         : { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }
     );
-    return result !== null;
+    return result === null ? 'skipped' : 'written';
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache write failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return false;
+    return 'failed';
   }
 }

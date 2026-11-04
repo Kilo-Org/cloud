@@ -139,7 +139,7 @@ export function startEnkryptInputGuardrail(
   const cacheWrites = [blockingResult, logOnlyResult].map(result =>
     result.then(async ({ cacheEntry }): Promise<VerdictCacheWrite> => {
       if (!cacheEntry || !verdictCacheStore) return 'skipped';
-      return (await rememberRequestVerdict(cacheEntry, verdictCacheStore)) ? 'written' : 'failed';
+      return rememberRequestVerdict(cacheEntry, verdictCacheStore);
     })
   );
   for (const cacheWrite of cacheWrites) after(cacheWrite);

@@ -716,7 +716,7 @@ describe('rememberRequestVerdict', () => {
     const store = memoryStore();
 
     await expect(rememberRequestVerdict({ key: 'key', verdict: 'allow' }, store)).resolves.toBe(
-      true
+      'written'
     );
 
     expect(store.set).toHaveBeenCalledWith('key', 'allow', {
@@ -732,7 +732,7 @@ describe('rememberRequestVerdict', () => {
       verdict: { action: 'block', detectors: ['injection_attack'] },
     };
 
-    await expect(rememberRequestVerdict(entry, store)).resolves.toBe(true);
+    await expect(rememberRequestVerdict(entry, store)).resolves.toBe('written');
 
     expect(store.set).toHaveBeenCalledWith('key', entry.verdict, {
       ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
@@ -760,7 +760,7 @@ describe('rememberRequestVerdict', () => {
     releaseAllow();
     const allowed = await allowing;
     if (!allowed.cacheEntry) throw new Error('expected a cacheable allow');
-    await expect(rememberRequestVerdict(allowed.cacheEntry, store)).resolves.toBe(false);
+    await expect(rememberRequestVerdict(allowed.cacheEntry, store)).resolves.toBe('skipped');
     const retryDependencies = deps(store);
     const retry = await scanRequestWithVerdictCache(makeRequest(conversation), retryDependencies);
 
@@ -777,7 +777,7 @@ describe('rememberRequestVerdict', () => {
     store.set.mockRejectedValue(new Error('unreachable'));
 
     await expect(rememberRequestVerdict({ key: 'key', verdict: 'allow' }, store)).resolves.toBe(
-      false
+      'failed'
     );
     expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
       '[enkrypt-guardrail] verdict cache write failed',

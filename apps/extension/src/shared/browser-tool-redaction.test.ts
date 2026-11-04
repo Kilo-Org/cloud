@@ -146,6 +146,17 @@ describe('body redaction', () => {
     expect(redactSensitiveBody('42')).toBeUndefined();
   });
 
+  it('keeps the unstructured pass when a JSON body is nested beyond the walk', () => {
+    // A body nested far past the walk's recursion budget still returns, so the
+    // Renderer keeps the body instead of the tool call failing.
+    let body = '"leaf"';
+    for (let index = 0; index < 200_000; index += 1) {
+      body = `{"a":${body}}`;
+    }
+
+    expect(redactSensitiveBody(body)).toBeUndefined();
+  });
+
   it('replaces urlencoded listed-key values only', () => {
     expect(redactSensitiveBody('user=ada&password=hunter2&remember=true')).toBe(
       'user=ada&password=[REDACTED]&remember=true'

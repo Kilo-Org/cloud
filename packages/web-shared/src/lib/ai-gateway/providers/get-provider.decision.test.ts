@@ -15,6 +15,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import syntheticDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/synthetic';
+import zaiCodingDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/zai-coding';
+import neuralwattDefinition from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/neurowatt';
 import {
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
@@ -198,6 +200,41 @@ afterEach(() => {
 });
 
 describe('getProvider routing decision', () => {
+  describe.each([
+    { provider: zaiCodingDefinition, inferenceProviderId: 'z-ai' },
+    { provider: neuralwattDefinition, inferenceProviderId: 'neuralwatt' },
+  ])('$provider.id inference provider attribution', ({ provider, inferenceProviderId }) => {
+    test.each([false, true])('uses the policy ID with catalog mode=%s', async catalogMode => {
+      const user = await insertTestUser();
+      await insertKeys(user, [{ providerId: provider.id, catalogMode }]);
+      const model = {
+        id: 'upstream-model',
+        name: 'Model',
+        context_length: 1,
+        max_completion_tokens: 1,
+      };
+      const requestedModel = catalogMode ? MODEL : `${provider.id}/${model.id}`;
+      if (catalogMode) {
+        jest.mocked(findDirectByokCatalogModels).mockResolvedValue([{ provider, model }]);
+      } else {
+        jest.mocked(getDirectByokModel).mockResolvedValueOnce({ provider, model });
+      }
+
+      const result = await getProvider({
+        requestedModel,
+        request: { kind: 'chat_completions', body: { model: requestedModel, messages: [] } },
+        user,
+        organizationId: undefined,
+      });
+
+      expect(result).toMatchObject({
+        kind: 'provider',
+        provider: { type: 'direct-byok', inferenceProviderId },
+        userByok: [{ providerId: provider.id }],
+      });
+    });
+  });
+
   test('records a catalog key that serves ahead of a lower-ranked provider key', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [

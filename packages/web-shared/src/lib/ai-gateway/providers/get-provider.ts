@@ -157,6 +157,7 @@ async function directByokProviderResult(
     provider: {
       type: 'direct-byok',
       ...upstream,
+      inferenceProviderId: getDirectByokPolicyProviderId(directByok),
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;

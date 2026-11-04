@@ -268,6 +268,8 @@ The server sends the token and trusted client IP to OpenAI, without email or pho
 Production assessments require Vercel's trusted client-IP header.
 Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
 Only local development and tests use the forwarded-header fallback.
+Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
+Watchwood skips older proofs without that claim instead of changing authentication admission.
 Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
 The optional SDK device cookie stays disabled.
 

@@ -112,6 +112,7 @@ export type TurnstileJwtPayload = {
    */
   guid: UUID;
   ip: string;
+  watchwoodIp?: string;
   iat: number;
   exp: number;
 };

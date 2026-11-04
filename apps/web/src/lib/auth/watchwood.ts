@@ -1,12 +1,12 @@
 import 'server-only';
 import { createHmac, randomUUID } from 'node:crypto';
-import { isIP } from 'node:net';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 
 const SESSION_COOKIE = 'watchwood_signup_session';
 const ASSESSMENT_COOKIE = 'watchwood_signup_assessment';
@@ -22,7 +22,7 @@ end
 return count
 `;
 const identitySchema = z.object({ safetyIdentifier: z.uuid() });
-const turnstileSchema = z.object({ guid: z.uuid(), ip: z.string() });
+const turnstileSchema = z.object({ guid: z.uuid(), watchwoodIp: z.string() });
 const assessmentBase = z.object({
   safetyIdentifier: z.uuid().optional(),
   latencyMs: z.number().finite().nonnegative(),
@@ -187,18 +187,6 @@ export async function prepareWatchwoodSignupSession(request: NextRequest): Promi
   }
 }
 
-function trustedClientIP(request: NextRequest): string | undefined {
-  const localHeaders = process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV;
-  const header = process.env.VERCEL
-    ? 'x-vercel-forwarded-for'
-    : localHeaders
-      ? 'x-forwarded-for'
-      : undefined;
-  if (!header) return undefined;
-  const address = request.headers.get(header)?.split(',')[0]?.trim();
-  return address && isIP(address) ? address : undefined;
-}
-
 async function readBoundedJson(
   body: ReadableStream<Uint8Array> | null,
   signal: AbortSignal
@@ -278,10 +266,8 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
     const turnstile = turnstileSchema.safeParse(
       verify(request.cookies.get('turnstile_jwt')?.value)
     );
-    const ip = trustedClientIP(request);
-    // Turnstile uses its issuance header; only the Watchwood request uses the trusted IP.
-    const turnstileIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-    if (!session.success || !turnstile.success || !ip || turnstile.data.ip !== turnstileIp)
+    const ip = getTrustedSignupClientIp(request.headers);
+    if (!session.success || !turnstile.success || !ip || turnstile.data.watchwoodIp !== ip)
       return result;
     safetyIdentifier = session.data.safetyIdentifier;
     turnstileGuid = turnstile.data.guid;

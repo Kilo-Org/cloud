@@ -6,11 +6,6 @@ import {
   GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
 } from './github-rate-limit-diagnostics.js';
 
-const sdk = vi.hoisted(() => {
-  class StockSandbox {}
-  class ContainerProxy {}
-  return { StockSandbox, ContainerProxy };
-});
 const logging = vi.hoisted(() => {
   const logger = {
     debug: vi.fn(),
@@ -23,25 +18,9 @@ const logging = vi.hoisted(() => {
   return { logger };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: sdk.StockSandbox,
-  ContainerProxy: sdk.ContainerProxy,
-}));
-vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
-import {
-  ContainerProxy,
-  Sandbox,
-  SandboxContainment,
-  SandboxDIND,
-  SandboxSmall,
-  SandboxSmallContainment,
-  SandboxCodeReview,
-  SandboxCodeReviewContainment,
-  MANAGED_SCM_OUTBOUND_HANDLER,
-  handleManagedScmOutbound,
-} from './sandbox-outbound.js';
+import { handleManagedScmOutbound } from './sandbox-outbound.js';
 import {
   createControlPlaneCredential,
   type ControlCredentialPurpose,
@@ -93,80 +72,6 @@ function serializedLogCalls(): string {
     error: logging.logger.error.mock.calls,
   });
 }
-
-describe('managed GitHub sandbox outbound configuration', () => {
-  it('enables HTTPS interception and the named handler only on containment sandboxes', () => {
-    // Existing sandboxes keep internet access but must not intercept HTTPS.
-    expect(new Sandbox({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new Sandbox({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxSmall({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxSmall({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxDIND({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxCodeReview({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxCodeReview({} as never, {} as never).interceptHttps).toBeFalsy();
-
-    // Containment sandboxes intercept HTTPS so the outbound handler can run.
-    expect(new SandboxContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxSmallContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxCodeReviewContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(ContainerProxy).toBe(sdk.ContainerProxy);
-    expect(Sandbox.outbound).toBeUndefined();
-    expect(SandboxContainment.outbound).toBeUndefined();
-    expect(SandboxSmall.outbound).toBeUndefined();
-    expect(SandboxSmallContainment.outbound).toBeUndefined();
-    expect(SandboxDIND.outbound).toBeUndefined();
-    expect(SandboxContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxSmallContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(Sandbox.outboundHandlers).toBeUndefined();
-    expect(SandboxSmall.outboundHandlers).toBeUndefined();
-    expect(SandboxDIND.outboundHandlers).toBeUndefined();
-    expect(SandboxCodeReviewContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxCodeReview.outboundHandlers).toBeUndefined();
-  });
-
-  it('wires the named handler to Git and API redemption behavior', async () => {
-    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
-      success: false,
-      reason: 'invalid_capability',
-    });
-    const env = createEnv(redeemGitHubSessionCapability);
-    const handler = SandboxSmallContainment.outboundHandlers?.[MANAGED_SCM_OUTBOUND_HANDLER];
-    if (!handler) throw new Error('Expected configured outbound handler');
-
-    await handler(
-      new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
-        headers: { Authorization: basicCredential(CAPABILITY) },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-    await handler(
-      new Request('https://api.github.com/user', {
-        headers: { Authorization: `token ${CAPABILITY}` },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledTimes(2);
-  });
-});
 
 describe('handleManagedScmOutbound', () => {
   beforeEach(() => {

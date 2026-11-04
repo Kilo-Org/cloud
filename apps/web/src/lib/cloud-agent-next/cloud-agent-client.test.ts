@@ -788,7 +788,7 @@ describe('CloudAgentNextClient sandbox selection', () => {
       getSandboxSelectionOptions: {
         query: jest.fn(async () => ({
           enabled: true,
-          options: [{ allocation: 'cloudflare-single', available: true }],
+          options: [{ allocation: 'cloudflare-containers-standard-3', available: true }],
         })),
       },
     });
@@ -796,7 +796,7 @@ describe('CloudAgentNextClient sandbox selection', () => {
       new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({ kilocodeOrganizationId })
     ).resolves.toEqual({
       enabled: true,
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') }],
     });
   });
 

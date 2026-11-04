@@ -190,7 +190,7 @@ describe('POST /api/edit/completions', () => {
     });
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
-    jest.mocked(isFreeModel).mockResolvedValue(false);
+    jest.mocked(isFreeModel).mockReturnValue(false);
   });
 
   afterAll(() => {

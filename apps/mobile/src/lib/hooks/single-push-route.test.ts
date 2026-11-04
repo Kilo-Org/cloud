@@ -49,6 +49,16 @@ describe('claimSinglePush', () => {
     expect(claimSinglePush(state, T0 + 40, A)).toBe(true);
   });
 
+  it('opens a new window when the clock steps backwards', () => {
+    const state = freshState();
+    claimSinglePush(state, T0, A);
+
+    // A wall clock that stepped back must not hold the destination out until
+    // the clock catches up with the recorded time.
+    expect(claimSinglePush(state, T0 - 3_600_000, A)).toBe(true);
+    expect(state.lastPushAt).toBe(T0 - 3_600_000);
+  });
+
   it('accepts a nearby press on a different destination', () => {
     const state = freshState();
     claimSinglePush(state, T0, A);

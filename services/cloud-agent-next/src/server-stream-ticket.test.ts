@@ -31,11 +31,6 @@ vi.mock('./logger.js', () => {
   };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
-
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     constructor(_state: unknown, _env: unknown) {}
@@ -107,8 +102,8 @@ const secret = 'test-secret';
 
 type MockEnv = {
   NEXTAUTH_SECRET: string;
-  Sandbox: unknown;
-  SandboxSmall: unknown;
+  SandboxContainment: unknown;
+  SandboxSmallContainment: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   STREAM_TICKET_NONCE_DO: {
@@ -127,8 +122,8 @@ type MockEnv = {
 function createEnv(): MockEnv {
   return {
     NEXTAUTH_SECRET: secret,
-    Sandbox: {},
-    SandboxSmall: {},
+    SandboxContainment: {},
+    SandboxSmallContainment: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     STREAM_TICKET_NONCE_DO: {
       idFromName: vi.fn(),

@@ -15,6 +15,7 @@ import {
   selectableSandboxAllocationInputSchema,
   isSelectableSandboxAllocation,
   isSandboxAllocationAvailable,
+  normalizeSandboxAllocation,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
   sandboxSelectionCapabilitiesSchema,
@@ -22,13 +23,32 @@ import {
 } from './sandbox-allocation.js';
 
 describe('sandbox allocation contract', () => {
-  it.each(['isolated-standard', 'cloudflare-single'] as const)(
-    'allows legacy %s without a picker option only for an enabled owner',
+  it.each(['isolated-standard', 'cloudflare-single', 'cloudflare-shared'] as const)(
+    'keeps retired %s out of the available allocations even for an enabled owner',
     allocation => {
-      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, allocation)).toBe(true);
+      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, allocation)).toBe(false);
       expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, allocation)).toBe(false);
     }
   );
+
+  it('accepts cloudflare-single when the native default is offered', () => {
+    expect(normalizeSandboxAllocation('cloudflare-single')).toBe(
+      CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+    );
+    expect(
+      isSandboxAllocationAvailable(
+        {
+          enabled: true,
+          options: [
+            {
+              allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION),
+            },
+          ],
+        },
+        'cloudflare-single'
+      )
+    ).toBe(true);
+  });
 
   it.each([
     { reasons: {}, expected: true },
@@ -199,16 +219,33 @@ describe('sandbox allocation contract', () => {
     ).toBe(false);
   });
 
-  it('keeps isolated-standard in the field but out of the selectable set', () => {
-    expect(sandboxAllocationSchema.safeParse('isolated-standard').success).toBe(true);
-    expect(isSelectableSandboxAllocation('isolated-standard')).toBe(false);
-    expect(SELECTABLE_SANDBOX_ALLOCATIONS).not.toContain('isolated-standard');
-    expect(
-      sandboxSelectionCapabilitiesSchema.safeParse({
-        enabled: true,
-        options: [{ allocation: 'isolated-standard' }],
-      }).success
-    ).toBe(false);
+  it.each(['isolated-standard', 'cloudflare-single', 'cloudflare-shared'] as const)(
+    'keeps retired %s decodable in persisted fields but out of the selectable set',
+    allocation => {
+      expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
+      expect(isSelectableSandboxAllocation(allocation)).toBe(false);
+      expect(SELECTABLE_SANDBOX_ALLOCATIONS).not.toContain(allocation);
+      expect(selectableSandboxAllocationInputSchema.safeParse(allocation).success).toBe(false);
+      expect(
+        sandboxSelectionCapabilitiesSchema.safeParse({
+          enabled: true,
+          options: [{ allocation }],
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('keeps every selectable allocation in the containers and BYOC Vercel providers', () => {
+    expect(SELECTABLE_SANDBOX_ALLOCATIONS).toEqual([
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+      'vercel-small',
+      'vercel-large',
+    ]);
+    for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
+      expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
+      expect(getSandboxAllocationProvider(allocation)).toMatch(/^(cloudflare-containers|vercel)$/);
+    }
   });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('treats %s as selectable', allocation => {
@@ -230,13 +267,13 @@ describe('sandbox allocation contract', () => {
 });
 
 describe('multi-repository allocation support', () => {
-  const unsupported = ['cloudflare-shared', 'vercel-small', 'vercel-large'];
+  const unsupported = ['vercel-small', 'vercel-large'];
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
     expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
   });
 
-  it('rejects exactly the shared Cloudflare sandbox and Vercel', () => {
+  it('rejects exactly Vercel among selectable allocations', () => {
     const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
       allocation => !allocationSupportsMultiRepository(allocation)
     );

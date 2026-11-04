@@ -11,7 +11,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   countAndStoreEmbeddingUsage,
@@ -136,18 +136,15 @@ export async function handleEmbeddingsRequest(
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const caller = resolveGatewayCaller(
     await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
-    { allowAnonymous: isFreeModelExcludingCustomLlms(requestedModelLowerCased), ipAddress }
+    { allowAnonymous: isFreeModel(requestedModelLowerCased), ipAddress }
   );
   authSpan.end();
   if (caller.kind === 'rejected') return caller.response;
   const { user } = caller;
   const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
 
-  // Custom LLMs are served only through chat routes; never forward their ids
-  // elsewhere for signed-in callers. Anonymous callers can only send ids the
-  // built-in free model rules allow, and such an id must be answered the same
-  // whether or not a custom LLM uses it, so they are not checked.
-  if (!isAnonymousContext(user) && (await isCustomLlm(requestedModelLowerCased))) {
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestedModelLowerCased)) {
     return modelDoesNotExistResponse();
   }
 

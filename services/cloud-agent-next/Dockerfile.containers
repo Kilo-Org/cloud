@@ -48,7 +48,7 @@ RUN wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${G
 	&& rm /tmp/glab.deb
 
 # Install GitHub CLI from the pinned release tarball so the version matches
-# Vercel and Dockerfile.dind exactly.
+# the Vercel BYOC runtime exactly.
 RUN wget -nv -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
 	&& tar -xzf /tmp/gh.tar.gz -C /tmp \
 	&& install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \

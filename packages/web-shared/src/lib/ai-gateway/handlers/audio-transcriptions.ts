@@ -21,7 +21,7 @@ import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { providerPrivacySchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -226,7 +226,7 @@ export async function handleAudioTranscriptionsRequest(
     api_kind: 'audio_transcriptions',
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
+    is_free: isFreeModel(requestedModelLowerCased),
     promptInfo,
     isStreaming: false,
     user_byok: !!userByok,

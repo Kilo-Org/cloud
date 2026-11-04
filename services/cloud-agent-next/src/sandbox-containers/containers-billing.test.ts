@@ -14,7 +14,6 @@ const { DurableObjectMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
-vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import type {
   BudgetVerdict,

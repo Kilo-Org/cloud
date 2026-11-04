@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { appliesImplicitProfiles, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { appliesRepoBindings, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import {
   useCombinedProfiles,
   useProfiles,
@@ -15,7 +15,7 @@ type SessionProfileLayersInput = {
   selectedOverrideProfileId: string | null;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
-  /** The session's environment. A V2 environment skips the binding and the implicit default. */
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
 };
 
@@ -61,24 +61,22 @@ export function useSessionProfileLayers({
     [organizationId, combinedData, personalProfilesData]
   );
 
-  const implicitProfiles = appliesImplicitProfiles(environment);
-  const effectiveDefaultProfileId = !implicitProfiles
-    ? null
-    : organizationId
-      ? (combinedData?.effectiveDefaultId ?? null)
-      : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
+  const binds = appliesRepoBindings(environment);
+  const effectiveDefaultProfileId = organizationId
+    ? (combinedData?.effectiveDefaultId ?? null)
+    : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
 
   const { data: repoBindings } = useRepoBindings({ organizationId });
 
   const repoBindingProfileId = useMemo(() => {
-    if (!implicitProfiles || !repoFullName || !repoBindings) return null;
+    if (!binds || !repoFullName || !repoBindings) return null;
     const binding = repoBindings.find(
       b =>
         b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
         (!platform || b.platform === platform)
     );
     return binding?.profileId ?? null;
-  }, [implicitProfiles, repoFullName, repoBindings, platform]);
+  }, [binds, repoFullName, repoBindings, platform]);
 
   // Shared resolution logic — same rules as the server-side merge.
   const layers = useMemo(

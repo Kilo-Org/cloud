@@ -29,6 +29,7 @@ import {
   assertSandboxAllocationAvailable,
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
+  RETIRED_SANDBOX_ALLOCATION_MESSAGE,
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
 import {
@@ -179,6 +180,12 @@ function assertSupportedSandboxAllocation(
   if (allocation === undefined) return;
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
+  }
+  // cloudflare-single is the compatibility alias for the native containers
+  // default. The other retired allocations are rejected rather than silently
+  // remapped; a saved legacy value is skipped before reaching this check.
+  if (allocation === 'cloudflare-shared' || allocation === 'isolated-standard') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
   }
   if (
     options?.billingOrigin === 'code-review' ||
@@ -1005,6 +1012,7 @@ async function allocateNewSession(
       botId: ctx.botId,
       codeReview: options?.billingOrigin === 'code-review',
       sandboxAllocation,
+      ...(requestedAllocation !== undefined ? { requestedAllocation } : {}),
     });
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
@@ -1231,7 +1239,9 @@ function rebuildRecordedSessionAllocation(
   }
   const sandboxKind = recordedKind.data;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
   const replacement = sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options);
   if (
@@ -2040,6 +2050,16 @@ export async function sessionCreateIntentFingerprint(
 }
 
 /**
+ * Explicit create choices include the retired-name compatibility alias so a
+ * retry cannot drop it and inherit an unrelated recorded allocation.
+ */
+function isExplicitSandboxAllocationChoice(
+  allocation: SandboxAllocation | undefined
+): allocation is SandboxAllocation {
+  return allocation === 'cloudflare-single' || isSelectableSandboxAllocation(allocation);
+}
+
+/**
  * Rejects a same-key retry whose create intent differs from the admitted
  * fingerprint. Rows admitted before the fingerprint contract carry no
  * comparison data and keep the legacy replay/reconcile behavior.
@@ -2052,11 +2072,13 @@ async function assertCreateIntentUnchanged(
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
-  const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
+  const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
   const requestedChoice = requestedSandboxAllocation(input);
-  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const requested = isExplicitSandboxAllocationChoice(requestedChoice)
+    ? requestedChoice
+    : undefined;
   const recorded = sandboxAllocationSchema
     .optional()
     .safeParse(row.canonical_result?.sandboxAllocation);
@@ -2197,8 +2219,12 @@ export async function createSessionWithLedger(
         await sessionCreateIntentFingerprint(initialEffectiveInput),
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: initialWorktreeEnabled,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
-      // Match the replay comparison, which only considers selectable choices.
-      ...(isSelectableSandboxAllocation(requestedSandboxAllocationChoice)
+      // Match the replay comparison, which only considers explicit choices.
+      // `cloudflare-single` is pinned as the compatibility alias so a retry
+      // keeps the same intent; its resolved runtime is the native default.
+      ...(requestedSandboxAllocationChoice !== undefined &&
+      (isSelectableSandboxAllocation(requestedSandboxAllocationChoice) ||
+        requestedSandboxAllocationChoice === 'cloudflare-single')
         ? { sandboxAllocation: requestedSandboxAllocationChoice }
         : {}),
       ...(savedSandboxAllocation !== undefined

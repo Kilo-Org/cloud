@@ -1,5 +1,7 @@
 import { type Href } from 'expo-router';
 
+import { insideBurstWindow } from './burst-window';
+
 /**
  * Guard window for one navigation. Two presses on the same destination inside
  * this window belong to the same burst, and the second would push the route
@@ -36,7 +38,7 @@ export function hrefKey(href: Href): string {
  * claim the same window twice.
  */
 export function claimSinglePush(state: SinglePushGuardState, now: number, key: string): boolean {
-  if (state.lastKey === key && now - state.lastPushAt < SINGLE_PUSH_GUARD_MS) {
+  if (state.lastKey === key && insideBurstWindow(state.lastPushAt, now, SINGLE_PUSH_GUARD_MS)) {
     return false;
   }
   state.lastKey = key;

@@ -32,11 +32,6 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(),
-  Sandbox: class Sandbox {},
-}));
-
 import type { KiloSdkStoredMessage } from '../session-ingest-binding';
 import type { Env } from '../types';
 import {

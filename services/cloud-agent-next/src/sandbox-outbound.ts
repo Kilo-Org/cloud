@@ -1,9 +1,7 @@
 import { Buffer } from 'node:buffer';
-import { ContainerProxy } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { readBoundedRequestBodyBytes } from './bounded-request-body.js';
 import { logger } from './logger.js';
-import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 import {
   isControlPlaneCredential,
   parseControlPlaneCredential,
@@ -11,8 +9,6 @@ import {
 } from './sandbox-control/managed-credential.js';
 import { withDORetry } from './utils/do-retry.js';
 import type { GitTokenService } from './types.js';
-import { MeteredSandbox } from './container-usage.js';
-import type { SandboxClassName } from './container-usage-context.js';
 import {
   GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
   GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS,
@@ -1035,68 +1031,3 @@ export function handleManagedScmOutbound(
   }
   return handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }
-
-const managedScmOutboundHandlers = {
-  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-};
-
-export class Sandbox extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'Sandbox';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxSmall extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmall';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxDIND extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxDIND';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxCodeReview extends MeteredSandbox {
-  protected get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReview';
-  }
-  enableInternet = true;
-  interceptHttps = false;
-}
-
-export class SandboxContainment extends Sandbox {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxContainment';
-  }
-  interceptHttps = true;
-}
-// Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
-// setter and registers into @cloudflare/containers' internal outboundHandlersRegistry. A static
-// class field here would shadow the inherited accessor and silently no-op the registration.
-SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxSmallContainment extends SandboxSmall {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxSmallContainment';
-  }
-  interceptHttps = true;
-}
-SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export class SandboxCodeReviewContainment extends SandboxCodeReview {
-  protected override get sandboxClassName(): SandboxClassName {
-    return 'SandboxCodeReviewContainment';
-  }
-  interceptHttps = true;
-}
-SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;
-
-export { ContainerProxy };

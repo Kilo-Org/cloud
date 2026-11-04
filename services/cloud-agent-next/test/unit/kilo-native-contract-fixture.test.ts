@@ -15,7 +15,6 @@ vi.mock('../../src/session/model-preflight.js', () => ({
   preflightExistingPromptModel: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn(), Sandbox: class {} }));
 
 import type { Env } from '../../src/types.js';
 import {

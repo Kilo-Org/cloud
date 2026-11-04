@@ -16,9 +16,9 @@ import {
   getBYOKforUser,
   getByokCredentials,
   getByokKeyStates,
-  getCatalogModeByokCredentials,
   getEnabledByokProviders,
   getOrganizationByokProviderIds,
+  getStoredByokKeys,
   getUserByokProviderIds,
   servesCatalogModels,
   type ByokOwner,
@@ -30,7 +30,7 @@ import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schem
 import type { ByokApiKeySettings, EncryptedData } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 const mockedCaptureException = jest.requireMock<typeof SentryNextjs>('@sentry/nextjs')
   .captureException as unknown as jest.Mock;
@@ -353,36 +353,44 @@ describe('getByokCredentials', () => {
   });
 });
 
-describe('getCatalogModeByokCredentials', () => {
-  test('never decrypts keys outside catalog mode', async () => {
+describe('getStoredByokKeys', () => {
+  test('lists every key from one read and decrypts only the requested one from it', async () => {
     const user = await createUser();
     const owner = byokOwner(user.id, null);
-    const catalogSecret = await insertByokKey(
+    const syntheticSecret = await insertByokKey(
       owner,
       user.id,
       'synthetic',
       '2026-01-01T00:00:00.000Z',
-      {
-        settings: { serve_catalog_models: true },
-      }
+      { settings: { serve_catalog_models: true, priority: 1 } }
     );
-    await insertByokKey(owner, user.id, 'chutes-byok', '2026-01-02T00:00:00.000Z', {
-      settings: { serve_catalog_models: false },
+    await insertByokKey(owner, user.id, 'openai', '2026-01-02T00:00:00.000Z', {
+      isEnabled: false,
     });
-    // A key outside catalog mode that cannot be decrypted, as during a KMS outage.
+    // A key that cannot be decrypted, as during a KMS outage.
     await db.insert(byok_api_keys).values({
       kilo_user_id: user.id,
       provider_id: 'edenai',
       encrypted_api_key: encryptApiKey('unreadable', randomBytes(32).toString('base64')),
       created_by: user.id,
+      created_at: '2026-01-03T00:00:00.000Z',
     });
-    const providers: UserByokProviderId[] = ['synthetic', 'chutes-byok', 'edenai'];
+    mockedCaptureException.mockClear();
 
-    await expect(getByokCredentials(db, owner, ['edenai'])).rejects.toThrow();
-    await expect(getCatalogModeByokCredentials(db, owner, providers)).resolves.toEqual([
-      { decryptedAPIKey: catalogSecret, providerId: 'synthetic', serveCatalogModels: true },
-    ]);
-    await expect(getCatalogModeByokCredentials(db, owner, ['edenai'])).resolves.toEqual([]);
+    const stored = await getStoredByokKeys(db, owner);
+    expect(stored.keys).toEqual(await getByokKeyStates(db, owner));
+    await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, user.id));
+
+    await expect(stored.decrypt('synthetic')).resolves.toEqual({
+      decryptedAPIKey: syntheticSecret,
+      providerId: 'synthetic',
+      priority: 1,
+    });
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    await expect(stored.decrypt('edenai')).rejects.toThrow();
+    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    await expect(stored.decrypt('openai')).rejects.toThrow('No enabled BYOK key for openai');
+    await expect(stored.decrypt('anthropic')).rejects.toThrow('No enabled BYOK key for anthropic');
   });
 });
 

@@ -28,6 +28,13 @@ function createTimePrefix(now: number): string {
 }
 
 export function buildMessageId(now: number, randomBytes: Uint8Array): string {
+  // One byte becomes one suffix character, so any other length would produce an
+  // id that MESSAGE_ID_PATTERN rejects.
+  if (randomBytes.length !== MESSAGE_ID_RANDOM_LENGTH) {
+    throw new Error(
+      `buildMessageId needs ${MESSAGE_ID_RANDOM_LENGTH} random bytes, got ${randomBytes.length}`
+    );
+  }
   const randomSuffix = Array.from(
     randomBytes,
     byte => BASE62_ALPHABET[byte % BASE62_ALPHABET.length]

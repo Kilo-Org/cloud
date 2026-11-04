@@ -77,16 +77,16 @@ export function resolveGatewayCaller(
 }
 
 /** Free models are not usage-funded, so reading their balance skips auto top-up. */
-export async function readGatewayBalance(
+export function readGatewayBalance(
   user: User,
   organizationId: string | undefined,
   model: string
 ): Promise<BalanceAndOrgSettings> {
-  return await getBalanceAndOrgSettings(
+  return getBalanceAndOrgSettings(
     organizationId,
     user,
     readDb,
-    (await isFreeModel(model)) ? undefined : 'usage'
+    isFreeModel(model) ? undefined : 'usage'
   );
 }
 

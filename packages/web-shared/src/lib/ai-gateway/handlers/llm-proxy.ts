@@ -21,7 +21,7 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -41,7 +41,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModelExcludingCustomLlms,
+  isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findCustomLlm,
@@ -175,7 +175,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -423,7 +423,7 @@ export async function handleLlmProxyRequest(
         kiloUserId: caller.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
-        text: extractRequestText(requestBodyParsed, {
+        segments: extractRequestSegments(requestBodyParsed, {
           includeToolResults: config.scanToolResults,
         }),
         config,
@@ -659,13 +659,8 @@ export async function handleLlmProxyRequest(
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // A public custom LLM owns its id, so it is publicly free exactly when it sets
-  // no pricing. Anonymous callers cannot use private custom LLMs, so for them a
-  // private custom LLM id must behave exactly like an unknown id.
-  const isPubliclyFreeModel =
-    customLlm !== null && !isPrivateCustomLlm
-      ? !customLlm.definition.pricing
-      : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
+  // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
+  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -685,14 +680,12 @@ export async function handleLlmProxyRequest(
     const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, callerPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern. So is the default internal benchmark user: a run
-    // sends every case of every free model it measures, and the anti-abuse limit
-    // would otherwise throttle the measurement itself. A benchmark user override is
-    // not exempt.
+    // The default internal benchmark user is exempt: a run sends every case of
+    // every free model it measures, and the anti-abuse limit would otherwise
+    // throttle the measurement itself. A benchmark user override is not exempt.
     const isExempt =
       rateLimitSubject.kind === 'account' &&
-      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
+      rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
     if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
@@ -886,6 +879,8 @@ export async function handleLlmProxyRequest(
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
 
   const usageId = randomUUID();
+  const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
+  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -896,10 +891,10 @@ export async function handleLlmProxyRequest(
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-    getAllowedProviders: accessCheckResolver.getAllowedProviders,
+    getAllowedProviders: async () => accessCheckResolver.getAllowedProviders?.(),
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
-    onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
+    onDecision: decision => providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -1047,6 +1042,7 @@ export async function handleLlmProxyRequest(
     auto_model: autoModel,
     clientRequestId,
     usageId,
+    providerMetadataCapture,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
       clientAttributed: usageBase.clientAttributed,

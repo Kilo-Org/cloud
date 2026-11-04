@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-allocation';
 import {
+  CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
+  DEVCONTAINER_RETIRED_MESSAGE,
   getEffectiveCredentialContainment,
-  hasCredentialContainment,
   getSandboxProvider,
+  hasCredentialContainment,
   parseSessionMetadata,
   requiresContainmentSandbox,
+  retiredRuntimeMessage,
   serializeSessionMetadata,
   updateProviderRuntime,
 } from './session-metadata.js';
@@ -846,6 +849,53 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
+  });
+
+  it('reports devcontainer retirement before a retired provider and ignores a missing workspace', () => {
+    const devcontainer = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_devcontainer', userId: 'user_retired' },
+      auth: {},
+      workspace: {
+        sandboxId: 'dind-abcdef',
+        sandboxProvider: 'cloudflare',
+        devcontainerRequested: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(devcontainer)).toBe(DEVCONTAINER_RETIRED_MESSAGE);
+
+    const retiredProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_retired_provider', userId: 'user_retired' },
+      auth: {},
+      workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(retiredProvider)).toBe(CLOUDFLARE_RUNTIME_RETIRED_MESSAGE);
+
+    const activeProvider = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user_active',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'cloudflare-containers',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(activeProvider)).toBeNull();
+
+    const noWorkspace = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_no_workspace', userId: 'user_no_workspace' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(retiredRuntimeMessage(noWorkspace)).toBeNull();
   });
 
   it.each(['agent_isolated_standard', 'workspace_isolated_standard'])(

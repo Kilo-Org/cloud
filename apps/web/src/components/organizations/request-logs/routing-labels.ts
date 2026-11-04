@@ -186,9 +186,9 @@ export function describeStep(step: RequestLogRoutingStep): DescribedStep {
     case 'unsupported-api-kind': {
       const supported = step.supported_api_kinds?.join(', ');
       return {
-        title: 'Unsupported API',
-        detail: `The ${step.provider_id ?? ''} key does not support this API${supported ? `; it supports ${supported}` : ''}.`,
-        tone: 'rejected',
+        title: 'BYOK key over another API',
+        detail: `No key serves this API, so the request went to the ${step.provider_id ?? ''} key${supported ? `, which supports ${supported}` : ''}.`,
+        tone,
       };
     }
     case 'kilo':

@@ -13,6 +13,8 @@ type Text = string | null | undefined;
 
 type RequestText = { source: 'input' | 'tool'; text: Text };
 
+type RequestSegment = RequestText[];
+
 function inputTexts(texts: Text[]): RequestText[] {
   return texts.map(text => ({ source: 'input', text }));
 }
@@ -151,14 +153,14 @@ function chatResponseFormatTexts(
   return [name, description, jsonText(schema)];
 }
 
-function chatCompletionsTexts(body: OpenRouterChatCompletionRequest): RequestText[] {
+function chatCompletionsSegments(body: OpenRouterChatCompletionRequest): RequestSegment[] {
   return [
-    ...body.messages.flatMap(chatMessageTexts),
-    ...inputTexts([
-      ...(body.tools ?? []).flatMap(chatToolDefinitionTexts),
-      ...(body.functions ?? []).flatMap(fn => [fn.name, fn.description, jsonText(fn.parameters)]),
-      ...chatResponseFormatTexts(body.response_format),
-    ]),
+    ...(body.tools ?? []).map(tool => inputTexts(chatToolDefinitionTexts(tool))),
+    ...(body.functions ?? []).map(fn =>
+      inputTexts([fn.name, fn.description, jsonText(fn.parameters)])
+    ),
+    inputTexts(chatResponseFormatTexts(body.response_format)),
+    ...body.messages.map(chatMessageTexts),
   ];
 }
 
@@ -311,17 +313,17 @@ type AnthropicTextSources = Pick<
   'system' | 'messages' | 'tools' | 'output_config' | 'output_format'
 >;
 
-function messagesTexts(request: GatewayMessagesRequest): RequestText[] {
+function messagesSegments(request: GatewayMessagesRequest): RequestSegment[] {
   const body: AnthropicTextSources = request;
   const { system } = body;
   return [
-    ...inputTexts(typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])),
-    ...body.messages.flatMap(anthropicMessageTexts),
-    ...inputTexts([
-      ...(body.tools ?? []).flatMap(anthropicToolDefinitionTexts),
+    ...(body.tools ?? []).map(tool => inputTexts(anthropicToolDefinitionTexts(tool))),
+    inputTexts([
       jsonText(body.output_format?.schema),
       jsonText(body.output_config?.format?.schema),
     ]),
+    inputTexts(typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])),
+    ...body.messages.map(anthropicMessageTexts),
   ];
 }
 
@@ -488,45 +490,58 @@ function responsesItemTexts(item: OpenAI.Responses.ResponseInputItem): RequestTe
   }
 }
 
-function responsesTexts(body: GatewayResponsesRequest): RequestText[] {
+function responsesSegments(body: GatewayResponsesRequest): RequestSegment[] {
   const { input } = body;
   return [
-    ...inputTexts([body.instructions]),
-    ...(typeof input === 'string'
-      ? inputTexts([input])
-      : (input ?? []).flatMap(responsesItemTexts)),
-    ...inputTexts([
-      ...(body.tools ?? []).flatMap(responsesToolDefinitionTexts),
-      ...responsesFormatTexts(body.text?.format),
-    ]),
+    ...(body.tools ?? []).map(tool => inputTexts(responsesToolDefinitionTexts(tool))),
+    inputTexts(responsesFormatTexts(body.text?.format)),
+    inputTexts([body.instructions]),
+    ...(typeof input === 'string' ? [inputTexts([input])] : (input ?? []).map(responsesItemTexts)),
   ];
 }
 
-function requestTexts(request: GatewayRequest): RequestText[] {
+/**
+ * Tool and output-format definitions come first: they rarely change within a session, so the
+ * conversation that grows behind them stays a prefix of the next request.
+ */
+function requestSegments(request: GatewayRequest): RequestSegment[] {
   switch (request.kind) {
     case 'chat_completions':
-      return chatCompletionsTexts(request.body);
+      return chatCompletionsSegments(request.body);
     case 'messages':
-      return messagesTexts(request.body);
+      return messagesSegments(request.body);
     case 'responses':
-      return responsesTexts(request.body);
+      return responsesSegments(request.body);
   }
+}
+
+const SEGMENT_SEPARATOR = '\n\n';
+
+export function joinRequestSegments(segments: string[]): string {
+  return segments.join(SEGMENT_SEPARATOR);
 }
 
 /**
  * Every request can rewrite history, including assistant and system messages. Scan the full
  * conversation rather than trusting earlier turns, respecting the organization's tool-result scope.
  * Binary media, encrypted content, and transport settings are never scanned.
+ *
+ * Returns one entry per tool definition, output format, system prompt, and message or input item
+ * that has scannable text, in order. Joined with `joinRequestSegments`, they are the scanned text.
  */
-export function extractRequestText(
+export function extractRequestSegments(
   request: GatewayRequest,
   { includeToolResults }: { includeToolResults: boolean }
-): string {
-  return requestTexts(request)
-    .filter(({ source }) => includeToolResults || source === 'input')
-    .flatMap(({ text }) => {
-      const trimmed = text?.trim();
-      return trimmed ? [trimmed] : [];
-    })
-    .join('\n\n');
+): string[] {
+  return requestSegments(request).flatMap(segment => {
+    const joined = joinRequestSegments(
+      segment
+        .filter(({ source }) => includeToolResults || source === 'input')
+        .flatMap(({ text }) => {
+          const trimmed = text?.trim();
+          return trimmed ? [trimmed] : [];
+        })
+    );
+    return joined ? [joined] : [];
+  });
 }

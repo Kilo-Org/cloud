@@ -367,13 +367,12 @@ export const kiloSdkSessionSnapshotOutcomeSchema = z.discriminatedUnion('kind', 
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
-export type KiloSdkSessionSnapshotRead = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
-export type KiloSdkSessionSnapshotOutcome = KiloSdkSessionSnapshotRead;
+export type KiloSdkSessionSnapshotOutcome = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
 
 export type CloudAgentRootSessionSnapshot = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  snapshot: KiloSdkSessionSnapshotRead;
+  snapshot: KiloSdkSessionSnapshotOutcome;
 };
 export type GetCloudAgentRootSessionSnapshotParams =
   ResolveCloudAgentRootSessionForKiloSessionParams;
@@ -1199,7 +1198,7 @@ export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
 /** Base64 and base64url alphabets, plus the optional trailing padding. */
 const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
-export const kiloSdkMessagesLegacyCursorSchema = z
+export const kiloSdkMessagesCursorSchema = z
   .object({
     id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
       message: 'message cursor ids must fit the cursor id byte limit',
@@ -1207,10 +1206,7 @@ export const kiloSdkMessagesLegacyCursorSchema = z
     time: z.number().nonnegative(),
   })
   .strict();
-export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCursorSchema>;
-
-export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
-export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
+export type KiloSdkMessagesCursor = z.infer<typeof kiloSdkMessagesCursorSchema>;
 
 export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
   return encodeBase64Url(JSON.stringify(kiloSdkMessagesCursorSchema.parse(cursor)));

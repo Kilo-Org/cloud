@@ -769,6 +769,69 @@ describe('browser_network_request', () => {
     expect(text).not.toContain('ak-fixture-1');
   });
 
+  it('hides private-key material in a response body under any field name', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('account', { resourceType: 'XHR', status: 200 })],
+      responseBody: {
+        body: JSON.stringify({
+          account: 'svc@example.com',
+          material: '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
+        }),
+      },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('"account": "svc@example.com"');
+    expect(text).toContain('"material": "[REDACTED]"');
+    expect(text).not.toContain('MIIEfixtureBody');
+  });
+
+  it('hides a plain text response body that carries a pem block', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [networkRequest('download', { resourceType: 'Other', status: 200 })],
+      responseBody: { body: '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody' },
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'response-body' },
+      session
+    );
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('[REDACTED]');
+    expect(text).not.toContain('MIIEfixtureBody');
+  });
+
+  it('hides a request body that carries a pem block', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [
+        networkRequest('upload', {
+          method: 'POST',
+          postData: 'upload-name=material\n-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
+          resourceType: 'XHR',
+          status: 200,
+        }),
+      ],
+    });
+
+    const result = await runReadBrowserTool(
+      'browser_network_request',
+      { index: 1, part: 'request-body' },
+      session
+    );
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('[REDACTED]');
+    expect(text).not.toContain('MIIEfixtureBody');
+  });
+
   it('errors on an out-of-range number', async () => {
     const { session } = createSession();
     const result = await runReadBrowserTool('browser_network_request', { index: 9 }, session);

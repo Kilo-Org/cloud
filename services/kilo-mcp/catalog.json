@@ -24927,6 +24927,91 @@
     ],
     "searchBlob": "organizations.modes.update Update an organization custom mode's name, slug, configuration, or model route. Use to edit an organization mode. organizations modes update organizationid modeid name slug config route_model organizationId modeId name slug config route_model"
   },
+  "organizations.requestLogs.getDetails": {
+    "path": "organizations.requestLogs.getDetails",
+    "kind": "query",
+    "summary": "Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "usageId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId",
+        "usageId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "getdetails",
+      "organizationid",
+      "usageid"
+    ],
+    "searchBlob": "organizations.requestLogs.getDetails Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region. organizations requestlogs getdetails organizationid usageid organizationId usageId"
+  },
+  "organizations.requestLogs.isAvailable": {
+    "path": "organizations.requestLogs.isAvailable",
+    "kind": "query",
+    "summary": "Check whether request logs (per-request usage and cost history) are enabled for an organization, returning a simple available flag.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "isavailable",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.requestLogs.isAvailable Check whether request logs (per-request usage and cost history) are enabled for an organization, returning a simple available flag. organizations requestlogs isavailable organizationid organizationId"
+  },
+  "organizations.requestLogs.list": {
+    "path": "organizations.requestLogs.list",
+    "kind": "query",
+    "summary": "List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "list",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.requestLogs.list List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first. organizations requestlogs list organizationid organizationId"
+  },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",
     "kind": "mutation",

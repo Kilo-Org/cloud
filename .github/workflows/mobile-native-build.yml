@@ -48,10 +48,32 @@ jobs:
       need_ios: ${{ steps.decide.outputs.need_ios }}
       need_android: ${{ steps.decide.outputs.need_android }}
       prefix: ${{ steps.decide.outputs.prefix }}
+      artifacts_provider: ${{ steps.filter_provider.outputs.provider || steps.filter_provider_retry.outputs.provider }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           lfs: true
+
+      - name: Detect artifacts provider behavior changes
+        id: filter_provider
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            provider:
+              - 'apps/mobile/targets/ArtifactsFileProvider/**'
+              - 'apps/mobile/tests/artifacts-file-provider/**'
+              - '.github/workflows/mobile-native-build.yml'
+      - name: Detect artifacts provider behavior changes (retry)
+        id: filter_provider_retry
+        if: steps.filter_provider.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            provider:
+              - 'apps/mobile/targets/ArtifactsFileProvider/**'
+              - 'apps/mobile/tests/artifacts-file-provider/**'
+              - '.github/workflows/mobile-native-build.yml'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -79,9 +101,29 @@ jobs:
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
-  ios:
+  artifacts-provider:
     needs: gate
-    if: needs.gate.outputs.need_ios == 'true'
+    if: needs.gate.outputs.artifacts_provider == 'true' || (github.event_name == 'workflow_dispatch' && inputs.platform != 'android')
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            apps/mobile/targets/ArtifactsFileProvider/ArtifactsFileProviderExtension.swift
+            apps/mobile/tests/artifacts-file-provider/main.swift
+      - name: Verify artifacts File Provider enumeration
+        run: |
+          xcrun swiftc -swift-version 5 \
+            apps/mobile/targets/ArtifactsFileProvider/ArtifactsFileProviderExtension.swift \
+            apps/mobile/tests/artifacts-file-provider/main.swift \
+            -o "$RUNNER_TEMP/artifacts-file-provider-tests"
+          "$RUNNER_TEMP/artifacts-file-provider-tests"
+
+  ios:
+    needs: [gate, artifacts-provider]
+    if: always() && needs.gate.result == 'success' && needs.gate.outputs.need_ios == 'true' && contains(fromJSON('["success","skipped"]'), needs['artifacts-provider'].result)
     runs-on: macos-26
     timeout-minutes: 90
     # A pull_request run takes one slot per ref, so pull requests with the same
@@ -107,14 +149,6 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
-
-      - name: Verify artifacts File Provider enumeration
-        run: |
-          xcrun swiftc -swift-version 5 \
-            apps/mobile/targets/ArtifactsFileProvider/ArtifactsFileProviderExtension.swift \
-            apps/mobile/tests/artifacts-file-provider/main.swift \
-            -o "$RUNNER_TEMP/artifacts-file-provider-tests"
-          "$RUNNER_TEMP/artifacts-file-provider-tests"
 
       # The probe runs tsx over the local dev/local scripts, so it needs only
       # the root project's dependencies. A duplicate that reaches this job

@@ -84,7 +84,8 @@ private func currentAnchor(_ enumerator: ArtifactsEnumerator) -> NSFileProviderS
 
 private func listedItems(_ enumerator: ArtifactsEnumerator) -> [NSFileProviderItem] {
   let observer = ItemsObserver()
-  enumerator.enumerateItems(for: observer, startingAt: .initialPageSortedByName)
+  let page = NSFileProviderPage(rawValue: NSFileProviderPage.initialPageSortedByName as Data)
+  enumerator.enumerateItems(for: observer, startingAt: page)
   check(observer.error == nil, "An existing or empty mirror must enumerate successfully")
   check(observer.completions == 1, "Item enumeration must complete once")
   return observer.items

@@ -29,6 +29,7 @@ import {
   type OwnerAccessState,
 } from './town/owner-access';
 import { evaluateGastownAccessFlag } from '../util/gastown-access-flag.util';
+import { isGastownKilled } from '../util/kill-switch.util';
 import {
   CONTAINER_HEALTH_STORAGE_KEYS,
   recoverContainerIfWedged as _recoverContainerIfWedged,
@@ -4214,6 +4215,21 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async _alarm(): Promise<void> {
+    if (isGastownKilled(this.env)) {
+      // Best effort: block container starts and stop a running container.
+      // Then drop the alarm so the loop never re-arms.
+      try {
+        const storedTownId = await this.ctx.storage.get<string>('town:id');
+        if (storedTownId) await getTownContainerStub(this.env, storedTownId).setAccessRevoked(true);
+      } catch (err) {
+        logger.warn('alarm: gastown disabled, failed to stop container', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+
     // Exit condition: if this DO was destroyed, don't re-arm.
     // After destroy(), deleteAll() wipes storage but may not clear
     // the alarm (compat date < 2026-02-24). A resurrected alarm

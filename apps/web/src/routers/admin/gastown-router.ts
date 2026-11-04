@@ -15,6 +15,7 @@ import {
 } from '@/lib/web-config.server';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
+import { isGastownKilled } from '@/lib/gastown/feature-flags';
 
 // ── Zod schemas matching Gastown API response shapes ─────────────────────────
 
@@ -260,6 +261,9 @@ const GastownApiResponseSchema = z.union([
 ]);
 
 function requireGastownUrl(): string {
+  if (isGastownKilled()) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Gastown is disabled' });
+  }
   if (!GASTOWN_SERVICE_URL) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',

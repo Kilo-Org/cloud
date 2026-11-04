@@ -1,27 +1,16 @@
-import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
-
-const GASTOWN_ACCESS_FLAG = 'gastown-access';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 /**
- * Check whether the current user has Gastown access.
- *
- * In non-production environments the flag is always enabled so local
- * development works without PostHog configuration. In production,
- * access is controlled by the `gastown-access` PostHog feature flag
- * (allowlists, percentage rollout, and kill-switch are managed in the
- * PostHog dashboard).
- *
- * Kilo admins always have access regardless of the feature flag.
- *
- * See #901 for details.
+ * Gastown is killed, for everyone, admins included, only when GASTOWN_KILLED
+ * is exactly `true`. Read per call so no restart of module state is needed.
  */
+export function isGastownKilled(): boolean {
+  return getEnvVariable('GASTOWN_KILLED') === 'true';
+}
+
 export async function isGastownEnabled(
-  userId: string,
-  opts?: { isAdmin?: boolean }
+  _userId: string,
+  _opts?: { isAdmin?: boolean }
 ): Promise<boolean> {
-  if (opts?.isAdmin) return true;
-  if (process.env.NODE_ENV !== 'production') {
-    return true;
-  }
-  return isFeatureFlagEnabled(GASTOWN_ACCESS_FLAG, userId);
+  return !isGastownKilled();
 }

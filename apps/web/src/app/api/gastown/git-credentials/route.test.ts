@@ -1,4 +1,9 @@
 const mockResolveGitCredentialsFromIntegration = jest.fn();
+let mockGastownKilled = false;
+
+jest.mock('@/lib/gastown/feature-flags', () => ({
+  isGastownKilled: () => mockGastownKilled,
+}));
 
 jest.mock('@/lib/gastown/git-credentials', () => ({
   resolveGitCredentialsFromIntegration: (...args: unknown[]) =>
@@ -83,6 +88,7 @@ async function createUserGitHubIntegration(userId: string) {
 
 afterEach(async () => {
   mockResolveGitCredentialsFromIntegration.mockReset();
+  mockGastownKilled = false;
   if (createdUserIds.length > 0) {
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, createdUserIds));
     createdUserIds.length = 0;
@@ -90,6 +96,19 @@ afterEach(async () => {
 });
 
 describe('POST /api/gastown/git-credentials', () => {
+  test('returns 503 without resolving credentials while Gastown is disabled', async () => {
+    mockGastownKilled = true;
+    const user = await createUser();
+    const integration = await createUserGitHubIntegration(user.id);
+    const token = signToken(user.id, { audience: KILO_API_AUDIENCE });
+
+    const response = await POST(makeRequest(token, integration.id));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Gastown is disabled' });
+    expect(mockResolveGitCredentialsFromIntegration).not.toHaveBeenCalled();
+  });
+
   test.each([
     [
       'Kilo API audience token',

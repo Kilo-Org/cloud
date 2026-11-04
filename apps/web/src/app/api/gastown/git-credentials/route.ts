@@ -19,8 +19,13 @@ import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
+import { isGastownKilled } from '@/lib/gastown/feature-flags';
 
 export async function POST(request: NextRequest) {
+  if (isGastownKilled()) {
+    return NextResponse.json({ error: 'Gastown is disabled' }, { status: 503 });
+  }
+
   // Verify auth — accept any valid Kilo API token
   const authResult = validateAuthorizationHeader(request.headers);
   if ('error' in authResult) {

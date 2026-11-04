@@ -4,6 +4,7 @@ import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user
 import { query } from '../util/query.util';
 import { generateId, now } from '../util/id.util';
 import { getTownDOStub } from './Town.do';
+import { isGastownKilled } from '../util/kill-switch.util';
 
 const USER_LOG = '[GastownUser.do]';
 
@@ -253,6 +254,10 @@ export class GastownUserDO extends DurableObject<Env> {
    * See #442 — replaces the Boot agent's role from local Gastown.
    */
   async alarm(): Promise<void> {
+    if (isGastownKilled(this.env)) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
     await this.ensureInitialized();
     const towns = UserTownRecord.array().parse([
       ...query(this.sql, /* sql */ `SELECT * FROM ${user_towns}`, []),

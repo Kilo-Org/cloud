@@ -1,6 +1,7 @@
 import { Container } from '@cloudflare/containers';
 import { ContainerUsageAdmissionError, type HeartbeatAck } from '@kilocode/container-usage';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
+import { isGastownKilled } from '../util/kill-switch.util';
 import {
   clientUsageContext,
   getContainerUsageClient,
@@ -758,6 +759,9 @@ export class TownContainerDO extends Container<Env> {
   }
 
   private async assertAutomaticStartsEnabled(): Promise<void> {
+    if (isGastownKilled(this.env)) {
+      throw new ContainerBillingError('ACCESS_REVOKED', 'Gastown is disabled');
+    }
     if (await this.isAccessRevoked()) {
       throw new ContainerBillingError(
         'ACCESS_REVOKED',

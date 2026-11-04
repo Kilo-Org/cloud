@@ -16,6 +16,7 @@ interface __BaseEnv_Env {
 	GASTOWN_API_URL: "http://192.168.65.254:8803" | "https://gastown.kiloapps.io";
 	WASTELAND_API_URL: "http://192.168.65.254:8788" | "https://wasteland.kiloapps.io";
 	GASTOWN_BILLING_ENABLED: "false" | "true";
+	GASTOWN_KILLED: "false" | "true";
 	NEXT_PUBLIC_POSTHOG_KEY: "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z";
 	GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 	GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
@@ -95,6 +96,7 @@ declare namespace Cloudflare {
 		GASTOWN_API_URL: "http://192.168.65.254:8803";
 		WASTELAND_API_URL: "http://192.168.65.254:8788";
 		GASTOWN_BILLING_ENABLED: "false" | "true";
+		GASTOWN_KILLED: "false" | "true";
 		NEXT_PUBLIC_POSTHOG_KEY: "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z";
 		GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 		GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
@@ -113,5 +115,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "KILO_API_URL" | "GASTOWN_API_URL" | "WASTELAND_API_URL" | "GASTOWN_BILLING_ENABLED" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ENVIRONMENT" | "CF_ACCESS_TEAM" | "CF_ACCESS_AUD" | "KILO_API_URL" | "GASTOWN_API_URL" | "WASTELAND_API_URL" | "GASTOWN_BILLING_ENABLED" | "GASTOWN_KILLED" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
 }

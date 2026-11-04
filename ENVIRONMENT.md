@@ -321,6 +321,7 @@ admission responses within the same slot and deadline.
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
+- `GASTOWN_KILLED` - Gastown kill switch. Gastown is turned off only when this is exactly `true`; unset or any other value leaves it on. Disables the Gastown pages, token and git-credentials routes, and the admin Gastown router. The Gastown worker has its own `GASTOWN_KILLED` Wrangler var that must be set separately. [SERVER]
 - `GASTOWN_BILLING_ENABLED` - Enables Gastown container usage billing _enforcement_: admission checks and low-balance stops. Does not control metering — usage is always reported to the meter whenever the `CONTAINER_USAGE` binding is present. Enabled in the Gastown Wrangler development environment and defaults to `false` in production. [SERVER]
 - `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` - Set to exactly `true` to show the upcoming usage-based container billing announcement on Gastown town overview pages. Always enabled when Next.js runs in development and defaults to off otherwise. [SERVER]
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]

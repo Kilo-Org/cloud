@@ -12,6 +12,7 @@ import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import { writeEvent } from './util/analytics.util';
 import { logger } from './util/log.util';
+import { isGastownKilled, gastownKilledResponse } from './util/kill-switch.util';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -1363,6 +1364,9 @@ export default withSentry(
   }),
   {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+      // Must stay first: the WebSocket branch below bypasses Hono entirely.
+      if (isGastownKilled(env)) return gastownKilledResponse();
+
       // Intercept WebSocket upgrade requests for agent streaming and PTY.
       // Must bypass Hono — the DO returns a 101 + WebSocketPair that the
       // runtime handles directly.

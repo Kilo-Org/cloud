@@ -9,6 +9,7 @@ import {
   preflightPreparedInitialPromptModel,
   preflightSessionRuntime,
 } from './model-preflight.js';
+import { CLOUDFLARE_RUNTIME_RETIRED_MESSAGE } from '../persistence/session-metadata.js';
 
 vi.mock('../sandbox-session/session-stub.js', () => ({
   getSandboxSessionStub: vi.fn(),
@@ -68,6 +69,31 @@ describe('model preflight for stored sessions', () => {
       await expect(preflight(input)).rejects.toMatchObject({
         code: 'BAD_REQUEST',
         message: expect.stringContaining('Devcontainer support has been retired'),
+      });
+    }
+    expect(getSandboxSessionStub).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retired Cloudflare runtime before auth renewal or catalog checks', async () => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({
+      ...metadata,
+      workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+    });
+    const input = {
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'resume',
+    };
+    for (const preflight of [
+      preflightSessionRuntime,
+      preflightExistingPromptModel,
+      preflightPreparedInitialPromptModel,
+    ]) {
+      await expect(preflight(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: CLOUDFLARE_RUNTIME_RETIRED_MESSAGE,
       });
     }
     expect(getSandboxSessionStub).not.toHaveBeenCalled();

@@ -556,7 +556,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Other Services
 
-- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/dev.sh`. [SERVER]
+- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
 
 ## Browser Extension (apps/extension)

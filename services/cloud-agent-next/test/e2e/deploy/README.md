@@ -203,30 +203,30 @@ semantics.
 | `main` and container `image` paths rebased (`../src/index.ts`, `../Dockerfile*`) | The rendered config lives one directory deeper, in `.wrangler/`. |
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
-| Three production runtime classes retained | Native containers serve new default sessions. Legacy containment pools retain saved-session routing. |
+| Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
-| `CREDENTIAL_CONTAINMENT_ENABLED=true` | Credential containment stays enabled for the retained legacy pools. |
+| `CREDENTIAL_CONTAINMENT_ENABLED=true` | Credential containment stays enabled, as in production. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
 | `SHARED_SANDBOX_OVERRIDES` KV binding pinned to the e2e namespace id | An id-less binding makes wrangler auto-provision the namespace and fail with `code: 10014` because the title already exists. |
 
 ### Container classes and migrations
 
-The E2E Worker keeps `SandboxContainment`, `SandboxSmallContainment`, and
-`SandboxContainers`. New default sessions use the native containers runtime.
-The two legacy containment pools retain their stored-session routing.
-Retired non-contained, devcontainer, and legacy code-review runtimes fail with
-an explicit retired-runtime error.
+The E2E Worker provisions one container class, `SandboxContainers`, the native
+runtime used by every session. `SandboxContainment` and
+`SandboxSmallContainment` have no container or binding; `src/e2e-entry.ts`
+exports them as no-op tombstones so their stored namespaces remain valid.
 
 The renderer preserves the deployed Worker's migration history. The `v15`
 migration deletes its old `Sandbox` namespace. The `v15-e2e` migration directly after `v15`
-creates the three retained runtime namespaces, which the old E2E configuration
-omitted. The local E2E renderer uses the production migration list and does not
+creates the `SandboxContainment`, `SandboxSmallContainment`, and
+`SandboxContainers` namespaces, which the old E2E configuration omitted. This
+applied migration stays fixed even though only `SandboxContainers` still has a
+container. The local E2E renderer uses the production migration list and does not
 add this deployed-only migration. Later production migrations keep their class operations and follow `v15-e2e`.
 
-Legacy pools use `max_instances: 40` and enable SSH. Native containers retain
-their production scheduling configuration. Container image paths are rebased
-for the generated configuration directory.
+Native containers retain their production scheduling configuration. Container
+image paths are rebased for the generated configuration directory.
 
 ## Token requirement
 

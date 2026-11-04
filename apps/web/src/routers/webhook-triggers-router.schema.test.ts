@@ -23,6 +23,7 @@ import type {
   webhookTriggersRouter as webhookTriggersRouterType,
 } from './webhook-triggers-router';
 import {
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   getSandboxAllocationRequest,
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -888,17 +889,37 @@ describe('webhook trigger variant inputs', () => {
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { activationMode: 'webhook', sandboxAllocation: 'isolated-standard' },
-    { activationMode: 'scheduled', sandboxAllocation: 'isolated-standard' },
-    { activationMode: 'webhook', sandboxAllocation: 'cloudflare-single' },
-    { activationMode: 'scheduled', sandboxAllocation: 'cloudflare-single' },
-  ] as const)(
-    'allows an enrolled organization member to retain $sandboxAllocation on $activationMode triggers without a picker option',
-    async ({ activationMode, sandboxAllocation }) => {
+  it.each(['webhook', 'scheduled'] as const)(
+    'rejects the retired isolated-standard allocation on %s triggers without a picker option',
+    async activationMode => {
       const organizationId = '00000000-0000-4000-8000-000000000003';
       mockEnsureOrganizationAccess.mockResolvedValue('member');
       mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: true, options: [] });
+      await expect(
+        createCaller({ user }).create({
+          ...createInput,
+          organizationId,
+          activationMode,
+          ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
+          sandboxAllocation: 'isolated-standard',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'allows an enrolled organization member to retain the cloudflare-single alias on %s triggers when its native size is offered',
+    async activationMode => {
+      const sandboxAllocation = 'cloudflare-single';
+      const organizationId = '00000000-0000-4000-8000-000000000003';
+      mockEnsureOrganizationAccess.mockResolvedValue('member');
+      mockGetSandboxSelectionOptions.mockResolvedValue({
+        enabled: true,
+        options: [
+          { allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION) },
+        ],
+      });
       await createCaller({ user }).create({
         ...createInput,
         organizationId,
@@ -972,13 +993,13 @@ describe('webhook trigger variant inputs', () => {
     ]);
     mockGetSandboxSelectionOptions.mockResolvedValueOnce({
       enabled: true,
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-shared') }],
+      options: [{ allocation: getSandboxAllocationRequest('vercel-large') }],
     });
 
     await createCaller({ user }).update({
       triggerId: 'trigger-id',
       organizationId,
-      sandboxAllocation: 'cloudflare-shared',
+      sandboxAllocation: 'vercel-large',
     });
 
     expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
@@ -990,7 +1011,7 @@ describe('webhook trigger variant inputs', () => {
       undefined,
       organizationId,
       'trigger-id',
-      expect.objectContaining({ sandboxAllocation: 'cloudflare-shared' })
+      expect.objectContaining({ sandboxAllocation: 'vercel-large' })
     );
   });
 

@@ -1,14 +1,11 @@
 import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
-import type { Sandbox } from '@cloudflare/sandbox';
 import {
   getSandboxAllocationProvider,
+  normalizeSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   classifySandboxId,
-  getSandboxNamespace,
-  getSandboxNamespaceForClass,
   hashToSandboxId,
   isPlacedSandboxKey,
   selectDefaultSandboxProvider,
@@ -16,8 +13,7 @@ import {
   type SandboxIdClass,
   type SandboxSelectionEnv,
 } from './sandbox-id.js';
-import { isCodeReviewContainersOwner, type CodeReviewContainersEnv } from './session-identity.js';
-import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
+import type { AgentSandboxProvider, SandboxId } from './types.js';
 
 /**
  * What a control-plane sandbox with a neutral `sbx-` key is. The key carries no
@@ -28,8 +24,6 @@ import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
 export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-review', 'shared']);
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
-
-type SandboxNamespaceEnv = Pick<Env, 'SandboxContainment' | 'SandboxSmallContainment'>;
 
 /**
  * The legacy key class each kind stands in for, so class-based rules (billing
@@ -50,20 +44,30 @@ export type ControlPlaneSandboxDecision = {
 
 /** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
 export async function selectControlPlaneSandbox(input: {
-  env: SandboxSelectionEnv & CodeReviewContainersEnv & Pick<Env, 'CREDENTIAL_CONTAINMENT_ENABLED'>;
+  env: SandboxSelectionEnv;
   sessionId: string;
   userId: string;
   orgId?: string;
   botId?: string;
   codeReview: boolean;
   sandboxAllocation?: SandboxAllocation;
+  /** The caller's normalized choice; the resolved default never changes the kind. */
+  requestedAllocation?: SandboxAllocation;
 }): Promise<ControlPlaneSandboxDecision> {
-  const sandboxKind = controlPlaneSandboxKind(input);
+  const requestedAllocation =
+    input.requestedAllocation !== undefined
+      ? normalizeSandboxAllocation(input.requestedAllocation)
+      : input.codeReview
+        ? undefined
+        : input.sandboxAllocation;
+  const sandboxKind = controlPlaneSandboxKind({
+    codeReview: input.codeReview,
+    ...(requestedAllocation !== undefined ? { sandboxAllocation: requestedAllocation } : {}),
+  });
   const provider =
     input.sandboxAllocation !== undefined
       ? getSandboxAllocationProvider(input.sandboxAllocation)
-      : input.codeReview &&
-          isCodeReviewContainersOwner(input.env, { userId: input.userId, orgId: input.orgId })
+      : input.codeReview
         ? 'cloudflare-containers'
         : selectDefaultSandboxProvider({
             env: input.env,
@@ -71,15 +75,6 @@ export async function selectControlPlaneSandbox(input: {
             userId: input.userId,
             isolated: sandboxKind === 'isolated',
           });
-  if (
-    provider === 'cloudflare' &&
-    (sandboxKind === 'code-review' || input.env.CREDENTIAL_CONTAINMENT_ENABLED === 'false')
-  ) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'This sandbox runtime has been retired. Select Cloudflare Containers.',
-    });
-  }
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
 }
 
@@ -132,20 +127,4 @@ export function resolveSandboxIdClass(input: {
   return input.sandboxKind === undefined
     ? classifySandboxId(input.sandboxId)
     : KIND_SANDBOX_ID_CLASS[input.sandboxKind];
-}
-
-/**
- * The Cloudflare Sandbox namespace from the stored kind, or from a legacy key's
- * prefix. A placed key without its kind is rejected by the prefix table.
- */
-export function resolveSandboxNamespace(
-  env: SandboxNamespaceEnv,
-  input: { sandboxId: string; sandboxKind?: SandboxKind; contained: boolean }
-): DurableObjectNamespace<Sandbox> {
-  if (input.sandboxKind === undefined) {
-    return getSandboxNamespace(env, input.sandboxId, { managedScmContainment: input.contained });
-  }
-  return getSandboxNamespaceForClass(env, KIND_SANDBOX_ID_CLASS[input.sandboxKind], {
-    managedScmContainment: input.contained,
-  });
 }

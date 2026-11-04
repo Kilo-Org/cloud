@@ -3,17 +3,13 @@ import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
+  normalizeSandboxAllocation,
   type SandboxAllocation,
   type SandboxDestination,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import { CODE_REVIEW_PLATFORM } from './session-identity.js';
-import type { Sandbox } from '@cloudflare/sandbox';
-import {
-  isCloudflareContainersEnrolled,
-  type CloudflareContainersEnrollmentEnv,
-} from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 
@@ -22,11 +18,6 @@ export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 const CONTROL_PLANE_SHARED_SANDBOX_ID_VERSION = 'shared-control-v1';
 
 type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
-type SandboxNamespaceEnv = Pick<Env, 'SandboxContainment' | 'SandboxSmallContainment'>;
-
-type SandboxNamespaceOptions = {
-  managedScmContainment?: boolean;
-};
 
 export type SharedSandboxRoutingTarget = {
   kind: 'shared';
@@ -151,58 +142,18 @@ export function isOrgInList(raw: string | undefined, orgId: string | undefined):
   return orgId !== undefined && orgs.has(orgId);
 }
 
-export function getSandboxNamespace(
-  env: SandboxNamespaceEnv,
-  sandboxId: string,
-  options: SandboxNamespaceOptions = {}
-): DurableObjectNamespace<Sandbox> {
-  if (isPlacedSandboxKey(sandboxId)) {
-    throw new Error('A placed sandbox key routes only through its stored kind');
-  }
-  return getSandboxNamespaceForClass(env, classifySandboxId(sandboxId), options);
-}
-
-export class RetiredSandboxRuntimeError extends Error {
-  constructor() {
-    super('This sandbox runtime has been retired. Start a new session.');
-    this.name = 'RetiredSandboxRuntimeError';
-  }
-}
-
-/** Resolve only the legacy namespaces that still retain their stored instances. */
-export function getSandboxNamespaceForClass(
-  env: SandboxNamespaceEnv,
-  sandboxIdClass: SandboxIdClass,
-  options: SandboxNamespaceOptions
-): DurableObjectNamespace<Sandbox> {
-  if (
-    options.managedScmContainment !== true ||
-    sandboxIdClass === 'devcontainer' ||
-    sandboxIdClass === 'code-review'
-  ) {
-    throw new RetiredSandboxRuntimeError();
-  }
-  return sandboxIdClass === 'isolated-small' ? env.SandboxSmallContainment : env.SandboxContainment;
-}
-
 export function getManagedOutboundContainerId(
   provider: AgentSandboxProvider,
-  env: SandboxNamespaceEnv & Pick<Env, 'SANDBOX_CONTAINERS'>,
+  env: Pick<Env, 'SANDBOX_CONTAINERS'>,
   ids: { logicalSandboxId: string; physicalSandboxId: string }
 ): string | undefined {
   if (!providerUsesOutboundCredentialProxy(provider)) return undefined;
-  if (provider === 'cloudflare-containers') {
-    return env.SANDBOX_CONTAINERS.idFromName(ids.logicalSandboxId).toString();
+  // The legacy Cloudflare Sandbox runtime has no compute authority. Failing
+  // closed keeps a stale persisted provider from reaching a retired namespace.
+  if (provider !== 'cloudflare-containers') {
+    throw new Error('The legacy Cloudflare Sandbox runtime has been retired');
   }
-  return getOutboundContainerId(env, ids.physicalSandboxId, { managedScmContainment: true });
-}
-
-export function getOutboundContainerId(
-  env: SandboxNamespaceEnv,
-  sandboxId: string,
-  options: SandboxNamespaceOptions = {}
-): string {
-  return getSandboxNamespace(env, sandboxId, options).idFromName(sandboxId).toString();
+  return env.SANDBOX_CONTAINERS.idFromName(ids.logicalSandboxId).toString();
 }
 
 export async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {
@@ -231,14 +182,14 @@ export type SandboxSelection = {
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-} & CloudflareContainersEnrollmentEnv &
-  Pick<
-    Env,
-    | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
-    | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
-    | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
-    | 'CREDENTIAL_CONTAINMENT_ENABLED'
-  >;
+} & Pick<
+  Env,
+  | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
+  | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
+  | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
+  | 'CLOUDFLARE_CONTAINERS_ORG_IDS'
+  | 'CREDENTIAL_CONTAINMENT_ENABLED'
+>;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -289,10 +240,7 @@ export function selectDefaultSandboxProvider(input: {
   const eligible = (provider: AgentSandboxProvider): boolean =>
     !enforced || providerSupportsEnforcedBilling(provider);
 
-  const useContainers =
-    eligible('cloudflare-containers') &&
-    input.isolated &&
-    isCloudflareContainersEnrolled(input.env, { orgId: input.orgId });
+  const useContainers = eligible('cloudflare-containers') && input.isolated;
 
   return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
@@ -304,8 +252,8 @@ export function credentialContainmentEnabled(env: {
 }
 
 /**
- * New control-plane sessions that would start on Cloudflare sandbox small use
- * the native containers runtime at 2 vCPU / 8 GiB instead.
+ * New control-plane sessions run on the native containers runtime at 2 vCPU /
+ * 8 GiB. `cloudflare-single` is a compatibility alias for that same size.
  * Existing sessions are unaffected because they keep their stored provider.
  */
 export function cloudflareSandboxSmallNativeReplacement(input: {
@@ -318,7 +266,6 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
   createdOnPlatform?: string;
   billingOrigin?: string;
 }): SandboxAllocation | undefined {
-  if (!input.contained) return undefined;
   if (
     input.billingOrigin === CODE_REVIEW_PLATFORM ||
     input.createdOnPlatform === CODE_REVIEW_PLATFORM
@@ -328,6 +275,7 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
   if (input.requestedAllocation === 'cloudflare-single') {
     return CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
   }
+  if (!input.contained) return undefined;
   if (input.requestedAllocation !== undefined) return undefined;
   const provider = selectDefaultSandboxProvider({
     env: input.env,
@@ -335,7 +283,9 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
     userId: input.userId,
     isolated: true,
   });
-  return provider === 'cloudflare' ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION : undefined;
+  return provider === 'cloudflare-containers'
+    ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+    : undefined;
 }
 
 export function resolveNewSessionSandboxAllocation(input: {
@@ -351,13 +301,30 @@ export function resolveNewSessionSandboxAllocation(input: {
   return cloudflareSandboxSmallNativeReplacement(input) ?? input.requestedAllocation;
 }
 
-/** Ledger retries accept the request or the native replacement recorded for it. */
+/**
+ * Ledger retries accept the request, the native replacement recorded for it, or
+ * either end of the `cloudflare-single` alias. A recorded allocation therefore
+ * keeps matching without rewriting the persisted runtime.
+ */
 export function recordedSandboxAllocationMatchesRequest(
   recorded: SandboxAllocation | undefined,
   requested: SandboxAllocation | undefined,
   replacement: SandboxAllocation | undefined
 ): boolean {
-  return recorded === requested || (replacement !== undefined && recorded === replacement);
+  const recordedAllocation = recorded && normalizeSandboxAllocation(recorded);
+  if (requested === undefined) {
+    // A retry that omits the choice accepts the native default it would resolve
+    // today, plus the historical alias recorded for that same runtime.
+    return (
+      recordedAllocation === undefined ||
+      recordedAllocation === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+    );
+  }
+  const requestedAllocation = normalizeSandboxAllocation(requested);
+  return (
+    recordedAllocation === requestedAllocation ||
+    (replacement !== undefined && recordedAllocation === normalizeSandboxAllocation(replacement))
+  );
 }
 
 export function getDefaultSandboxDestination(
@@ -373,10 +340,7 @@ export function getDefaultSandboxDestination(
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
-  if (credentialContainmentEnabled(env)) {
-    return getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION);
-  }
-  return getSandboxAllocationRequest('cloudflare-single');
+  return getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION);
 }
 
 export async function selectSandboxForNewSession(

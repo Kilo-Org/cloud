@@ -9,7 +9,7 @@ import {
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
 import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
-import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
+import { isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
   issueCloudAgentBitbucketSessionCapability,
@@ -419,7 +419,7 @@ export function hasRuntimeCredentialProxy(grant: SessionCredentialGrant): boolea
   );
 }
 
-type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
+type CredentialEnv = Pick<Env, 'SANDBOX_CONTAINERS'> &
   Partial<
     Pick<
       Env,

@@ -45,12 +45,19 @@ const OMITTED_MIGRATION_CLASSES = [
   'SandboxContainers',
 ];
 
+const TOMBSTONE_CLASSES = ['SandboxContainment', 'SandboxSmallContainment'];
+
 const KEPT_DO_CLASSES = [
   'StreamTicketNonceDO',
   'UserKiloFacade',
   'SandboxControl',
   'SandboxSession',
 ];
+
+const V15_E2E_MIGRATION = {
+  tag: 'v15-e2e',
+  new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
+};
 
 function readSourceConfig() {
   return parse(readFileSync(join(process.cwd(), 'wrangler.jsonc'), 'utf8'));
@@ -82,10 +89,7 @@ describe('buildE2eWorkerConfig', () => {
       'v15',
       'v15-e2e',
     ]);
-    expect(config.migrations.at(-1)).toEqual({
-      tag: 'v15-e2e',
-      new_sqlite_classes: ['SandboxContainment', 'SandboxSmallContainment', 'SandboxContainers'],
-    });
+    expect(config.migrations.at(-1)).toEqual(V15_E2E_MIGRATION);
   });
 
   it('keeps future production migrations after the runtime anchor and preserves their operations', () => {
@@ -119,22 +123,22 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
   });
 
-  it('keeps the three production runtime classes and rebases their images', () => {
-    const { config } = render();
+  it('keeps only the native containers runtime and rebases its image', () => {
+    const { source, config } = render();
     expect(config.containers.map((entry: { class_name: string }) => entry.class_name)).toEqual([
-      'SandboxContainment',
-      'SandboxSmallContainment',
       'SandboxContainers',
     ]);
-    expect(config.containers[2].images.app.dockerfile).toBe('../Dockerfile.containers');
-    expect(config.containers[0].image).toBe('../Dockerfile');
-    expect(config.containers[0].instance_type).toEqual({
-      vcpu: 4,
-      memory_mib: 12288,
-      disk_mb: 20000,
-    });
-    expect(config.containers[0].max_instances).toBe(40);
-    expect(config.containers[0].ssh.enabled).toBe(true);
+    expect(config.containers[0].images.app.dockerfile).toBe('../Dockerfile.containers');
+    const { images: _rendered, ...rendered } = config.containers[0];
+    const { images: _source, ...production } = source.containers[0];
+    expect(rendered).toEqual(production);
+    for (const className of TOMBSTONE_CLASSES) {
+      expect(
+        config.durable_objects.bindings.some(
+          (binding: { class_name: string }) => binding.class_name === className
+        )
+      ).toBe(false);
+    }
   });
 
   it('removes retired runtime bindings and preserves their deletion migration', () => {
@@ -262,7 +266,7 @@ describe('buildE2eWorkerConfig', () => {
       for (const className of migration.new_sqlite_classes ?? []) migratedClasses.add(className);
       for (const className of migration.deleted_classes ?? []) migratedClasses.delete(className);
     }
-    expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
+    expect([...migratedClasses].sort()).toEqual([...bindingClasses, ...TOMBSTONE_CLASSES].sort());
   });
 
   it('keeps and filters non-SQLite new_classes migrations', () => {
@@ -272,7 +276,7 @@ describe('buildE2eWorkerConfig', () => {
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
         { tag: 'v2', new_classes: ['LegacyDo', 'SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
-        { tag: 'v15', deleted_classes: ['SandboxSmall'] },
+        { tag: 'v15', deleted_classes: ['LegacyDo', 'SandboxSmall'] },
       ],
     };
     const config = buildE2eWorkerConfig(source, overrides);
@@ -281,6 +285,8 @@ describe('buildE2eWorkerConfig', () => {
       { tag: 'v2', new_classes: ['LegacyDo'] },
       { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
       { tag: 'v10-e2e', new_sqlite_classes: ['E2eCallbackSink'] },
+      { tag: 'v15', deleted_classes: ['LegacyDo'] },
+      V15_E2E_MIGRATION,
     ]);
   });
 
@@ -291,7 +297,7 @@ describe('buildE2eWorkerConfig', () => {
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
         { tag: 'v2', new_classes: ['SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
-        { tag: 'v15', deleted_classes: ['SandboxSmall'] },
+        { tag: 'v15', deleted_classes: ['CloudAgentSession', 'SandboxSmall'] },
       ],
     };
     const config = buildE2eWorkerConfig(source, overrides);
@@ -299,6 +305,8 @@ describe('buildE2eWorkerConfig', () => {
       { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
       { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
       { tag: 'v10-e2e', new_sqlite_classes: ['E2eCallbackSink'] },
+      { tag: 'v15', deleted_classes: ['CloudAgentSession'] },
+      V15_E2E_MIGRATION,
     ]);
   });
 
@@ -463,7 +471,7 @@ describe('buildE2eWorkerConfig', () => {
     buildE2eWorkerConfig(source, overrides);
     expect(source).toEqual(snapshot);
     expect(source.main).toBe('src/index.ts');
-    expect(source.containers[0].image).toBe('./Dockerfile');
+    expect(source.containers[0].images.app.dockerfile).toBe('./Dockerfile.containers');
   });
 });
 
@@ -522,10 +530,14 @@ describe('local e2e worker config', () => {
 
   it('resolves every relative container image from both the top level and env.dev', () => {
     const { config } = renderLocalConfig();
-    const images = [
-      ...(config.containers ?? []).map(entry => entry.image),
-      ...(config.env?.dev?.containers ?? []).map(entry => entry.image),
-    ];
+    const images = [...(config.containers ?? []), ...(config.env?.dev?.containers ?? [])].flatMap(
+      entry => [
+        entry.image,
+        ...Object.values(entry.images ?? {}).map(
+          (definition: { dockerfile?: string }) => definition.dockerfile
+        ),
+      ]
+    );
     const relative = images.filter((image: unknown): image is string =>
       typeof image === 'string' ? image.startsWith('./') || image.startsWith('../') : false
     );
@@ -544,7 +556,7 @@ describe('local e2e worker config', () => {
     buildLocalE2eWorkerConfig(source);
     expect(source).toEqual(snapshot);
     expect(source.main).toBe('src/index.ts');
-    expect(source.containers[0].image).toBe('./Dockerfile');
+    expect(source.containers[0].images.app.dockerfile).toBe('./Dockerfile.containers');
   });
 });
 

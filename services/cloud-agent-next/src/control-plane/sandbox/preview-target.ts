@@ -1,22 +1,12 @@
 import type { AgentSandboxProvider } from '../../types.js';
-import { decodeCloudflareProviderRef } from '../../sandbox-control/cloudflare-provider.js';
-import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AllocationKind } from './allocation.js';
 import type { RouteState } from './routes.js';
 
-export type PreviewProviderCoordinates =
-  | {
-      provider: 'cloudflare';
-      allocationName: string;
-      containment: boolean;
-      /** The pinned kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
-      sandboxKind?: SandboxKind;
-    }
-  | {
-      provider: 'cloudflare-containers';
-      logicalSandboxId: string;
-      allocationRef: string;
-    };
+export type PreviewProviderCoordinates = {
+  provider: 'cloudflare-containers';
+  logicalSandboxId: string;
+  allocationRef: string;
+};
 
 export type PreviewTargetResult =
   | { status: 'not_ready' }
@@ -31,14 +21,15 @@ export type PreviewTargetSnapshot = {
   allocationKind: AllocationKind;
   providerRef: string | null;
   provider: AgentSandboxProvider;
-  pinnedAllocationName: string;
-  /** The pinned kind; a placed key routes only through it. */
-  sandboxKind: SandboxKind | undefined;
   logicalSandboxId: string;
 };
 
 export function resolvePreviewTarget(snapshot: PreviewTargetSnapshot): PreviewTargetResult {
-  if (snapshot.provider === 'vercel') return { status: 'unsupported_provider' };
+  // Vercel has no preview upstream, and the retired Cloudflare Sandbox runtime
+  // is not started for any allocation, including a persisted one.
+  if (snapshot.provider === 'vercel' || snapshot.provider === 'cloudflare') {
+    return { status: 'unsupported_provider' };
+  }
 
   // No route means this session is not routed to the sandbox.
   if (snapshot.routeState === null || snapshot.routeState === 'failed') {
@@ -54,28 +45,12 @@ export function resolvePreviewTarget(snapshot: PreviewTargetSnapshot): PreviewTa
   }
   if (snapshot.providerRef === null) return { status: 'not_running' };
 
-  if (snapshot.provider === 'cloudflare-containers') {
-    return {
-      status: 'ok',
-      coordinates: {
-        provider: 'cloudflare-containers',
-        logicalSandboxId: snapshot.logicalSandboxId,
-        allocationRef: snapshot.providerRef,
-      },
-    };
-  }
-
-  const decoded = decodeCloudflareProviderRef(snapshot.providerRef);
-  if (decoded === null && snapshot.providerRef !== snapshot.pinnedAllocationName) {
-    return { status: 'not_running' };
-  }
   return {
     status: 'ok',
     coordinates: {
-      provider: 'cloudflare',
-      allocationName: decoded?.sandboxId ?? snapshot.pinnedAllocationName,
-      containment: decoded?.containment ?? false,
-      ...(snapshot.sandboxKind === undefined ? {} : { sandboxKind: snapshot.sandboxKind }),
+      provider: 'cloudflare-containers',
+      logicalSandboxId: snapshot.logicalSandboxId,
+      allocationRef: snapshot.providerRef,
     },
   };
 }

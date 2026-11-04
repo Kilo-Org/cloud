@@ -32,7 +32,8 @@ export type AuthEnv = {
 
 const GRANT_ISSUER = 'session-sync';
 const GRANT_AUDIENCE = 'session-sync';
-const GRANT_TTL_SECONDS = 60;
+// Bounds how long a revoked or blocked account keeps sync access, and how often clients exchange.
+const GRANT_TTL_SECONDS = 300;
 const MIN_GRANT_SECRET_BYTES = 32;
 const MAX_EXCHANGE_BODY_BYTES = 1024;
 

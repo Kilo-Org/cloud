@@ -68,7 +68,8 @@ No deletion endpoint removes workspace files or credentials.
 Credential exchange accepts a personal target or an organization target.
 The service verifies current account status and credential revocation before issuing a grant.
 Organization exchange also verifies current membership using the shared access rules.
-A grant lasts at most a minute, never beyond the original credential, and has the dedicated `session-sync` audience.
+A grant lasts at most five minutes, never beyond the original credential, and has the dedicated `session-sync` audience.
+This bounds how long a revoked or blocked account keeps sync access, and keeps exchange load on the account database low.
 Do not repeat the account-database lookup for every upload packet.
 `ENVIRONMENT` is required and must match the credential's `env` claim. Missing or
 empty configuration returns `auth_unavailable` (503) and logs a configuration error;

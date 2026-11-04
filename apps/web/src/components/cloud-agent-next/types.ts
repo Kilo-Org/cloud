@@ -406,6 +406,7 @@ export type StoredSession = {
   sessionStatusUpdatedAt?: string | null;
   latestRunFailureKind?: 'failed' | 'system_interrupted' | null;
   latestRunTerminalAt?: string | null;
+  lastActivityAt?: string | null;
   /**
    * Associated GitHub pull request for this session's own verified link, if
    * any.

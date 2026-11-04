@@ -129,6 +129,7 @@ const SessionRow = memo(function SessionRow({
   session,
   isActive,
   isLive,
+  liveStatus,
   onDeleteSession,
   isDeleting,
   onStartRename,
@@ -142,6 +143,7 @@ const SessionRow = memo(function SessionRow({
   session: StoredSession;
   isActive: boolean;
   isLive: boolean;
+  liveStatus: string | null;
   onDeleteSession?: (sessionId: string) => void;
   isDeleting: boolean;
   onStartRename?: (session: StoredSession) => void;
@@ -178,7 +180,16 @@ const SessionRow = memo(function SessionRow({
   };
 
   const isV2 = session.sessionId.startsWith('ses_');
-  const sidebarStatus = getSidebarSessionStatus(session);
+  const storedStatus = getSidebarSessionStatus(session);
+  const sidebarStatus =
+    storedStatus === 'failed' ||
+    storedStatus === 'system_interrupted' ||
+    storedStatus === 'question' ||
+    storedStatus === 'permission'
+      ? storedStatus
+      : liveStatus && liveStatus !== 'idle'
+        ? liveStatus
+        : storedStatus;
   const sessionActivityIndicatorKind = getSessionActivityIndicatorKind(
     sidebarStatus,
     session.sessionStatusUpdatedAt ?? null
@@ -997,6 +1008,7 @@ export function ChatSidebar({
         session={session}
         isActive={session.sessionId === currentSessionId}
         isLive={activeSessionIds.has(session.sessionId)}
+        liveStatus={activeSessionStatuses.get(session.sessionId) ?? null}
         onDeleteSession={onDeleteSession}
         onStartRename={onRenameSession ? handleStartRename : undefined}
         isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
@@ -1010,6 +1022,7 @@ export function ChatSidebar({
     ),
     [
       activeSessionIds,
+      activeSessionStatuses,
       currentSessionId,
       deletingSessionIds,
       editingSessionId,

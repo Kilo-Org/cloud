@@ -579,6 +579,7 @@ const commonSessionFields = {
   git_branch: cli_sessions_v2.git_branch,
   status: cli_sessions_v2.status,
   status_updated_at: cli_sessions_v2.status_updated_at,
+  last_activity_at: cli_sessions_v2.last_activity_at,
   created_at: cli_sessions_v2.created_at,
   updated_at: cli_sessions_v2.updated_at,
   version: cli_sessions_v2.version,
@@ -719,6 +720,7 @@ type WorktreeDetail = {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
+    lastActivityAt: string | null;
     updatedAt: string;
   })[];
   prSession:
@@ -1101,6 +1103,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
             'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'lastActivityAt', ${cli_sessions_v2.last_activity_at},
             'latest_run_status', ${latestRunFields.latest_run_status},
             'latest_run_failure_kind', ${latestRunFields.latest_run_failure_kind},
             'latest_run_terminal_at', ${latestRunFields.latest_run_terminal_at},
@@ -1125,6 +1128,9 @@ export const cliSessionsV2Router = createTRPCRouter({
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,
+          lastActivityAt: session.lastActivityAt
+            ? new Date(session.lastActivityAt).toISOString()
+            : null,
         })),
       ])
     );
@@ -1140,6 +1146,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: new Date(session.updated_at).toISOString(),
         status_updated_at: session.status_updated_at
           ? new Date(session.status_updated_at).toISOString()
+          : null,
+        last_activity_at: session.last_activity_at
+          ? new Date(session.last_activity_at).toISOString()
           : null,
         associatedPr: {
           ...session.associatedPr,

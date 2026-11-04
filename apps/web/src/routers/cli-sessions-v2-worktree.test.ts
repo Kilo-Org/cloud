@@ -674,6 +674,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
               latest_run_status: null,
               latest_run_failure_kind: null,
               latest_run_terminal_at: null,
+              lastActivityAt: null,
               updatedAt: new Date(ownershipRow.updated_at).toISOString(),
             },
           ],
@@ -713,6 +714,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           latest_run_status: null,
           latest_run_failure_kind: null,
           latest_run_terminal_at: null,
+          lastActivityAt: null,
           updatedAt: new Date(ownershipRow.updated_at).toISOString(),
         },
         {
@@ -722,6 +724,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           latest_run_status: null,
           latest_run_failure_kind: null,
           latest_run_terminal_at: null,
+          lastActivityAt: null,
           updatedAt: '2026-04-29T01:17:12.945Z',
         },
       ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
@@ -734,6 +737,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         latest_run_status: null,
         latest_run_failure_kind: null,
         latest_run_terminal_at: null,
+        lastActivityAt: null,
         updatedAt: new Date(otherWorktreeSession.updated_at).toISOString(),
       },
     ]);
@@ -793,6 +797,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       latest_run_status: null,
       latest_run_failure_kind: null,
       latest_run_terminal_at: null,
+      lastActivityAt: null,
       updatedAt: '2020-01-01T00:00:00.000Z',
     });
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
@@ -1079,6 +1084,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
             latest_run_status: null,
             latest_run_failure_kind: null,
             latest_run_terminal_at: null,
+            lastActivityAt: null,
             updatedAt: new Date(ownershipRow.updated_at).toISOString(),
           },
         ],
@@ -1349,6 +1355,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
         'git_branch',
         'status',
         'status_updated_at',
+        'last_activity_at',
         'latest_run_status',
         'latest_run_failure_kind',
         'latest_run_terminal_at',

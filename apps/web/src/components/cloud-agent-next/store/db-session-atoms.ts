@@ -159,6 +159,7 @@ type ApiSession = {
   organization_id: string | null;
   status: string | null;
   status_updated_at: string | null;
+  last_activity_at?: string | null;
   parent_session_id: string | null;
   associatedPr?: AssociatedPr | null;
 };
@@ -185,6 +186,7 @@ export type DbSession = {
   organization_id: string | null;
   status: string | null;
   status_updated_at: Date | null;
+  last_activity_at?: Date | null;
   associatedPr?: AssociatedPr | null;
 };
 
@@ -210,6 +212,7 @@ export type DbSessionV2 = {
   version: number;
   status: string | null;
   status_updated_at: Date | null;
+  last_activity_at?: Date | null;
   associatedPr?: AssociatedPr | null;
   /**
    * Persisted session total cost in microdollars (USD × 1,000,000). Optional
@@ -232,6 +235,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession | DbSes
     created_at: new Date(apiSession.created_at),
     updated_at: new Date(apiSession.updated_at),
     status_updated_at: apiSession.status_updated_at ? new Date(apiSession.status_updated_at) : null,
+    last_activity_at: apiSession.last_activity_at ? new Date(apiSession.last_activity_at) : null,
     associatedPr: apiSession.associatedPr ?? null,
   };
 }

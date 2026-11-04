@@ -80,6 +80,8 @@ export function dbSessionToStoredSession(session: DbSession | DbSessionV2): Stor
     sessionStatusUpdatedAt: session.status_updated_at?.toISOString() ?? null,
     latestRunFailureKind: session.latest_run_failure_kind ?? null,
     latestRunTerminalAt: session.latest_run_terminal_at ?? null,
+    lastActivityAt:
+      'last_activity_at' in dbSession ? (dbSession.last_activity_at?.toISOString() ?? null) : null,
     associatedPr: 'associatedPr' in dbSession ? (dbSession.associatedPr ?? null) : undefined,
   };
 }
@@ -148,18 +150,33 @@ export function deriveForegroundSessionStatus({
 export function getSidebarSessionStatus(
   session: Pick<
     StoredSession,
-    'sessionStatus' | 'sessionStatusUpdatedAt' | 'latestRunFailureKind' | 'latestRunTerminalAt'
+    | 'sessionStatus'
+    | 'sessionStatusUpdatedAt'
+    | 'latestRunFailureKind'
+    | 'latestRunTerminalAt'
+    | 'lastActivityAt'
   >
 ): string | null {
   const status = session.sessionStatus;
+  const latestRunFailureIsObsolete = Boolean(
+    session.latestRunFailureKind &&
+    session.latestRunTerminalAt &&
+    session.lastActivityAt &&
+    new Date(session.lastActivityAt).getTime() > new Date(session.latestRunTerminalAt).getTime()
+  );
   if (
     session.latestRunFailureKind &&
     session.latestRunTerminalAt &&
+    !latestRunFailureIsObsolete &&
     new Date(session.latestRunTerminalAt).getTime() >=
       new Date(session.sessionStatusUpdatedAt ?? 0).getTime()
   )
     return session.latestRunFailureKind;
-  return !status || status === 'idle' ? (session.latestRunFailureKind ?? status ?? null) : status;
+  return !status || status === 'idle'
+    ? latestRunFailureIsObsolete
+      ? (status ?? null)
+      : (session.latestRunFailureKind ?? status ?? null)
+    : status;
 }
 
 export function mergeWorktreeChatSessions(
@@ -234,6 +251,7 @@ type SidebarSessionActivity = Pick<
   | 'updatedAt'
   | 'latestRunFailureKind'
   | 'latestRunTerminalAt'
+  | 'lastActivityAt'
 >;
 
 export type SidebarForegroundSessionStatus = {
@@ -458,6 +476,7 @@ export function getSidebarWorktreeActivity(
               ...session,
               latestRunFailureKind: existing.latestRunFailureKind,
               latestRunTerminalAt: existing.latestRunTerminalAt,
+              lastActivityAt: existing.lastActivityAt ?? session.lastActivityAt ?? null,
             }
           : session
       );
@@ -531,7 +550,7 @@ export function getSidebarWorktreeActivity(
 
 export function patchSidebarWorktreeSessionStatus(
   data: WorktreeDetailsQueryData,
-  update: Omit<SidebarSessionActivity, 'updatedAt'> & { updatedAt?: string }
+  update: Omit<SidebarSessionActivity, 'updatedAt' | 'lastActivityAt'> & { updatedAt?: string }
 ): WorktreeDetailsQueryData {
   const worktrees = { ...data.worktrees };
   let changed = false;
@@ -584,6 +603,7 @@ export function sessionCacheKey(s: {
   latest_run_status?: string | null;
   latest_run_failure_kind?: string | null;
   latest_run_terminal_at?: string | null;
+  last_activity_at?: string | null;
   associatedPr?: {
     state: string;
     lastSyncedAt: string;
@@ -592,7 +612,7 @@ export function sessionCacheKey(s: {
     observations?: AssociatedPr['observations'];
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.last_activity_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
 }
 
 /**
@@ -716,6 +736,8 @@ function mergeSidebarDbSession(
     cloud_agent_session_id: existing.cloud_agent_session_id ?? next.cloud_agent_session_id,
     cloud_agent_worktree_id:
       next.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
+    last_activity_at:
+      next.last_activity_at === undefined ? existing.last_activity_at : next.last_activity_at,
   };
   if ('associatedPr' in existing) return { ...merged, associatedPr: existing.associatedPr };
   return merged;
@@ -1065,6 +1087,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       sessionStatusUpdatedAt: row.status_updated_at,
       latestRunFailureKind: row.latest_run_failure_kind,
       latestRunTerminalAt: row.latest_run_terminal_at,
+      lastActivityAt: row.last_activity_at,
       associatedPr: row.associatedPr ?? null,
     }));
   }, [searchData?.results]);
@@ -1093,6 +1116,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       latest_run_status: session.latest_run_status ?? null,
       latest_run_failure_kind: session.latest_run_failure_kind ?? null,
       latest_run_terminal_at: session.latest_run_terminal_at ?? null,
+      last_activity_at: session.last_activity_at?.toISOString() ?? null,
     };
   }
 

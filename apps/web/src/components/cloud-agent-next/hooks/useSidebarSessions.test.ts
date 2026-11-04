@@ -375,6 +375,15 @@ describe('useSidebarSessions live update helpers', () => {
     }
   );
 
+  it('carries persisted session activity into the stored sidebar session', () => {
+    expect(
+      dbSessionToStoredSession({
+        ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+        last_activity_at: new Date('2026-01-03T12:02:00.000Z'),
+      }).lastActivityAt
+    ).toBe('2026-01-03T12:02:00.000Z');
+  });
+
   it.each([
     { latest_run_status: 'failed' },
     { latest_run_status: 'interrupted' },
@@ -434,6 +443,33 @@ describe('useSidebarSessions live update helpers', () => {
       expect(getSidebarSessionStatus({ sessionStatus: null })).toBeNull();
       expect(getSidebarSessionStatus({})).toBeNull();
     });
+
+    it.each(['busy', 'retry', 'question', 'permission', 'idle', null] as const)(
+      'ignores a failure that predates recorded session activity (status %s)',
+      sessionStatus => {
+        expect(
+          getSidebarSessionStatus({
+            sessionStatus,
+            sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+            latestRunFailureKind: 'failed',
+            latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+            lastActivityAt: '2026-01-03T12:02:00.000Z',
+          })
+        ).toBe(sessionStatus);
+      }
+    );
+
+    it('keeps a failure that is newer than recorded session activity', () => {
+      expect(
+        getSidebarSessionStatus({
+          sessionStatus: 'idle',
+          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+          latestRunFailureKind: 'failed',
+          latestRunTerminalAt: '2026-01-03T12:02:00.000Z',
+          lastActivityAt: '2026-01-03T12:01:00.000Z',
+        })
+      ).toBe('failed');
+    });
   });
 
   it.each(['failed', null] as const)(
@@ -465,6 +501,19 @@ describe('useSidebarSessions live update helpers', () => {
         status: 'busy',
       }).status
     ).toBe('busy');
+  });
+
+  it('shows live work instead of a failure recorded before newer session activity', () => {
+    const session = makeStoredSession('ses_root', '2026-01-03T12:03:00.000Z', {
+      sessionStatus: 'idle',
+      sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+      latestRunFailureKind: 'failed',
+      latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+      lastActivityAt: '2026-01-03T12:02:00.000Z',
+    });
+    expect(getSidebarWorktreeActivity([session], new Map([['ses_root', 'busy']])).status).toBe(
+      'busy'
+    );
   });
 
   it.each(['busy', 'retry'])(
@@ -1744,6 +1793,7 @@ describe('useSidebarSessions live update helpers', () => {
               sessionId: 'ses_hidden',
               sessionStatus: 'busy',
               sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+              lastActivityAt: null,
               updatedAt: '2026-01-03T12:00:00.000Z',
               latest_run_status: null,
               latest_run_failure_kind: null,

@@ -43,7 +43,6 @@ export function readLlmProxyHeaders(request: NextRequest) {
     // `Feedback Submitted.parentMessageID`.
     clientRequestId: extractHeaderAndLimitLength(request, 'x-kilo-request'),
     machineId: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-    editorName: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
     // Vercel's per-invocation request id. Logged on the disconnect and upstream
     // failure paths so a client disconnect can be correlated with the upstream

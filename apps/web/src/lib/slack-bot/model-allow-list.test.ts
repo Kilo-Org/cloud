@@ -3,7 +3,7 @@ import type { Organization } from '@kilocode/db/schema';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import type { OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import type { OrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
-import type * as EffectiveModelAccess from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type * as EffectiveModelAccess from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
@@ -18,26 +18,30 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
 // production deny/allow semantics. Only the two database-backed entry points are
 // stubbed, plus the provider lookup, which is the documented seam that keeps the
 // decision independent of the live model catalog.
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => {
-  const actual = jest.requireActual<typeof EffectiveModelAccess>(
-    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  );
-  return {
-    ...actual,
-    resolveOrganizationDefaultModelPolicy: jest.fn(),
-    getEffectiveModelDecision: (
-      policy: Parameters<typeof actual.getEffectiveModelDecision>[0],
-      modelId: string
-    ) => actual.getEffectiveModelDecision(policy, modelId, async () => new Set(['test-provider'])),
-  };
-});
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => {
+    const actual = jest.requireActual<typeof EffectiveModelAccess>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    );
+    return {
+      ...actual,
+      resolveOrganizationDefaultModelPolicy: jest.fn(),
+      getEffectiveModelDecision: (
+        policy: Parameters<typeof actual.getEffectiveModelDecision>[0],
+        modelId: string
+      ) =>
+        actual.getEffectiveModelDecision(policy, modelId, async () => new Set(['test-provider'])),
+    };
+  }
+);
 
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   evaluateEffectiveModelAccessPolicy,
   resolveOrganizationDefaultModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { getDefaultAllowedModel } from './model-allow-list';
 
 const ORGANIZATION_ID = '00000000-0000-0000-0000-000000000001';

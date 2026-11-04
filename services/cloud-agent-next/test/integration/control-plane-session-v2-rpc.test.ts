@@ -25,7 +25,7 @@ import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
@@ -123,7 +123,7 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: input.sandboxProvider ?? 'cloudflare',
+      sandboxProvider: input.sandboxProvider ?? 'cloudflare-containers',
       ...(input.egressMode === undefined ? {} : { egressMode: input.egressMode }),
       ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
       ...(input.egressAudit === undefined ? {} : { egressAudit: input.egressAudit }),
@@ -178,7 +178,7 @@ async function installSandbox(
     await instance.getAllocationState();
     // Isolated sessions address their containment namespace by `ses-` prefix.
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -297,7 +297,7 @@ type GeneratedTitleSession = {
   sessionId: string;
   kiloId: string;
   sessionMetadata: SessionMetadata;
-  sandboxSelection: { provider: 'cloudflare' };
+  sandboxSelection: { provider: 'cloudflare-containers' };
 };
 
 async function setupGeneratedTitleSession(
@@ -317,7 +317,7 @@ async function setupGeneratedTitleSession(
     sessionId,
     kiloId,
     sessionMetadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   };
 }
 
@@ -552,6 +552,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionId,
       kiloSessionId: kiloSessionId(),
       sandboxId,
+      sandboxProvider: 'cloudflare',
       egressMode: 'unrestricted',
     });
     await expect(
@@ -665,7 +666,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await startStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId, worktreeId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // H3: the sibling registers through the DO, which builds the registration.
@@ -678,7 +679,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         worktreeId,
         workspacePath: identityPath,
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(siblingResult).toEqual({ success: true });
 
@@ -728,7 +729,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         sandboxId: sbx,
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' as const },
+      sandboxSelection: { provider: 'cloudflare-containers' as const },
       runtimeAuthorizationSeal: seal,
     });
 
@@ -782,7 +783,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const createInput = (id: string) => ({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(id),
-      sandboxSelection: { provider: 'cloudflare' as const },
+      sandboxSelection: { provider: 'cloudflare-containers' as const },
     });
 
     await expect(
@@ -849,7 +850,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'cloudflare', configuration: { provider: 'vercel' } },
+        sandboxSelection: {
+          provider: 'cloudflare-containers',
+          configuration: { provider: 'vercel' },
+        },
       })
     ).resolves.toMatchObject({
       success: false,
@@ -869,7 +873,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload('m1'),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
       })
     ).resolves.toEqual({
       success: false,
@@ -900,7 +904,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           kiloToken: runtimeAuthorizedKiloToken(),
         }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
         runtimeAuthorizationSeal: seal,
       })
     ).resolves.toMatchObject({ success: true });
@@ -928,7 +932,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     });
     await sessionStub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const assistant = (id: string, sessionID: string) =>
@@ -997,7 +1001,7 @@ describe('SandboxSessionV2 generated titles', () => {
 
     const aiCalls = await readGeneratedTitleAiCalls(session.stub);
     expect(aiCalls).toHaveLength(1);
-    expect(aiCalls[0]?.model).toContain('llama-3.2-3b-instruct');
+    expect(aiCalls[0]?.model).toContain('glm-4.7-flash');
     expect(aiCalls[0]?.input.max_tokens).toBe(64);
     expect(aiCalls[0]?.input.temperature).toBe(0);
     expect(JSON.stringify(aiCalls[0]?.input.messages)).toContain('Summarize this change');

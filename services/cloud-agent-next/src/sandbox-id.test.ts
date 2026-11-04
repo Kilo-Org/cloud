@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Sandbox } from '@cloudflare/sandbox';
 import { getSandboxAllocationRequest } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   deriveSharedSandboxId,
@@ -7,8 +6,6 @@ import {
   generateSandboxRoutingTarget,
   getDefaultSandboxDestination,
   getManagedOutboundContainerId,
-  getOutboundContainerId,
-  getSandboxNamespace,
   isOrgInList,
   selectSandboxForNewSession,
   selectSandboxProvider,
@@ -898,35 +895,21 @@ describe('selectSandboxForNewSession', () => {
   });
 });
 
-describe('non-contained sandbox consolidation', () => {
-  const namespaces = {
-    Sandbox: {},
-    SandboxContainment: {},
-    SandboxSmall: {},
-    SandboxSmallContainment: {},
-    SandboxCodeReview: {},
-    SandboxCodeReviewContainment: {},
-    SandboxDIND: {},
-  } as unknown as Env;
-
+describe('legacy sandbox retirement', () => {
   it.each([
-    [undefined, undefined, 'ses-', 'SandboxSmallContainment'],
-    ['cloudflare-single', undefined, 'ses-', 'SandboxSmallContainment'],
-    ['isolated-standard', undefined, 'istd-', 'SandboxContainment'],
-    [undefined, 'code-review', 'crv-', 'SandboxCodeReviewContainment'],
+    [undefined, undefined, 'ses-', 'cloudflare-containers'],
+    ['cloudflare-single', undefined, 'ses-', 'cloudflare'],
+    ['isolated-standard', undefined, 'istd-', 'cloudflare'],
+    [undefined, 'code-review', 'crv-', 'cloudflare'],
   ] as const)(
-    'routes non-contained %s / %s sandboxes to Sandbox and keeps their containment pool',
-    async (sandboxAllocation, createdOnPlatform, prefix, containedNamespace) => {
-      const sessionId = 'agent_abc123';
+    'generates the historical %s / %s sandbox identity',
+    async (sandboxAllocation, createdOnPlatform, prefix, expectedProvider) => {
+      const sessionId = 'workspace_abc123';
       const sandboxId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
         sandboxAllocation,
         createdOnPlatform,
       });
       expect(sandboxId.startsWith(prefix)).toBe(true);
-      expect(getSandboxNamespace(namespaces, sandboxId)).toBe(namespaces.Sandbox);
-      expect(getSandboxNamespace(namespaces, sandboxId, { managedScmContainment: true })).toBe(
-        namespaces[containedNamespace]
-      );
       const provider = selectSandboxProvider({
         env: {},
         orgId: 'org-id',
@@ -935,7 +918,7 @@ describe('non-contained sandbox consolidation', () => {
         sandboxId,
         sandboxAllocation,
       });
-      expect(provider).toBe('cloudflare');
+      expect(provider).toBe(expectedProvider);
       expect(
         CurrentSessionMetadataSchema.safeParse({
           metadataSchemaVersion: 2,
@@ -953,206 +936,39 @@ describe('non-contained sandbox consolidation', () => {
         metadata: { origin: createdOnPlatform ?? 'cloud-agent' },
         enforcementRequested: true,
       });
-      expect(() => assertSandboxBillingAllocation('Sandbox', billing)).not.toThrow();
-      expect(() => assertSandboxBillingAllocation(containedNamespace, billing)).not.toThrow();
+      const billingClass = sandboxId.startsWith('crv-')
+        ? 'SandboxContainersCodeReview'
+        : sandboxId.startsWith('istd-')
+          ? 'SandboxContainment'
+          : 'SandboxSmallContainment';
+      expect(() => assertSandboxBillingAllocation(billingClass, billing)).not.toThrow();
       expect(sandboxId.startsWith('crv-')).toBe(createdOnPlatform === 'code-review');
     }
   );
-
-  it.each(['ses-abcdef', 'crv-abcdef'] as const)(
-    'keeps the contained standard pool strict for %s',
-    sandboxId => {
-      const billing = parseSandboxBillingInput({
-        sandboxId,
-        subject: { type: 'user', id: 'user-id' },
-        actor: { type: 'user', id: 'user-id' },
-        sessionId: 'agent_abc123',
-        metadata: { origin: 'cloud-agent' },
-      });
-      expect(() => assertSandboxBillingAllocation('SandboxContainment', billing)).toThrow(
-        'incompatible sandbox ID'
-      );
-    }
-  );
-});
-
-describe('getSandboxNamespace', () => {
-  const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxContainment = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxSmall = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxSmallContainment = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxDIND = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxCodeReview = {} as DurableObjectNamespace<Sandbox>;
-  const mockSandboxCodeReviewContainment = {} as DurableObjectNamespace<Sandbox>;
-  const mockEnv = {
-    Sandbox: mockSandbox,
-    SandboxContainment: mockSandboxContainment,
-    SandboxSmall: mockSandboxSmall,
-    SandboxSmallContainment: mockSandboxSmallContainment,
-    SandboxDIND: mockSandboxDIND,
-    SandboxCodeReview: mockSandboxCodeReview,
-    SandboxCodeReviewContainment: mockSandboxCodeReviewContainment,
-  } as unknown as Env;
-
-  it('should return SandboxDIND for dind- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'dind-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'
-    );
-    expect(ns).toBe(mockSandboxDIND);
-  });
-
-  it('routes non-contained ses- prefixed IDs to Sandbox, not the retired Small pool', () => {
-    const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandbox);
-    expect(ns).not.toBe(mockSandboxSmall);
-  });
-
-  it('should return SandboxSmallContainment for contained ses- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-      { managedScmContainment: true }
-    );
-    expect(ns).toBe(mockSandboxSmallContainment);
-  });
-
-  it('should return Sandbox for istd- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'istd-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'
-    );
-    expect(ns).toBe(mockSandbox);
-  });
-
-  it('should return SandboxContainment for contained istd- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'istd-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-      { managedScmContainment: true }
-    );
-    expect(ns).toBe(mockSandboxContainment);
-  });
-
-  it('routes non-contained crv- prefixed IDs to Sandbox, not the retired review pool', () => {
-    const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandbox);
-    expect(ns).not.toBe(mockSandboxCodeReview);
-  });
-
-  it('should return SandboxCodeReviewContainment for contained crv- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-      { managedScmContainment: true }
-    );
-    expect(ns).toBe(mockSandboxCodeReviewContainment);
-  });
-
-  it('should return Sandbox for org- prefixed IDs', () => {
-    const ns = getSandboxNamespace(mockEnv, 'org-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandbox);
-  });
-
-  it('should return SandboxContainment for contained org- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'org-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-      { managedScmContainment: true }
-    );
-    expect(ns).toBe(mockSandboxContainment);
-  });
-
-  it('should return Sandbox for usr- prefixed IDs', () => {
-    const ns = getSandboxNamespace(mockEnv, 'usr-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandbox);
-  });
-
-  it('should return Sandbox for bot- prefixed IDs', () => {
-    const ns = getSandboxNamespace(mockEnv, 'bot-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandbox);
-  });
-
-  it('should ignore containment for dind- prefixed IDs', () => {
-    const ns = getSandboxNamespace(
-      mockEnv,
-      'dind-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-      { managedScmContainment: true }
-    );
-    expect(ns).toBe(mockSandboxDIND);
-  });
-});
-
-describe('getOutboundContainerId', () => {
-  it.each([
-    ['org-a1b2c3', 'shared-do-id'],
-    ['ses-a1b2c3', 'shared-do-id'],
-    ['crv-a1b2c3', 'shared-do-id'],
-    ['istd-a1b2c3', 'shared-do-id'],
-    ['dind-a1b2c3', 'dind-do-id'],
-  ])('derives %s from the selected sandbox namespace', (sandboxId, expected) => {
-    const createNamespace = (containerId: string) => ({
-      idFromName: (name: string) => ({ toString: () => `${containerId}:${name}` }),
-    });
-    const env = {
-      Sandbox: createNamespace('shared-do-id'),
-      SandboxSmall: createNamespace('small-do-id'),
-      SandboxCodeReview: createNamespace('review-do-id'),
-      SandboxDIND: createNamespace('dind-do-id'),
-    } as unknown as Env;
-
-    expect(getOutboundContainerId(env, sandboxId)).toBe(`${expected}:${sandboxId}`);
-  });
-
-  it.each([
-    ['org-a1b2c3', 'containment-shared-do-id'],
-    ['ses-a1b2c3', 'containment-small-do-id'],
-    ['crv-a1b2c3', 'containment-code-review-do-id'],
-  ])('derives contained %s from the selected containment namespace', (sandboxId, expected) => {
-    const createNamespace = (containerId: string) => ({
-      idFromName: (name: string) => ({ toString: () => `${containerId}:${name}` }),
-    });
-    const env = {
-      SandboxContainment: createNamespace('containment-shared-do-id'),
-      SandboxSmallContainment: createNamespace('containment-small-do-id'),
-      SandboxCodeReviewContainment: createNamespace('containment-code-review-do-id'),
-    } as unknown as Env;
-
-    expect(getOutboundContainerId(env, sandboxId, { managedScmContainment: true })).toBe(
-      `${expected}:${sandboxId}`
-    );
-  });
 });
 
 describe('getManagedOutboundContainerId', () => {
-  it('binds containers containment to the containers Durable Object, not the sandbox class', () => {
-    const env = {
-      SANDBOX_CONTAINERS: {
-        idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
-      },
-      SandboxSmallContainment: {
-        idFromName: (name: string) => ({ toString: () => `sandbox:${name}` }),
-      },
-    } as unknown as Env;
+  const env = {
+    SANDBOX_CONTAINERS: {
+      idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
+    },
+  } as unknown as Env;
+  const ids = { logicalSandboxId: 'sbx-logical', physicalSandboxId: 'ses-physical' };
 
-    expect(
-      getManagedOutboundContainerId('cloudflare-containers', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBe('containers:ses-logical');
-    expect(
-      getManagedOutboundContainerId('cloudflare', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBe('sandbox:ses-physical');
-    expect(
-      getManagedOutboundContainerId('vercel', env, {
-        logicalSandboxId: 'ses-logical',
-        physicalSandboxId: 'ses-physical',
-      })
-    ).toBeUndefined();
+  it('names the native containers Durable Object by the logical sandbox id', () => {
+    expect(getManagedOutboundContainerId('cloudflare-containers', env, ids)).toBe(
+      'containers:sbx-logical'
+    );
+  });
+
+  it('fails closed for the retired Cloudflare Sandbox provider', () => {
+    expect(() => getManagedOutboundContainerId('cloudflare', env, ids)).toThrow(
+      'runtime has been retired'
+    );
+  });
+
+  it('has no outbound proxy for Vercel', () => {
+    expect(getManagedOutboundContainerId('vercel', env, ids)).toBeUndefined();
   });
 });
 

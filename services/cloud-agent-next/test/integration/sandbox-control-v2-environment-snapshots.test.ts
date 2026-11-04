@@ -414,7 +414,7 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
-    expect(provider.launchOptions).toEqual([{}]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
         state: 'preparing',
@@ -515,7 +515,7 @@ describe('environment snapshot launch', () => {
     await waitFor(async () =>
       expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
     );
-    expect(provider.launchOptions[1]).toEqual({});
+    expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
     expect(provider.launchEnvs).toHaveLength(2);
   });
 
@@ -573,7 +573,8 @@ describe('environment snapshot launch', () => {
         }),
       });
     });
-    await stub.prepare(prepareInput());
+    // No environment: a snapshot candidate would extend the create deadline.
+    await stub.prepare(prepareInput({ environment: null }));
     await waitFor(() => expect(provider.stopRefs.length).toBeGreaterThan(0));
     const allocationId = provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID;
     await waitFor(async () =>
@@ -592,7 +593,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_selected', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
     expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
@@ -617,7 +618,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_none', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{}]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
     expect(lookups.lookups).toEqual([]);
     expect(frame.spec.capture).toBeUndefined();
   });
@@ -628,7 +629,7 @@ describe('environment snapshot launch', () => {
     await stub.prepare(prepareInput());
     await connect('sbx__env_launch_missing', provider);
 
-    expect(provider.launchOptions).toEqual([{}]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
         state: 'preparing',
@@ -644,13 +645,13 @@ describe('environment snapshot launch', () => {
     const { stub: sharedStub } = await setup('sbx__env_launch_shared', shared);
     await sharedStub.prepare(prepareInput({ directory: '/workspace/org/user/sessions/s1' }));
     await waitFor(() => expect(shared.launchEnvs).toHaveLength(1));
-    expect(shared.launchOptions).toEqual([{}]);
+    expect(shared.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
 
     const unsupported = createFakeProvider({ snapshots: false });
     const { stub } = await setup('sbx__env_launch_unsupported', unsupported);
     await stub.prepare(prepareInput());
     await waitFor(() => expect(unsupported.launchEnvs).toHaveLength(1));
-    expect(unsupported.launchOptions).toEqual([{}]);
+    expect(unsupported.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
   });
 
   it('answers a capture request from a pre-change wrapper at once without the provider', async () => {
@@ -681,7 +682,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_discard', provider);
 
-    expect(provider.launchOptions).toEqual([{}]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
   });
 
   it.each([
@@ -695,7 +696,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_keep', provider);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
   });
 
   it('keeps the failed-snapshot skip when a launch fails before it completes', async () => {
@@ -778,7 +779,7 @@ describe('environment snapshot launch', () => {
     // Completing the stop starts the next allocation, which must keep the snapshot.
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT });
+    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'all-in-one' });
   });
 
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
@@ -923,7 +924,7 @@ describe('environment snapshot preparation fallback', () => {
       const replacement = await prepareFrameOf(fresh.wrapper);
       expect(fresh.allocationId).not.toBe(allocationId);
       expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-      expect(provider.launchOptions[1]).toEqual({});
+      expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
       expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
         provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
       );
@@ -1033,7 +1034,7 @@ describe('environment snapshot preparation fallback', () => {
       if (startSource === 'repository') {
         const fresh = await connect(sandboxId, provider, 2);
         await prepareFrameOf(fresh.wrapper);
-        expect(provider.launchOptions[1]).toEqual({});
+        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
       } else {
         await waitFor(async () =>
           expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
@@ -1159,7 +1160,7 @@ describe('environment snapshot preparation fallback', () => {
         const fresh = await connect(sandboxId, provider, 2);
         const frame = await prepareFrameOf(fresh.wrapper);
         expect(frame.spec.attemptId).toBe(view.attemptId);
-        expect(provider.launchOptions[1]).toEqual({});
+        expect(provider.launchOptions[1]).toEqual({ nativeImage: 'all-in-one' });
       } else {
         expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
         expect(provider.launchEnvs).toHaveLength(1);

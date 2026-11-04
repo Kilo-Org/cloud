@@ -1,11 +1,18 @@
 import type { NextResponse as NextResponseType } from 'next/server';
 import type { User } from '@kilocode/db';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import {
   getProvider,
   type GetProviderProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import {
+  getOrganizationGatewaySettings,
+  isManagedGatewayDisabled,
+  NO_ORGANIZATION_GATEWAY_SETTINGS,
+  type OrganizationGatewaySettings,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -21,13 +28,13 @@ import {
   allowedInferenceProviders,
   apiKindNotSupportedResponse,
   chatGptReconnectResponse,
-  creditsBlockedResponse,
   dataCollectionRequiredResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
   efficientPoolBlockedResponse,
   getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
+  managedGatewayDisabledResponse,
   modelDoesNotExistOnOpenRouterResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
@@ -47,7 +54,7 @@ import {
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { ValidatedGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
@@ -66,14 +73,19 @@ type ProviderPolicyInput = {
   botId: string | undefined;
   countryCode: string | null;
   boundedSpending: boolean;
-  usageId: string;
+  providerMetadataCapture: AiProviderMetadataCapture | undefined;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
 };
 
 type ProviderPolicyResult =
-  | { ok: true; providerResult: GetProviderProviderResult; isNonTrialEnterprise: boolean }
+  | {
+      ok: true;
+      providerResult: GetProviderProviderResult;
+      isNonTrialEnterprise: boolean;
+      dataRegion: OrganizationGatewaySettings['dataRegion'];
+    }
   | { ok: false; response: NextResponseType<unknown> };
 
 async function resolveAccessCheck(input: ProviderPolicyInput) {
@@ -141,6 +153,13 @@ export async function resolveProviderAndPolicy(
   };
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise(input);
+  const organizationGatewaySettings = input.organizationId
+    ? getOrganizationGatewaySettings(
+        await getRuntimeOrganizationFeatures(),
+        input.organizationId,
+        (await input.balanceAndSettingsPromise).settings
+      )
+    : NO_ORGANIZATION_GATEWAY_SETTINGS;
   const providerResult = await getProvider({
     requestedModel: model,
     request,
@@ -148,16 +167,16 @@ export async function resolveProviderAndPolicy(
     organizationId: input.organizationId,
     botId: input.botId,
     boundedSpending: input.boundedSpending,
+    organizationDisabledVercelAiGateway: organizationGatewaySettings.disabledGateways.has('vercel'),
     countryCode: input.countryCode,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
       request.body.provider,
-    getAllowedProviders: isAnonymous
-      ? undefined
-      : async () => (await getAccessCheck()).allowedProviders,
+    getAllowedProviders: async () =>
+      isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
     isDirectByokProviderAllowed,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
-    onDecision: decision => archiveKiloRoutingDecision(input.usageId, decision),
+    onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -182,6 +201,11 @@ export async function resolveProviderAndPolicy(
           )
         : directByokCatalogOnlyResponse(message)
     );
+  }
+  // A local, so the type guard narrows it rather than `providerResult.provider.type`.
+  const providerType = providerResult.provider.type;
+  if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
+    return reject(managedGatewayDisabledResponse(providerType));
   }
   if (orgAutoRouteTarget) {
     try {
@@ -220,23 +244,15 @@ export async function resolveProviderAndPolicy(
   }
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  if (
-    !isAnonymousContext(user) &&
-    !providerResult.isFree &&
-    !providerResult.userByok &&
-    !providerResult.skipBalanceCheck
-  ) {
-    const { balance, balanceLimitedByUserAllowance } = await input.balanceAndSettingsPromise;
-    if (!canSpendPaidUsage(balance)) {
-      return reject(
-        await creditsBlockedResponse({
-          user,
-          balance,
-          organizationId: input.organizationId,
-          balanceLimitedByUserAllowance,
-        })
-      );
-    }
+  if (!isAnonymousContext(user)) {
+    const creditsBlocked = paidUsageRejection({
+      user,
+      organizationId: input.organizationId,
+      account: await input.balanceAndSettingsPromise,
+      exempt:
+        providerResult.isFree || !!providerResult.userByok || !!providerResult.skipBalanceCheck,
+    });
+    if (creditsBlocked) return reject(await creditsBlocked());
   }
 
   if (!isAnonymous && !providerResult.bypassAccessCheck) {
@@ -308,5 +324,10 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  return { ok: true, providerResult, isNonTrialEnterprise };
+  return {
+    ok: true,
+    providerResult,
+    isNonTrialEnterprise,
+    dataRegion: organizationGatewaySettings.dataRegion,
+  };
 }

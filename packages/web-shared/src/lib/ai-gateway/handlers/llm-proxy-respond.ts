@@ -7,6 +7,7 @@ import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/pr
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import {
   accountForMicrodollarUsage,
+  extractInferenceRegion,
   makeErrorReadable,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
@@ -74,6 +75,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     input.requestStartedAt
   );
   usageContext.status_code = response.status;
+  usageContext.inference_region = extractInferenceRegion(request.body);
   const userByokProviderIds = providerResult.userByok?.map(byok => byok.providerId) ?? null;
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({

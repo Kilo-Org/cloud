@@ -197,6 +197,7 @@ const context: MicrodollarUsageContext = {
   auto_model: null,
   ttfb_ms: null,
   reasoning_setting: 'medium',
+  inference_region: 'eu',
 };
 let sent: UsageRecordRequest[];
 let info: jest.MockedFunction<typeof console.info>;
@@ -477,7 +478,6 @@ describe('production FRA queued accounting', () => {
     { is_free: true },
     { bouncer: undefined },
     { bouncer: { ...personalBouncer, spendWatch: true } },
-    { botId: 'synthetic-bot' },
   ])('FRA selection remains transport-only for %j', async change => {
     configureFra();
     const lifecycle = requestLifetime();
@@ -644,7 +644,6 @@ describe('production SFO queued accounting', () => {
       name: 'unknown spend-watch status',
       change: { bouncer: { ...personalBouncer, spendWatch: undefined } },
     },
-    { name: 'bot', change: { botId: 'synthetic-bot' } },
     { name: 'missing Bouncer / classifier context', change: { bouncer: undefined } },
     {
       name: 'anonymous Bouncer context',
@@ -1053,6 +1052,7 @@ describe('gateway accounting integration', () => {
         metadata: {
           is_user_byok: true,
           reasoning_setting: 'medium',
+          inference_region: 'eu',
           market_cost: 1234,
           user_prompt_prefix: null,
           system_prompt_prefix: null,

@@ -12,7 +12,11 @@ import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
 import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
-import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  isSelectableSandboxAllocation,
+  normalizeSandboxAllocation,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import { getSecretValue } from './util/secret';
 
@@ -464,8 +468,12 @@ async function processWebhookMessage(
       if (triggerConfig.variant !== undefined) {
         prepareSessionBody.variant = triggerConfig.variant;
       }
-      if (triggerConfig.sandboxAllocation !== undefined) {
-        prepareSessionBody.sandboxAllocation = triggerConfig.sandboxAllocation;
+      const sandboxAllocation =
+        triggerConfig.sandboxAllocation !== undefined
+          ? normalizeSandboxAllocation(triggerConfig.sandboxAllocation)
+          : undefined;
+      if (isSelectableSandboxAllocation(sandboxAllocation)) {
+        prepareSessionBody.sandboxAllocation = sandboxAllocation;
       }
 
       logger.debug('Calling prepareSession', {

@@ -43,6 +43,16 @@ describe('parseGitHubPrUrl', () => {
     });
   });
 
+  it('parses a PR URL with an uppercase host', () => {
+    // Hosts are case-insensitive, so a pasted `https://GitHub.com/...` link
+    // must parse like the canonical lowercase form.
+    expect(parseGitHubPrUrl('https://GitHub.com/octocat/hello-world/pull/42')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
   it('parses www.github.com host', () => {
     expect(parseGitHubPrUrl('https://www.github.com/octocat/hello-world/pull/7')).toEqual({
       owner: 'octocat',

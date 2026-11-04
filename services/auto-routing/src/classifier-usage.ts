@@ -100,6 +100,7 @@ export async function buildClassifierUsage(
       mode: clean(payload.mode),
       auto_model: clean(identity.requestedModel.toLowerCase()),
       reasoning_setting: null,
+      inference_region: null,
       market_cost: Math.round(costUsd * 1_000_000),
       non_inference_cost: null,
       is_free: false,

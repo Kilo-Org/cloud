@@ -352,6 +352,7 @@ function createdMetadata(doStub: ReturnType<typeof makeDoStub>): SessionMetadata
 
 function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
   return {
+    CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
@@ -609,6 +610,37 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
+  it('resolves an inherited allowlist to the native containers replacement', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
+    });
+
+    await runCreate(ctx, request);
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
+    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
+      provider: 'cloudflare-containers',
+      sandboxKind: 'isolated',
+    });
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+    expect(createCliSessionMock).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
+  });
+
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-single');
@@ -830,15 +862,16 @@ describe('explicit sandbox session creation', () => {
   });
 
   it.each(['cloudflare-shared', 'isolated-standard'] as const)(
-    'allows explicit unrestricted mode on %s',
+    'rejects retired explicit allocation %s before allocating',
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const request = requestForPreset(sandboxAllocation);
       request.runtime = { sandboxAllocation, egressMode: 'unrestricted', egressAudit: false };
-      await runCreate(selectedContext(doStub), request);
-      expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('unrestricted');
-      expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
-      expect(createdMetadata(doStub)?.workspace?.egressAudit).toBe(false);
+      await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('has been retired'),
+      });
+      expectNoAllocation(doStub);
     }
   );
 
@@ -882,6 +915,183 @@ describe('explicit sandbox session creation', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMetadata).not.toHaveBeenCalled();
+  });
+
+  describe.each(['duplicate_settled', 'takeover', 'duplicate_reconcile_pending'] as const)(
+    '%s changed network policy',
+    admission => {
+      it('conflicts before allocation, registration, or settlement', async () => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        const request = {
+          ...requestForPreset('cloudflare-containers-standard-3'),
+          runtime: {
+            sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+            egressMode: 'allowlist' as const,
+            egressAllowlist: ['api.example.com'],
+          },
+        };
+        await runCreate(ctx, request);
+        const progress = Object.assign(
+          {},
+          ...recordOperationProgressMock.mock.calls.map(call => call[2])
+        );
+        const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+        const settles = settleOperationMock.mock.calls.length;
+        const progressWrites = recordOperationProgressMock.mock.calls.length;
+        getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+        admitOperationMock.mockResolvedValueOnce({
+          admission,
+          row: makeLedgerRow({
+            organization_id: orgId,
+            status: admission === 'duplicate_settled' ? 'completed' : 'reconcile_pending',
+            canonical_result: progress,
+          }),
+        });
+
+        await expect(
+          runCreate(ctx, {
+            ...request,
+            runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'session_create_intent_conflict',
+        });
+
+        expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+        expect(doStub.getMetadata).not.toHaveBeenCalled();
+        expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+        expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+      });
+    }
+  );
+
+  it('conflicts a changed policy against an in-flight admitted fingerprint before effects', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = {
+      ...requestForPreset('cloudflare-containers-standard-3'),
+      runtime: {
+        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: ['api.example.com'],
+      },
+    };
+    await runCreate(ctx, request);
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'admitted',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+  });
+
+  it('keeps the in-flight bound for an admitted row without recorded progress', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    request.runtime = {
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    };
+    await runCreate(ctx, request);
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({ organization_id: orgId, status: 'admitted' }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+  });
+
+  it('conflicts a restricted retry against an unrestricted Vercel creation before recovery', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.BYOC_VERCEL_IDS = orgId;
+    fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+      organizationId: orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
+      setupStatus: 'ready',
+    });
+    const request = requestForPreset('vercel-small');
+    await runCreate(ctx, request);
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'vercel',
+      sandboxAllocation: 'vercel-small',
+    });
+    expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const dispatches = createCliSessionMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'reconcile_pending',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: {
+          sandboxAllocation: 'vercel-small',
+          egressMode: 'allowlist',
+          egressAllowlist: ['api.example.com'],
+        },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+    expect(createCliSessionMock).toHaveBeenCalledTimes(dispatches);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
   });
 
   it.each([
@@ -1075,9 +1285,8 @@ describe('explicit sandbox session creation', () => {
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
-      const persistedAllocation =
-        preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
-      const sandboxKind = preset === 'cloudflare-shared' ? 'shared' : 'isolated';
+      const persistedAllocation = preset;
+      const sandboxKind = 'isolated';
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -1169,10 +1378,7 @@ describe('explicit sandbox session creation', () => {
         operationKey: OPERATION_KEY,
       });
       expect(generateSessionIdMock).toHaveBeenCalledOnce();
-      const persistedAllocation =
-        sandboxAllocation === 'cloudflare-single'
-          ? 'cloudflare-containers-standard-3'
-          : sandboxAllocation;
+      const persistedAllocation = sandboxAllocation;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -1273,6 +1479,7 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
       const request = requestForPreset(sandboxAllocation);
       request.options = {
         ...request.options,
@@ -1860,7 +2067,7 @@ describe('explicit sandbox session creation', () => {
       });
 
     it.each([
-      ['the shared sandbox', 'cloudflare-shared', 'shared sandbox'],
+      ['the retired shared sandbox', 'cloudflare-shared', 'has been retired'],
       ['a Vercel sandbox', 'vercel-small', 'Vercel sandbox'],
     ] as const)(
       'fails a ledger create on %s before admission',
@@ -1878,39 +2085,38 @@ describe('explicit sandbox session creation', () => {
       }
     );
 
-    it("fails a ledger create whose environment's saved allocation is shared, before admission", async () => {
+    it("fails a ledger create whose environment's saved allocation is Vercel, before admission", async () => {
       const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
 
       await expect(
-        createSessionWithLedger(
-          environmentRequest(v2Environment, undefined, 'cloudflare-shared'),
-          selectedContext(doStub),
-          {
-            ...CREATE_OPTIONS,
-            resolveSavedAllocationBeforeAdmission: true,
-          }
-        )
+        createSessionWithLedger(environmentRequest(v2Environment, undefined, 'vercel-small'), ctx, {
+          ...CREATE_OPTIONS,
+          resolveSavedAllocationBeforeAdmission: true,
+        })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
-        message: expect.stringContaining('shared sandbox'),
+        message: expect.stringContaining('Vercel sandbox'),
       });
       expect(admitOperationMock).not.toHaveBeenCalled();
       expectNoAllocation(doStub);
     });
 
-    it("settles the ledger row failed when the environment's saved shared allocation resolves after admission", async () => {
+    it("settles the ledger row failed when the environment's saved Vercel allocation resolves after admission", async () => {
       const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
 
       // No `resolveSavedAllocationBeforeAdmission`: the row is admitted first.
       await expect(
-        runCreate(
-          selectedContext(doStub),
-          environmentRequest(v2Environment, undefined, 'cloudflare-shared')
-        )
+        runCreate(ctx, environmentRequest(v2Environment, undefined, 'vercel-small'))
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
-        message: expect.stringContaining('shared sandbox'),
+        message: expect.stringContaining('Vercel sandbox'),
       });
 
       expect(admitOperationMock).toHaveBeenCalledOnce();
@@ -1936,24 +2142,28 @@ describe('explicit sandbox session creation', () => {
       expectNoAllocation(doStub);
     });
 
-    it('fails a split registration on the shared sandbox before it allocates', async () => {
-      const doStub = makeDoStub();
+    it.each([
+      ['cloudflare-shared', 'has been retired'],
+      ['vercel-small', 'Vercel sandbox'],
+    ] as const)(
+      'fails a split registration on %s before it allocates',
+      async (allocation, reason) => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
 
-      await expect(
-        registerNewSession(
-          environmentRequest(v2Environment, 'cloudflare-shared'),
-          selectedContext(doStub)
-        )
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('shared sandbox'),
-      });
-      // The late check runs once the allocation is final; nothing is registered.
-      expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
-      expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(doStub.registerSession).not.toHaveBeenCalled();
-      expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
-    });
+        await expect(
+          registerNewSession(environmentRequest(v2Environment, allocation), ctx)
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining(reason),
+        });
+        expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+        expect(doStub.registerSession).not.toHaveBeenCalled();
+        expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+      }
+    );
 
     it('starts on an isolated sandbox', async () => {
       const doStub = makeDoStub();
@@ -1964,23 +2174,67 @@ describe('explicit sandbox session creation', () => {
           environmentRequest(v2Environment, 'cloudflare-containers-standard-3')
         )
       ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxKind: 'isolated',
+      });
+      expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
     });
 
-    it('skips a shared owner default and starts a V2 environment on an isolated sandbox', async () => {
-      getSandboxAllocationCandidatesMock.mockResolvedValue({
-        contextAllocation: 'cloudflare-shared',
-      });
-      const doStub = makeDoStub();
+    it.each([true, false])(
+      'skips a retired saved environment allocation (resolve before admission: %s)',
+      async resolveSavedAllocationBeforeAdmission => {
+        const doStub = makeDoStub();
 
-      await expect(
-        runCreate(selectedContext(doStub), environmentRequest(v2Environment))
-      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
-      expect(settleOptions(0)?.outboxEvent).toMatchObject({
-        properties: { outcome: 'completed' },
-      });
-    });
+        await expect(
+          createSessionWithLedger(
+            environmentRequest(v2Environment, undefined, 'cloudflare-shared'),
+            selectedContext(doStub),
+            { ...CREATE_OPTIONS, resolveSavedAllocationBeforeAdmission }
+          )
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'isolated',
+        });
+        expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'completed' },
+        });
+      }
+    );
 
-    it('still starts a V1 environment on a shared owner default', async () => {
+    it.each([
+      'cloudflare-single',
+      'cloudflare-shared',
+      'isolated-standard',
+      'vercel-small',
+    ] as const)(
+      'skips an incompatible owner default %s and starts a V2 environment on an isolated sandbox',
+      async contextAllocation => {
+        getSandboxAllocationCandidatesMock.mockResolvedValue({
+          contextAllocation,
+        });
+        const doStub = makeDoStub();
+
+        await expect(
+          runCreate(selectedContext(doStub), environmentRequest(v2Environment))
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'isolated',
+        });
+        expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'completed' },
+        });
+      }
+    );
+
+    it('skips a retired shared owner default for a V1 environment', async () => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
         contextAllocation: 'cloudflare-shared',
       });
@@ -1989,14 +2243,24 @@ describe('explicit sandbox session creation', () => {
       await expect(
         runCreate(selectedContext(doStub), environmentRequest(v1Environment))
       ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxKind: 'isolated',
+      });
     });
 
-    it('still starts a V1 environment on the shared sandbox', async () => {
+    it('rejects the retired explicit shared sandbox even for a V1 environment', async () => {
       const doStub = makeDoStub();
 
       await expect(
         runCreate(selectedContext(doStub), environmentRequest(v1Environment, 'cloudflare-shared'))
-      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('has been retired'),
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
     });
   });
 
@@ -2139,9 +2403,13 @@ describe('explicit sandbox session creation', () => {
     );
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
-    expectNoAllocation(doStub);
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
   });
 
   it('does not read settings for a legacy fingerprint row without a choice', async () => {
@@ -2169,7 +2437,9 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
     });
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
-    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
   });
 
   it('admits a fresh create whose request pins a selectable allocation', async () => {
@@ -2241,35 +2511,32 @@ describe('explicit sandbox session creation', () => {
 
   it.each([
     { allocation: 'cloudflare-single' as const, pinned: true },
-    { allocation: 'isolated-standard' as const, pinned: false },
-  ])(
-    'pins a requested $allocation at admission only when selectable',
-    async ({ allocation, pinned }) => {
-      const request = requestForPreset(allocation);
-      const doStub = makeDoStub();
-      admitOperationMock.mockImplementationOnce(
-        async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
-          admission: 'admitted' as const,
-          row: makeLedgerRow({
-            organization_id: orgId,
-            canonical_result: admitted.initialCanonicalResult,
-          }),
-        })
-      );
+    { allocation: 'cloudflare-containers-standard-3' as const, pinned: true },
+  ])('pins a requested $allocation at admission', async ({ allocation, pinned }) => {
+    const request = requestForPreset(allocation);
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
 
-      await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
-        cloudAgentSessionId: WORKSPACE_SESSION_ID,
-      });
-      const canonical = admitOperationMock.mock.calls[0]?.[1] as {
-        initialCanonicalResult: Record<string, unknown>;
-      };
-      if (pinned) {
-        expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
-      } else {
-        expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
-      }
+    await expect(runCreate(selectedContext(doStub), request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    const canonical = admitOperationMock.mock.calls[0]?.[1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    if (pinned) {
+      expect(canonical.initialCanonicalResult).toMatchObject({ sandboxAllocation: allocation });
+    } else {
+      expect(canonical.initialCanonicalResult).not.toHaveProperty('sandboxAllocation');
     }
-  );
+  });
 
   it('resolves the saved allocation for a fresh prepare create', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
@@ -2294,11 +2561,16 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
     });
     expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledOnce();
-    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe('cloudflare-shared');
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
+      'cloudflare-containers-standard-3'
+    );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(
       expect.anything(),
       ROW_ID,
-      expect.objectContaining({ [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-shared' })
+      expect.objectContaining({ sandboxAllocation: 'cloudflare-containers-standard-3' })
+    );
+    expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty(
+      SESSION_CREATE_SAVED_ALLOCATION_KEY
     );
   });
 
@@ -2497,6 +2769,7 @@ describe('createSessionWithLedger admission ladder', () => {
           const doStub = makeDoStub();
           const ctx = makeContext(doStub);
           if (flag !== undefined) ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = flag;
+          if (flag === 'false') ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
           await runCreate(ctx, makeRequest({ repository }));
 
@@ -2521,6 +2794,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
     await runCreate(
       ctx,
@@ -2548,6 +2822,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
 
     await runCreate(
       ctx,
@@ -2569,12 +2844,13 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it('routes and persists isolated Standard allocation for an enrolled organization', async () => {
+  it('routes and persists a larger containers allocation for an enrolled organization', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
     );
@@ -2586,7 +2862,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await runCreate(
       ctx,
       makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: {
           operationKey: OPERATION_KEY,
           createdOnPlatform: 'cli',
@@ -2599,7 +2875,8 @@ describe('createSessionWithLedger admission ladder', () => {
       expect.objectContaining({
         sessionId: WORKSPACE_SESSION_ID,
         orgId,
-        sandboxAllocation: 'isolated-standard',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
+        requestedAllocation: 'cloudflare-containers-standard-4',
       })
     );
     expect(createdMetadata(doStub)).toMatchObject(
@@ -2607,18 +2884,18 @@ describe('createSessionWithLedger admission ladder', () => {
         identity: expect.objectContaining({ orgId, createdOnPlatform: 'cli' }),
         workspace: expect.objectContaining({
           sandboxId: expect.any(String),
-          sandboxAllocation: 'isolated-standard',
-          sandboxKind: 'isolated-standard',
-          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+          sandboxKind: 'isolated',
+          sandboxProvider: 'cloudflare-containers',
         }),
       })
     );
   });
 
-  it('replays a settled organization Standard allocation', async () => {
+  it('replays a settled organization containers allocation', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const input = makeRequest({
-      runtime: { sandboxAllocation: 'isolated-standard' },
+      runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
       options: {
         operationKey: OPERATION_KEY,
         createdOnPlatform: 'cli',
@@ -2633,6 +2910,7 @@ describe('createSessionWithLedger admission ladder', () => {
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
         initialMessageId: INITIAL_MESSAGE_ID,
+        sandboxAllocation: 'cloudflare-containers-standard-4',
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       },
     });
@@ -3159,7 +3437,11 @@ describe('createSessionWithLedger admission ladder', () => {
 
   it.each([
     ['cloudflare-single', 'cloudflare-containers-standard-3', 'cloudflare-containers'],
-    ['isolated-standard', 'isolated-standard', 'cloudflare'],
+    [
+      'cloudflare-containers-standard-4',
+      'cloudflare-containers-standard-4',
+      'cloudflare-containers',
+    ],
   ] as const)(
     'keeps an enrolled organization on the explicit Cloudflare allocation %s',
     async (sandboxAllocation, persistedAllocation, sandboxProvider) => {
@@ -3169,6 +3451,7 @@ describe('createSessionWithLedger admission ladder', () => {
       Object.assign(ctx.env, {
         BYOC_VERCEL_IDS: organizationId,
         SANDBOX_SELECTION_IDS: organizationId,
+        CLOUDFLARE_CONTAINERS_ORG_IDS: organizationId,
         CONTROL_PLANE_IDS: '',
       });
       getPgDbMock.mockReturnValue(
@@ -3367,6 +3650,7 @@ describe('createSessionWithLedger admission ladder', () => {
       botId: undefined,
       codeReview: false,
       sandboxAllocation: 'vercel-small',
+      requestedAllocation: 'vercel-small',
     });
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
       sandboxId: PLACED_SANDBOX_ID,
@@ -3673,7 +3957,7 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        workspace: expect.objectContaining({ sandboxProvider: 'cloudflare' }),
+        workspace: expect.objectContaining({ sandboxProvider: 'cloudflare-containers' }),
       })
     );
   });
@@ -3711,7 +3995,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await runCreate(
       ctx,
       makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' },
         options: { operationKey: OPERATION_KEY },
       })
     );
@@ -3721,9 +4005,9 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          sandboxProvider: 'cloudflare',
-          sandboxAllocation: 'isolated-standard',
-          sandboxKind: 'isolated-standard',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxKind: 'isolated',
         }),
       })
     );
@@ -6153,17 +6437,20 @@ describe('createSessionWithLedger changed-intent rejection', () => {
   /** Asserts the request is rejected with the typed error and no effect runs. */
   async function expectRejectedWithoutEffects(
     request: SessionCreateRequest,
-    identityConflict = false
+    identityConflict = false,
+    expectedRejection?: { code: string; message: string }
   ) {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = ORIGINAL_OPTIONS.kilocodeOrganizationId;
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = ORIGINAL_OPTIONS.kilocodeOrganizationId;
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
 
     await expect(runCreate(ctx, request)).rejects.toMatchObject(
-      identityConflict
-        ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
-        : { code: 'CONFLICT', message: 'session_create_intent_conflict' }
+      expectedRejection ??
+        (identityConflict
+          ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
+          : { code: 'CONFLICT', message: 'session_create_intent_conflict' })
     );
 
     // Rejected before replay, reconciliation, or any external effect.
@@ -6281,6 +6568,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     admission?: 'duplicate_settled' | 'takeover' | 'duplicate_reconcile_pending';
     original?: SessionCreateRequest;
     identityConflict?: boolean;
+    rejection?: { code: string; message: string };
     retry: SessionCreateRequest;
   }> = [
     {
@@ -6374,8 +6662,9 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     },
     {
       name: 'the sandbox allocation',
+      rejection: { code: 'BAD_REQUEST', message: 'session_creation_failed' } as const,
       retry: makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: ORIGINAL_OPTIONS,
       }),
     },
@@ -6533,7 +6822,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
 
   it.each(changedIntentCases)(
     'rejects a same-key retry that changes $name',
-    async ({ admission = 'duplicate_settled', original, identityConflict, retry }) => {
+    async ({ admission = 'duplicate_settled', original, identityConflict, rejection, retry }) => {
       const originalIntent = original ?? originalRequest();
       const status =
         admission === 'duplicate_settled'
@@ -6555,7 +6844,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
           },
         }),
       });
-      await expectRejectedWithoutEffects(retry, identityConflict);
+      await expectRejectedWithoutEffects(retry, identityConflict, rejection);
     }
   );
 
@@ -6812,7 +7101,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   });
 
   it.each(['webhook', 'scheduled'])(
-    'creates a %s workspace session with isolated Standard allocation',
+    'creates a %s workspace session with a larger containers allocation',
     async createdOnPlatform => {
       const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
@@ -6822,6 +7111,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
       getPgDbMock.mockReturnValue(
         makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
       );
@@ -6833,7 +7123,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       await runCreate(
         ctx,
         makeRequest({
-          runtime: { sandboxAllocation: 'isolated-standard' },
+          runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
           options: {
             operationKey: OPERATION_KEY,
             createdOnPlatform,
@@ -6849,23 +7139,24 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       });
       expect(metadata.workspace).toMatchObject({
         sandboxId: expect.stringMatching(/^sbx-[0-9a-f]{48}$/),
-        sandboxKind: 'isolated-standard',
-        sandboxProvider: 'cloudflare',
-        sandboxAllocation: 'isolated-standard',
+        sandboxKind: 'isolated',
+        sandboxProvider: 'cloudflare-containers',
+        sandboxAllocation: 'cloudflare-containers-standard-4',
       });
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
-        expect.objectContaining({ sandboxKind: 'isolated-standard' })
+        expect.objectContaining({ sandboxKind: 'isolated' })
       );
     }
   );
 
-  it('allows isolated Standard allocation for non-interactive sessions', async () => {
+  it('allows a larger containers allocation for non-interactive sessions', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
     );
@@ -6878,7 +7169,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     await runCreate(
       ctx,
       makeRequest({
-        runtime: { sandboxAllocation: 'isolated-standard' },
+        runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
         options: {
           operationKey: OPERATION_KEY,
           createdOnPlatform: 'cli',
@@ -6892,9 +7183,9 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, orgId }),
         workspace: expect.objectContaining({
-          sandboxAllocation: 'isolated-standard',
-          sandboxKind: 'isolated-standard',
-          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-containers-standard-4',
+          sandboxKind: 'isolated',
+          sandboxProvider: 'cloudflare-containers',
         }),
       })
     );
@@ -6940,34 +7231,31 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   it.each([
     {
       name: 'code review',
-      runtime: { sandboxAllocation: 'isolated-standard' } as const,
+      runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' } as const,
       billingOrigin: 'code-review',
     },
-  ])(
-    'rejects isolated Standard allocation with $name routing before external effects',
-    async input => {
-      const doStub = makeDoStub();
-      const ctx = makeContext(doStub);
+  ])('rejects an allocation with $name routing before external effects', async input => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
 
-      await expect(
-        createSessionWithLedger(
-          makeRequest({
-            runtime: input.runtime,
-            options: { operationKey: OPERATION_KEY },
-          }),
-          ctx,
-          { ...CREATE_OPTIONS, billingOrigin: input.billingOrigin }
-        )
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
-      });
+    await expect(
+      createSessionWithLedger(
+        makeRequest({
+          runtime: input.runtime,
+          options: { operationKey: OPERATION_KEY },
+        }),
+        ctx,
+        { ...CREATE_OPTIONS, billingOrigin: input.billingOrigin }
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
+    });
 
-      expect(admitOperationMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    }
-  );
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
 
   it('registers explicitly selected Vercel clone-only sessions in the control-plane Durable Object', async () => {
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d486';

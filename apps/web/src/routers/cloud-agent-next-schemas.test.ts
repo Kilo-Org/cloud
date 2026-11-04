@@ -1000,10 +1000,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(personalPrepareSessionNextSchema.parse(personalClone).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       personalPrepareSessionNextSchema.safeParse({ ...personalClone, prompt: 'Not allowed' })
@@ -1016,10 +1016,10 @@ describe('prepare session sandbox selection', () => {
       cloneFromKiloSessionId: KILO_SESSION_ID,
       autoInitiate: true,
       operationKey: MESSAGE_UUID,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     };
     expect(organizationPrepareSessionNextSchema.parse(cloneInput).sandboxAllocation).toEqual(
-      getSandboxAllocationRequest('cloudflare-single')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(
       organizationPrepareSessionNextSchema.safeParse({ ...cloneInput, prompt: 'Not allowed' })

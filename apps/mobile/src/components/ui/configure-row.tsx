@@ -52,6 +52,14 @@ type ConfigureRowProps = {
    */
   subtitleNumberOfLines?: number;
   /**
+   * Node rendered in the subtitle's place while the value that fills it loads.
+   * The row's subtitle is one line of `text-xs`, so a placeholder of that
+   * height keeps the row's settled size: the rows below never move, and the
+   * card does not print loading copy. The caller builds it, because the width
+   * that stands in for the settled text is the caller's.
+   */
+  subtitlePlaceholder?: ReactNode;
+  /**
    * Semantic tone override (good / warn / danger). When omitted the row uses
    * the shared neutral tile, so every row in a settings list carries the same
    * accent instead of a hue hashed from its title.
@@ -86,6 +94,7 @@ export function ConfigureRow({
   title,
   subtitle,
   subtitleNumberOfLines,
+  subtitlePlaceholder,
   tone,
   hue,
   onPress,
@@ -127,11 +136,22 @@ export function ConfigureRow({
   // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
   // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
-  // and the chevron, the pressed feedback and `accessibilityState` are what
-  // still say "unavailable".
+  // and the chevron, the pressed feedback and the row Pressable's
+  // `accessibilityState` are what still say "unavailable". The inner layout
+  // View owns no role, so it declares no interactive state of its own: a
+  // state on it would announce disablement from a node a reader never reaches.
   const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
 
   const iconTile = <IconTile icon={Icon} tint={iconTint} />;
+
+  let subtitleNode: ReactNode = subtitlePlaceholder ?? null;
+  if (subtitle) {
+    subtitleNode = (
+      <Text numberOfLines={subtitleNumberOfLines} className="mt-0.5 text-xs text-muted-foreground">
+        {subtitle}
+      </Text>
+    );
+  }
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
@@ -143,20 +163,12 @@ export function ConfigureRow({
       >
         {title}
       </Text>
-      {subtitle ? (
-        <Text
-          numberOfLines={subtitleNumberOfLines}
-          className="mt-0.5 text-xs text-muted-foreground"
-        >
-          {subtitle}
-        </Text>
-      ) : null}
+      {subtitleNode}
     </View>
   );
 
   const inner = (
     <View
-      accessibilityState={{ disabled: Boolean(disabled) }}
       className={cn(
         stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',

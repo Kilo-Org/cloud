@@ -9,8 +9,13 @@
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-/** The built-in agent mode slugs. */
-export type BuiltinAgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+/**
+ * The built-in agent mode slugs, in picker order. The type, the membership
+ * test and the picker rows all derive from this list.
+ */
+export const BUILTIN_AGENT_MODES = ['code', 'plan', 'debug', 'orchestrator', 'ask'] as const;
+
+export type BuiltinAgentMode = (typeof BUILTIN_AGENT_MODES)[number];
 
 /**
  * A valid mode for a session: a built-in slug or any custom profile-agent
@@ -53,15 +58,9 @@ type RuntimeAgent = {
   variant?: string;
 };
 
-const BUILTIN_MODE_SET: ReadonlySet<string> = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-]);
+const BUILTIN_MODE_SET: ReadonlySet<string> = new Set(BUILTIN_AGENT_MODES);
 
-/** True when `value` is one of the five built-in slugs. */
+/** True when `value` is one of the built-in slugs. */
 export function isBuiltinAgentMode(value: AgentMode): value is BuiltinAgentMode {
   return BUILTIN_MODE_SET.has(value);
 }

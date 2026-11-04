@@ -112,6 +112,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'billing_blocked',
   'billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'invalid_configuration',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',

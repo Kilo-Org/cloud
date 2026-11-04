@@ -16,7 +16,7 @@ import type { OrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/or
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}

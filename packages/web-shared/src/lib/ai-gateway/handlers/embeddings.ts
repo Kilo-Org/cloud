@@ -1,5 +1,4 @@
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -7,44 +6,36 @@ import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gatewa
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
-  getOrganizationProviderPrivacy,
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
   invalidRequestResponse,
-  invalidTokenResponse,
+  malformedJsonResponse,
   modelDoesNotExistResponse,
-  modelNotAllowedResponse,
-  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getBalanceAndOrgSettings,
-  type BalancePayer,
-} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
-  createAnonymousContext,
-  isAnonymousContext,
-  type AnonymousUserContext,
-} from '@kilocode/web-shared/lib/anonymous';
+  gatewayUsageContextBase,
+  organizationProviderPreferences,
+  paidUsageRejection,
+  readGatewayBalance,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -68,10 +59,7 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 async function embeddingProxyRequest(params: {
   body: Record<string, unknown>;
@@ -117,11 +105,7 @@ export async function handleEmbeddingsRequest(
   try {
     requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
   } catch (e) {
-    captureException(e, {
-      extra: { requestBodyText },
-      tags: { source: 'embedding-proxy' },
-    });
-    return invalidRequestResponse();
+    return malformedJsonResponse(e);
   }
 
   if (typeof requestBodyParsed.model !== 'string' || requestBodyParsed.model.trim().length === 0) {
@@ -149,62 +133,22 @@ export async function handleEmbeddingsRequest(
     );
   }
 
-  // Auth check
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: isFreeModel(requestedModelLowerCased), ipAddress }
+  );
   authSpan.end();
+  if (caller.kind === 'rejected') return caller.response;
+  const { user } = caller;
+  const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
 
-  let user: typeof maybeUser | AnonymousUserContext;
-  let organizationId: string | undefined = authOrganizationId;
-  const botId: string | undefined = authBotId;
-  const tokenSource: string | undefined = authTokenSource;
-
-  if (authFailedResponse) {
-    // A credential we could not verify is not the absence of one. Fail the
-    // request rather than answering as anonymous; see `invalidTokenResponse`.
-    if (credentialsRejected) {
-      return invalidTokenResponse();
-    }
-
-    if (!isFreeModelExcludingCustomLlms(requestedModelLowerCased)) {
-      return NextResponse.json(
-        {
-          error: {
-            code: PAID_MODEL_AUTH_REQUIRED,
-            message: 'You need to sign in to use this model.',
-          },
-          error_type: ProxyErrorType.paid_model_auth_required,
-        },
-        { status: 401 }
-      );
-    }
-
-    user = createAnonymousContext(ipAddress);
-    organizationId = undefined;
-  } else {
-    user = maybeUser;
-  }
-
-  // Custom LLMs are served only through chat routes; never forward their ids
-  // elsewhere for signed-in callers. Anonymous callers can only send ids the
-  // built-in free model rules allow, and such an id must be answered the same
-  // whether or not a custom LLM uses it, so they are not checked.
-  if (!isAnonymousContext(user) && (await isCustomLlm(requestedModelLowerCased))) {
+  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
+  if (await isCustomLlm(requestedModelLowerCased)) {
     return modelDoesNotExistResponse();
   }
 
-  // Extract fraud/project headers
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
 
   const organizationDecision =
     !isAnonymousContext(user) && organizationId
@@ -226,12 +170,9 @@ export async function handleEmbeddingsRequest(
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
-  // Attribution must not inherit the billing fallback. A Kilo client is shown only
-  // by a genuine feature value or a Kilo client version header.
-  const attributionFeature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncerIp = bareIpLiteral(ipAddress);
-  const ja4Digest = fraudHeaders.http_x_vercel_ja4_digest;
+  const ja4Digest = usageBase.context.fraudHeaders.http_x_vercel_ja4_digest;
   const bouncer = isAnonymousContext(user)
     ? anonymousBouncerRequest({ ip: bouncerIp, ja4Digest })
     : signedInBouncerRequest({
@@ -246,37 +187,19 @@ export async function handleEmbeddingsRequest(
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'embeddings',
-    kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
     is_free: isFree,
-    custom_llm_pricing: null,
     promptInfo,
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
-    session_id: null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: attributionFeature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // Embedding input is not read by any bouncer rule, so no hash is computed.
@@ -293,43 +216,28 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const freeRequest = await isFreeModel(requestedModelLowerCased);
-    const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(
-        organizationId,
-        user,
-        readDb,
-        freeRequest ? undefined : 'usage'
-      );
+    const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
+    const { balance, settings, plan, payer } = account;
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
-    if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-      return await creditsBlockedResponse({
-        user,
-        balance,
-        organizationId,
-        balanceLimitedByUserAllowance,
-      });
-    }
+    const creditsBlocked = paidUsageRejection({
+      user,
+      organizationId,
+      account,
+      exempt: usageContext.is_free || !!userByok,
+    });
+    if (creditsBlocked) return await creditsBlocked();
 
-    const providerConfig = getOrganizationProviderPrivacy(settings);
-
-    if (organizationDecision) {
-      const decision = organizationDecision;
-      if (!decision.allowed) return modelNotAllowedResponse();
-      if (decision.eligibleProviderRoutes) {
-        const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
-        if (only.length === 0) return modelNotAllowedResponse();
-        requestBodyParsed.provider = { ...providerConfig, only };
-      } else if (providerConfig) {
-        requestBodyParsed.provider = providerConfig;
-      }
-    } else if (providerConfig) {
-      requestBodyParsed.provider = providerConfig;
-    }
+    const preferences = organizationProviderPreferences({
+      decision: organizationDecision,
+      settings,
+      requestProvider: requestPrivacy.data,
+    });
+    if (preferences.kind === 'rejected') return preferences.response;
+    if (preferences.provider) requestBodyParsed.provider = preferences.provider;
   }
 
   sentryRootSpan()?.setAttribute(

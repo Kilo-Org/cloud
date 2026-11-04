@@ -40,6 +40,7 @@ import {
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
+  inference_region,
   microdollar_usage_metadata,
   microdollar_usage_view,
   organization_user_usage,
@@ -953,6 +954,7 @@ describe('logMicrodollarUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
@@ -1039,6 +1041,36 @@ describe('logMicrodollarUsage', () => {
       expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
     }
   );
+
+  test.each([
+    { region: 'eu', stored: true },
+    { region: null, stored: false },
+  ] as const)('stores inference region $region in the lookup table', async ({ region, stored }) => {
+    const user = await insertTestUser({
+      id: `test-log-user-region-${region}`,
+      microdollars_used: 1000,
+      google_user_email: `test-region-${region}@example.com`,
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-region-${region}` };
+
+    await logMicrodollarUsage(usageStats, {
+      ...createBaseUsageContext(user),
+      inference_region: region,
+    });
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+    });
+    if (!stored) {
+      expect(metadataRecord?.inference_region_id).toBeNull();
+      return;
+    }
+    const [lookup] = await db
+      .select()
+      .from(inference_region)
+      .where(eq(inference_region.inference_region_id, metadataRecord!.inference_region_id!));
+    expect(lookup?.inference_region).toBe('eu');
+  });
 
   test('stores session_id when provided', async () => {
     const user = await insertTestUser({
@@ -2009,6 +2041,133 @@ describe('logMicrodollarUsage', () => {
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
   });
 
+  describe.each([
+    {
+      apiKind: 'chat_completions',
+      response: {
+        id: 'direct-chat',
+        model: 'upstream-model',
+        choices: [
+          { index: 0, message: { content: 'hi' }, delta: { content: 'hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+      },
+    },
+    {
+      apiKind: 'messages',
+      response: {
+        id: 'direct-message',
+        model: 'upstream-model',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 2 },
+      },
+    },
+    {
+      apiKind: 'responses',
+      response: {
+        id: 'direct-response',
+        model: 'upstream-model',
+        status: 'completed',
+        output: [],
+        usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
+      },
+    },
+  ] as const)('direct BYOK $apiKind usage', ({ apiKind, response }) => {
+    test.each([false, true])(
+      'persists the serving inference provider with streaming=%s',
+      async isStreaming => {
+        const user = await insertTestUser();
+        const events =
+          apiKind === 'messages'
+            ? [
+                { type: 'message_start', message: response },
+                {
+                  type: 'message_delta',
+                  delta: { stop_reason: 'end_turn' },
+                  usage: response.usage,
+                },
+              ]
+            : apiKind === 'responses'
+              ? [{ type: 'response.completed', response }]
+              : [response];
+        const body = isStreaming
+          ? events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
+          : JSON.stringify(response);
+
+        const result = await countAndStoreUsage(
+          new Response(body),
+          {
+            ...createBaseUsageContext(user),
+            api_kind: apiKind,
+            provider: 'direct-byok',
+            user_byok: true,
+            isStreaming,
+            requested_model: 'neuralwatt/upstream-model',
+          },
+          undefined,
+          { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'neuralwatt' }
+        );
+
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({
+          provider: 'direct-byok',
+          inference_provider: 'neuralwatt',
+          input_tokens: 10,
+          output_tokens: 2,
+          has_error: false,
+        });
+      }
+    );
+  });
+
+  test.each([
+    {
+      name: 'preserves the upstream inference provider',
+      upstream: 'upstream-provider',
+      servingProvider: { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'z-ai' },
+      expected: 'upstream-provider',
+    },
+    {
+      name: 'leaves unknown direct BYOK attribution null',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, type: 'direct-byok' },
+      expected: null,
+    },
+    {
+      name: 'leaves attribution null without a serving provider',
+      upstream: null,
+      servingProvider: undefined,
+      expected: null,
+    },
+    {
+      name: 'uses configured attribution regardless of provider type',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, inferenceProviderId: 'z-ai' },
+      expected: 'z-ai',
+    },
+  ] as const)('$name', async ({ upstream, servingProvider, expected }) => {
+    const user = await insertTestUser();
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, inference_provider: upstream },
+      {
+        ...createBaseUsageContext(user),
+        provider: servingProvider?.type ?? 'direct-byok',
+        user_byok: true,
+      },
+      servingProvider
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.inference_provider).toBe(expected);
+  });
+
   test.each([
     { provider: 'openrouter', user_byok: false, reportsToSentry: true },
     { provider: 'custom', user_byok: false, reportsToSentry: true },
@@ -2437,6 +2596,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     }) satisfies MicrodollarUsageContext;

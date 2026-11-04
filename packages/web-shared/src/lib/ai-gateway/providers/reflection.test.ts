@@ -394,7 +394,8 @@ describe('applyProviderSpecificLogic reasoning placeholders', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return chatAssistant(request);
   }

@@ -64,18 +64,6 @@ const slots: RegistrySlots = {
   prDiffSelection: new Map<RouteKey, DiffSelection>(),
 };
 
-const ALL_SLOT_KINDS: readonly SlotKind[] = [
-  'modelPicker',
-  'modePicker',
-  'repoPicker',
-  'branchPicker',
-  'instancePicker',
-  'folderPicker',
-  'profilePicker',
-  'prFileNav',
-  'prDiffSelection',
-];
-
 export type RouteSlot<K extends SlotKind> = {
   get: (routeKey: RouteKey) => SlotValue[K] | undefined;
   set: (routeKey: RouteKey, value: SlotValue[K]) => void;
@@ -124,8 +112,8 @@ export function prRouteKey(pr: { owner: string; repo: string; number: number }):
 export function useRouteRegistry(routeKey: RouteKey): void {
   useEffect(
     () => () => {
-      for (const kind of ALL_SLOT_KINDS) {
-        slots[kind].delete(routeKey);
+      for (const slotMap of Object.values(slots)) {
+        slotMap.delete(routeKey);
       }
     },
     [routeKey]

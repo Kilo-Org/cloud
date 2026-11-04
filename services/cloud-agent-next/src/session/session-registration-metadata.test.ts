@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildSessionMetadataFromRegistration } from './session-registration-metadata.js';
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-  ContainerProxy: class ContainerProxy {},
-}));
-
 vi.mock('@cloudflare/containers', () => ({}));
 
 vi.mock('cloudflare:workers', () => ({

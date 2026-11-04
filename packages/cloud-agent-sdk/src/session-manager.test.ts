@@ -124,6 +124,7 @@ const mockSession = {
     getStatus: jest.fn<AgentStatus, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getPreparationAttempts: jest.fn<readonly PreparationAttempt[], []>(() => []),
     getCommits: jest.fn(() => []),
     clearCommits: jest.fn(),
     clearPreparationAttempts: jest.fn(),
@@ -447,6 +448,7 @@ describe('createSessionManager', () => {
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
     mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.state.getSetupLog.mockReturnValue([]);
+    mockSession.state.getPreparationAttempts.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
     mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
     mockSession.storage = latestStorage;
@@ -738,7 +740,7 @@ describe('createSessionManager', () => {
         callback();
         return () => {};
       });
-      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      mockSession.state.getPreparationAttempts.mockImplementation(livePreparation);
       try {
         const config = createMockConfig({
           writeCachedSnapshotPage: page => cached.set(page.info.id, page),
@@ -768,7 +770,7 @@ describe('createSessionManager', () => {
         expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
         mgr.destroy();
       } finally {
-        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+        mockSession.state.getPreparationAttempts.mockReturnValue([]);
       }
     });
 
@@ -789,7 +791,7 @@ describe('createSessionManager', () => {
         callback();
         return () => {};
       });
-      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      mockSession.state.getPreparationAttempts.mockImplementation(livePreparation);
       try {
         const config = createMockConfig({
           fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
@@ -810,7 +812,7 @@ describe('createSessionManager', () => {
         expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
         mgr.destroy();
       } finally {
-        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+        mockSession.state.getPreparationAttempts.mockReturnValue([]);
       }
     });
 

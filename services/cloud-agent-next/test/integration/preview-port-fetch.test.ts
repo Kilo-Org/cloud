@@ -1,4 +1,3 @@
-import { getSandbox } from '@cloudflare/sandbox';
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import type { PreviewPortTestDO } from './helpers/preview-port-test-do.js';
@@ -15,13 +14,9 @@ function marked(path: string, headers: Record<string, string> = {}): Request {
   });
 }
 
-function sandboxFor(name: string) {
-  return getSandbox(env.PREVIEW_PORT_TEST, name);
-}
-
-describe('preview port fetch over stub.fetch (fake getTcpPort)', () => {
-  it('streams a response body across a getSandbox-wrapped fetch boundary', async () => {
-    const response = await sandboxFor('stream').fetch(marked('/stream'));
+describe('preview port fetch over stub.fetch', () => {
+  it('streams a response body across a Durable Object fetch boundary', async () => {
+    const response = await env.PREVIEW_PORT_TEST.getByName('stream').fetch(marked('/stream'));
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/plain');
     await expect(response.text()).resolves.toBe('chunk-1|chunk-2');
@@ -49,8 +44,10 @@ describe('preview port fetch over stub.fetch (fake getTcpPort)', () => {
     await expect(reader!.read()).resolves.toEqual({ done: true, value: undefined });
   });
 
-  it('bridges a container WebSocket 101 across a getSandbox-wrapped fetch boundary', async () => {
-    const response = await sandboxFor('ws').fetch(marked('/ws', { Upgrade: 'websocket' }));
+  it('bridges a container WebSocket 101 across a Durable Object fetch boundary', async () => {
+    const response = await env.PREVIEW_PORT_TEST.getByName('ws').fetch(
+      marked('/ws', { Upgrade: 'websocket' })
+    );
     expect(response.status).toBe(101);
     const socket = response.webSocket;
     expect(socket).not.toBeNull();

@@ -627,7 +627,7 @@ export function CustomLlmsContent() {
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>.
+                OpenRouter model.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Set <code>api_kinds</code> to a subset of <code>chat_completions</code>,{' '}
@@ -638,11 +638,15 @@ export function CustomLlmsContent() {
                 otherwise. Without it, only that API is served.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Custom LLMs are free for users unless the definition sets <code>pricing</code>, a
-                list of tiers in the same format as a custom pricing entry&apos;s{' '}
-                <code>pricing</code>. Priced custom LLMs bill users like other paid models and are
-                not available to signed-out users. To make the model available to every user, or
-                every signed-in user when it sets <code>pricing</code>, replace{' '}
+                A custom LLM is free when its public ID ends in <code>-free</code> or starts with{' '}
+                <code>stealth/</code>. Such a definition must not set <code>pricing</code>, and a
+                public one is available to signed-out users. Other custom LLMs should set{' '}
+                <code>pricing</code>, a list of tiers in the same format as a custom pricing
+                entry&apos;s <code>pricing</code>, and bill users like other paid models. Without it
+                they charge nothing, but still need a signed-in user with credits. Alongside{' '}
+                <code>pricing</code>, set <code>&quot;may_train_on_prompts&quot;: false</code> only
+                for an upstream with zero data retention; otherwise the model is assumed to train on
+                prompts. To make the model available to every eligible user, replace{' '}
                 <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
@@ -693,7 +697,7 @@ export function CustomLlmsContent() {
                   <p>
                     Signed-in Kilo users will be billed for{' '}
                     <code className="font-mono">{pendingChange.input.public_id}</code> at the
-                    definition&apos;s pricing. Signed-out users will no longer be able to use it.
+                    definition&apos;s pricing.
                   </p>
                 ) : pendingChange?.priced ? (
                   <p>
@@ -703,9 +707,11 @@ export function CustomLlmsContent() {
                   </p>
                 ) : (
                   <p>
-                    Every Kilo user, including signed-out users, will be able to use{' '}
-                    <code className="font-mono">{pendingChange?.input.public_id}</code> for free.
-                    Kilo pays for all usage.
+                    Every Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange?.input.public_id}</code> without
+                    being charged. Kilo pays for all usage. Unless the public ID ends in{' '}
+                    <code>-free</code> or starts with <code>stealth/</code>, only signed-in users
+                    with credits can use it.
                   </p>
                 )}
                 <p>

@@ -7,7 +7,7 @@ import type { EnvironmentBuildRunner } from '../shared/environment-build-protoco
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
-import { encodeCloudflareProviderRef } from '../sandbox-control/cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from '../sandbox-control/provider-ref.js';
 import { leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
 import { SHA256_PATTERN } from '../sandbox-control/runtime-release.js';

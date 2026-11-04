@@ -2,7 +2,6 @@ import { preinstalledStartup } from './preinstalled-startup.js';
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import type { AgentSandboxProvider } from '../types.js';
-import type { SandboxInstance } from '../types.js';
 import {
   parseSandboxBillingInput,
   type SandboxBillingAdmissionResult,
@@ -21,10 +20,7 @@ import {
   type VercelSandboxSession,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
-import {
-  createCloudflareProviderAdapter,
-  encodeCloudflareProviderRef,
-} from './cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from './provider-ref.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import {
   createVercelProviderAdapter,
@@ -42,14 +38,14 @@ import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-p
 import { leaseAtLeastMs } from './deadlines.js';
 
 /**
- * The shared provider-adapter contract, exercised against the three real
- * control-plane adapters (cloudflare, cloudflare-containers, vercel) over
- * hand-written fake backends. Nothing here adapts a provider for the test: the
- * production `createCloudflareProviderAdapter` and friends are the code under
- * test, and the fakes stand in only for the Cloudflare Sandbox binding, the
- * `SandboxContainers` Durable Object and the Vercel REST client. That means each
- * assertion drives the adapter's real ref encoding, ownership check, status
- * mapping and backend call shape, which no mock-call-only test does.
+ * The shared provider-adapter contract, exercised against the two real
+ * control-plane adapters (cloudflare-containers, vercel) over hand-written fake
+ * backends. Nothing here adapts a provider for the test: the production
+ * `createCloudflareContainersProviderAdapter` and friends are the code under
+ * test, and the fakes stand in only for the `SandboxContainers` Durable Object
+ * and the Vercel REST client. That means each assertion drives the adapter's
+ * real ref encoding, ownership check, status mapping and backend call shape,
+ * which no mock-call-only test does.
  *
  * The fake backends carry real observable state (running/idle/stopped, admission
  * results, stop outcomes, recorded lease and capture calls) rather than flags,
@@ -129,95 +125,6 @@ async function requireRef(adapter: ProviderAdapter): Promise<string> {
   const created = await adapter.create(intent);
   if (!('providerRef' in created)) throw new Error('create did not resolve a provider ref');
   return created.providerRef;
-}
-
-function cloudflareHarness(): ContractHarness {
-  const state = {
-    running: true,
-    observeThrows: false,
-    destroyThrows: false,
-    admission: async (): Promise<SandboxBillingAdmissionResult> => ({ success: true }),
-    startEnvs: [] as Record<string, string>[],
-    startPaths: [] as string[],
-    leaseCalls: 0,
-    billingBlocked: false,
-    billingReads: 0,
-  };
-  const sandbox = {
-    isContainerRunning: async () => {
-      if (state.observeThrows) throw new Error('cloudflare inspect failed');
-      return state.running;
-    },
-    isBillingBlocked: async () => {
-      state.billingReads += 1;
-      return state.billingBlocked;
-    },
-    getBillingRuntimeStatus: async () => {
-      state.billingReads += 1;
-      return {
-        sandboxClassName: 'Sandbox',
-        running: state.running,
-        blocked: state.billingBlocked,
-        context: {
-          service: 'cloud-agent',
-          instanceId: SANDBOX,
-          sku: 'cloud-agent-standard-2026-07',
-          subject: { type: 'user', id: 'user-1' },
-          actor: { type: 'user', id: 'user-1' },
-          startEpochMs: 1,
-        },
-      };
-    },
-    ensureBillingAdmission: () => state.admission(),
-    configureBilling: async () => {},
-    setOutboundHandler: async () => {},
-    startProcess: async (path: string, options?: { env?: Record<string, string> }) => {
-      state.startPaths.push(path);
-      state.startEnvs.push(options?.env ?? {});
-    },
-    renewActivityTimeout: async () => {
-      state.leaseCalls += 1;
-    },
-  } as unknown as SandboxInstance;
-  const adapter = createCloudflareProviderAdapter({
-    sandboxId: SANDBOX,
-    getSandbox: () => sandbox,
-    destroy: async () => {
-      if (state.destroyThrows) throw new Error('cloudflare destroy failed');
-    },
-  });
-  return {
-    name: 'cloudflare',
-    adapter,
-    create: () => requireRef(adapter),
-    foreignRef: () =>
-      encodeCloudflareProviderRef({ sandboxId: FOREIGN, containment: false, instanceId: 'x' }),
-    setRunning: running => {
-      state.running = running;
-    },
-    failObserve: () => {
-      state.observeThrows = true;
-    },
-    failStop: () => {
-      state.destroyThrows = true;
-    },
-    failCreate: () => {
-      state.admission = async () => ({
-        success: false,
-        code: 'stopping',
-        message: 'Sandbox is stopping',
-      });
-    },
-    launchedEnv: () => state.startEnvs.at(-1),
-    launchSupervisor: () => state.startPaths.at(-1),
-    launchInvocation: () => state.startPaths.at(-1),
-    leaseCalls: () => state.leaseCalls,
-    leaseMs: () => [],
-    billingBlock: blocked => {
-      state.billingBlocked = blocked;
-    },
-    billingReads: () => state.billingReads,
-  };
 }
 
 function containersHarness(
@@ -441,7 +348,7 @@ function vercelHarness(): ContractHarness {
   };
 }
 
-const harnessFactories = [cloudflareHarness, containersHarness, vercelHarness];
+const harnessFactories = [containersHarness, vercelHarness];
 
 describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
@@ -464,9 +371,7 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
               runtimeBuildId: 'build',
               startSource: 'snapshot',
             }
-          : harness.name === 'cloudflare'
-            ? { startSource: 'image' }
-            : { instanceType: 'standard-3' }),
+          : { instanceType: 'standard-3' }),
       });
       expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
       expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
@@ -593,23 +498,6 @@ describe('provider-specific contract differences', () => {
     expect(harness.leaseCalls()).toBe(1);
   });
 
-  it('keeps Cloudflare logs as an opaque descriptor and ignores the lease duration', async () => {
-    const harness = cloudflareHarness();
-    const ref = await harness.create();
-
-    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
-    expect(harness.launchSupervisor()).toBe(`'/bin/sh' '${CONTROL_SUPERVISOR_PATH}'`);
-    expect(await harness.adapter.logs(ref)).toBe(`cloudflare ${ref}`);
-    await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-    // Cloudflare renews its activity timeout with no duration argument.
-    expect(harness.leaseMs()).toEqual([]);
-    const owned = harness.leaseCalls();
-    await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
-    expect(harness.leaseCalls()).toBe(owned);
-    expect('environmentSnapshots' in harness.adapter).toBe(false);
-    expect('applyContainedCredentials' in harness.adapter).toBe(false);
-  });
-
   it('forwards an environment snapshot start and reports a backend stop outcome verbatim', async () => {
     const harness = containersHarness();
     const ref = await harness.create();
@@ -653,11 +541,8 @@ describe('provider-specific contract differences', () => {
     expect(harness.launchSupervisor()).toBeUndefined();
   });
 
-  it.each([
-    ['cloudflare', cloudflareHarness],
-    ['cloudflare-containers', containersHarness],
-  ] as const)('reads the stored %s billing block for an owned ref only', async (_name, factory) => {
-    const harness = factory();
+  it('reads the stored billing block for an owned ref only', async () => {
+    const harness = containersHarness();
     const ref = await harness.create();
     const initialReads = harness.billingReads?.();
 
@@ -672,55 +557,44 @@ describe('provider-specific contract differences', () => {
     expect(harness.billingReads?.()).toBe(reads);
   });
 
-  it.each([
-    ['cloudflare', cloudflareHarness, 'cloud-agent-standard-2026-07'],
-    ['cloudflare-containers', containersHarness, 'cloud-agent-containers-standard-3-2026-09'],
-  ] as const)(
-    'projects stored %s billing state without admitting or starting compute',
-    async (_name, factory, sku) => {
-      const harness = factory();
-      await harness.create();
-      const reads = harness.billingReads?.() ?? 0;
-      const leases = harness.leaseCalls();
-      const launches = harness.launchInputs?.().length ?? 0;
+  it('projects stored billing state without admitting or starting compute', async () => {
+    const harness = containersHarness();
+    const sku = 'cloud-agent-containers-standard-3-2026-09';
+    await harness.create();
+    const reads = harness.billingReads?.() ?? 0;
+    const leases = harness.leaseCalls();
+    const launches = harness.launchInputs?.().length ?? 0;
 
-      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
-        blocked: false,
-        sandboxClassName: expect.any(String),
-        context: {
-          sku,
-          subject: { type: 'user', id: 'user-1' },
-          actor: { type: 'user', id: 'user-1' },
-          startEpochMs: 1,
-        },
-      });
-      harness.billingBlock?.(true);
-      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
-        blocked: true,
-      });
-      expect(harness.billingReads?.()).toBe(reads + 2);
-      expect(harness.leaseCalls()).toBe(leases);
-      expect(harness.launchInputs?.().length ?? 0).toBe(launches);
-    }
-  );
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: false,
+      sandboxClassName: expect.any(String),
+      context: {
+        sku,
+        subject: { type: 'user', id: 'user-1' },
+        actor: { type: 'user', id: 'user-1' },
+        startEpochMs: 1,
+      },
+    });
+    harness.billingBlock?.(true);
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: true,
+    });
+    expect(harness.billingReads?.()).toBe(reads + 2);
+    expect(harness.leaseCalls()).toBe(leases);
+    expect(harness.launchInputs?.().length ?? 0).toBe(launches);
+  });
 
-  it.each([
-    ['cloudflare', cloudflareHarness],
-    ['cloudflare-containers', containersHarness],
-  ] as const)(
-    'reads the stored %s billing projection after compute stops',
-    async (_name, factory) => {
-      const harness = factory();
-      const ref = await harness.create();
-      await harness.adapter.stop(ref);
-      harness.setRunning(false);
-      harness.billingBlock?.(true);
+  it('reads the stored billing projection after compute stops', async () => {
+    const harness = containersHarness();
+    const ref = await harness.create();
+    await harness.adapter.stop(ref);
+    harness.setRunning(false);
+    harness.billingBlock?.(true);
 
-      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
-        blocked: true,
-      });
-    }
-  );
+    await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+      blocked: true,
+    });
+  });
 
   it('runs the trusted downloaded installer as root on Vercel', async () => {
     const harness = vercelHarness();

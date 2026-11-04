@@ -13,7 +13,7 @@ import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -40,7 +40,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
 }): Promise<BalanceCheckModelEligibility> {
   // Naming a custom LLM the user cannot call skips this check too, but the
   // gateway refuses every request for it, so the session cannot run inference.
-  if (await isFreeModel(params.modelId)) {
+  if (isFreeModel(params.modelId)) {
     return { isFree: true, hasUserByokAvailable: false };
   }
 

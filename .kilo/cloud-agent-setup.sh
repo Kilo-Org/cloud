@@ -224,8 +224,6 @@ if (!stdinDockerfile) {
     const limits = 'ENV NODE_OPTIONS=--max-old-space-size=768 GOMAXPROCS=2 npm_config_jobs=1';
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)([^\n]*)/gm,
       (_, image, suffix) => `FROM mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}\n${limits}`);
-    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/)?cloudflare\/sandbox:[^\n]+/m, from =>
-      `${from}\n${trust}\n${limits}`);
     run(dockerfile);
   });
 }

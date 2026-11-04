@@ -36,6 +36,7 @@ import { getPgDb } from '../../db/pg.js';
 import {
   CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
+  retiredRuntimeMessage,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
@@ -332,8 +333,7 @@ async function loadSourceMetadata(
     (requirements.requireSourceScopeId !== undefined &&
       ownership.cloudAgentSessionScopeId !== requirements.requireSourceScopeId) ||
     metadata.identity.botId !== undefined ||
-    metadata.devcontainer !== undefined ||
-    workspace.devcontainerRequested === true ||
+    retiredRuntimeMessage(metadata) !== null ||
     workspace.worktreeId !== worktreeId ||
     workspace.workspacePath !==
       getWorktreeWorkspacePath(requirements.organizationId, ctx.userId, worktreeId) ||

@@ -5,6 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { SELECTABLE_SANDBOX_ALLOCATIONS } from '@kilocode/worker-utils/sandbox-allocation';
+import { egressModeSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -43,6 +44,11 @@ import {
   environmentBuildRequestResultSchema,
   environmentBuildStatusSchema,
 } from '../../../../services/cloud-agent-next/src/shared/environment-build-status';
+
+// Environments store network restrictions, but auditing is a session-only option.
+const environmentEgressPolicySchema = egressPolicySchema.safeExtend({
+  egressAudit: z.never().optional(),
+});
 
 const environmentNameSchema = z.string().trim().min(1).max(ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
 const environmentKeySchema = z
@@ -142,6 +148,8 @@ const environmentResponseBaseSchema = {
   secretKeys: z.array(z.string()),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
+  egressMode: egressModeSchema.nullable(),
+  egressAllowlist: z.array(z.string()).nullable(),
 };
 
 const environmentResponseSchema = z.union([
@@ -275,18 +283,20 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   create: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        name: environmentNameSchema,
-        /** One repository: a V1 environment. */
-        repository: createRepositorySchema.optional(),
-        /** One or more repositories: a V2 environment. */
-        repositories: environmentRepositoryListSchema.optional(),
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretsSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          name: environmentNameSchema,
+          /** One repository: a V1 environment. */
+          repository: createRepositorySchema.optional(),
+          /** One or more repositories: a V2 environment. */
+          repositories: environmentRepositoryListSchema.optional(),
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretsSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(environmentEgressPolicySchema)
     )
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
@@ -326,6 +336,8 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         secrets: input.secrets,
         commands: input.commands,
         sandboxAllocation: input.sandboxAllocation,
+        egressMode: input.egressMode,
+        egressAllowlist: input.egressAllowlist,
       };
       const createInput: EnvironmentCreateInput = input.repositories
         ? { ...base, repositories: entries }
@@ -342,17 +354,19 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   update: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        environmentId: z.uuid(),
-        name: environmentNameSchema.optional(),
-        /** Replaces repositories, converting older environments when needed. */
-        repositories: environmentRepositoryListSchema.optional(),
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretChangesSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          environmentId: z.uuid(),
+          name: environmentNameSchema.optional(),
+          /** Replaces repositories, converting older environments when needed. */
+          repositories: environmentRepositoryListSchema.optional(),
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretChangesSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(environmentEgressPolicySchema)
     )
     .output(z.object({ success: z.boolean(), configurationRevision: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -399,6 +413,8 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           secrets: input.secrets,
           commands: input.commands,
           sandboxAllocation: input.sandboxAllocation,
+          egressMode: input.egressMode,
+          egressAllowlist: input.egressAllowlist,
         })
       );
       return { success: true, configurationRevision };

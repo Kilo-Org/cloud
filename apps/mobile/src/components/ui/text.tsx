@@ -43,19 +43,19 @@ type TextVariantProps = VariantProps<typeof textVariants>;
 
 type TextVariant = NonNullable<TextVariantProps['variant']>;
 
-const ROLE = {
-  h1: 'heading',
-  h2: 'heading',
-  h3: 'heading',
-  h4: 'heading',
-} satisfies Partial<Record<TextVariant, Role>>;
-
-const ARIA_LEVEL = {
-  h1: '1',
-  h2: '2',
-  h3: '3',
-  h4: '4',
-} satisfies Partial<Record<TextVariant, string>>;
+/**
+ * The heading variants and the accessibility an assistive reader needs to
+ * navigate by them. Role and level travel together in one entry per heading, so
+ * a heading variant cannot take a role without its level (or the reverse), and
+ * the lookup is keyed by `TextVariant`: a heading typo is a type error and a
+ * non-heading variant reads `undefined` without an unchecked key cast.
+ */
+const HEADING_A11Y = new Map<TextVariant, { role: Role; level: string }>([
+  ['h1', { role: 'heading', level: '1' }],
+  ['h2', { role: 'heading', level: '2' }],
+  ['h3', { role: 'heading', level: '3' }],
+  ['h4', { role: 'heading', level: '4' }],
+]);
 
 /**
  * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
@@ -109,6 +109,7 @@ function Text({
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
   const resetsTracking = joinedScript || (isRTL && isRtlScript);
+  const headingA11y = HEADING_A11Y.get(variant ?? 'default');
   const classes = cn(
     textVariants({ variant }),
     variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
@@ -118,8 +119,8 @@ function Text({
   return (
     <Component
       className={isRtlScript ? withoutMonoFamily(classes) : classes}
-      role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
-      aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
+      role={headingA11y?.role}
+      aria-level={headingA11y?.level}
       {...props}
       maxFontSizeMultiplier={fontScaleCap ?? props.maxFontSizeMultiplier}
       style={

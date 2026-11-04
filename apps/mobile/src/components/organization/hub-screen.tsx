@@ -71,11 +71,41 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   }, [organizationIdOverride, org, setOrganizationId]);
 
   const orgWithMembers = useOrgWithMembers(organizationId);
+  // `organizations.list` carries the org's parent link, so the billing group
+  // knows from its first frame whether this org has a Kilo Pass row instead of
+  // adding one a request later and pushing the rows under it down. A device
+  // that persisted the list before that field existed hydrates an entry
+  // without it, and an entry written before an admin moved the organization
+  // under a parent still says `null`, so the membership payload fills the gap
+  // in both directions: a parent id from either payload makes this a child,
+  // because only an admin change moves an organization under a parent after
+  // creation and that id is never the stale side. A `null` confirms a
+  // top-level organization only from the freshly fetched membership payload;
+  // the list's own `null` is a cached value and leaves the link unknown until
+  // membership answers.
+  const listParentLink = org?.parentOrganizationId;
+  const membershipParentLink = orgWithMembers.data?.parent_organization_id;
+  const reportedParentLink = listParentLink ?? membershipParentLink;
+  const topLevelConfirmed = membershipParentLink === null;
+  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
+  // No membership payload and a failed or paused fetch: the payload that would
+  // settle anything waiting on it will not arrive on its own.
+  const membershipUnavailable =
+    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
+  // An unknown link keeps the row: it renders in its loading state instead of
+  // appearing once a payload lands. Only a known child organization, which
+  // carries its parent's id, has no Kilo Pass row.
+  const isChildOrganization = parentLink != null;
+  const showKiloPassRow = isMoneyRole(role) && !isChildOrganization;
   // The summary API is parent-only (`organizationParentBillingProcedure`
-  // rejects child orgs and non-billing roles), so a child org must never fire
-  // it — gate on the loaded membership payload, not just the role.
-  const showKiloPass = isMoneyRole(role) && orgWithMembers.data?.parent_organization_id === null;
-  const kiloPassSummary = useOrgKiloPassSummary(organizationId, showKiloPass);
+  // rejects child orgs and non-billing roles), so it fires only once the
+  // membership payload confirms a top-level organization. A cached list entry
+  // cannot confirm it, because the organization may have moved under a parent
+  // since that entry was written.
+  const kiloPassSummary = useOrgKiloPassSummary(
+    organizationId,
+    isMoneyRole(role) && parentLink === null
+  );
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
@@ -90,26 +120,47 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   }
 
   const showMoney = isMoneyRole(role);
-  const kiloPassRowState = showKiloPass
-    ? getOrgKiloPassRowState({ data: kiloPassSummary.data, isError: kiloPassSummary.isError })
+  // An unknown parent link with no membership arriving is not a state the row
+  // can settle into: it would keep its placeholder forever, so it offers the
+  // retry that asks the membership payload again instead.
+  const kiloPassLinkUnavailable = parentLink === undefined && membershipUnavailable;
+  const kiloPassRowState = showKiloPassRow
+    ? getOrgKiloPassRowState({
+        data: kiloPassSummary.data,
+        isError: kiloPassSummary.isError || kiloPassLinkUnavailable,
+      })
     : null;
   const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
   const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
-  const lowBalanceUnavailable =
-    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  let lowBalanceSubtitle = t('common.loading');
+  // The row shows a placeholder line, not loading copy, until the membership
+  // payload supplies the value: the settled subtitle is one short phrase
+  // ("Off", or the threshold sentence), so an unfinished card must not print an
+  // indefinite sentence in its place.
+  let lowBalanceSubtitle: string | undefined = undefined;
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
       amount: formatMoney(minimumBalance, i18n.language),
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
-  } else if (lowBalanceUnavailable) {
+  } else if (membershipUnavailable) {
     lowBalanceSubtitle = t(
       orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
     );
   }
+  const lowBalanceLoading = orgWithMembers.data == null && !membershipUnavailable;
+  // The row names itself from the state it shows, and the name is set on every
+  // state: a name handed back as `undefined` once the value lands leaves the
+  // Android node announcing the value it had while loading. While loading the
+  // subtitle is a Skeleton with no text, so the name carries the loading state
+  // itself instead of `accessibilityState.busy`, which Android renders as the
+  // node's whole content description and drops the title with it.
+  const lowBalanceRetry = membershipUnavailable ? t('common.retry') : undefined;
+  const lowBalanceDetail = lowBalanceSubtitle ?? t('common.loading');
+  const lowBalanceAccessibilityLabel = lowBalanceRetry
+    ? `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}. ${lowBalanceRetry}`
+    : `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}`;
 
   return (
     <View className="flex-1 bg-background">
@@ -211,6 +262,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                     });
                   }}
                   onRetry={() => {
+                    // While the link is unknown the summary never fired, so the
+                    // retry asks the payload that decides whether it should.
+                    if (kiloPassLinkUnavailable) {
+                      void orgWithMembers.refetch();
+                      return;
+                    }
                     void kiloPassSummary.refetch();
                   }}
                 />
@@ -219,13 +276,19 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
+                subtitlePlaceholder={
+                  lowBalanceLoading ? (
+                    <Skeleton className="mt-0.5 h-4 w-12 rounded bg-muted-soft" />
+                  ) : undefined
+                }
+                accessibilityLabel={lowBalanceAccessibilityLabel}
                 trailing={
-                  lowBalanceUnavailable ? (
+                  membershipUnavailable ? (
                     <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
                   ) : undefined
                 }
                 onPress={() => {
-                  if (lowBalanceUnavailable) {
+                  if (membershipUnavailable) {
                     void orgWithMembers.refetch();
                     return;
                   }

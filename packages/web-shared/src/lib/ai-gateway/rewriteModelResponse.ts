@@ -13,7 +13,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
-import { createVercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 import { after, type NextResponse } from 'next/server';
 import type {
   RequestLogCapture,
@@ -56,10 +55,10 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-export function redactApiRequestLogRequest(request: GatewayRequest): unknown {
+export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
-    return request.body;
+    return { ...request.body };
   }
 
   const redactedByok = Object.fromEntries(
@@ -135,7 +134,7 @@ async function createRequestLogCapture(
         return;
       }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
-        request: JSON.stringify(redactApiRequestLogRequest(request)),
+        request: redactApiRequestLogRequest(request),
         response: responseText,
       });
       const r2UploadError = uploadError?.substring(0, 4000);
@@ -224,8 +223,6 @@ export async function rewriteModelResponse({
     user_byok: userByok,
     custom_llm_pricing: customLlmPricing,
     custom_pricing_config: await getCustomPricingConfig(),
-    captureProviderMetadata:
-      providerId === 'vercel' ? createVercelProviderMetadataCapture() : undefined,
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

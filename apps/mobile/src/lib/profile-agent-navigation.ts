@@ -262,13 +262,33 @@ export function getProfileOverviewPath(
   return `${PROFILE_ROOTS[stack]}/${profileId}${profileContextQuery(options.organizationId, options.openedFrom)}` as Href;
 }
 
+/** The Stack and organization a section route carries. */
+type ProfileSectionContext = {
+  organizationId: string | undefined;
+  stack: ProfileManagementStack;
+};
+
+/**
+ * One section of the profile editor: its route root, the profile, and the
+ * context query that carries the owning organization. The section screens are
+ * siblings under the profile route, so they differ only by `segment`.
+ */
+function profileSectionPath(
+  profileId: string,
+  segment: string,
+  context: ProfileSectionContext
+): Href {
+  const { organizationId, stack } = context;
+  return `${PROFILE_ROOTS[stack]}/${profileId}/${segment}${profileContextQuery(organizationId)}` as Href;
+}
+
 /** The profile editor's Variables tab. */
 export function getProfileVariablesPath(
   profileId: string,
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/variables${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'variables', { organizationId, stack });
 }
 
 /** The profile editor's Setup Commands tab. */
@@ -277,7 +297,7 @@ export function getProfileCommandsPath(
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/commands${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'commands', { organizationId, stack });
 }
 
 /** The profile editor's Slash Commands tab. */
@@ -286,7 +306,7 @@ export function getProfileSlashCommandsPath(
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/slash-commands${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'slash-commands', { organizationId, stack });
 }
 
 /** The profile editor's MCP Servers tab. */
@@ -295,7 +315,7 @@ export function getProfileMcpPath(
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/mcp${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'mcp', { organizationId, stack });
 }
 
 /** The profile editor's Agents tab. */
@@ -304,7 +324,7 @@ export function getProfileAgentsPath(
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/agents${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'agents', { organizationId, stack });
 }
 
 /** The profile editor's Skills tab. */
@@ -313,5 +333,5 @@ export function getProfileSkillsPath(
   organizationId?: string,
   stack: ProfileManagementStack = 'profileTab'
 ): Href {
-  return `${PROFILE_ROOTS[stack]}/${profileId}/skills${profileContextQuery(organizationId)}` as Href;
+  return profileSectionPath(profileId, 'skills', { organizationId, stack });
 }

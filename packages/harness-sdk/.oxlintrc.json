@@ -105,12 +105,6 @@
       }
     },
     {
-      "files": ["src/index.ts"],
-      "rules": {
-        "unicorn/require-module-specifiers": "off"
-      }
-    },
-    {
       "files": [
         "src/plugins/store/node.ts",
         "src/plugins/store/*.test.ts",

@@ -49,14 +49,20 @@ const PREFERENCES_HUB_ROW_TITLES = [
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function renderRow(
-  props: { title?: string; tone?: 'good' | 'warn' | 'danger'; disabled?: boolean } = {}
+  props: {
+    title?: string;
+    tone?: 'good' | 'warn' | 'danger';
+    disabled?: boolean;
+    /** `false` renders the inert row a display-only row is: no Pressable at all. */
+    pressable?: boolean;
+  } = {}
 ) {
   act(() => {
     const element = createElement(ConfigureRow, {
       icon: Globe,
       title: props.title ?? 'General',
       subtitle: 'Transcribe',
-      onPress: () => undefined,
+      ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
     });
@@ -208,5 +214,27 @@ describe('ConfigureRow disabled cue', () => {
       ).props.accessibilityState
     ).toEqual({ disabled: true });
     expect(renderRow().findAllByType('ChevronRight' as never)).toHaveLength(1);
+  });
+
+  // The state belongs to the element that owns the accessible role. The inner
+  // layout View has no role and is never a stop a reader reaches, so a state on
+  // it announces disablement nowhere while making a second copy that can drift
+  // from the Pressable's.
+  it('declares the disabled state once, on the Pressable that owns the role', () => {
+    const root = renderRow({ disabled: true });
+    const withState = root.findAll(node => node.props.accessibilityState !== undefined);
+
+    expect(withState).toHaveLength(1);
+    expect(withState[0]?.type).toBe('Pressable');
+    expect(withState[0]?.props.accessibilityRole).toBe('button');
+  });
+
+  it('declares no interactive state on an inert row', () => {
+    const root = renderRow({ disabled: true, pressable: false });
+
+    // No onPress means no Pressable: the row is one plain View, and it carries
+    // no state of its own to announce from a node a reader never reaches.
+    expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
+    expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
   });
 });

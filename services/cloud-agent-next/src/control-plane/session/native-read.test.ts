@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     ctx: unknown;

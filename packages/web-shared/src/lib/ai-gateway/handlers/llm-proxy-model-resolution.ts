@@ -1,5 +1,4 @@
-import { after } from 'next/server';
-import type { User } from '@kilocode/db';
+import { after, type NextResponse } from 'next/server';
 import {
   AUTO_DECISION_HEADER,
   customRouterModelId,
@@ -48,7 +47,6 @@ import {
   autoRoutingUnavailableResponse,
   customRouterErrorResponse,
   invalidAutoDecisionResponse,
-  invalidTokenResponse,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   paidModelAuthRequiredResponse,
@@ -57,19 +55,22 @@ import {
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
-import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type {
+  GatewayCaller,
+  gatewayUsageContextBase,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type {
   LlmProxyRequestHeaders,
   ValidatedGatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 
 type AutoRoutingFailure =
-  | { kind: 'invalid_token' }
+  | { kind: 'caller_rejected'; response: NextResponse }
   | { kind: 'auth_required' }
   | { kind: 'decision_secret_missing' }
   | { kind: 'invalid_auto_decision'; reason: AutoDecisionRejection }
@@ -113,7 +114,7 @@ type ModelResolutionContext = {
   headers: LlmProxyRequestHeaders;
   providerHints: ReturnType<typeof redactProviderHints>;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
-  authPromise: ReturnType<typeof getUserFromAuth>;
+  callerPromise: Promise<GatewayCaller>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
 };
@@ -131,12 +132,13 @@ function rejected(
 // Custom routers and signed CLI decisions bill an account, so they never fall through to
 // anonymous handling.
 async function authenticatedRoutingCaller(
-  authPromise: ModelResolutionContext['authPromise']
+  callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<{ caller: RoutingCaller } | { failure: AutoRoutingFailure }> {
-  const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
-  if (authFailedResponse && credentialsRejected) return { failure: { kind: 'invalid_token' } };
-  if (!user || authFailedResponse) return { failure: { kind: 'auth_required' } };
-  return { caller: { userId: user.id, organizationId: organizationId ?? null } };
+  const caller = await callerPromise;
+  if (caller.kind === 'rejected')
+    return { failure: { kind: 'caller_rejected', response: caller.response } };
+  if (caller.kind === 'anonymous') return { failure: { kind: 'auth_required' } };
+  return { caller: { userId: caller.user.id, organizationId: caller.organizationId ?? null } };
 }
 
 async function autoRoutingDenials(
@@ -172,7 +174,7 @@ async function resolveSignedDecision(
   ctx: ModelResolutionContext,
   token: string
 ): Promise<ModelResolution> {
-  const auth = await authenticatedRoutingCaller(ctx.authPromise);
+  const auth = await authenticatedRoutingCaller(ctx.callerPromise);
   if ('failure' in auth) return rejected(auth.failure);
   if (!AUTO_ROUTING_DECISION_SECRET) {
     console.error(`${AUTO_DECISION_HEADER} received but AUTO_ROUTING_DECISION_SECRET is unset`);
@@ -205,7 +207,7 @@ async function resolveAutoModelId(
 ): Promise<ModelResolution> {
   const requestedModel = ctx.request.body.model;
   if (isCustomRouterModelId(autoModel)) {
-    const auth = await authenticatedRoutingCaller(ctx.authPromise);
+    const auth = await authenticatedRoutingCaller(ctx.callerPromise);
     if ('failure' in auth) return rejected(auth.failure, autoModel);
   }
   const isAutoEfficientId =
@@ -214,11 +216,11 @@ async function resolveAutoModelId(
   let classifierCostUsd = 0;
 
   const decisionForRouter = async (router: AutoRouter) => {
-    const { user, authFailedResponse, organizationId } = await ctx.authPromise;
+    const caller = await ctx.callerPromise;
     // The classifier uses Kilo's paid credential. Unauthenticated callers
     // must never spend classification without a user to attribute it to.
-    if (!user || authFailedResponse) return null;
-    const owner = { userId: user.id, organizationId: organizationId ?? null };
+    if (caller.kind !== 'signed-in') return null;
+    const owner = { userId: caller.user.id, organizationId: caller.organizationId ?? null };
     const deniedModelIds = await autoRoutingDenials(
       ctx,
       policy => collectDeniedAutoRoutingModelIds(policy, router),
@@ -234,7 +236,7 @@ async function resolveAutoModelId(
     return result?.decision ?? null;
   };
   const customRouterDecision = async (reference: CustomRouterReference) => {
-    const auth = await authenticatedRoutingCaller(ctx.authPromise);
+    const auth = await authenticatedRoutingCaller(ctx.callerPromise);
     if ('failure' in auth) {
       return {
         kind: 'rejected',
@@ -282,8 +284,12 @@ async function resolveAutoModelId(
           ? () => decisionForRouter('frontier')
           : undefined,
       customRouterDecision,
-      organizationContext: Promise.all([ctx.authPromise, ctx.balanceAndSettingsPromise]).then(
-        ([auth, { settings, plan }]) => ({ organizationId: auth.organizationId, settings, plan })
+      organizationContext: Promise.all([ctx.callerPromise, ctx.balanceAndSettingsPromise]).then(
+        ([caller, { settings, plan }]) => ({
+          organizationId: caller.kind === 'signed-in' ? caller.organizationId : undefined,
+          settings,
+          plan,
+        })
       ),
       isAutoFreeCandidateAllowed: async modelId => {
         const policy = await ctx.organizationGroupPolicyPromise;
@@ -291,7 +297,7 @@ async function resolveAutoModelId(
       },
     },
     ctx.request,
-    ctx.authPromise.then(res => res.user),
+    ctx.callerPromise.then(caller => (caller.kind === 'signed-in' ? caller.user : null)),
     ctx.balanceAndSettingsPromise.then(res => res.balance)
   );
   switch (result.kind) {
@@ -329,14 +335,14 @@ async function resolveAutoModelId(
  */
 async function catalogModeModelForRoutedModel(
   model: string,
-  authPromise: ModelResolutionContext['authPromise']
+  callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
   const { provider } = await getDirectByokModel(model.toLowerCase());
   if (!provider || !supportsCatalogMode(provider.id)) return null;
-  const { user, authFailedResponse, organizationId } = await authPromise;
-  if (!user || authFailedResponse) return null;
+  const caller = await callerPromise;
+  if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(user.id, organizationId)
+    byokOwner(caller.user.id, caller.organizationId)
   );
   const resolved = await resolveReference(model);
   return resolved === model ? null : resolved;
@@ -359,7 +365,7 @@ export async function resolveModel(ctx: ModelResolutionContext): Promise<ModelRe
     // the catalog id then goes through the organization policy check.
     const catalogModelId = await catalogModeModelForRoutedModel(
       ctx.request.body.model,
-      ctx.authPromise
+      ctx.callerPromise
     );
     if (catalogModelId) ctx.request.body.model = catalogModelId;
   }
@@ -368,8 +374,8 @@ export async function resolveModel(ctx: ModelResolutionContext): Promise<ModelRe
 
 export function autoRoutingFailureResponse(failure: AutoRoutingFailure, requestedModel: string) {
   switch (failure.kind) {
-    case 'invalid_token':
-      return invalidTokenResponse();
+    case 'caller_rejected':
+      return failure.response;
     case 'auth_required':
       return paidModelAuthRequiredResponse();
     case 'decision_secret_missing':
@@ -391,26 +397,13 @@ export function autoRoutingFailureResponse(failure: AutoRoutingFailure, requeste
  * New workers persist classifier usage themselves and return zero. Retain positive-cost billing
  * only for workers still running the previous protocol.
  */
-export function billLegacyClassifierCost(params: {
-  resolution: ModelResolution;
-  user: User;
-  usage: Pick<
-    MicrodollarUsageContext,
-    | 'api_kind'
-    | 'fraudHeaders'
-    | 'organizationId'
-    | 'requested_model'
-    | 'project_id'
-    | 'botId'
-    | 'tokenSource'
-    | 'feature'
-  >;
-  headers: LlmProxyRequestHeaders;
-}): void {
-  const { resolution, user, usage, headers } = params;
+export function billLegacyClassifierCost(
+  resolution: ModelResolution,
+  usage: ReturnType<typeof gatewayUsageContextBase>['context'] &
+    Pick<MicrodollarUsageContext, 'api_kind' | 'requested_model' | 'feature' | 'clientRequestId'>
+): void {
   if (resolution.kind === 'direct' || !(resolution.classifierCostUsd > 0)) return;
   const costMicrodollars = toMicrodollars(resolution.classifierCostUsd);
-  const priorMicrodollarUsage = user.microdollars_used;
   after(
     (async () => {
       try {
@@ -438,20 +431,14 @@ export function billLegacyClassifierCost(params: {
           },
           {
             ...usage,
-            kiloUserId: user.id,
             provider: 'openrouter',
             is_free: false,
-            custom_llm_pricing: null,
             promptInfo: {
               system_prompt_prefix: '',
               system_prompt_length: 0,
               user_prompt_prefix: '',
             },
-            max_tokens: null,
-            has_middle_out_transform: null,
-            reasoning_setting: null,
             isStreaming: false,
-            prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
             // the generic first_usage / first_microdollar_usage lifecycle
             // events (those are gated on posthog_distinct_id in processUsage).
@@ -460,15 +447,9 @@ export function billLegacyClassifierCost(params: {
             // DB billing is unaffected — it keys on kiloUserId.
             posthog_distinct_id: undefined,
             status_code: 200,
-            editor_name: headers.editorName,
-            machine_id: headers.machineId,
             user_byok: false,
             has_tools: false,
-            session_id: headers.sessionId,
-            mode: headers.mode,
             auto_model: resolution.autoModel,
-            ttfb_ms: null,
-            clientRequestId: headers.clientRequestId,
           }
         );
       } catch (error) {

@@ -7,8 +7,6 @@ import {
 } from '../../shared/sandbox-status.js';
 import { createControlPlaneTerminals } from './terminals.js';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
-
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 const DIRECTORY = '/workspace/terminal';

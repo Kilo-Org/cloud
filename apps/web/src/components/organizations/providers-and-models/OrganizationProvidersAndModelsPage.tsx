@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  useOrganizationAvailableModels,
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
@@ -44,6 +43,9 @@ import { getOfferingPricing } from '@/components/organizations/providers-and-mod
 import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
 import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { GatewaysTab } from '@/components/organizations/providers-and-models/GatewaysTab';
 
 type Props = {
   organizationId: string;
@@ -99,16 +101,21 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const availableModels = useOrganizationAvailableModels(organizationId, {
-    enabled: organizationData?.plan === 'enterprise',
-  });
+  const trpc = useTRPC();
+  const { data: gatewaySettings } = useQuery(
+    trpc.organizations.settings.getGatewaySettings.queryOptions(
+      { organizationId },
+      { enabled: organizationData?.plan === 'enterprise' }
+    )
+  );
+  const showGatewaysTab = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,
     isLoading: isOpenRouterLoading,
   } = useOpenRouterModelsAndProviders();
 
-  const { state, actions, selectors } = useProvidersAndModelsAllowListsState({
+  const { state, actions, selectors, dispatch } = useProvidersAndModelsAllowListsState({
     openRouterModels,
     openRouterProviders,
   });
@@ -487,6 +494,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
+            {showGatewaysTab && <TabsTrigger value="gateways">Gateways</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -494,17 +502,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               isLoading={isLoading}
               canEdit={canEdit}
               search={state.modelSearch}
-              selectedOnly={state.modelSelectedOnly}
+              enabledOnly={state.modelSelectedOnly}
               onSearchChange={actions.setModelSearch}
-              onSelectedOnlyChange={actions.setModelSelectedOnly}
+              onEnabledOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
-              availableModelCount={
-                availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
-              }
               enabledProviderSlugs={enabledProviderSlugs}
               byokOnlyProviderSlugs={byokOnlyProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
+              onSetModelsAllowed={(modelIds, nextAllowed) => {
+                if (canEdit) dispatch({ type: 'SET_MODELS_ALLOWED', modelIds, nextAllowed });
+              }}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>
@@ -528,6 +536,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
+              onSetProvidersEnabled={(providerSlugs, nextEnabled) => {
+                if (canEdit)
+                  dispatch({ type: 'SET_PROVIDERS_ENABLED', providerSlugs, nextEnabled });
+              }}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>
@@ -540,6 +552,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
+
+          {showGatewaysTab && (
+            <TabsContent value="gateways" className="mt-6">
+              <GatewaysTab
+                organizationId={organizationId}
+                canEdit={canEdit}
+                settings={gatewaySettings}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
         <ModelDetailsDialog

@@ -415,19 +415,25 @@ export function getFindingLifecycleStatusPresentation(finding: SecurityFinding):
   return { label: finding.status, tone: 'neutral' };
 }
 
-const DISMISSAL_REASON_LABELS: Record<string, string> = {
+const DISMISSAL_REASON_LABELS = {
   fix_started: 'a fix has already started',
   no_bandwidth: 'no bandwidth is available',
   tolerable_risk: 'the risk is tolerable',
   inaccurate: 'the finding is inaccurate',
   not_used: 'vulnerable code is not used',
-};
+} as const;
+
+type DismissalReason = keyof typeof DISMISSAL_REASON_LABELS;
 
 export function getDismissalReasonLabel(reason: string | null): string {
   if (!reason) {
     return 'after review';
   }
-  return DISMISSAL_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
+  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
+  // through to the humanized code instead of leaking prototype members.
+  return Object.hasOwn(DISMISSAL_REASON_LABELS, reason)
+    ? DISMISSAL_REASON_LABELS[reason as DismissalReason]
+    : reason.replaceAll('_', ' ');
 }
 
 export function getFindingSourceLabel(source: string): string {

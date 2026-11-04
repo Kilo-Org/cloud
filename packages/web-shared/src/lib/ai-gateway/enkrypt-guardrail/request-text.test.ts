@@ -1,10 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { extractRequestText as extractWithScope } from './request-text';
+import { extractRequestSegments, joinRequestSegments } from './request-text';
 
 function request(kind: GatewayRequest['kind'], body: Record<string, unknown>): GatewayRequest {
   const defaults = kind === 'responses' ? {} : { messages: [] };
   return { kind, body: { model: 'test/model', ...defaults, ...body } } as GatewayRequest;
+}
+
+function extractWithScope(gatewayRequest: GatewayRequest, scope: { includeToolResults: boolean }) {
+  return joinRequestSegments(extractRequestSegments(gatewayRequest, scope));
 }
 
 function extractRequestText(gatewayRequest: GatewayRequest) {
@@ -868,7 +872,67 @@ describe('tool definitions and output formats', () => {
       })
     );
 
-    expect(text).toBe('visible text\n\nvisible server description');
+    expect(text).toBe('visible server description\n\nvisible text');
+  });
+});
+
+describe('extractRequestSegments', () => {
+  const tool = { type: 'function', function: { name: 'read', parameters: { type: 'object' } } };
+
+  it('puts definitions before the conversation and splits at message boundaries', () => {
+    expect(
+      extractRequestSegments(
+        request('chat_completions', {
+          messages: [
+            { role: 'system', content: 'system prompt' },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'first' },
+                { type: 'text', text: 'second' },
+              ],
+            },
+            { role: 'assistant', content: null, tool_calls: [] },
+            { role: 'tool', tool_call_id: 'call_1', content: 'tool output' },
+          ],
+          tools: [tool],
+          response_format: { type: 'json_schema', json_schema: { name: 'answer' } },
+        }),
+        { includeToolResults: false }
+      )
+    ).toEqual(['read\n\n{"type":"object"}', 'answer', 'system prompt', 'first\n\nsecond']);
+  });
+
+  it('keeps earlier segments unchanged when the conversation grows', () => {
+    const messages = [
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'hi' },
+    ];
+    const scope = { includeToolResults: true };
+    const before = extractRequestSegments(
+      request('chat_completions', { messages, tools: [tool] }),
+      scope
+    );
+    const after = extractRequestSegments(
+      request('chat_completions', {
+        messages: [...messages, { role: 'user', content: 'next' }],
+        tools: [tool],
+      }),
+      scope
+    );
+
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(after.slice(before.length)).toEqual(['next']);
+  });
+
+  it.each([
+    ['messages', { system: 'system prompt', messages: [{ role: 'user', content: 'hello' }] }],
+    ['responses', { instructions: 'system prompt', input: 'hello' }],
+  ] as const)('orders %s system instructions before the conversation', (kind, body) => {
+    expect(extractRequestSegments(request(kind, body), { includeToolResults: true })).toEqual([
+      'system prompt',
+      'hello',
+    ]);
   });
 });
 

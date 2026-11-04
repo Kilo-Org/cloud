@@ -65,6 +65,7 @@ export type SecureProxyRoute = {
 
 export type Provider = {
   type: ProviderType;
+  inferenceProviderId?: string;
   /**
    * The ChatGPT connection that serves this provider. Set only on the delegated
    * "Sign in with ChatGPT" route, and it names the exact connection that paid

@@ -40,7 +40,7 @@ export const REVIEW_PAGE_SIZE = 50;
  */
 export const REVIEW_LIST_MAX_PAGES = 10;
 
-/** Poll cadence for page one while a review on it is still running. */
+/** Poll cadence for a running review: the page-one probe and the review detail screen. */
 const REVIEW_POLL_INTERVAL_MS = 5000;
 
 /**
@@ -369,7 +369,7 @@ export function useReviewDetail(reviewId: string) {
       if (!data?.success) {
         return false;
       }
-      return isInFlightReviewStatus(data.review.status) ? 5000 : false;
+      return isInFlightReviewStatus(data.review.status) ? REVIEW_POLL_INTERVAL_MS : false;
     },
   });
 }
@@ -377,9 +377,7 @@ export function useReviewDetail(reviewId: string) {
 function useInvalidateReviews(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const listQueryKey = isPersonal(scope)
-    ? trpc.codeReviews.listForUser.queryKey()
-    : trpc.codeReviews.listForOrganization.queryKey({ organizationId: scope });
+  const listQueryKey = buildReviewListQueryKey(trpc, scope);
   return (reviewId?: string) => {
     void queryClient.invalidateQueries({ queryKey: listQueryKey });
     if (reviewId) {

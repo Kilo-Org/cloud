@@ -22,7 +22,7 @@ import type {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -91,7 +91,7 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
     },
     lifecycle: { version: 1, timestamp: 1 },
@@ -143,7 +143,7 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -257,7 +257,7 @@ async function startSessionWithSandbox(input: {
       worktreeId: input.worktreeId,
     }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(input.provider.launchEnvs).toHaveLength(1));
   return sessionStub;
@@ -358,7 +358,7 @@ describe('control-plane worktree changes (B10)', () => {
       await sandbox.deleteWorktreeResources({
         worktreeId,
         kiloUserId: USER_ID,
-        location: { sandboxId, provider: 'cloudflare' },
+        location: { sandboxId, provider: 'cloudflare-containers' },
         sessionIds: [context.session.kiloSessionId],
       });
       await read();
@@ -680,7 +680,10 @@ describe('control-plane worktree changes (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
-    await sandbox.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await sandbox.ensureAllocation({
+      provider: 'cloudflare-containers',
+      allocationName: sandboxId,
+    });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_concurrent');
     const context = worktreeChangesContext(
@@ -1011,7 +1014,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_b10');
 
@@ -1035,7 +1038,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
     await expect(
@@ -1055,7 +1058,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_queue');
 
@@ -1082,7 +1085,7 @@ describe('control-plane worktree changes (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_close');
 
@@ -1111,7 +1114,7 @@ describe('control-plane worktree changes (B10)', () => {
     await runInDurableObject(stub, instance => {
       instance.controlRequestTimeoutMs = 25;
     });
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_timeout');
 
@@ -1328,7 +1331,7 @@ describe('control-plane worktree changes (B10)', () => {
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_child');
@@ -1360,7 +1363,7 @@ describe('control-plane worktree changes (B10)', () => {
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const wrapper = await connectAndHello(provider, sandboxId, 'wr_hooks');

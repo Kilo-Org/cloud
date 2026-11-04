@@ -18,7 +18,7 @@ import type {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -68,7 +68,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/b10t',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -116,7 +116,7 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -189,7 +189,7 @@ async function startTerminalSandbox(): Promise<{
   const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
   const provider = createFakeProvider();
   const stub = await injectProvider(sandboxId, provider);
-  await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+  await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId, WRAPPER_ID);
   return { sandboxId, stub, provider, wrapper };
@@ -269,7 +269,7 @@ describe('control-plane terminals on the Sandbox DO (B10)', () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
     await expect(
@@ -368,7 +368,7 @@ async function startTerminalSession(): Promise<{
   await sessionStub.createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId, WRAPPER_ID);
@@ -452,7 +452,7 @@ describe('control-plane terminals on the Session DO (B10)', () => {
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 

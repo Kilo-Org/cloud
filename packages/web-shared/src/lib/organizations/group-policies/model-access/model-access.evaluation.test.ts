@@ -5,14 +5,14 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
-import type { OrganizationGroupModelAccessPolicy } from './group-policies/organization-group-policies';
+import type { OrganizationGroupPolicyContext } from '../../organization-group-policy-context.server';
+import type { OrganizationGroupModelAccessPolicy } from '../organization-group-policies';
 import {
   allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
-} from './effective-model-access.server';
+} from './model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 

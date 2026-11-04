@@ -140,6 +140,7 @@ ordinary local startup does not require this credential.
 - `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
+- Native (mobile) sign-in rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `native-token-address` counts token exchanges per caller address before the admission gate; `native-token-user` counts them per account after it. Both belong in that configuration, and `apps/web/src/lib/auth/native-token-rate-limit.ts` reports a rule that is not configured at most once a minute. The address rule must answer: when it is absent, the exchange is refused before any provider call.
 - Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` sends a magic link or sign-in code only when both rules answer that the caller may proceed; an unconfigured or unevaluable rule refuses the send and is reported to Sentry at most once a minute, so both rules are required configuration.
 
 ### Social OAuth Clients
@@ -459,7 +460,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
-- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; Vercel objects use `vercel/<generation_id>.json` and gateway routing decisions use `kilo/<microdollar_usage id>.json`. [SERVER]
+- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; `<microdollar_usage id>.json` contains the version-1 gateway routing decision, optional `vercel: { metadata }`, and optional `enkrypt` (the organization's input guardrail settings and scan steps, without prompt text). [SERVER]
 - `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID` - Dedicated R2 access key ID for the AI provider metadata bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID`. `[SECRET]`
 
@@ -513,7 +514,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Cloud Agent Services
 
-- `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `false`. Existing sessions retain their persisted containment flags. [SERVER]
+- `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `true`. Existing sessions retain their persisted containment flags. Retired non-contained sessions must use a new session. [SERVER]
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
@@ -556,8 +557,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Other Services
 
-- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]
-- `DOCKER_PROXY_SOCKET` - Path to the Docker privileged proxy socket. [SERVER]
+- `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
 
 ## Browser Extension (apps/extension)

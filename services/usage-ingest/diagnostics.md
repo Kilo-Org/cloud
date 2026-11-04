@@ -1,22 +1,29 @@
 # Queue delivery diagnostics
 
-`USAGE_INGEST_DIAGNOSTICS=all` enables 100% diagnostic logging on the staging
-publisher/consumer. No random sampling is applied in this mode: each valid test
-usage ID can join across stages. Otherwise ingress logs 1% of successful sends,
-all sends taking at least 1,000 ms, and all failed sends. One percent provides a
-modest baseline while limiting normal log volume; one second highlights a sizable
-publication delay. These records contain only the validated usage ID, outcome and
-monotonic send duration. Failures and slow sends are not volume capped. Existing
-processing outcome logs remain enabled, including `queue` for old/EU filters.
-Disable diagnostic settings after the investigation to reduce log volume.
+Diagnostics are always on. The publisher logs enqueue start plus every accepted
+or unavailable result; the consumer logs every handler entry and repeats the same
+batch identity and handler-entry time on every processing outcome. No random
+sampling applies to these records: each valid test usage ID can join across
+stages. Existing processing outcome logs remain enabled, including `queue` for
+old/EU filters.
+
+The independent phase sampling described in the service README under
+[Processing](README.md#processing) still applies only to the
+`handler_entry_queue_age_ms` and `slot_wait_ms` fields on processing
+outcomes; it does not gate the diagnostics above.
+
+These records are emitted for 100% of valid publisher requests and deliveries in
+every environment, including production. That is more log volume than the
+previous production publisher path, which logged only sampled, slow, or failed
+sends. There is no runtime flag to reduce it; any reduction requires a code change
+or an explicit Workers Logs sampling configuration.
 
 | Event | Fields and boundary |
 |---|---|
 | `usage_ingest_enqueue_start` | Validated `usage_id`, `publisher_entry_at_ms`, `before_send_at_ms`; emitted before the existing single send |
-| `usage_ingest_enqueue` (non-`all`) | Validated `usage_id`, `accepted` / `unavailable` outcome, monotonic `send_duration_ms` |
-| `usage_ingest_enqueue` (`all`) | Validated `usage_id`, `accepted` / `unavailable` outcome, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
+| `usage_ingest_enqueue` | Validated `usage_id`, `accepted` / `unavailable` outcome, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
 | `usage_ingest_handler_entry` | `queue`, local invocation `batch_id`, actual `batch_size`, handler entry and per-message start epochs, queue message ID/timestamp, attempts, validated usage ID/event timestamp, optional batch backlog sample; emitted before that message's writer call |
-| `usage_ingest_processing` | Existing per-message writer duration/outcome/disposition plus `queue` and, when enabled, the same batch identity and handler entry |
+| `usage_ingest_processing` | Existing per-message writer duration/outcome/disposition plus `queue`, the same batch identity and handler entry |
 
 Times ending `_at_ms` and `message_timestamp_ms` are epoch milliseconds. Elapsed
 send/writer durations use `performance.now()`. `batch_id` is local
@@ -56,7 +63,7 @@ existing response validation and overload failure still determine disposition.
    these logs. Hosted timing/placement and performance benefits remain unmeasured.
 
 Merge order is diagnostics → EU queue → batching → middleware. EU/batching config
-refreshes must preserve staging diagnostic vars and generated types, plus `queue`
-in outcome logs and the shared handler-entry timestamp/batch identity. Rerun the
+refreshes must preserve the always-on diagnostics, generated types, `queue` in
+outcome logs and the shared handler-entry timestamp/batch identity. Rerun the
 combined runtime tests after composition; this PR changes no queue names, batch,
 delay, retry/DLQ, concurrency or early-ACK policy.

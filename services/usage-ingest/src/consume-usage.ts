@@ -18,12 +18,7 @@ function sampleDelivery(messageId: string, attempts: number): boolean {
 
 type Diagnostics = { batch_size: number; handler_entry_at_ms: number };
 
-function diagnosticFields(
-  env: Env,
-  entryAtMs: number,
-  batch: MessageBatch<unknown>
-): Diagnostics | undefined {
-  if (env.USAGE_INGEST_DIAGNOSTICS !== 'all') return undefined;
+function diagnosticFields(entryAtMs: number, batch: MessageBatch<unknown>): Diagnostics {
   return { batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs };
 }
 
@@ -38,8 +33,8 @@ async function processQueue(
   startedAtMs: number
 ): Promise<void> {
   const lastLaunchAtMs = startedAtMs + INVOCATION_BUDGET_MS - MIN_LAUNCH_REMAINING_MS;
-  const diagnostics = diagnosticFields(env, entryAtMs, batch);
-  const batchId = diagnostics === undefined ? undefined : crypto.randomUUID();
+  const diagnostics = diagnosticFields(entryAtMs, batch);
+  const batchId = crypto.randomUUID();
   const parallelism = env.USAGE_INGEST_PARALLELISM === '2' ? 2 : 1;
   let nextIndex = 0;
   let writerOverloaded = false;
@@ -95,8 +90,8 @@ async function processMessage(
   message: Message<unknown>,
   env: Env,
   batch: MessageBatch<unknown>,
-  diagnostics: Diagnostics | undefined,
-  batchId: string | undefined,
+  diagnostics: Diagnostics,
+  batchId: string,
   lastLaunchAtMs: number,
   entryAtMs: number,
   startedAtMs: number
@@ -106,24 +101,23 @@ async function processMessage(
   const queueWaitMs = Math.max(0, Date.now() - timestampMs);
   const handlerEntryQueueAgeMs = Math.max(0, entryAtMs - timestampMs);
   const parsed = UsageRecordRequestSchema.safeParse(message.body);
-  if (diagnostics !== undefined)
-    logSafely('info', () => ({
-      event: 'usage_ingest_handler_entry',
-      queue: batch.queue,
-      batch_id: batchId,
-      ...diagnostics,
-      message_start_at_ms: Date.now(),
-      queue_message_id: message.id,
-      message_timestamp_ms: message.timestamp.getTime(),
-      delivery_attempts: message.attempts,
-      ...(parsed.success
-        ? {
-            usage_id: parsed.data.core.id,
-            event_created_at_ms: Date.parse(parsed.data.core.created_at),
-          }
-        : {}),
-      ...queueMetrics(batch),
-    }));
+  logSafely('info', () => ({
+    event: 'usage_ingest_handler_entry',
+    queue: batch.queue,
+    batch_id: batchId,
+    ...diagnostics,
+    message_start_at_ms: Date.now(),
+    queue_message_id: message.id,
+    message_timestamp_ms: message.timestamp.getTime(),
+    delivery_attempts: message.attempts,
+    ...(parsed.success
+      ? {
+          usage_id: parsed.data.core.id,
+          event_created_at_ms: Date.parse(parsed.data.core.created_at),
+        }
+      : {}),
+    ...queueMetrics(batch),
+  }));
   let outcome:
     | UsageWriteOutcome
     | { kind: 'unavailable'; reason: 'invalid_event' | 'invocation_budget' };
@@ -161,7 +155,8 @@ async function processMessage(
   logSafely(level, () => ({
     event: 'usage_ingest_processing',
     queue: batch.queue,
-    ...(diagnostics === undefined ? {} : { batch_id: batchId, ...diagnostics }),
+    batch_id: batchId,
+    ...diagnostics,
     outcome: outcome.kind,
     ...('reason' in outcome ? { reason: outcome.reason } : {}),
     queue_action: acknowledged ? 'ack' : 'retry',

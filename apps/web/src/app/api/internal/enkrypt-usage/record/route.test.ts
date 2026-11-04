@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { enkrypt_usage, organizations } from '@kilocode/db/schema';
+import { enkrypt_usage, enkrypt_usage_guardrail, organizations } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
@@ -39,6 +39,7 @@ async function usageWriteForNewOrganization(): Promise<EnkryptUsageWrite> {
     decision: 'blocked',
     creditsCost: 7,
     addedLatencyMs: 212,
+    guardrail: 'output',
   };
 }
 
@@ -56,7 +57,15 @@ function post(
 }
 
 async function ledgerRows(organizationId: string) {
-  return db.select().from(enkrypt_usage).where(eq(enkrypt_usage.organization_id, organizationId));
+  const rows = await db
+    .select({ row: enkrypt_usage, guardrail: enkrypt_usage_guardrail.guardrail })
+    .from(enkrypt_usage)
+    .leftJoin(
+      enkrypt_usage_guardrail,
+      eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+    )
+    .where(eq(enkrypt_usage.organization_id, organizationId));
+  return rows.map(({ row, guardrail }) => ({ ...row, guardrail }));
 }
 
 async function microdollarsUsed(organizationId: string) {
@@ -84,6 +93,7 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     ['a body that is not JSON', () => 'not json'],
     ['a non-UUID id', (write: EnkryptUsageWrite) => ({ ...write, id: 'usage-1' })],
     ['an unknown decision', (write: EnkryptUsageWrite) => ({ ...write, decision: 'maybe' })],
+    ['an unknown guardrail', (write: EnkryptUsageWrite) => ({ ...write, guardrail: 'both' })],
     ['negative credits', (write: EnkryptUsageWrite) => ({ ...write, creditsCost: -1 })],
     [
       'credits above the per-call maximum',
@@ -120,11 +130,23 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
+        guardrail: 'output',
       }),
     ]);
     expect(await microdollarsUsed(usageWrite.organizationId)).toBe(
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
+  });
+
+  test('records a write from a gateway that does not send the guardrail as an input call', async () => {
+    const { guardrail: _guardrail, ...usageWrite } = await usageWriteForNewOrganization();
+
+    const response = await post(usageWrite);
+
+    expect(response.status).toBe(200);
+    expect(await ledgerRows(usageWrite.organizationId)).toEqual([
+      expect.objectContaining({ id: usageWrite.id, guardrail: 'input' }),
+    ]);
   });
 
   test('reports a failed write without logging query parameters', async () => {

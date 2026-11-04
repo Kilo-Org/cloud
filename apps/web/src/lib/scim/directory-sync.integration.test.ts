@@ -11,6 +11,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
+import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { createOrUpdateUser } from '@/lib/user';
 
 // Stripe is not reachable in tests (`.env.test` sets a deliberately invalid
@@ -250,6 +251,53 @@ describe('upsertDirectoryOrganization', () => {
       .from(organizations)
       .where(eq(organizations.id, organizationId));
     expect(row.ssoDomain).toBe(domain);
+  });
+
+  test('a reordered or extended domain list does not move a captured domain', async () => {
+    const primary = `acme-${suffix}.test`;
+    const secondary = `subsidiary-${suffix}.test`;
+
+    const organizationId = trackOrganization(
+      (
+        await upsertDirectoryOrganization(directoryId, {
+          workOSOrganizationId,
+          name: `SCIM Org ${suffix}`,
+          capturedDomains: [primary],
+        })
+      ).id
+    );
+
+    // `data.domains[]` promises no order, and `sso_domain` decides who must
+    // authenticate through SSO and which addresses a takeover may claim, so a
+    // later activation listing the domains differently must not shift it.
+    await upsertDirectoryOrganization(directoryId, {
+      workOSOrganizationId,
+      name: `SCIM Org ${suffix}`,
+      capturedDomains: [secondary, primary],
+    });
+
+    const [row] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(row.ssoDomain).toBe(primary);
+
+    // And a domain the administrator set is never replaced either.
+    await db
+      .update(organizations)
+      .set({ sso_domain: `admin-${suffix}.test` })
+      .where(eq(organizations.id, organizationId));
+    await upsertDirectoryOrganization(directoryId, {
+      workOSOrganizationId,
+      name: `SCIM Org ${suffix}`,
+      capturedDomains: [secondary],
+    });
+
+    const [afterAdmin] = await db
+      .select({ ssoDomain: organizations.sso_domain })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(afterAdmin.ssoDomain).toBe(`admin-${suffix}.test`);
   });
 });
 
@@ -515,6 +563,141 @@ describe('upsertDirectoryUser', () => {
       })
     ).rejects.toThrow(DirectorySyncConflictError);
   });
+
+  test('takes over a case-variant address without creating a second account', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
+
+    // Stored with capitals; the directory delivers the same mailbox lowercased.
+    const storedEmail = `Holder.${suffix}@${domain}`;
+    const priorHolder = await createOrUpdateUser(
+      {
+        google_user_email: storedEmail,
+        google_user_name: 'Prior Holder',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google',
+        provider_account_id: `google_${suffix}`,
+      },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { skipSignupAdmission: true }
+    );
+    if (!priorHolder.success) throw new Error(`setup failed: ${priorHolder.error}`);
+    createdUserIds.push(priorHolder.user.id);
+
+    const taken = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: storedEmail.toLowerCase(),
+      firstName: 'Prior',
+      lastName: 'Holder',
+      idpId: `idp_${suffix}`,
+    });
+
+    // The gate resolves the mailbox case-insensitively, so the conversion must
+    // settle that same row rather than miss it on an exact-address match and
+    // fall through to an insert.
+    expect(taken.id).toBe(priorHolder.user.id);
+
+    const forMailbox = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.normalized_email, storedEmail.toLowerCase()));
+    expect(forMailbox).toHaveLength(1);
+
+    const providers = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, taken.id));
+    expect(providers.map(provider => provider.provider)).toEqual(['workos']);
+  });
+
+  test('refuses to rebind an account that already belongs to another directory user', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
+
+    const sharedEmail = `shared-${suffix}@${domain}`;
+    const first = await upsertDirectoryUser(`directory_user_A_${suffix}`, {
+      directoryId,
+      email: sharedEmail,
+      firstName: 'Shared',
+      lastName: 'Person',
+      idpId: `idp_a_${suffix}`,
+    });
+    createdUserIds.push(first.id);
+
+    // A second directory user claiming the same mailbox must not silently take
+    // the binding: events for the first identifier would then resolve to no
+    // user, which the removal routes report as converged rather than failing.
+    await expect(
+      upsertDirectoryUser(`directory_user_B_${suffix}`, {
+        directoryId,
+        email: sharedEmail,
+        firstName: 'Shared',
+        lastName: 'Person',
+        idpId: `idp_b_${suffix}`,
+      })
+    ).rejects.toThrow(DirectorySyncConflictError);
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, first.id));
+    expect(row.external_id).toBe(`directory_user_A_${suffix}`);
+  });
+
+  test('keeps the refused address out of the error it returns', async () => {
+    const organizationId = await seedOrganization();
+    await db
+      .update(organizations)
+      .set({ sso_domain: `captured-${suffix}.test` })
+      .where(eq(organizations.id, organizationId));
+
+    const foreignEmail = `holder-${suffix}@unrelated-${suffix}.test`;
+    const priorHolder = await createOrUpdateUser(
+      {
+        google_user_email: foreignEmail,
+        google_user_name: 'Unrelated Person',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google',
+        provider_account_id: `google_${suffix}`,
+      },
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { skipSignupAdmission: true }
+    );
+    if (!priorHolder.success) throw new Error(`setup failed: ${priorHolder.error}`);
+    createdUserIds.push(priorHolder.user.id);
+
+    // The message is returned in the 409 body and logged again by
+    // `directorySyncErrorResponse`, so it carries the domain, never the address.
+    const refusal = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: foreignEmail,
+      firstName: 'Unrelated',
+      lastName: 'Person',
+      idpId: `idp_${suffix}`,
+    }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+
+    expect(refusal).not.toContain(foreignEmail);
+    expect(refusal).toContain(`unrelated-${suffix}.test`);
+  });
 });
 
 describe('directory membership', () => {
@@ -741,6 +924,48 @@ describe('deleteDirectoryOrganization', () => {
 
     const replay = await deleteDirectoryOrganization(directoryId);
     expect(replay.deleted).toBe(false);
+  });
+
+  test('leaves a customer-created sub-organization intact', async () => {
+    const parentId = await seedOrganization();
+    const groupId = await seedSubOrganization();
+    const manual = await createChildOrganization(`manual-${suffix}`, parentId);
+    trackOrganization(manual.id);
+
+    await deleteDirectoryOrganization(directoryId);
+
+    // `markOrganizationAsDeleted` hard-deletes an organization's
+    // `cloud_agent_environments` and `provider_oauth_attempts`, so sweeping a
+    // customer's own sub-organization into a directory disconnect would destroy
+    // rows no reconnect could restore.
+    const [manualRow] = await db
+      .select({ deletedAt: organizations.deleted_at })
+      .from(organizations)
+      .where(eq(organizations.id, manual.id));
+    expect(manualRow.deletedAt).toBeNull();
+
+    const [groupRow] = await db
+      .select({ deletedAt: organizations.deleted_at })
+      .from(organizations)
+      .where(eq(organizations.id, groupId));
+    expect(groupRow.deletedAt).not.toBeNull();
+  });
+
+  test('soft-deletes the organization and its groups together', async () => {
+    const parentId = await seedOrganization();
+    const groupId = await seedSubOrganization();
+
+    await deleteDirectoryOrganization(directoryId);
+
+    // One transaction: committing the parent first would make a retry find no
+    // live unparented row, report nothing deleted, and never reach the groups —
+    // whose `directory_id` keeps matching group events.
+    const rows = await db
+      .select({ id: organizations.id, deletedAt: organizations.deleted_at })
+      .from(organizations)
+      .where(inArray(organizations.id, [parentId, groupId]));
+    expect(rows).toHaveLength(2);
+    expect(rows.every(row => row.deletedAt !== null)).toBe(true);
   });
 });
 

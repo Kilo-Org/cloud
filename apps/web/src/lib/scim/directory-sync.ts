@@ -130,29 +130,40 @@ export async function upsertDirectoryOrganization(
 }
 
 /**
- * Records a WorkOS-captured domain as the organization's `sso_domain`.
+ * Records a WorkOS-captured domain as the organization's `sso_domain`, when it
+ * has none.
  *
  * The domain is trusted: our administrators gate directory intake, so a domain
  * on the event has already passed a human. What is not trusted is that it is
  * free — Policy Resolution rule 6 forbids two authorities claiming one domain,
  * and `resolveSsoAuthorityForDomain` fails closed on an ambiguous one, which
  * would break authentication for both organizations. So this takes the first
- * domain no other live organization holds, under the same advisory lock
- * `updateSsoDomain` uses, and leaves `sso_domain` alone when every candidate is
+ * candidate no other live organization holds, under the same advisory lock
+ * `updateSsoDomain` uses, and leaves `sso_domain` unset when every candidate is
  * taken.
+ *
+ * It only ever fills an empty `sso_domain`. Moving an existing one would change
+ * who must authenticate through SSO and which addresses a takeover may claim,
+ * and `data.domains[]` promises no order, so a reordered or extended list would
+ * otherwise shift authority between activations.
  *
  * An absent or empty list says nothing about domains rather than clearing one:
  * `dsync.deleted` omits `domains` entirely, and releasing an SSO domain is a
  * deliberate administrative action (`clearSsoDomain`), not a sync side effect.
  *
- * A set is written only when it changes the row, so a replayed event is a
- * no-op and does not re-audit.
+ * Nothing is written when the row already carries a domain, so a replayed event
+ * is a no-op and does not re-audit.
  */
 async function captureDirectoryDomain(
   organizationId: string,
   capturedDomains: readonly string[] | undefined
 ): Promise<void> {
   if (!capturedDomains || capturedDomains.length === 0) return;
+
+  const candidates = capturedDomains
+    .map(candidate => candidate.trim().toLowerCase())
+    .filter(candidate => candidate !== '');
+  if (candidates.length === 0) return;
 
   await db.transaction(async tx => {
     const [organization] = await tx
@@ -162,11 +173,15 @@ async function captureDirectoryDomain(
       .for('update');
     if (!organization) return;
 
-    for (const candidate of capturedDomains) {
-      const domain = candidate.trim().toLowerCase();
-      if (domain === '') continue;
-      if (organization.ssoDomain?.toLowerCase() === domain) return;
+    // An organization that already has a domain keeps it, whether or not the
+    // event still lists it. `sso_domain` decides who must sign in through SSO
+    // and which addresses a takeover may claim, and the event's order carries
+    // no promise — a reordered or extended `data.domains[]` would otherwise
+    // move authority between activations. Replacing a domain stays a
+    // deliberate administrative action.
+    if (organization.ssoDomain !== null) return;
 
+    for (const domain of candidates) {
       // Same lock `updateSsoDomain` takes, so a concurrent human capture of the
       // same domain cannot interleave with this one.
       await tx.execute(
@@ -315,21 +330,38 @@ export async function upsertDirectoryUser(
     return { id: bound.id, created: false };
   }
 
-  // `findUserByNormalizedEmail` also matches legacy rows whose
-  // `normalized_email` is null by comparing `google_user_email`, which a plain
-  // equality check on the normalized column would miss. Taking one over is
-  // gated on the domain; `createOrUpdateUser` performs the conversion.
+  // `findUserByNormalizedEmail` matches case variants, `+` aliases, and legacy
+  // rows whose `normalized_email` is null, so it resolves the mailbox rather
+  // than one spelling of it.
   const existing = await findUserByNormalizedEmail(input.email);
   if (existing) {
     await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
+
+    // One account, one directory user. Overwriting would silently drop the
+    // first binding, and events for that identifier would then resolve to no
+    // user — which the removal routes now report as converged, so it would fail
+    // silently rather than conflict.
+    if (existing.external_id !== null && existing.external_id !== externalId) {
+      throw new DirectorySyncConflictError(
+        `A Kilo account for this address is already bound to directory user ${existing.external_id}`
+      );
+    }
   }
 
   const displayName = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
 
+  // The address is the one the gate resolved, in the spelling the row stores.
+  // `createOrUpdateUser` links an existing account only on an exact
+  // `google_user_email` match, so passing the event's spelling of a case
+  // variant or alias would miss the row, fall through to the insert, and either
+  // be rejected by the normalized-email dedup or create a second account for
+  // the same mailbox.
+  const settlementEmail = existing?.google_user_email ?? input.email;
+
   const result = await createOrUpdateUser(
     {
-      google_user_email: input.email,
-      google_user_name: displayName === '' ? input.email : displayName,
+      google_user_email: settlementEmail,
+      google_user_name: displayName === '' ? settlementEmail : displayName,
       google_user_image_url: '',
       hosted_domain: null,
       // `workos` is the provider SSO sign-in records, so a later sign-in
@@ -385,8 +417,11 @@ async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string
       emailDomain: getLowerDomainFromEmail(email),
       reason,
     });
+    // The domain, not the address: this message is returned in the 409 body and
+    // logged again by `directorySyncErrorResponse`, and the directory id plus
+    // the reason are what an operator acts on.
     throw new DirectorySyncConflictError(
-      `An existing Kilo account holds ${email}, and directory ${directoryId} has not captured its domain: ${reason}`
+      `An existing Kilo account holds an address at ${getLowerDomainFromEmail(email)}, which directory ${directoryId} has not captured: ${reason}`
     );
   };
 
@@ -552,49 +587,87 @@ export async function removeDirectoryMembership(
 }
 
 /**
- * Soft-delete the parent organization bound to a directory, and every
- * sub-organization under it.
+ * Soft-delete the organization bound to a directory, and the directory group
+ * organizations under it.
  *
  * The match is restricted to the unparented row, through `directoryOwner`: a
  * sub-organization carries its parent's `directory_id` too, so matching on that
  * column alone could soft-delete a group while leaving the organization live.
  *
- * Children go with the parent. Leaving them live would strand
- * sub-organizations whose parent is deleted, and their directory group bindings
- * would keep matching group events for a directory that no longer exists.
+ * Only children carrying a `directory_group_id` go with it. A sub-organization
+ * a customer created under the same parent is not a directory group and is left
+ * intact: `markOrganizationAsDeleted` hard-deletes that organization's
+ * `cloud_agent_environments` and `provider_oauth_attempts` rows, so including
+ * one here would destroy data no reconnect could restore.
+ *
+ * Such a child stays parented to the soft-deleted organization, which resolves
+ * `misconfigured` with reason `deleted_parent` and therefore fails closed for
+ * authentication and membership admission (Policy Resolution rule 7). Detaching
+ * it would be worse: the parent's `sso_domain` is the only thing forcing its
+ * members through SSO, so a standalone child would silently accept magic-link
+ * sign-ins. It is logged instead, because nothing else would tell an operator
+ * the disconnect stranded it.
+ *
+ * Parent and groups are stamped in one transaction, so a failure part-way
+ * leaves the organization live and the whole event retryable. Committing the
+ * parent first would make the retry find no live unparented row, return
+ * `deleted: false`, and never reach the remaining groups — whose `directory_id`
+ * keeps matching group events.
  */
 export async function deleteDirectoryOrganization(
   directoryId: string
 ): Promise<DirectorySyncDeleteResult> {
-  const result = await softDeleteBoundOrganization(directoryOwner(directoryId));
-  if (!result.deleted) return result;
+  return db.transaction(async tx => {
+    const ownerRows = await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(and(directoryOwner(directoryId), liveOrganization))
+      .limit(1);
 
-  const children = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(and(eq(organizations.parent_organization_id, result.id), liveOrganization));
+    const owner = ownerRows.at(0);
+    // No live row is the idempotent repeat: a replayed deletion is a no-op.
+    if (!owner) {
+      return { id: '', deleted: false };
+    }
 
-  for (const child of children) {
-    await markOrganizationAsDeleted(child.id);
-  }
+    const children = await tx
+      .select({
+        id: organizations.id,
+        directoryGroupId: organizations.directory_group_id,
+      })
+      .from(organizations)
+      .where(and(eq(organizations.parent_organization_id, owner.id), liveOrganization));
 
-  return result;
+    const groups = children.filter(child => child.directoryGroupId !== null);
+    const stranded = children.filter(child => child.directoryGroupId === null);
+
+    for (const group of groups) {
+      await markOrganizationAsDeleted(group.id, tx);
+    }
+    await markOrganizationAsDeleted(owner.id, tx);
+
+    if (stranded.length > 0) {
+      // Left live on purpose, and invisible otherwise.
+      console.warn('[scim] Directory disconnect stranded customer-created sub-organizations', {
+        directoryId,
+        organizationId: owner.id,
+        strandedOrganizationIds: stranded.map(child => child.id),
+        effect: 'they resolve deleted_parent and fail closed until an administrator reparents them',
+      });
+    }
+
+    return { id: owner.id, deleted: true };
+  });
 }
 
 /** Soft-delete the sub-organization bound to a directory group. */
 export async function deleteDirectorySubOrganization(
   directoryGroupId: string
 ): Promise<DirectorySyncDeleteResult> {
-  return softDeleteBoundOrganization(eq(organizations.directory_group_id, directoryGroupId));
-}
-
-async function softDeleteBoundOrganization(
-  match: SQL | undefined
-): Promise<DirectorySyncDeleteResult> {
   const rows = await db
     .select({ id: organizations.id })
     .from(organizations)
-    .where(and(match, liveOrganization))
+    .where(and(eq(organizations.directory_group_id, directoryGroupId), liveOrganization))
     .limit(1);
 
   const target = rows.at(0);

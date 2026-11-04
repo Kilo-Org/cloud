@@ -94,14 +94,19 @@ sending it.
 ### Domain capture
 
 `dsync.activated` carries `data.domains[]`, and the organization upsert sends
-them as `capturedDomains`. The first one no other live organization holds
-becomes that organization's `sso_domain`, which is what later authorizes taking
-over an existing account on the domain. Directory intake is administratively
-gated, so a domain on the event has already passed a human reviewer — the same
-authority a manual capture in the dashboard carries.
+them as `capturedDomains`. For an organization with **no** `sso_domain`, the
+first candidate no other live organization holds becomes it, which is what later
+authorizes taking over an existing account on that domain. Directory intake is
+administratively gated, so a domain on the event has already passed a human
+reviewer — the same authority a manual capture in the dashboard carries.
 
-Three guards, all because a domain is an SSO authority rather than a label:
+Four guards, all because a domain is an SSO authority rather than a label:
 
+- An organization that already has a domain keeps it. The SSO domain decides who
+  must authenticate through SSO and which addresses a takeover may claim, and
+  `data.domains[]` carries no ordering guarantee, so a reordered or extended list
+  would otherwise move authority between activations. Replacing one stays a
+  dashboard action.
 - A domain another live organization holds is skipped, not overwritten. Two
   authorities claiming one domain fails closed for *both*
   (`.specs/organization-sso.md`, Policy Resolution rule 6), so stealing it would
@@ -122,6 +127,31 @@ Note that an Okta directory's domain is often the IdP tenant hostname
 (`integrator-6483000.okta.com`) rather than the customer's email domain. That is
 what WorkOS reports and what gets captured; a takeover is then authorized only
 for addresses actually on that domain.
+
+### Disconnect
+
+`dsync.deleted` soft-deletes the organization and the sub-organizations carrying
+a `directory_group_id`, in one transaction. One transaction matters: committing
+the organization first would make a retry find no live unparented row, report
+nothing deleted, and never reach the remaining groups — whose `directory_id`
+keeps matching group events.
+
+A sub-organization the *customer* created under the same parent carries no
+directory binding and is left alone. `markOrganizationAsDeleted` soft-deletes
+the organization row but hard-deletes that organization's
+`cloud_agent_environments` and `provider_oauth_attempts`, so sweeping one in
+would destroy rows that clearing `deleted_at` could not bring back.
+
+Such a child stays parented to the soft-deleted organization, so its effective
+SSO policy resolves `misconfigured` with reason `deleted_parent` and fails
+closed. That is deliberate: detaching it would leave it with no policy at all
+and silently re-admit magic-link sign-ins for members the parent's `sso_domain`
+was forcing through SSO. Locked out beats quietly downgraded. The app logs
+`[scim] Directory disconnect stranded customer-created sub-organizations` with
+the ids, because nothing else distinguishes one from a healthy organization. A
+reconnect does not re-adopt it — `dsync.activated` only matches live rows, so it
+creates a new organization and the stranded child keeps pointing at the dead
+one until an administrator reparents it.
 
 ### Arrival order
 
@@ -172,13 +202,25 @@ The account is then converted to the SSO authority's WorkOS identity, its other
 authentication providers are dropped and its browser sessions are invalidated,
 so the prior holder keeps neither a login that bypasses SSO nor a live session.
 
+The match is the mailbox, not one spelling of it. The account is resolved
+case-insensitively and with `+` aliases and Gmail dots ignored, and that same
+row is then converted by its stored address — otherwise a directory delivering
+`holder@acme.test` for a row stored as `Holder@acme.test` would miss it and
+either 409 forever on the normalized-email dedup or, for a legacy row with no
+`normalized_email`, create a second account for one mailbox.
+
+An account already bound to a different directory user is refused rather than
+rebound. Overwriting would drop the first identifier, and its later events would
+then resolve to no account — which the removal routes report as converged, so it
+would fail silently.
+
 Any other address is refused, including when the organization has captured no
 domain or its policy is misconfigured. Every SCIM account is expected to be
 domain-captured, so a refusal is a real misconfiguration rather than a race, and
 retrying will not clear it. The app logs it as
 `[scim] Refused a directory account takeover` with the directory and the email
-domain — never the address. See `.specs/organization-sso.md`, Directory Sync
-rule 13.
+domain, and the 409 body names the domain too — neither carries the address. See
+`.specs/organization-sso.md`, Directory Sync rules 13 and 15.
 
 Separating genuinely terminal failures from the retryable ones is still open,
 and is why the loop needs a retry bound rather than indefinite retry.

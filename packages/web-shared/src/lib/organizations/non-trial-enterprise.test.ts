@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
+import { after } from 'next/server';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
@@ -8,12 +9,25 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { isNonTrialEnterpriseOrganization } from './non-trial-enterprise';
 
+jest.mock('next/server', () => ({
+  ...jest.requireActual('next/server'),
+  after: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(), set: jest.fn() },
 }));
 
+const mockedAfter = jest.mocked(after);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
+
+async function flushAfterCallbacks() {
+  const callbacks = mockedAfter.mock.calls.map(([callback]) => callback);
+  mockedAfter.mockClear();
+  await Promise.all(
+    callbacks.map(callback => (typeof callback === 'function' ? callback() : callback))
+  );
+}
 
 async function createOrganization(values: Partial<typeof organizations.$inferInsert>) {
   const user = await insertTestUser({
@@ -46,6 +60,7 @@ describe('isNonTrialEnterpriseOrganization', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     const cache = new Map<string, string>();
+    mockedAfter.mockReset();
     mockedRedisGet.mockReset();
     mockedRedisGet.mockImplementation((async (key: string) => cache.get(key) ?? null) as never);
     mockedRedisSet.mockReset();
@@ -55,10 +70,12 @@ describe('isNonTrialEnterpriseOrganization', () => {
     }) as never);
   });
 
-  it('caches the result in Redis for an hour', async () => {
+  it('caches the positive result in Redis for an hour after returning', async () => {
     const organizationId = await createOrganization({ require_seats: false });
 
     expect(await isNonTrialEnterpriseOrganization(organizationId)).toBe(true);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+    await flushAfterCallbacks();
     expect(mockedRedisSet).toHaveBeenCalledWith(
       nonTrialEnterpriseRedisKey(organizationId),
       'true',
@@ -74,10 +91,12 @@ describe('isNonTrialEnterpriseOrganization', () => {
     expect(mockedRedisSet).toHaveBeenCalledTimes(1);
   });
 
-  it('caches a negative result', async () => {
+  it('caches the negative result after returning', async () => {
     const organizationId = await createOrganization({});
 
     expect(await isNonTrialEnterpriseOrganization(organizationId)).toBe(false);
+    expect(mockedRedisSet).not.toHaveBeenCalled();
+    await flushAfterCallbacks();
     expect(mockedRedisSet).toHaveBeenCalledWith(
       nonTrialEnterpriseRedisKey(organizationId),
       'false',
@@ -89,6 +108,22 @@ describe('isNonTrialEnterpriseOrganization', () => {
     expect(await isNonTrialEnterpriseOrganization(organizationId)).toBe(false);
   });
 
+  it('resolves without waiting for Redis SET', async () => {
+    const organizationId = await createOrganization({ require_seats: false });
+    const redisSet = Promise.withResolvers<'OK'>();
+    mockedRedisSet.mockImplementation((async () => redisSet.promise) as never);
+
+    await expect(isNonTrialEnterpriseOrganization(organizationId)).resolves.toBe(true);
+    const flushing = flushAfterCallbacks();
+    expect(mockedRedisSet).toHaveBeenCalledWith(
+      nonTrialEnterpriseRedisKey(organizationId),
+      'true',
+      { ex: 3600 }
+    );
+    redisSet.resolve('OK');
+    await flushing;
+  });
+
   it('falls back to the database when Redis fails', async () => {
     const organizationId = await createOrganization({ require_seats: false });
     mockedRedisGet.mockRejectedValue(new Error('redis timeout'));
@@ -96,7 +131,13 @@ describe('isNonTrialEnterpriseOrganization', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     expect(await isNonTrialEnterpriseOrganization(organizationId)).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    await flushAfterCallbacks();
     expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenLastCalledWith('Non-trial enterprise cache write failed', {
+      organizationId,
+      error: expect.any(Error),
+    });
     warn.mockRestore();
   });
 

@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { nonTrialEnterpriseRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { and, eq, isNull } from 'drizzle-orm';
+import { after } from 'next/server';
 import { getMostRecentSeatPurchase } from './organization-seat-purchases';
 import { classifyOrganizationEntitlement } from './trial-utils';
 
@@ -74,6 +75,6 @@ export async function isNonTrialEnterpriseOrganization(
   if (cached !== null) return cached;
 
   const result = await queryIsNonTrialEnterpriseOrganization(organizationId, fromDb);
-  await writeCachedResult(organizationId, result);
+  after(() => writeCachedResult(organizationId, result));
   return result;
 }

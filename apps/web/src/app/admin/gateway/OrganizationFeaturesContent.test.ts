@@ -9,6 +9,7 @@ const activeId = 'aaaaaaaa-1111-4111-8111-111111111111';
 const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
 const emptyFeatures: OrganizationFeatures = { experimental_byok: [], gateway_settings: [] };
+const previewTransport = { context: { methodOverride: 'POST' } };
 const mockMutate = jest.fn();
 const mockRefetchConfig = jest.fn();
 const mockRefetchPreview = jest.fn();
@@ -30,7 +31,7 @@ const mockPreviewQuery: {
   refetch: typeof mockRefetchPreview;
 } = { data: [], isPending: false, error: null, refetch: mockRefetchPreview };
 const mockPreviewOptions = jest.fn(
-  (input: OrganizationFeatures, options: { enabled: boolean }) => ({
+  (input: OrganizationFeatures, options: { enabled: boolean; trpc: typeof previewTransport }) => ({
     kind: 'preview',
     input,
     ...options,
@@ -148,6 +149,7 @@ describe('OrganizationFeaturesContent', () => {
     mockPreviewQuery.data?.push({ id: deletedId, name: 'Deleted organization', isDeleted: true });
     render();
 
+    expect(container.textContent).toContain('These features are experimental.');
     const sections = Array.from(container.querySelectorAll('section'));
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
@@ -183,7 +185,10 @@ describe('OrganizationFeaturesContent', () => {
     edit('gateway_settings', ` ${deletedId.toUpperCase()} \n${deletedId}\n`);
 
     const input = { experimental_byok: [deletedId], gateway_settings: [deletedId] };
-    expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, { enabled: true });
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, {
+      enabled: true,
+      trpc: previewTransport,
+    });
     expect(container.textContent).toContain('Unsaved changes');
     expect(container.textContent).not.toContain('Stored configuration');
     expect(container.textContent).not.toContain('Active organization');
@@ -252,7 +257,10 @@ describe('OrganizationFeaturesContent', () => {
     edit('experimental_byok', ' \n\t\n ');
 
     expect(mockPreviewOptions.mock.calls.every(([, options]) => !options.enabled)).toBe(true);
-    expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, { enabled: false });
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, {
+      enabled: false,
+      trpc: previewTransport,
+    });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual([
       'No organizations enabled.',
       'No organizations enabled.',
@@ -269,7 +277,10 @@ describe('OrganizationFeaturesContent', () => {
     mockPreviewOptions.mockClear();
     edit('experimental_byok', value);
 
-    expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, { enabled: false });
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(emptyFeatures, {
+      enabled: false,
+      trpc: previewTransport,
+    });
     expect(mockPreviewOptions.mock.calls.every(([, options]) => !options.enabled)).toBe(true);
     expect(container.querySelector('[role="status"]')?.textContent).toBe(
       'Enter valid organization IDs to see the preview. Each feature supports up to 1,000 IDs.'

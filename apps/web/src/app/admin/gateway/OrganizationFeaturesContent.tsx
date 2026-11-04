@@ -53,6 +53,7 @@ function OrganizationFeaturesPreview({
   const { data, isPending, error, refetch } = useQuery(
     trpc.admin.gatewayConfig.previewOrganizationFeatures.queryOptions(features, {
       enabled: parsed.success && hasOrganizations,
+      trpc: { context: { methodOverride: 'POST' } },
     })
   );
   const organizationsById = new Map(data?.map(organization => [organization.id, organization]));
@@ -199,8 +200,8 @@ export function OrganizationFeaturesContent() {
         <CardHeader>
           <CardTitle>Organization Features</CardTitle>
           <CardDescription>
-            Enables gateway features for specific organizations. Stored under{' '}
-            <code>organization_features</code> in the <code>config</code> column of{' '}
+            These features are experimental. Enable gateway features for specific organizations.
+            Stored under <code>organization_features</code> in the <code>config</code> column of{' '}
             <code>ai_gateway_config</code>. Enter one organization ID per line. Gateway requests
             pick up changes within one minute on warm instances.
           </CardDescription>

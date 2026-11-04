@@ -69,7 +69,13 @@ export function TRPCContext(props: { children: React.ReactNode }) {
         ];
 
     return createTRPCClient<RootRouter>({
-      links,
+      links: [
+        splitLink({
+          condition: op => op.context.methodOverride === 'POST',
+          true: httpLink({ url: getUrl(), methodOverride: 'POST' }),
+          false: links,
+        }),
+      ],
     });
   });
   return (

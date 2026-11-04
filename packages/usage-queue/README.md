@@ -70,7 +70,7 @@ ordinary-route checks after cleanup.
 
 **One runtime switch:** set `USAGE_QUEUE_TRANSPORT=vercel` on the gateway's
 **staging** environment and redeploy. It also selects queue-only accounting in
-staging; `USAGE_QUEUE_ONLY_ENABLED=true` is not additionally required. Production
+staging. Production
 ignores this selector and deploys neither the callback nor its queue trigger.
 
 There is still a one-time setup: supply the gateway's existing staging writer
@@ -206,7 +206,6 @@ never pasted into commands, PRs, logs or manifests.
 |---|---|---|---|
 | Gateway / staging | `VERCEL_TARGET_ENV` | Vercel supplied `staging` | Platform; verify target |
 | Gateway / staging | `VERCEL_ENV` | Vercel supplied, must not be `production` | Platform; verify |
-| Gateway / staging | `USAGE_QUEUE_ONLY_ENABLED` | Not required for Vercel; retain the existing CF/direct choice | Legacy CF flag; does not override exact `vercel` |
 | Gateway / staging | `USAGE_QUEUE_TRANSPORT` | Exact `vercel` | Ordinary selector; redeploy |
 | Gateway / staging | `USAGE_WRITER_URL` | `https://staging-app.kilo.ai/api/internal/usage/record` | Ordinary URL; verify destination, redeploy |
 | Gateway / staging | `USAGE_WRITER_SECRET` | Match the existing staging writer's `INTERNAL_API_SECRET`; also signs/verifies the scoped queue envelope | Existing credential; secure workflow, redeploy |
@@ -403,12 +402,13 @@ Receiving/deleting/republishing with queue tools is a separately authorized muta
 
 ## Switchback without stranding accepted work
 
-For **new events only**, set `USAGE_QUEUE_TRANSPORT=cloudflare` (or remove it),
-set `USAGE_QUEUE_ONLY_ENABLED=true`, and redeploy staging to select the existing
-CF processing path. For existing direct accounting, remove/change the Vercel selector **and** set
-`USAGE_QUEUE_ONLY_ENABLED=false`, then redeploy. That flag alone cannot disable
-an exact `vercel` selector. The removed shadow-publishing flag has no effect. Verify the chosen
+For **new events only**, set `USAGE_QUEUE_TRANSPORT=cloudflare` (or remove it)
+and redeploy staging to select the existing CF processing path. Staging remains
+queue-selected when `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` is not
+`production`: the retired `USAGE_QUEUE_ONLY_ENABLED` gate no longer provides a
+direct-accounting switch, including when false or unset. Verify the chosen
 destination and writer before switching; never dual-publish a billed event.
+The removed shadow-publishing flag has no effect.
 
 Retain old Vercel deployments/consumers and compatible writer credentials/schema
 until their pinned work ACKs/drains. Publishing opt-out does not disable the

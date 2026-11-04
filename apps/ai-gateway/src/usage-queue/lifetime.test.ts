@@ -24,7 +24,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
-  USAGE_QUEUE_ONLY_ENABLED: false,
+  USAGE_QUEUE_STAGING_ENABLED: false,
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
@@ -109,7 +109,7 @@ const publisher = jest.requireMock<typeof UsagePublisher>(
   '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
 );
 const config = jest.requireMock<{
-  USAGE_QUEUE_ONLY_ENABLED: boolean;
+  USAGE_QUEUE_STAGING_ENABLED: boolean;
   USAGE_INGEST_URL: string;
   USAGE_INGEST_PUBLISH_SECRET: string;
 }>('@kilocode/web-shared/lib/config.server');
@@ -228,7 +228,7 @@ beforeEach(() => {
         '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
       ).enqueueUsage
     );
-  config.USAGE_QUEUE_ONLY_ENABLED = false;
+  config.USAGE_QUEUE_STAGING_ENABLED = false;
   queueConfig.USAGE_VERCEL_QUEUE_ENABLED = false;
   jest.mocked(enqueueVercelUsage).mockReset();
   process.env.VERCEL_REGION = 'fra1';
@@ -252,7 +252,7 @@ describe('Vercel queued accounting lifetime', () => {
   )(
     'awaits $region $mode acceptance=$accepted without another transport or writer',
     async ({ region, mode, accepted }) => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      config.USAGE_QUEUE_STAGING_ENABLED = true;
       queueConfig.USAGE_VERCEL_QUEUE_ENABLED = true;
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();

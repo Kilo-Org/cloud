@@ -7,7 +7,6 @@ test.each([undefined, '', 'cloudflare', 'VERCEL', 'other'])(
   transport => {
     const original = { ...process.env };
     try {
-      process.env.USAGE_QUEUE_ONLY_ENABLED = 'true';
       process.env.VERCEL_TARGET_ENV = 'staging';
       process.env.VERCEL_ENV = 'preview';
       process.env.BYOK_ENCRYPTION_KEY = 'synthetic-key';
@@ -17,7 +16,7 @@ test.each([undefined, '', 'cloudflare', 'VERCEL', 'other'])(
         const actual = jest.requireActual<typeof ServerConfig>(
           '@kilocode/web-shared/lib/config.server'
         );
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(true);
+        expect(actual.USAGE_QUEUE_STAGING_ENABLED).toBe(true);
         expect(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED
@@ -61,7 +60,7 @@ test.each(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED
         ).toBe(enabled);
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(enabled);
+        expect(actual.USAGE_QUEUE_STAGING_ENABLED).toBe(enabled);
       });
     } finally {
       process.env = original;
@@ -74,7 +73,7 @@ test.each(
     [
       { region: 'sfo1', master: 'true', exposure: '1', selected: true },
       { region: 'sfo1', master: 'true', exposure: '0', selected: false },
-      { region: 'sfo1', master: 'false', exposure: '1', selected: false },
+      { region: 'sfo1', master: 'false', exposure: '1', selected: true },
       { region: 'fra1', master: 'true', exposure: '1', selected: false },
     ].map(config => ({ ...config, transport }))
   )
@@ -99,7 +98,7 @@ test.each(
         const { isSfoUsageQueueSelected } = jest.requireActual<typeof SfoPolicy>(
           '@kilocode/web-shared/lib/ai-gateway/usage-queue-policy'
         );
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(false);
+        expect(actual.USAGE_QUEUE_STAGING_ENABLED).toBe(false);
         expect(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED

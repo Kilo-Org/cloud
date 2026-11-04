@@ -7,8 +7,8 @@ always processes queued events through the existing Frankfurt writer. Only a
 matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
-The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
-for staging or for the production regional cohorts controlled independently by
+The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
+and `VERCEL_ENV` not `production`) or for production regional cohorts controlled by
 `USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
 The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
 exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
@@ -448,10 +448,12 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before enabling the launch
-or FRA/SFO cohort controls; a missing Worker secret returns 503.
+Provision and verify the Worker-side publisher secret before selecting staging
+or FRA/SFO cohorts; a missing Worker secret returns 503.
 The HTTP address alone selects no traffic: production selection still requires
-`USAGE_QUEUE_ONLY_ENABLED` and the applicable FRA or SFO cohort controls above.
+both production environment labels, a trusted function region and its applicable
+FRA or SFO cohort controls above. The retired `USAGE_QUEUE_ONLY_ENABLED` value
+no longer affects selection after deployment of this source.
 Verify the deployed gateway version and effective settings before drawing conclusions
 about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.

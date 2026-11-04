@@ -20,7 +20,7 @@ jest.mock('next/server', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-  USAGE_QUEUE_ONLY_ENABLED: true,
+  USAGE_QUEUE_STAGING_ENABLED: true,
 }));
 jest.mock('./usage-publisher', () => ({
   enqueueUsage: jest.fn(async () => ({ kind: 'accepted' })),

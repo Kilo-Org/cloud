@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { type DeviceAuthError } from '@/lib/auth/device-auth-state';
 import { MIN_BOTTOM_CHROME_HEIGHT } from '@/lib/toast-offset';
 
 /**
@@ -37,7 +38,13 @@ export function resolveKeyboardBottomPadding({
   return Math.max(bottomInset, MIN_BOTTOM_CHROME_HEIGHT);
 }
 
-export function errorMessage(status: string, fallback: string | undefined): string {
+/**
+ * The banner text for a terminal device-auth error, in the active language.
+ * Denied and expired are translated here from the status so a language switch
+ * re-renders them; keyed descriptors translate at render the same way, and a
+ * server-authored text (the start 429 body) passes through as-is.
+ */
+export function errorMessage(status: string, error: DeviceAuthError | undefined): string {
   switch (status) {
     case 'expired': {
       return i18n.t('login.signInCodeExpired');
@@ -46,7 +53,10 @@ export function errorMessage(status: string, fallback: string | undefined): stri
       return i18n.t('login.accessDenied');
     }
     default: {
-      return fallback ?? i18n.t('authErrors.default');
+      if (!error) {
+        return i18n.t('authErrors.default');
+      }
+      return error.kind === 'key' ? i18n.t(error.key) : error.text;
     }
   }
 }

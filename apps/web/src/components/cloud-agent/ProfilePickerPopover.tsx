@@ -16,13 +16,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  useProfiles,
-  useCombinedProfiles,
-  useRepoBindings,
-  type ProfileSummaryWithOwner,
-} from '@/hooks/useCloudAgentProfiles';
-import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
+import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
 import { ProfilesListDialog } from './ProfilesListDialog';
 
 type ProfilePickerPopoverProps = {
@@ -31,6 +26,8 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
+  environment?: { repositories?: unknown } | null;
 };
 
 export function ProfilePickerPopover({
@@ -39,6 +36,7 @@ export function ProfilePickerPopover({
   onOverrideProfileSelect,
   repoFullName,
   platform,
+  environment,
 }: ProfilePickerPopoverProps) {
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
@@ -59,76 +57,21 @@ export function ProfilePickerPopover({
   };
 
   const {
-    data: combinedData,
-    isLoading: combinedProfilesLoading,
-    error: combinedProfilesError,
-    refetch: refetchCombinedProfiles,
-  } = useCombinedProfiles({
-    organizationId: organizationId ?? '',
-    enabled: !!organizationId,
+    allProfiles,
+    profilesData,
+    profilesLoading,
+    profilesError,
+    refetchProfiles,
+    layers,
+    baseProfile,
+    topProfile,
+  } = useSessionProfileLayers({
+    organizationId,
+    selectedOverrideProfileId,
+    repoFullName,
+    platform,
+    environment,
   });
-  const {
-    data: personalProfilesData,
-    isLoading: personalProfilesLoading,
-    error: personalProfilesError,
-    refetch: refetchPersonalProfiles,
-  } = useProfiles({
-    organizationId: undefined,
-    enabled: !organizationId,
-  });
-  const profilesLoading = organizationId ? combinedProfilesLoading : personalProfilesLoading;
-  const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
-  // React Query keeps `error` set while retaining `data` when a background
-  // refetch fails (a window-focus refetch, or the invalidation refetch a profile
-  // mutation triggers). Only surface the retry state when there is nothing
-  // cached to show, so a transient failure never blanks a working picker.
-  const profilesData = organizationId ? combinedData : personalProfilesData;
-  const refetchProfiles = organizationId ? refetchCombinedProfiles : refetchPersonalProfiles;
-
-  const allProfiles: ProfileSummaryWithOwner[] = useMemo(
-    () =>
-      organizationId
-        ? (combinedData?.allProfiles ?? [])
-        : (personalProfilesData ?? []).map(p => ({ ...p, ownerType: 'user' as const })),
-    [organizationId, combinedData, personalProfilesData]
-  );
-
-  const effectiveDefaultProfileId = organizationId
-    ? (combinedData?.effectiveDefaultId ?? null)
-    : (personalProfilesData?.find(p => p.isDefault)?.id ?? null);
-
-  const { data: repoBindings } = useRepoBindings({ organizationId });
-
-  const repoBindingProfileId = useMemo(() => {
-    if (!repoFullName || !repoBindings) return null;
-    const binding = repoBindings.find(
-      b =>
-        b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
-        (!platform || b.platform === platform)
-    );
-    return binding?.profileId ?? null;
-  }, [repoFullName, repoBindings, platform]);
-
-  // Shared resolution logic — same rules as the server-side merge.
-  const layers = useMemo(
-    () =>
-      resolveProfileLayers({
-        repoBindingProfileId,
-        effectiveDefaultProfileId,
-        explicitOverrideProfileId: selectedOverrideProfileId,
-      }),
-    [repoBindingProfileId, effectiveDefaultProfileId, selectedOverrideProfileId]
-  );
-
-  const baseProfile = useMemo(
-    () => (layers.base ? (allProfiles.find(p => p.id === layers.base?.profileId) ?? null) : null),
-    [allProfiles, layers.base]
-  );
-
-  const topProfile = useMemo(
-    () => (layers.top ? (allProfiles.find(p => p.id === layers.top?.profileId) ?? null) : null),
-    [allProfiles, layers.top]
-  );
   const topSource = layers.top?.source ?? null;
 
   // Profiles offered as override candidates. The base profile is omitted
@@ -140,21 +83,6 @@ export function ProfilePickerPopover({
 
   const chipName = topProfile?.name ?? baseProfile?.name ?? null;
 
-  const chipCounts = useMemo(() => {
-    const vars = Math.max(baseProfile?.varCount ?? 0, topProfile?.varCount ?? 0);
-    const mcps = (baseProfile?.mcpServerCount ?? 0) + (topProfile?.mcpServerCount ?? 0);
-    const skills = (baseProfile?.skillCount ?? 0) + (topProfile?.skillCount ?? 0);
-    const cmds = (baseProfile?.kiloCommandCount ?? 0) + (topProfile?.kiloCommandCount ?? 0);
-    return [
-      vars > 0 && `${vars} vars`,
-      mcps > 0 && `${mcps} MCP`,
-      skills > 0 && `${skills} skills`,
-      cmds > 0 && `${cmds} cmds`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }, [baseProfile, topProfile]);
-
   function formatCounts(profile: ProfileSummaryWithOwner) {
     return [
       profile.varCount > 0 && `${profile.varCount} vars`,
@@ -165,11 +93,6 @@ export function ProfilePickerPopover({
       .filter(Boolean)
       .join(' · ');
   }
-
-  // Two layers are present (repo + something on top). Used for the "+1" hint
-  // and the "on top of …" affordance regardless of whether the top is an
-  // explicit pick or just the default.
-  const hasTwoLayers = !!topProfile && !!baseProfile;
 
   return (
     <>
@@ -184,15 +107,7 @@ export function ProfilePickerPopover({
             )}
           >
             <Layers className="h-3 w-3 shrink-0" />
-            {chipName ? (
-              <>
-                <span className="font-medium">{chipName}</span>
-                {chipCounts && <span className="opacity-60">· {chipCounts}</span>}
-                {hasTwoLayers && <span className="text-primary/80 ml-0.5">+1</span>}
-              </>
-            ) : (
-              <span>No profile</span>
-            )}
+            {chipName ? <span className="font-medium">{chipName}</span> : <span>No profile</span>}
             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>

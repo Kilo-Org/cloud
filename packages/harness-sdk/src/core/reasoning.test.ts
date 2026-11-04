@@ -1,4 +1,4 @@
-import { Chunk, Effect, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { assemble } from '../plugins/prompt/default.js';
 import { run } from './session-fixture.js';
@@ -17,7 +17,7 @@ const thinking = {
 
 it('keeps the reasoning and its signature, ahead of what the model then said', async () => {
   const { value } = await run([thinking], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
 
   const [, answer] = value;
@@ -29,7 +29,7 @@ it('keeps the reasoning and its signature, ahead of what the model then said', a
 
 it('adds no reasoning part when the model did none', async () => {
   const { value } = await run([{ deltas: ['plain'] }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
 
   expect(value[1]?.parts).toMatchObject([{ kind: 'text', body: 'plain' }]);
@@ -41,7 +41,7 @@ it('keeps a thinking block that carries a signature and no words', async () => {
      exactly as it came. Dropping it here would drop every block on that
      default. */
   const { value } = await run([{ deltas: ['said'], signature: 'sig_empty' }], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
 
   expect(value[1]?.parts).toMatchObject([
@@ -68,7 +68,7 @@ it('does not open a second block on the empty event that ends the first', async 
         ],
       },
     ],
-    session => Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    session => Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
 
   expect(value[1]?.parts).toMatchObject([
@@ -79,7 +79,7 @@ it('does not open a second block on the empty event that ends the first', async 
 
 it('sends the thinking back on the next question, unchanged', async () => {
   const { calls } = await run([thinking], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and then')))
+    Effect.andThen(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and then')))
   );
 
   const answer = calls[1]?.prompt.messages[1];
@@ -92,16 +92,16 @@ it('sends the thinking back on the next question, unchanged', async () => {
 it('streams the reasoning to the caller, marked as reasoning', async () => {
   const { value } = await run([thinking], session => Stream.runCollect(session.ask('why')));
 
-  expect(
-    Chunk.toReadonlyArray(value)
-      .filter(event => event.kind === 'reasoning')
-      .map(event => event.text)
-  ).toEqual(['first', ' second', '']);
+  expect(value.filter(event => event.kind === 'reasoning').map(event => event.text)).toEqual([
+    'first',
+    ' second',
+    '',
+  ]);
 });
 
 it('carries the signature through the store and back into the prompt', async () => {
   const { value } = await run([thinking], session =>
-    Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+    Effect.andThen(Stream.runDrain(session.ask('why')), session.history)
   );
 
   const prompt = assemble({ system: 'sys', turns: value });
@@ -119,8 +119,8 @@ it('keeps thinking the provider encrypted, and hands it back byte for byte', asy
   const { value, calls } = await run(
     [{ deltas: ['said'], redacted: ['ENCRYPTED_ONE', 'ENCRYPTED_TWO'] }, { deltas: ['after'] }],
     session =>
-      Effect.zipRight(
-        Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and'))),
+      Effect.andThen(
+        Effect.andThen(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and'))),
         session.history
       )
   );
@@ -160,8 +160,8 @@ it('keeps an encrypted block where it arrived, between the thinking around it', 
       { deltas: ['next'] },
     ],
     session =>
-      Effect.zipRight(
-        Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and'))),
+      Effect.andThen(
+        Effect.andThen(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and'))),
         session.history
       )
   );

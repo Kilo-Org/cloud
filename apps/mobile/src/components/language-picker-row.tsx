@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -13,7 +14,8 @@ type LanguagePickerRowProps = Readonly<{
   first: boolean;
   /** A group title never carries the divider of the row above it. */
   showDivider: boolean;
-  selected: LanguagePreference;
+  /** True only for the row the sheet holds as its selection. */
+  selected: boolean;
   disabled: boolean;
   /** The device's own language, shown under the device option. */
   deviceEndonym: string;
@@ -22,7 +24,10 @@ type LanguagePickerRowProps = Readonly<{
   onSelect: (preference: LanguagePreference) => void;
 }>;
 
-export function LanguagePickerRow({
+// FlashList re-renders the mounted cells when `extraData` changes, and the
+// list's item objects keep their identity across a selection. Memoizing the
+// row narrows that repaint to the two rows whose own `selected` flag flipped.
+export const LanguagePickerRow = memo(function LanguagePickerRow({
   item,
   first,
   showDivider,
@@ -34,7 +39,11 @@ export function LanguagePickerRow({
 }: LanguagePickerRowProps) {
   const { t } = useTranslation();
   const dividerClass = showDivider ? 'border-b-[0.5px] border-hair-soft' : undefined;
-  const textClass = `flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`;
+  // The check is the row's trailing element, so the gap belongs on the logical
+  // end edge — the same `pe-3` ChoiceRow gives its own default children. A
+  // physical `pl-3`/`pr-3` pair would land on the wrong side under RTL, where
+  // React Native swaps the two: the copy then touched the check.
+  const textClass = 'flex-1 pe-3';
   // iOS resolves `textAlign: 'auto'` from the paragraph's first strong
   // character, so an Arabic endonym right-aligns itself inside an LTR
   // interface while its Latin subtitle stays left — the two lines of one row
@@ -48,6 +57,7 @@ export function LanguagePickerRow({
     return (
       <Text
         variant="small"
+        accessibilityRole="header"
         className={`uppercase tracking-wide text-muted-foreground ${first ? 'pb-2 pt-1' : 'pb-2 pt-6'}`}
       >
         {t(item.section === 'current' ? 'language.current' : 'language.allLanguages')}
@@ -59,14 +69,16 @@ export function LanguagePickerRow({
     return (
       <ChoiceRow
         className={dividerClass}
-        selected={selected === 'device'}
+        selected={selected}
         disabled={disabled}
         onPress={() => {
           onSelect('device');
         }}
       >
         <View className={textClass}>
-          <Text className={cn('text-sm font-medium', alignClass)}>
+          <Text
+            className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+          >
             {t('language.deviceLanguage')}
           </Text>
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
@@ -80,7 +92,7 @@ export function LanguagePickerRow({
   return (
     <ChoiceRow
       className={dividerClass}
-      selected={selected === item.row.tag}
+      selected={selected}
       disabled={disabled}
       onPress={() => {
         onSelect(item.row.tag);
@@ -91,7 +103,11 @@ export function LanguagePickerRow({
             a Latin name under a right-aligned row must not jump to the left
             edge. Unicode bidi already renders each script correctly inside
             the line. */}
-        <Text className={cn('text-sm font-medium', alignClass)}>{item.row.endonym}</Text>
+        <Text
+          className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+        >
+          {item.row.endonym}
+        </Text>
         {item.row.englishName !== item.row.endonym ? (
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
             {item.row.englishName}
@@ -100,4 +116,4 @@ export function LanguagePickerRow({
       </View>
     </ChoiceRow>
   );
-}
+});

@@ -1,5 +1,6 @@
 import {
-  encodeKiloSdkMessagesCursor,
+  type CloudAgentRootSessionsPage,
+  type CloudAgentRootSessionSummary,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
 } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
@@ -31,21 +32,27 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(),
-  Sandbox: class Sandbox {},
-}));
-
 import type { KiloSdkStoredMessage } from '../session-ingest-binding';
 import type { Env } from '../types';
 import {
   handleKiloFacadeRequest,
-  isSyntheticGlobalEvent,
   publicCloudAgentDirectory,
-  rewriteGlobalEventDirectory,
   UserKiloFacade,
+  type KiloFacadeNativeTailOpener,
 } from './user-kilo-facade';
-import type { LiveWrapperResolution, SessionKiloFacadeDecision } from './session-proxy';
+import type { NativeEventTail, NativeTailOpenResult, NativeTailSink } from './native-event-tail.js';
+
+function nativeTailDouble(
+  options: { run?: (sink: NativeTailSink) => Promise<void> } = {}
+): NativeEventTail {
+  return {
+    async run(sink) {
+      if (options.run !== undefined) return options.run(sink);
+      await sink.send({ type: 'kilo.native.fence', properties: { snapshotComplete: true } });
+    },
+    close: () => undefined,
+  };
+}
 
 const kiloSessionId = 'ses_12345678901234567890123456';
 const siblingKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
@@ -55,7 +62,6 @@ const groupedWorktreeId = 'worktree_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const firstWorkspaceSessionId = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const siblingWorkspaceSessionId = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
-type ContainerFetch = (request: Request, port: number) => Promise<Response>;
 type PendingOwnershipFixture = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
@@ -106,14 +112,6 @@ function envStub(): Env {
       getCloudAgentRootSessionSnapshot: vi.fn(),
       listCloudAgentRootSessions: vi.fn(),
       getCloudAgentRootSessionMessages: vi.fn(),
-    },
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(() => 'session-do-id'),
-      get: vi.fn(() => ({
-        hasMessageAdmission: vi.fn().mockResolvedValue(false),
-        admitSubmittedMessage: vi.fn(),
-        interruptExecution: vi.fn(),
-      })),
     },
     SANDBOX_SESSION: {
       idFromName: vi.fn(() => 'sandbox-session-do-id'),
@@ -279,7 +277,7 @@ function sdkMessageHistory(): KiloSdkStoredMessage[] {
   ];
 }
 
-function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessage[] {
+function sdkMessageHistoryWithPrivateStructuredPaths(): KiloSdkStoredMessage[] {
   const history = sdkMessageHistory();
   const assistant = history[1];
   if (!assistant || assistant.info.role !== 'assistant') {
@@ -294,7 +292,16 @@ function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessag
     parts: [
       ...assistant.parts.map(part =>
         part.id === tool.id
-          ? { ...tool, state: { ...tool.state, input: { path: '/workspace/repo' } } }
+          ? {
+              ...tool,
+              state: {
+                ...tool.state,
+                input: {
+                  path: '/workspace/repo',
+                  content: 'Keep /workspace/repo and file:///workspace/private as user text',
+                },
+              },
+            }
           : part
       ),
       {
@@ -324,21 +331,29 @@ function sdkMessageHistoryWithOwnerVisibleStructuredPaths(): KiloSdkStoredMessag
   return history;
 }
 
-function expectOwnerVisibleStructuredMessagePaths(body: KiloSdkStoredMessage[]): void {
+function expectPublicStructuredMessagePaths(body: KiloSdkStoredMessage[]): void {
+  const directory = publicCloudAgentDirectory(kiloSessionId);
   expect(body[1]?.parts).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         id: 'prt_tool_1',
-        state: expect.objectContaining({ input: { path: '/workspace/repo' } }),
+        state: expect.objectContaining({
+          input: {
+            path: directory,
+            content: 'Keep /workspace/repo and file:///workspace/private as user text',
+          },
+          output: 'unchanged model-authored /workspace/private text',
+        }),
       }),
       expect.objectContaining({
         id: 'prt_metadata_private',
         text: 'file: src/foo.ts was updated',
-        metadata: { path: '/workspace/private/unreviewed.ts' },
+        metadata: { path: `${directory}/unreviewed.ts` },
       }),
       expect.objectContaining({
         id: 'prt_resource_private',
-        source: expect.objectContaining({ uri: 'file:///workspace/private/resource.txt' }),
+        url: 'data:text/plain,safe',
+        source: expect.objectContaining({ type: 'resource', uri: '' }),
       }),
     ])
   );
@@ -401,7 +416,7 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
       parts: [
         {
           ...filePart,
-          source: { ...filePart.source, path: directory },
+          source: { ...filePart.source, path: `${directory}/source.ts` },
         },
         {
           ...toolPart,
@@ -412,7 +427,7 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
                 ...attachment,
                 source: {
                   ...attachment.source,
-                  path: directory,
+                  path: `${directory}/symbol.ts`,
                 },
               },
             ],
@@ -421,19 +436,6 @@ function projectedSdkMessageHistory(): KiloSdkStoredMessage[] {
       ],
     },
   ];
-}
-
-function liveWrapperTarget(containerFetch: ContainerFetch): LiveWrapperResolution {
-  return {
-    kind: 'available',
-    target: {
-      port: 5123,
-      sandbox: { containerFetch } as unknown as Extract<
-        LiveWrapperResolution,
-        { kind: 'available' }
-      >['target']['sandbox'],
-    },
-  };
 }
 
 async function readSseTextFrame(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
@@ -457,7 +459,10 @@ describe('handleKiloFacadeRequest', () => {
   it('returns 501 for intentionally unsupported Kilo route families', async () => {
     for (const request of [
       new Request('http://worker.test/kilo/session', { method: 'POST' }),
-      new Request('http://worker.test/kilo/session/status'),
+      new Request(
+        'http://worker.test/kilo/session/status?directory=%2Fcloud-agent%2Fsessions%2Fses_12345678901234567890123456',
+        { method: 'POST' }
+      ),
       new Request('http://worker.test/kilo/session/viewed', { method: 'POST' }),
       new Request('http://worker.test/kilo/sync/history', { method: 'POST' }),
       new Request('http://worker.test/kilo/config'),
@@ -485,15 +490,25 @@ describe('handleKiloFacadeRequest', () => {
   it('lists mapped Cloud Agent roots without requiring private SDK snapshots', async () => {
     const env = envStub();
     const listCloudAgentRootSessions = vi.mocked(env.SESSION_INGEST.listCloudAgentRootSessions);
-    listCloudAgentRootSessions.mockResolvedValue([
-      {
-        kiloSessionId,
-        cloudAgentSessionId: 'agent_live',
-        title: 'Mapped session',
-        created: 100,
-        updated: 200,
-      },
-    ]);
+    listCloudAgentRootSessions.mockResolvedValue({
+      items: [
+        {
+          kiloSessionId,
+          cloudAgentSessionId: firstWorkspaceSessionId,
+          workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
+          userId: 'usr_1',
+          organizationId: null,
+          title: 'Mapped session',
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'unknown',
+          created: 100,
+          updated: 200,
+        },
+      ],
+      nextCursor: null,
+    });
 
     const response = await handleKiloFacadeRequest({
       request: new Request('http://worker.test/kilo/session?limit=15&start=1234'),
@@ -559,6 +574,7 @@ describe('handleKiloFacadeRequest', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     expect(openPublicGlobalEventStream).toHaveBeenCalledOnce();
+    expect(openPublicGlobalEventStream).toHaveBeenCalledWith('usr_1', expect.any(Function));
   });
 
   it('requires a directory selector for a scoped event subscription', async () => {
@@ -671,7 +687,7 @@ describe('handleKiloFacadeRequest', () => {
     const openPublicSessionEventStream = vi.fn(
       () => new Response('stream', { headers: { 'Content-Type': 'text/event-stream' } })
     );
-    const resolveLiveWrapper = vi.fn();
+    const tail = nativeTailDouble();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(
@@ -681,16 +697,37 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
+        openNativeTail: vi.fn(async () => ({ kind: 'open' as const, tail })),
         globalEvents: { openPublicGlobalEventStream: vi.fn(), openPublicSessionEventStream },
       },
     });
 
     expect(response.status).toBe(200);
-    expect(openPublicSessionEventStream).toHaveBeenCalledWith(kiloSessionId);
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+    expect(openPublicSessionEventStream).toHaveBeenCalledWith(kiloSessionId, { tail });
+  });
+
+  it('hides a non-control root scoped event selector as not found', async () => {
+    const openPublicSessionEventStream = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_legacy',
+        })),
+        globalEvents: { openPublicGlobalEventStream: vi.fn(), openPublicSessionEventStream },
+      },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(openPublicSessionEventStream).not.toHaveBeenCalled();
   });
 
   it('hides a foreign scoped event selector as not found', async () => {
@@ -712,21 +749,129 @@ describe('handleKiloFacadeRequest', () => {
     expect(openPublicSessionEventStream).not.toHaveBeenCalled();
   });
 
-  it('returns 404 for unresolved root Kilo sessions before live wrapper lookup', async () => {
-    const resolveLiveWrapper = vi.fn();
+  it('requires a directory selector for the system event feed', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/cloud-agent/event'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { systemFeed: vi.fn() },
+    });
 
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_EVENT_DIRECTORY_REQUIRED',
+    });
+  });
+
+  it('opens the system event feed for an owned root without waking the runtime', async () => {
+    const env = envStub();
+    const systemFeed = vi.fn(
+      () => new Response('stream', { headers: { 'Content-Type': 'text/event-stream' } })
+    );
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env,
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        systemFeed,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    expect(systemFeed).toHaveBeenCalledWith({
+      env,
+      userId: 'usr_1',
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      kiloSessionId,
+    });
+  });
+
+  it('rejects unsupported system event selectors before ownership lookup', async () => {
+    const resolveRootSessionForKiloSession = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/cloud-agent/event?workspace=private'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession, systemFeed: vi.fn() },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_EVENT_SELECTOR_UNSUPPORTED',
+    });
+    expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+  });
+
+  it('hides a foreign system event selector as not found', async () => {
+    const systemFeed = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession: vi.fn(async () => null), systemFeed },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(systemFeed).not.toHaveBeenCalled();
+  });
+
+  it('hides a malformed system event session id as not found', async () => {
+    const resolveRootSessionForKiloSession = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        'http://worker.test/kilo/cloud-agent/event?directory=%2Fcloud-agent%2Fsessions%2Fbad-id'
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession, systemFeed: vi.fn() },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+  });
+
+  it('hides a non-control root system event selector as not found', async () => {
+    const systemFeed = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_legacy',
+        })),
+        systemFeed,
+      },
+    });
+
+    expect(response.status).toBe(404);
+    expect(systemFeed).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for unresolved root Kilo sessions before live wrapper lookup', async () => {
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
       env: envStub(),
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => null),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(404);
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
   it('returns 404 for malformed Kilo session IDs before resolving ownership', async () => {
@@ -748,32 +893,6 @@ describe('handleKiloFacadeRequest', () => {
     expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
   });
 
-  it('runs the session route policy seam before live wrapper lookup', async () => {
-    const resolveLiveWrapper = vi.fn();
-    const decision: SessionKiloFacadeDecision = {
-      kind: 'reject',
-      status: 418,
-      code: 'POLICY_REJECTED',
-      message: 'rejected by policy',
-    };
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        decideSessionRoute: vi.fn(() => decision),
-        resolveLiveWrapper,
-      },
-    });
-
-    expect(response.status).toBe(418);
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
-  });
-
   it('returns a persisted session snapshot when an authorized detail read is cold', async () => {
     const env = envStub();
     const getCloudAgentRootSessionSnapshot = vi.mocked(
@@ -781,7 +900,7 @@ describe('handleKiloFacadeRequest', () => {
     );
     getCloudAgentRootSessionSnapshot.mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
     });
 
@@ -791,13 +910,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(
-          async (): Promise<LiveWrapperResolution> => ({
-            kind: 'unavailable',
-          })
-        ),
       },
     });
 
@@ -809,139 +923,11 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
-  it('returns a billing rejection instead of reading a persisted detail snapshot', async () => {
-    const env = envStub();
-    const getCloudAgentRootSessionSnapshot = vi.mocked(
-      env.SESSION_INGEST.getCloudAgentRootSessionSnapshot
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_billing_blocked',
-        })),
-        resolveLiveWrapper: vi.fn(
-          async (): Promise<LiveWrapperResolution> => ({
-            kind: 'billing-rejected',
-            admission: {
-              success: false,
-              code: 'insufficient_credits',
-              message: 'internal admission detail',
-              remainingMicrodollars: 1,
-              minimumRequiredMicrodollars: 5,
-            },
-          })
-        ),
-      },
-    });
-
-    expect(response.status).toBe(402);
-    await expect(response.json()).resolves.toEqual({
-      error: 'KILO_BILLING_PAYMENT_REQUIRED',
-      message: 'Container billing requires additional credits',
-      remainingMicrodollars: 1,
-      minimumRequiredMicrodollars: 5,
-    });
-    expect(getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the persisted detail snapshot when the wrapper has no private Kilo runtime', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(
-        { error: 'KILO_RUNTIME_UNAVAILABLE', message: 'Kilo runtime is not bootstrapped' },
-        { status: 503 }
-      )
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      directory: publicCloudAgentDirectory(kiloSessionId),
-    });
-  });
-
-  it('falls back to the persisted detail snapshot when live wrapper discovery is unavailable', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
-    });
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => {
-          throw new Error('wrapper discovery failed');
-        }),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      directory: publicCloudAgentDirectory(kiloSessionId),
-    });
-  });
-
-  it('falls back to the persisted detail snapshot when a live proxy request cannot be reached', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () => {
-      throw new Error('wrapper request failed');
-    });
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      directory: publicCloudAgentDirectory(kiloSessionId),
-    });
-  });
-
   it('preserves owner-visible structured paths in a cold session snapshot', async () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: {
         kind: 'value',
         byteLength: 123,
@@ -957,9 +943,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -998,19 +983,18 @@ describe('handleKiloFacadeRequest', () => {
             : siblingWorkspaceSessionId,
       })
     );
-    const resolveLiveWrapper = vi.fn();
 
     const firstResponse = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
       env,
       userId: groupedOwnerId,
-      deps: { resolveRootSessionForKiloSession, resolveLiveWrapper },
+      deps: { resolveRootSessionForKiloSession },
     });
     const siblingResponse = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${siblingKiloSessionId}`),
       env,
       userId: groupedOwnerId,
-      deps: { resolveRootSessionForKiloSession, resolveLiveWrapper },
+      deps: { resolveRootSessionForKiloSession },
     });
 
     expect(firstResponse.status).toBe(200);
@@ -1047,7 +1031,6 @@ describe('handleKiloFacadeRequest', () => {
     expect(JSON.stringify([firstSession, siblingSession])).not.toContain('/workspace/');
     expect(JSON.stringify([firstSession, siblingSession])).not.toContain(groupedOrganizationId);
     expect(ownershipQuery.leftJoin).toHaveBeenCalledTimes(2);
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1062,8 +1045,6 @@ describe('handleKiloFacadeRequest', () => {
       cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'pending' },
     });
-    const resolveLiveWrapper = vi.fn(async () => null);
-
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
       env,
@@ -1072,7 +1053,6 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
@@ -1081,7 +1061,6 @@ describe('handleKiloFacadeRequest', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'KILO_SESSION_SNAPSHOT_PENDING',
     });
-    expect(resolveLiveWrapper).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -1095,7 +1074,6 @@ describe('handleKiloFacadeRequest', () => {
       cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'pending' },
     });
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
@@ -1105,13 +1083,11 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
   it('denies a foreign grouped root before reading its snapshot or ownership', async () => {
@@ -1119,19 +1095,17 @@ describe('handleKiloFacadeRequest', () => {
     vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession).mockResolvedValue(
       null
     );
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
       env,
       userId: 'oauth/google:foreign-owner',
-      deps: { resolveLiveWrapper },
+      deps: {},
     });
 
     expect(response.status).toBe(404);
     expect(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
     expect(getPgDbMock).not.toHaveBeenCalled();
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1154,7 +1128,6 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(),
       },
     });
 
@@ -1175,7 +1148,6 @@ describe('handleKiloFacadeRequest', () => {
       cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'pending' },
     });
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
@@ -1185,7 +1157,6 @@ describe('handleKiloFacadeRequest', () => {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
           cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
@@ -1193,14 +1164,14 @@ describe('handleKiloFacadeRequest', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'KILO_UPSTREAM_RESPONSE_INVALID',
     });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
-  it('returns a stable pending response for a cold detail read without a materialized snapshot', async () => {
+  it('hides a cold detail read without authorized ownership as not found', async () => {
     const env = envStub();
+    mockPendingOwnershipRows([[]]);
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'pending' },
     });
 
@@ -1210,25 +1181,23 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
-    expect(response.status).toBe(503);
-    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_SESSION_SNAPSHOT_PENDING',
+      error: 'KILO_SESSION_NOT_FOUND',
     });
-    expect(getPgDbMock).not.toHaveBeenCalled();
+    expect(getPgDbMock).toHaveBeenCalledOnce();
   });
 
   it('maps an oversized cold session snapshot to stable 413', async () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'too_large', maximumBytes: 8 * 1024 * 1024 },
     });
 
@@ -1238,9 +1207,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1254,7 +1222,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'retryable_failure' },
     });
 
@@ -1264,9 +1232,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1279,7 +1246,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       snapshot: { kind: 'invalid_data' },
     } as never);
 
@@ -1289,9 +1256,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1299,143 +1265,6 @@ describe('handleKiloFacadeRequest', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'KILO_UPSTREAM_RESPONSE_INVALID',
       message: 'Kilo session response is not valid',
-    });
-  });
-
-  it('falls back to the persisted detail snapshot when the live private Kilo request fails', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json({ error: 'KILO_PROXY_ERROR', message: 'fetch failed' }, { status: 502 })
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      directory: publicCloudAgentDirectory(kiloSessionId),
-    });
-  });
-
-  it('rewrites fresh live session routing fields while preserving owner-visible structured paths', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(
-        { ...sdkSessionInfo(kiloSessionId), share: { url: '/workspace/private/share' } },
-        { headers: { 'X-Upstream': 'kept' } }
-      )
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('x-upstream')).toBe('kept');
-    await expect(response.json()).resolves.toEqual({
-      ...projectedSdkSessionInfo(kiloSessionId),
-      share: { url: '/workspace/private/share' },
-    });
-  });
-
-  it('bounds successful live detail JSON before projection', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(
-      async () =>
-        new Response(JSON.stringify(sdkSessionInfo(kiloSessionId)), {
-          status: 200,
-          headers: { 'Content-Length': String(8 * 1024 * 1024 + 1) },
-        })
-    );
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
-  });
-
-  it('bounds live detail without consuming an oversized streamed body', async () => {
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () =>
-          liveWrapperTarget(
-            async () =>
-              new Response(
-                new ReadableStream<Uint8Array>({
-                  start(controller) {
-                    controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1));
-                    controller.close();
-                  },
-                })
-              )
-          )
-        ),
-      },
-    });
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
-  });
-
-  it('rejects malformed successful live detail JSON instead of returning an SDK-invalid session', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json({ directory: '/workspace/root' })
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
     });
   });
 
@@ -1448,9 +1277,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(),
       },
     });
 
@@ -1461,7 +1289,6 @@ describe('handleKiloFacadeRequest', () => {
   });
 
   it('rejects repeated SDK session detail selectors before live wrapper lookup', async () => {
-    const resolveLiveWrapper = vi.fn();
     const directory = encodeURIComponent(publicCloudAgentDirectory(kiloSessionId));
 
     const response = await handleKiloFacadeRequest({
@@ -1472,15 +1299,13 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported session list selectors instead of broadening the result', async () => {
@@ -1507,7 +1332,7 @@ describe('handleKiloFacadeRequest', () => {
     );
     getCloudAgentRootSessionMessages.mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { messages: sdkMessageHistory(), nextCursor, omittedItemCount: 0 },
     });
 
@@ -1517,9 +1342,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1542,7 +1366,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { messages: sdkMessageHistory(), nextCursor: null, omittedItemCount: 3 },
     });
 
@@ -1552,9 +1376,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1566,37 +1389,8 @@ describe('handleKiloFacadeRequest', () => {
     expect(response.headers.get('x-next-cursor')).toBeNull();
   });
 
-  it('keeps legacy message cursors on the live-first path', async () => {
-    const env = envStub();
-    const cursor = encodeKiloSdkMessagesCursor({ id: 'msg_user_1', time: 110 });
-    const containerFetch = vi.fn<ContainerFetch>(async () => Response.json(sdkMessageHistory()));
-    const resolveLiveWrapper = vi.fn(async () => liveWrapperTarget(containerFetch));
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(
-        `http://worker.test/kilo/session/${kiloSessionId}/message?limit=1&before=${cursor}`
-      ),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
-    expect(resolveLiveWrapper).toHaveBeenCalledOnce();
-    expect(containerFetch).toHaveBeenCalledOnce();
-    expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
-    expect(response.headers.get('x-kilo-omitted-item-count')).toBeNull();
-  });
-
   it('rejects invalid message pagination before durable lookup', async () => {
     const env = envStub();
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(
@@ -1606,21 +1400,18 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
     expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
   });
 
   it('rejects a decodable non-message cursor before durable lookup', async () => {
     const env = envStub();
-    const resolveLiveWrapper = vi.fn();
     const cursor = btoa(JSON.stringify({ id: 'other_01', time: 1 })).replace(/=+$/g, '');
 
     const response = await handleKiloFacadeRequest({
@@ -1631,21 +1422,18 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
     expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
   });
 
   it('rejects message page limits above the shared maximum before live or persisted reads', async () => {
     const env = envStub();
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(
@@ -1655,21 +1443,18 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
     expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
   });
 
   it('rejects repeated message pagination parameters before live or persisted reads', async () => {
     const env = envStub();
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(
@@ -1679,227 +1464,22 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_QUERY_INVALID' });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
     expect(env.SESSION_INGEST.getCloudAgentRootSessionMessages).not.toHaveBeenCalled();
   });
 
-  it('falls back to persisted messages when the wrapper has no private Kilo runtime', async () => {
+  it('projects private structured paths and preserves file text in cold messages', async () => {
     const env = envStub();
+    const history = sdkMessageHistoryWithPrivateStructuredPaths();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      history: { messages: sdkMessageHistory(), nextCursor: null, omittedItemCount: 0 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(
-        { error: 'KILO_RUNTIME_UNAVAILABLE', message: 'Kilo runtime is not bootstrapped' },
-        { status: 503 }
-      )
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
-  });
-
-  it('falls back to persisted messages when the live private Kilo request fails', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      history: { messages: sdkMessageHistory(), nextCursor: null, omittedItemCount: 0 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json({ error: 'KILO_PROXY_ERROR', message: 'fetch failed' }, { status: 502 })
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
-  });
-
-  it('falls back to persisted messages when a live proxy request cannot be reached', async () => {
-    const env = envStub();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_live',
-      history: { messages: sdkMessageHistory(), nextCursor: null, omittedItemCount: 0 },
-    });
-    const containerFetch = vi.fn<ContainerFetch>(async () => {
-      throw new Error('wrapper request failed');
-    });
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env,
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
-  });
-
-  it('continues forwarding live message reads for freshest available history without private selectors', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () => Response.json(sdkMessageHistory()));
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(
-        `http://worker.test/kilo/session/${kiloSessionId}/message?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}&limit=1`
-      ),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(projectedSdkMessageHistory());
-    const [forwardedRequest] = containerFetch.mock.calls[0];
-    expect(new URL(forwardedRequest.url).search).toBe('?limit=1');
-  });
-
-  it('preserves owner-visible structured paths and file text in live messages', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () =>
-      Response.json(sdkMessageHistoryWithOwnerVisibleStructuredPaths())
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
-      },
-    });
-
-    expect(response.status).toBe(200);
-    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
-  });
-
-  it('bounds and validates successful live message JSON before public projection', async () => {
-    const oversizedResponse = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () =>
-          liveWrapperTarget(
-            async () =>
-              new Response(JSON.stringify(sdkMessageHistory()), {
-                status: 200,
-                headers: { 'Content-Length': String(8 * 1024 * 1024 + 1) },
-              })
-          )
-        ),
-      },
-    });
-    expect(oversizedResponse.status).toBe(502);
-    await expect(oversizedResponse.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
-
-    const malformedResponse = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () =>
-          liveWrapperTarget(async () => Response.json([{ info: {} }]))
-        ),
-      },
-    });
-    expect(malformedResponse.status).toBe(502);
-    await expect(malformedResponse.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
-  });
-
-  it('bounds live messages without consuming an oversized streamed body', async () => {
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/message`),
-      env: envStub(),
-      userId: 'usr_1',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
-        })),
-        resolveLiveWrapper: vi.fn(async () =>
-          liveWrapperTarget(
-            async () =>
-              new Response(
-                new ReadableStream<Uint8Array>({
-                  start(controller) {
-                    controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1));
-                    controller.close();
-                  },
-                })
-              )
-          )
-        ),
-      },
-    });
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
-    });
-  });
-
-  it('preserves owner-visible structured paths and file text in cold messages', async () => {
-    const env = envStub();
-    const history = sdkMessageHistoryWithOwnerVisibleStructuredPaths();
-    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
-      kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { messages: history, nextCursor: null, omittedItemCount: 0 },
     });
     const response = await handleKiloFacadeRequest({
@@ -1908,14 +1488,13 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
     expect(response.status).toBe(200);
-    expectOwnerVisibleStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
+    expectPublicStructuredMessagePaths((await response.json()) as KiloSdkStoredMessage[]);
   });
 
   it('preserves non-enumerating not-found behavior for a cold transcript miss', async () => {
@@ -1928,9 +1507,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1942,7 +1520,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_pending',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: null,
     });
 
@@ -1952,9 +1530,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_pending',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1969,7 +1546,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { kind: 'too_large', maximumBytes: 8 * 1024 * 1024, phase: 'message_scan' },
     });
 
@@ -1979,9 +1556,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -1997,7 +1573,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { kind: 'retryable_failure', phase: 'page_parts' },
     });
 
@@ -2007,9 +1583,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -2022,7 +1597,7 @@ describe('handleKiloFacadeRequest', () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionMessages).mockResolvedValue({
       kiloSessionId,
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       history: { kind: 'invalid_data' },
     } as never);
 
@@ -2032,9 +1607,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => null),
       },
     });
 
@@ -2066,7 +1640,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
         admitPrompt,
@@ -2098,7 +1672,7 @@ describe('handleKiloFacadeRequest', () => {
         authToken: 'validated-token',
         deps: {
           resolveRootSessionForKiloSession: vi.fn(async () => ({
-            cloudAgentSessionId: 'agent_cold',
+            cloudAgentSessionId: firstWorkspaceSessionId,
           })),
           validatePromptBalance,
           admitPrompt,
@@ -2132,7 +1706,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance,
         admitPrompt,
@@ -2158,7 +1732,7 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         interruptPrompt,
       },
@@ -2171,20 +1745,14 @@ describe('handleKiloFacadeRequest', () => {
     expect(interruptPrompt).not.toHaveBeenCalled();
   });
 
-  it('admits text-only prompt_async through the session DO while its wrapper is cold', async () => {
+  it('admits text-only prompt_async through durable prompt admission', async () => {
     const env = envStub();
-    const admitSubmittedMessage = vi.fn().mockResolvedValue({
+    const admitPrompt = vi.fn().mockResolvedValue({
       success: true,
       outcome: 'queued',
       messageId: 'msg_018f1e2d3c4bAsynPrmtAbCdEf',
       compatibilityDelivery: 'queued',
     });
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
-      hasMessageAdmission: vi.fn().mockResolvedValue(false),
-      admitSubmittedMessage,
-    } as never);
-    const idFromName = vi.spyOn(env.CLOUD_AGENT_SESSION, 'idFromName');
-    const resolveLiveWrapper = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
@@ -2202,39 +1770,38 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
+        admitPrompt,
       },
       authToken: 'validated-token',
     });
 
     expect(response.status).toBe(204);
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
-    expect(idFromName).toHaveBeenCalledWith('usr_1:agent_cold');
-    expect(admitSubmittedMessage).toHaveBeenCalledWith({
+    expect(admitPrompt).toHaveBeenCalledWith({
+      env,
       userId: 'usr_1',
-      turn: {
-        type: 'prompt',
-        id: 'msg_018f1e2d3c4bAsynPrmtAbCdEf',
-        prompt: 'hello world',
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      request: {
+        userId: 'usr_1',
+        turn: {
+          type: 'prompt',
+          id: 'msg_018f1e2d3c4bAsynPrmtAbCdEf',
+          prompt: 'hello world',
+        },
       },
     });
   });
 
   it('forwards native SDK agent and Kilo model selections through prompt_async admission', async () => {
     const env = envStub();
-    const admitSubmittedMessage = vi.fn().mockResolvedValue({
+    const admitPrompt = vi.fn().mockResolvedValue({
       success: true,
       outcome: 'queued',
       messageId: 'msg_018f1e2d3c4bAgentModAbCdEf',
       compatibilityDelivery: 'queued',
     });
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
-      hasMessageAdmission: vi.fn().mockResolvedValue(false),
-      admitSubmittedMessage,
-    } as never);
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
@@ -2252,9 +1819,10 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
+        admitPrompt,
       },
     });
 
@@ -2262,18 +1830,23 @@ describe('handleKiloFacadeRequest', () => {
     expect(preflightExistingPromptModelMock).toHaveBeenCalledWith({
       env,
       userId: 'usr_1',
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       requestedModel: 'anthropic/claude-sonnet-4',
       procedure: 'kilo.prompt_async',
     });
-    expect(admitSubmittedMessage).toHaveBeenCalledWith({
+    expect(admitPrompt).toHaveBeenCalledWith({
+      env,
       userId: 'usr_1',
-      turn: {
-        type: 'prompt',
-        id: 'msg_018f1e2d3c4bAgentModAbCdEf',
-        prompt: 'use my selection',
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      request: {
+        userId: 'usr_1',
+        turn: {
+          type: 'prompt',
+          id: 'msg_018f1e2d3c4bAgentModAbCdEf',
+          prompt: 'use my selection',
+        },
+        agent: { mode: 'plan', model: 'anthropic/claude-sonnet-4' },
       },
-      agent: { mode: 'plan', model: 'anthropic/claude-sonnet-4' },
     });
   });
 
@@ -2295,7 +1868,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance,
         admitPrompt,
@@ -2313,15 +1886,12 @@ describe('handleKiloFacadeRequest', () => {
 
   it('preflights the stored session model before admitting a new prompt_async message', async () => {
     const env = envStub();
-    const admitSubmittedMessage = vi.fn().mockResolvedValue({
+    const admitPrompt = vi.fn().mockResolvedValue({
       success: true,
       outcome: 'queued',
       messageId: 'msg_018f1e2d3c4bPreflightAbCdEf',
       compatibilityDelivery: 'queued',
     });
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
-      admitSubmittedMessage,
-    } as never);
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
@@ -2334,9 +1904,10 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
+        admitPrompt,
       },
     });
 
@@ -2344,55 +1915,12 @@ describe('handleKiloFacadeRequest', () => {
     expect(preflightExistingPromptModelMock).toHaveBeenCalledWith({
       env,
       userId: 'usr_1',
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
       procedure: 'kilo.prompt_async',
     });
     expect(preflightExistingPromptModelMock.mock.invocationCallOrder[0]).toBeLessThan(
-      admitSubmittedMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      admitPrompt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
-  });
-
-  it('replays an admitted matching prompt_async message before model preflight', async () => {
-    const env = envStub();
-    const admitSubmittedMessage = vi.fn().mockResolvedValue({
-      success: true,
-      outcome: 'queued',
-      messageId: 'msg_018f1e2d3c4bReplayAbCdEfGh',
-      compatibilityDelivery: 'queued',
-    });
-    const hasMessageAdmission = vi.fn().mockResolvedValue(true);
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
-      admitSubmittedMessage,
-      hasMessageAdmission,
-    } as never);
-    preflightExistingPromptModelMock.mockRejectedValue(
-      new Error('Selected model is no longer available')
-    );
-
-    const response = await handleKiloFacadeRequest({
-      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messageID: 'msg_018f1e2d3c4bReplayAbCdEfGh',
-          parts: [{ type: 'text', text: 'retry me' }],
-        }),
-      }),
-      env,
-      userId: 'usr_1',
-      authToken: 'validated-token',
-      deps: {
-        resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
-        })),
-        validatePromptBalance: vi.fn(async () => ({ success: true as const })),
-      },
-    });
-
-    expect(response.status).toBe(204);
-    expect(hasMessageAdmission).toHaveBeenCalledWith('msg_018f1e2d3c4bReplayAbCdEfGh');
-    expect(preflightExistingPromptModelMock).not.toHaveBeenCalled();
-    expect(admitSubmittedMessage).toHaveBeenCalledOnce();
   });
 
   it('maps unavailable stored-session models to an SDK error before prompt_async admission', async () => {
@@ -2416,7 +1944,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
         admitPrompt,
@@ -2452,7 +1980,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance: vi.fn(async () => ({ success: true as const })),
         admitPrompt,
@@ -2525,7 +2053,7 @@ describe('handleKiloFacadeRequest', () => {
   it('rejects unsupported prompt_async semantic fields without admitting work', async () => {
     const env = envStub();
     const admitSubmittedMessage = vi.fn();
-    vi.spyOn(env.CLOUD_AGENT_SESSION, 'get').mockReturnValue({
+    vi.spyOn(env.SANDBOX_SESSION, 'get').mockReturnValue({
       admitSubmittedMessage,
     } as never);
 
@@ -2542,7 +2070,7 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
       },
     });
@@ -2582,7 +2110,7 @@ describe('handleKiloFacadeRequest', () => {
         authToken: 'validated-token',
         deps: {
           resolveRootSessionForKiloSession: vi.fn(async () => ({
-            cloudAgentSessionId: 'agent_cold',
+            cloudAgentSessionId: firstWorkspaceSessionId,
           })),
           validatePromptBalance,
           admitPrompt,
@@ -2604,7 +2132,7 @@ describe('handleKiloFacadeRequest', () => {
     const validatePromptBalance = vi.fn();
     const admitPrompt = vi.fn();
     const resolveRootSessionForKiloSession = vi.fn(async () => ({
-      cloudAgentSessionId: 'agent_owned',
+      cloudAgentSessionId: firstWorkspaceSessionId,
     }));
 
     const response = await handleKiloFacadeRequest({
@@ -2658,7 +2186,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_owned',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance,
         admitPrompt,
@@ -2691,7 +2219,7 @@ describe('handleKiloFacadeRequest', () => {
       authToken: 'validated-token',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
         validatePromptBalance,
         admitPrompt,
@@ -2706,17 +2234,13 @@ describe('handleKiloFacadeRequest', () => {
       env,
       authToken: 'validated-token',
       userId: 'usr_1',
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
     });
     expect(admitPrompt).not.toHaveBeenCalled();
   });
 
-  it('applies abort idempotently and returns the native boolean success response', async () => {
-    const interruptPrompt = vi.fn().mockResolvedValue({
-      success: false,
-      message: 'No accepted wrapper messages or pending queued messages',
-    });
-    const resolveLiveWrapper = vi.fn();
+  it('hides a non-control root before abort or balance side effects', async () => {
+    const interruptPrompt = vi.fn();
 
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/abort`, {
@@ -2726,10 +2250,34 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_cold',
+          cloudAgentSessionId: 'agent_legacy',
         })),
         interruptPrompt,
-        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(interruptPrompt).not.toHaveBeenCalled();
+  });
+
+  it('applies abort idempotently and returns the native boolean success response', async () => {
+    const interruptPrompt = vi.fn().mockResolvedValue({
+      success: false,
+      message: 'No accepted wrapper messages or pending queued messages',
+    });
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/abort`, {
+        method: 'POST',
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        interruptPrompt,
       },
     });
 
@@ -2738,15 +2286,11 @@ describe('handleKiloFacadeRequest', () => {
     expect(interruptPrompt).toHaveBeenCalledWith({
       env: expect.anything(),
       userId: 'usr_1',
-      cloudAgentSessionId: 'agent_cold',
+      cloudAgentSessionId: firstWorkspaceSessionId,
     });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
   });
 
-  it('rejects unsupported root-scoped session routes without contacting a warm wrapper', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () => new Response('unexpected'));
-    const resolveLiveWrapper = vi.fn(async () => liveWrapperTarget(containerFetch));
-
+  it('rejects unsupported root-scoped session routes', async () => {
     const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/share?cursor=abc`, {
         method: 'POST',
@@ -2756,9 +2300,8 @@ describe('handleKiloFacadeRequest', () => {
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper,
       },
     });
 
@@ -2767,71 +2310,42 @@ describe('handleKiloFacadeRequest', () => {
       error: 'KILO_ROUTE_UNSUPPORTED',
       message: 'Kilo facade route is not supported',
     });
-    expect(resolveLiveWrapper).not.toHaveBeenCalled();
-    expect(containerFetch).not.toHaveBeenCalled();
   });
 
   it('preserves the exact no-suffix session route shape', async () => {
-    const containerFetch = vi.fn<ContainerFetch>(async () => new Response('ok'));
+    const env = envStub();
+    const getCloudAgentRootSessionSnapshot = vi.mocked(
+      env.SESSION_INGEST.getCloudAgentRootSessionSnapshot
+    );
+    getCloudAgentRootSessionSnapshot.mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      snapshot: { kind: 'value', info: sdkSessionInfo(kiloSessionId), byteLength: 123 },
+    });
 
-    await handleKiloFacadeRequest({
+    const response = await handleKiloFacadeRequest({
       request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
-      env: envStub(),
+      env,
       userId: 'usr_1',
       deps: {
         resolveRootSessionForKiloSession: vi.fn(async () => ({
-          cloudAgentSessionId: 'agent_live',
+          cloudAgentSessionId: firstWorkspaceSessionId,
         })),
-        resolveLiveWrapper: vi.fn(async () => liveWrapperTarget(containerFetch)),
       },
     });
 
-    const [forwardedRequest] = containerFetch.mock.calls[0];
-    expect(new URL((forwardedRequest as Request).url).pathname).toBe(
-      `/kilo-proxy/session/${kiloSessionId}`
-    );
+    expect(response.status).toBe(200);
+    expect(getCloudAgentRootSessionSnapshot).toHaveBeenCalledWith({
+      kiloUserId: 'usr_1',
+      kiloSessionId,
+    });
   });
 });
 
 describe('UserKiloFacade producer messages', () => {
-  it('does not let an older routed producer replace a newer connected feed', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const close = vi.fn();
-    const currentSocket = {
-      close,
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 2,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-    const ctx = {
-      getWebSockets: vi.fn(() => [currentSocket]),
-    } as unknown as DurableObjectState;
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade(ctx, env);
-    const response = await facade.fetch(
-      new Request(
-        'http://worker.test/internal/kilo/global-feed?userId=usr_1&cloudAgentSessionId=agent_live&kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_old&wrapperGeneration=1&wrapperConnectionId=conn_old',
-        { headers: { Upgrade: 'websocket' } }
-      )
-    );
-
-    expect(response.status).toBe(409);
-    expect(close).not.toHaveBeenCalled();
-  });
-
   it('emits a native-shaped global connection event in the public virtual-server directory', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const response = facade.openPublicGlobalEventStream();
@@ -2852,205 +2366,10 @@ describe('UserKiloFacade producer messages', () => {
     }
   });
 
-  it('drops malformed substantive global producer envelopes without a usable directory or payload type', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          payload: { type: 'message.updated', properties: { sessionID: kiloSessionId } },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/root',
-          payload: { properties: { sessionID: kiloSessionId } },
-        })
-      );
-      expect((ws as unknown as { send: ReturnType<typeof vi.fn> }).send).toHaveBeenCalledTimes(2);
-      expect((ws as unknown as { send: ReturnType<typeof vi.fn> }).send).toHaveBeenLastCalledWith(
-        JSON.stringify({ error: 'Invalid global event envelope' })
-      );
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('accepts the deployed native substantive message envelope without a payload id', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-    const payload = {
-      type: 'message.updated',
-      properties: { sessionID: kiloSessionId, info: { id: 'msg_native' } },
-    };
-
-    try {
-      await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({ directory: '/workspace/native', payload })
-      );
-      await expect(readSseFrame(reader)).resolves.toEqual({
-        directory: publicCloudAgentDirectory(kiloSessionId),
-        payload,
-      });
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('rewrites a valid substantive global producer event at the public stream boundary', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          project: 'project-1',
-          payload: {
-            id: 'evt_public',
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: 'msg_public' },
-          },
-        })
-      );
-      await expect(readSseFrame(reader)).resolves.toEqual({
-        directory: publicCloudAgentDirectory(kiloSessionId),
-        project: 'project-1',
-        payload: {
-          id: 'evt_public',
-          type: 'message.updated',
-          properties: { sessionID: kiloSessionId, id: 'msg_public' },
-        },
-      });
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('rewrites only the outer producer directory while preserving sibling envelope fields', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(reader);
-      const event = {
-        directory: '/workspace/private',
-        artifact: { path: '/workspace/private/envelope-secret.ts' },
-        payload: {
-          type: 'message.updated',
-          properties: { sessionID: kiloSessionId, id: 'preserved-envelope' },
-        },
-      };
-      await facade.webSocketMessage(ws, JSON.stringify(event));
-      await expect(readSseFrame(reader)).resolves.toEqual({
-        ...event,
-        directory: publicCloudAgentDirectory(kiloSessionId),
-      });
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
   it('uses comment frames for public keepalives rather than undeclared heartbeat events', async () => {
     vi.useFakeTimers();
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const body = facade.openPublicSessionEventStream(kiloSessionId).body;
@@ -3070,7 +2389,7 @@ describe('UserKiloFacade producer messages', () => {
 
   it('emits a native-shaped scoped connection event while no producer is live', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const response = facade.openPublicSessionEventStream(kiloSessionId);
@@ -3096,7 +2415,7 @@ describe('UserKiloFacade producer messages', () => {
 
   it('fans Cloud Agent extension events out before a native wrapper producer is live', async () => {
     const env = {
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const globalBody = facade.openPublicGlobalEventStream().body;
@@ -3118,7 +2437,7 @@ describe('UserKiloFacade producer messages', () => {
       await readSseFrame(scopedReader);
       await facade.publishCloudAgentExtensionEvent({
         kiloUserId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
+        cloudAgentSessionId: firstWorkspaceSessionId,
         kiloSessionId,
         event,
       });
@@ -3137,7 +2456,7 @@ describe('UserKiloFacade producer messages', () => {
     const resolveCloudAgentRootSessionForKiloSession = vi.fn(async () => null);
     const env = {
       SESSION_INGEST: { resolveCloudAgentRootSessionForKiloSession },
-      CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+      SANDBOX_SESSION: { idFromName: vi.fn(), get: vi.fn() },
     } as unknown as Env;
     const facade = new UserKiloFacade({} as DurableObjectState, env);
     const body = facade.openPublicGlobalEventStream().body;
@@ -3187,596 +2506,530 @@ describe('UserKiloFacade producer messages', () => {
       await reader.cancel().catch(() => undefined);
     }
   });
+});
 
-  it('opens a scoped stream while cold and emits only matching bare native events', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicSessionEventStream(kiloSessionId);
-    const body = response.body;
-    if (!body) throw new Error('Expected public scoped event response body');
-    const reader = body.getReader();
-    const matchingWs = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-    const otherWs = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_other',
-        kiloSessionId: 'ses_22222222222222222222222222',
-        wrapperRunId: 'wr_other',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_other',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      const connected = await readSseFrame<{ id?: string; type: string }>(reader);
-      expect(connected.type).toBe('server.connected');
-      expect(connected.id).toMatch(/^evt_/);
-      await facade.webSocketMessage(
-        otherWs,
-        JSON.stringify({
-          directory: '/workspace/other',
-          payload: {
-            id: 'evt_other',
-            type: 'message.updated',
-            properties: { sessionID: 'ses_22222222222222222222222222', id: 'msg_other' },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        matchingWs,
-        JSON.stringify({
-          directory: '/workspace/root',
-          payload: {
-            id: 'evt_synthetic_connected',
-            type: 'server.connected',
-            properties: { sessionID: kiloSessionId },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        matchingWs,
-        JSON.stringify({
-          directory: '/workspace/root',
-          payload: {
-            id: 'evt_synthetic_heartbeat',
-            type: 'server.heartbeat',
-            properties: { sessionID: kiloSessionId },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        matchingWs,
-        JSON.stringify({
-          directory: '/workspace/root',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, info: { id: 'msg_match' } },
-          },
-        })
-      );
-      const event = await readSseFrame<{
-        type: string;
-        properties: { sessionID: string; info: { id: string } };
-      }>(reader);
-      expect(event).toEqual({
-        type: 'message.updated',
-        properties: { sessionID: kiloSessionId, info: { id: 'msg_match' } },
-      });
-      expect(
-        (matchingWs as unknown as { send: ReturnType<typeof vi.fn> }).send
-      ).not.toHaveBeenCalled();
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('preserves embedded session and message entities during scoped and global fanout', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const globalBody = facade.openPublicGlobalEventStream().body;
-    const scopedBody = facade.openPublicSessionEventStream(kiloSessionId).body;
-    if (!globalBody || !scopedBody) throw new Error('Expected public event response bodies');
-    const globalReader = globalBody.getReader();
-    const scopedReader = scopedBody.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(globalReader);
-      await readSseFrame(scopedReader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'session.updated',
-            properties: { sessionID: kiloSessionId, info: sdkSessionInfo(kiloSessionId) },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, info: sdkMessageHistory()[1].info },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, info: sdkMessageHistory()[0].info },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.part.updated',
-            properties: {
-              sessionID: kiloSessionId,
-              part: {
-                ...sdkMessageHistory()[1].parts[1],
-                sessionID: 'ses_22222222222222222222222222',
-              },
-            },
-          },
-        })
-      );
-
-      const globalSession = await readSseFrame<{ payload: { properties: { info: unknown } } }>(
-        globalReader
-      );
-      const scopedSession = await readSseFrame<{ properties: { info: unknown } }>(scopedReader);
-      expect(globalSession.payload.properties.info).toEqual(sdkSessionInfo(kiloSessionId));
-      expect(scopedSession.properties.info).toEqual(sdkSessionInfo(kiloSessionId));
-      const globalMessage = await readSseFrame<{
-        payload: { properties: { info: { path: unknown } } };
-      }>(globalReader);
-      const scopedMessage = await readSseFrame<{ properties: { info: { path: unknown } } }>(
-        scopedReader
-      );
-      expect(globalMessage.payload.properties.info.path).toEqual({
-        cwd: '/workspace/private/session',
-        root: '/workspace/private',
-      });
-      expect(scopedMessage.properties.info.path).toEqual({
-        cwd: '/workspace/private/session',
-        root: '/workspace/private',
-      });
-      const globalUserMessage = await readSseFrame<{
-        payload: { properties: { info: { editorContext: { activeFile: string } } } };
-      }>(globalReader);
-      const scopedUserMessage = await readSseFrame<{
-        properties: { info: { editorContext: { activeFile: string } } };
-      }>(scopedReader);
-      expect(globalUserMessage.payload.properties.info.editorContext.activeFile).toBe(
-        '/workspace/private/active.ts'
-      );
-      expect(scopedUserMessage.properties.info.editorContext.activeFile).toBe(
-        '/workspace/private/active.ts'
-      );
-      const globalPart = await readSseFrame<{
-        payload: {
-          properties: {
-            part: {
-              sessionID: string;
-              state: { attachments: Array<{ source: { path: string } }> };
-            };
-          };
-        };
-      }>(globalReader);
-      const scopedPart = await readSseFrame<{
-        properties: {
-          part: { sessionID: string; state: { attachments: Array<{ source: { path: string } }> } };
-        };
-      }>(scopedReader);
-      expect(globalPart.payload.properties.part.sessionID).toBe('ses_22222222222222222222222222');
-      expect(scopedPart.properties.part.sessionID).toBe('ses_22222222222222222222222222');
-      expect(globalPart.payload.properties.part.state.attachments[0].source.path).toBe(
-        '/workspace/private/symbol.ts'
-      );
-      expect(scopedPart.properties.part.state.attachments[0].source.path).toBe(
-        '/workspace/private/symbol.ts'
-      );
-    } finally {
-      await globalReader.cancel().catch(() => undefined);
-      await scopedReader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('does not accept Cloud Agent extension namespace frames from wrapper producers', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const body = facade.openPublicGlobalEventStream().body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'cloud.status',
-            properties: {
-              sessionID: kiloSessionId,
-              internalDetail: 'secret backend lifecycle detail',
-            },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: 'safe-native-after-extension' },
-          },
-        })
-      );
-      const next = await readSseFrame<{ payload: { properties: { id: string } } }>(reader);
-      expect(next.payload.properties.id).toBe('safe-native-after-extension');
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('suppresses identityless and foreign-root wrapper events using top-level attribution', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) throw new Error('Expected public global event response body');
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    try {
-      await readSseFrame(reader);
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: { type: 'file.edited', properties: { path: '/workspace/private/secret.ts' } },
-        })
-      );
-      for (const type of ['pty.exited', 'indexing.status', 'session.error']) {
-        await facade.webSocketMessage(
-          ws,
-          JSON.stringify({ directory: '/workspace/private', payload: { type, properties: {} } })
-        );
-      }
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'session.idle',
-            properties: { sessionID: 'ses_22222222222222222222222222' },
-          },
-        })
-      );
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/private',
-          payload: {
-            type: 'message.updated',
-            properties: {
-              sessionID: kiloSessionId,
-              id: 'matching-after-suppressed',
-              info: sdkMessageHistory()[1].info,
-              artifact: { path: '/workspace/private/unreviewed.ts' },
-            },
-          },
-        })
-      );
-      const next = await readSseFrame<{
-        payload: { properties: { id: string; artifact: { path: string } } };
-      }>(reader);
-      expect(next.payload.properties).toMatchObject({
-        id: 'matching-after-suppressed',
-        artifact: { path: '/workspace/private/unreviewed.ts' },
-      });
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('rejects repeated internal producer identity parameters before fence validation', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn();
-    const idFromName = vi.fn();
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName,
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-
-    const response = await facade.fetch(
-      new Request(
-        `http://worker.test/internal/kilo/global-feed?userId=usr_1&cloudAgentSessionId=agent_live&kiloSessionId=${kiloSessionId}&wrapperRunId=wr_first&wrapperRunId=wr_second&wrapperGeneration=1&wrapperConnectionId=conn_current`,
-        { headers: { Upgrade: 'websocket' } }
-      )
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ error: 'INVALID_GLOBAL_FEED_SOURCE' });
-    expect(idFromName).not.toHaveBeenCalled();
-    expect(validateKiloGlobalFeedProducer).not.toHaveBeenCalled();
-  });
-
-  it('rejects a producer connection once its wrapper fence is no longer current', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({
-      success: false as const,
-      status: 409,
-      message: 'Stale wrapper connection',
-    }));
-    const idFromName = vi.fn(() => 'session-do-id');
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName,
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-
-    const response = await facade.fetch(
-      new Request(
-        `http://worker.test/internal/kilo/global-feed?userId=usr_1&cloudAgentSessionId=agent_live&kiloSessionId=${kiloSessionId}&wrapperRunId=wr_stale&wrapperGeneration=1&wrapperConnectionId=conn_stale`,
-        { headers: { Upgrade: 'websocket' } }
-      )
-    );
-
-    expect(idFromName).toHaveBeenCalledWith('usr_1:agent_live');
-    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledWith({
-      kiloSessionId,
-      wrapperRunId: 'wr_stale',
-      wrapperGeneration: 1,
-      wrapperConnectionId: 'conn_stale',
-    });
-    expect(response.status).toBe(409);
-    await expect(response.text()).resolves.toBe('Stale wrapper connection');
-  });
-
-  it('terminates a public subscriber that falls behind the live event stream', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName: vi.fn(() => 'session-do-id'),
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) {
-      throw new Error('Expected public global event response body');
-    }
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    for (let index = 0; index < 256; index++) {
-      await facade.webSocketMessage(
-        ws,
-        JSON.stringify({
-          directory: '/workspace/root',
-          payload: {
-            id: `evt_${index}`,
-            type: 'message.updated',
-            properties: { sessionID: kiloSessionId, id: `msg_${index}` },
-          },
-        })
-      );
-    }
-
-    try {
-      await expect(reader.read()).rejects.toThrow('Global event subscriber fell behind');
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-  });
-
-  it('preserves producer event order without revalidating each frame', async () => {
-    const validateKiloGlobalFeedProducer = vi.fn();
-    const idFromName = vi.fn();
-    const env = {
-      CLOUD_AGENT_SESSION: {
-        idFromName,
-        get: vi.fn(() => ({ validateKiloGlobalFeedProducer })),
-      },
-    } as unknown as Env;
-    const facade = new UserKiloFacade({} as DurableObjectState, env);
-    const response = facade.openPublicGlobalEventStream();
-    const body = response.body;
-    if (!body) {
-      throw new Error('Expected public global event response body');
-    }
-    const reader = body.getReader();
-    const ws = {
-      close: vi.fn(),
-      send: vi.fn(),
-      deserializeAttachment: () => ({
-        userId: 'usr_1',
-        cloudAgentSessionId: 'agent_live',
-        kiloSessionId,
-        wrapperRunId: 'wr_current',
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_current',
-      }),
-    } as unknown as WebSocket;
-
-    await facade.webSocketMessage(
-      ws,
-      JSON.stringify({
-        directory: '/workspace/root',
-        payload: {
-          id: 'evt_first',
-          type: 'message.updated',
-          properties: { sessionID: kiloSessionId, id: 'first' },
-        },
-      })
-    );
-    await facade.webSocketMessage(
-      ws,
-      JSON.stringify({
-        directory: '/workspace/root',
-        payload: {
-          id: 'evt_second',
-          type: 'message.updated',
-          properties: { sessionID: kiloSessionId, id: 'second' },
-        },
-      })
-    );
-
-    const readEvent = async (): Promise<{ payload: { properties?: { id?: string } } }> => {
-      const frame = await reader.read();
-      if (frame.done) {
-        throw new Error('Expected global event frame');
-      }
-      return JSON.parse(new TextDecoder().decode(frame.value).slice('data: '.length));
+describe('hosted global native events', () => {
+  function rootSummary(
+    id = kiloSessionId,
+    cloudAgentSessionId = firstWorkspaceSessionId
+  ): CloudAgentRootSessionSummary {
+    return {
+      kiloSessionId: id,
+      cloudAgentSessionId,
+      workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
+      userId: groupedOwnerId,
+      organizationId: null,
+      title: 'Owned root',
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      createdOnPlatform: 'unknown',
+      created: 100,
+      updated: 200,
     };
+  }
 
+  function rootPage(roots: CloudAgentRootSessionSummary[]): CloudAgentRootSessionsPage {
+    return { items: roots, nextCursor: null };
+  }
+
+  function globalFixture(roots = [rootSummary()]) {
+    const env = envStub();
+    const listCloudAgentRootSessions = vi.mocked(env.SESSION_INGEST.listCloudAgentRootSessions);
+    listCloudAgentRootSessions.mockResolvedValue(rootPage(roots));
+    const resolveRoot = vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession);
+    resolveRoot.mockImplementation(async ({ kiloUserId, kiloSessionId: requestedId }) => {
+      if (kiloUserId !== groupedOwnerId) return null;
+      const root = roots.find(item => item.kiloSessionId === requestedId);
+      return root ? { cloudAgentSessionId: root.cloudAgentSessionId } : null;
+    });
+    const tails = new Map<
+      string,
+      Array<{ sink?: NativeTailSink; closed: boolean; history?: boolean }>
+    >();
+    const openNativeTail = vi.fn(
+      async (params: {
+        env: Env;
+        userId: string;
+        cloudAgentSessionId: string;
+        kiloSessionId: string;
+        history?: boolean;
+      }): Promise<NativeTailOpenResult> => {
+        const entry: { sink?: NativeTailSink; closed: boolean; history?: boolean } = {
+          closed: false,
+          history: params.history,
+        };
+        const tail: NativeEventTail = {
+          async run(sink) {
+            entry.sink = sink;
+          },
+          close() {
+            entry.closed = true;
+          },
+        };
+        tails.set(params.kiloSessionId, [...(tails.get(params.kiloSessionId) ?? []), entry]);
+        return { kind: 'open', tail };
+      }
+    );
+    const waitUntil = vi.fn<(promise: Promise<unknown>) => void>();
+    const facade = new UserKiloFacade({ waitUntil } as unknown as DurableObjectState, env);
+
+    const event = (eventId: number, root = roots[0]) => ({
+      type: 'message.updated',
+      properties: { sessionID: root?.kiloSessionId, eventId },
+    });
+    const sinksFor = (root = roots[0]) => {
+      if (!root) throw new Error('Expected native root fixture');
+      const list = tails.get(root.kiloSessionId) ?? [];
+      if (list.length === 0) throw new Error('Expected an open global native tail');
+      return list;
+    };
+    const push = async (frames: unknown[], root = roots[0]) => {
+      const list = sinksFor(root);
+      for (const item of frames) for (const entry of list) await entry.sink?.send(item as never);
+    };
+    return {
+      env,
+      facade,
+      listCloudAgentRootSessions,
+      resolveRoot,
+      openNativeTail,
+      tails,
+      waitUntil,
+      event,
+      push,
+      sinksFor,
+    };
+  }
+
+  function globalReader(facade: UserKiloFacade, openNativeTail: KiloFacadeNativeTailOpener) {
+    const response = facade.openPublicGlobalEventStream(groupedOwnerId, openNativeTail);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    if (!response.body) throw new Error('Expected authenticated global event response body');
+    return response.body.getReader();
+  }
+
+  async function expectGlobalConnected(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    await expect(readSseFrame(reader)).resolves.toEqual({
+      directory: '/cloud-agent',
+      payload: { id: expect.stringMatching(/^evt_/), type: 'server.connected', properties: {} },
+    });
+  }
+
+  it('tails only listed owned control roots without history or compute reads', async () => {
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+      rootSummary('ses_legacy_legacy_legacy_legacy', 'agent_legacy'),
+    ]);
+    const reader = globalReader(fixture.facade, fixture.openNativeTail);
     try {
-      await readEvent();
-      expect((await readEvent()).payload.properties?.id).toBe('first');
-      expect((await readEvent()).payload.properties?.id).toBe('second');
-      expect(idFromName).not.toHaveBeenCalled();
-      expect(validateKiloGlobalFeedProducer).not.toHaveBeenCalled();
+      await expectGlobalConnected(reader);
+      expect(fixture.listCloudAgentRootSessions).toHaveBeenCalledWith({
+        kiloUserId: groupedOwnerId,
+        limit: 100,
+      });
+      const tailed = fixture.openNativeTail.mock.calls.map(([params]) => params.kiloSessionId);
+      expect(new Set(tailed)).toEqual(new Set([kiloSessionId, siblingKiloSessionId]));
+      expect(fixture.openNativeTail).toHaveBeenCalledWith(
+        expect.objectContaining({ history: false })
+      );
+      expect(fixture.env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
     } finally {
-      await reader.cancel().catch(() => undefined);
+      await reader.cancel();
+    }
+  });
+
+  it('delivers a live frame for an owned root with its directory and never fences it', async () => {
+    const fixture = globalFixture();
+    const reader = globalReader(fixture.facade, fixture.openNativeTail);
+    try {
+      await expectGlobalConnected(reader);
+      await fixture.push([fixture.event(11)]);
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: { type: 'message.updated', properties: { sessionID: kiloSessionId, eventId: 11 } },
+      });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('discovers a root added after global connection on the next heartbeat', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture([]);
+    fixture.listCloudAgentRootSessions.mockResolvedValue(rootPage([]));
+    const reader = globalReader(fixture.facade, fixture.openNativeTail);
+    try {
+      await vi.runOnlyPendingTimersAsync();
+      await expectGlobalConnected(reader);
+      expect(fixture.openNativeTail).not.toHaveBeenCalled();
+      fixture.listCloudAgentRootSessions.mockResolvedValue(rootPage([rootSummary()]));
+      await vi.advanceTimersByTimeAsync(10_000);
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(fixture.openNativeTail.mock.calls.map(([params]) => params.kiloSessionId)).toEqual([
+        kiloSessionId,
+      ]);
+      await reader.cancel();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes a root tail removed from the owned list and stops its delivery', async () => {
+    vi.useFakeTimers();
+    const fixture = globalFixture([rootSummary()]);
+    const reader = globalReader(fixture.facade, fixture.openNativeTail);
+    try {
+      await vi.runOnlyPendingTimersAsync();
+      await expectGlobalConnected(reader);
+      const entries = fixture.sinksFor();
+      expect(entries).toHaveLength(1);
+      fixture.listCloudAgentRootSessions.mockResolvedValue(rootPage([]));
+      await vi.advanceTimersByTimeAsync(10_000);
+      await Promise.all(fixture.waitUntil.mock.calls.map(([promise]) => promise));
+      expect(entries.every(entry => entry.closed)).toBe(true);
+      await reader.cancel();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resnapshots only the root whose tail reports a gap and keeps the global SSE open', async () => {
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
+    const reader = globalReader(fixture.facade, fixture.openNativeTail);
+    try {
+      await expectGlobalConnected(reader);
+      fixture.sinksFor()[0]?.sink?.finish('continuity_unproven');
+      await expect(readSseFrame(reader)).resolves.toEqual({
+        directory: publicCloudAgentDirectory(kiloSessionId),
+        payload: {
+          type: 'kilo.native.resnapshot',
+          properties: { sessionID: kiloSessionId, reason: 'continuity_unproven' },
+        },
+      });
+      expect(fixture.sinksFor()[0]?.closed).toBe(true);
+      // The global SSE stays open: the sibling root still delivers on it.
+      const siblingRoot = rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId);
+      await fixture.push([fixture.event(12, siblingRoot)], siblingRoot);
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        payload: { properties: { sessionID: siblingKiloSessionId, eventId: 12 } },
+      });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
+  it('keeps two global consumers distinct when one cancels', async () => {
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
+    const first = globalReader(fixture.facade, fixture.openNativeTail);
+    const second = globalReader(fixture.facade, fixture.openNativeTail);
+    try {
+      await expectGlobalConnected(first);
+      await expectGlobalConnected(second);
+      await fixture.push([fixture.event(11)]);
+      await expect(readSseFrame(first)).resolves.toMatchObject({
+        payload: { properties: { eventId: 11 } },
+      });
+      await expect(readSseFrame(second)).resolves.toMatchObject({
+        payload: { properties: { eventId: 11 } },
+      });
+      await first.cancel();
+      const siblingRoot = rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId);
+      await fixture.push([fixture.event(12, siblingRoot)], siblingRoot);
+      await expect(readSseFrame(second)).resolves.toMatchObject({
+        payload: { properties: { sessionID: siblingKiloSessionId, eventId: 12 } },
+      });
+      expect(fixture.sinksFor(siblingRoot).some(entry => !entry.closed)).toBe(true);
+      await second.cancel();
+    } finally {
+      await first.cancel();
+      await second.cancel();
     }
   });
 });
 
-describe('global event helpers', () => {
-  it('rewrites only directory to the public Cloud Agent session namespace', () => {
-    const payload = {
-      id: 'evt_msg_1',
-      type: 'message.updated',
-      properties: { sessionID: kiloSessionId, id: 'msg_1' },
-    };
-    const event = {
-      directory: '/workspace/project/sessions/agent_live',
-      project: 'project-1',
-      workspace: 'workspace-1',
-      payload,
-    };
+describe('hosted native routes', () => {
+  const workspaceSession = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-    expect(rewriteGlobalEventDirectory(event, kiloSessionId)).toEqual({
-      directory: publicCloudAgentDirectory(kiloSessionId),
-      project: 'project-1',
-      workspace: 'workspace-1',
-      payload,
+  function hostedDeps(overrides: Record<string, unknown> = {}) {
+    return {
+      resolveRootSessionForKiloSession: vi.fn(async () => ({
+        cloudAgentSessionId: workspaceSession,
+      })),
+      decideSessionRoute: vi.fn(() => ({ kind: 'native-session' }) as never),
+      ...overrides,
+    };
+  }
+
+  it('maps a stopped hosted root to the live-runtime-unavailable error before opening SSE', async () => {
+    const openPublicSessionEventStream = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({
+        openNativeTail: vi.fn(async () => ({ kind: 'stopped' as const })),
+        globalEvents: { openPublicGlobalEventStream: vi.fn(), openPublicSessionEventStream },
+      }),
+    });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_LIVE_RUNTIME_UNAVAILABLE',
+    });
+    expect(openPublicSessionEventStream).not.toHaveBeenCalled();
+  });
+
+  it('maps an unavailable native tail to a retryable 503 before opening SSE', async () => {
+    const openPublicSessionEventStream = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({
+        openNativeTail: vi.fn(async () => ({
+          kind: 'unavailable' as const,
+          code: 'KILO_SESSION_READ_RETRYABLE',
+          message: 'Native event stream is unavailable',
+        })),
+        globalEvents: { openPublicGlobalEventStream: vi.fn(), openPublicSessionEventStream },
+      }),
+    });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_READ_RETRYABLE' });
+    expect(openPublicSessionEventStream).not.toHaveBeenCalled();
+  });
+
+  it('streams tail frames in order and closes the response when the tail finishes', async () => {
+    const env = envStub();
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const reader = facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        tail: nativeTailDouble({
+          run: async sink => {
+            await sink.send({ type: 'message.updated', properties: { sessionID: kiloSessionId } });
+            await sink.send({ type: 'kilo.native.fence', properties: { snapshotComplete: true } });
+            sink.finish(undefined);
+          },
+        }),
+      })
+      .body!.getReader();
+    await reader.read();
+    await expect(readSseFrame(reader)).resolves.toMatchObject({ type: 'message.updated' });
+    await expect(readSseFrame(reader)).resolves.toMatchObject({ type: 'kilo.native.fence' });
+    await expect(reader.read()).resolves.toEqual({ done: true, value: undefined });
+  });
+
+  it('emits a continuity resnapshot and closes when the tail reports a gap', async () => {
+    const env = envStub();
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const reader = facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        tail: nativeTailDouble({
+          run: async sink => {
+            await sink.send({ type: 'message.updated', properties: { sessionID: kiloSessionId } });
+            sink.finish('continuity_unproven');
+          },
+        }),
+      })
+      .body!.getReader();
+    await reader.read();
+    await expect(readSseFrame(reader)).resolves.toMatchObject({ type: 'message.updated' });
+    await expect(readSseFrame(reader)).resolves.toMatchObject({
+      type: 'kilo.native.resnapshot',
+      properties: { reason: 'continuity_unproven' },
+    });
+    await expect(reader.read()).resolves.toEqual({ done: true, value: undefined });
+  });
+
+  it('keeps the response open after a snapshot_too_large resnapshot', async () => {
+    vi.useFakeTimers();
+    const env = envStub();
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const reader = facade
+      .openPublicSessionEventStream(kiloSessionId, {
+        tail: nativeTailDouble({ run: async sink => sink.finish('snapshot_too_large') }),
+      })
+      .body!.getReader();
+    try {
+      await reader.read();
+      await expect(readSseFrame(reader)).resolves.toMatchObject({
+        type: 'kilo.native.resnapshot',
+        properties: { reason: 'snapshot_too_large' },
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await readSseTextFrame(reader)).toBe(': heartbeat\n\n');
+    } finally {
+      await reader.cancel();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads a hosted session status through the Session DO without waking compute', async () => {
+    const nativeLiveRead = vi.fn(async () => ({
+      ok: true as const,
+      result: { [kiloSessionId]: { type: 'busy', directory: '/workspace/private' } },
+    }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/session/status?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ [kiloSessionId]: { type: 'busy' } });
+    expect(nativeLiveRead).toHaveBeenCalledWith({
+      env: expect.anything(),
+      userId: 'usr_1',
+      cloudAgentSessionId: workspaceSession,
+      operation: { name: 'session.status' },
+    });
+    const sandboxGet = vi.fn();
+    expect(sandboxGet).not.toHaveBeenCalled();
+  });
+
+  it('requires the hosted directory selector for collection reads', async () => {
+    const nativeLiveRead = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/question'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({ nativeLiveRead }),
+    });
+    expect(response.status).toBe(400);
+    expect(nativeLiveRead).not.toHaveBeenCalled();
+  });
+
+  it('rejects a collection selector that names no hosted session', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        'http://worker.test/kilo/permission?directory=%2Fcloud-agent%2Fsessions%2Fnot-a-session'
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it('reports a stopped hosted runtime as unavailable rather than starting it', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/todo`),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: hostedDeps({
+        nativeLiveRead: vi.fn(async () => ({
+          ok: false as const,
+          error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+        })),
+      }),
+    });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_LIVE_RUNTIME_UNAVAILABLE',
     });
   });
 
-  it('identifies wrapper synthetic global frames for suppression', () => {
-    expect(
-      isSyntheticGlobalEvent({
-        payload: { id: 'evt_connected', type: 'server.connected', properties: {} },
-      })
-    ).toBe(true);
-    expect(
-      isSyntheticGlobalEvent({
-        payload: { id: 'evt_heartbeat', type: 'server.heartbeat', properties: {} },
-      })
-    ).toBe(true);
-    expect(
-      isSyntheticGlobalEvent({
-        payload: { id: 'evt_message', type: 'message.updated', properties: {} },
-      })
-    ).toBe(false);
+  it('answers a hosted question through the Session DO, which owns the route identity', async () => {
+    const answer = vi.fn(async () => 'delivered' as const);
+    const env = envStub();
+    const sandboxGet = vi.fn(() => ({ answer }));
+    vi.mocked(env.SANDBOX_SESSION).get = sandboxGet as never;
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/que_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['yes']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(200);
+    expect(answer).toHaveBeenCalledWith({
+      sessionId: workspaceSession,
+      reply: { action: 'answer', questionId: 'que_1', answers: [['yes']] },
+    });
+  });
+
+  it('rejects an interaction the session does not wait on', async () => {
+    const env = envStub();
+    const sandboxGet = vi.fn(() => ({ answer: vi.fn(async () => 'not_connected' as const) }));
+    vi.mocked(env.SANDBOX_SESSION).get = sandboxGet as never;
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/permission/per_stale/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ reply: 'once' }) }
+      ),
+      env,
+      userId: 'usr_1',
+      deps: hostedDeps(),
+    });
+    expect(response.status).toBe(409);
+  });
+
+  it.each([{ mode: 'code', model: 'anthropic/test' }, { model: 'anthropic/test' }])(
+    'forwards command overrides %j through durable admission',
+    async agent => {
+      const admitPrompt = vi.fn(async (_params: unknown) => ({
+        success: true as const,
+        outcome: 'queued' as const,
+        compatibilityDelivery: 'queued' as const,
+        messageId: 'msg_1',
+      }));
+      const response = await handleKiloFacadeRequest({
+        request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+          method: 'POST',
+          body: JSON.stringify({
+            messageID: 'msg_1',
+            command: 'commit',
+            arguments: '-m done',
+            agent: 'mode' in agent ? agent.mode : undefined,
+            model: agent.model,
+          }),
+        }),
+        env: envStub(),
+        userId: 'usr_1',
+        authToken: 'token',
+        deps: hostedDeps({ admitPrompt }),
+      });
+      expect(response.status).toBe(204);
+      expect(admitPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cloudAgentSessionId: workspaceSession,
+          request: expect.objectContaining({
+            agent,
+            turn: { type: 'command', id: 'msg_1', command: 'commit', arguments: '-m done' },
+          }),
+        })
+      );
+    }
+  );
+
+  it('refuses a balance bypass on the native command route', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/command`, {
+        method: 'POST',
+        headers: { 'x-skip-balance-check': '1' },
+        body: JSON.stringify({ command: 'commit' }),
+      }),
+      env: envStub(),
+      userId: 'usr_1',
+      authToken: 'token',
+      deps: hostedDeps(),
+    });
+    expect([400, 204]).toContain(response.status);
   });
 });

@@ -2,13 +2,13 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   CodeReviewCouncilConfigSchema,
   MAX_RUNTIME_AGENT_MODEL_LENGTH,
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
+import { MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH } from '@kilocode/app-shared/code-review';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
@@ -27,9 +27,12 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabMergeRequest } from '@/lib/integrations/platforms/gitlab/adapter';
-import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
+import {
+  authorizeProject,
+  gitlabReviewErrorToTrpcError,
+  gitlabReviewOwnerFor,
+} from '@/lib/provider-review/gitlab-authorization';
 import type { CodeReviewPlatform, Owner } from './core';
 import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
 import { tryDispatchPendingReviews } from './dispatch/dispatch-pending-reviews';
@@ -47,7 +50,9 @@ export const ManualCodeReviewJobInputSchema = z.object({
     .regex(/^[a-zA-Z]+$/)
     .nullable()
     .optional(),
-  instructions: z.string().max(4_000).optional(),
+  // Capped by the same constant both review forms bound their field with, so a
+  // draft a form accepts is a draft this schema accepts.
+  instructions: z.string().max(MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH).optional(),
   // When present, this is a multi-specialist council run. The specialists (with their
   // per-specialist model/effort) and aggregation strategy are carried here and merged
   // into the run's agent config. Absent = a standard single-reviewer run.
@@ -524,38 +529,34 @@ async function resolveConnectedGitLabSource(
     });
   }
 
-  for (const integration of integrations) {
-    const instanceUrl = getGitLabIntegrationInstanceUrl(integration);
-    if (parsed.origin !== instanceUrl) continue;
+  const reviewOwner = gitlabReviewOwnerFor(owner, owner.userId);
 
-    const accessToken = await getValidGitLabToken(integration, {
-      userId: owner.userId,
-      ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
-    });
+  try {
+    // The same boundary GitLab branch listing and the provider-review reads
+    // enforce: the pasted project has to be one of the connection's cached
+    // repositories, and the pasted instance has to be the connected one. A
+    // refusal here happens before the connection's credential is minted, so a
+    // path outside that scope never reaches the token broker, the provider, a
+    // review row, or session preparation.
+    const access = await authorizeProject(reviewOwner, parsed.projectPath, parsed.origin);
     const rawMergeRequest = await fetchGitLabMergeRequest({
-      accessToken,
-      projectId: parsed.projectPath,
+      accessToken: access.accessToken,
+      projectId: access.projectPath,
       mrIid: parsed.mrIid,
-      instanceUrl,
+      instanceUrl: access.instanceUrl,
     });
     const mergeRequest = GitLabMergeRequestApiSchema.parse(rawMergeRequest);
     validateOpenGitLabMergeRequest(mergeRequest);
 
     return buildGitLabSource({
       mergeRequest,
-      projectPath: parsed.projectPath,
-      integrationId: integration.id,
-      platformProjectId:
-        mergeRequest.target_project_id ??
-        mergeRequest.project_id ??
-        getGitLabRepositoryIdFromIntegration(integration, parsed.projectPath),
+      projectPath: access.projectPath,
+      integrationId: access.integrationId,
+      platformProjectId: access.repositoryId,
     });
+  } catch (error) {
+    throw gitlabReviewErrorToTrpcError(error, reviewOwner);
   }
-
-  throw new TRPCError({
-    code: 'BAD_REQUEST',
-    message: 'The merge request URL does not match a connected GitLab instance.',
-  });
 }
 
 function buildGitHubSource(
@@ -752,27 +753,6 @@ function validateOpenGitLabMergeRequest(mergeRequest: GitLabMergeRequestApi): vo
       message: 'Code Reviewer does not run on draft merge requests.',
     });
   }
-}
-
-function getGitLabIntegrationInstanceUrl(integration: PlatformIntegration): string {
-  const metadata = integration.metadata;
-  const instanceUrl =
-    typeof metadata === 'object' &&
-    metadata !== null &&
-    !Array.isArray(metadata) &&
-    'gitlab_instance_url' in metadata
-      ? metadata.gitlab_instance_url
-      : undefined;
-  return normalizeGitLabInstanceUrl(typeof instanceUrl === 'string' ? instanceUrl : undefined);
-}
-
-function getGitLabRepositoryIdFromIntegration(
-  integration: PlatformIntegration,
-  projectPath: string
-): number | undefined {
-  const repositories = integration.repositories;
-  const repository = repositories?.find(candidate => candidate.full_name === projectPath);
-  return typeof repository?.id === 'number' ? repository.id : undefined;
 }
 
 class ProviderFetchError extends Error {

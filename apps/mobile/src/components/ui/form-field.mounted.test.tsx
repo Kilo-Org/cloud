@@ -121,6 +121,71 @@ describe('FormField reserved validation space', () => {
   });
 });
 
+describe('FormField errors known from elsewhere', () => {
+  const label = i18n.t('login.emailAddress');
+  const ownError = i18n.t('login.pleaseEnterEmail');
+  const submittedError = i18n.t('authErrors.invalidEmail');
+
+  function mount(props: { error?: string }) {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label,
+          validate: (value: string) => (value === '' ? ownError : null),
+          ...props,
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer;
+  }
+
+  function shownError(mounted: TestRenderer.ReactTestRenderer) {
+    const texts = mounted.root.findByType(AccessibleStatus).findAllByType('Text');
+    return texts.map(node => node.props.children);
+  }
+
+  function inputHandlers(mounted: TestRenderer.ReactTestRenderer) {
+    const props = mounted.root.findByType('TextInput').props as {
+      onBlur: (event: unknown) => void;
+      onChangeText: (value: string) => void;
+    };
+    return props;
+  }
+
+  it('shows a rejected submit before the field has been blurred', () => {
+    const mounted = mount({ error: submittedError });
+
+    expect(shownError(mounted)).toEqual([submittedError]);
+    expect(mounted.root.findByType('TextInput').props.className).toContain('border-destructive');
+  });
+
+  it("lets the field's own rule speak first once it has something to say", () => {
+    const mounted = mount({ error: submittedError });
+
+    act(() => {
+      inputHandlers(mounted).onBlur({});
+    });
+
+    expect(shownError(mounted)).toEqual([ownError]);
+  });
+
+  it('returns to the externally known error once the value satisfies the rule', () => {
+    const mounted = mount({ error: submittedError });
+
+    act(() => {
+      inputHandlers(mounted).onBlur({});
+    });
+    act(() => {
+      inputHandlers(mounted).onChangeText('dev@example.com');
+    });
+
+    expect(shownError(mounted)).toEqual([submittedError]);
+  });
+});
+
 describe('FormField direction-aware content alignment', () => {
   function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
     act(() => {

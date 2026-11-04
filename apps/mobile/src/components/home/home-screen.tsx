@@ -7,15 +7,15 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import logo from '@/../assets/images/logo.png';
 import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import {
-  AgentSessionsSection,
-  LiveSessionFeedback,
-} from '@/components/home/agent-sessions-section';
+import { BriefingCard, useHomeBriefing } from '@/components/agent-briefing/briefing-card';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { AgentSessionsSection } from '@/components/home/home-agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -30,6 +30,7 @@ export function HomeScreen() {
     organizationId: context.organizationId,
     enabled: context.isReady,
   });
+  const homeBriefing = useHomeBriefing();
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
   const liveContent = liveSessionContent(context, sessions);
@@ -61,6 +62,14 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
+        // The active account at the mark's trailing edge, on the mark's row:
+        // the same switchable control the profile credits card uses, so the org
+        // a new task will start in is visible (and changeable) before the form
+        // opens. The heading is the mark alone, so the row never reflows the
+        // picker under it (`allowInlineActionsStacking` reserves room for a
+        // heading's text that this header does not have).
+        inlineActions={<ContextControl />}
+        allowInlineActionsStacking={false}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards
         // and actions use (`mx-4`), not a wider header-only gutter.
@@ -91,7 +100,16 @@ export function HomeScreen() {
             }
           >
             <Animated.View layout={LinearTransition} className="gap-2">
-              <AgentSessionsSection context={context} sessions={sessions} />
+              <AgentSessionsSection
+                context={context}
+                sessions={sessions}
+                briefing={{
+                  visible: homeBriefing.briefing !== undefined,
+                  card: homeBriefing.frameReport ? (
+                    <BriefingCard report={homeBriefing.frameReport} embedded />
+                  ) : null,
+                }}
+              />
               <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
                 <View className="gap-2 pt-4">

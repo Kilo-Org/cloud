@@ -1,31 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, StatusBar, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
-
-/**
- * How much top clearance the header reserves:
- *
- * - 'always': the surface owns the top of the window (full-screen modals), so
- *   the status-bar inset applies whenever it is non-zero.
- * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
- *   status bar, so it reserves no top clearance on either platform — the
- *   window inset would only be a dead band above the header (p7). Android
- *   caps the detents just below the inset (useFormSheetScreenOptions) and the
- *   iOS sheet clears the top edge with its grabber, so the same rule holds
- *   everywhere.
- * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
- *   on both platforms, so the header reserves no top clearance — the native
- *   iOS pageSheet presents below the status bar, and the Android full-window
- *   Modal pads its own top inset (session-page-sheet). `useSafeAreaInsets`
- *   still reports the window's inset inside either Modal, so reading it in the
- *   header would leave a dead band above the title.
- */
-export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet';
 
 export function SheetHeader({
   title,
@@ -37,6 +18,7 @@ export function SheetHeader({
   onShare,
   sharing = false,
   disabled = false,
+  doneDisabled = false,
   topInset = 'always',
 }: {
   title: string;
@@ -55,7 +37,14 @@ export function SheetHeader({
   cancelLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
+  /** Disables both controls. Use `doneDisabled` when only the commit waits. */
   disabled?: boolean;
+  /**
+   * Disables the Done control alone, so Cancel still closes a sheet that is
+   * saving. A full-window sheet has no drag dismissal left, so Cancel is the
+   * only way out while a write is in flight.
+   */
+  doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
@@ -63,23 +52,11 @@ export function SheetHeader({
   const insets = useScreenInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
-  // Reserve top clearance as well as landscape cutout clearance inside the
-  // gutters. Keeping the inset on an inner wrapper preserves the header's own
-  // padding. Android can report top: 0 for the frame a freshly presented
-  // sheet first lays out (before the insets propagate); fall back to the
-  // synchronous status-bar height the same way the form-sheet detents do.
-  // `StatusBar.currentHeight` is an Android-only API and `undefined` on iOS,
-  // so the nullish fallback yields the status-bar height on both platforms
-  // without branching on Platform.OS.
-  const statusBarHeight = StatusBar.currentHeight ?? 0;
-  const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // Both sheet surfaces own the top of the window, so the header reserves no
-  // top clearance: a bottom formSheet is anchored below the status bar and a
-  // SessionPageSheet presents below it too (the native pageSheet on iOS, a
-  // full-window Modal that pads its own top inset on Android). Any resolved
-  // window inset here would only be a dead band above the header.
-  const dropsTopInset = topInset === 'bottom-form-sheet' || topInset === 'ios-page-sheet';
-  const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
+  // The top clearance comes from the same rule (and the same inputs) as the
+  // detent cap, so the header and the sheet edge cannot disagree about who
+  // clears the status bar. It is known before the first frame, so the header
+  // paints once, already settled, instead of moving by the inset.
+  const topInsetHeight = useSheetHeaderTopClearance(topInset);
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
@@ -96,7 +73,7 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
       <View style={safeAreaStyle}>
-        <View className="min-h-11 flex-row items-center gap-x-3">
+        <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined ? (
             <Pressable
               onPress={onShare}
@@ -105,7 +82,7 @@ export function SheetHeader({
               accessibilityRole="button"
               accessibilityLabel={t('common.share', { title })}
               accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Share size={20} color={colors.foreground} />
             </Pressable>
@@ -117,9 +94,13 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
-              <Text className="text-center text-base font-medium text-foreground">
+              <Text
+                className="text-center text-base font-medium text-foreground"
+                numberOfLines={1}
+                ellipsizeMode="clip"
+              >
                 {resolvedCancelLabel}
               </Text>
             </Pressable>
@@ -139,15 +120,22 @@ export function SheetHeader({
               {title}
             </Text>
           </View>
+          {/* The trailing control commits what the sheet holds, so it carries
+              the accent weight and colour while the leading Cancel stays a
+              neutral label. Both keep the same hit box. */}
           <Pressable
             onPress={onDone}
-            disabled={disabled}
+            disabled={disabled || doneDisabled}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
-            <Text className="text-center text-base font-medium text-foreground">
+            <Text
+              className="text-center text-base font-semibold text-primary"
+              numberOfLines={1}
+              ellipsizeMode="clip"
+            >
               {resolvedDoneLabel}
             </Text>
           </Pressable>

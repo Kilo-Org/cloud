@@ -14,6 +14,7 @@ import { useOpenPartDetail } from '../open-part-detail-context';
 import { ReadMarkdownBody } from '../read-markdown-body';
 import { isMarkdownPath } from '../read-tool-markdown';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolStatusLabel } from '../tool-status-label';
 
 const WRITE_CODE_CHARACTER_CAP = 50_000;
 
@@ -75,7 +76,7 @@ export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

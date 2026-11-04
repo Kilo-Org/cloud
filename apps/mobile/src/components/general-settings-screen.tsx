@@ -7,7 +7,9 @@ import {
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useCallback } from 'react';
 import { View } from 'react-native';
 
 import { AppUnlockFeedback } from '@/components/app-unlock-screen';
@@ -59,6 +61,18 @@ export function GeneralSettingsScreen() {
   } = useCondenseToolCallsPreference();
   const { t } = useTranslation();
 
+  // One enable attempt owns its feedback: leaving this screen retires it, so
+  // a later visit shows no error until the user tries again.
+  const { clearSettingOutcome } = unlock;
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        clearSettingOutcome();
+      },
+      [clearSettingOutcome]
+    )
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.general')} />
@@ -82,9 +96,20 @@ export function GeneralSettingsScreen() {
         <PreferenceRow
           icon={Brain}
           title={t('preferences.autoExpandThinking')}
-          subtitle={t('preferences.autoExpandThinkingSubtitle')}
+          subtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingInactiveSubtitle')
+              : t('preferences.autoExpandThinkingSubtitle')
+          }
+          inactiveSubtitle={
+            hideThinking
+              ? t('preferences.autoExpandThinkingSubtitle')
+              : t('preferences.autoExpandThinkingInactiveSubtitle')
+          }
           value={defaultExpanded}
-          disabled={!reasoningLoaded}
+          // The row states a dependency on the hide-thinking preference, so it
+          // stays inert until both stored values are known.
+          disabled={!reasoningLoaded || !hideThinkingLoaded || hideThinking}
           onValueChange={setDefaultExpanded}
         />
         <PreferenceRow

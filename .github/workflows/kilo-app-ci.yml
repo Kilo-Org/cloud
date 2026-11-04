@@ -45,17 +45,11 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Install root dependencies
-        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      # The stacked-CI admission wiring must be checked on every PR, before the
-      # suite is gated.
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
-
       # The suite jobs always report (required checks); only the suite's own
       # paths justify the heavy work. The patterns are pinned by
-      # scripts/stacked-ci.test.mjs.
+      # scripts/stacked-ci.test.mjs, which ci.yml's `ci-wiring` job runs.
+      # A lockfile change matches the patterns first, so the detector below
+      # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
         id: detect
         run: |
@@ -79,9 +73,10 @@ jobs:
             | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           # The app also reads every workspace it depends on, directly or
-          # through a relative import. A detection error runs the suite.
+          # through a relative import, and its tests may read other
+          # workspaces' files as data. A detection error runs the suite.
           elif ! affected=$(node scripts/affected-workspaces.mjs "$(git rev-parse "${base}^{commit}")") \
-            || ! selected=$(jq -r '.full or (.packages | index("kilo-app") != null)' <<< "$affected") \
+            || ! selected=$(jq -r '.full or (.packages + .test_only_packages | index("kilo-app") != null)' <<< "$affected") \
             || [ "$selected" != false ]; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           else
@@ -110,19 +105,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
@@ -154,19 +141,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Lint
         run: pnpm --filter kilo-app run lint
@@ -190,15 +169,21 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # No step here reads types or built output, so only the workspaces the
+      # tools come from are installed: the root one carries oxlint, and the
+      # app one carries react-native-css, whose compiler the class checker
+      # probes. The i18n oxlint config is not type-aware.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
-      # Neither check reads types or built packages: the i18n oxlint config
-      # is not type-aware.
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
       - name: Check for silently-dropped NativeWind classes
         run: pnpm --filter kilo-app run check:classes
+      - name: Test the NativeWind class checker
+        run: node --test tools/nativewind/check-classes.test.mjs
+      - name: Test the i18n catalog checker
+        run: node --test tools/i18n/check-catalogs.test.mjs
 
   format-check:
     needs: mobile-changes
@@ -219,8 +204,9 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # oxfmt is a root dev dependency; the workspace packages are not needed.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Format check
         run: |
@@ -251,22 +237,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
   # Eight shards run the mobile Vitest suite in parallel; the `test` job below
   # reports the combined result under the required check name.
+  #
+  # The shard's `Test` step is CPU-bound and the jobs start together, so the
+  # runner size sets the wall clock of the whole row: measured on a work VM the
+  # step drops from 84 s to 36 s per shard (2 vCPU -> 4 vCPU), against a ~15 s
+  # fixed setup that does not change. Four vCPU pays for itself: the mobile row
+  # gets shorter while its vCPU-seconds rise by about 2%.
+  #
+  # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
+  # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
+  # pull requests, so the job falls back to `ubuntu-latest` there.
   mobile-test:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -275,7 +263,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -294,18 +282,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
-
       # The tests import the harness SDK build at run time. The tRPC build
       # holds only type declarations, which Vitest does not read.
-      - name: Build harness SDK
-        run: pnpm --filter @kilocode/harness-sdk run build
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Test
         run: pnpm --filter kilo-app run test --shard=${{ matrix.shard }}/8

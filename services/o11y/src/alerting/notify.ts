@@ -4,6 +4,7 @@
 
 import type { AlertSeverity } from './slo-config';
 import type { HealthInstances } from './container-capacity';
+import type { ContainerAllocations } from './container-allocations';
 
 type NotifyEnv = {
   O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
@@ -43,6 +44,17 @@ export type ContainerCapacityAlertPayload = {
   health?: HealthInstances;
 };
 
+export type ContainerAllocationAlertPayload = {
+  alertType: 'container_capacity';
+  severity: AlertSeverity;
+  provider: string;
+  model: string;
+  clientName: string;
+  allocatedInstances: number;
+  thresholdCount: number;
+  counts: ContainerAllocations;
+};
+
 export type QueueBacklogAlertPayload = {
   alertType: 'queue_backlog';
   severity: AlertSeverity;
@@ -75,6 +87,7 @@ export type GastownHealthAlertPayload = {
 export type AlertPayload =
   | SloAlertPayload
   | ContainerCapacityAlertPayload
+  | ContainerAllocationAlertPayload
   | QueueBacklogAlertPayload
   | GastownHealthAlertPayload;
 
@@ -153,8 +166,34 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
   ];
 }
 
-function buildCapacitySlackBlocks(alert: ContainerCapacityAlertPayload): object[] {
+function buildCapacitySlackBlocks(
+  alert: ContainerCapacityAlertPayload | ContainerAllocationAlertPayload
+): object[] {
   const severityLabel = formatSeverityLabel(alert.severity);
+  if ('allocatedInstances' in alert) {
+    return [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: `${severityLabel} - Container Allocation Alert` },
+      },
+      {
+        type: 'section',
+        fields: [
+          { type: 'mrkdwn', text: `*Application:*\n${alert.model}` },
+          { type: 'mrkdwn', text: `*Allocated containers:*\n${alert.allocatedInstances}` },
+          { type: 'mrkdwn', text: `*Alert threshold:*\n${alert.thresholdCount} containers` },
+          { type: 'mrkdwn', text: `*Running:*\n${alert.counts.running}` },
+        ],
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `Provisioning: ${alert.counts.provisioning}\nStopping: ${alert.counts.stopping}\nAllocation count includes running, provisioning, and stopping containers. Threshold is operational, not a Cloudflare limit.`,
+        },
+      },
+    ];
+  }
   const utilizationPct = (alert.utilizationFraction * 100).toFixed(1);
   const thresholdPct = (alert.thresholdFraction * 100).toFixed(1);
 

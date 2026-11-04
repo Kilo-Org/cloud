@@ -309,6 +309,19 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     expect(collectText(renderer.toJSON())).toContain('Top-up');
   });
 
+  it('shows paid-credit deadlines in UTC and does not invent one for grandfathered activity', async () => {
+    pageHook.entries = [
+      { ...TRANSACTION, expiry_date: '2027-10-15T00:00:00Z' },
+      { ...TRANSACTION, id: 'legacy' },
+    ];
+    pageQuery.data = { pages: [{ entries: pageHook.entries, nextCursor: null, hasMore: false }] };
+    const texts = await renderScreen();
+    const expiryLabels = texts.filter(text => text.startsWith('Expires '));
+    expect(expiryLabels).toHaveLength(1);
+    expect(expiryLabels[0]).toContain('2027');
+    expect(expiryLabels[0]).toContain('(UTC)');
+  });
+
   it('keeps pagination available when a loaded page has no visible entries', async () => {
     pageQuery.data = { pages: [{ entries: [], nextCursor: 1, hasMore: true }] };
     pageHook.hasMore = true;

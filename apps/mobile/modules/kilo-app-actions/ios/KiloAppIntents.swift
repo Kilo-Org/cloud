@@ -56,11 +56,12 @@ enum KiloAppActionTarget {
   }
 }
 
-/// Starts a new agent. The app may be closed: the bridge hands the payload to
-/// the JS pipeline, which owns the whole start path, and reports its answer.
+/// Starts a new agent. The run opens the app, which shows the request for
+/// confirmation; the bridge hands the payload to the JS pipeline, which owns
+/// the whole start path, and reports its answer.
 struct StartAgentIntent: AppIntent {
   static var title: LocalizedStringResource = "Start agent"
-  static var openAppWhenRun: Bool = false
+  static var openAppWhenRun: Bool = true
 
   @Parameter(title: "Prompt")
   var prompt: String

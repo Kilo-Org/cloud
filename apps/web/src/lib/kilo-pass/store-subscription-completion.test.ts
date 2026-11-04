@@ -3,6 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
+  analytics_event_outbox,
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
@@ -577,10 +578,16 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(items[0]?.amountUsd).toBe(getMonthlyPriceUsd(KiloPassTier.Tier49));
 
     const creditRows = await db
-      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        policy: credit_transactions.paid_credit_policy,
+        source: credit_transactions.credit_source,
+        expiry: credit_transactions.expiry_date,
+      })
       .from(credit_transactions)
       .where(eq(credit_transactions.id, items[0]?.creditTransactionId ?? ''));
     expect(creditRows[0]?.amountMicrodollars).toBe(49_000_000);
+    expect(creditRows[0]).toMatchObject({ policy: 'apple_exempt', source: 'apple', expiry: null });
 
     const [updatedUser] = await db
       .select({
@@ -1087,6 +1094,8 @@ describe('completeStoreKiloPassPurchase', () => {
           is_free: true,
           description: 'test Kilo Pass bonus credits',
           credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
+          expiry_date: '2030-05-31T00:00:00.000Z',
+          expiration_baseline_microdollars_used: 0,
         })
         .returning({ id: credit_transactions.id }),
       db
@@ -1097,6 +1106,8 @@ describe('completeStoreKiloPassPurchase', () => {
           is_free: true,
           description: 'test Kilo Pass promo credits',
           credit_category: `test-kilo-pass-promo-${crypto.randomUUID()}`,
+          expiry_date: '2030-05-31T00:00:00.000Z',
+          expiration_baseline_microdollars_used: 0,
         })
         .returning({ id: credit_transactions.id }),
     ]);
@@ -1168,6 +1179,27 @@ describe('completeStoreKiloPassPurchase', () => {
         }),
       ])
     );
+    const retiredBonus = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusTransaction[0]?.id ?? ''),
+    });
+    expect(retiredBonus).toMatchObject({
+      consumed_microdollars: 9_500_000,
+      retired_microdollars: 0,
+    });
+    expect(new Date(retiredBonus?.expiry_date ?? '').toISOString()).toBe(
+      '2030-05-31T00:00:00.000Z'
+    );
+    const upgradedPrincipal = await db.query.credit_transactions.findFirst({
+      where: and(
+        eq(credit_transactions.kilo_user_id, user.id),
+        eq(credit_transactions.description, 'Kilo Pass upgrade base credits (tier_49, monthly)')
+      ),
+    });
+    expect(upgradedPrincipal).toMatchObject({
+      paid_credit_policy: 'apple_exempt',
+      credit_source: 'apple',
+      expiry_date: null,
+    });
 
     const [updatedUser] = await db
       .select({
@@ -1553,7 +1585,7 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(ledgerRow?.status).toBe('reconcile_pending');
   });
 
-  it('still returns the result when the completed settle fails', async () => {
+  it('leaves the purchase row reclaimable when the completed settle keeps failing', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();
 
@@ -1570,6 +1602,8 @@ describe('completeStoreKiloPassPurchase', () => {
     }));
     jest.resetModules();
 
+    // `jest.doMock` + `resetModules` require re-importing the module after the
+    // mock registry changes, so this test cannot use a static import.
     const { completeStoreKiloPassPurchase: isolatedComplete } =
       await import('./store-subscription-completion');
     const freshDrizzle = await import('@kilocode/web-shared/lib/drizzle');
@@ -1586,8 +1620,123 @@ describe('completeStoreKiloPassPurchase', () => {
       });
 
       expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+
+      const [ledgerRow] = await db
+        .select()
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, user.id),
+            eq(operation_ledgers.domain, 'purchase'),
+            eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+          )
+        );
+      expect(ledgerRow?.status).toBe('reconcile_pending');
     } finally {
       await freshDrizzle.closeAllDrizzleConnections();
     }
+  });
+
+  it('keeps a committed purchase recoverable when the completed settle hits a database failure', async () => {
+    const email = `settle-recovery-${crypto.randomUUID()}@example.com`;
+    const user = await insertTestUser({
+      google_user_email: email,
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+    const purchase = applePurchase();
+    const triggerName = `test_reject_purchase_settled_${crypto.randomUUID().replace(/-/g, '')}`;
+
+    // The settle writes the terminal status and its outbox row in one
+    // transaction, so rejecting the insert at the database boundary fails the
+    // settle exactly as a real write failure would, and rolls it back.
+    await db.execute(sql`
+      CREATE FUNCTION ${sql.raw(triggerName)}() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.event_name = 'purchase_settled' AND NEW.distinct_id = ${sql.raw(`'${email}'`)} THEN
+          RAISE EXCEPTION 'simulated outbox write failure';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER ${sql.raw(triggerName)}
+        BEFORE INSERT ON analytics_event_outbox
+        FOR EACH ROW EXECUTE FUNCTION ${sql.raw(triggerName)}()
+    `);
+
+    try {
+      await expect(completeStoreKiloPassPurchase({ user, purchase })).resolves.toMatchObject({
+        tier: KiloPassTier.Tier49,
+        alreadyProcessed: false,
+      });
+
+      const [failingRow] = await db
+        .select()
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, user.id),
+            eq(operation_ledgers.domain, 'purchase'),
+            eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+          )
+        );
+      expect(failingRow?.status).toBe('reconcile_pending');
+      expect(
+        await db
+          .select()
+          .from(analytics_event_outbox)
+          .where(eq(analytics_event_outbox.distinct_id, email))
+      ).toHaveLength(0);
+    } finally {
+      await db.execute(
+        sql`DROP TRIGGER IF EXISTS ${sql.raw(triggerName)} ON analytics_event_outbox`
+      );
+      await db.execute(sql`DROP FUNCTION IF EXISTS ${sql.raw(triggerName)}()`);
+    }
+
+    const creditsBefore = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditsBefore.length).toBeGreaterThan(0);
+
+    // The next same-key retry claims the reconciliation lease, re-runs the
+    // idempotent effect, and finishes the bookkeeping with its event.
+    await expect(completeStoreKiloPassPurchase({ user, purchase })).resolves.toMatchObject({
+      tier: KiloPassTier.Tier49,
+      alreadyProcessed: true,
+    });
+
+    const [recoveredRow] = await db
+      .select()
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.kilo_user_id, user.id),
+          eq(operation_ledgers.domain, 'purchase'),
+          eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+        )
+      );
+    expect(recoveredRow).toMatchObject({ status: 'completed', outcome_code: 'ok' });
+
+    const outboxRows = await db
+      .select()
+      .from(analytics_event_outbox)
+      .where(
+        and(
+          eq(analytics_event_outbox.distinct_id, email),
+          eq(analytics_event_outbox.event_name, 'purchase_settled')
+        )
+      );
+    expect(outboxRows).toHaveLength(1);
+    expect(outboxRows[0]?.properties).toMatchObject({ outcome: 'completed' });
+
+    const creditsAfter = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(creditsAfter).toHaveLength(creditsBefore.length);
   });
 });

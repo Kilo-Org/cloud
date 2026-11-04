@@ -19,18 +19,14 @@ describe('billingPayerPresentation', () => {
     });
   });
 
-  it('gives ordinary members the billing-details action and guidance', () => {
+  it('gives ordinary members guidance instead of a billing navigation target', () => {
     expect(
       billingPayerPresentation(failure, {
         organization: { id: 'org-1', name: 'Acme', role: 'member' },
       })
     ).toEqual({
       payerName: 'Acme',
-      action: {
-        href: '/organizations/org-1/payment-details',
-        label: 'View organization billing',
-        memberGuidance: true,
-      },
+      memberGuidance: true,
     });
   });
 

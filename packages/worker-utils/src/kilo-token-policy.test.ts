@@ -588,7 +588,6 @@ describe('isKiloCredentialExchangeEligible', () => {
     ['botId', ''],
     ['internalApiUse', false],
     ['createdOnPlatform', ''],
-    ['deviceSessionId', ''],
     ['gastownAccess', false],
     ['isAdmin', false],
     ['orgMemberships', []],
@@ -624,7 +623,6 @@ describe('isKiloCredentialExchangeEligible', () => {
     'botId',
     'internalApiUse',
     'createdOnPlatform',
-    'deviceSessionId',
     'gastownAccess',
     'isAdmin',
     'orgMemberships',
@@ -643,6 +641,34 @@ describe('isKiloCredentialExchangeEligible', () => {
             : 'present';
     const context = await verifyKiloTokenForPolicy(
       await sign(legacyClaims({ [marker]: value })),
+      SECRET,
+      LEGACY_POLICY
+    );
+    expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(false);
+  });
+
+  it('permits a five-year credential that also names its session', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const context = await verifyKiloTokenForPolicy(
+      await sign(legacyClaims({ deviceSessionId: '11111111-1111-4111-8111-111111111111' })),
+      SECRET,
+      LEGACY_POLICY
+    );
+    expect(isKiloCredentialExchangeEligible(context, { legacy: 'five-year-api' })).toBe(true);
+    expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(false);
+  });
+
+  it('still denies a five-year credential with another restricted marker', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const context = await verifyKiloTokenForPolicy(
+      await sign(
+        legacyClaims({
+          deviceSessionId: '11111111-1111-4111-8111-111111111111',
+          tokenSource: 'cloud-agent',
+        })
+      ),
       SECRET,
       LEGACY_POLICY
     );

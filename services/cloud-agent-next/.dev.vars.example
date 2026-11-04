@@ -25,8 +25,14 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
 # Always the local Next.js gateway. Selecting `fake-deterministic` routes
 # through Next.js to the fake-llm service; do not point this at fake-llm.
-# @url nextjs/api
-KILO_OPENROUTER_BASE=http://localhost:3000/api
+# @url nextjs/api/openrouter
+KILO_OPENROUTER_BASE=http://localhost:3000/api/openrouter
+
+# Scoped subagent-launch MCP endpoint for parent sessions that opt in with
+# allowSubagentSessions. Local dev points the grant at the local kilo-mcp
+# service; deployed config never sets this and issuance pins production.
+# @url kilo-mcp/mcp
+CLOUD_AGENT_MCP_URL_OVERRIDE=http://host.docker.internal:8815/mcp
 
 # Worker base URL used by the wrapper to connect to /ingest.
 # Sandbox containers reach the host via `host.docker.internal`.
@@ -47,44 +53,34 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Code Reviewer sessions run on the control plane for these owners.
+# Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTROL_PLANE_IDS=*
+CODE_REVIEW_CONTAINERS_ORG_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
 # Non-secret rollout control for per-session Kilo runtime isolation.
 RUNTIME_ISOLATION_ENABLED=true
 
-CREDENTIAL_CONTAINMENT_ENABLED=false
+CREDENTIAL_CONTAINMENT_ENABLED=true
 
-# Container repo snapshot IDs (optional)
-# Comma-separated user or org IDs whose isolated control-plane containers start from a saved
-# repository snapshot, or `*` for all. Empty disables it. Needs the REPO_SNAPSHOTS KV
-# binding and only applies to the constant isolated workspace path.
-CONTAINER_REPO_SNAPSHOT_IDS=
-
-# Vercel Sandbox operational configuration (optional)
-# Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
-# acceptance run. Partial configuration never enables Vercel.
-VERCEL_PROJECT_ID=
-VERCEL_TEAM_ID=
-VERCEL_SANDBOX_SNAPSHOT_ID=
-VERCEL_SANDBOX_RUNTIME_BUILD_ID=
+# Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
 VERCEL_SANDBOX_INITIAL_TIMEOUT_MS=300000
 VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
-# Keep `VERCEL_TOKEN` in local secrets/.dev.vars only; never commit a token value.
-# VERCEL_TOKEN=
 
-# Vercel enrollment is the allowlist itself. Empty is off. Comma-separated org
-# IDs, or `*` for every organization and personal accounts. Organizations must
-# also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
-VERCEL_SANDBOX_ORG_IDS=
+# Customer-paid Vercel enrollment. Comma-separated user or organization IDs; empty is off.
+# `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
+BYOC_VERCEL_IDS=
 
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.
-CLOUDFLARE_CONTAINERS_ORG_IDS=
+CLOUDFLARE_CONTAINERS_ORG_IDS=*
+# Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
+ENVIRONMENT_SNAPSHOT_ORG_IDS=*
+# Explicit organization or user IDs allowed to capture and restore per-session disks. No wildcard.
+SESSION_SNAPSHOT_ORG_IDS=
+SESSION_SNAPSHOT_USER_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- one file for the review-list pagination builder and the mutation wiring suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   buildReviewFirstPageQueryOptions,
   buildReviewListQueryKey,
@@ -17,12 +19,20 @@ import {
   useCancelReview,
   useCreateManualReview,
   useRetriggerReview,
+  useReviewDetail,
 } from './use-code-reviews';
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onSuccess?: (data: unknown, vars: unknown) => void;
-  onError?: (error: unknown) => void;
+  onError?: (error: unknown, vars?: { reviewId: string }) => void;
+};
+
+type QueryRefetchInterval = (query: { state: { data?: unknown } }) => number | false;
+
+type QueryOptions = {
+  queryKey: readonly unknown[];
+  refetchInterval?: QueryRefetchInterval;
 };
 
 const cancelMutateMock = vi.fn();
@@ -38,13 +48,17 @@ const setQueryDataMock = vi.fn();
 const toastErrorMock = vi.fn();
 
 let lastCapturedOptions: MutationOptions | null = null;
+let lastCapturedQueryOptions: QueryOptions | null = null;
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     lastCapturedOptions = opts;
     return { mutate: vi.fn() };
   },
-  useQuery: () => ({ data: undefined }),
+  useQuery: (opts: QueryOptions) => {
+    lastCapturedQueryOptions = opts;
+    return { data: undefined };
+  },
   useInfiniteQuery: () => ({ data: undefined }),
   useQueryClient: () => ({
     cancelQueries: cancelQueriesMock,
@@ -58,8 +72,19 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     codeReviews: {
       listForUser: { queryKey: () => ['codeReviews', 'listForUser'] },
-      listForOrganization: { queryKey: () => ['codeReviews', 'listForOrganization'] },
-      get: { queryKey: () => ['codeReviews', 'get'] },
+      listForOrganization: {
+        queryKey: (input: { organizationId: string }) => [
+          'codeReviews',
+          'listForOrganization',
+          input,
+        ],
+      },
+      get: {
+        queryKey: (input: { reviewId: string }) => ['codeReviews', 'get', input],
+        queryOptions: (input: { reviewId: string }) => ({
+          queryKey: ['codeReviews', 'get', input],
+        }),
+      },
     },
   }),
   trpcClient: {
@@ -97,7 +122,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 vi.mock('@kilocode/app-shared/code-review', () => ({
   hasInFlightReview: (reviews: { status: string }[]) =>
     reviews.some(review => review.status === 'running'),
-  isInFlightReviewStatus: () => false,
+  isInFlightReviewStatus: (status: string) => status === 'running',
 }));
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
@@ -110,7 +135,11 @@ const CREATE_VARS = {
   modelSlug: 'claude-opus-4-7',
 } as const;
 
-function getOptions(hook: 'cancel' | 'retrigger' | 'create', scope = 'personal'): MutationOptions {
+function getOptions(
+  hook: 'cancel' | 'retrigger' | 'create',
+  scope = 'personal',
+  createOptions?: { silent?: boolean }
+): MutationOptions {
   lastCapturedOptions = null;
   if (hook === 'cancel') {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -120,7 +149,7 @@ function getOptions(hook: 'cancel' | 'retrigger' | 'create', scope = 'personal')
     useRetriggerReview(scope);
   } else {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    useCreateManualReview(scope);
+    useCreateManualReview(scope, createOptions);
   }
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!lastCapturedOptions) {
@@ -129,8 +158,26 @@ function getOptions(hook: 'cancel' | 'retrigger' | 'create', scope = 'personal')
   return lastCapturedOptions;
 }
 
+function takeCapturedQueryOptions(): QueryOptions | null {
+  const captured = lastCapturedQueryOptions;
+  lastCapturedQueryOptions = null;
+  return captured;
+}
+
+function getDetailRefetchInterval(): QueryRefetchInterval {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useReviewDetail('review-1');
+  const captured = takeCapturedQueryOptions();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- set by the mocked useQuery
+  if (!captured?.refetchInterval) {
+    throw new Error('review detail query options were not captured');
+  }
+  return captured.refetchInterval;
+}
+
 beforeEach(() => {
   lastCapturedOptions = null;
+  lastCapturedQueryOptions = null;
   cancelMutateMock.mockReset();
   retriggerMutateMock.mockReset();
   personalCreateMutateMock.mockReset();
@@ -190,24 +237,42 @@ describe('useCancelReview wiring', () => {
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 
-  it('invalidates the review list and detail on real success', () => {
+  it('invalidates the review list and detail keys on real success', () => {
     const opts = getOptions('cancel');
     opts.onSuccess?.({ success: true, review: { id: 'r1' } }, { reviewId: 'r1' });
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: buildReviewListQueryKey(createReviewTrpcStub(), 'personal'),
+    });
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(2, {
+      queryKey: ['codeReviews', 'get', { reviewId: 'r1' }],
+    });
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the organization list key for an organization scope', () => {
+    const opts = getOptions('cancel', 'org_42');
+    opts.onSuccess?.({ success: true, review: { id: 'r1' } }, { reviewId: 'r1' });
+
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: buildReviewListQueryKey(createReviewTrpcStub(), 'org_42'),
+    });
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: ['codeReviews', 'listForOrganization', { organizationId: 'org_42' }],
+    });
   });
 });
 
 describe('retriggerReviewMutationFn', () => {
-  it('throws a typed error carrying the server error message on {success:false}', async () => {
+  it('rejects with the localized copy when the retry did not start', async () => {
     retriggerMutateMock.mockResolvedValueOnce({
       success: false,
-      error: 'Repository not connected',
+      error: 'Dispatch failed: could not reach the code review service.',
     });
 
     await expect(retriggerReviewMutationFn({ reviewId: 'r2' })).rejects.toThrow(
-      'Repository not connected'
+      i18n.t('codeReviewer.reviewDetail.retryNotStarted')
     );
   });
 
@@ -220,7 +285,7 @@ describe('retriggerReviewMutationFn', () => {
 });
 
 describe('useRetriggerReview wiring', () => {
-  it('toasts the thrown error message via onError and does NOT invalidate queries', async () => {
+  it('toasts the localized copy via onError and refreshes the review', async () => {
     retriggerMutateMock.mockResolvedValueOnce({
       success: false,
       error: 'Provider rate limit hit',
@@ -230,18 +295,26 @@ describe('useRetriggerReview wiring', () => {
     try {
       await opts.mutationFn?.({ reviewId: 'r2' });
     } catch (error) {
-      opts.onError?.(error);
+      opts.onError?.(error, { reviewId: 'r2' });
     }
 
-    expect(toastErrorMock).toHaveBeenCalledWith('Provider rate limit hit');
-    expect(invalidateQueriesMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      i18n.t('codeReviewer.reviewDetail.retryNotStarted')
+    );
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
   });
 
-  it('invalidates the review list and detail on real success', () => {
+  it('invalidates the review list and detail keys on real success', () => {
     const opts = getOptions('retrigger');
     opts.onSuccess?.({ success: true }, { reviewId: 'r2' });
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: buildReviewListQueryKey(createReviewTrpcStub(), 'personal'),
+    });
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(2, {
+      queryKey: ['codeReviews', 'get', { reviewId: 'r2' }],
+    });
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });
@@ -303,11 +376,28 @@ describe('useCreateManualReview wiring', () => {
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 
-  it('invalidates the list (no detail) on real success', () => {
+  it('invalidates the list key (no detail) on real success', () => {
     const opts = getOptions('create', 'personal');
     opts.onSuccess?.({ reviewId: 'rev_abc123', outputMode: 'provider' }, undefined);
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: buildReviewListQueryKey(createReviewTrpcStub(), 'personal'),
+    });
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('stays silent in silent mode so a screen that renders the failure inline owns the channel', async () => {
+    const opts = getOptions('create', 'personal', { silent: true });
+    personalCreateMutateMock.mockResolvedValue({
+      success: false,
+      error: 'Insufficient balance',
+    });
+
+    await opts.mutationFn?.(CREATE_VARS).catch((error: unknown) => {
+      opts.onError?.(error);
+    });
+
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });
@@ -645,6 +735,29 @@ describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
     listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
 
     await expect(options.queryFn()).rejects.toThrow('boom');
+  });
+});
+
+describe('useReviewDetail polling', () => {
+  it('polls a running review at the shared cadence and stops once it settles', () => {
+    const detailInterval = getDetailRefetchInterval();
+    const probeInterval = readProbeRefetchInterval(
+      buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', { enabled: true })
+    );
+    const running = { state: { data: { success: true, review: { status: 'running' } } } };
+    const completed = { state: { data: { success: true, review: { status: 'completed' } } } };
+
+    // One cadence: the detail screen and the page-one probe poll a running review
+    // at the same rate, so changing one cannot leave the other behind.
+    expect(detailInterval(running)).toBe(
+      probeInterval({ state: { data: makePage(50, true, 'running') } })
+    );
+    expect(detailInterval(running)).toBe(5000);
+    // A settled review stops it; a held failure payload and a missing payload
+    // have no review to poll.
+    expect(detailInterval(completed)).toBe(false);
+    expect(detailInterval({ state: { data: { success: false, error: 'boom' } } })).toBe(false);
+    expect(detailInterval({ state: {} })).toBe(false);
   });
 });
 

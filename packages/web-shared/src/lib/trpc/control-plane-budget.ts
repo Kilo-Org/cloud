@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 
+import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
 import { RequestDeadlineError, withDeadline } from '@kilocode/event-service';
 import {
   isMobileClient,
@@ -150,7 +151,7 @@ export async function withControlPlaneBudget<TResult>({
     });
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Control-plane request timed out',
+      message: CONTROL_PLANE_TIMEOUT_MESSAGE,
       cause,
     });
   };

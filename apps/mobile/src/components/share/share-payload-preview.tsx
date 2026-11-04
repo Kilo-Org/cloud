@@ -104,7 +104,25 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   }
 
   if (validation.kind === 'all-rejected') {
-    return null;
+    // Only the names belong here: the terminal message already says why the
+    // gate cannot continue, and these say which file was unreadable. Other
+    // all-rejected outcomes stay a bare message.
+    if (validation.failedCopies.length === 0) {
+      return null;
+    }
+    return (
+      <View className="gap-0.5 px-4 pb-2">
+        {validation.failedCopies.map((name, index) => (
+          <Text
+            key={`${name}-${index}`}
+            numberOfLines={1}
+            className="text-xs text-muted-foreground"
+          >
+            {name}
+          </Text>
+        ))}
+      </View>
+    );
   }
 
   const text = payload.text.trim();
@@ -114,7 +132,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
   return (
     <View className="gap-2 px-4 pb-2">
       {hasText ? (
-        <Text numberOfLines={3} className="text-sm leading-5 text-foreground">
+        <Text numberOfLines={3} className="text-sm leading-[1.25rem] text-foreground">
           {text}
         </Text>
       ) : null}

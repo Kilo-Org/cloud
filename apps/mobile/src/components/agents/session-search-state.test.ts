@@ -144,25 +144,25 @@ describe('createSessionSearchController', () => {
 describe('resolveSearchRestoreDecision', () => {
   it('seeds a non-empty restored query and remounts the input', () => {
     expect(
-      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: 'hello' })
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: 'hello' })
     ).toEqual({ shouldSeed: true, query: 'hello', hasText: true, shouldRemount: true });
   });
 
   it('does not seed before the load settles', () => {
     expect(
-      resolveSearchRestoreDecision({ settled: false, hasTyped: false, restoredQuery: 'hello' })
+      resolveSearchRestoreDecision({ settled: false, hasInteracted: false, restoredQuery: 'hello' })
     ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
   });
 
-  it('does not overwrite text the user has already typed', () => {
+  it('does not overwrite a field the user has already touched', () => {
     expect(
-      resolveSearchRestoreDecision({ settled: true, hasTyped: true, restoredQuery: 'hello' })
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: true, restoredQuery: 'hello' })
     ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
   });
 
   it('seeds empty when nothing was stored (null)', () => {
     expect(
-      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: null })
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: null })
     ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
   });
 
@@ -170,7 +170,7 @@ describe('resolveSearchRestoreDecision', () => {
     // A clear persists '' (not the prior non-empty text); restore must seed the
     // empty value, never a stale previous query.
     expect(
-      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: '' })
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '' })
     ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
   });
 });

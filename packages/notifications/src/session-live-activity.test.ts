@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+
 import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
 import {
   aggregateLiveActivityRelevance,
@@ -25,6 +27,25 @@ describe('sessionLiveActivityTitle', () => {
     expect(sessionLiveActivityTitle('  Fix the login bug\n')).toBe('Fix the login bug');
     const capped = sessionLiveActivityTitle(`${'x'.repeat(119)}😀`);
     expect(capped).toBe('x'.repeat(119));
+  });
+
+  it('caps the title on a character boundary', () => {
+    const family = '👨‍👩‍👧';
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`)).toBe(
+      `${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`
+    );
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)}${family}`)).toBe(
+      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)
+    );
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
+      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)
+    );
+  });
+
+  it('keeps the title to the characters it draws', () => {
+    expect(sessionLiveActivityTitle('report\u202Efdp.exe')).toBe('reportfdp.exe');
+    expect(sessionLiveActivityTitle('\u2066Deploy\u2069\u200B fix')).toBe('Deploy fix');
+    expect(sessionLiveActivityTitle('Fix\u2028the login bug')).toBe('Fix the login bug');
   });
 });
 
@@ -63,6 +84,53 @@ describe('buildSessionLiveActivityContentState', () => {
       approvalKey: null,
       statusSince: options.statusSinceFallback,
     });
+  });
+
+  it('keeps the card text to the characters it draws', () => {
+    const content = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_text',
+        title: '\u202EFix the \u2066login bug',
+        status: 'permission',
+        permissionCommand: 'pnpm\u200B install \u202E--frozen-lockfile',
+        currentStep: { verb: 'editing', target: 'src/report\u202Efdp.exe' },
+        plan: { done: 1, total: 3, current: '\u2066review\u2069 tests' },
+      },
+      options
+    );
+    expect(content).toMatchObject({
+      title: 'Fix the login bug',
+      permissionCommand: 'pnpm install --frozen-lockfile',
+      currentStep: { verb: 'editing', target: 'src/reportfdp.exe' },
+      plan: { done: 1, total: 3, current: 'review tests' },
+    });
+    expect(sessionLiveActivityContentStateSchema.parse(content)).toEqual(content);
+  });
+
+  it('keeps the permission wait when the request text draws nothing', () => {
+    const content = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_blank_text',
+        title: '\u200B\u2066',
+        status: 'permission',
+        permissionCommand: '\u2066\u200B\u2069',
+        currentStep: { verb: 'running', target: '\u200B' },
+        plan: { done: 1, total: 3, current: '\u2066\u2069' },
+      },
+      options
+    );
+    // Approve answers the key, not the command, so the wait survives text that
+    // draws nothing; the card shows its local "answer needed" text instead.
+    expect(content).toMatchObject({
+      title: null,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: options.approvalKey,
+      permissionCommand: null,
+      currentStep: { verb: 'running', target: null },
+      plan: { done: 1, total: 3, current: null },
+    });
+    expect(sessionLiveActivityContentStateSchema.parse(content)).toEqual(content);
   });
 
   it('carries the derived facts and keeps the server-only ones on a local update', () => {
@@ -174,6 +242,35 @@ describe('buildSessionLiveActivityContentState', () => {
     expect(
       buildSessionLiveActivityContentState(reasoning, { ...options, previous: failed }).failure
     ).toBeNull();
+  });
+
+  it('clears a remembered failure when the row reports none of its own', () => {
+    const previous = buildSessionLiveActivityContentState(
+      { id: 'ses_9', status: 'idle', failure: 'provider' },
+      options
+    );
+    const idle = buildSessionLiveActivityContentState(
+      { id: 'ses_9', status: 'idle', failure: null },
+      { ...options, previous }
+    );
+    expect(idle.statusKind).toBe('idle');
+    expect(idle.failure).toBeNull();
+    expect(idle.outcome).toEqual({ kind: 'none' });
+  });
+
+  it('keeps a remembered failure for a row that cannot report one', () => {
+    // A tray row carries no failure fact at all, so a foreground rebuild must
+    // not wipe the failed card a push delivered.
+    const previous = buildSessionLiveActivityContentState(
+      { id: 'ses_10', status: 'idle', failure: 'tool' },
+      options
+    );
+    const idle = buildSessionLiveActivityContentState(
+      { id: 'ses_10', status: 'idle' },
+      { ...options, previous }
+    );
+    expect(idle.statusKind).toBe('failed');
+    expect(idle.failure).toEqual({ kind: 'tool' });
   });
 
   it('sets the wake time only for a scheduled session', () => {

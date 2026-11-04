@@ -1,4 +1,5 @@
-import { Effect, TestClock, TestContext } from 'effect';
+import { Effect } from 'effect';
+import { TestClock } from 'effect/testing';
 import { expect, it } from 'vitest';
 import type { ToolCall } from '../../core/tool.js';
 import { timeTool } from './time.js';
@@ -18,7 +19,7 @@ const asked = (tool: ReturnType<typeof timeTool>, one: ToolCall = call): Promise
   Effect.runPromise(
     Effect.provide(
       Effect.flatMap(TestClock.setTime(at), () => tool.run(one)),
-      TestContext.TestContext
+      TestClock.layer()
     )
   );
 
@@ -42,7 +43,7 @@ it('says midnight as hour zero, not hour twenty-four', async () => {
       Effect.flatMap(TestClock.setTime(midnight), () =>
         timeTool({ zone: 'Europe/Amsterdam' }).run(call)
       ),
-      TestContext.TestContext
+      TestClock.layer()
     )
   );
 

@@ -111,6 +111,7 @@ async function pickNextTaskForRequest(
 
   const candidates = steps
     .filter(step => {
+      if (step.step_key === UserDeletionStepKey.CsaSupportDb) return false;
       if (params.excludeStepKeys?.includes(step.step_key)) return false;
       if (!CLAIMABLE_STATUSES.includes(step.status as (typeof CLAIMABLE_STATUSES)[number])) {
         return false;

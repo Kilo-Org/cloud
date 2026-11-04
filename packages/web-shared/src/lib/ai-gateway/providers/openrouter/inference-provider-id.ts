@@ -1,5 +1,6 @@
+import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
-import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { GoogleServiceAccountSigningKeySchema } from '@kilocode/db/schema-types';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -86,8 +87,10 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'azure',
   'bedrock',
+  'cohere',
   'deepseek',
   'fireworks',
+  'gmicloud',
   'google', // Google AI Studio
   'inception',
   'openai',
@@ -108,33 +111,49 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
-  'alibaba-token-plan',
-  'byteplus-coding',
-  'chutes-byok',
+  ...DIRECT_BYOK_PROVIDER_IDS,
   'codestral',
-  'edenai',
-  'inceptron-byok',
-  'kimi-coding',
-  'martian',
-  'morph-byok',
-  'neuralwatt',
-  'nvidia-byok',
-  'ollama-cloud',
-  'opencode-go',
-  'orcarouter',
-  'synthetic',
-  'xiaomi-token-plan-ams',
-  'xiaomi-token-plan-sgp',
-  'zai-coding',
 ]);
+
+/**
+ * Direct BYOK providers in proof of concept. Keys for them can only be added
+ * where `isExperimentalByokEnabled` allows it.
+ */
+export const ExperimentalByokProviderIdSchema = DirectUserByokInferenceProviderIdSchema.extract([
+  'bedrock-byok',
+  'vertex-byok',
+]);
+
+export type ExperimentalByokProviderId = z.infer<typeof ExperimentalByokProviderIdSchema>;
+
+export function isExperimentalByokProviderId(
+  providerId: string
+): providerId is ExperimentalByokProviderId {
+  return ExperimentalByokProviderIdSchema.safeParse(providerId).success;
+}
 
 export type DirectUserByokInferenceProviderId = z.infer<
   typeof DirectUserByokInferenceProviderIdSchema
 >;
 
+/**
+ * Keys for a whole gateway rather than one inference provider. They serve the
+ * regular catalog models under their regular ids, ordered by preference: when a
+ * user has both, the Vercel AI Gateway key wins for models Vercel can serve.
+ */
+export const GatewayUserByokProviderIdSchema = z.enum(['vercel-ai-gateway', 'openrouter']);
+
+export type GatewayUserByokProviderId = z.infer<typeof GatewayUserByokProviderIdSchema>;
+
+export function isGatewayUserByokProviderId(
+  providerId: string
+): providerId is GatewayUserByokProviderId {
+  return GatewayUserByokProviderIdSchema.safeParse(providerId).success;
+}
+
 export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   DirectUserByokInferenceProviderIdSchema
-);
+).or(GatewayUserByokProviderIdSchema);
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
@@ -142,8 +161,10 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.azure]: 'openai/gpt-5.4-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.cohere]: 'cohere/command-a',
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
+  [VercelUserByokInferenceProviderIdSchema.enum.gmicloud]: 'zai/glm-5.3-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.nebius]: 'openai/gpt-oss-120b',
@@ -158,6 +179,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
+  [DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']]: 'openai.gpt-oss-120b-1:0',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
@@ -173,9 +195,12 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['opencode-go']]: 'qwen3.7-plus',
+  [DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']]: 'google/gemini-3.5-flash-lite',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
+  [GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']]: 'openai/gpt-5-nano',
+  [GatewayUserByokProviderIdSchema.enum.openrouter]: 'openai/gpt-5-nano',
 } satisfies Record<UserByokProviderId, string>;
 
 // This is a registry of provider IDs referenced explicitly in our mappings, not
@@ -189,7 +214,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'bytedance',
   'cerebras',
   'claudeaws',
-  'cohere',
   'crusoe',
   'deepinfra',
   'digitalocean',
@@ -253,6 +277,49 @@ export function openRouterToVercelInferenceProviderId(providerId: string): strin
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 
+/** The Vercel provider a user BYOK key is sent to. Vercel serves Codestral keys as Mistral keys. */
+export function getVercelProviderIdForUserByok(providerId: string): string {
+  return providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
+    ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+    : providerId;
+}
+
+/**
+ * The Vercel providers the request's own `provider.ignore` names. Kilo's provider preferences are
+ * added to the request later and never apply to the caller's keys.
+ */
+export function getRequestIgnoredVercelProviderIds(
+  provider: { ignore?: string[] } | undefined
+): ReadonlySet<string> {
+  return new Set((provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId));
+}
+
+const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
+  OpenRouterInferenceProviderIdSchema.options.map(openRouterToVercelInferenceProviderId)
+);
+
+/**
+ * Whether the organization provider allow-list admits a provider key sent through Vercel.
+ * `allowedProviders` holds the OpenRouter provider slugs the policy allows for the model, or is
+ * undefined when the policy does not restrict providers. A key whose provider has no OpenRouter
+ * slug cannot be named on the provider policy screen, so the allow-list does not apply to it.
+ * Gateway keys are not affected, and catalog-mode direct BYOK keys are decided per provider
+ * instead (see `isModelAllowedForProviderKey`).
+ */
+export function isVercelUserByokProviderAllowed(
+  providerId: string,
+  allowedProviders: ReadonlySet<string> | undefined
+): boolean {
+  if (!allowedProviders) return true;
+  const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+    getVercelProviderIdForUserByok(providerId)
+  ).data;
+  if (!vercelProviderId || !providerPolicyVercelProviderIds.has(vercelProviderId)) return true;
+  return [...allowedProviders].some(
+    provider => openRouterToVercelInferenceProviderId(provider) === vercelProviderId
+  );
+}
+
 export function getVercelUserByokProviderIdForEndpoint(
   providerId: string | undefined
 ): VercelUserByokInferenceProviderId | undefined {
@@ -269,25 +336,6 @@ export function normalizeVercelInferenceProviderIdForRouting(providerId: string 
   return providerId === VercelNonUserByokInferenceProviderIdSchema.enum.vertexAnthropic
     ? VercelUserByokInferenceProviderIdSchema.enum.vertex
     : providerId;
-}
-
-const modelPrefixToVercelInferenceProviderMapping = {
-  anthropic: VercelUserByokInferenceProviderIdSchema.enum.anthropic,
-  google: VercelUserByokInferenceProviderIdSchema.enum.google,
-  openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
-  minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
-  mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
-  'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
-  'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
-} as Record<string, VercelInferenceProviderId | undefined>;
-
-export function inferVercelFirstPartyInferenceProviderForModel(
-  model: string
-): VercelInferenceProviderId | null {
-  return isGptOssModel(model)
-    ? null
-    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({
@@ -333,3 +381,25 @@ export const VertexCredentialsSchema = z.object({
 });
 
 export type VertexCredentials = z.infer<typeof VertexCredentialsSchema>;
+
+/**
+ * A Google Cloud service account key file, as downloaded from the console, with
+ * an optional Vertex AI `location`. Only the fields needed to sign token
+ * requests and address the project are required.
+ */
+export const GoogleServiceAccountKeyFileSchema = GoogleServiceAccountSigningKeySchema.extend({
+  type: z.literal('service_account'),
+  project_id: z.string().min(1),
+  location: z.string().trim().min(1).optional(),
+});
+
+/**
+ * Direct Vertex AI BYOK accepts the Vercel-shaped credentials above, or a
+ * service account key file with an optional `location` (default `global`).
+ */
+export const DirectVertexCredentialsSchema = z.union([
+  VertexCredentialsSchema,
+  GoogleServiceAccountKeyFileSchema,
+]);
+
+export type DirectVertexCredentials = z.infer<typeof DirectVertexCredentialsSchema>;

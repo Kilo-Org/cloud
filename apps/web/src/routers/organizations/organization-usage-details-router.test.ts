@@ -80,7 +80,7 @@ describe('organizations usage details trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      expect(result.checks).toHaveLength(6);
+      expect(result.checks).toHaveLength(5);
       expect(result.checks.every(check => !check.adopted)).toBe(true);
     });
 

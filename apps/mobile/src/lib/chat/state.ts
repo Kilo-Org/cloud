@@ -120,6 +120,15 @@ export function watchChats(watcher: () => void): () => void {
   };
 }
 
+/**
+ * The copy a chat shows when it is not one this place may read: the app's own
+ * key for something that is no longer here.
+ *
+ * The screen withholds the Retry for it, because entering the chat again cannot
+ * change the answer.
+ */
+export const CHAT_UNAVAILABLE_KEY = 'queryError.notFoundDescription';
+
 /** A chat with nothing in it, which is what every chat starts as. */
 export const NOTHING = {
   turns: [] as readonly Turn[],

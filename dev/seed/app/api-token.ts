@@ -66,7 +66,9 @@ function printUsage(): void {
   console.log(
     `  --expires-days=<number>   Token lifetime in days (default: ${DEFAULT_EXPIRES_DAYS})`
   );
-  console.log('  --admin                   Include isAdmin=true in the token payload');
+  console.log(
+    '  --admin                   Include isAdmin=true in the token payload (control-token exchange rejects it)'
+  );
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:api-token ada@example.com');
@@ -178,7 +180,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     pepper: user.apiTokenPepper,
     secret,
     ...apiTokenSigningParams(options.expiresDays),
-    extra: options.isAdmin || user.isAdmin ? { isAdmin: true } : undefined,
+    extra: options.isAdmin ? { isAdmin: true } : undefined,
   });
 
   console.log('');
@@ -188,7 +190,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   return {
     userId: user.userId,
     email: user.email,
-    isAdmin: options.isAdmin || user.isAdmin,
+    isAdmin: options.isAdmin,
     expiresAt,
     expiresDays: options.expiresDays,
     token,

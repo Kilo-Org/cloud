@@ -9,7 +9,8 @@
 // if both entries remain mounted in the navigation stack: `getDiffSelection`
 // returns null unless the requested PR matches the stored selection.
 
-import { prDiffSelectionSlot, prRouteKey } from '../route-registry';
+import { prDiffSelectionSlot, prRouteKey, type RouteKey } from '../route-registry';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 type DiffSelectionSide = 'LEFT' | 'RIGHT';
 
@@ -17,6 +18,14 @@ export type PrIdentity = {
   owner: string;
   repo: string;
   number: number;
+  /**
+   * The provider ref (identity rule 17) this identity belongs to, when the
+   * caller is on a provider surface. Present, the bridge key folds the
+   * `providerPrRefKey` identity in — exactly like the viewed-files and draft
+   * keys — so every slot key resolves under the full provider identity.
+   * Absent, the key stays the legacy GitHub bytes.
+   */
+  ref?: ProviderPrRef;
 };
 
 export type DiffSelection = PrIdentity & {
@@ -27,12 +36,26 @@ export type DiffSelection = PrIdentity & {
   selectedText: string;
 };
 
+/**
+ * The bridge slot key for one PR identity. Mirrors `viewedFilesKey`: the
+ * GitHub-shaped legacy bytes, suffixed with the provider ref identity when a
+ * provider ref is present, so every slot resolves under the same
+ * provider-scoped identity rule 17 the viewed-files and draft keys use.
+ */
+function bridgeRouteKey(pr: PrIdentity): RouteKey {
+  const legacy = prRouteKey(pr);
+  if (!pr.ref || pr.ref.platform === 'github') {
+    return legacy;
+  }
+  return `${legacy}@${providerPrRefKey(pr.ref)}`;
+}
+
 export function setDiffSelection(next: DiffSelection) {
-  prDiffSelectionSlot.set(prRouteKey(next), next);
+  prDiffSelectionSlot.set(bridgeRouteKey(next), next);
 }
 
 export function getDiffSelection(pr: PrIdentity): DiffSelection | null {
-  return prDiffSelectionSlot.get(prRouteKey(pr)) ?? null;
+  return prDiffSelectionSlot.get(bridgeRouteKey(pr)) ?? null;
 }
 
 /**
@@ -41,5 +64,5 @@ export function getDiffSelection(pr: PrIdentity): DiffSelection | null {
  * not discard the selection the entry underneath is still holding.
  */
 export function clearDiffSelection(pr: PrIdentity) {
-  prDiffSelectionSlot.clear(prRouteKey(pr));
+  prDiffSelectionSlot.clear(bridgeRouteKey(pr));
 }

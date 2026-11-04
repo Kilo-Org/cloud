@@ -15,6 +15,7 @@ import {
 // hears why the control is gated.
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',

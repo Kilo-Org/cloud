@@ -318,6 +318,83 @@ describe('resource delegation authority', () => {
     });
   });
 
+  test('accepts a device credential with the fixed legacy lifetime', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'legacy-lifetime-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 5 * 365 * 24 * 60 * 60 }
+    );
+
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      isModern: false,
+      deviceSessionId: session.id,
+    });
+  });
+
+  test('rejects a device credential with an unapproved lifetime', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'other-lifetime-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 2 * 60 * 60 }
+    );
+
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toThrow('Unsupported legacy credential context');
+  });
+
+  test('rejects a device credential after its session is revoked', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'revoked-session-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 5 * 365 * 24 * 60 * 60 }
+    );
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session.id));
+
+    await expect(
+      getResourceDelegationAuthority(current, { headers: bearer(token) })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
   test('requires an active owned device session for a modern device credential', async () => {
     const current = await user();
     const [session] = await db

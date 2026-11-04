@@ -1,6 +1,7 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useCallback } from 'react';
 import { ActionSheetIOS, Platform } from 'react-native';
 import { toast } from 'sonner-native';
@@ -48,7 +49,7 @@ export function useMessageCopy() {
 export async function performCopy(text: string): Promise<void> {
   try {
     await Clipboard.setStringAsync(text);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notificationHaptic(Haptics.NotificationFeedbackType.Success);
     toast.success(i18n.t('common.copiedToClipboard'), { duration: COPY_TOAST_DURATION_MS });
   } catch {
     toast.error(i18n.t('common.couldNotCopyToClipboard'));

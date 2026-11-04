@@ -105,7 +105,7 @@ it('replays streamed reasoning through a real tool turn and the next question', 
       Effect.flatMap(
         openSession({ system: 'sys', model: 'upstream', maxTokens: 1024, tools: ['weather'] }),
         session =>
-          Effect.zipRight(
+          Effect.andThen(
             Stream.runDrain(session.ask('Weather?')),
             Stream.runDrain(session.ask('Thanks'))
           )

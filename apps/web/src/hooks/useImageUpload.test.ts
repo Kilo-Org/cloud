@@ -1,5 +1,4 @@
 import {
-  buildImageUploadPath,
   calculateResizeDimensions,
   isAllowedImageType,
   validateImageFileSize,
@@ -8,12 +7,6 @@ import {
 function createFile(size: number, type = 'image/png') {
   return new File([new Uint8Array(size)], 'image.png', { type });
 }
-
-describe('buildImageUploadPath', () => {
-  it('uses the message UUID as the image path', () => {
-    expect(buildImageUploadPath('message-uuid')).toBe('message-uuid');
-  });
-});
 
 describe('calculateResizeDimensions', () => {
   it('resizes landscape images to the max longest side', () => {
@@ -34,7 +27,7 @@ describe('calculateResizeDimensions', () => {
 });
 
 describe('image upload validation helpers', () => {
-  it('defaults can preserve app-builder 5MB original/final semantics', () => {
+  it('defaults can preserve 5MB original/final semantics', () => {
     const maxSizeBytes = 5 * 1024 * 1024;
     const file = createFile(maxSizeBytes + 1);
 

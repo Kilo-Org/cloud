@@ -5,10 +5,6 @@ import { serviceUrl } from '../mobile-env';
 import { services } from '../services';
 import type { Annotation, ExampleEntry, ResolvedValueSource } from './types';
 
-// ---------------------------------------------------------------------------
-// JSONC parsing (handles // comments, /* */ comments, trailing commas)
-// ---------------------------------------------------------------------------
-
 function stripJsoncComments(text: string): string {
   let result = '';
   let i = 0;
@@ -52,10 +48,6 @@ function parseJsonc(content: string): unknown {
   return JSON.parse(stripJsoncComments(content));
 }
 
-// ---------------------------------------------------------------------------
-// Env file parsing
-// ---------------------------------------------------------------------------
-
 function stripEnvQuotes(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value
@@ -96,10 +88,6 @@ function readEnvFile(filePath: string): Map<string, string> {
     return new Map();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Annotation parser
-// ---------------------------------------------------------------------------
 
 const KNOWN_DIRECTIVES = new Set(['override', 'url', 'from', 'pkcs8', 'exec']);
 
@@ -180,17 +168,9 @@ function parseExampleFile(content: string): ExampleEntry[] {
   return entries;
 }
 
-// ---------------------------------------------------------------------------
-// Service port resolution (single source of truth: services.ts)
-// ---------------------------------------------------------------------------
-
 function servicePort(name: string): number | undefined {
   return services.get(name)?.port;
 }
-
-// ---------------------------------------------------------------------------
-// PKCS#1 → PKCS#8 conversion
-// ---------------------------------------------------------------------------
 
 function toPkcs8IfNeeded(pem: string): string {
   if (!pem || !pem.includes('-----BEGIN RSA PRIVATE KEY-----')) return pem;
@@ -201,10 +181,6 @@ function toPkcs8IfNeeded(pem: string): string {
     return pem;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Annotation-based value resolution
-// ---------------------------------------------------------------------------
 
 const WORKER_LOCALHOST_URL_KEYS = new Set(['KILOCODE_BACKEND_BASE_URL', 'KILO_OPENROUTER_BASE']);
 
@@ -321,10 +297,6 @@ function resolveAnnotatedValue(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// File generation utilities
-// ---------------------------------------------------------------------------
 
 function needsQuoting(value: string): boolean {
   return (

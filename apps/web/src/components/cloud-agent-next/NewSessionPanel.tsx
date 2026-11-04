@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Arrow as PopoverArrow } from '@radix-ui/react-popover';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
@@ -20,13 +21,9 @@ import {
   Upload,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
-import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
+import { useTRPC } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
-import { getSandboxAllocationKey } from '@kilocode/worker-utils/sandbox-allocation';
-import { resolveSandboxSelectionSubmissionError } from './sandbox-selection';
-import { NewSessionSandboxSelect } from './NewSessionSandboxSelect';
-import { useSandboxPicker } from './useSandboxPicker';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -53,6 +50,11 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
+import { EnvironmentProfileSetupNotice } from '@/components/cloud-agent-next/EnvironmentProfileSetupNotice';
+import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
+import { environmentBlocksStart } from '@/components/cloud-agent-next/environment-selection';
+import { useSessionEnvironment } from '@/hooks/useSessionEnvironment';
+import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
   Command as UICommand,
@@ -63,30 +65,28 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Button as UIButton } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  isPublicRepoUrlEnabled,
+  isValidPublicGitUrl,
+} from '@/lib/cloud-agent-next/public-repo-url';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
+import {
+  getGitHubRepositoryNotices,
+  githubIntegrationSettingsHref,
+} from './github-repository-status';
 import {
   extractRepoFromGitUrl,
   findAllGitPlatformUrls,
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
-import { isAmbiguousCloudSessionCreationError, type AgentMode } from './types';
-import { formatSessionError } from '@kilocode/cloud-agent-sdk';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
-import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
-import { CloudAgentBillingError } from './CloudAgentBillingError';
-import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { AgentMode } from './types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import { PendingChatView } from './PendingChatView';
-import { PENDING_FIRST_CHAT_STATUS_LABEL, usePendingFirstChat } from './pending-first-chat';
-import {
-  createFirstChatCreationGuard,
-  resolveFirstChatCreationAttempt,
-  type FirstChatCreationAttempt,
-  type FirstChatCreationGuard,
-} from './first-chat-creation';
+import { createFirstChatCreationGuard, type FirstChatCreationGuard } from './first-chat-creation';
+import { useLocalSessions } from './local-sessions/LocalSessionsProvider';
+import type { LocalSessionRequest } from './local-sessions/local-session-request';
 import {
   buildCloudAgentAttachments,
   useCloudAgentAttachmentUpload,
@@ -94,6 +94,7 @@ import {
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
+  CLOUD_AGENT_METADATA_STALE_TIME,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
@@ -117,6 +118,7 @@ import {
 import {
   getBitbucketRepositoryRefreshFailureMessage,
   refreshSessionRepositories,
+  resolveRepositoryStatus,
   shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
@@ -134,15 +136,7 @@ type Repository = {
 };
 
 type NewSessionPanelProps = {
-  currentUserId: string;
   organizationId?: string;
-  organizationName?: string;
-  organizationRole?: OrganizationRole;
-};
-
-type PendingFirstChatCreation = {
-  prompt: string;
-  attachmentNames: string[];
 };
 
 type ContextualTipProps = {
@@ -152,34 +146,19 @@ type ContextualTipProps = {
   onDismiss: () => void;
 };
 
-export function NewSessionPanel({
-  currentUserId,
-  organizationId,
-  organizationName,
-  organizationRole,
-}: NewSessionPanelProps) {
+export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
-  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialComposerFocusedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const creationGuardRef = useRef<FirstChatCreationGuard | null>(null);
   if (creationGuardRef.current === null) {
     creationGuardRef.current = createFirstChatCreationGuard();
   }
-  const { setPendingFirstChat } = usePendingFirstChat();
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  const [firstChatCreationOperation, setFirstChatCreationOperation] =
-    useState<FirstChatCreationAttempt | null>(null);
-  const [pendingCreation, setPendingCreation] = useState<PendingFirstChatCreation | null>(null);
+  const { createLocalSession, discardedPrompt, clearDiscardedPrompt } = useLocalSessions();
   const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
     boolean | null
   >(null);
@@ -190,9 +169,6 @@ export function NewSessionPanel({
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
 
-  // ---------------------------------------------------------------------------
-  // Eligibility
-  // ---------------------------------------------------------------------------
   const personalEligibilityQuery = useQuery({
     ...trpc.cloudAgentNext.checkEligibility.queryOptions(),
     enabled: !organizationId,
@@ -211,10 +187,10 @@ export function NewSessionPanel({
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  // ---------------------------------------------------------------------------
-  // Models
-  // ---------------------------------------------------------------------------
-  const { data: modelsData } = useModelSelectorList(organizationId);
+  const { data: modelsData } = useModelSelectorList(organizationId, true, 'member', {
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
@@ -234,10 +210,16 @@ export function NewSessionPanel({
     return options.filter(option => option.isFree || option.hasUserByokAvailable);
   }, [allModels, hasLimitedAccess]);
 
-  // ---------------------------------------------------------------------------
-  // Form state
-  // ---------------------------------------------------------------------------
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(() => discardedPrompt ?? '');
+  useEffect(() => {
+    if (discardedPrompt !== null) clearDiscardedPrompt();
+  }, [clearDiscardedPrompt, discardedPrompt]);
+  useEffect(() => {
+    if (initialComposerFocusedRef.current) return;
+    initialComposerFocusedRef.current = true;
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
     string | undefined
@@ -248,16 +230,29 @@ export function NewSessionPanel({
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
-  const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
-  const [billingFailure, setBillingFailure] = useState<CustomerBillingFailure | null>(null);
-  const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
+  const [startValidation, setStartValidation] = useState<{
+    field: 'repository' | 'environment';
+  } | null>(null);
+  useEffect(() => {
+    if (!startValidation) return;
+    const timeout = setTimeout(() => setStartValidation(null), 5000);
+    return () => clearTimeout(timeout);
+  }, [startValidation]);
+  // Dev-only: clone a public repository by URL when no source-control
+  // integration is configured. See `public-repo-url`.
+  const [publicRepoUrl, setPublicRepoUrl] = useState('');
+  const isPublicRepoDevEnabled = isPublicRepoUrlEnabled();
+  const trimmedPublicRepoUrl = publicRepoUrl.trim();
+  const publicRepoUrlError =
+    trimmedPublicRepoUrl.length > 0 && !isValidPublicGitUrl(trimmedPublicRepoUrl)
+      ? 'Enter an https git URL'
+      : null;
+  const hasPublicRepo = trimmedPublicRepoUrl.length > 0 && publicRepoUrlError === null;
+  const [attachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
 
-  // ---------------------------------------------------------------------------
-  // GitHub identity awareness
-  // ---------------------------------------------------------------------------
   const {
     data: githubUserAuthorization,
     isLoading: isGitHubUserAuthorizationLoading,
@@ -281,13 +276,9 @@ export function NewSessionPanel({
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
-  // ---------------------------------------------------------------------------
-  // Session form atoms (profile override)
-  // ---------------------------------------------------------------------------
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
-  // Clear any lingering manual overrides whenever the page loads
   useEffect(() => {
     safeLocalStorage.removeItem('cloud-agent:devcontainer-enabled');
     resetSessionForm();
@@ -307,16 +298,6 @@ export function NewSessionPanel({
 
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
-  const sandbox = useSandboxPicker({
-    organizationId,
-    platform: selectedPlatform,
-    repository: selectedRepo,
-  });
-  const sandboxAllocation = sandbox.picker.allocation;
-
-  // ---------------------------------------------------------------------------
-  // Model auto-selection
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (modelOptions.length === 0) {
       if (model) {
@@ -393,10 +374,6 @@ export function NewSessionPanel({
     [model, organizationId, persistServerLastSelected]
   );
 
-  // ---------------------------------------------------------------------------
-  // Profiles — used for the selector and to clear a stale selection when a
-  // selected profile is deleted elsewhere.
-  // ---------------------------------------------------------------------------
   const { data: combinedProfilesData } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -413,13 +390,159 @@ export function NewSessionPanel({
       ]
     : (personalProfiles ?? []);
 
-  // If the override profile was deleted, clear the selection
   useEffect(() => {
     if (!selectedProfileId || allProfiles.length === 0) return;
     if (!allProfiles.some(p => p.id === selectedProfileId)) {
       setSelectedProfileId(null);
     }
   }, [allProfiles, selectedProfileId, setSelectedProfileId]);
+
+  const {
+    data: githubRepoData,
+    isLoading: isLoadingGitHubRepos,
+    error: githubRepoError,
+    refetch: refetchGitHubRepositories,
+  } = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
+          forceRefresh: false,
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
+
+  const {
+    data: gitlabRepoData,
+    isLoading: isLoadingGitLabRepos,
+    error: gitlabRepoError,
+    refetch: refetchGitLabRepositories,
+  } = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
+          forceRefresh: false,
+        })),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
+
+  const {
+    data: bitbucketRepoData,
+    isLoading: isLoadingBitbucketRepos,
+    error: bitbucketRepoError,
+    isRefetching: isRefetchingBitbucketRepos,
+  } = useQuery({
+    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+      organizationId: organizationId ?? '',
+      forceRefresh: false,
+    }),
+    enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
+  const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
+    ...trpc.organizations.bitbucket.getStatus.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: Boolean(organizationId),
+    staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+  });
+
+  const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
+  const { data: recentRepoData } = useQuery(
+    trpc.cliSessionsV2.recentRepositories.queryOptions({
+      organizationId: organizationId ?? null,
+      updatedSince: repoUpdatedSince,
+    })
+  );
+
+  const isLoadingRepos =
+    isLoadingGitHubRepos && isLoadingGitLabRepos && (!organizationId || isLoadingBitbucketRepos);
+
+  const githubRepositories = (githubRepoData?.repositories || []) as Repository[];
+  const gitlabRepositories = (gitlabRepoData?.repositories || []) as Repository[];
+  const bitbucketRepositories =
+    organizationId && bitbucketRepoData?.status === 'available'
+      ? bitbucketRepoData.repositories
+      : [];
+
+  const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
+    const github = githubRepositories.map(repo => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      private: repo.private,
+      platform: 'github' as const,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
+      githubAppType: repo.githubAppType,
+    }));
+    const gitlab = gitlabRepositories.map(repo => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      private: repo.private,
+      platform: 'gitlab' as const,
+    }));
+    const bitbucket = bitbucketRepositories.map(repo => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      private: repo.private,
+      platform: 'bitbucket' as const,
+      workspaceUuid: repo.workspaceUuid,
+    }));
+    return [...github, ...gitlab, ...bitbucket];
+  }, [githubRepositories, gitlabRepositories, bitbucketRepositories]);
+
+  const bitbucketRepo = useMemo(() => {
+    if (!organizationId || selectedPlatform !== 'bitbucket') return undefined;
+    const repository = unifiedRepositories.find(
+      repository => repository.fullName === selectedRepo && repository.platform === 'bitbucket'
+    );
+    if (!repository || typeof repository.id !== 'string' || !repository.workspaceUuid) {
+      return undefined;
+    }
+    return {
+      fullName: selectedRepo,
+      workspaceUuid: repository.workspaceUuid,
+      repositoryUuid: repository.id,
+    };
+  }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
+
+  const environmentRepository = useMemo<EnvironmentRepository | undefined>(() => {
+    if (hasPublicRepo || !selectedRepo) return undefined;
+    if (selectedPlatform === 'bitbucket') {
+      if (!bitbucketRepo) return undefined;
+      return {
+        platform: 'bitbucket',
+        fullName: bitbucketRepo.fullName,
+        workspaceUuid: bitbucketRepo.workspaceUuid,
+        repositoryUuid: bitbucketRepo.repositoryUuid,
+      };
+    }
+    if (selectedPlatform === 'gitlab') {
+      return { platform: 'gitlab', projectPath: selectedRepo };
+    }
+    return { platform: 'github', fullName: selectedRepo };
+  }, [hasPublicRepo, selectedRepo, selectedPlatform, bitbucketRepo]);
+  const sessionEnvironment = useSessionEnvironment({
+    organizationId,
+    repository: environmentRepository,
+  });
+  const repositoryEnvironment = sessionEnvironment.environment;
+  const { requestedEnvironment } = sessionEnvironment;
+  const startValidationMessage =
+    startValidation?.field === 'repository'
+      ? 'Select a repository to start the session.'
+      : startValidation?.field === 'environment' && sessionEnvironment.selection.status === 'choose'
+        ? 'Select an environment to start the session.'
+        : null;
 
   // Resolve the profile whose custom agents should appear in the mode picker.
   // Prefers an explicit selection; otherwise falls back to the effective
@@ -471,104 +594,6 @@ export function NewSessionPanel({
   const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
   const displayVariants = hasAgentModelOverride ? [] : availableVariants;
 
-  // ---------------------------------------------------------------------------
-  // Repositories (GitHub + GitLab + Bitbucket)
-  // ---------------------------------------------------------------------------
-  const {
-    data: githubRepoData,
-    isLoading: isLoadingGitHubRepos,
-    error: githubRepoError,
-    refetch: refetchGitHubRepositories,
-  } = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
-  );
-
-  const {
-    data: gitlabRepoData,
-    isLoading: isLoadingGitLabRepos,
-    error: gitlabRepoError,
-    refetch: refetchGitLabRepositories,
-  } = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
-          forceRefresh: false,
-        })
-  );
-
-  const {
-    data: bitbucketRepoData,
-    isLoading: isLoadingBitbucketRepos,
-    error: bitbucketRepoError,
-    isRefetching: isRefetchingBitbucketRepos,
-  } = useQuery({
-    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-      organizationId: organizationId ?? '',
-      forceRefresh: false,
-    }),
-    enabled: Boolean(organizationId),
-  });
-  const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
-    ...trpc.organizations.bitbucket.getStatus.queryOptions({
-      organizationId: organizationId ?? '',
-    }),
-    enabled: Boolean(organizationId),
-  });
-
-  const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
-  const { data: recentRepoData } = useQuery(
-    trpc.cliSessionsV2.recentRepositories.queryOptions({
-      organizationId: organizationId ?? null,
-      updatedSince: repoUpdatedSince,
-    })
-  );
-
-  const isLoadingRepos =
-    isLoadingGitHubRepos && isLoadingGitLabRepos && (!organizationId || isLoadingBitbucketRepos);
-
-  const githubRepositories = (githubRepoData?.repositories || []) as Repository[];
-  const gitlabRepositories = (gitlabRepoData?.repositories || []) as Repository[];
-  const bitbucketRepositories =
-    organizationId && bitbucketRepoData?.status === 'available'
-      ? bitbucketRepoData.repositories
-      : [];
-
-  const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
-    const github = githubRepositories.map(repo => ({
-      id: repo.id,
-      fullName: repo.fullName,
-      private: repo.private,
-      platform: 'github' as const,
-      platformIntegrationId: repo.platformIntegrationId,
-      platformAccountLogin: repo.platformAccountLogin,
-      githubAppType: repo.githubAppType,
-    }));
-    const gitlab = gitlabRepositories.map(repo => ({
-      id: repo.id,
-      fullName: repo.fullName,
-      private: repo.private,
-      platform: 'gitlab' as const,
-    }));
-    const bitbucket = bitbucketRepositories.map(repo => ({
-      id: repo.id,
-      fullName: repo.fullName,
-      private: repo.private,
-      platform: 'bitbucket' as const,
-      workspaceUuid: repo.workspaceUuid,
-    }));
-    return [...github, ...gitlab, ...bitbucket];
-  }, [githubRepositories, gitlabRepositories, bitbucketRepositories]);
-
   const recentRepos = useMemo<RepositoryOption[]>(() => {
     const recentList = recentRepoData?.repositories;
     if (!recentList?.length || unifiedRepositories.length === 0) return [];
@@ -599,7 +624,8 @@ export function NewSessionPanel({
       setSelectedGitHubIntegrationId(
         repo.platform === 'github' ? repo.platformIntegrationId : undefined
       );
-      setShowRepositoryRequiredMessage(false);
+      setPublicRepoUrl('');
+      setStartValidation(null);
       if (userInitiated) setIsRepoUserSelected(true);
       if (repo.platform) {
         setSelectedPlatform(repo.platform);
@@ -611,10 +637,8 @@ export function NewSessionPanel({
     [organizationId]
   );
 
-  // ---------------------------------------------------------------------------
   // Auto-select repo from saved preference, recent session, or the only
   // available repository, in that priority order.
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (selectedRepo || isRepoUserSelected || unifiedRepositories.length === 0) return;
 
@@ -655,9 +679,6 @@ export function NewSessionPanel({
     bitbucketRepoError,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Auto-select repo from pasted GitHub/GitLab URLs
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (isRepoUserSelected) return;
 
@@ -768,14 +789,16 @@ export function NewSessionPanel({
     async (statusOverride?: typeof bitbucketStatusData) => {
       if (!organizationId) return;
 
-      const bitbucketStatus =
-        statusOverride ??
-        bitbucketStatusData ??
-        (await queryClient.fetchQuery(
-          trpc.organizations.bitbucket.getStatus.queryOptions({
-            organizationId,
-          })
-        ));
+      const bitbucketStatus = await resolveRepositoryStatus({
+        override: statusOverride,
+        cached: bitbucketStatusData,
+        // The tRPC option type widens the result to include undefined; `query`
+        // resolves with the fetched data or rejects.
+        load: () =>
+          queryClient.query(
+            trpc.organizations.bitbucket.getStatus.queryOptions({ organizationId })
+          ) as Promise<NonNullable<typeof bitbucketStatusData>>,
+      });
 
       if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
         const result = await refreshBitbucketRepositoriesFromProvider({
@@ -788,7 +811,7 @@ export function NewSessionPanel({
         return;
       }
 
-      const result = await queryClient.fetchQuery({
+      const result = await queryClient.query({
         ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
           organizationId,
           forceRefresh: true,
@@ -900,11 +923,15 @@ export function NewSessionPanel({
     refreshBitbucketRepositories,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing check
-  // ---------------------------------------------------------------------------
+  // An installation that exists but cannot list repositories is not a missing
+  // provider: the takeover screen would ask the user to connect one more time.
+  // That state keeps the composer and explains itself through the notices below.
   const githubIntegrationMissing =
-    !isLoadingGitHubRepos && githubRepoData?.integrationInstalled === false;
+    !isLoadingGitHubRepos &&
+    githubRepoData?.integrationInstalled === false &&
+    githubRepoData.unavailableReason === undefined;
+  const githubSettingsHref = githubIntegrationSettingsHref(organizationId);
+  const githubNotices = getGitHubRepositoryNotices(githubRepoData, githubSettingsHref);
   const gitlabIntegrationMissing =
     !isLoadingGitLabRepos && gitlabRepoData?.integrationInstalled === false;
   const bitbucketIntegrationMissing = organizationId
@@ -916,9 +943,7 @@ export function NewSessionPanel({
     ? `/organizations/${organizationId}/integrations/bitbucket`
     : null;
 
-  // ---------------------------------------------------------------------------
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
-  // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
   const repositoryKey = (repo: RepositoryOption) =>
@@ -955,9 +980,6 @@ export function NewSessionPanel({
     [handleRepoSelect]
   );
 
-  // ---------------------------------------------------------------------------
-  // Slash commands
-  // ---------------------------------------------------------------------------
   const slashCommands = useMemo<SlashCommand[]>(() => {
     const defaults = commandsOrDefault(undefined).map(cmd => ({
       trigger: cmd.name,
@@ -1006,9 +1028,6 @@ export function NewSessionPanel({
     listRef: commandListRef,
   });
 
-  // ---------------------------------------------------------------------------
-  // Submit
-  // ---------------------------------------------------------------------------
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
   const selectedModelOption = modelOptions.find(m => m.id === model);
@@ -1020,20 +1039,6 @@ export function NewSessionPanel({
     !!selectedModelOption &&
     (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
 
-  const bitbucketRepo = useMemo(() => {
-    if (!organizationId || selectedPlatform !== 'bitbucket') return undefined;
-    const repository = unifiedRepositories.find(
-      repository => repository.fullName === selectedRepo && repository.platform === 'bitbucket'
-    );
-    if (!repository || typeof repository.id !== 'string' || !repository.workspaceUuid) {
-      return undefined;
-    }
-    return {
-      fullName: selectedRepo,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.id,
-    };
-  }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1047,6 +1052,10 @@ export function NewSessionPanel({
       model: displayModel,
       variant: displayVariant,
       profileId: selectedProfileId ?? undefined,
+      ...(sessionEnvironment.selection.status !== 'unknown'
+        ? { requireEnvironmentChoice: true as const }
+        : {}),
+      ...(requestedEnvironment ? { requestedEnvironment } : {}),
       autoCommit: true,
       autoInitiate: true,
       attachments: buildCloudAgentAttachments(attachmentMessageUuid, attachmentUpload.attachments),
@@ -1067,43 +1076,27 @@ export function NewSessionPanel({
     displayModel,
     displayVariant,
     selectedProfileId,
+    sessionEnvironment.selection.status,
+    requestedEnvironment,
     attachmentMessageUuid,
     attachmentUpload.attachments,
   ]);
-  const creationIntent = JSON.stringify({
-    ...creationInput,
-    organizationId: organizationId ?? null,
-    repository: selectedRepo,
-    platform: selectedPlatform,
-    ...(organizationId && selectedPlatform === 'github'
-      ? { githubIntegrationId: selectedGitHubIntegrationId }
-      : {}),
-    bitbucketRepo,
-    sandboxAllocation: sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : undefined,
-  });
-  const sandboxSelectionError = resolveSandboxSelectionSubmissionError({
-    error: sandbox.error,
-    intent: creationIntent,
-    pendingOperation: firstChatCreationOperation,
-  });
-  const sandboxDescriptionId = sandboxSelectionError ? 'new-session-sandbox-error' : undefined;
-
   const isFormValid =
     prompt.trim().length > 0 &&
+    sessionEnvironment.selection.status !== 'loading' &&
     !isPromptTooLong &&
+    !publicRepoUrlError &&
     model.length > 0 &&
-    !sandboxSelectionError &&
     (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
 
-  const handleStartSession = useCallback(async () => {
+  const handleStartSession = useCallback(() => {
     const guard = creationGuardRef.current;
     if (!guard || !guard.tryBegin()) return;
 
     if (
       !prompt.trim() ||
       attachmentUpload.hasUploadingAttachments ||
-      sandboxSelectionError ||
       (creationInput.initialPayload && attachmentUpload.attachments.length > 0)
     ) {
       if (creationInput.initialPayload && attachmentUpload.attachments.length > 0) {
@@ -1114,163 +1107,107 @@ export function NewSessionPanel({
       guard.end();
       return;
     }
-    if (!selectedRepo) {
-      setShowRepositoryRequiredMessage(true);
+    if (!selectedRepo && !hasPublicRepo) {
+      setStartValidation({ field: 'repository' });
       guard.end();
       return;
     }
-    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
+    if (environmentBlocksStart(sessionEnvironment.selection)) {
+      setStartValidation({ field: 'environment' });
+      guard.end();
+      return;
+    }
+    if (
+      !hasPublicRepo &&
+      organizationId &&
+      selectedPlatform === 'github' &&
+      !selectedGitHubIntegrationId
+    ) {
       toast.error('Select the GitHub repository again.');
       guard.end();
       return;
     }
-    if (selectedPlatform === 'bitbucket' && !bitbucketRepo) {
+    if (!hasPublicRepo && selectedPlatform === 'bitbucket' && !bitbucketRepo) {
       toast.error('Select the Bitbucket repository again.');
       guard.end();
       return;
     }
 
     const submittedPrompt = prompt.trim();
-    const submittedAttachmentNames = attachmentUpload.attachments.map(a => a.file.name);
-    setPendingCreation({ prompt: submittedPrompt, attachmentNames: submittedAttachmentNames });
-
-    try {
-      const operation = resolveFirstChatCreationAttempt(
-        firstChatCreationOperation,
-        creationIntent,
-        uuidv4,
-        generateMessageId
-      );
-      setFirstChatCreationOperation(operation);
-      const baseInput = {
-        ...creationInput,
-        initialMessageId: operation.initialMessageId,
-        operationKey: operation.operationKey,
-      };
-      let result: { kiloSessionId: string; cloudAgentSessionId: string };
-
-      if (organizationId) {
-        const organizationInput = {
-          ...baseInput,
-          organizationId,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-        };
-        if (selectedPlatform === 'gitlab') {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            gitlabProject: selectedRepo,
-          });
-        } else if (selectedPlatform === 'bitbucket' && bitbucketRepo) {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            bitbucketRepo,
-          });
-        } else {
-          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
-            ...organizationInput,
-            githubRepo: selectedRepo,
-            githubIntegrationId: selectedGitHubIntegrationId,
-          });
+    const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+    const initialMessageId = generateMessageId();
+    const sessionInput = { ...creationInput, initialMessageId };
+    const request: LocalSessionRequest = organizationId
+      ? {
+          kind: 'new-organization-session',
+          input: {
+            ...sessionInput,
+            organizationId,
+            ...(hasPublicRepo
+              ? { publicRepoUrl: trimmedPublicRepoUrl }
+              : selectedPlatform === 'gitlab'
+                ? { gitlabProject: selectedRepo }
+                : selectedPlatform === 'bitbucket' && bitbucketRepo
+                  ? { bitbucketRepo }
+                  : { githubRepo: selectedRepo, githubIntegrationId: selectedGitHubIntegrationId }),
+          },
         }
-      } else if (selectedPlatform === 'gitlab') {
-        result = await trpcClient.cloudAgentNext.prepareSession.mutate({
-          ...baseInput,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-          gitlabProject: selectedRepo,
-        });
-      } else {
-        result = await trpcClient.cloudAgentNext.prepareSession.mutate({
-          ...baseInput,
-          ...(sandboxAllocation ? { sandboxAllocation } : {}),
-          githubRepo: selectedRepo,
-        });
-      }
+      : {
+          kind: 'new-session',
+          input: {
+            ...sessionInput,
+            ...(hasPublicRepo
+              ? { publicRepoUrl: trimmedPublicRepoUrl }
+              : selectedPlatform === 'gitlab'
+                ? { gitlabProject: selectedRepo }
+                : { githubRepo: selectedRepo }),
+          },
+        };
+    if (!hasAgentModelOverride) setLastUsedModel(model, organizationId);
+    if (!hasAgentModelOverride && variant) setLastUsedVariant(model, variant, organizationId);
 
-      setFirstChatCreationOperation(current =>
-        current?.operationKey === operation.operationKey ? null : current
-      );
-
-      if (!hasAgentModelOverride) {
-        setLastUsedModel(model, organizationId);
-      }
-      if (!hasAgentModelOverride && variant) {
-        setLastUsedVariant(model, variant, organizationId);
-      }
-
-      void queryClient.invalidateQueries({
-        queryKey: trpc.cliSessionsV2.list.queryKey({
-          limit: 3,
-          createdOnPlatform: 'cloud-agent',
-          orderBy: 'updated_at',
-          organizationId: organizationId ?? null,
-        }),
-      });
-
-      attachmentUpload.clearAttachments();
-      setAttachmentMessageUuid(uuidv4());
-
-      // A completion that lands after the panel is gone must not yank the user
-      // back to this session; the created session stays reachable from the
-      // sidebar.
-      if (!mountedRef.current) return;
-
-      setPendingFirstChat({
-        operationKey: operation.operationKey,
-        initialMessageId: operation.initialMessageId,
+    // The chat opens at once from local data; the store owns the request, so it
+    // continues after this panel unmounts and the chat page shows its outcome.
+    const kiloSessionId = createLocalSession({
+      organizationId: organizationId ?? null,
+      worktreeId: null,
+      request,
+      repository: hasPublicRepo ? trimmedPublicRepoUrl : selectedRepo,
+      branch: null,
+      composer: {
+        mode: creationInput.mode,
+        model: creationInput.model,
+        variant: creationInput.variant ?? null,
+      },
+      firstMessage: {
+        id: initialMessageId,
         prompt: submittedPrompt,
-        attachmentNames: submittedAttachmentNames,
-        kiloSessionId: result.kiloSessionId,
-      });
-      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
-      router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
-      setBillingFailure(null);
-      // The pending view and its single-flight lock stay in place through the
-      // route change: the panel must not flash the empty composer while the
-      // chat route loads. The lock is released only on failure.
-    } catch (error) {
-      if (!isAmbiguousCloudSessionCreationError(error)) {
-        setFirstChatCreationOperation(null);
-      }
-      // No setPendingFirstChat(null) here: this attempt publishes the shared
-      // value only after success, so clearing it could only drop another
-      // panel's newer creation.
-      setPendingCreation(null);
-      guard.end();
-      const failure = parseCustomerBillingFailure(error);
-      setBillingFailure(failure);
-      console.error('Failed to prepare session:', error);
-      if (!failure) {
-        toast.error('Failed to create session', {
-          description: formatSessionError(error),
-        });
-      }
-    }
+        attachmentNames: attachmentUpload.attachments.map(a => a.file.name),
+      },
+    });
+    // The local session owns these uploads now; clearing would delete them before prepare links them.
+    // The lock stays held: the panel unmounts with this navigation, and a second
+    // submit before then would create a second session.
+    router.push(`${basePath}/chat?sessionId=${kiloSessionId}`);
   }, [
     attachmentUpload,
     bitbucketRepo,
+    createLocalSession,
     creationInput,
-    creationIntent,
-    firstChatCreationOperation,
     hasAgentModelOverride,
-    sandboxAllocation,
-    sandboxSelectionError,
+    hasPublicRepo,
     model,
     variant,
     organizationId,
     prompt,
-    queryClient,
     router,
-    setPendingFirstChat,
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
-    trpc.cliSessionsV2.list,
-    trpcClient,
+    sessionEnvironment.selection,
+    trimmedPublicRepoUrl,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Textarea auto-resize
-  // ---------------------------------------------------------------------------
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -1335,7 +1272,9 @@ export function NewSessionPanel({
   // ---------------------------------------------------------------------------
   // Integration missing view
   // ---------------------------------------------------------------------------
-  if (isIntegrationMissing) {
+  // Dev-only: with the public-repo path enabled, render the composer without an
+  // integration so a public repository URL can be used instead.
+  if (isIntegrationMissing && !isPublicRepoDevEnabled) {
     return (
       <div className="relative flex h-full flex-col items-center justify-start overflow-y-auto px-4 py-8">
         <SetPageTitle title="Cloud Agent">
@@ -1354,25 +1293,6 @@ export function NewSessionPanel({
     );
   }
 
-  if (pendingCreation) {
-    // Full width below a gap the height of the chat route's workspace header
-    // (two rows below `sm`), so the pending turn sits where the chat route
-    // renders it and the prompt does not move on the route change.
-    return (
-      <div className="relative flex h-full flex-col pt-24 sm:pt-14">
-        <SetPageTitle title="Cloud Agent">
-          <Badge variant="new">new</Badge>
-        </SetPageTitle>
-        <MobileSidebarToggle />
-        <PendingChatView
-          prompt={pendingCreation.prompt}
-          attachmentNames={pendingCreation.attachmentNames}
-          statusLabel={PENDING_FIRST_CHAT_STATUS_LABEL}
-        />
-      </div>
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1383,22 +1303,6 @@ export function NewSessionPanel({
       </SetPageTitle>
       <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
-        {billingFailure && (
-          <CloudAgentBillingError
-            failure={billingFailure}
-            presentation={billingPayerPresentation(billingFailure, {
-              currentUserId,
-              organization:
-                organizationId && organizationName && organizationRole
-                  ? {
-                      id: organizationId,
-                      name: organizationName,
-                      role: organizationRole,
-                    }
-                  : undefined,
-            })}
-          />
-        )}
         {/* Organization members intentionally see the shared balance: the existing eligibility API returns it to members. */}
         {hasInsufficientBalance && eligibilityData && !hasLimitedAccess && (
           <InsufficientBalanceBanner
@@ -1640,144 +1544,213 @@ export function NewSessionPanel({
             >
               <Paperclip className="h-4 w-4" />
             </UIButton>
-            {showRepositoryRequiredMessage && (
-              <p
-                id="new-session-repository-required"
-                className="flex shrink-0 items-center gap-1 text-xs text-amber-400"
-                role="alert"
-              >
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Select a repository
-              </p>
-            )}
-            <UIButton
-              type="button"
-              variant="primary"
-              size="icon"
-              onClick={() => void handleStartSession()}
-              disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
-              className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-              aria-describedby={
-                showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
-              }
-              aria-label="Start session"
+            <Popover
+              open={Boolean(startValidationMessage)}
+              onOpenChange={open => {
+                if (!open) setStartValidation(null);
+              }}
             >
-              <Send className="h-4 w-4" />
-            </UIButton>
+              <PopoverAnchor asChild>
+                <UIButton
+                  type="button"
+                  variant="primary"
+                  size="icon"
+                  onClick={() => void handleStartSession()}
+                  disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
+                  className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
+                  aria-describedby={
+                    startValidationMessage ? 'new-session-start-validation' : undefined
+                  }
+                  aria-label="Start session"
+                >
+                  <Send className="h-4 w-4" />
+                </UIButton>
+              </PopoverAnchor>
+              <PopoverContent
+                id="new-session-start-validation"
+                role="alert"
+                side="left"
+                sideOffset={8}
+                className="flex w-auto max-w-[min(16rem,calc(100vw-2rem))] items-center gap-2 p-3 text-xs"
+                onOpenAutoFocus={event => event.preventDefault()}
+                onCloseAutoFocus={event => event.preventDefault()}
+              >
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+                {startValidationMessage}
+                <PopoverArrow className="fill-popover" />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
         {/* Repo + Settings row (outside prompt box) */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Repo — bottom left */}
-          <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  'text-muted-foreground hover:text-foreground inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-sm',
-                  selectedRepo && 'text-foreground'
-                )}
-              >
-                <FolderGit2 className="h-3.5 w-3.5" />
-                <span className="max-w-[min(16rem,50vw)] truncate">
-                  {selectedRepo || 'Repository'}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
-              {isLoadingRepos ? (
-                <div className="text-muted-foreground p-4 text-center text-sm">
-                  Loading repositories...
-                </div>
-              ) : repoError ? (
-                <div className="p-4 text-center text-sm text-red-400">
-                  Failed to load repositories
-                </div>
-              ) : unifiedRepositories.length === 0 ? (
-                <div className="text-muted-foreground space-y-2 p-4 text-center text-sm">
-                  <p>No repositories found</p>
-                  {organizationId && bitbucketRepoData?.status === 'temporarily_unavailable' && (
-                    <p>The Bitbucket repository cache is temporarily unavailable.</p>
+          {/* Repo and its environment — bottom left */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+            <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'text-muted-foreground hover:text-foreground inline-flex min-w-0 cursor-pointer items-center gap-1 text-sm',
+                    selectedRepo && 'text-foreground'
                   )}
-                  {organizationId &&
-                    bitbucketIntegrationHref &&
-                    bitbucketRepoData?.status &&
-                    bitbucketRepoData.status !== 'available' &&
-                    bitbucketRepoData.status !== 'temporarily_unavailable' && (
-                      <Link
-                        href={bitbucketIntegrationHref}
-                        className="text-link hover:text-link-hover underline underline-offset-4"
-                      >
-                        {bitbucketRepoData.status === 'reconnect_required' ||
-                        bitbucketRepoData.status === 'insufficient_permissions'
-                          ? 'Replace the Bitbucket token'
-                          : bitbucketRepoData.status === 'invalid_request'
-                            ? 'Review the Bitbucket connection'
-                            : 'Connect Bitbucket'}
-                      </Link>
-                    )}
-                  <UIButton
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void refreshRepositories()}
-                    disabled={isRefreshingRepos}
-                    className="mx-auto"
-                  >
-                    <RefreshCw className={cn('size-3.5', isRefreshingRepos && 'animate-spin')} />
-                    {isRefreshingRepos ? 'Refreshing repositories...' : 'Refresh repositories'}
-                  </UIButton>
-                </div>
-              ) : (
-                <UICommand>
-                  <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
-                    <CommandInput placeholder="Search repositories..." />
-                    <button
-                      type="button"
-                      onClick={() => void refreshRepositories()}
-                      disabled={isRefreshingRepos}
-                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
-                      aria-label="Refresh repositories"
-                      title="Refresh repositories"
+                >
+                  <FolderGit2 className="h-3.5 w-3.5" />
+                  <span className="max-w-[min(16rem,50vw)] truncate">
+                    {(hasPublicRepo ? trimmedPublicRepoUrl : '') || selectedRepo || 'Repository'}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
+                {isPublicRepoDevEnabled && (
+                  <div className="space-y-2 border-b p-3">
+                    <label
+                      htmlFor="new-session-public-repo-url"
+                      className="text-muted-foreground text-xs font-medium"
                     >
-                      <RefreshCw
-                        className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
-                      />
-                    </button>
+                      Public repository URL
+                    </label>
+                    <Input
+                      id="new-session-public-repo-url"
+                      type="url"
+                      inputMode="url"
+                      spellCheck={false}
+                      autoComplete="off"
+                      placeholder="https://github.com/owner/repo.git"
+                      value={publicRepoUrl}
+                      onChange={event => {
+                        setPublicRepoUrl(event.target.value);
+                        setStartValidation(null);
+                      }}
+                      aria-invalid={publicRepoUrlError ? true : undefined}
+                      aria-describedby={
+                        publicRepoUrlError
+                          ? 'new-session-public-repo-error'
+                          : 'new-session-public-repo-help'
+                      }
+                    />
+                    {publicRepoUrlError ? (
+                      <p id="new-session-public-repo-error" className="text-xs text-red-400">
+                        {publicRepoUrlError}
+                      </p>
+                    ) : (
+                      <p
+                        id="new-session-public-repo-help"
+                        className="text-muted-foreground text-xs"
+                      >
+                        Local dev only. Clones a public repository without a source-control
+                        integration.
+                      </p>
+                    )}
                   </div>
-                  {(bitbucketRepoData?.status === 'reconnect_required' ||
-                    bitbucketRepoData?.status === 'insufficient_permissions') &&
-                    bitbucketIntegrationHref && (
-                      <div className="border-b px-3 py-2 text-xs">
+                )}
+
+                {isLoadingRepos ? (
+                  <div className="text-muted-foreground p-4 text-center text-sm">
+                    Loading repositories...
+                  </div>
+                ) : repoError ? (
+                  <div className="p-4 text-center text-sm text-red-400">
+                    Failed to load repositories
+                  </div>
+                ) : unifiedRepositories.length === 0 ? (
+                  <div className="text-muted-foreground space-y-2 p-4 text-center text-sm">
+                    <p>No repositories found</p>
+                    {organizationId && bitbucketRepoData?.status === 'temporarily_unavailable' && (
+                      <p>The Bitbucket repository cache is temporarily unavailable.</p>
+                    )}
+                    {organizationId &&
+                      bitbucketIntegrationHref &&
+                      bitbucketRepoData?.status &&
+                      bitbucketRepoData.status !== 'available' &&
+                      bitbucketRepoData.status !== 'temporarily_unavailable' && (
                         <Link
                           href={bitbucketIntegrationHref}
                           className="text-link hover:text-link-hover underline underline-offset-4"
                         >
-                          Replace the Bitbucket token to list repositories
+                          {bitbucketRepoData.status === 'reconnect_required' ||
+                          bitbucketRepoData.status === 'insufficient_permissions'
+                            ? 'Replace the Bitbucket token'
+                            : bitbucketRepoData.status === 'invalid_request'
+                              ? 'Review the Bitbucket connection'
+                              : 'Connect Bitbucket'}
                         </Link>
-                      </div>
-                    )}
-                  <CommandEmpty>No repositories match your search</CommandEmpty>
-                  <CommandList className="max-h-64 overflow-auto">
-                    {recentRepos.length > 0 && (
-                      <CommandGroup heading="Recently used">
-                        {recentRepos.map(repo => (
-                          <RepoCommandItem
-                            key={`recent-${repositoryKey(repo)}`}
-                            repo={repo}
-                            isSelected={isSelectedRepository(repo)}
-                            onSelect={handleRepoPillSelect}
-                          />
-                        ))}
-                      </CommandGroup>
-                    )}
-                    {hasMultiplePlatforms || hasMultipleGitHubAccounts ? (
-                      <>
-                        {Object.entries(githubRepoGroups).map(([accountLogin, repositories]) =>
-                          repositories?.length ? (
-                            <CommandGroup key={accountLogin} heading={accountLogin}>
-                              {repositories.map(repo => (
+                      )}
+                    <UIButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void refreshRepositories()}
+                      disabled={isRefreshingRepos}
+                      className="mx-auto"
+                    >
+                      <RefreshCw className={cn('size-3.5', isRefreshingRepos && 'animate-spin')} />
+                      {isRefreshingRepos ? 'Refreshing repositories...' : 'Refresh repositories'}
+                    </UIButton>
+                  </div>
+                ) : (
+                  <UICommand>
+                    <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
+                      <CommandInput placeholder="Search repositories..." />
+                      <button
+                        type="button"
+                        onClick={() => void refreshRepositories()}
+                        disabled={isRefreshingRepos}
+                        className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
+                        aria-label="Refresh repositories"
+                        title="Refresh repositories"
+                      >
+                        <RefreshCw
+                          className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
+                        />
+                      </button>
+                    </div>
+                    {(bitbucketRepoData?.status === 'reconnect_required' ||
+                      bitbucketRepoData?.status === 'insufficient_permissions') &&
+                      bitbucketIntegrationHref && (
+                        <div className="border-b px-3 py-2 text-xs">
+                          <Link
+                            href={bitbucketIntegrationHref}
+                            className="text-link hover:text-link-hover underline underline-offset-4"
+                          >
+                            Replace the Bitbucket token to list repositories
+                          </Link>
+                        </div>
+                      )}
+                    <CommandEmpty>No repositories match your search</CommandEmpty>
+                    <CommandList className="max-h-64 overflow-auto">
+                      {recentRepos.length > 0 && (
+                        <CommandGroup heading="Recently used">
+                          {recentRepos.map(repo => (
+                            <RepoCommandItem
+                              key={`recent-${repositoryKey(repo)}`}
+                              repo={repo}
+                              isSelected={isSelectedRepository(repo)}
+                              onSelect={handleRepoPillSelect}
+                            />
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {hasMultiplePlatforms || hasMultipleGitHubAccounts ? (
+                        <>
+                          {Object.entries(githubRepoGroups).map(([accountLogin, repositories]) =>
+                            repositories?.length ? (
+                              <CommandGroup key={accountLogin} heading={accountLogin}>
+                                {repositories.map(repo => (
+                                  <RepoCommandItem
+                                    key={repositoryKey(repo)}
+                                    repo={repo}
+                                    isSelected={isSelectedRepository(repo)}
+                                    onSelect={handleRepoPillSelect}
+                                  />
+                                ))}
+                              </CommandGroup>
+                            ) : null
+                          )}
+                          {gitlabRepos.length > 0 && (
+                            <CommandGroup heading="GitLab">
+                              {gitlabRepos.map(repo => (
                                 <RepoCommandItem
                                   key={repositoryKey(repo)}
                                   repo={repo}
@@ -1786,71 +1759,70 @@ export function NewSessionPanel({
                                 />
                               ))}
                             </CommandGroup>
-                          ) : null
-                        )}
-                        {gitlabRepos.length > 0 && (
-                          <CommandGroup heading="GitLab">
-                            {gitlabRepos.map(repo => (
-                              <RepoCommandItem
-                                key={repositoryKey(repo)}
-                                repo={repo}
-                                isSelected={isSelectedRepository(repo)}
-                                onSelect={handleRepoPillSelect}
-                              />
-                            ))}
-                          </CommandGroup>
-                        )}
-                        {bitbucketRepos.length > 0 && (
-                          <CommandGroup heading="Bitbucket">
-                            {bitbucketRepos.map(repo => (
-                              <RepoCommandItem
-                                key={repositoryKey(repo)}
-                                repo={repo}
-                                isSelected={isSelectedRepository(repo)}
-                                onSelect={handleRepoPillSelect}
-                              />
-                            ))}
-                          </CommandGroup>
-                        )}
-                        {otherRepos.length > 0 && (
-                          <CommandGroup heading="Other">
-                            {otherRepos.map(repo => (
-                              <RepoCommandItem
-                                key={repositoryKey(repo)}
-                                repo={repo}
-                                isSelected={isSelectedRepository(repo)}
-                                onSelect={handleRepoPillSelect}
-                              />
-                            ))}
-                          </CommandGroup>
-                        )}
-                      </>
-                    ) : (
-                      <CommandGroup>
-                        {filteredUnifiedRepos.map(repo => (
-                          <RepoCommandItem
-                            key={repositoryKey(repo)}
-                            repo={repo}
-                            isSelected={isSelectedRepository(repo)}
-                            onSelect={handleRepoPillSelect}
-                          />
-                        ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </UICommand>
-              )}
-            </PopoverContent>
-          </Popover>
+                          )}
+                          {bitbucketRepos.length > 0 && (
+                            <CommandGroup heading="Bitbucket">
+                              {bitbucketRepos.map(repo => (
+                                <RepoCommandItem
+                                  key={repositoryKey(repo)}
+                                  repo={repo}
+                                  isSelected={isSelectedRepository(repo)}
+                                  onSelect={handleRepoPillSelect}
+                                />
+                              ))}
+                            </CommandGroup>
+                          )}
+                          {otherRepos.length > 0 && (
+                            <CommandGroup heading="Other">
+                              {otherRepos.map(repo => (
+                                <RepoCommandItem
+                                  key={repositoryKey(repo)}
+                                  repo={repo}
+                                  isSelected={isSelectedRepository(repo)}
+                                  onSelect={handleRepoPillSelect}
+                                />
+                              ))}
+                            </CommandGroup>
+                          )}
+                        </>
+                      ) : (
+                        <CommandGroup>
+                          {filteredUnifiedRepos.map(repo => (
+                            <RepoCommandItem
+                              key={repositoryKey(repo)}
+                              repo={repo}
+                              isSelected={isSelectedRepository(repo)}
+                              onSelect={handleRepoPillSelect}
+                            />
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </UICommand>
+                )}
+              </PopoverContent>
+            </Popover>
+            <RepositoryEnvironmentChip
+              organizationId={organizationId}
+              repository={environmentRepository}
+              repositoryLabel={selectedRepo}
+              environments={sessionEnvironment.matches}
+              environment={repositoryEnvironment}
+              onChooseEnvironment={environmentId => {
+                setStartValidation(null);
+                sessionEnvironment.chooseEnvironment(environmentId);
+              }}
+              selectedProfileId={selectedProfileId}
+            />
+          </div>
 
-          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">
-            {sandbox.isVisible && (
-              <NewSessionSandboxSelect
-                picker={sandbox.picker}
-                groups={sandbox.groups}
-                invalid={!!sandboxSelectionError}
-                describedBy={sandboxDescriptionId}
-                onChoose={sandbox.choose}
+          <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto">
+            {repositoryEnvironment && environmentRepository && (
+              <EnvironmentProfileSetupNotice
+                organizationId={organizationId}
+                repository={environmentRepository}
+                environment={repositoryEnvironment}
+                selectedProfileId={selectedProfileId}
               />
             )}
             <ProfilePickerPopover
@@ -1859,31 +1831,42 @@ export function NewSessionPanel({
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
               platform={profileBindingPlatform}
+              environment={repositoryEnvironment}
             />
           </div>
         </div>
 
-        {sandboxSelectionError && (
-          <div className="flex flex-wrap items-center gap-2">
-            <p id="new-session-sandbox-error" className="text-destructive text-xs" role="alert">
-              {sandboxSelectionError}
-            </p>
-            <UIButton type="button" variant="outline" size="sm" onClick={sandbox.chooseDefault}>
-              Use default sandbox
-            </UIButton>
-            {sandbox.query.isError && (
-              <UIButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={sandbox.query.isFetching}
-                onClick={() => void sandbox.query.refetch()}
+        {githubNotices.length > 0 && (
+          <div className="flex flex-col gap-1" role="status">
+            {githubNotices.map(notice => (
+              <p
+                key={notice.kind}
+                className="flex flex-wrap items-center gap-1 text-xs text-amber-400"
               >
-                Retry
-              </UIButton>
-            )}
+                <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span>{notice.message}</span>
+                {notice.kind === 'reconnect' ? (
+                  <Link
+                    href={notice.settingsHref}
+                    className="text-link hover:text-link-hover underline underline-offset-4"
+                  >
+                    Review the GitHub connection
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void refreshGitHubRepositories()}
+                    disabled={isRefreshingGitHubRepos}
+                    className="underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+                  >
+                    {isRefreshingGitHubRepos ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                )}
+              </p>
+            ))}
           </div>
         )}
+
         {githubIdentityHint && (
           <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />
         )}
@@ -1924,9 +1907,7 @@ function ContextualTip({ body, linkLabel, href, onDismiss }: ContextualTipProps)
   );
 }
 
-// ---------------------------------------------------------------------------
 // Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 function RepoCommandItem({
   repo,
   isSelected,

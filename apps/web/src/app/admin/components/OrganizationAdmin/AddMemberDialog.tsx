@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useAddMember } from '@/app/admin/api/organizations/hooks';
+import { useAddMember, useSearchParentMembers } from '@/app/admin/api/organizations/hooks';
 import { useSearchUsers } from '@/app/admin/api/users/hooks';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,21 +51,29 @@ export function AddMemberDialog({
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const { data: organizationData, isLoading: isOrganizationLoading } =
+    useOrganizationWithMembers(organizationId);
+  const parentOrganizationId = organizationData?.parent_organization_id ?? null;
   const currentMembers = organizationData?.members || [];
+  const currentMemberEmails = new Set(currentMembers.map(member => member.email));
+  const parentMembersQuery = useSearchParentMembers(
+    organizationId,
+    debouncedSearchTerm,
+    open && parentOrganizationId !== null
+  );
 
-  // Search users query - only enabled when there's a search term
-  const searchUsersQuery = useSearchUsers(debouncedSearchTerm);
+  const searchUsersQuery = useSearchUsers(
+    organizationData && !parentOrganizationId ? debouncedSearchTerm : ''
+  );
 
-  // Filter search results to exclude current members
-  const filteredSearchResults = searchUsersQuery.data?.users
-    ? (() => {
-        const currentMemberEmails = new Set(currentMembers.map(member => member.email));
-        return searchUsersQuery.data.users.filter(
-          user => !currentMemberEmails.has(user.google_user_email)
-        );
-      })()
-    : [];
+  const filteredSearchResults = parentOrganizationId
+    ? (parentMembersQuery.data?.users ?? [])
+    : (searchUsersQuery.data?.users ?? []).filter(
+        user => !currentMemberEmails.has(user.google_user_email)
+      );
+  const isSearching = parentOrganizationId
+    ? parentMembersQuery.isFetching
+    : isOrganizationLoading || searchUsersQuery.isFetching;
 
   const addMemberMutation = useAddMember(organizationId);
 
@@ -140,7 +148,9 @@ export function AddMemberDialog({
         <DialogHeader>
           <DialogTitle>Add Member</DialogTitle>
           <DialogDescription>
-            Search for an existing user by email and assign them a role in this organization.
+            {parentOrganizationId
+              ? 'Search parent organization members by name or email and assign them a role in this sub-organization.'
+              : 'Search for an existing user by email and assign them a role in this organization.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -157,10 +167,10 @@ export function AddMemberDialog({
                 onChange={e => handleEmailChange(e.target.value)}
                 className="pr-10"
               />
-              {searchUsersQuery.isFetching && (
+              {isSearching && (
                 <Loader2 className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin" />
               )}
-              {!searchUsersQuery.isFetching && email && (
+              {!isSearching && email && (
                 <Search className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
               )}
             </div>

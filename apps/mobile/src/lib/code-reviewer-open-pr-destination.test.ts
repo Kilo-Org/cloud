@@ -9,6 +9,7 @@ describe('resolveCodeReviewerOpenPrDestination', () => {
     ).toEqual({
       kind: 'in-app',
       href: '/(app)/pr-review/octocat/hello-world/42',
+      platform: 'github',
     });
   });
 
@@ -18,6 +19,7 @@ describe('resolveCodeReviewerOpenPrDestination', () => {
     ).toEqual({
       kind: 'in-app',
       href: '/(app)/pr-review/gitlab/group/sub/repo/7?instance=https%3A%2F%2Fgitlab.com',
+      platform: 'gitlab',
     });
   });
 
@@ -29,6 +31,7 @@ describe('resolveCodeReviewerOpenPrDestination', () => {
     ).toEqual({
       kind: 'in-app',
       href: '/(app)/pr-review/gitlab/team/repo/9?instance=https%3A%2F%2Fgitlab.example.com',
+      platform: 'gitlab',
     });
   });
 
@@ -40,6 +43,7 @@ describe('resolveCodeReviewerOpenPrDestination', () => {
     ).toEqual({
       kind: 'in-app',
       href: '/(app)/pr-review/bitbucket/acme/api/42',
+      platform: 'bitbucket',
     });
   });
 

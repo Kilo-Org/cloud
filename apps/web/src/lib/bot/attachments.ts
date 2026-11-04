@@ -1,4 +1,5 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { TRPCError } from '@trpc/server';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
@@ -8,6 +9,12 @@ import {
   type CloudAgentAttachments,
   type CloudAgentImageAllowedType,
 } from '@/lib/cloud-agent/constants';
+import {
+  admitPendingUpload,
+  linkAttachmentsForDispatch,
+  releasePendingUploads,
+  releaseUnadmittedUploads,
+} from '@/lib/r2/cloud-agent-pending-uploads';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import { captureException } from '@sentry/nextjs';
 import type { Attachment, Message } from 'chat';
@@ -24,8 +31,17 @@ type CloudAgentDocumentAllowedType = (typeof DOCUMENT_ALLOWED_TYPES)[number];
 
 type UploadableAttachment = {
   attachment: Attachment;
-  fetchData: () => Promise<Buffer>;
   mimeType: CloudAgentAttachmentAllowedType;
+};
+
+/**
+ * How the bot reads an attachment body. A platform that can authorize its own
+ * attachment URL passes `fetchAttachmentUrl`, so the body is read under the size
+ * cap and the transfer stops as soon as the cap is passed; other platforms fall
+ * back to the adapter's `fetchData`, which returns the whole body at once.
+ */
+export type AttachmentRetrievalOptions = {
+  fetchAttachmentUrl?: (url: string) => Promise<Response>;
 };
 
 function isAllowedImageType(mimeType: string): mimeType is CloudAgentImageAllowedType {
@@ -80,26 +96,203 @@ function resolveAttachmentMimeType(
   return attachment.type === 'file' ? resolveDocumentMimeType(attachment) : undefined;
 }
 
-function toUploadableAttachment(attachment: Attachment): UploadableAttachment | undefined {
-  if (typeof attachment.fetchData !== 'function') return undefined;
+function toUploadableAttachment(
+  attachment: Attachment,
+  options: AttachmentRetrievalOptions
+): UploadableAttachment | undefined {
+  const readable =
+    attachment.data !== undefined ||
+    typeof attachment.fetchData === 'function' ||
+    (options.fetchAttachmentUrl !== undefined && typeof attachment.url === 'string');
+  if (!readable) return undefined;
 
   const mimeType = resolveAttachmentMimeType(attachment);
   if (!mimeType) return undefined;
 
-  return { attachment, fetchData: attachment.fetchData, mimeType };
+  return { attachment, mimeType };
+}
+
+/** The error a file the size cap refuses carries, whichever check caught it. */
+function attachmentTooLargeError(label: string, byteLength: number): Error {
+  return new Error(
+    `Attachment ${label} exceeds ${CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(byteLength / (1024 * 1024)).toFixed(1)}MB)`
+  );
+}
+
+/**
+ * Read a body chunk by chunk, so a body that passes the size cap stops the
+ * transfer instead of buffering it whole. `declaredLength` is the source's own
+ * Content-Length when it has one, which refuses an oversized body before its
+ * first byte arrives.
+ */
+async function readBoundedBody(
+  stream: ReadableStream<Uint8Array>,
+  label: string,
+  declaredLength: number | undefined
+): Promise<Buffer> {
+  const maxBytes = CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES;
+  if (declaredLength !== undefined && declaredLength > maxBytes) {
+    await stream.cancel().catch(() => undefined);
+    throw attachmentTooLargeError(label, declaredLength);
+  }
+
+  const reader = stream.getReader();
+  const chunks: Buffer[] = [];
+  let byteLength = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > maxBytes) {
+        // Stop the transfer: the file is refused, so the rest is not read.
+        await reader.cancel().catch(() => undefined);
+        throw attachmentTooLargeError(label, byteLength);
+      }
+      chunks.push(Buffer.from(value.buffer, value.byteOffset, value.byteLength));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks, byteLength);
+}
+
+/**
+ * Read the platform attachment URL with the caller's authorization. Returns
+ * undefined when the URL is not the body this message carries — a non-2xx
+ * answer, a login page, or a failed request — so the caller can fall back to
+ * the adapter's own fetch instead of declining a file that would have uploaded.
+ */
+async function readAttachmentUrl(
+  url: string,
+  label: string,
+  fetchAttachmentUrl: (url: string) => Promise<Response>
+): Promise<Buffer | undefined> {
+  let response: Response;
+  try {
+    response = await fetchAttachmentUrl(url);
+  } catch {
+    return undefined;
+  }
+
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html')) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+
+  if (!response.body) return undefined;
+
+  const contentLength = response.headers.get('content-length');
+  const declaredLength = contentLength === null ? undefined : Number(contentLength);
+  return readBoundedBody(
+    response.body,
+    label,
+    declaredLength !== undefined && Number.isFinite(declaredLength) ? declaredLength : undefined
+  );
+}
+
+/**
+ * Read one attachment's bytes under `CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES`.
+ * The platform URL is preferred when the caller can authorize it, because only
+ * a streamed read can give up part-way; an already-fetched body and the
+ * adapter's own `fetchData` are checked after they arrive.
+ */
+async function readAttachmentBody(
+  attachment: Attachment,
+  label: string,
+  options: AttachmentRetrievalOptions
+): Promise<Buffer> {
+  if (attachment.data !== undefined) {
+    // Already in memory: nothing is transferred, so only the cap applies.
+    const data = attachment.data;
+    const body = Buffer.isBuffer(data) ? data : Buffer.from(await data.arrayBuffer());
+    if (body.byteLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
+      throw attachmentTooLargeError(label, body.byteLength);
+    }
+    return body;
+  }
+
+  if (typeof attachment.url === 'string' && options.fetchAttachmentUrl) {
+    const body = await readAttachmentUrl(attachment.url, label, options.fetchAttachmentUrl);
+    if (body) return body;
+  }
+
+  if (typeof attachment.fetchData === 'function') {
+    const data = await attachment.fetchData();
+    if (data.byteLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
+      throw attachmentTooLargeError(label, data.byteLength);
+    }
+    return data;
+  }
+
+  throw new Error(`Attachment ${label} has no readable body`);
+}
+
+/**
+ * The result of forwarding one chat message's attachments: the ordered
+ * references for the session prompt, the ledger object keys behind them so the
+ * caller can link or discard exactly this message's uploads, and the names of
+ * the referenced files this message did not forward, so the run can say they
+ * are missing.
+ */
+export type UploadedBotAttachments = {
+  /** Absent when every referenced file was declined. */
+  attachments?: CloudAgentAttachments;
+  objectKeys: string[];
+  declinedFilenames: string[];
+};
+
+const MAX_DECLINED_FILENAME_LENGTH = 120;
+const UNNAMED_DECLINED_ATTACHMENT = 'an unnamed attachment';
+
+/** A user-supplied name is prompt data, so keep it single-line and bounded. */
+function describeDeclinedAttachment(attachment: Attachment): string {
+  const name = (attachment.name ?? '')
+    .replaceAll(/[\p{Cc}\p{Cf}]+/gu, ' ')
+    .replaceAll(/\s+/gu, ' ')
+    .trim();
+  return name.slice(0, MAX_DECLINED_FILENAME_LENGTH) || UNNAMED_DECLINED_ATTACHMENT;
+}
+
+function logAttachmentFailure(op: string, error: unknown): void {
+  console.error(`[KiloBot] ${op}:`, error);
+  captureException(error, {
+    tags: { component: 'kilo-bot', op },
+  });
+}
+
+/** A per-message or per-account ledger bound is an expected refusal. */
+function isLedgerRefusal(error: unknown): error is TRPCError {
+  return error instanceof TRPCError && error.code === 'BAD_REQUEST';
 }
 
 /**
  * Upload supported Slack attachments to the canonical Cloud Agent attachment
  * location and return one ordered reference for the initial session prompt.
+ *
+ * Every file is admitted into the shared pending-upload ledger before its body
+ * is retrieved, so a bot message counts against the same per-account live
+ * upload ceiling as the presigned composer path, a file the account cannot take
+ * costs no transfer, and the hourly reaper can reclaim anything the run never
+ * hands to a session. The retrieval itself is bounded by
+ * `CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES`, and the admitted row records the exact
+ * size the body turned out to have.
  */
 export async function extractAndUploadAttachments(
   message: Message,
-  userId: string
-): Promise<CloudAgentAttachments | undefined> {
+  userId: string,
+  options: AttachmentRetrievalOptions = {}
+): Promise<UploadedBotAttachments | undefined> {
   const uploadableAttachments = message.attachments
     .flatMap(attachment => {
-      const uploadableAttachment = toUploadableAttachment(attachment);
+      const uploadableAttachment = toUploadableAttachment(attachment, options);
       return uploadableAttachment ? [uploadableAttachment] : [];
     })
     .slice(0, CLOUD_AGENT_ATTACHMENT_MAX_COUNT);
@@ -107,36 +300,51 @@ export async function extractAndUploadAttachments(
   if (uploadableAttachments.length === 0) return undefined;
 
   const messageUuid = randomUUID();
-  const filenames: string[] = [];
+  const uploaded: { filename: string; objectKey: string }[] = [];
+  const declinedFilenames: string[] = [];
 
-  for (const { attachment, fetchData, mimeType } of uploadableAttachments) {
+  for (const { attachment, mimeType } of uploadableAttachments) {
+    const attachmentId = randomUUID();
+    const extension = CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[mimeType];
+    const filename = `${attachmentId}.${extension}`;
+    const label = attachment.name ?? filename;
+    const keyPrefix = `${userId}/cloud-agent/${messageUuid}`;
+    // Drawn once, so the reservation and the size refresh address one key.
+    const admittedUpload = {
+      kiloUserId: userId,
+      messageUuid,
+      attachmentId,
+      objectKey: `${keyPrefix}/${filename}`,
+      freshObjectKey: `${keyPrefix}/${randomUUID()}.${extension}`,
+    };
+    let admittedKey: string | undefined;
+
     try {
-      const attachmentId = randomUUID();
-      const extension = CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[mimeType];
-      const filename = `${attachmentId}.${extension}`;
-      const r2Key = `${userId}/cloud-agent/${messageUuid}/${filename}`;
-
       if (
         typeof attachment.size === 'number' &&
         attachment.size > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES
       ) {
-        throw new Error(
-          `Attachment ${attachment.name ?? filename} exceeds ${CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(attachment.size / (1024 * 1024)).toFixed(1)}MB)`
-        );
+        throw attachmentTooLargeError(label, attachment.size);
       }
 
-      const data = await fetchData();
+      // Reserve before the retrieval. The ledger owns the per-account ceiling
+      // and the reaper's lease, so a file the account cannot take is declined
+      // without downloading it.
+      admittedKey = await admitPendingUpload({
+        ...admittedUpload,
+        byteSize: typeof attachment.size === 'number' ? attachment.size : 0,
+      });
 
-      if (data.byteLength > CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES) {
-        throw new Error(
-          `Attachment ${attachment.name ?? filename} exceeds ${CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(data.byteLength / (1024 * 1024)).toFixed(1)}MB)`
-        );
-      }
+      const data = await readAttachmentBody(attachment, label, options);
+
+      // Record the size the body actually has. The same ids and key suffix
+      // refresh the reserved row in place, keeping its key.
+      admittedKey = await admitPendingUpload({ ...admittedUpload, byteSize: data.byteLength });
 
       await r2Client.send(
         new PutObjectCommand({
           Bucket: r2CloudAgentAttachmentsBucketName,
-          Key: r2Key,
+          Key: admittedKey,
           Body: data,
           ContentType: mimeType,
           ContentLength: data.byteLength,
@@ -144,14 +352,87 @@ export async function extractAndUploadAttachments(
         })
       );
 
-      filenames.push(filename);
-    } catch (error) {
-      console.error('[KiloBot] Failed to upload attachment:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'upload-bot-attachment' },
+      uploaded.push({
+        filename: admittedKey.slice(admittedKey.lastIndexOf('/') + 1),
+        objectKey: admittedKey,
       });
+    } catch (error) {
+      // A row whose write failed holds ceiling budget without an object, so
+      // give it back now instead of waiting for its lease to lapse.
+      if (admittedKey) await discardPendingUploads(userId, [admittedKey]);
+      // Whatever the cause, this file is not in the run: name it so the model
+      // does not answer as if it received every file the user referenced, and
+      // the other files of the message still go through.
+      declinedFilenames.push(describeDeclinedAttachment(attachment));
+      if (isLedgerRefusal(error)) {
+        // A ledger bound is an expected answer to this message, not an
+        // incident.
+        console.warn('[KiloBot] Attachment not forwarded:', error.message);
+      } else {
+        logAttachmentFailure('upload-bot-attachment', error);
+      }
     }
   }
 
-  return filenames.length > 0 ? { path: messageUuid, files: filenames } : undefined;
+  if (uploaded.length === 0 && declinedFilenames.length === 0) return undefined;
+
+  return {
+    ...(uploaded.length > 0
+      ? { attachments: { path: messageUuid, files: uploaded.map(entry => entry.filename) } }
+      : {}),
+    objectKeys: uploaded.map(entry => entry.objectKey),
+    declinedFilenames,
+  };
+}
+
+/** Delete pending ledger rows and their objects, never throwing. */
+async function discardPendingUploads(kiloUserId: string, objectKeys: string[]): Promise<void> {
+  try {
+    await releasePendingUploads(kiloUserId, objectKeys);
+  } catch (error) {
+    logAttachmentFailure('discard-bot-attachments', error);
+  }
+}
+
+/**
+ * Delete the objects of a bot run that never handed them to a Cloud Agent
+ * session. Rows a session already linked are left alone, so an accepted
+ * session keeps its attachments.
+ */
+export async function discardUploadedAttachments(
+  userId: string,
+  uploaded: UploadedBotAttachments | undefined
+): Promise<void> {
+  if (!uploaded || uploaded.objectKeys.length === 0) return;
+  await discardPendingUploads(userId, uploaded.objectKeys);
+}
+
+/**
+ * Link a message's rows before its session is prepared, so the reaper keeps
+ * them. Refuses when a row is gone, because a session must not reference an
+ * object that was already reclaimed.
+ */
+export async function linkUploadedAttachments(
+  userId: string,
+  attachments: CloudAgentAttachments | undefined
+): Promise<string[]> {
+  if (!attachments || attachments.files.length === 0) return [];
+  return linkAttachmentsForDispatch(userId, attachments);
+}
+
+/**
+ * Hand a refused dispatch's rows back to 'pending' and keep their objects, so a
+ * retried tool call can link them again and run-level cleanup can delete them.
+ */
+export async function releaseRefusedAttachments(
+  userId: string,
+  attachments: CloudAgentAttachments | undefined,
+  linkedObjectKeys: string[]
+): Promise<void> {
+  if (!attachments || linkedObjectKeys.length === 0) return;
+  try {
+    await releaseUnadmittedUploads(userId, attachments.path, linkedObjectKeys);
+  } catch (error) {
+    logAttachmentFailure('release-refused-bot-attachments', error);
+  }
 }

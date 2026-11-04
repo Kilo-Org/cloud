@@ -5,7 +5,7 @@ import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/sch
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { createCloudAgentReportStore } from './report-store.js';
 
-const cloudAgentSessionId = 'agent_12345678-1234-4234-8234-123456789abc';
+const cloudAgentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
 const occurredAt = '2026-05-25T12:00:00.000Z';
 const diagnostic = {
   errorMessageRedacted: 'The model provider is unavailable',

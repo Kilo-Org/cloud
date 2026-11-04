@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveNewSessionPromptMinHeight } from './new-session-prompt-fit';
+import {
+  resolveComposerTopFadeHeight,
+  resolveNewSessionPromptMinHeight,
+} from './new-session-prompt-fit';
 
 const LINE_HEIGHT = 24;
 const PREFERRED_LINES = 3;
@@ -14,14 +17,24 @@ const PREFERRED = {
 
 /**
  * The explorer finding's geometry, in points: the card sat 439px in a 410px
- * frame — its bottom 61px (≈27dp) behind the system bar — with the input at
- * its 3-line floor. The card's own chrome is ~103dp and it starts ~14dp below
- * the frame top.
+ * frame — its bottom 61px (~27dp) behind the system bar — with the input at its
+ * 3-line floor. The card's own chrome is ~103dp and it starts ~14dp below the
+ * frame top.
  */
 const EXPLORER = {
   frameHeight: 178,
   cardTop: 14,
   cardChromeHeight: 103,
+} as const;
+
+/**
+ * The Android emulator's frame with the keyboard up, in points: the card starts
+ * 16dp below the frame top and its chrome measures 98dp.
+ */
+const LONG_DRAFT = {
+  frameHeight: 339,
+  cardTop: 16,
+  cardChromeHeight: 98,
 } as const;
 
 describe('resolveNewSessionPromptMinHeight', () => {
@@ -132,5 +145,79 @@ describe('resolveNewSessionPromptMinHeight', () => {
     expect(withErrorRow).toBeLessThan(plain);
     expect(withErrorRow).toBe(PREFERRED_MIN_HEIGHT - LINE_HEIGHT);
     expect(withErrorRow).toBeGreaterThanOrEqual(LINE_HEIGHT + 16);
+  });
+
+  it('never yields the floor to the Run on row under the card', () => {
+    // The cap gives the row up instead when whole lines cannot hold both (see
+    // `resolveNewSessionPromptMaxHeight`); the floor only ever yields to the
+    // frame, so the composer keeps its three lines wherever the frame alone
+    // has room for them.
+    const frameHeight = 280;
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...LONG_DRAFT, frameHeight })).toBe(
+      PREFERRED_MIN_HEIGHT
+    );
+    expect(
+      LONG_DRAFT.cardTop + LONG_DRAFT.cardChromeHeight + PREFERRED_MIN_HEIGHT
+    ).toBeLessThanOrEqual(frameHeight);
+  });
+});
+
+describe('resolveComposerTopFadeHeight', () => {
+  const LINE = 24;
+
+  it('hides nothing at the top of the field, where no line is cut', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 0, lineHeight: LINE })).toBe(0);
+  });
+
+  it('covers the fragment the field clips without reaching the line under it', () => {
+    // 1 dp into the line: the fragment is 1 dp of cut glyph tops, and the next
+    // whole line starts 23 dp below the edge, so only 1 dp may be masked.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 1, lineHeight: LINE })).toBe(1);
+    // 23.9 dp in: the fragment is the last 0.1 dp of a glyph row and the next
+    // whole line begins at 0.1 dp, so a one-line fade would wash a readable
+    // line. The band is what is left of the fragment.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 23.9, lineHeight: LINE })).toBeCloseTo(
+      0.1,
+      5
+    );
+  });
+
+  it('never masks more than half a line', () => {
+    for (const intoLine of [6, 12, 18]) {
+      expect(
+        resolveComposerTopFadeHeight({ scrollOffset: intoLine, lineHeight: LINE })
+      ).toBeLessThanOrEqual(LINE / 2);
+    }
+    // The halfway point is where fragment and remaining line are equal.
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 12, lineHeight: LINE })).toBe(12);
+  });
+
+  it('uses the position inside the current line across several lines of scroll', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: LINE + 4, lineHeight: LINE })).toBe(4);
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 3 * LINE + 20, lineHeight: LINE })).toBe(4);
+  });
+
+  it('treats an unmeasurable line or offset as no fade', () => {
+    expect(resolveComposerTopFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
+    expect(resolveComposerTopFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
+  });
+});
+
+describe('the shipped phone geometry with the keyboard up', () => {
+  /**
+   * The Android emulator (1080x2400 at 420dpi) with its keyboard up: the form
+   * frame reports 339pt, the card starts 14pt below the frame top and its own
+   * chrome measures 101.33pt. The floor alone fits, so the composer keeps its
+   * three lines there and a longer draft scrolls inside them.
+   */
+  it('keeps the 3-line floor on a phone frame with the keyboard up', () => {
+    expect(
+      resolveNewSessionPromptMinHeight({
+        ...PREFERRED,
+        frameHeight: 339,
+        cardTop: 14,
+        cardChromeHeight: 101.33,
+      })
+    ).toBe(PREFERRED_MIN_HEIGHT);
   });
 });

@@ -120,9 +120,9 @@ export function makeFakeQueryClient(
   const seed = qc.setQueryData.bind(qc);
   seed(QUERY_KEY, initial);
   let pendingFetch: Deferred<CachedActiveSessionsData> | null = null;
-  const fetch = qc.fetchQuery.bind(qc);
+  const fetch = qc.query.bind(qc);
   const cancel = qc.cancelQueries.bind(qc);
-  const fetchSpy = vi.spyOn(qc, 'fetchQuery').mockImplementation(async options => {
+  const fetchSpy = vi.spyOn(qc, 'query').mockImplementation(async options => {
     const queryFn = options.queryFn;
     if (typeof queryFn !== 'function') {
       throw new TypeError('Expected a query function');
@@ -267,6 +267,23 @@ export function makeTestQueryClient(): QueryClient {
     mutations: { retry: false, gcTime: Infinity },
   });
   return client;
+}
+
+/**
+ * Seed the cache and settle the scope on that server result. A socket write never establishes one, and
+ * an unaccepted scope schedules its own replacement fetch, so tests about other
+ * follow-up reasons start from an accepted scope.
+ */
+export async function acceptScope(
+  qc: FakeQueryClient,
+  sync: ActiveSessionsLiveSync,
+  payload: CachedActiveSessionsData = emptySessionsData()
+): Promise<void> {
+  qc.__setCached(payload);
+  sync.scheduleRefresh('manual');
+  await sync.getFetchQueue();
+  qc.__triggerFetchResolve(payload);
+  await sync.getFetchCompletion();
 }
 
 export function seedMutationSessions(

@@ -7,6 +7,7 @@ import {
   TELEMETRY_DESCRIPTION_KEY,
   type TelemetryEvent,
 } from '@/lib/telemetry/error-sink';
+import { FINGERPRINT_MESSAGE_LIMIT } from '@/lib/telemetry/sentry-scrub';
 
 let events: TelemetryEvent[] = [];
 
@@ -104,6 +105,44 @@ describe('reportAppError', () => {
     });
   });
 
+  it('redacts a long opaque run in the fingerprint message and keeps the words', () => {
+    reportAppError(new Error('sync failed for abcdefghijklmnopqrst'), { source: 'query' });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual([
+      'app-error',
+      'query',
+      'Error',
+      'sync failed for [redacted]',
+    ]);
+  });
+
+  it('strips the volatile host, path, and query from the fingerprint message', () => {
+    reportAppError(
+      new Error(
+        'POST https://api.example.com:8443/api/trpc/session.list?input=abcdefghijklmnopqrst failed'
+      ),
+      { source: 'mutation' }
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual([
+      'app-error',
+      'mutation',
+      'Error',
+      'POST <host><path> failed',
+    ]);
+  });
+
+  it('bounds the fingerprint message of a pathologically long error', () => {
+    reportAppError(new Error('x'.repeat(200_000)), { source: 'query' });
+
+    const fingerprint = events[0]?.fingerprint ?? [];
+
+    expect(fingerprint).toEqual(['app-error', 'query', 'Error', '[redacted]']);
+    expect((fingerprint[3] ?? '').length).toBeLessThanOrEqual(FINGERPRINT_MESSAGE_LIMIT);
+  });
+
   it('does not report an already-reported tRPC-shaped error', () => {
     reportAppError(Object.assign(new Error('trpc'), { data: { code: 'FORBIDDEN' } }), {
       source: 'query',
@@ -154,6 +193,22 @@ describe('reportAppError', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ level: 'warning', fingerprint: ['expected-outage'] });
+  });
+
+  it('stays silent for a declared none, which the network layer already owns', () => {
+    reportAppError(
+      Object.assign(new Error('stale token'), {
+        [TELEMETRY_DESCRIPTION_KEY]: {
+          fingerprint: ['transcription-models-fetch', 'http.401'],
+          level: 'warning',
+          report: 'none',
+          tags: { 'error.subsystem': 'transcription-models', 'http.status': 401 },
+        },
+      }),
+      { source: 'query' }
+    );
+
+    expect(events).toEqual([]);
   });
 
   it('ignores a malformed declared telemetry and keeps the generic fingerprint', () => {

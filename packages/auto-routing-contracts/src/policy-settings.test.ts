@@ -64,7 +64,7 @@ describe('policy setting resolution', () => {
   it('treats a null override as cleared and keeps fixed settings fixed', () => {
     const states = resolvePolicySettings({
       ...base,
-      policyOverrides: { minAccuracy: null, switchCostFactor: 99 },
+      policyOverrides: parseStoredPolicyOverrides({ minAccuracy: null, switchCostFactor: 99 }),
       policyComputed: {
         minAccuracy: { value: 0.6, computedAt, source: 'held-out-grid', evidence: 'fixture' },
       },
@@ -74,9 +74,16 @@ describe('policy setting resolution', () => {
     expect(states.switchCostFactor).toMatchObject({
       kind: 'fixed',
       effective: 3,
+      override: null,
+      computed: null,
       reason: expect.any(String),
     });
-    expect(states.frontierMinAccuracyDelta).toMatchObject({ kind: 'fixed', effective: 0 });
+    expect(states.frontierMinAccuracyDelta).toMatchObject({
+      kind: 'fixed',
+      effective: 0,
+      override: null,
+      computed: null,
+    });
   });
 
   it('parses a stored config written before policy settings existed', () => {
@@ -142,11 +149,19 @@ describe('policy setting resolution', () => {
     const storedOverrides: unknown = {
       minAccuracy: { uncachedInputTokens: 1000, cachedInputTokens: 200 },
       accuracyNoiseBand: 0.02,
+      // Valid for its own value schema, but a fixed setting cannot be overridden.
+      switchCostFactor: 9,
     };
     const storedComputed: unknown = {
       minAccuracy: { value: 'high', computedAt, source: 'held-out-grid', evidence: 'fixture' },
       productionTokenProfile: { value: 0.5, computedAt, source: 'production-usage', evidence: 'x' },
       switchHorizonTurns: { value: 7, computedAt, source: 'production-usage', evidence: 'x' },
+      bestAccuracySwitchThreshold: {
+        value: 0.5,
+        computedAt,
+        source: 'held-out-grid',
+        evidence: 'fixed settings are never computed',
+      },
     };
     const overrides = parseStoredPolicyOverrides(storedOverrides);
     const computed = parseStoredPolicyComputed(storedComputed);

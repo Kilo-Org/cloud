@@ -3,7 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 
 import {
   breakPane,
@@ -31,6 +31,19 @@ const hasTmux = (() => {
     return false;
   }
 })();
+
+const suiteSession = `kilo-tmux-suite-${process.pid}`;
+
+before(() => {
+  if (!hasTmux) return;
+  // Keep the server alive between tests so new-session cannot race its shutdown.
+  execFileSync('tmux', ['new-session', '-d', '-s', suiteSession], { stdio: 'pipe' });
+});
+
+after(() => {
+  if (!hasTmux) return;
+  execFileSync('tmux', ['kill-session', '-t', `=${suiteSession}`], { stdio: 'pipe' });
+});
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =

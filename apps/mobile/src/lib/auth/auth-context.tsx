@@ -59,6 +59,7 @@ import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
+import { clearTrackingPromptDismissed } from '@/lib/hooks/use-tracking-permission-prompt';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
@@ -66,7 +67,9 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
+import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLoginDrafts } from '@/lib/login-draft';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
@@ -91,6 +94,7 @@ import {
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
+  PICKER_RESTORE_RECORD_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -108,6 +112,7 @@ import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/c
 // warning level with the stable read fingerprint).
 export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
+let authPreloadAvailable = true;
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -258,7 +263,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // began while the exchange was in flight has not bumped the epoch
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
-            if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+            if (
+              pair &&
+              isCurrentAuthEpoch(epoch) &&
+              !isSignedOutReference.current &&
+              !isSignOutActive()
+            ) {
               markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
@@ -287,7 +297,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // without it a success landing mid-teardown republishes the stored
           // credentials (owner, React state, deep-link binding) that sign-out
           // is tearing down.
-          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current) {
+          // The sign-out flag is module-scoped, so a provider remount starts
+          // with a fresh ref while the teardown is still before its own fence:
+          // both must stop this publish, or the remounted tree stays signed in
+          // after the teardown finishes.
+          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current || isSignOutActive()) {
             return;
           }
           // A same-session refresh replaced the stored pair while the reads
@@ -356,7 +370,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   );
 
   useEffect(() => {
-    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+    // Android can recreate the activity without restarting JavaScript. Later provider mounts
+    // and root-boundary Retry remounts must read current credentials rather than the snapshot
+    // from before sign-in or a credential change.
+    const preload = authPreloadAvailable
+      ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
+      : undefined;
+    authPreloadAvailable = false;
+    void load(preload);
   }, [load]);
 
   const retryRestore = useCallback(() => {
@@ -445,6 +466,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's session
         // state: trusted hosts, image confirms, media caches, temp copies.
         clearSessionScopedState();
+        // The sign-in form's drafts belong to the attempt that just succeeded,
+        // whatever provider finished it; a later signed-out screen must not
+        // prefill the previous attempt's address or SSO banner.
+        clearLoginDrafts();
       });
     },
     []
@@ -570,6 +595,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
+            deleteAccountMetadata(PICKER_RESTORE_RECORD_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that
@@ -611,6 +637,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
+          clearTrackingPromptDismissed();
           clearSessionScopedState();
           // The remote MCP connection and the servers stored behind it (which
           // hold bearer tokens) belong to the account that is leaving. The
@@ -628,6 +655,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // throw into sign-out.
           runBestEffortTeardown(clearLauncherSurfaces);
           runBestEffortTeardown(clearLastOpenedSession);
+          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

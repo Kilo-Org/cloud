@@ -83,6 +83,7 @@ export function RepositoryRow({
             Sandbox
           </span>
           <SandboxSelect
+            layout="compact"
             value={toSelectableAllocation(row.allocation)}
             choices={choices}
             unavailableReason={

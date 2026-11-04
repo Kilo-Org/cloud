@@ -29,7 +29,9 @@ export async function OrganizationByPageLayout({
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const result = await getAuthorizedOrgContext(organizationId, roles);
+  const result = await getAuthorizedOrgContext(organizationId, roles, {
+    surface: 'server-component',
+  });
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());

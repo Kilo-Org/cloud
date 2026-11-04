@@ -8,6 +8,10 @@
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  // Notification history retention. `NotificationsService.scheduled` prunes rows
+  // older than the 90-day history window; see
+  // src/lib/notification-history-prune.ts.
+  "triggers": { "crons": ["41 3 * * *"] },
   "vars": {
     "WORKER_ENV": "production",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",

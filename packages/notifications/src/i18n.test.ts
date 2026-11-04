@@ -47,6 +47,16 @@ describe('resolvePushLocale', () => {
     expect(resolvePushLocale('xx')).toBe('en');
   });
 
+  it('maps Object.prototype property names to en', () => {
+    // Membership must be an own-key check: inherited names like `constructor`
+    // or `toString` are not catalog tags and must fall back to English.
+    expect(resolvePushLocale('constructor')).toBe('en');
+    expect(resolvePushLocale('toString')).toBe('en');
+    expect(resolvePushLocale('valueOf')).toBe('en');
+    expect(resolvePushLocale('__proto__')).toBe('en');
+    expect(resolvePushLocale('hasOwnProperty')).toBe('en');
+  });
+
   it('resolves supported tags to themselves', () => {
     expect(resolvePushLocale('fr')).toBe('fr');
     expect(resolvePushLocale('de')).toBe('de');

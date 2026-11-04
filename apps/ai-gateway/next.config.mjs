@@ -1,4 +1,4 @@
-import { withSentryConfig } from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import { resolve } from 'path';
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
@@ -40,7 +40,7 @@ const nextConfig = {
   },
 };
 
-/** @type {import('@sentry/nextjs').SentryBuildOptions} */
+/** @type {import('@sentry/nextjs/config').SentryBuildOptions} */
 const sentryConfig = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,

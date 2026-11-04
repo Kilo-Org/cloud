@@ -3,7 +3,10 @@ import { i18n } from '@/i18n';
 // `platformLabel` maps a backend platform string (`created_on_platform` or
 // the heartbeat `platform` field) to the uppercase label. This file is the
 // only implementation.
-export function platformLabel(platform: string): string {
+export function platformLabel(platform: string | null | undefined): string {
+  if (!platform) {
+    return i18n.t('agents.sessionList.live');
+  }
   switch (platform) {
     case 'cloud-agent':
     case 'cloud-agent-web': {

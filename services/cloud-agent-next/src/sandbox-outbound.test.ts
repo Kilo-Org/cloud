@@ -6,11 +6,6 @@ import {
   GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
 } from './github-rate-limit-diagnostics.js';
 
-const sdk = vi.hoisted(() => {
-  class StockSandbox {}
-  class ContainerProxy {}
-  return { StockSandbox, ContainerProxy };
-});
 const logging = vi.hoisted(() => {
   const logger = {
     debug: vi.fn(),
@@ -23,25 +18,9 @@ const logging = vi.hoisted(() => {
   return { logger };
 });
 
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: sdk.StockSandbox,
-  ContainerProxy: sdk.ContainerProxy,
-}));
-vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
-import {
-  ContainerProxy,
-  Sandbox,
-  SandboxContainment,
-  SandboxDIND,
-  SandboxSmall,
-  SandboxSmallContainment,
-  SandboxCodeReview,
-  SandboxCodeReviewContainment,
-  MANAGED_SCM_OUTBOUND_HANDLER,
-  handleManagedScmOutbound,
-} from './sandbox-outbound.js';
+import { handleManagedScmOutbound } from './sandbox-outbound.js';
 import {
   createControlPlaneCredential,
   type ControlCredentialPurpose,
@@ -93,80 +72,6 @@ function serializedLogCalls(): string {
     error: logging.logger.error.mock.calls,
   });
 }
-
-describe('managed GitHub sandbox outbound configuration', () => {
-  it('enables HTTPS interception and the named handler only on containment sandboxes', () => {
-    // Existing sandboxes keep internet access but must not intercept HTTPS.
-    expect(new Sandbox({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new Sandbox({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxSmall({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxSmall({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxDIND({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxDIND({} as never, {} as never).interceptHttps).toBeFalsy();
-    expect(new SandboxCodeReview({} as never, {} as never)).toMatchObject({ enableInternet: true });
-    expect(new SandboxCodeReview({} as never, {} as never).interceptHttps).toBeFalsy();
-
-    // Containment sandboxes intercept HTTPS so the outbound handler can run.
-    expect(new SandboxContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxSmallContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(new SandboxCodeReviewContainment({} as never, {} as never)).toMatchObject({
-      enableInternet: true,
-      interceptHttps: true,
-    });
-    expect(ContainerProxy).toBe(sdk.ContainerProxy);
-    expect(Sandbox.outbound).toBeUndefined();
-    expect(SandboxContainment.outbound).toBeUndefined();
-    expect(SandboxSmall.outbound).toBeUndefined();
-    expect(SandboxSmallContainment.outbound).toBeUndefined();
-    expect(SandboxDIND.outbound).toBeUndefined();
-    expect(SandboxContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxSmallContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(Sandbox.outboundHandlers).toBeUndefined();
-    expect(SandboxSmall.outboundHandlers).toBeUndefined();
-    expect(SandboxDIND.outboundHandlers).toBeUndefined();
-    expect(SandboxCodeReviewContainment.outboundHandlers).toEqual({
-      [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-    });
-    expect(SandboxCodeReview.outboundHandlers).toBeUndefined();
-  });
-
-  it('wires the named handler to Git and API redemption behavior', async () => {
-    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
-      success: false,
-      reason: 'invalid_capability',
-    });
-    const env = createEnv(redeemGitHubSessionCapability);
-    const handler = SandboxSmallContainment.outboundHandlers?.[MANAGED_SCM_OUTBOUND_HANDLER];
-    if (!handler) throw new Error('Expected configured outbound handler');
-
-    await handler(
-      new Request('https://github.com/acme/repo.git/info/refs?service=git-upload-pack', {
-        headers: { Authorization: basicCredential(CAPABILITY) },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-    await handler(
-      new Request('https://api.github.com/user', {
-        headers: { Authorization: `token ${CAPABILITY}` },
-      }),
-      env,
-      { containerId: 'container-test', className: 'SandboxSmallContainment' }
-    );
-
-    expect(redeemGitHubSessionCapability).toHaveBeenCalledTimes(2);
-  });
-});
 
 describe('handleManagedScmOutbound', () => {
   beforeEach(() => {
@@ -375,6 +280,35 @@ describe('handleManagedScmOutbound', () => {
     const logs = serializedLogCalls();
     expect(logs).not.toContain('upstream-body-secret');
     expect(logs).not.toContain('upstream-token');
+  });
+
+  it('forwards a request that needs no credential', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: null,
+      installationId: 'installation-123',
+      source: 'user',
+      appType: 'standard',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('Not Found', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handleOutbound(
+      new Request('https://github.com/other/project.git/info/refs?service=git-upload-pack', {
+        headers: {
+          Authorization: basicCredential(CAPABILITY),
+          'User-Agent': 'git/2.43.0',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(404);
+    expect(redeemGitHubSessionCapability).toHaveBeenCalledOnce();
+    const forwarded = fetchMock.mock.calls[0]?.[0];
+    if (!(forwarded instanceof Request)) throw new Error('Expected a forwarded request');
+    expect(forwarded.headers.get('Authorization')).toBeNull();
+    expect(forwarded.headers.get('User-Agent')).toBe('git/2.43.0');
   });
 
   it('keeps forwarding and logs null correlation fields for an older redemption response', async () => {
@@ -1704,6 +1638,82 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       expect(logs).not.toContain(capabilities[purpose]);
       expect(logs).not.toContain('query-secret');
       expect(logs).not.toContain('upstream-token');
+    }
+  );
+
+  it.each([false, true])(
+    'preserves GitHub attachment uploads through managed authorization (alias=%s)',
+    async alias => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = alias ? createControlPlaneCredential('sbx_1', 'github') : CAPABILITY;
+      resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+      redemptions.github.mockResolvedValue({
+        success: true,
+        authorization: 'Bearer upstream-token',
+      });
+      const url =
+        'https://uploads.github.com/user-attachments/assets?content_type=image%2Fpng&name=screenshot.png&repository_id=1145038391';
+      const body = new Uint8Array([137, 80, 78, 71, 0, 255]);
+      const response = await handleOutbound(
+        new Request(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `token ${credential}`,
+            'Content-Type': 'image/png',
+            'User-Agent': 'GitHub CLI 2.103.3',
+          },
+          body,
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(resolveCredential).toHaveBeenCalledTimes(alias ? 1 : 0);
+      expect(redemptions.github).toHaveBeenCalledExactlyOnceWith({
+        capability: CAPABILITY,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        requestUrl: url,
+        requestMethod: 'POST',
+      });
+      expect(forward).toHaveBeenCalledOnce();
+      const forwarded = forward.mock.calls[0]?.[0];
+      if (!forwarded) throw new Error('Expected forwarded attachment request');
+      expect(forwarded.url).toBe(url);
+      expect(forwarded.method).toBe('POST');
+      expect(forwarded.headers.get('Authorization')).toBe('Bearer upstream-token');
+      expect(forwarded.headers.get('Content-Type')).toBe('image/png');
+      expect(forwarded.redirect).toBe('manual');
+      expect(new Uint8Array(await forwarded.arrayBuffer())).toEqual(body);
+      expect(serializedLogCalls()).not.toContain(credential);
+      expect(serializedLogCalls()).not.toContain('upstream-token');
+      expect(serializedLogCalls()).not.toContain('screenshot.png');
+    }
+  );
+
+  it.each(['repository_mismatch', 'source_unavailable'])(
+    'does not forward GitHub attachment bytes when redemption fails with %s',
+    async reason => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'github');
+      resolveCredential.mockResolvedValue({ credential: CAPABILITY });
+      redemptions.github.mockResolvedValue({ success: false, reason });
+
+      const response = await handleOutbound(
+        new Request('https://uploads.github.com/user-attachments/assets?repository_id=42', {
+          method: 'POST',
+          headers: { Authorization: `token ${credential}` },
+          body: 'attachment-bytes',
+        }),
+        env
+      );
+
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('GitHub authorization unavailable');
+      expect(redemptions.github).toHaveBeenCalledOnce();
+      expect(forward).not.toHaveBeenCalled();
+      expect(logging.logger.withFields).toHaveBeenCalledWith(
+        expect.objectContaining({ failureStage: 'redemption-policy', reason })
+      );
     }
   );
 

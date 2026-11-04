@@ -129,6 +129,11 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 401 Unauthorized')).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 403 Forbidden')).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'GitLab rejected the connected credential while preparing this review of owner/repo. Reconnect the GitLab integration, then retry.'
+      )
+    ).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('Rate limit exceeded: 429')).toBeNull();
     expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')

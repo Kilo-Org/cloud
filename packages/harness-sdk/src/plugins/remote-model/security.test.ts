@@ -1,4 +1,4 @@
-import { Effect, Either, Schedule, Stream } from 'effect';
+import { Effect, Result, Schedule, Stream } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { type FetchLike, ModelError, type ModelEvent } from '../../index.js';
 import { webFetch } from '../fetch/web.js';
@@ -115,14 +115,14 @@ it.each(['status', 'transport', 'headers', 'defect', 'body', 'stream', 'redirect
     const { fetch } = fakeFetch([responseForFailure(failure)]);
     const client = remoteModelClient(failureConfig(failure, fetch), retry);
     const result = await Effect.runPromise(
-      Stream.runCollect(client.stream(sampleRequest())).pipe(Effect.either)
+      Stream.runCollect(client.stream(sampleRequest())).pipe(Effect.result)
     );
-    expect(Either.isLeft(result)).toBe(true);
-    if (Either.isLeft(result)) {
-      expect(JSON.stringify(result.left)).not.toContain(echoed);
-      expect(String(result.left)).not.toContain(echoed);
-      expect(String(result.left.cause)).not.toContain(echoed);
-      expect(result.left.reason).toBe(reasonByFailure[failure]);
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) {
+      expect(JSON.stringify(result.failure)).not.toContain(echoed);
+      expect(String(result.failure)).not.toContain(echoed);
+      expect(String(result.failure.cause)).not.toContain(echoed);
+      expect(result.failure.reason).toBe(reasonByFailure[failure]);
     }
   }
 );
@@ -148,11 +148,11 @@ it('keeps streamed fragments visible but emits no done after a provider error an
           seen.push(event);
         })
       ),
-      Effect.either
+      Effect.result
     )
   );
   expect(seen).toEqual([{ kind: 'delta', text: 'partial' }]);
-  expect(result).toMatchObject({ left: { reason: 'stream' } });
+  expect(result).toMatchObject({ failure: { reason: 'stream' } });
   expect(calls).toHaveLength(1);
 });
 
@@ -171,10 +171,10 @@ it('rejects credential-bearing roots and Kilo-specific headers without sending a
     ].map(async config => {
       const result = await Effect.runPromise(
         Stream.runDrain(remoteModelClient(config, retry).stream(sampleRequest())).pipe(
-          Effect.either
+          Effect.result
         )
       );
-      expect(Either.isLeft(result)).toBe(true);
+      expect(Result.isFailure(result)).toBe(true);
       expect(JSON.stringify(result)).not.toContain('private-key');
       expect(JSON.stringify(result)).not.toContain('test-password');
     })
@@ -190,10 +190,10 @@ it('forwards fail-closed redirect policy and omits ambient cookies in the shippe
   try {
     const result = await Effect.runPromise(
       Stream.runDrain(remoteModelClient(configFor(webFetch), retry).stream(sampleRequest())).pipe(
-        Effect.either
+        Effect.result
       )
     );
-    expect(result).toMatchObject({ left: { reason: 'transport' } });
+    expect(result).toMatchObject({ failure: { reason: 'transport' } });
     expect(JSON.stringify(result)).not.toContain('private-key');
     expect(runtimeFetch).toHaveBeenCalledExactlyOnceWith(
       'https://provider.example/v1/chat/completions',
@@ -220,9 +220,9 @@ it.each([
         remoteModelClient({ ...configFor(fetch), apiKind: 'responses' }, retry).stream(
           sampleRequest()
         )
-      ).pipe(Effect.either)
+      ).pipe(Effect.result)
     );
-    expect(result).toMatchObject({ left: { reason: 'stream' } });
+    expect(result).toMatchObject({ failure: { reason: 'stream' } });
     expect(JSON.stringify(result)).not.toContain('private-key');
   }
 );
@@ -240,9 +240,9 @@ it('redacts synchronous stream reader defects as well as asynchronous transport 
     });
   const result = await Effect.runPromise(
     Stream.runDrain(remoteModelClient(configFor(fetch), retry).stream(sampleRequest())).pipe(
-      Effect.either
+      Effect.result
     )
   );
-  expect(result).toMatchObject({ left: { reason: 'transport' } });
+  expect(result).toMatchObject({ failure: { reason: 'transport' } });
   expect(JSON.stringify(result)).not.toContain('private-key');
 });

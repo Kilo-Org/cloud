@@ -121,6 +121,16 @@ export function useOrganizationsList(params: UseOrganizationsListParams) {
   );
 }
 
+export function useSearchParentMembers(organizationId: string, search: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.searchParentMembers.queryOptions(
+      { organizationId, search },
+      { enabled: enabled && search.trim().length > 0 }
+    )
+  );
+}
+
 export function useAddMember(organizationId: string) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();

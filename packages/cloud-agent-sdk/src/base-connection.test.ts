@@ -738,6 +738,32 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
+    it('replaces the socket in notify, close, disconnect, refresh order', async () => {
+      const order: string[] = [];
+      const refreshAuth = jest.fn(() => {
+        order.push('refreshAuth');
+        return Promise.resolve();
+      });
+      const { connection } = createTestConnection({
+        refreshAuth,
+        onReplacingConnection: () => order.push('onReplacingConnection'),
+        onDisconnected: () => order.push('onDisconnected'),
+      });
+      connection.connect();
+      connectSocket(0);
+      sockets[0].close.mockImplementation(() => order.push('close'));
+
+      connection.reconnectWithRefreshedAuth?.();
+
+      expect(order).toEqual(['onReplacingConnection', 'close', 'onDisconnected', 'refreshAuth']);
+
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
+
     it('calls refreshAuth before reconnecting after staleness timeout', async () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
       const onReplacingConnection = jest.fn();

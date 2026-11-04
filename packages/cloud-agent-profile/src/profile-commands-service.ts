@@ -17,12 +17,10 @@ export async function setCommands(
   await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {
-    // Delete existing commands
     await tx
       .delete(agent_environment_profile_commands)
       .where(eq(agent_environment_profile_commands.profile_id, profileId));
 
-    // Insert new commands with sequence numbers
     if (commands.length > 0) {
       const values = commands.map((command, index) => ({
         profile_id: profileId,

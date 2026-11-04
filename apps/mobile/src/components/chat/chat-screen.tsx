@@ -1,5 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -20,19 +21,23 @@ import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
+import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { resolveChatTarget } from '@/lib/chat/backend-target';
+import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
 import { ChatComposerArea } from './chat-composer-area';
+import { ChatTranscriptFailure } from './chat-transcript-failure';
 import { ChatDetailsSheet } from './chat-details-sheet';
 import { useChatDetails } from './chat-details-state';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
@@ -62,8 +67,17 @@ type ChatScreenProps = {
   opened: string;
 };
 
+/**
+ * The chats a chat was opened from, and the destination its error state's Back
+ * names. A chat is also reachable without that list beneath it — a deep link,
+ * or a stack where the list itself already left — so Back cannot just pop and
+ * inherit whatever route happens to be there.
+ */
+const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
+
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
@@ -136,20 +150,27 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     }
     const epoch = currentAuthEpoch();
     const name = availableOptions.find(option => option.id === modelId)?.name ?? modelId;
+    const local = chatTargetKind(modelId) === 'local';
     Alert.alert(
-      t('modelChat.backends.switchTitle'),
-      t('modelChat.backends.switchMessage', { name }),
+      t(local ? 'modelChat.localModels.switchTitle' : 'modelChat.backends.switchTitle'),
+      t(local ? 'modelChat.localModels.switchMessage' : 'modelChat.backends.switchMessage', {
+        name,
+      }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('modelChat.backends.switchConfirm'),
+          text: t(
+            local ? 'modelChat.localModels.switchConfirm' : 'modelChat.backends.switchConfirm'
+          ),
           onPress: () => {
             if (isCurrentAuthEpoch(epoch)) {
               accept();
             }
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: the model stays as is.
+      { cancelable: true }
     );
   };
 
@@ -189,7 +210,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       } catch (error) {
         Alert.alert(
           t('modelChat.backends.title'),
-          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget')
+          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget'),
+          // Android back dismisses the error; the composer keeps the draft.
+          undefined,
+          { cancelable: true }
         );
         throw error;
       }
@@ -205,6 +229,16 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     void stop();
   }, [stop]);
 
+  // A chat that settled with a failure and no transcript has nothing to read:
+  // the failure is the transcript. The area draws it once, in place of the
+  // empty state, so the screen does not show a chat that is ready for a first
+  // message beside an error saying there is nothing to open.
+  const transcriptFailure =
+    state.status === 'idle' && messages.length === 0 ? state.failureKey : null;
+  // A chat that is not one this place may read is not one this place can retry
+  // into: entering it again settles the same state.
+  const retryable = !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY;
+
   function renderTranscript() {
     if (state.status === 'opening') {
       // The chat is being reopened. A stored conversation has history that is
@@ -212,11 +246,24 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // that is empty: the empty state waits for the open to finish.
       //
       // It is the sessions list's own placeholder — anchored to the bottom and
-      // shaped like the bubbles — and it is rendered as a direct child of the
-      // area so its fade-out plays as the stored transcript arrives. The
-      // transcript lands where the placeholder stood instead of jumping from
-      // the top of the area to the bottom when the open finishes.
+      // shaped like the bubbles — so the transcript lands where the placeholder
+      // stood instead of jumping from the top of the area to the bottom when
+      // the open finishes.
       return <SessionSkeletonMessages sessionId={state.sessionId} />;
+    }
+    if (transcriptFailure !== null) {
+      return (
+        <ChatTranscriptFailure
+          failureKey={transcriptFailure}
+          retryable={retryable}
+          onRetry={() => void retry()}
+          onBack={() => {
+            // POP_TO keeps the list's scroll position when the chat was opened
+            // from it, and puts the list on the stack when it was not.
+            router.dismissTo(CHAT_LIST_HREF);
+          }}
+        />
+      );
     }
     if (messages.length === 0) {
       return (
@@ -254,23 +301,32 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       <>
         <View className="flex-1">{renderTranscript()}</View>
 
-        <ChatComposerArea
-          status={state.status}
-          messages={messages}
-          failureKey={state.failureKey}
-          retryable={!actions.hasUnanswered}
-          onRetry={() => void retry()}
-          onSend={handleSend}
-          composerControlRef={actions.composerControlRef}
-          onStop={handleStop}
-          model={model}
-          variant={variant}
-          onModelSelect={selectModel}
-          modelOptions={availableOptions}
-          attachmentsEnabled={imagesSupported}
-          organizationId={organizationId ?? undefined}
-          disabled={modelsFailed && availableOptions.length === 0}
-        />
+        {/* A failure with no transcript owns the screen: there is no chat to
+            type into, so the composer would offer a question the state cannot
+            take, and sit beside the state's own way out as a second answer to
+            the same screen. It returns as soon as the chat has a transcript. */}
+        {transcriptFailure === null ? (
+          <ChatComposerArea
+            status={state.status}
+            messages={messages}
+            failureKey={state.failureKey}
+            retryable={retryable}
+            onRetry={() => void retry()}
+            onAddCredits={() => {
+              router.push('/(app)/credits' as Href);
+            }}
+            onSend={handleSend}
+            composerControlRef={actions.composerControlRef}
+            onStop={handleStop}
+            model={model}
+            variant={variant}
+            onModelSelect={selectModel}
+            modelOptions={availableOptions}
+            attachmentsEnabled={imagesSupported}
+            organizationId={organizationId ?? undefined}
+            disabled={modelsFailed && availableOptions.length === 0}
+          />
+        ) : null}
       </>
     );
   }
@@ -290,7 +346,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           />
         }
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable
@@ -303,7 +359,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
               // state it stood for is named here and drawn in full by the sheet
               // this control opens.
               accessibilityValue={{ text: mcpStatusText }}
-              className="h-11 w-11 items-center justify-center active:opacity-70"
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
               <Wrench size={22} color={colors.foreground} />
             </Pressable>

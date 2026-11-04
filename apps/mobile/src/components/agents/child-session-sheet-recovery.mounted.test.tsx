@@ -28,6 +28,10 @@ import { QueryError } from '@/components/query-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { i18n } from '@/i18n';
 
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -274,6 +278,14 @@ describe('ChildSessionSheet recovery', () => {
     expect(textValues(sheet.renderer.root)).toContain('child text');
     expect(textValues(sheet.renderer.root)).not.toContain('Retry');
     expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+
+    // The page is known unavailable: another load-older request must not
+    // reach the backend again, and the banner stays up.
+    const fetchCallsBefore = sheet.fetchPage.mock.calls.length;
+    await sheet.manager.loadOlderChildMessages('child-1' as KiloSessionId);
+    await sheet.sync();
+    expect(sheet.fetchPage.mock.calls.length).toBe(fetchCallsBefore);
+    expect(textValues(sheet.renderer.root)).toContain(i18n.t(key));
   });
 
   it('preserves uncached Retry, loading, confirmed empty history, and later live content', async () => {

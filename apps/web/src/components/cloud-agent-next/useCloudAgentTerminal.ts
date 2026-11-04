@@ -8,6 +8,11 @@ import type { FitAddon } from '@xterm/addon-fit';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxLifecycleStatus,
+} from '@/routers/cloud-agent-next-schemas';
+import { subscribeSandboxStatus } from './sandbox-status-stream';
+import {
   classifyTerminalCreateError,
   classifyTerminalSocketClose,
   getTerminalReconnectDelayMs,
@@ -19,6 +24,7 @@ export type TerminalStatus =
   | 'connecting'
   | 'connected'
   | 'reconnecting'
+  | 'sleeping'
   | 'disconnected'
   | 'exited'
   | 'error';
@@ -59,6 +65,9 @@ export function useCloudAgentTerminal({
   const ptyIdRef = useRef<string | null>(null);
   const activeRef = useRef(active);
   const reconnectNowRef = useRef<() => void>(() => {});
+  const applySandboxStatusRef = useRef<(status: SandboxLifecycleStatus) => void>(() => {});
+  const sleepingRef = useRef(false);
+  const resumeWhenActiveRef = useRef(false);
 
   activeRef.current = active;
 
@@ -163,6 +172,49 @@ export function useCloudAgentTerminal({
     if (!enabled || !cloudAgentSessionId) return;
 
     let disposed = false;
+    const unsubscribe = subscribeSandboxStatus({
+      baseUrl: CLOUD_AGENT_NEXT_WS_URL,
+      sessionId: cloudAgentSessionId,
+      getTicket: async () => {
+        const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cloudAgentSessionId,
+            ...(organizationId ? { organizationId } : {}),
+          }),
+        });
+        if (!response.ok) throw new Error('Sandbox status authorization failed');
+        const data: unknown = await response.json();
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          typeof (data as { ticket?: unknown }).ticket !== 'string' ||
+          typeof (data as { expiresAt?: unknown }).expiresAt !== 'number'
+        ) {
+          throw new Error('Invalid sandbox status ticket');
+        }
+        return {
+          ticket: (data as { ticket: string }).ticket,
+          expiresAt: (data as { expiresAt: number }).expiresAt,
+        };
+      },
+      onSnapshot: snapshot => {
+        if (!disposed) applySandboxStatusRef.current(snapshot.status);
+      },
+      onDisconnected: () => undefined,
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [cloudAgentSessionId, enabled, organizationId]);
+
+  useEffect(() => {
+    if (!enabled || !cloudAgentSessionId) return;
+
+    let disposed = false;
     const capturedSessionId = cloudAgentSessionId;
     intentionalCloseRef.current = false;
 
@@ -203,6 +255,41 @@ export function useCloudAgentTerminal({
       }, delay);
     }
 
+    function enterSleeping(term: Terminal) {
+      sleepingRef.current = true;
+      resumeWhenActiveRef.current = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      reconnectAttemptsRef.current = 0;
+      ptyIdRef.current = null;
+      term.options.disableStdin = true;
+      const ws = wsRef.current;
+      wsRef.current = null;
+      ws?.close(1000, 'Terminal sleeping');
+      updateStatus('sleeping', SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped);
+    }
+
+    function applySandboxStatus(
+      term: Terminal,
+      fitAddon: FitAddon,
+      status: SandboxLifecycleStatus
+    ) {
+      if (status === 'sleeping') {
+        enterSleeping(term);
+        return;
+      }
+
+      if (status !== 'active' || !resumeWhenActiveRef.current) return;
+
+      resumeWhenActiveRef.current = false;
+      sleepingRef.current = false;
+      term.options.disableStdin = false;
+      reconnectAttemptsRef.current = 0;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      void reconnectTerminal(term, fitAddon);
+    }
+
     function connectWs(term: Terminal, fitAddon: FitAddon, wsUrl: string) {
       const ws = new WebSocket(resolveCloudAgentTerminalWsUrl(wsUrl, CLOUD_AGENT_NEXT_WS_URL));
       ws.binaryType = 'arraybuffer';
@@ -211,6 +298,9 @@ export function useCloudAgentTerminal({
       ws.onopen = () => {
         if (disposed) return;
         reconnectAttemptsRef.current = 0;
+        sleepingRef.current = false;
+        resumeWhenActiveRef.current = false;
+        term.options.disableStdin = false;
         updateStatus('connected', 'Connected');
         const dims = fitAddon.proposeDimensions();
         if (dims) sendResize(dims.cols, dims.rows);
@@ -228,6 +318,10 @@ export function useCloudAgentTerminal({
       ws.onclose = event => {
         if (disposed) return;
         if (wsRef.current === ws) wsRef.current = null;
+        if (sleepingRef.current) {
+          updateStatus('sleeping', SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped);
+          return;
+        }
         if (intentionalCloseRef.current) {
           updateStatus('disconnected', 'Disconnected');
           return;
@@ -264,7 +358,7 @@ export function useCloudAgentTerminal({
         return;
       }
 
-      if (reconnectAttemptsRef.current === 0) {
+      if (reconnectAttemptsRef.current === 0 && !sleepingRef.current) {
         updateStatus('reconnecting', 'Retrying terminal');
       }
       try {
@@ -276,6 +370,10 @@ export function useCloudAgentTerminal({
       } catch (error) {
         if (disposed) return;
         const decision = classifyTerminalCreateError(error);
+        if (decision.kind === 'sleeping') {
+          enterSleeping(term);
+          return;
+        }
         if (decision.kind === 'retry') {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
@@ -285,7 +383,7 @@ export function useCloudAgentTerminal({
     }
 
     async function createAndConnect(term: Terminal, fitAddon: FitAddon) {
-      if (reconnectAttemptsRef.current === 0) {
+      if (reconnectAttemptsRef.current === 0 && !sleepingRef.current) {
         updateStatus('connecting', 'Connecting terminal');
       }
       const dims = fitAddon.proposeDimensions();
@@ -305,6 +403,10 @@ export function useCloudAgentTerminal({
       } catch (error) {
         if (disposed) return;
         const decision = classifyTerminalCreateError(error);
+        if (decision.kind === 'sleeping') {
+          enterSleeping(term);
+          return;
+        }
         if (decision.kind === 'retry') {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
@@ -353,6 +455,9 @@ export function useCloudAgentTerminal({
 
       xtermRef.current = term;
       fitAddonRef.current = fitAddon;
+      applySandboxStatusRef.current = status => {
+        if (!disposed) applySandboxStatus(term, fitAddon, status);
+      };
       reconnectNowRef.current = () => {
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -363,6 +468,7 @@ export function useCloudAgentTerminal({
 
       term.onResize(({ cols, rows }) => sendResize(cols, rows));
       term.onData(data => {
+        if (sleepingRef.current) return;
         const ws = wsRef.current;
         if (ws?.readyState === WebSocket.OPEN) ws.send(data);
       });
@@ -394,6 +500,9 @@ export function useCloudAgentTerminal({
       fitAddonRef.current = null;
       resizeObserverRef.current = null;
       reconnectNowRef.current = () => {};
+      applySandboxStatusRef.current = () => {};
+      sleepingRef.current = false;
+      resumeWhenActiveRef.current = false;
       updateStatus('disconnected', 'Disconnected');
     };
   }, [

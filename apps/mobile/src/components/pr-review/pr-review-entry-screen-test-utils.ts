@@ -22,6 +22,11 @@ const harnessMocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   toastError: vi.fn(),
   clipboard: { current: '' as string },
+  clipboardHasString: { current: false },
+  // A clipboard read the platform refuses: the mocks below throw these so a
+  // test can prove the tap still ends in a visible result.
+  clipboardFailure: { current: null as Error | null },
+  clipboardHasStringFailure: { current: null as Error | null },
 }));
 
 // A hoisted binding cannot be exported directly; alias it for the test files.
@@ -52,7 +57,17 @@ vi.mock('expo-router', () => ({
 vi.mock('expo-clipboard', () => ({
   getStringAsync: async () => {
     await Promise.resolve();
+    if (harnessMocks.clipboardFailure.current) {
+      throw harnessMocks.clipboardFailure.current;
+    }
     return harnessMocks.clipboard.current;
+  },
+  hasStringAsync: async () => {
+    await Promise.resolve();
+    if (harnessMocks.clipboardHasStringFailure.current) {
+      throw harnessMocks.clipboardHasStringFailure.current;
+    }
+    return harnessMocks.clipboardHasString.current;
   },
 }));
 
@@ -82,7 +97,6 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 
 vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
@@ -105,7 +119,8 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 // the field now uses is the one `@/components/ui/input` owns and s3 covers.
 vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Clipboard: 'ClipboardIcon',
   Link2: 'Link2',
@@ -120,6 +135,9 @@ vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
 }));
 vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
   PrLinkPlaceholder: 'PrLinkPlaceholder',
+}));
+vi.mock('@/components/context-control', () => ({
+  ContextControl: 'ContextControl',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
@@ -176,7 +194,7 @@ function isElement(value: unknown): value is El {
   return typeof value === 'object' && value !== null && 'type' in value && 'props' in value;
 }
 
-function collect(node: unknown, typeName: string, out: El[]): void {
+function collect(node: unknown, typeName: unknown, out: El[]): void {
   if (node == null) {
     return;
   }
@@ -197,7 +215,7 @@ function collect(node: unknown, typeName: string, out: El[]): void {
   }
 }
 
-export function findAll(tree: unknown, typeName: string): El[] {
+export function findAll(tree: unknown, typeName: unknown): El[] {
   const out: El[] = [];
   collect(tree, typeName, out);
   return out;
@@ -205,12 +223,12 @@ export function findAll(tree: unknown, typeName: string): El[] {
 
 export function find(
   tree: unknown,
-  typeName: string,
+  typeName: unknown,
   where: (props: Record<string, unknown>) => boolean
 ): El {
   const match = findAll(tree, typeName).find(el => where(el.props ?? {}));
   if (!match) {
-    throw new Error(`no ${typeName} matched the predicate`);
+    throw new Error(`no ${String(typeName)} matched the predicate`);
   }
   return match;
 }

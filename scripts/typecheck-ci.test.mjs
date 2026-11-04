@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -9,20 +19,182 @@ import { fileURLToPath } from 'node:url';
 import { load } from 'js-yaml';
 
 const workflows = Object.fromEntries(
-  ['ci.yml', 'kilo-app-ci.yml'].map(file => [
+  ['ci.yml', 'kilo-app-ci.yml', 'mobile-native-build.yml', 'explorer-ios-release.yml'].map(file => [
     file,
     load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
+);
+const harnessBuildAction = load(
+  readFileSync(new URL('../.github/actions/harness-sdk-build/action.yml', import.meta.url), 'utf8')
 );
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
+const pnpmCleanup = fileURLToPath(
+  new URL('../.github/actions/pnpm-store/cleanup/cleanup.cjs', import.meta.url)
+);
+
+test('dependency cache keeps only the content store on the mounted filesystem', t => {
+  const action = load(
+    readFileSync(new URL('../.github/actions/pnpm-store/action.yml', import.meta.url), 'utf8')
+  );
+  const mount = action.runs.steps.find(step => step.uses?.startsWith('useblacksmith/stickydisk@'));
+  assert.equal(mount.with.path, './node_modules');
+  assert.equal(
+    mount.with.key,
+    '${{ github.repository }}-node-modules-${{ runner.os }}-${{ runner.arch }}'
+  );
+
+  const mountIndex = action.runs.steps.indexOf(mount);
+  const cleanupIndex = action.runs.steps.findIndex(
+    step => step.name === 'Reset pnpm installed graph'
+  );
+  const configureIndex = action.runs.steps.findIndex(step => step.name === 'Configure pnpm store');
+  assert.ok(mountIndex < cleanupIndex && cleanupIndex < configureIndex);
+
+  const workspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-cleanup-'));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const modules = join(workspace, 'node_modules');
+  const store = join(modules, '.pnpm-store');
+  mkdirSync(join(store, 'v11/files'), { recursive: true });
+  writeFileSync(join(store, 'v11/files/content'), 'cached package');
+  mkdirSync(join(modules, '.pnpm/node_modules'), { recursive: true });
+  mkdirSync(join(modules, '.bin'), { recursive: true });
+  writeFileSync(join(modules, '.modules.yaml'), 'stale metadata');
+  writeFileSync(join(modules, '.pnpm/lock.yaml'), 'stale graph');
+  symlinkSync('../package', join(modules, 'stale-package'));
+
+  const cleanup = action.runs.steps.find(step => step.name === 'Reset pnpm installed graph');
+  assert.equal(cleanup.uses, './.github/actions/pnpm-store/cleanup');
+  const cleanupAction = load(
+    readFileSync(
+      new URL('../.github/actions/pnpm-store/cleanup/action.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.equal(cleanupAction.runs.main, 'cleanup.cjs');
+  assert.equal(cleanupAction.runs.post, 'cleanup.cjs');
+  assert.equal(cleanupAction.runs['post-if'], 'always()');
+
+  const result = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: workspace },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(join(store, 'v11/files/content'), 'utf8'), 'cached package');
+  assert.equal(existsSync(join(modules, '.pnpm')), false);
+  assert.equal(existsSync(join(modules, '.modules.yaml')), false);
+  assert.equal(existsSync(join(modules, '.bin')), false);
+  assert.equal(existsSync(join(modules, 'stale-package')), false);
+  assert.ok(
+    action.runs.steps.some(step =>
+      step.run?.includes('pnpm_config_store_dir=$GITHUB_WORKSPACE/node_modules/.pnpm-store')
+    )
+  );
+
+  const missingMountWorkspace = mkdtempSync(join(tmpdir(), 'pnpm-cache-missing-mount-'));
+  t.after(() => rmSync(missingMountWorkspace, { recursive: true, force: true }));
+  const missingMountResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
+  });
+  assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
+});
+
+// The reset runs before install and again after the job, so it must never reach
+// anything except the checkout's own node_modules tree.
+test('pnpm reset keeps every deletion inside the checkout', t => {
+  const base = mkdtempSync(join(tmpdir(), 'pnpm-cache-reset-'));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+
+  const shared = join(base, 'shared');
+  const sharedFile = join(shared, 'cache', 'content');
+  mkdirSync(join(shared, 'cache'), { recursive: true });
+  writeFileSync(sharedFile, 'shared content');
+
+  const runCleanup = workspace =>
+    spawnSync(process.execPath, [pnpmCleanup], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_WORKSPACE: workspace },
+    });
+
+  const linked = join(base, 'linked');
+  mkdirSync(linked);
+  symlinkSync(shared, join(linked, 'node_modules'));
+  const linkedResult = runCleanup(linked);
+  assert.equal(linkedResult.status, 0, linkedResult.stderr);
+  assert.match(linkedResult.stdout, /::warning::/);
+  assert.equal(readFileSync(sharedFile, 'utf8'), 'shared content');
+  assert.equal(lstatSync(join(linked, 'node_modules')).isSymbolicLink(), true);
+
+  const fileRoot = join(base, 'file-root');
+  mkdirSync(fileRoot);
+  writeFileSync(join(fileRoot, 'node_modules'), 'not a directory');
+  const fileResult = runCleanup(fileRoot);
+  assert.equal(fileResult.status, 0, fileResult.stderr);
+  assert.match(fileResult.stdout, /::warning::/);
+  assert.equal(readFileSync(join(fileRoot, 'node_modules'), 'utf8'), 'not a directory');
+
+  const linkedWorkspace = join(base, 'symlinked-workspace');
+  const realWorkspace = join(base, 'real-workspace');
+  mkdirSync(join(realWorkspace, 'node_modules', '.pnpm'), { recursive: true });
+  writeFileSync(join(realWorkspace, 'node_modules', '.modules.yaml'), 'stale metadata');
+  symlinkSync(shared, join(realWorkspace, 'node_modules', 'shared-package'));
+  symlinkSync(realWorkspace, linkedWorkspace);
+  const symlinkedWorkspaceResult = runCleanup(linkedWorkspace);
+  assert.equal(symlinkedWorkspaceResult.status, 0, symlinkedWorkspaceResult.stderr);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', '.pnpm')), false);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', '.modules.yaml')), false);
+  assert.equal(existsSync(join(realWorkspace, 'node_modules', 'shared-package')), false);
+  assert.equal(readFileSync(sharedFile, 'utf8'), 'shared content');
+
+  const withoutWorkspace = { ...process.env };
+  delete withoutWorkspace.GITHUB_WORKSPACE;
+  const missingResult = spawnSync(process.execPath, [pnpmCleanup], {
+    encoding: 'utf8',
+    env: withoutWorkspace,
+  });
+  assert.notEqual(missingResult.status, 0);
+  assert.match(missingResult.stderr, /GITHUB_WORKSPACE is required/);
+
+  const relativeResult = runCleanup('relative/checkout');
+  assert.notEqual(relativeResult.status, 0);
+  assert.match(relativeResult.stderr, /absolute/);
+});
+
+// A frozen-lockfile install without a warm dependency source refetches every
+// package on each run. Jobs on a Blacksmith runner mount the shared store; jobs
+// on another runner use setup-node's pnpm cache instead.
+test('every workflow install job restores a pnpm dependency cache', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const uncached = [];
+  for (const file of readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()) {
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
+      const installIndex = steps.findIndex(step =>
+        (step.run ?? '').split('\n').some(line => /\bpnpm\b.*\binstall\b/.test(line))
+      );
+      if (installIndex < 0) continue;
+      const warmIndex = steps.findIndex(
+        step =>
+          step.uses === './.github/actions/pnpm-store' ||
+          (String(step.uses).startsWith('actions/setup-node@') && step.with?.cache === 'pnpm')
+      );
+      // A mount or cache step after the install warms nothing.
+      if (warmIndex < 0 || warmIndex > installIndex) uncached.push(`${file}:${jobName}`);
+    }
+  }
+  assert.deepEqual(uncached, [], 'an install job must restore a pnpm cache before it installs');
+});
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
-  ['ci.yml', 'lint-groups', harnessBuild],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
@@ -30,11 +202,6 @@ for (const [file, name, command, condition] of [
     'pnpm --filter ${{ matrix.workspace.name }} test',
     "matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
-  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
-    'kilo-app-ci.yml',
-    name,
-    harnessBuild,
-  ]),
 ]) {
   test(`${file} ${name} restores the compiler plugin cache after install and before use`, () => {
     const steps = workflows[file].jobs[name].steps;
@@ -58,6 +225,85 @@ for (const [file, name, command, condition] of [
     assert.equal(cache.if, condition ?? steps[buildIndex].if);
   });
 }
+
+const harnessBuildGuards = [
+  [
+    'ci.yml',
+    'lint-groups',
+    "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
+  ],
+  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
+    'kilo-app-ci.yml',
+    name,
+    undefined,
+  ]),
+  ...['ios', 'android'].map(name => [
+    'mobile-native-build.yml',
+    name,
+    "steps.published.outputs.published != 'true'",
+  ]),
+  [
+    'explorer-ios-release.yml',
+    'build',
+    "hashFiles('.github/actions/harness-sdk-build/action.yml') != ''",
+  ],
+];
+
+test('every consumer job restores or builds the harness SDK through the action', () => {
+  for (const [file, name, guard] of harnessBuildGuards) {
+    const steps = workflows[file].jobs[name].steps;
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    const actionIndex = steps.findIndex(
+      step => step.uses === './.github/actions/harness-sdk-build'
+    );
+    assert.ok(
+      installIndex >= 0 && actionIndex > installIndex,
+      `${file}:${name} runs the action after install`
+    );
+    assert.equal(steps[actionIndex].if, guard, `${file}:${name} keeps its guard`);
+    // explorer-ios-release checks out an arbitrary cloud_ref, which can predate
+    // the action; it is the only job allowed a plain build, behind the
+    // complementary guard.
+    const plain = steps.filter(step => step.run === harnessBuild);
+    if (file !== 'explorer-ios-release.yml') {
+      assert.deepEqual(
+        plain.map(step => step.name),
+        [],
+        `${file}:${name} never builds outside`
+      );
+    } else {
+      assert.equal(plain.length, 1);
+      assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
+    }
+  }
+});
+
+test('the harness SDK action restores dist and builds only on a miss', () => {
+  const steps = harnessBuildAction.runs.steps;
+  const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
+  const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
+  const build = steps.find(step => step.name === 'Build harness SDK');
+  assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
+  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(cache.with.path, 'packages/harness-sdk/dist');
+  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  assert.equal(build.run, harnessBuild);
+  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  // The typia transform takes minutes to compile, so the build's plugin cache
+  // comes from the same action and only when a build will run.
+  assert.equal(plugins.length, 1);
+  assert.equal(plugins[0].uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(plugins[0].with.path, 'node_modules/.cache/ttsc/plugins');
+  assert.equal(
+    plugins[0].with.key,
+    "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
+  );
+  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+});
 
 function runTypecheck(
   t,

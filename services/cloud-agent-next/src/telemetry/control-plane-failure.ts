@@ -10,6 +10,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   assistantTerminalCode,
+  missingAgentSlug,
   resolveAssistantProviderOwnership,
 } from '../shared/assistant-failure.js';
 
@@ -90,16 +91,25 @@ export function classifyControlPlaneFailure(
   switch (reason) {
     case 'missing_metadata':
       return { stage: 'pre_dispatch', code: 'session_metadata_missing' };
+    case 'runtime_artifact_unauthorized':
+    case 'runtime_artifact_invalid':
+    case 'runtime_cli_probe_failed':
+    case 'runtime_supervisor_missing':
     case 'preparation_timeout':
     case 'attach_exhausted':
       return PRE_DISPATCH;
     // Spec §10 reasons for the new plane (the mapping's one owner).
     case 'workspace_setup_failed':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
+    case 'credential_upgrade_required':
+    case 'repository_access_failed':
+      return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };
     case 'container_limit_reached':
       return { stage: 'pre_dispatch', code: 'container_limit_reached' };
+    case 'account_blocked':
+      return { stage: 'pre_dispatch', code: 'account_blocked' };
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':
@@ -231,13 +241,18 @@ export function classifyControlPlaneRunFailure(input: {
     input.assistantReason,
     input.admittedModel
   );
-  const mapped = classifyCloudAgentFailure({
-    source: 'run',
-    stage,
-    code,
-    assistantReason: input.assistantReason,
-    ...(providerOwnership === undefined ? {} : { providerOwnership }),
-  });
+  // Missing repository/profile agents are user configuration errors, not provider rejections.
+  const localConfigurationFailure =
+    input.assistantReason === 'invalid_request' && missingAgentSlug(input.reason) !== undefined;
+  const mapped = localConfigurationFailure
+    ? { responsibility: 'user' as const, reason: 'assistant_invalid_request' as const }
+    : classifyCloudAgentFailure({
+        source: 'run',
+        stage,
+        code,
+        assistantReason: input.assistantReason,
+        ...(providerOwnership === undefined ? {} : { providerOwnership }),
+      });
   return {
     stage,
     code,

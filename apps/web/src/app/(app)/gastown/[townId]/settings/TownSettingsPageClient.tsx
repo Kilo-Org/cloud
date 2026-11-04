@@ -1156,7 +1156,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                       className="ml-4 shrink-0 gap-1.5"
                     >
                       <RotateCcw
-                        className={`size-3 ${restartContainer.isPending ? 'animate-spin' : ''}`}
+                        className={`size-3 ${restartContainer.isPending ? 'animate-spin [animation-direction:reverse]' : ''}`}
                       />
                       {restartContainer.isPending ? 'Stopping...' : 'Graceful Stop'}
                     </Button>

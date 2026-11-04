@@ -231,8 +231,9 @@ export function InviteMemberDialog({
           <DialogHeader>
             <DialogTitle>Invite Member</DialogTitle>
             <DialogDescription className="text-pretty">
-              Send an invitation to join this team. They will receive an email with instructions to
-              join.
+              {organizationData?.parent_organization_id
+                ? 'Invite someone who is already a member of the parent organization. They will receive an email with instructions to join.'
+                : 'Send an invitation to join this team. They will receive an email with instructions to join.'}
             </DialogDescription>
           </DialogHeader>
 

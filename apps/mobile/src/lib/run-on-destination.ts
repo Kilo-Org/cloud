@@ -6,6 +6,15 @@
  */
 export const PRESELECT_CLOUD_RUN_ON = 'cloud';
 
+/**
+ * Transient new-session route-param value that asks the form to open on the
+ * computer target: the first-sign-in tour's computer path passes it, the form
+ * binds the first connected computer once the live instance list arrives, and
+ * none connected leaves the target selected but unbound (Start disabled with
+ * the setup hint) instead of falling back to the Cloud Agent.
+ */
+export const PRESELECT_COMPUTER_RUN_ON = 'computer';
+
 export function parseStoredRunOnDestination(raw: string | null): string | null {
   if (!raw) {
     return null;

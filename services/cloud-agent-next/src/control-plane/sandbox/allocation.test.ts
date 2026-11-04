@@ -189,6 +189,73 @@ describe('allocation recovery after delivery', () => {
     );
     expect(reduction.state.kind).toBe('connected');
   });
+
+  it.each(['wr-1', 'wr-2'])(
+    'does not reset activity or extend the idle window when %s reconnects',
+    wrapperId => {
+      const lastActivityAt = 1_000;
+      const idleDeadlineAt = lastActivityAt + TIMERS.idleMs;
+      const reconnectAt = idleDeadlineAt - 10_000;
+      const reconnected = reduceAllocation(
+        {
+          ...disconnectedState(lastActivityAt, reconnectAt - 5_000),
+          connectionId: 'conn-1',
+          wrapperId: 'wr-1',
+        },
+        {
+          type: 'hello-accepted',
+          at: reconnectAt,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-2',
+          wrapperId,
+        },
+        TIMERS
+      );
+      expect(reconnected.state.kind).toBe('connected');
+      expect(reconnected.state.lastFrameAt).toBe(reconnectAt);
+      expect(reconnected.state.lastActivityAt).toBe(lastActivityAt);
+      expect(reconnected.effects).toEqual([]);
+      expect(nextAllocationAlarmAt(reconnected.state, TIMERS)).toBe(idleDeadlineAt);
+
+      const heartbeat = reduceAllocation(
+        reconnected.state,
+        {
+          type: 'heartbeat',
+          at: idleDeadlineAt - 1,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-2',
+          active: false,
+        },
+        TIMERS
+      );
+      expect(heartbeat.state.lastFrameAt).toBe(idleDeadlineAt - 1);
+      expect(heartbeat.state.lastActivityAt).toBe(lastActivityAt);
+      expect(heartbeat.effects).toEqual([]);
+      expect(nextAllocationAlarmAt(heartbeat.state, TIMERS)).toBe(idleDeadlineAt);
+
+      const early = reduceAllocation(
+        heartbeat.state,
+        {
+          type: 'tick',
+          at: idleDeadlineAt - 1,
+          nextAllocationId: 'alloc-2',
+          retryAllowed: false,
+        },
+        TIMERS
+      );
+      expect(early.state.kind).toBe('connected');
+      expect(early.effects).toEqual([]);
+
+      const due = reduceAllocation(
+        heartbeat.state,
+        { type: 'tick', at: idleDeadlineAt, nextAllocationId: 'alloc-2', retryAllowed: false },
+        TIMERS
+      );
+      expect(due.state.kind).toBe('stopping');
+      expect(due.stopReason).toBe('sandbox_stopped');
+      expect(due.effects).toEqual([{ type: 'stop', stopAttempt: 1 }]);
+    }
+  );
 });
 
 describe('allocation create retry', () => {

@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 oven/bun:1-slim
+FROM --platform=linux/arm64 oven/bun:1.4.4-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -73,7 +73,7 @@ RUN apt-get update && \
 # npm's global install does not resolve optionalDependencies, so we must
 # explicitly install the platform-specific binary package alongside the CLI.
 # Install both glibc and musl variants — the CLI's binary resolver may
-# pick either depending on the detected libc. bun:1-slim is Debian (glibc)
+# pick either depending on the detected libc. bun:1.4.4-slim is Debian (glibc)
 # but the resolver sometimes misdetects; installing both is safe.
 # Also install pnpm — many projects use it as their package manager.
 RUN npm install -g @kilocode/cli@7.2.14 @kilocode/cli-linux-arm64@7.2.14 @kilocode/cli-linux-arm64-musl@7.2.14 @kilocode/plugin@7.2.14 pnpm && \

@@ -1,5 +1,4 @@
 import { View } from 'react-native';
-import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,11 +32,17 @@ function shapeFor(sessionId: string) {
  * `justify-end` matters: the real list is a FlashList with
  * `startRenderingFromBottom`, so a top-anchored placeholder would drop the
  * whole transcript from the top of the screen to the bottom on first paint.
+ *
+ * No exit animation: the transcript takes the placeholder's place in the same
+ * commit, so an `exiting` fade paints the placeholder bubbles over the real
+ * rows it gives way to, at their own positions, for the length of the fade.
+ * The rows are anchored to the same bottom edge the placeholder is, so the swap
+ * lands in the same place and only the real messages show.
  */
 export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: string }>) {
   const [first, second, third] = shapeFor(sessionId ?? '');
   return (
-    <Animated.View exiting={FadeOut.duration(150)} className="flex-1 justify-end pb-2">
+    <View className="flex-1 justify-end pb-2">
       <View className="items-start px-4 py-1">
         <Skeleton className={`w-3/4 rounded-2xl rounded-tl-sm ${first}`} />
       </View>
@@ -47,7 +52,7 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
       <View className="items-start px-4 py-1">
         <Skeleton className={`w-2/3 rounded-2xl rounded-tl-sm ${third}`} />
       </View>
-    </Animated.View>
+    </View>
   );
 }
 

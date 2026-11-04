@@ -133,7 +133,9 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
               {error && (
                 <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
-                  Failed to send feedback. Please try again.
+                  {error.data?.code === 'TOO_MANY_REQUESTS'
+                    ? error.message
+                    : 'Failed to send feedback. Please try again.'}
                 </div>
               )}
 

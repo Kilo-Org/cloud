@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { rememberAsked, titledByAsked } from './pending';
+import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
 const stored = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
@@ -63,5 +64,20 @@ describe('titledByAsked', () => {
 
   it('leaves a chat with no question untitled', async () => {
     expect(await titledByAsked([row('fresh', '')])).toEqual([row('fresh', '')]);
+  });
+
+  it('reduces the waiting question to one short line instead of the whole message', async () => {
+    const long = 'a question about the composer '.repeat(200);
+    await rememberAsked('long', {
+      text: long,
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+
+    const [titled] = await titledByAsked([row('long', '')]);
+
+    expect(titled?.title).toHaveLength(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    expect(titled?.title.endsWith('…')).toBe(true);
   });
 });

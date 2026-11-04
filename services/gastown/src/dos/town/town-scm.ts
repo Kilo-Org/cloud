@@ -7,7 +7,10 @@ import {
   parseGitUrl,
 } from '../../util/platform-pr.util';
 import { writeEvent } from '../../util/analytics.util';
+import { getGastownUserStub } from '../GastownUser.do';
+import { getGastownOrgStub } from '../GastownOrg.do';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import { withDORetry } from '@kilocode/worker-utils';
 
 const TOWN_LOG = '[town-scm]';
 
@@ -28,7 +31,7 @@ export type SCMContext = {
 
 export type GitHubTokenResolution =
   | { ok: true; token: string; source: string }
-  | { ok: false; tried: string[] };
+  | { ok: false; tried: string[]; reason?: 'owner_lookup_failed' };
 
 /**
  * Resolve a GitHub API token from the town config.
@@ -68,10 +71,26 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   const sourceLabel = townConfig.git_auth?.platform_integration_id
     ? 'town platform integration'
     : 'rig platform integration';
-  if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
+  let integrationOwner: Awaited<ReturnType<typeof resolveTownIntegrationOwner>> = null;
+  if (integrationId) {
+    try {
+      integrationOwner = await resolveTownIntegrationOwner(ctx, townConfig);
+    } catch {
+      tried.push(`${sourceLabel} (town owner lookup failed)`);
+      return { ok: false, tried, reason: 'owner_lookup_failed' };
+    }
+  }
+  if (integrationId && !integrationOwner) {
+    tried.push(`${sourceLabel} (town owner not confirmed)`);
+    return { ok: false, tried };
+  }
+  if (integrationId && integrationOwner && ctx.env.GIT_TOKEN_SERVICE) {
     tried.push(sourceLabel);
     try {
-      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getTokenForIntegration(integrationId);
+      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getTokenForIntegration({
+        integrationId,
+        ...integrationOwner,
+      });
       if (fresh.success) {
         return { ok: true, token: fresh.token, source: sourceLabel };
       }
@@ -103,6 +122,39 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   return { ok: false, tried };
 }
 
+/**
+ * The identity a town's platform integration must belong to: the owning user
+ * for a personal town, or the owning org plus its creator for an org town.
+ * The owner named in town config is confirmed against the town's creation
+ * record in the owning user or org DO, which only the create flows write,
+ * and the org creator is taken from that record.
+ */
+async function resolveTownIntegrationOwner(
+  ctx: SCMContext,
+  townConfig: TownConfig
+): Promise<{ userId: string } | { userId: string; orgId: string } | null> {
+  if (townConfig.owner_type === 'org') {
+    const orgId = townConfig.organization_id ?? townConfig.owner_id;
+    if (!orgId) return null;
+    const town = await withDORetry(
+      () => getGastownOrgStub(ctx.env, orgId),
+      stub => stub.getTownAsync(ctx.townId),
+      'resolveTownIntegrationOwner.org'
+    );
+    if (!town || town.owner_org_id !== orgId) return null;
+    return { userId: town.created_by_user_id, orgId };
+  }
+  const userId = townConfig.owner_user_id ?? townConfig.owner_id;
+  if (!userId) return null;
+  const town = await withDORetry(
+    () => getGastownUserStub(ctx.env, userId),
+    stub => stub.getTownAsync(ctx.townId),
+    'resolveTownIntegrationOwner.user'
+  );
+  if (!town || town.owner_user_id !== userId) return null;
+  return { userId };
+}
+
 export async function resolveGitHubTokenString(ctx: SCMContext): Promise<string | null> {
   const r = await resolveGitHubToken(ctx);
   return r.ok ? r.token : null;
@@ -115,6 +167,7 @@ export type PRStatusResult = {
 
 export type PRStatusError =
   | { kind: 'no_token'; provider: 'github' | 'gitlab'; resolutionChain: string[] }
+  | { kind: 'owner_lookup_failed'; provider: 'github' }
   | { kind: 'unrecognized_url'; url: string }
   | {
       kind: 'http_error';
@@ -153,6 +206,9 @@ export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRS
     const [, owner, repo, numberStr] = ghMatch;
     const resolution = await resolveGitHubToken(ctx);
     if (!resolution.ok) {
+      if (resolution.reason === 'owner_lookup_failed') {
+        return { ok: false, error: { kind: 'owner_lookup_failed', provider: 'github' } };
+      }
       console.warn(`${TOWN_LOG} checkPRStatus: no GitHub token available, cannot poll ${prUrl}`);
       return {
         ok: false,

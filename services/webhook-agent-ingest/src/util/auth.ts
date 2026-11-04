@@ -7,6 +7,7 @@
  */
 
 import { createMiddleware } from 'hono/factory';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
@@ -27,7 +28,7 @@ export function validateInternalApiKey(
     return { success: false, error: 'Missing internal API key' };
   }
 
-  if (apiKeyHeader !== secret) {
+  if (!timingSafeEqual(apiKeyHeader, secret)) {
     return { success: false, error: 'Invalid internal API key' };
   }
 

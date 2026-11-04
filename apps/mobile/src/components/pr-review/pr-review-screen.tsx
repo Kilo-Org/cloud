@@ -7,6 +7,7 @@ import { Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
@@ -15,7 +16,6 @@ import {
   type PrReviewTabId,
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,13 +23,24 @@ import {
   getMergeabilityStatus,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
+import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import {
+  usePrReviewInboxBack,
+  usePrReviewInboxHardwareBack,
+} from '@/lib/pr-review/pr-review-inbox-back';
+import { selectOverviewWebUrl, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import {
+  providerPrTriple,
+  providerPrWebUrl,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
+const TABS_WITHOUT_A_REQUEST: readonly PrReviewTabId[] = ['files', 'discussion'];
+const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -66,6 +77,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+  // Deep-linked PRs mount on top of the tab anchor, where a plain pop would
+  // leave PR review for Home; both Back affordances dismiss to the inbox.
+  const backToInbox = usePrReviewInboxBack();
+  usePrReviewInboxHardwareBack();
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
@@ -174,9 +189,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     void markRecentPrFailed(recentIdentity);
   }, [pr.isError, recentIdentity]);
 
-  // Share the provider's public URL via the native share sheet. Without an
-  // instance hint a GitLab ref has no public URL, so Share stays disabled.
-  const webUrl = providerPrWebUrl(queries.ref);
+  // Share the provider's public URL via the native share sheet. The URL is
+  // the provider's own: GitHub and Bitbucket name constant hosts, and a
+  // GitLab link names the instance the server resolved for the loaded PR/MR,
+  // so it is read off that answer. Share is disabled while there is no URL.
+  const webUrl = providerPrWebUrl({
+    ref: queries.ref,
+    serverWebUrl: selectOverviewWebUrl(pr.data),
+  });
   const sharePullRequest = useCallback(() => {
     if (!webUrl) {
       return;
@@ -201,7 +221,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
           ...(headSha
             ? [
                 queryClient.invalidateQueries({
-                  queryKey: queries.checksOptions(headSha).queryKey,
+                  queryKey: queries.checksOptions(headSha, true).queryKey,
                 }),
               ]
             : []),
@@ -213,14 +233,33 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   }, [queryClient, queries, pr.data?.headSha]);
 
   const isMergeRequest = queries.platform === 'gitlab';
-  // A first-load failure keeps the controls in place but disables actions and
-  // tabs that depend on a successfully loaded request.
-  const loadFailed = pr.isError && pr.data === undefined;
+  // The header actions follow the body, not the query: `PrReviewOverview`
+  // renders its error state for every failure except the two it keeps cached
+  // data for, so a terminal read (not-found, permission, reconnect) leaves the
+  // body showing "unavailable" even though an earlier read left `pr.data`
+  // behind. Deriving `loadFailed` from the same classification keeps the
+  // controls in step: a share, review or merge affordance that acts on the
+  // request is inert — disabled, and dimmed by `Button`'s disabled cue — while
+  // the body offers no request to act on, and before the first read answers.
+  const errorState = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
+  const keepsCachedData =
+    errorState?.kind === 'retryable' || errorState?.kind === 'service-unavailable';
+  const loadFailed = errorState !== null && (pr.data === undefined || !keepsCachedData);
+  const requestLoaded = !loadFailed && pr.data !== undefined;
+  // Files and Discussion read from the request, so a failed load leaves them
+  // with nothing to show. Overview owns that failure: it renders the
+  // unavailable state and its recovery, and it stays selectable, so a reader
+  // whose selected tab was Files keeps a way back to it.
+  const tabSelectorDisabledTabs = loadFailed ? TABS_WITHOUT_A_REQUEST : NO_DISABLED_TABS;
   // The review-submit sheet is a route sibling on every provider (s6), so
   // the affordance is offered wherever its scope can actually be queried:
   // a Bitbucket PR without a selected organization waits at the boundary
   // instead of opening a sheet that cannot load.
-  const canSubmitReview = queries.isReady;
+  const canSubmitReview = queries.isReady && requestLoaded;
+  // Share names the loaded request: a provider URL alone is not enough while
+  // the body is still loading or has failed, because the sheet would offer a
+  // link the screen cannot vouch for.
+  const canShare = requestLoaded && webUrl !== null;
   // The header Merge affordance mirrors the Overview merge section's gate so
   // the two never disagree: GitHub reads the mergeability off the overview DTO
   // (a merged/closed PR is terminal, a blocked one keeps the section's
@@ -238,15 +277,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   let body: ReactNode = null;
   if (!queries.isReady) {
     // Non-retryable: Bitbucket Cloud review is organization-scoped and no
-    // organization is selected. Nothing on this screen can fix that, so the
-    // state names where the switch lives instead of offering a dead retry.
-    body = (
-      <EmptyState
-        icon={GitPullRequest}
-        title={t('organization.boundary.selectOrganization')}
-        description={t('organization.boundary.selectDescription')}
-      />
-    );
+    // organization is selected. The shared organization boundary owns the
+    // recovery states: it opens the context picker when memberships exist
+    // and sends accounts with no organization to the web organizations page.
+    body = <OrganizationBoundary icon={GitPullRequest} />;
   } else if (tab === 'overview') {
     body = (
       <>
@@ -297,6 +331,8 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
         titleNumberOfLines={1}
+        showBackButton
+        onBack={backToInbox}
         allowHeaderRightStacking={false}
         headerRight={
           <View className="flex-row items-center gap-1">
@@ -304,7 +340,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               size="icon"
               variant="ghost"
               onPress={sharePullRequest}
-              disabled={loadFailed || !webUrl}
+              disabled={!canShare}
               accessibilityLabel={
                 isMergeRequest
                   ? t('prReview.terms.shareMergeRequest')
@@ -340,11 +376,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             activeTab={tab}
             onChange={setTab}
             discussionCount={pr.data?.commentCount}
-            disabled={loadFailed}
+            disabledTabs={tabSelectorDisabledTabs}
           />
         </View>
       ) : null}
-      {body}
+      <ProviderPrWebUrlProvider value={webUrl}>{body}</ProviderPrWebUrlProvider>
     </View>
   );
 }

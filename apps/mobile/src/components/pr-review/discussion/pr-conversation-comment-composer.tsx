@@ -10,9 +10,17 @@
 // the draft so the user can retry without retyping.
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
 import {
   ComposerInlineError,
   type ComposerInlineErrorKind,
@@ -29,6 +37,7 @@ import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/pers
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconnectExpiredMessage } from '@/lib/pr-review/mutation-error-display';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
@@ -73,6 +82,9 @@ export function PrConversationCommentComposer({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
+  // The provider platform as a stable primitive: the error effect names the
+  // connected provider without depending on the `prRef` object identity.
+  const providerPlatform = prRef?.platform;
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
@@ -85,7 +97,7 @@ export function PrConversationCommentComposer({
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the refs from the settled draft once per identity/destination, during
   // render, before the body field mounts. Re-seeding on a key change (and
@@ -138,7 +150,7 @@ export function PrConversationCommentComposer({
     // The ledger persistence-failure marker is retry-blocking: the same
     // operation key must not be retried.
     if (isPrOperationPersistenceFailed(addComment.error)) {
-      setInlineError(i18n.t('prReview.operation.persistenceFailed'));
+      setInlineError(i18n.t('common.actionNotRecorded'));
       setInlineErrorKind('bad-request');
       setRetryBlocked(true);
       return;
@@ -163,8 +175,9 @@ export function PrConversationCommentComposer({
           setInlineError(t('prReview.discussion.termsCheckRetryCopy'));
           setInlineErrorKind('retryable');
         } else {
-          setInlineError(t('prReview.discussion.termsCopy'));
+          setInlineError(t('prReview.discussion.termsAcceptRequired'));
           setInlineErrorKind(null);
+          setInlineErrorIsLocal(true);
         }
       })();
     } else if (classification.kind === 'bad-request') {
@@ -176,7 +189,7 @@ export function PrConversationCommentComposer({
       setInlineError(t('prReview.discussion.commentForbidden'));
       setInlineErrorKind('forbidden');
     } else if (classification.kind === 'reconnect') {
-      setInlineError(t('prReview.connectionExpired'));
+      setInlineError(reconnectExpiredMessage(providerPlatform));
       setInlineErrorKind('reconnect');
     } else {
       // A generic/transient failure shows the specified retryable copy, never
@@ -187,7 +200,7 @@ export function PrConversationCommentComposer({
       setInlineError(t('prReview.mutationError.couldNotPostComment'));
       setInlineErrorKind('retryable');
     }
-  }, [addComment.error, t]);
+  }, [addComment.error, t, providerPlatform]);
 
   function handleBodyChange(value: string) {
     bodyRef.current = value;
@@ -247,7 +260,7 @@ export function PrConversationCommentComposer({
       if (userId) {
         void clearDraft(userId, commentDraftKey);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       // The mutation hook announces success for a11y; its settle invalidation
       // renders the posted comment in the discussion behind the sheet.
       onDismiss();

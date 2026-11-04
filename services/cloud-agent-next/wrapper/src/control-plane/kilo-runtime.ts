@@ -1,3 +1,4 @@
+import { selectedRuntimeCli } from '../../../src/shared/runtime-distribution.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -11,7 +12,9 @@ import type {
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../../src/shared/control-plane-protocol.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
+import { WORKSPACE_MCP_SERVER_NAME } from '../control/worktree-runtime.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
@@ -232,10 +235,14 @@ async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<Ki
   input.onProcessScope?.(processes);
   const credential = createKiloServerCredential();
   // Own process group via the owned-process scope's detached spawn.
-  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
-    cwd: input.directory,
-    env: { ...input.env, ...credential.env },
-  });
+  const proc = processes.spawn(
+    selectedRuntimeCli(process.env),
+    ['serve', '--hostname=127.0.0.1', '--port=0'],
+    {
+      cwd: input.directory,
+      env: { ...input.env, ...credential.env },
+    }
+  );
   proc.stderr.resume();
   const exited = new Promise<void>(resolve => {
     proc.once('exit', () => resolve());
@@ -351,7 +358,10 @@ export type KiloRuntime = {
   /**
    * Stores the env immediately; the turn owner authorizes an idle restart.
    */
-  installCredentials(env: Record<string, string>): Promise<void>;
+  installCredentials(
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
   isRetiredClient(client: WrapperKiloClient): boolean;
@@ -1222,28 +1232,37 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     },
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
-    async installCredentials(env: Record<string, string>): Promise<void> {
+    async installCredentials(env, cloudAgentMcp): Promise<void> {
       const installedHandle = options.env.KILOCODE_TOKEN;
       const incomingHandle = env.KILOCODE_TOKEN;
       const installedExp = proxyHandleExpiry(installedHandle);
       const incomingExp = proxyHandleExpiry(incomingHandle);
       if (installedExp !== undefined && incomingExp !== undefined) {
-        // Both sides are proxy handles. A repeated frame must not roll the
-        // credential (and must not clear a latched rollover); a stale frame
-        // whose handle expires earlier is ignored entirely.
-        if (installedHandle === incomingHandle) {
-          options.env = env;
-          return;
-        }
-        if (incomingExp <= installedExp) return;
-        options.env = env;
+        // Stale handles cannot replace the current environment or MCP grant.
+        if (installedHandle !== incomingHandle && incomingExp <= installedExp) return;
+        if (installedHandle !== incomingHandle) pendingCredentials = true;
+      } else {
         pendingCredentials = true;
-        return;
       }
-      // Store the refreshed env immediately; the running process keeps the old
-      // grant (valid below 1 h) until an idle restart applies the new one.
+      // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
-      pendingCredentials = true;
+      if (client && cloudAgentMcp) {
+        try {
+          await withTimeoutAndAbort(
+            client.updateCloudAgentMcp(
+              cloudAgentMcp,
+              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+            ),
+            {
+              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+              abortMessage: 'Cloud Agent MCP credential refresh aborted',
+            }
+          );
+        } catch {
+          log('control-plane MCP credential refresh failed; retaining pending credential restart');
+        }
+      }
     },
     applyPendingCredentials,
     needsCompute: () => activity?.needsCompute() ?? false,
@@ -1385,9 +1404,11 @@ export function proxyHandleExpiry(token: string | undefined): number | undefined
 }
 
 /**
- * The MCP portion of the runtime configuration. Credential refreshes rotate the
- * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
- * false-positive; only `mcp` identifies the runtime's server set.
+ * The workspace-profile MCP portion of the runtime configuration. Credential
+ * refreshes rotate the Kilo alias inside `KILO_CONFIG_CONTENT`, and the
+ * workspace-owned built-in server carries a rotating workspace credential, so
+ * comparing the whole config or the raw server set would false-positive; only
+ * the workspace-profile servers identify the shared runtime's configuration.
  */
 function mcpConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
@@ -1395,7 +1416,16 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return raw;
-    return JSON.stringify((parsed as { mcp?: unknown }).mcp ?? {});
+    const mcp = (parsed as { mcp?: unknown }).mcp;
+    if (typeof mcp !== 'object' || mcp === null || Array.isArray(mcp)) {
+      return JSON.stringify(mcp ?? {});
+    }
+    const profileServers = Object.fromEntries(
+      Object.entries(mcp as Record<string, unknown>).filter(
+        ([name]) => name !== WORKSPACE_MCP_SERVER_NAME
+      )
+    );
+    return JSON.stringify(profileServers);
   } catch {
     return raw;
   }

@@ -33,13 +33,13 @@ export async function readServiceFeeTaxBehaviorFromPrice(params: {
   priceId: string;
 }): Promise<ServiceFeeTaxInput> {
   const price = await params.stripe.prices.retrieve(params.priceId);
-  if (price.tax_behavior !== 'exclusive' && price.tax_behavior !== 'inclusive') {
-    throw new Error('service_fee_tax_behavior_unresolved');
+  if (price.tax_behavior === 'inclusive') {
+    return { source: 'price', taxBehavior: 'inclusive' };
   }
-  return {
-    source: 'price',
-    taxBehavior: price.tax_behavior,
-  };
+  if (price.tax_behavior === 'exclusive') {
+    return { source: 'price', taxBehavior: 'exclusive' };
+  }
+  throw new Error('service_fee_tax_behavior_unresolved');
 }
 
 /**

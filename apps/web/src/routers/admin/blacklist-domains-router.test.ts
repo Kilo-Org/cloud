@@ -1,14 +1,56 @@
+jest.mock('@/lib/abuse/block-blacklisted-domains', () => {
+  const actual = jest.requireActual('@/lib/abuse/block-blacklisted-domains');
+  return {
+    ...actual,
+    backfillBlockBlacklistedDomainsBatch: jest.fn(),
+  };
+});
+
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(),
+    mset: jest.fn(),
+  },
+}));
+
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { kilocode_users } from '@kilocode/db';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { eq, inArray } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
+import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
+import {
+  BLACKLIST_DOMAINS_REDIS_KEY,
+  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
+
+type BackfillBatch = (params: {
+  actorId: string;
+  domains: string[];
+}) => Promise<BlockBlacklistedDomainsBackfillResponse>;
+
+const actualBackfillModule = jest.requireActual<{
+  backfillBlockBlacklistedDomainsBatch: BackfillBatch;
+}>('@/lib/abuse/block-blacklisted-domains');
+const mockedBackfill = jest.mocked(backfillBlockBlacklistedDomainsBatch);
+const mockedRedisGet = jest.mocked(redisClient.get);
+const mockedRedisMset = jest.mocked(redisClient.mset);
 
 let admin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  mockedRedisGet.mockReset();
+  mockedRedisGet.mockResolvedValue(null);
+  mockedRedisMset.mockReset();
+  mockedRedisMset.mockResolvedValue('OK');
+  mockedBackfill.mockReset();
+  mockedBackfill.mockImplementation(actualBackfillModule.backfillBlockBlacklistedDomainsBatch);
   admin = await insertTestUser({
     google_user_email: `admin-${Math.random()}@admin.example.com`,
     is_admin: true,
@@ -91,6 +133,25 @@ describe('computeBlacklistStats', () => {
     expect(stats.domains.map(d => d.domain)).toEqual(['second.com', 'third.com', 'first.com']);
   });
 
+  it('caps the returned rows while keeping the full domain total', () => {
+    const stats = computeBlacklistStats(
+      ['first.com', 'second.com', 'third.com'],
+      [
+        { email_domain: 'first.com', count: 1 },
+        { email_domain: 'second.com', count: 10 },
+        { email_domain: 'third.com', count: 5 },
+      ],
+      2
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'second.com', blockedCount: 10 },
+      { domain: 'third.com', blockedCount: 5 },
+    ]);
+    expect(stats.totalDomains).toBe(3);
+    expect(stats.totalBlockedUsers).toBe(16);
+  });
+
   it('ignores rows with null email_domain', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
@@ -108,6 +169,28 @@ describe('computeBlacklistStats', () => {
 
     expect(stats.domains).toEqual([{ domain: 'unused.com', blockedCount: 0 }]);
     expect(stats.totalBlockedUsers).toBe(0);
+  });
+
+  it('counts one group once for each matching entry, including nested entries', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com', 'sub.mailinator.com'],
+      [{ email_domain: 'sub.mailinator.com', count: 3 }]
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'mailinator.com', blockedCount: 3 },
+      { domain: 'sub.mailinator.com', blockedCount: 3 },
+    ]);
+    expect(stats.totalBlockedUsers).toBe(6);
+  });
+
+  it('does not match a group whose label boundary differs from the entry', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com'],
+      [{ email_domain: 'notmailinator.com', count: 50 }]
+    );
+
+    expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 0 }]);
   });
 
   it('returns empty stats for an empty blacklist', () => {
@@ -311,5 +394,170 @@ describe('admin.blacklistDomains.suspicious', () => {
     expect(example).toBeDefined();
     expect(typeof example!.firstSeen).toBe('string');
     expect(typeof example!.lastSeen).toBe('string');
+  });
+});
+
+describe('admin.blacklistDomains.set', () => {
+  it('blocks existing accounts on a newly added domain', async () => {
+    const target = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      api_token_pepper: 'initial-pepper',
+    });
+    const safe = await insertTestUser({
+      google_user_email: 'b@legit.com',
+      email_domain: 'legit.com',
+      api_token_pepper: 'safe-pepper',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 1, remaining: false, failed: false });
+    expect(mockedRedisMset).toHaveBeenCalledWith({
+      [BLACKLIST_DOMAINS_REDIS_KEY]: expect.stringContaining('mailinator.com'),
+      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: result.updated_at,
+    });
+    expect(result.updated_at).toEqual(expect.any(String));
+
+    const rows = await db
+      .select({
+        id: kilocode_users.id,
+        blocked_reason: kilocode_users.blocked_reason,
+        blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, [target.id, safe.id]));
+    const byId = new Map(rows.map(row => [row.id, row]));
+
+    const blocked = byId.get(target.id);
+    expect(blocked?.blocked_reason).toBe('domainblocked');
+    expect(blocked?.blocked_by_kilo_user_id).toBe(admin.id);
+    expect(blocked?.api_token_pepper).not.toBe('initial-pepper');
+
+    const untouched = byId.get(safe.id);
+    expect(untouched?.blocked_reason).toBeNull();
+    expect(untouched?.api_token_pepper).toBe('safe-pepper');
+  });
+
+  it('only backfills domains that were not already on the list', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+    const existing = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({
+      domains: ['mailinator.com', 'spam.org'],
+    });
+
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: false });
+    expect(mockedBackfill).toHaveBeenCalledWith({ actorId: admin.id, domains: ['spam.org'] });
+
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, existing.id));
+    expect(row.blocked_reason).toBeNull();
+  });
+
+  it('keeps the saved list when the automatic block fails', async () => {
+    mockedBackfill.mockRejectedValue(new Error('database unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    expect(mockedRedisMset).toHaveBeenCalled();
+  });
+
+  it('does not backfill the whole list when the previous config cannot be read', async () => {
+    mockedRedisGet.mockRejectedValue(new Error('redis unavailable'));
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.domains).toEqual(['mailinator.com']);
+    expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    expect(mockedRedisMset).toHaveBeenCalled();
+  });
+
+  it('stores normalized signup TLDs and never backfills on a TLD change', async () => {
+    const onDomain = await insertTestUser({
+      google_user_email: 'a@example.asia',
+      email_domain: 'example.asia',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({
+      domains: [],
+      blocked_tlds: ['  .ASIA  ', 'shop', 'asia'],
+    });
+
+    expect(result.blocked_signup_tlds).toEqual(['asia', 'shop']);
+    const [written] = mockedRedisMset.mock.calls.at(-1) ?? [];
+    expect(JSON.parse(String(written?.[BLACKLIST_DOMAINS_REDIS_KEY])).blocked_signup_tlds).toEqual([
+      'asia',
+      'shop',
+    ]);
+
+    // A TLD gates new signups only, so existing accounts stay untouched.
+    expect(mockedBackfill).not.toHaveBeenCalled();
+    const [row] = await db
+      .select({ blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, onDomain.id));
+    expect(row.blocked_reason).toBeNull();
+  });
+
+  it('keeps the stored signup TLDs when the field is omitted', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com'],
+        blocked_signup_tlds: ['asia'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    expect(result.blocked_signup_tlds).toEqual(['asia']);
+  });
+
+  it('keeps the effective TLD fallback when no config is stored yet', async () => {
+    mockedRedisGet.mockResolvedValue(null);
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.blacklistDomains.set({ domains: ['mailinator.com'] });
+
+    // The stored config is written with the effective list auth enforces, not
+    // an empty field that would silently re-allow every TLD.
+    expect(result.blocked_signup_tlds).toEqual(['shop', 'top']);
+  });
+});
+
+describe('admin.blacklistDomains.get', () => {
+  it('shows the effective TLD list when no config is stored yet', async () => {
+    mockedRedisGet.mockResolvedValue(null);
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.blocked_signup_tlds).toEqual(['shop', 'top']);
   });
 });

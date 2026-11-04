@@ -3,7 +3,6 @@ import {
   buildRepoBrowseUrl,
   detectGitPlatform,
   extractRepoFromGitUrl,
-  buildPrepareSessionRepoParams,
   findAllGitPlatformUrls,
 } from './git-utils';
 
@@ -214,34 +213,6 @@ describe('extractRepoFromGitUrl', () => {
 
   test('null returns undefined', () => {
     expect(extractRepoFromGitUrl(null)).toBeUndefined();
-  });
-});
-
-describe('buildPrepareSessionRepoParams', () => {
-  test('github platform with repo', () => {
-    expect(buildPrepareSessionRepoParams({ repo: 'owner/repo', platform: 'github' })).toEqual({
-      githubRepo: 'owner/repo',
-    });
-  });
-
-  test('gitlab platform with repo', () => {
-    expect(buildPrepareSessionRepoParams({ repo: 'group/project', platform: 'gitlab' })).toEqual({
-      gitlabProject: 'group/project',
-    });
-  });
-
-  test('bitbucket platform requires structured repository identity', () => {
-    expect(
-      buildPrepareSessionRepoParams({ repo: 'workspace/repo', platform: 'bitbucket' })
-    ).toBeNull();
-  });
-
-  test('null repo returns null', () => {
-    expect(buildPrepareSessionRepoParams({ repo: null, platform: 'github' })).toBeNull();
-  });
-
-  test('empty string repo returns null', () => {
-    expect(buildPrepareSessionRepoParams({ repo: '', platform: 'github' })).toBeNull();
   });
 });
 

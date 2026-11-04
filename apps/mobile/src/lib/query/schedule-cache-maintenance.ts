@@ -1,10 +1,14 @@
-import { InteractionManager } from 'react-native';
-
-/**
- * Run cache maintenance after the current interactions settle, so a
- * navigation frame never waits on it.
- */
 export function scheduleCacheMaintenance(run: () => void): void {
-  // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
-  InteractionManager.runAfterInteractions(run);
+  let completed = false;
+  const flush = () => {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    cancelIdleCallback(idle);
+    clearTimeout(fallback);
+    run();
+  };
+  const fallback = setTimeout(flush, 500);
+  const idle = requestIdleCallback(flush, { timeout: 500 });
 }

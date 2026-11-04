@@ -1,17 +1,23 @@
+import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import { getSandboxAllocationCandidates, type ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
+  allocationSupportsMultiRepository,
+  getSandboxAllocationProvider,
   isSelectableSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
 import {
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
+  resolveVercelSelectionReadiness,
   type SandboxAllocationCapability,
   type SessionRepositoryType,
+  type VercelSelectionReadiness,
 } from '../sandbox-selection.js';
-import { requiredProviderCapability } from '../session-plane.js';
+import { requiredProviderCapability } from '../session-identity.js';
 import type { Env } from '../types.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 
@@ -21,6 +27,7 @@ export type RepositoryAllocationTarget = {
 };
 
 type SelectionOwner = { userId: string; orgId?: string };
+type EnvironmentRequest = Pick<SessionCreateRequest, 'environment'>['environment'];
 
 export function repositoryAllocationTarget(
   repository: SessionRepositoryRequest
@@ -41,10 +48,16 @@ function profileOwner(owner: SelectionOwner): ProfileOwner {
 
 /**
  * Resolves the allocation that an owner's saved settings give a repository: the
- * eligible repository override first, then the eligible context default. Stale
- * or incompatible saved keys are skipped; the unavailable saved key is never
- * disabled or deleted. Session start and the new-session picker both read this,
- * so the picker shows what a session would actually use.
+ * eligible repository environment allocation first, then the eligible
+ * repository override, then the eligible context default. Stale or
+ * incompatible saved keys are skipped; the unavailable saved key is never
+ * disabled or deleted. For a V2 environment, a repository or context allocation
+ * that cannot hold several repositories is skipped the same way, so resolution
+ * falls to the next candidate. The environment's own allocation is an explicit
+ * choice and is never skipped here; `assertEnvironmentSupportsSandbox` rejects
+ * it. Session start passes the session's environment. The new-session picker
+ * passes `null` until it knows the environment, so for a V2 environment it can
+ * show a default that the session itself skips.
  */
 export async function resolveSavedSandboxAllocation(args: {
   db: WorkerDb;
@@ -53,19 +66,42 @@ export async function resolveSavedSandboxAllocation(args: {
   repositoryType: SessionRepositoryType;
   target?: RepositoryAllocationTarget;
   capability?: SandboxAllocationCapability;
+  environmentAllocation?: string;
+  environment: EnvironmentRequest | null;
+  readiness?: VercelSelectionReadiness;
 }): Promise<SandboxAllocation | undefined> {
-  const { db, env, owner, repositoryType, target, capability } = args;
-  const capabilities = getSandboxSelectionCapabilities(env, owner, {
+  const { db, env, owner, repositoryType, target, capability, environmentAllocation } = args;
+  const needsMultiRepository = isMultiRepositoryEnvironment(args.environment);
+  const selectionOptions = {
     repositoryType,
     ...(capability ? { capability } : {}),
-  });
+    ...(args.readiness?.vercelUnavailableReason
+      ? { vercelUnavailableReason: args.readiness.vercelUnavailableReason }
+      : {}),
+  };
+  let capabilities = getSandboxSelectionCapabilities(env, owner, selectionOptions);
   if (!capabilities.enabled) return undefined;
 
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
-  for (const candidate of [candidates.repositoryAllocation, candidates.contextAllocation]) {
+  let readiness = args.readiness;
+  const ownerAllocations = [candidates.repositoryAllocation, candidates.contextAllocation]
+    .filter((candidate): candidate is string => candidate !== undefined)
+    .map(candidate => candidate as SandboxAllocation)
+    .filter(isSelectableSandboxAllocation)
+    .filter(allocation => !needsMultiRepository || allocationSupportsMultiRepository(allocation));
+  for (const candidate of [environmentAllocation, ...ownerAllocations]) {
     if (candidate === undefined) continue;
     const allocation = candidate as SandboxAllocation;
     if (!isSelectableSandboxAllocation(allocation)) continue;
+    if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
+      readiness = await resolveVercelSelectionReadiness(env, owner);
+      capabilities = getSandboxSelectionCapabilities(env, owner, {
+        ...selectionOptions,
+        ...(readiness.vercelUnavailableReason
+          ? { vercelUnavailableReason: readiness.vercelUnavailableReason }
+          : {}),
+      });
+    }
     // The same check as the picker, so a saved choice that the picker offered is
     // never skipped here.
     if (isSandboxAllocationAvailable(capabilities, allocation)) return allocation;
@@ -117,6 +153,39 @@ export async function withSavedSandboxAllocation(
     repositoryType: input.repository.type,
     ...(target ? { target } : {}),
     ...(capability ? { capability } : {}),
+    ...(input.environmentSandboxAllocation
+      ? { environmentAllocation: input.environmentSandboxAllocation }
+      : {}),
+    environment: input.environment ?? null,
   });
   return { ...input, savedSandboxAllocation: saved ?? null };
+}
+
+/**
+ * A V2 environment keeps every repository in one workspace and gives each
+ * repository its own contained capability, so it needs an isolated Cloudflare
+ * sandbox and a contained credential grant. A session that cannot have both
+ * fails before it registers, with the reason. `allocation` is the one the
+ * session will use, and `undefined` is the default isolated sandbox.
+ */
+export function assertEnvironmentSupportsSandbox(input: {
+  environment: EnvironmentRequest;
+  allocation: SandboxAllocation | undefined;
+  contained: boolean;
+}): void {
+  if (!isMultiRepositoryEnvironment(input.environment)) return;
+  const reject = (message: string) => new TRPCError({ code: 'BAD_REQUEST', message });
+  if (!input.contained) {
+    throw reject(
+      'A multi-repository environment needs contained credentials, which are off for this deployment'
+    );
+  }
+  const { allocation } = input;
+  if (allocation !== undefined && !allocationSupportsMultiRepository(allocation)) {
+    throw reject(
+      getSandboxAllocationProvider(allocation) === 'vercel'
+        ? 'A multi-repository environment cannot run on a Vercel sandbox'
+        : 'A multi-repository environment cannot run on the shared sandbox'
+    );
+  }
 }

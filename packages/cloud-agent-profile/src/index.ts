@@ -22,6 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
+  appliesRepoBindings,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,
@@ -36,6 +37,7 @@ export {
   ProfileNotFoundError,
   type MergeProfileConfigurationArgs,
   type MergeProfileConfigurationResult,
+  type EnvironmentInlineArgs,
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
@@ -55,6 +57,7 @@ export {
   deleteProfile,
   listProfiles,
   getProfile,
+  getProfileOverview,
   setDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
@@ -63,11 +66,11 @@ export {
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 
@@ -85,6 +88,7 @@ export {
   mcpRemoteServerInputSchema,
   mcpServerFullInputSchema,
   listMcpServersForProfile,
+  getProfileMcpServers,
   createMcpServer,
   updateMcpServer,
   deleteMcpServer,
@@ -108,17 +112,23 @@ export {
   skillFilesSchema,
   skillCustomInputSchema,
   skillUpdateInputSchema,
+  skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
+  getProfileSkills,
   createCustomSkill,
+  createSkillsShSkill,
   updateSkill,
   deleteSkill,
   setSkillEnabled,
   getSkillsForSession,
   type SkillCustomInput,
   type SkillUpdateInput,
+  type SkillsShInput,
   type SkillForSession,
 } from './profile-skills-service';
+
+export type { SkillsShSource } from './skills-sh';
 
 // Agent CRUD + session helpers
 export {
@@ -131,6 +141,7 @@ export {
   agentCreateInputSchema,
   agentUpdateInputSchema,
   listAgentsForProfile,
+  getProfileAgents,
   createAgent,
   updateAgent,
   deleteAgent,
@@ -148,9 +159,11 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
+  getProfileKiloCommands,
   createKiloCommand,
   updateKiloCommand,
   deleteKiloCommand,
@@ -221,3 +234,57 @@ export {
   type PostImportKiloCommand,
   type PostImportSkill,
 } from './profile-import-service';
+// Repository environments
+export {
+  ENVIRONMENT_SECRET_PLACEHOLDER,
+  ENVIRONMENT_LIMITS,
+  ENVIRONMENT_KEY_PATTERN,
+  isReservedEnvironmentKey,
+  validateEnvironmentName,
+  assertValidEnvironmentKey,
+  validateEnvironmentPlainVars,
+  validateEnvironmentSecretValue,
+  validateEnvironmentCommands,
+  validateEnvironmentVarCount,
+  bitbucketCloneUrl,
+  repositoryLeaf,
+  isSafeRepositoryLeaf,
+  normalizeRepoFullName,
+  sameRepositoryIdentity,
+  type EnvironmentOwner,
+  type EnvironmentPlatform,
+  type EnvironmentRepositoryIdentity,
+  type EnvironmentReferenceRepository,
+  type EnvironmentIdentityInput,
+  type EnvironmentIdentityResponse,
+  type EnvironmentV1CreateInput,
+  type EnvironmentV2CreateInput,
+  type EnvironmentCreateInput,
+  type EnvironmentSecretChange,
+  type EnvironmentUpdateInput,
+  type EnvironmentSessionLayer,
+  type EnvironmentReference,
+  type EnvironmentForSession,
+  type EnvironmentBuildInput,
+  type EnvironmentResponse,
+  type EnvironmentSummary,
+} from './environment-contracts';
+export {
+  environmentRepositoryEntrySchema,
+  environmentRepositoriesSchema,
+  type EnvironmentRepositoryEntry,
+} from './environment-repository-entry';
+export {
+  createEnvironment,
+  updateEnvironment,
+  deleteEnvironment,
+  getEnvironment,
+  listEnvironments,
+  listEnvironmentsForOwner,
+  loadEnvironmentForSession,
+  loadEnvironmentBuildInput,
+  readEnvironmentReference,
+  lockActiveOrganization,
+  type EnvironmentSessionResolution,
+  type EnvironmentTransaction,
+} from './environment-service';

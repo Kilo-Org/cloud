@@ -9,13 +9,16 @@ import {
 import {
   _resetSessionFollowForTests,
   applySessionLiveUpdate,
+  approveFollowedSession,
   dismissFinishedSessionCard,
   followSession,
   isSessionFollowed,
   restoreFollowedSessionCards,
+  restoreFollowedSessionCardsFromStorage,
   syncFollowedSessionCards,
   unfollowDismissedSession,
 } from './session-follow';
+import { _setStoredContextReaderForTests } from './session-stored-context';
 
 const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
@@ -23,7 +26,13 @@ const mocks = vi.hoisted(() => ({
   pruneSessionCards: vi.fn(),
   restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<
-    () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
+    () => {
+      sessionId: string;
+      userId?: string | null;
+      organizationId: string | null;
+      approvalKey: string | null;
+      finishedUntil?: number;
+    }[]
   >(() => []),
   registerAndroidSessionToken: vi.fn(async () => {
     await Promise.resolve();
@@ -35,6 +44,7 @@ const mocks = vi.hoisted(() => ({
     await Promise.resolve();
   }),
   setAndroidSessionScope: vi.fn(),
+  runGlanceableApprove: vi.fn(),
 }));
 
 vi.mock('./session-notification', () => ({
@@ -52,7 +62,9 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
   setAndroidSessionScope: mocks.setAndroidSessionScope,
 }));
 
-vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }));
+vi.mock('@/lib/glanceable/approve-ask', () => ({
+  runGlanceableApprove: mocks.runGlanceableApprove,
+}));
 
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
@@ -81,12 +93,13 @@ beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   setLiveActivityEnabledValue(true);
   setNotificationPermissionGrantedValue(true);
+  _setStoredContextReaderForTests(null);
 });
 
 describe('a fresh process', () => {
   it('follows the stored cards again, so a push for one still renders', async () => {
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: null, approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: null, approvalKey: null },
     ]);
 
     restoreFollowedSessionCards(PERSONAL);
@@ -110,8 +123,8 @@ describe('a fresh process', () => {
 
   it('re-posts the kept native card after a force-stop without waiting for the tray', () => {
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: null, approvalKey: null },
-      { sessionId: 'other-scope', organizationId: 'org-1', approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: null, approvalKey: null },
+      { sessionId: 'other-scope', userId: 'user-1', organizationId: 'org-1', approvalKey: null },
     ]);
 
     restoreFollowedSessionCards(PERSONAL, NOW);
@@ -124,7 +137,7 @@ describe('a fresh process', () => {
 
   it('lets the tray fill a rebuilt follow and keeps it on a session open', () => {
     mocks.getStoredSessionCards.mockReturnValue([
-      { sessionId: 'session-1', organizationId: null, approvalKey: null },
+      { sessionId: 'session-1', userId: 'user-1', organizationId: null, approvalKey: null },
     ]);
     restoreFollowedSessionCards(PERSONAL);
 
@@ -142,6 +155,66 @@ describe('a fresh process', () => {
   it('retries a pending registration on every publish', () => {
     syncFollowedSessionCards([], NOW);
     expect(mocks.retryAndroidSessionTokens).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a session Approve in a cold process', () => {
+  it('answers under the scope recorded on the card', async () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-1', userId: 'user-1', organizationId: null, approvalKey: 'key' },
+    ]);
+    _setStoredContextReaderForTests(() => PERSONAL);
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
+
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+    await expect(approveFollowedSession('session-1', 'a'.repeat(64))).resolves.toBe(true);
+
+    expect(mocks.runGlanceableApprove).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: {
+          kiloSessionId: 'session-1',
+          organizationId: null,
+          approvalKey: 'a'.repeat(64),
+        },
+      })
+    );
+  });
+
+  it('answers nothing when the card belongs to another account in the same organization', async () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      {
+        sessionId: 'session-1',
+        userId: 'user-2',
+        organizationId: 'org-1',
+        approvalKey: 'key',
+      },
+    ]);
+    _setStoredContextReaderForTests(() => ({ userId: 'user-1', organizationId: 'org-1' }));
+
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(true);
+    await expect(approveFollowedSession('session-1', 'a'.repeat(64))).resolves.toBe(false);
+
+    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+    // The card is cancelled, and the notification keeps Approve until then.
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-1');
+  });
+
+  it('answers nothing when the keychain cannot be read', async () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      {
+        sessionId: 'session-1',
+        userId: 'user-1',
+        organizationId: 'org-1',
+        approvalKey: 'key',
+      },
+    ]);
+    _setStoredContextReaderForTests(() => 'unavailable');
+
+    await expect(restoreFollowedSessionCardsFromStorage()).resolves.toBe(false);
+    await expect(approveFollowedSession('session-1', 'a'.repeat(64))).resolves.toBe(false);
+
+    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+    expect(mocks.dismissSessionCard).not.toHaveBeenCalled();
   });
 });
 

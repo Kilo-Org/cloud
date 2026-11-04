@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import type { Sandbox } from '@cloudflare/sandbox';
 import {
   getSandboxAllocationProvider,
+  normalizeSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   classifySandboxId,
-  getSandboxNamespace,
   hashToSandboxId,
   isPlacedSandboxKey,
   selectDefaultSandboxProvider,
@@ -14,7 +13,7 @@ import {
   type SandboxIdClass,
   type SandboxSelectionEnv,
 } from './sandbox-id.js';
-import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
+import type { AgentSandboxProvider, SandboxId } from './types.js';
 
 /**
  * What a control-plane sandbox with a neutral `sbx-` key is. The key carries no
@@ -26,15 +25,6 @@ export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
 
-type SandboxNamespaceEnv = Pick<
-  Env,
-  | 'Sandbox'
-  | 'SandboxContainment'
-  | 'SandboxSmallContainment'
-  | 'SandboxCodeReviewContainment'
-  | 'SandboxDIND'
->;
-
 /**
  * The legacy key class each kind stands in for, so class-based rules (billing
  * pools, workspace layout) keep one table for both key formats.
@@ -45,14 +35,6 @@ const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
   'code-review': 'code-review',
   shared: 'shared',
 };
-
-/** The contained pool per kind; the same mapping the legacy prefixes encode. */
-const CONTAINED_NAMESPACE = {
-  isolated: 'SandboxSmallContainment',
-  'isolated-standard': 'SandboxContainment',
-  'code-review': 'SandboxCodeReviewContainment',
-  shared: 'SandboxContainment',
-} as const satisfies Record<SandboxKind, keyof SandboxNamespaceEnv>;
 
 export type ControlPlaneSandboxDecision = {
   sandboxId: SandboxId;
@@ -69,18 +51,30 @@ export async function selectControlPlaneSandbox(input: {
   botId?: string;
   codeReview: boolean;
   sandboxAllocation?: SandboxAllocation;
+  /** The caller's normalized choice; the resolved default never changes the kind. */
+  requestedAllocation?: SandboxAllocation;
 }): Promise<ControlPlaneSandboxDecision> {
-  const sandboxKind = controlPlaneSandboxKind(input);
+  const requestedAllocation =
+    input.requestedAllocation !== undefined
+      ? normalizeSandboxAllocation(input.requestedAllocation)
+      : input.codeReview
+        ? undefined
+        : input.sandboxAllocation;
+  const sandboxKind = controlPlaneSandboxKind({
+    codeReview: input.codeReview,
+    ...(requestedAllocation !== undefined ? { sandboxAllocation: requestedAllocation } : {}),
+  });
   const provider =
-    input.sandboxAllocation === undefined
-      ? selectDefaultSandboxProvider({
-          env: input.env,
-          orgId: input.orgId,
-          userId: input.userId,
-          plane: 'control',
-          isolated: sandboxKind === 'isolated',
-        })
-      : getSandboxAllocationProvider(input.sandboxAllocation);
+    input.sandboxAllocation !== undefined
+      ? getSandboxAllocationProvider(input.sandboxAllocation)
+      : input.codeReview
+        ? 'cloudflare-containers'
+        : selectDefaultSandboxProvider({
+            env: input.env,
+            orgId: input.orgId,
+            userId: input.userId,
+            isolated: sandboxKind === 'isolated',
+          });
   return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
 }
 
@@ -133,19 +127,4 @@ export function resolveSandboxIdClass(input: {
   return input.sandboxKind === undefined
     ? classifySandboxId(input.sandboxId)
     : KIND_SANDBOX_ID_CLASS[input.sandboxKind];
-}
-
-/**
- * The Cloudflare Sandbox namespace from the stored kind, or from a legacy key's
- * prefix. A placed key without its kind is rejected by the prefix table.
- */
-export function resolveSandboxNamespace(
-  env: SandboxNamespaceEnv,
-  input: { sandboxId: string; sandboxKind?: SandboxKind; contained: boolean }
-): DurableObjectNamespace<Sandbox> {
-  if (input.sandboxKind === undefined) {
-    return getSandboxNamespace(env, input.sandboxId, { managedScmContainment: input.contained });
-  }
-  // Every non-contained sandbox runs in the standard pool, as for legacy keys.
-  return input.contained ? env[CONTAINED_NAMESPACE[input.sandboxKind]] : env.Sandbox;
 }

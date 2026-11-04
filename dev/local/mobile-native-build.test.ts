@@ -199,7 +199,7 @@ test('root native inputs hash changes with patch, workspace, and lockfile edits'
   const seen = [hashRootNativeInputs(root)];
   const mutations: (() => void)[] = [
     () => fs.writeFileSync(path.join(root, 'patches', 'react-native.patch'), 'edited patch'),
-    () => fs.writeFileSync(path.join(root, 'patches', 'expo-server-sdk.patch'), 'new patch'),
+    () => fs.writeFileSync(path.join(root, 'patches', 'expo-server-sdk@6.1.0.patch'), 'new patch'),
     () => fs.writeFileSync(path.join(root, 'pnpm-workspace.yaml'), 'packages:\n  - services/*\n'),
     () => fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 10\n'),
   ];

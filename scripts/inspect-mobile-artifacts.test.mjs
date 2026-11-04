@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { deflateRawSync } from 'node:zlib';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  assertFileSha256,
   checkResourceShrinking,
   INSPECT_JS_NEEDLES,
   bundleBufferContains,
@@ -104,6 +105,99 @@ function withFixture(entries, run) {
     rmSync(work, { recursive: true, force: true });
   }
 }
+
+test('assertFileSha256 accepts matching bytes and rejects a different digest', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-checksum-test-'));
+  const filePath = join(work, 'download.jar');
+  const expectedSha256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+  try {
+    writeFileSync(filePath, 'abc');
+    assert.doesNotThrow(() => assertFileSha256(filePath, expectedSha256));
+    writeFileSync(filePath, 'abcd');
+    assert.throws(() => assertFileSha256(filePath, expectedSha256), /SHA-256 must be/);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+function runInspectionWithDownload(downloadScript) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspection-test-'));
+  const artifactPath = join(work, 'fixture.zip');
+  const buildJsonPath = join(work, 'build.json');
+  const javaLogPath = join(work, 'java.log');
+  try {
+    const plist = {
+      CFBundleIdentifier: 'com.kilocode.kiloapp',
+      NSMicrophoneUsageDescription: 'Microphone',
+      NSSpeechRecognitionUsageDescription: 'Speech',
+      NSLocationWhenInUseUsageDescription: 'Location',
+      NSUserTrackingUsageDescription: 'Tracking',
+      NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
+      AttributionCopyEndpoint: 'https://appsflyer-skadnetwork.com/',
+    };
+    writeZip(artifactPath, [
+      [
+        'Payload/Fixture.app/Info.plist',
+        `<plist version="1.0"><dict>${Object.entries(plist)
+          .map(([key, value]) => `<key>${key}</key><string>${value}</string>`)
+          .join('')}</dict></plist>`,
+      ],
+      ['Payload/Fixture.app/PrivacyInfo.xcprivacy', ''],
+      ['Payload/Fixture.app/main.jsbundle', BUNDLE_CONTENT],
+      ['BUNDLE-METADATA/com.android.tools.build.debugsymbols/fixture.sym', 'symbols'],
+    ]);
+    writeFileSync(buildJsonPath, JSON.stringify([{ status: 'FINISHED' }]));
+    writeFileSync(join(work, 'curl'), `#!${process.execPath}\n${downloadScript}\n`, {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(work, 'java'),
+      `#!${process.execPath}
+import { writeFileSync } from 'node:fs';
+writeFileSync(process.env.JAVA_CALL_LOG, 'called');
+process.stdout.write('<manifest package="com.kilocode.kiloapp"><data android:host="app.kilo.ai"/></manifest>');
+`,
+      { mode: 0o755 }
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('./inspect-mobile-artifacts.mjs', import.meta.url)),
+        artifactPath,
+        artifactPath,
+        buildJsonPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${work}${delimiter}${process.env.PATH}`,
+          JAVA_CALL_LOG: javaLogPath,
+        },
+      }
+    );
+    return { ...result, javaCalled: existsSync(javaLogPath) };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('inspection reports bundletool verification results', () => {
+  const result = runInspectionWithDownload(
+    `import { writeFileSync } from 'node:fs';
+writeFileSync(process.argv.at(-1), 'fixture download');`
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot verify bundletool: SHA-256 must be/);
+  assert.equal(result.javaCalled, false);
+});
+
+test('inspection reports unavailable tooling', () => {
+  const result = runInspectionWithDownload('process.exit(0);');
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /cannot verify bundletool:.*ENOENT/);
+  assert.equal(result.javaCalled, false);
+});
 
 test('checkResourceShrinking returns false when the sentinel is present', () => {
   const result = withFixture(

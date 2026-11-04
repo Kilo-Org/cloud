@@ -20,6 +20,13 @@ export type ModelPickerBridge = {
   options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
+  /**
+   * Whether the caller keeps the thinking effort it picks. A caller that stores
+   * only the model id cannot, so the picker leaves the effort chips out for it
+   * and treats a model tap as the whole selection: offering a choice the caller
+   * must drop would discard the user's pick without saying so.
+   */
+  acceptsVariant: boolean;
   selectionScope: ModelPickerSelectionScope;
   isSelectionCurrent: (scope: ModelPickerSelectionScope) => boolean;
   onSelect: (selection: ModelPickerSelection) => void;
@@ -93,6 +100,8 @@ export type BranchPickerBridge = {
   defaultBranch: string | null;
   /** The branch the trigger row shows as selected (override or default). */
   selectedBranch: string | null;
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   onSelect: (branch: string) => void;
 };
 
@@ -103,6 +112,12 @@ export type InstancePickerInstance =
 export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the picker shows neither
+   * row checked, since the Cloud Agent default is not the current target.
+   */
+  pendingComputer?: boolean;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
@@ -141,7 +156,7 @@ type LanguagePickerBridge = {
 let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options'>,
   value: string,
   variant: string
 ): ModelPickerSelection | null {
@@ -157,7 +172,7 @@ export function resolveModelPickerSelection(
 }
 
 export function commitModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
   value: string,
   variant: string
 ): boolean {

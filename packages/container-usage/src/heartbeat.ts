@@ -1,6 +1,15 @@
 import type { Container } from '@cloudflare/containers';
-import type { nonRetryableSkuAdmissionCodes, BudgetVerdict, RecordAck } from './contracts';
-import { isNonRetryableSkuAdmissionError, type ContainerUsageClient } from './client';
+import type {
+  nonRetryableSkuAdmissionCodes,
+  BudgetVerdict,
+  HeartbeatAck,
+  RecordAck,
+} from './contracts';
+import {
+  ContainerUsageContractError,
+  isNonRetryableSkuAdmissionError,
+  type ContainerUsageClient,
+} from './client';
 import {
   clearBillingContext,
   getBillingContext,
@@ -405,13 +414,43 @@ export function installBillingHeartbeat(
     }
     try {
       await dependencies.beforeHeartbeatDelivery?.(context);
-      const ack = await dependencies.client.recordHeartbeat({
-        instanceId: context.instanceId,
-        startEpochMs: context.startEpochMs,
-        seq: pendingHeartbeat.seq,
-        usageSinceLast: pendingHeartbeat.usageSinceLast,
-        context: contextForHeartbeat(context),
-      });
+      let ack: HeartbeatAck;
+      try {
+        ack = await dependencies.client.recordHeartbeat({
+          instanceId: context.instanceId,
+          startEpochMs: context.startEpochMs,
+          seq: pendingHeartbeat.seq,
+          usageSinceLast: pendingHeartbeat.usageSinceLast,
+          context: contextForHeartbeat(context),
+        });
+      } catch (error) {
+        if (!(error instanceof ContainerUsageContractError)) throw error;
+        // The meter durably recorded this segment, so the usage is already
+        // settled; only the budget verdict was unreadable. Stopping is the
+        // fail-closed reading of an unverifiable verdict.
+        const current = await getBillingContext(dependencies.storage);
+        if (
+          !current ||
+          !isSameBillingGeneration(current, context) ||
+          current.pendingHeartbeat?.seq !== pendingHeartbeat.seq
+        ) {
+          await rescheduleIfCurrent(context);
+          return;
+        }
+        await updateBillingContext(dependencies.storage, contextAfterPendingHeartbeat(current));
+        await rescheduleIfCurrent(context);
+        await dependencies.enforceBudgetStop(
+          { verdict: 'stop' },
+          {
+            generation: context.generation,
+            startEpochMs: context.startEpochMs,
+          }
+        );
+        if (!dependencies.deferBudgetStopFinalSettlement) {
+          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+        }
+        return;
+      }
       const current = await getBillingContext(dependencies.storage);
       if (!current || !isSameBillingGeneration(current, context)) return;
       if (

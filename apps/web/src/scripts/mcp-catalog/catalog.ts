@@ -40,9 +40,40 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
 /**
  * Exact procedure paths withheld from MCP even though no segment is internal.
  * `activeSessions.widgetCredential` mints a 30-day Home widget bearer and only
- * native device sessions may call it, so no MCP credential can use it.
+ * native device sessions may call it, so no MCP credential can use it. The
+ * `agentBriefing` generation and consent mutations spend the context's balance
+ * behind a cost disclosure that only a person in the app can acknowledge; an MCP
+ * agent could otherwise mint the estimate token itself and bypass that consent.
  */
-const NATIVE_ONLY_PATHS: Record<string, true> = { 'activeSessions.widgetCredential': true };
+const NATIVE_ONLY_PATHS: Record<string, true> = {
+  // Vercel connection uses raw credentials; teardown and builds require app confirmation.
+  'vercelCompute.add': true,
+  'vercelCompute.discoverProjects': true,
+  'vercelCompute.discoverTeams': true,
+  'vercelCompute.remove': true,
+  'vercelCompute.retrySetup': true,
+  'vercelCompute.upgradeRuntime': true,
+  'organizations.vercelCompute.add': true,
+  'organizations.vercelCompute.discoverProjects': true,
+  'organizations.vercelCompute.discoverTeams': true,
+  'organizations.vercelCompute.remove': true,
+  'organizations.vercelCompute.retrySetup': true,
+  'organizations.vercelCompute.upgradeRuntime': true,
+  // Org admins set MCP guardrail policy in the app only. Clients read the policy and report
+  // connections through /api/organizations/[id]/guardrails, which is not part of the tRPC catalog.
+  'organizations.mcpGuardrails.add': true,
+  'organizations.mcpGuardrails.update': true,
+  'organizations.mcpGuardrails.setStatus': true,
+  'organizations.mcpGuardrails.setEnforcement': true,
+  'organizations.mcpGuardrails.approveConnection': true,
+  'organizations.mcpGuardrails.delete': true,
+  'organizations.guardrails.update': true,
+  // Disabling a gateway or pinning a data region changes routing for every member, so org admins
+  // set it in the app only.
+  'organizations.settings.updateGatewaySettings': true,
+  'activeSessions.widgetCredential': true,
+  'agentBriefing.updateContextPreferences': true,
+};
 
 /**
  * Whether a procedure path is internal-only. A path is internal when it is in
@@ -64,7 +95,7 @@ export function isDenylistedPath(path: string): boolean {
 
 /**
  * Procedure builders that reject non-admin users. `packages/web-shared/src/lib/trpc/init.ts`
- * builds every admin-only procedure from `adminProcedure`, and the other three
+ * builds every admin-only procedure from `adminProcedure`, and the other
  * variants in `apps/web/src/lib/trpc/admin-procedures.ts` chain on it, so a
  * chain whose head is any of these is admin-guarded.
  */
@@ -73,6 +104,7 @@ export const ADMIN_GUARD_PROCEDURES = [
   'creditManagerProcedure',
   'superadminProcedure',
   'sessionViewerProcedure',
+  'apiRequestLogExporterProcedure',
 ] as const;
 
 /** Instruction every generated summary must follow. */
@@ -254,10 +286,10 @@ function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
   if (isRecord(properties)) {
     for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
   }
-  // A chain that falls back to a top-level `allOf` keeps its field keys in the
-  // subschemas; surface them so tags and the search blob stay complete.
-  if (Array.isArray(inputSchema.allOf)) {
-    for (const sub of inputSchema.allOf) {
+  for (const keyword of ['allOf', 'anyOf', 'oneOf']) {
+    const alternatives = inputSchema[keyword];
+    if (!Array.isArray(alternatives)) continue;
+    for (const sub of alternatives) {
       if (isRecord(sub)) {
         for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
       }

@@ -7,7 +7,7 @@ import {
   buildSlackCredentialLockKey,
   type SlackCredentialOwner,
 } from '@kilocode/worker-utils/slack-credential';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptSlackCredentialSecret,
   encryptSlackCredentialSecret,
@@ -17,9 +17,7 @@ import {
 /**
  * System of record for Slack bot credentials.
  *
- * Nothing in production reads this store yet — Step 2 only dual-writes it alongside
- * the existing plaintext `platform_integrations.metadata.access_token`, so the change
- * is reversible. Step 3 repoints the read paths here and deletes the plaintext copy.
+ * Install writes and every server read path of the bot credential go through here.
  */
 
 export type WriteSlackCredentialInput = {
@@ -58,9 +56,10 @@ export type SlackCredentialWriteOutcome =
  * interleave a read of the current version with a write of the next one.
  */
 export async function writeSlackCredential(
-  input: WriteSlackCredentialInput
+  input: WriteSlackCredentialInput,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackOAuthCredential> {
-  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false });
+  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false }, database);
   if (outcome.status === 'skipped_existing') {
     // Unreachable: only `onlyIfAbsent` can skip. Asserted rather than cast so a future
     // change to the skip conditions cannot silently drop a credential write.
@@ -72,11 +71,9 @@ export async function writeSlackCredential(
 /**
  * Creates the credential row only when the integration does not have one yet.
  *
- * For callers whose token comes from a snapshot rather than from a live Slack
- * response — the Step 2 backfill reads `platform_integrations.metadata` up front — a
- * reinstall part-way through the run writes a fresh credential that a blind replace
- * would overwrite with the by-then-revoked snapshot token. Existence is therefore
- * re-checked inside the same locked transaction as the write.
+ * A caller whose token comes from a snapshot rather than from a live Slack response
+ * needs the current row to win: existence is re-checked inside the same locked
+ * transaction as the write, so a credential written after the snapshot is kept.
  */
 export async function createSlackCredentialIfAbsent(
   input: WriteSlackCredentialInput
@@ -86,9 +83,10 @@ export async function createSlackCredentialIfAbsent(
 
 async function upsertSlackCredential(
   input: WriteSlackCredentialInput,
-  { onlyIfAbsent }: { onlyIfAbsent: boolean }
+  { onlyIfAbsent }: { onlyIfAbsent: boolean },
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackCredentialWriteOutcome> {
-  return db.transaction(async tx => {
+  return database.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildSlackCredentialLockKey(input.integrationId)}, 0))`
     );

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import {
   markServiceFeeAssessmentCharged,
@@ -2371,7 +2371,7 @@ function passInvoiceLine(
     pretax_credit_amounts: null,
     pricing: {
       type: 'price_details',
-      unit_amount_decimal: String(amount),
+      unit_amount_decimal: Stripe.Decimal.from(amount),
       price_details: { price: 'price_pass', product: 'prod_pass' },
     },
     quantity: extra.quantity ?? 1,
@@ -2409,10 +2409,12 @@ function seatInvoiceLine(amount: number): Stripe.InvoiceLineItem {
     pretax_credit_amounts: null,
     pricing: {
       type: 'price_details',
-      unit_amount_decimal: String(amount),
+      unit_amount_decimal: Stripe.Decimal.from(amount),
       price_details: { price: SEAT_PRICE_ID, product: SEAT_PRODUCT_ID },
     },
     quantity: 9,
+    quantity_decimal: Stripe.Decimal.from(9),
+    subtotal: amount,
     subscription: 'sub_1',
     taxes: null,
   } as Stripe.InvoiceLineItem;

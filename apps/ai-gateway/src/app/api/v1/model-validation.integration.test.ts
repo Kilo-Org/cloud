@@ -1,11 +1,11 @@
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 const mockFetchSessionMetadata = jest.fn();
 const mockGetRuntimeToken = jest.fn();
-jest.mock('../../../../../../services/cloud-agent-next/src/session-service', () => ({
+jest.mock('../../../../../../services/cloud-agent-next/src/session/metadata', () => ({
   fetchSessionMetadata: (...args: unknown[]) => mockFetchSessionMetadata(...args),
 }));
 jest.mock('../../../../../../services/cloud-agent-next/src/sandbox-session/session-stub', () => ({
-  resolveSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
+  getSandboxSessionStub: () => ({ getRuntimeToken: () => mockGetRuntimeToken() }),
 }));
 let currentHeaders = new Headers();
 const mockHeaders = jest.fn(() => currentHeaders);
@@ -34,8 +34,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
+  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  addDirectByokCatalogAvailability: jest.requireActual('@kilocode/web-shared/lib/ai-gateway/byok')
+    .addDirectByokCatalogAvailability,
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
@@ -81,12 +84,13 @@ const publicCatalog = { data: [{ id: 'public/model' }] };
 // Load the real Worker implementations at runtime without adding Worker ambient
 // types and their transitive service graph to the web TypeScript project.
 type ValidationEnv = { KILOCODE_BACKEND_BASE_URL: string; NEXTAUTH_SECRET: string };
+const ISOLATED_SANDBOX_ID = `ses-${'a'.repeat(48)}`;
 type TestSessionMetadata = {
   metadataSchemaVersion: 2;
   identity: { sessionId: string; userId: string };
   auth: { kilocodeToken: string };
   agent: { model: string };
-  workspace: Record<string, never>;
+  workspace: { sandboxId: string; sandboxProvider: 'cloudflare-containers' };
   lifecycle: { version: number; timestamp: number };
 };
 const { assertKiloModelAvailable } = jest.requireActual<{
@@ -141,7 +145,7 @@ async function runtimeToken(
         runtimeAuthorization: {
           id: crypto.randomUUID(),
           resourceKind: 'cloud-agent-next',
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       },
     })
@@ -217,11 +221,12 @@ describe('cloud-agent model validation through real web authentication', () => {
           procedure,
         })
       ).resolves.toBeUndefined();
-      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(org.id, {
-        type: 'member',
-        kiloUserId: user.id,
-        allowNonMember: true,
-      });
+      expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(
+        org.id,
+        { type: 'member', kiloUserId: user.id, allowNonMember: true },
+        'member',
+        { countryCode: null }
+      );
     }
   );
 
@@ -235,7 +240,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         runtimeAuthorization: {
           id,
           resourceKind: 'cloud-agent-next' as const,
-          resourceId: 'agent-session',
+          resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         },
       };
       const sign = (issuedAt: Date) =>
@@ -253,17 +258,17 @@ describe('cloud-agent model validation through real web authentication', () => {
         });
       let metadata: TestSessionMetadata = {
         metadataSchemaVersion: 2,
-        identity: { sessionId: 'agent-session', userId: user.id },
+        identity: { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', userId: user.id },
         auth: { kilocodeToken: (await sign(new Date(now - 7200000))).token },
         agent: { model: privateModel },
-        workspace: {},
+        workspace: { sandboxId: ISOLATED_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
         lifecycle: { version: 1, timestamp: now },
       };
       const record: RuntimeAuthorization = {
         version: 1,
         id,
         resourceKind: 'cloud-agent-next',
-        resourceId: 'agent-session',
+        resourceId: 'workspace_11111111-1111-4111-8111-111111111111',
         userId: user.id,
         authorizationUserId: user.id,
         issuedAt: new Date(now - 10800000).toISOString(),
@@ -293,7 +298,7 @@ describe('cloud-agent model validation through real web authentication', () => {
       const validation = preflightExistingPromptModel({
         env,
         userId: user.id,
-        cloudAgentSessionId: 'agent-session',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         procedure: 'send',
       });
       if (state === 'active') {

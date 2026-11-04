@@ -239,6 +239,24 @@ export async function getGitHubUserAccessToken(
 }
 
 /**
+ * Drop the cached credential for a Kilo user so the next fetch re-consults the
+ * token service. Call it whenever the authoritative authorization for that user
+ * changes: disconnect, revocation, or a newly stored grant.
+ *
+ * The delete is synchronous so a fetch that starts after this call cannot be
+ * served from the cache fast path, and so webhook callers never wait on another
+ * in-flight token-service call for the same user. An operation that was already
+ * enqueued for the user can still write the credential when it settles, so the
+ * delete is also queued behind it.
+ */
+export function evictGitHubUserAccessTokenCache(kiloUserId: string): void {
+  cache.delete(kiloUserId);
+  void enqueueForUser(kiloUserId, async () => {
+    cache.delete(kiloUserId);
+  });
+}
+
+/**
  * Test-only helper: reset the in-process cache and per-user queue. NOT exported
  * via the module's public API surface — only consumed by jest tests in the
  * same package.

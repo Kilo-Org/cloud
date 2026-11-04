@@ -147,7 +147,9 @@ export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
     .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
     .map(name => path.join(parent, name));
   const sessionParent =
-    path.basename(parent) === 'worktrees' || path.basename(parent) === 'sessions';
+    path.basename(parent) === 'worktrees' ||
+    path.basename(parent) === 'sessions' ||
+    directory === '/workspace/app';
   return {
     exclusive:
       sessionParent &&
@@ -883,19 +885,7 @@ export async function recycleControlConnection(
   await executeDocker(['exec', handle.containerId, 'kill', '-USR1', String(handle.processId)]);
 }
 
-/**
- * Legacy control wrapper: `bun run /usr/local/bin/kilocode-control-wrapper.js`
- * (`src/sandbox-control/cloudflare-provider.ts`).
- */
-export const LEGACY_CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
-
-/**
- * New-plane control wrapper: the control-plane supervisor runs
- * `bun run /usr/local/bin/kilocode-control-plane-wrapper.js` (`Dockerfile`).
- * Its basename differs from the legacy wrapper, so a new-plane capture must
- * match this exact basename; the legacy capture finds zero processes in a
- * new-plane container (and vice versa).
- */
+/** Wrapper launched by the container supervisor. */
 export const CONTROL_PLANE_WRAPPER_BASENAME = 'kilocode-control-plane-wrapper.js';
 
 /**
@@ -1046,22 +1036,8 @@ async function captureWrapperProcess(
 }
 
 /**
- * Capture the legacy control-wrapper Bun process for one container in a single
- * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
- * a frozen process cannot answer a discovery request. Exactly one match is
- * required; zero or several matches is an ambiguous identity and throws.
- */
-export async function captureControlWrapperProcess(
-  containerId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
-): Promise<KiloServerProcessHandle> {
-  return captureWrapperProcess(containerId, LEGACY_CONTROL_WRAPPER_BASENAME, executeDocker);
-}
-
-/**
- * Capture the new-plane control-wrapper Bun process. A unique match is positive
- * evidence the container runs the new plane; zero matches (a legacy container)
- * throws rather than silently falling back.
+ * Capture the wrapper Bun process with one docker exec. Require exactly one
+ * process before returning the handle used for STOP, CONT, and recycling.
  */
 export async function captureControlPlaneWrapperProcess(
   containerId: string,
@@ -1354,13 +1330,12 @@ export async function listSandboxContainers(
     const [id, name, image] = line.split('\t');
     if (!id || !name || !image) continue;
     // Match sandbox DO container names. cloudflare/containers uses a naming
-    // scheme that includes the DO class name; we match on `Sandbox` (covers
-    // both `Sandbox` and `SandboxSmall`) plus the dev worker prefix when
-    // present. Relaxed match keeps the harness robust to wrangler version
-    // changes.
+    // scheme that includes the DO class name, so `Sandbox` covers the native
+    // `SandboxContainers` provider and the retired tombstone names. Keep the
+    // relaxed image fallback so the harness survives wrangler naming changes.
     const isSandbox =
       (name.includes('cloud-agent-next-dev') || name.includes('cloud-agent-next')) &&
-      (name.includes('Sandbox') || image.includes('cloudflare/sandbox'));
+      (name.includes('Sandbox') || image.toLowerCase().includes('sandboxcontainers'));
     if (!isSandbox) continue;
     result.push({ id, name, image, isProxy: name.endsWith('-proxy') });
   }

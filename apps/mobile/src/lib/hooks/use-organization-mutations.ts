@@ -1,6 +1,5 @@
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   isLatestMutationGeneration,
@@ -11,10 +10,11 @@ import {
   type OrgRole,
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-const onMutationError = (error: { message: string }) => {
-  announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
+const onMutationError = (error: unknown) => {
+  announcingToast.error(organizationErrorMessage(error));
 };
 
 // Distributive helpers: `OrgWithMembers` is a union of the admin and member
@@ -68,7 +68,7 @@ export function useOrganizationMutations(
   };
 
   // onError policy: roll back the onMutate snapshot (latest generation only);
-  // toast error.message, or the caller renders the error inline when silent.
+  // toast the mapped copy, or the caller renders the error inline when silent.
   function optimistic<TInput>(
     updater: (old: OrgWithMembers, input: TInput) => OrgWithMembers,
     { silent }: { silent?: boolean } = {}
@@ -84,7 +84,7 @@ export function useOrganizationMutations(
         return { previous, generation };
       },
       onError: (
-        error: { message: string },
+        error: unknown,
         _input: TInput,
         context?: { previous?: OrgWithMembers; generation: number }
       ) => {
@@ -134,7 +134,7 @@ export function useOrganizationMutations(
       // No onMutationError toast here: RenameModal (the only caller) shows
       // the error inline while it stays open (see Pattern P2).
       onError: (
-        _error: { message: string },
+        _error: unknown,
         _input,
         context?: {
           previousWithMembers?: OrgWithMembers;

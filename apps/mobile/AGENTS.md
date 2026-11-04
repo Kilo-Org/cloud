@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 58, React Native 0.88, React 19.3, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -38,16 +38,26 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
+- `jotai` stays on 2.x for now, and the four pins move together: `apps/mobile`,
+  `apps/web`, `apps/extension` and `packages/cloud-agent-sdk`. The SDK creates
+  the session atoms and each app reads them through its own jotai hooks, so a
+  partial bump fails `typecheck`: a 2.x `Atom` is not assignable to the 3.x
+  type because its `read` options still require `setSelf`, which 3.x removed
+  (mobile alone reports 153 such errors). `apps/web` cannot move first while
+  `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
+  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
+  soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
+  clears `minimumReleaseAge`.
 
 ## Library First
 
 Before you build a UI element, find the library that already does it.
 
 1. Check the element map below. If the concern has an entry, use that element.
-2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
    `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
    `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
-3. Check the Expo SDK 57 docs for the concern.
+3. Check the Expo SDK 58 docs for the concern.
 4. Check npm for a maintained package. A release in the last six months is the bar.
 
 A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
@@ -58,24 +68,24 @@ reason.
 
 One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
 
-| Concern | Element | Use instead of |
-|---|---|---|
-| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
-| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
-| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
-| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
-| System confirm, non-destructive | `Alert.alert` | — |
-| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
-| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
-| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
-| Video | `expo-video` | `react-native-video`, `expo-av` |
-| Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
-| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
-| Icons | `@/components/ui/icons` | `lucide-react-native` |
-| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
-| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
-| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
+| Concern                               | Element                                                                                                                                                | Use instead of                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Bottom sheet, imperative / non-route  | `Sheet` from `@/components/ui/sheet`                                                                                                                   | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route                   | expo-router `formSheet` via `useFormSheetScreenOptions()`                                                                                              | a JS bottom-sheet library                                                                          |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet)                                                                                    | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import                   |
+| Dialog form (a field, a form)         | `DialogCard` from `@/components/ui/dialog`                                                                                                             | a direct `@rn-primitives/dialog` import                                                            |
+| System confirm, non-destructive       | `Alert.alert`                                                                                                                                          | —                                                                                                  |
+| Keyboard avoidance                    | `react-native-keyboard-controller`                                                                                                                     | `KeyboardAvoidingView` from `react-native`                                                         |
+| Lists                                 | `@shopify/flash-list`                                                                                                                                  | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list`                                    |
+| Image viewer                          | `@/components/ui/image-viewer`                                                                                                                         | `react-native-image-viewing`, `react-native-awesome-gallery`                                       |
+| Video                                 | `expo-video`                                                                                                                                           | `react-native-video`, `expo-av`                                                                    |
+| Blur                                  | `expo-blur`                                                                                                                                            | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass)                                   |
+| Toast                                 | `sonner-native`                                                                                                                                        | `react-native-toast-message`, `burnt`                                                              |
+| Images                                | `@/components/ui/image`                                                                                                                                | `Image` from `react-native`, `expo-image`                                                          |
+| Icons                                 | `@/components/ui/icons`                                                                                                                                | `lucide-react-native`                                                                              |
+| Markdown                              | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown`                                                  | `react-native-marked`, `react-native-markdown-display`                                             |
+| HTML in markdown                      | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html`                                                                         |
+| Diagram                               | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`)                                                                                     | —                                                                                                  |
 
 No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
 outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
@@ -108,9 +118,15 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-Scope each PR form header with a native safe-area provider outside the scroll view.
-Apply its top inset with `SafeAreaView`, not the app root inset.
-Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 
@@ -128,9 +144,10 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
+- Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
-- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` fails. Use a concrete Tailwind color with a dark variant. Non-variable colors like `bg-black/5` are fine.
+- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
 - Use Lucide icons, never emoji. Color icons with `color={colors.<token>}` from `useThemeColors()`; `className` colors do not work on them.
 
@@ -156,6 +173,14 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+- A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
+- Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.
+- Center single-line content on both axes in its row or control: icons beside text, carets, button labels, badges, and the text and placeholder of single-line inputs.
+- Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
+- Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
+- Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
+- Change only the visual properties the task names. A color fix does not change dimensions.
 
 ## Translations
 
@@ -163,7 +188,17 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The
+  exceptions are value-level edits of an existing non-English entry. For both,
+  keep the key name, the placeholder set, and the surrounding entries as they
+  are, and say so in the pull request:
+  - a confirmed mistranslation, meaning a wrong word rather than a style
+    preference: fix the value in place, leave the English copy unchanged, and
+    verify the corrected string on the screen that renders it;
+  - a change to the meaning of the English copy, or to the surface it names: the
+    existing value in every catalog now describes the old meaning, so update it
+    in each of them, using that catalog's own established wording for the new
+    meaning or surface. `check:i18n` and `check:plurals` still have to pass.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.
@@ -171,6 +206,10 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
 - Case follows the English copy, and only in a language that has case. Georgian
   Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
   it only in full capitals.
@@ -178,10 +217,35 @@ what a translator has to work from.
 - If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
   `tools/i18n/check-catalogs.mjs` and record both senses there.
 - Run `pnpm check:i18n` after you touch copy.
+- A key `en.json` gains must reach all 86 catalogs before the pull request
+  merges: `check:i18n` fails on a key one of them lacks, so a change that adds
+  copy either waits for the translation slice or lands the catalog values
+  itself and says so.
 
 ## Design
 
 The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.
+
+## Design gate
+
+Before you call a UI change done, run the design gate on every screen and state the change touches:
+
+```bash
+pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standard --out <dir>
+```
+
+- It needs a dev build connected to Metro. The dev-only probe (`src/lib/design-gate/probe.ts`) reports every element's frame, so the gate measures layout in numbers instead of judging a screenshot.
+- Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
+- The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
+- After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
+- The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
+- Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
+- Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
+- A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
+- For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
 
 ## Debugging
 
@@ -198,7 +262,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

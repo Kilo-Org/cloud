@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, type TextInput, View } from 'react-native';
+import { Platform, type TextInput, type TextInputProps, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { DialogCard } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { withUiDeadline } from '@/lib/ui-deadline';
+import { isUiDeadlineError, withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
 
 const SAVE_UI_DEADLINE_MS = 15_000;
@@ -26,6 +26,13 @@ type RenameModalProps<TSaveResult> = {
    * keep the single-line field.
    */
   multiline?: boolean;
+  /**
+   * Turns a rejected save into the line shown under the field. Defaults to the
+   * error's own message; a caller whose procedure returns server sentences
+   * meant for logs passes a mapper that yields localized copy instead
+   * (organization rename, for example).
+   */
+  errorCopy?: (error: unknown) => string;
 };
 
 // Mount this component only while the dialog should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -38,10 +45,29 @@ export function RenameModal<TSaveResult>({
   onClose,
   maxLength = 50,
   multiline = false,
+  errorCopy,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const nameRef = useRef(initialValue);
+  // The field keeps what the user typed. Its seed is the value the dialog
+  // opened with, captured once, so a caller that writes the typed name into its
+  // cache on save and restores the old one when the save is refused never
+  // re-seeds it.
+  //
+  // Android commits this dialog while the save is pending and after it fails
+  // (the field's editable/locked state and the inline error), and its text input
+  // applies the text of the committed props on every one of those commits. An
+  // uncontrolled field's only text source is the props, so the typed name is
+  // replaced by the seed unless the seed is the typed text: Android passes the
+  // field's own text as its `value`.
+  //
+  // iOS applies that text only when the text state itself updates, so the
+  // uncontrolled field keeps the typed name and the seed stays its
+  // `defaultValue`; this app never controls text with `value` plus state on iOS
+  // (apps/mobile/CLAUDE.md).
+  const [openingValue] = useState(initialValue);
+  const [text, setText] = useState(openingValue);
+  const textRef = useRef(openingValue);
   const inputRef = useRef<TextInput>(null);
   const [canSave, setCanSave] = useState(false);
   const [pending, setPending] = useState(false);
@@ -69,7 +95,7 @@ export function RenameModal<TSaveResult>({
   };
 
   const handleSave = async () => {
-    const trimmed = nameRef.current.trim();
+    const trimmed = textRef.current.trim();
     setPending(true);
     setSaveInFlight(true);
     setErrorText(null);
@@ -87,11 +113,29 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      // The deadline is the app's own message, already localized; only a
+      // rejection from the save itself goes through the caller's mapper.
+      if (errorCopy && !isUiDeadlineError(error)) {
+        setErrorText(errorCopy(error));
+      } else {
+        setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      }
     } finally {
       setPending(false);
     }
   };
+
+  // The keyboard's Done key is the Save button: same guards, so an unchanged or
+  // empty value and a save already in flight stay inert. A multi-line field
+  // keeps Return for a new line, so only the single-line field submits.
+  const submitFromKeyboard = () => {
+    if (!multiline && canSave && !pending && !saveInFlight) {
+      void handleSave();
+    }
+  };
+
+  const textProps: Pick<TextInputProps, 'value' | 'defaultValue'> =
+    Platform.OS === 'android' ? { value: text } : { defaultValue: openingValue };
 
   return (
     <DialogCard onClose={handleClose} placement="top">
@@ -100,29 +144,34 @@ export function RenameModal<TSaveResult>({
         ref={inputRef}
         accessible
         accessibilityLabel={placeholder}
-        // Single-line: leading-[normal] (not leading-5) so no lineHeight reaches
+        // Single-line: leading-[normal] (not leading-[1.25rem]) so no lineHeight reaches
         // the style: a lineHeight above the font's natural one makes iOS draw the
         // placeholder lower than the typed text and clip its bottom.
-        // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
+        // Multi-line: an explicit leading-[1.25rem] plus bounded min/max heights, so the
         // value soft-wraps into the field and scrolls vertically past the cap.
         className={cn(
           'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
-          multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
+          multiline ? 'py-2.5 max-h-40 min-h-24 leading-[1.25rem]' : 'leading-[normal]',
           pending && 'opacity-50'
         )}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        defaultValue={initialValue}
+        {...textProps}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : undefined}
         onChangeText={val => {
-          nameRef.current = val;
+          textRef.current = val;
+          if (Platform.OS === 'android') {
+            setText(val);
+          }
           const trimmed = val.trim();
-          setCanSave(trimmed.length > 0 && trimmed !== initialValue);
+          setCanSave(trimmed.length > 0 && trimmed !== openingValue);
         }}
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}
         editable={!pending}
+        onSubmitEditing={multiline ? undefined : submitFromKeyboard}
+        returnKeyType={multiline ? undefined : 'done'}
         accessibilityState={{ disabled: pending }}
       />
       {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}

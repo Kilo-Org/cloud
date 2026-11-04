@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
@@ -9,7 +10,7 @@ import type {
   ControlPlaneSessionRegistration,
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/db/sqlite-schema.js';
+import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -24,19 +25,19 @@ import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
+import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const USER_ID = 'user_123';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 let sequence = 0;
 
 function b64url(value: string): string {
@@ -99,6 +100,7 @@ function metadata(input: {
   workspacePath?: string;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -110,7 +112,7 @@ function metadata(input: {
     },
     auth: {
       kiloSessionId: input.kiloSessionId,
-      kilocodeToken: input.kiloToken ?? NATIVE_KILO_TOKEN,
+      kilocodeToken: input.kiloToken ?? runtimeAuthorizedKiloToken(),
     },
     agent: { mode: 'code', model: 'test/model' },
     repository: input.repository ?? {
@@ -121,9 +123,10 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: input.sandboxProvider ?? 'cloudflare',
+      sandboxProvider: input.sandboxProvider ?? 'cloudflare-containers',
       ...(input.egressMode === undefined ? {} : { egressMode: input.egressMode }),
       ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
+      ...(input.egressAudit === undefined ? {} : { egressAudit: input.egressAudit }),
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
@@ -175,12 +178,13 @@ async function installSandbox(
     await instance.getAllocationState();
     // Isolated sessions address their containment namespace by `ses-` prefix.
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
   });
   return sandboxStub;
@@ -208,6 +212,7 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
         allocationName?: string;
         egressMode?: EgressMode;
         egressAllowlist?: string[];
+        egressAudit?: boolean;
       };
     }
   | undefined
@@ -215,11 +220,167 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
   return runInDurableObject(stub, (_instance, state) => state.storage.get('control_plane_session'));
 }
 
+const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
+const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
+
+type GeneratedTitleAiInput = {
+  messages?: unknown;
+  max_tokens?: number;
+  temperature?: number;
+};
+
+type GeneratedTitleAiCall = { model: string; input: GeneratedTitleAiInput };
+
+type GeneratedTitlePersist = {
+  sessionId: string;
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+  title: string;
+};
+
+async function installGeneratedTitleFakes(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  options: { aiRejects?: boolean; ingestRejects?: boolean } = {}
+): Promise<void> {
+  await runInDurableObject(stub, async (instance, state) => {
+    await state.storage.put(GENERATED_TITLE_AI_CALLS_KEY, []);
+    await state.storage.put(GENERATED_TITLE_PERSISTS_KEY, []);
+    const AI = {
+      async run(model: string, input: GeneratedTitleAiInput) {
+        const calls =
+          (await state.storage.get<GeneratedTitleAiCall[]>(GENERATED_TITLE_AI_CALLS_KEY)) ?? [];
+        calls.push({ model, input });
+        await state.storage.put(GENERATED_TITLE_AI_CALLS_KEY, calls);
+        if (options.aiRejects === true) throw new Error('inference rejected');
+        return { response: 'Generated title' };
+      },
+    };
+    const SESSION_INGEST = {
+      async canGenerateTitleForCloudAgent() {
+        return true;
+      },
+      async setGeneratedTitleForCloudAgent(params: GeneratedTitlePersist) {
+        const persists =
+          (await state.storage.get<GeneratedTitlePersist[]>(GENERATED_TITLE_PERSISTS_KEY)) ?? [];
+        persists.push(params);
+        await state.storage.put(GENERATED_TITLE_PERSISTS_KEY, persists);
+        if (options.ingestRejects === true) throw new Error('persistence rejected');
+        return { applied: true };
+      },
+    };
+    Object.assign(instance.env, { AI, SESSION_INGEST });
+  });
+}
+
+async function readGeneratedTitleAiCalls(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<GeneratedTitleAiCall[]> {
+  return runInDurableObject(
+    stub,
+    async (_instance, state) =>
+      (await state.storage.get<GeneratedTitleAiCall[]>(GENERATED_TITLE_AI_CALLS_KEY)) ?? []
+  );
+}
+
+async function readGeneratedTitlePersists(
+  stub: DurableObjectStub<SandboxSessionV2>
+): Promise<GeneratedTitlePersist[]> {
+  return runInDurableObject(
+    stub,
+    async (_instance, state) =>
+      (await state.storage.get<GeneratedTitlePersist[]>(GENERATED_TITLE_PERSISTS_KEY)) ?? []
+  );
+}
+
+type GeneratedTitleSession = {
+  stub: DurableObjectStub<SandboxSessionV2>;
+  sessionId: string;
+  kiloId: string;
+  sessionMetadata: SessionMetadata;
+  sandboxSelection: { provider: 'cloudflare-containers' };
+};
+
+async function setupGeneratedTitleSession(
+  options: { aiRejects?: boolean; ingestRejects?: boolean } = {}
+): Promise<GeneratedTitleSession> {
+  const sessionId = newSessionId();
+  const kiloId = kiloSessionId();
+  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const stub = sessions.getByName(sessionId);
+  const peer = new FakeSandboxPeer();
+  await runInDurableObject(stub, instance => {
+    instance.sandboxPeerFor = () => peer;
+  });
+  await installGeneratedTitleFakes(stub, options);
+  return {
+    stub,
+    sessionId,
+    kiloId,
+    sessionMetadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
+    sandboxSelection: { provider: 'cloudflare-containers' },
+  };
+}
+
 afterEach(async () => {
   await reset();
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it.each(
+    ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
+      [undefined, false, true].map(egressAudit => ({ egressMode, egressAudit }))
+    )
+  )(
+    'retains audit policy %j after eviction and rejects changed or contradictory registration replays',
+    async ({ egressMode, egressAudit }) => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      let stub = sessions.getByName(sessionId);
+      const registered = metadata({
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        sandboxId,
+        sandboxProvider: 'cloudflare-containers',
+        egressMode,
+        egressAudit,
+      });
+      const input = {
+        metadata: registered,
+        sandboxSelection: {
+          provider: 'cloudflare-containers' as const,
+          egressMode,
+          egressAudit,
+        },
+      };
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      await evictAllDurableObjects();
+      stub = sessions.getByName(sessionId);
+      expect((await stub.getMetadata())?.workspace?.egressAudit).toBe(egressAudit);
+      expect((await readRegistration(stub))?.sandboxSelection?.egressAudit).toBe(egressAudit);
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      for (const changed of [undefined, false, true]) {
+        const changedMetadata = {
+          ...registered,
+          workspace: { ...registered.workspace, egressAudit: changed },
+        };
+        const changedSelection = { ...input.sandboxSelection, egressAudit: changed };
+        const expected =
+          (changed ?? false) === (egressAudit ?? false)
+            ? { success: true }
+            : { success: false, code: 'BAD_REQUEST', failureBoundary: 'registration' };
+        for (const replay of [
+          { metadata: changedMetadata, sandboxSelection: changedSelection },
+          { metadata: registered, sandboxSelection: changedSelection },
+          { metadata: changedMetadata, sandboxSelection: input.sandboxSelection },
+        ]) {
+          await expect(stub.registerSessionFromMetadata(replay)).resolves.toMatchObject(expected);
+        }
+      }
+      expect((await stub.getMetadata())?.workspace?.egressAudit).toBe(egressAudit);
+      expect((await readRegistration(stub))?.sandboxSelection?.egressAudit).toBe(egressAudit);
+    }
+  );
+
   it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'retains registration policy after eviction and rejects changed replays %j',
     async ({ egressAllowlist }) => {
@@ -333,6 +494,13 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
       success: true,
     });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        ...input,
+        metadata: { ...registered, workspace: { ...registered.workspace, egressAudit: true } },
+        sandboxSelection: { ...input.sandboxSelection, egressAudit: true },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
     await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
       success: true,
     });
@@ -384,6 +552,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionId,
       kiloSessionId: kiloSessionId(),
       sandboxId,
+      sandboxProvider: 'cloudflare',
       egressMode: 'unrestricted',
     });
     await expect(
@@ -430,7 +599,11 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         },
       }),
       message: promptPayload(firstMessageId),
-      sandboxSelection: { provider: 'vercel', allocationName: 'alloc_test' },
+      sandboxSelection: {
+        provider: 'vercel',
+        allocationName: 'alloc_test',
+        byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+      },
     });
 
     // M2: legacy admission ack shape.
@@ -460,10 +633,12 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       messages: [{ messageId: firstMessageId, state: 'queued' }],
     });
 
-    // H1: the non-default provider/allocation reached the sandbox pin.
+    // Vercel pins each physical allocation under its own immutable name.
+    const allocation = await sandboxStub.getAllocationState();
+    expect(allocation.allocationId).toEqual(expect.any(String));
     await expect(sandboxStub.getProviderRuntime()).resolves.toEqual({
       provider: 'vercel',
-      allocationName: 'alloc_test',
+      allocationName: `sbx-${allocation.allocationId?.replaceAll('-', '')}`,
     });
     expect(provider.createCalls).toBe(1);
 
@@ -491,7 +666,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await startStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId, worktreeId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     // H3: the sibling registers through the DO, which builds the registration.
@@ -504,7 +679,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         worktreeId,
         workspacePath: identityPath,
       }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     expect(siblingResult).toEqual({ success: true });
 
@@ -554,7 +729,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         sandboxId: sbx,
         kiloToken: runtimeAuthorizedKiloToken(),
       }),
-      sandboxSelection: { provider: 'cloudflare' as const },
+      sandboxSelection: { provider: 'cloudflare-containers' as const },
       runtimeAuthorizationSeal: seal,
     });
 
@@ -608,7 +783,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const createInput = (id: string) => ({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(id),
-      sandboxSelection: { provider: 'cloudflare' as const },
+      sandboxSelection: { provider: 'cloudflare-containers' as const },
     });
 
     await expect(
@@ -658,7 +833,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'vercel' },
+        sandboxSelection: {
+          provider: 'vercel',
+          byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+        },
       })
     ).resolves.toEqual({
       success: false,
@@ -672,7 +850,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'cloudflare', configuration: { provider: 'vercel' } },
+        sandboxSelection: {
+          provider: 'cloudflare-containers',
+          configuration: { provider: 'vercel' },
+        },
       })
     ).resolves.toMatchObject({
       success: false,
@@ -692,7 +873,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload('m1'),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
       })
     ).resolves.toEqual({
       success: false,
@@ -723,7 +904,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           kiloToken: runtimeAuthorizedKiloToken(),
         }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'cloudflare' },
+        sandboxSelection: { provider: 'cloudflare-containers' },
         runtimeAuthorizationSeal: seal,
       })
     ).resolves.toMatchObject({ success: true });
@@ -751,7 +932,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     });
     await sessionStub.registerSessionFromMetadata({
       metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const assistant = (id: string, sessionID: string) =>
@@ -798,5 +979,116 @@ describe('SandboxSessionV2 worker RPC surface', () => {
   it('returns null for the latest assistant message when the session is unregistered', async () => {
     const sessionStub = sessions.getByName(newSessionId());
     await expect(sessionStub.getLatestAssistantMessage()).resolves.toBeNull();
+  });
+});
+
+describe('SandboxSessionV2 generated titles', () => {
+  it('generates and persists a title for the first admitted message', async () => {
+    const session = await setupGeneratedTitleSession();
+    const firstMessageId = messageId();
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission({
+        metadata: session.sessionMetadata,
+        message: promptPayload(firstMessageId, 'Summarize this change'),
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+
+    const aiCalls = await readGeneratedTitleAiCalls(session.stub);
+    expect(aiCalls).toHaveLength(1);
+    expect(aiCalls[0]?.model).toContain('glm-4.7-flash');
+    expect(aiCalls[0]?.input.max_tokens).toBe(64);
+    expect(aiCalls[0]?.input.temperature).toBe(0);
+    expect(JSON.stringify(aiCalls[0]?.input.messages)).toContain('Summarize this change');
+    expect(await readGeneratedTitlePersists(session.stub)).toEqual([
+      {
+        sessionId: session.kiloId,
+        kiloUserId: USER_ID,
+        cloudAgentSessionId: session.sessionId,
+        title: 'Generated title',
+      },
+    ]);
+  });
+
+  it('does not regenerate for a create replay or a subsequent message', async () => {
+    const session = await setupGeneratedTitleSession();
+    const firstMessageId = messageId();
+    const createInput = {
+      metadata: session.sessionMetadata,
+      message: promptPayload(firstMessageId),
+      sandboxSelection: session.sandboxSelection,
+    };
+
+    await session.stub.createSessionWithInitialAdmission(createInput);
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission(createInput)
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+    await expect(session.stub.send(promptPayload(messageId(), 'second'))).resolves.toEqual({
+      type: 'ok',
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(1);
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1);
+  });
+
+  it('generates on the first send after an empty-chat register', async () => {
+    const session = await setupGeneratedTitleSession();
+
+    await expect(
+      session.stub.registerSessionFromMetadata({
+        metadata: session.sessionMetadata,
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toEqual({ success: true });
+
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(0);
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(0);
+
+    await expect(session.stub.send(promptPayload(messageId(), 'first prompt'))).resolves.toEqual({
+      type: 'ok',
+    });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(1)
+    );
+    expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(1);
+    expect((await readGeneratedTitlePersists(session.stub))[0]).toMatchObject({
+      sessionId: session.kiloId,
+      cloudAgentSessionId: session.sessionId,
+      title: 'Generated title',
+    });
+  });
+
+  it('admits the first message when title inference rejects', async () => {
+    const session = await setupGeneratedTitleSession({ aiRejects: true });
+    const firstMessageId = messageId();
+
+    await expect(
+      session.stub.createSessionWithInitialAdmission({
+        metadata: session.sessionMetadata,
+        message: promptPayload(firstMessageId),
+        sandboxSelection: session.sandboxSelection,
+      })
+    ).resolves.toMatchObject({ success: true, messageId: firstMessageId });
+
+    await waitFor(async () =>
+      expect(await readGeneratedTitleAiCalls(session.stub)).toHaveLength(2)
+    );
+    expect(await readGeneratedTitlePersists(session.stub)).toHaveLength(0);
+    await expect(session.stub.getSession()).resolves.toMatchObject({
+      type: 'found',
+      messages: [{ messageId: firstMessageId, state: 'queued' }],
+    });
   });
 });

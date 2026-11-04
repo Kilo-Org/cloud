@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createHash } from 'node:crypto';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -18,6 +17,7 @@ import {
 } from '@/lib/integrations/google/oauth-state';
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { oauthStateHash, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
 
 /**
  * Build the post-OAuth redirect path. The query-string fragment is appended
@@ -70,11 +70,7 @@ function sanitizeOAuthProviderError(
 }
 
 function sanitizeOAuthCode(code: string | null): string | null {
-  if (!code) return null;
-  const normalized = code.trim();
-  if (!normalized || normalized.length > 2048) return null;
-  if (!/^[A-Za-z0-9._~+\-/]+$/.test(normalized)) return null;
-  return normalized;
+  return validOAuthCode(code ? code.trim() : null);
 }
 
 function oauthSentryContext(searchParams: URLSearchParams): {
@@ -88,7 +84,7 @@ function oauthSentryContext(searchParams: URLSearchParams): {
   return {
     hasCode: !!searchParams.get('code'),
     hasState: !!state,
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    stateHash: oauthStateHash(state),
     error: searchParams.get('error'),
     errorDescription: searchParams.get('error_description'),
   };

@@ -1,6 +1,36 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
 import { describe, it, expect } from 'vitest';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import { MAX_PAYLOAD_SIZE } from '../../src/util/constants';
+import { triggerConfig } from '../../src/db/sqlite-schema';
+
+const STREAM_CHUNK_BYTES = 16 * 1024;
+
+function streamedBody(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  let offset = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (offset >= bytes.byteLength) {
+        controller.close();
+        return;
+      }
+      const end = Math.min(offset + STREAM_CHUNK_BYTES, bytes.byteLength);
+      controller.enqueue(bytes.slice(offset, end));
+      offset = end;
+    },
+  });
+}
+
+function chunkedRequest(path: string, bytes: Uint8Array): Request {
+  return new Request(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: streamedBody(bytes),
+    duplex: 'half',
+  } as RequestInit);
+}
 
 describe('Hono Routes', () => {
   describe('Webhook Ingestion - Personal Triggers', () => {
@@ -78,6 +108,105 @@ describe('Hono Routes', () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error).toBe('Payload too large');
+    });
+
+    it('captures a streamed body of exactly the limit', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const payload = new TextEncoder().encode('x'.repeat(MAX_PAYLOAD_SIZE));
+      expect(payload.byteLength).toBe(MAX_PAYLOAD_SIZE);
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.success).toBe(true);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].body).toHaveLength(MAX_PAYLOAD_SIZE);
+    });
+
+    it('rejects a streamed body one byte over the limit without capturing it', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const payload = new TextEncoder().encode('x'.repeat(MAX_PAYLOAD_SIZE + 1));
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(413);
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Payload too large');
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(0);
+    });
+
+    it('captures a multibyte body whose encoded size is within the limit', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const text = JSON.stringify({ note: 'é'.repeat(100_000) });
+      const payload = new TextEncoder().encode(text);
+      expect(payload.byteLength).toBeGreaterThan(text.length);
+      expect(payload.byteLength).toBeLessThanOrEqual(MAX_PAYLOAD_SIZE);
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(200);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].body).toBe(text);
+    });
+
+    it('captures a request that carries no body', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const response = await SELF.fetch(
+        `http://localhost/inbound/user/${testUserId}/${testTriggerId}`
+      );
+
+      expect(response.status).toBe(200);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].method).toBe('GET');
+      expect(listed.requests[0].body).toBe('');
     });
 
     it('should return 415 for unsupported content type', async () => {
@@ -312,6 +441,86 @@ describe('Hono Routes', () => {
       await runInDurableObject(stub, async (_instance, state) => {
         expect(await state.storage.getAlarm()).not.toBeNull();
       });
+    });
+  });
+
+  describe('Stored body schema patterns', () => {
+    it('captures a body for a schema stored under the previous policy', async () => {
+      const userId = 'body-schema-user';
+      const triggerId = 'legacy-pattern';
+      const namespace = `user/${userId}`;
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+      await stub.configure(namespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+        bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .update(triggerConfig)
+          .set({
+            body_schema: {
+              type: 'object',
+              properties: { event: { type: 'string', pattern: '^(a+)+$' } },
+              required: ['event'],
+              additionalProperties: false,
+            },
+          })
+          .where(eq(triggerConfig.trigger_id, triggerId))
+          .run();
+      });
+
+      const started = Date.now();
+      const response = await SELF.fetch(`http://localhost/inbound/user/${userId}/${triggerId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: `${'a'.repeat(40)}!` }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true });
+      expect(Date.now() - started).toBeLessThan(5_000);
+    });
+
+    it('captures a body for a stored over-budget pattern', async () => {
+      const userId = 'body-schema-user';
+      const triggerId = 'stored-over-budget-pattern';
+      const namespace = `user/${userId}`;
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+      await stub.configure(namespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+        bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .update(triggerConfig)
+          .set({
+            body_schema: {
+              type: 'object',
+              properties: { event: { type: 'string', pattern: '^' + 'a+'.repeat(20) + 'b$' } },
+              required: ['event'],
+              additionalProperties: false,
+            },
+          })
+          .where(eq(triggerConfig.trigger_id, triggerId))
+          .run();
+      });
+
+      const started = Date.now();
+      const response = await SELF.fetch(`http://localhost/inbound/user/${userId}/${triggerId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'aab' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true });
+      expect(Date.now() - started).toBeLessThan(5_000);
     });
   });
 });

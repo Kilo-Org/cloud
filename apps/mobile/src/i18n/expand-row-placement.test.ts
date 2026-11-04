@@ -90,9 +90,19 @@ describe('counted expand rows', () => {
     languages: readonly SupportedLanguage[],
     annotated: readonly string[],
   ])[] = [
-    ['en af am fi gu he hi kn ml mr pa sq ta te ur'.split(' ') as SupportedLanguage[], []],
-    ['bg bs ca el es gl hr is mk pt pt-BR ro'.split(' ') as SupportedLanguage[], [ALL_LINES]],
-    ['de nl sv'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
+    // Greek inflects the noun in every family, including expandAllLines, whose
+    // singular reads "Εμφάνιση όλης της γραμμής (N)", so it annotates none.
+    ['el en af am fi gu he hi kn ml mr pa sq ta te ur'.split(' ') as SupportedLanguage[], []],
+    ['bg bs ca es gl hr is mk pt pt-BR ro'.split(' ') as SupportedLanguage[], [ALL_LINES]],
+    ['de nl'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
+    [
+      'sv'.split(' ') as SupportedLanguage[],
+      // Swedish reworded moreLinesAbove to lead the numeral ("… ytterligare
+      // 1 rad ovanför"), which the noun can govern, so its one category
+      // inflects the noun singular and only expandAllLines annotates: its
+      // determiner alla ("all") cannot take a singular numeral.
+      [ALL_LINES],
+    ],
     ['da nb'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_LINES, MORE_ABOVE]],
     ['fr it'.split(' ') as SupportedLanguage[], [ALL_LINES, MORE_ABOVE]],
     ['sw'.split(' ') as SupportedLanguage[], [ALL_LINES]],

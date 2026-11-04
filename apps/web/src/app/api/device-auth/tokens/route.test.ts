@@ -6,11 +6,14 @@ import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
-jest.mock('@/lib/device-auth/device-auth', () => ({
-  approveDeviceAuthRequest: jest.fn(),
-}));
-
-import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+jest.mock('@/lib/device-auth/device-auth', () => {
+  const actual = jest.requireActual('@/lib/device-auth/device-auth');
+  return { ...actual, approveDeviceAuthRequest: jest.fn() };
+});
+import {
+  approveDeviceAuthRequest,
+  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
+} from '@/lib/device-auth/device-auth';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
 
@@ -43,7 +46,41 @@ describe('POST /api/device-auth/tokens', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
-    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1');
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {});
+  });
+
+  it('passes the confirmed client to the approval', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+
+    const response = await POST(
+      createRequest(
+        JSON.stringify({ code: 'ABCD-EFGH', confirmed_client_id: 'client-abc' }),
+        sessionHeaders
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {
+      confirmedClientId: 'client-abc',
+    });
+  });
+
+  it('answers 409 when the approval does not confirm the client it names', async () => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockRejectedValueOnce(new Error(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE));
+
+    const response = await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE });
   });
 
   it.each([
@@ -75,7 +112,7 @@ describe('POST /api/device-auth/tokens', () => {
 
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error });
-    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1');
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1', {});
   });
 
   it.each([new Error('Database unavailable'), 'Unexpected rejection'])(

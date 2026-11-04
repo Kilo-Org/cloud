@@ -1,3 +1,4 @@
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { type LucideIcon } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -51,6 +52,14 @@ type ConfigureRowProps = {
    */
   subtitleNumberOfLines?: number;
   /**
+   * Node rendered in the subtitle's place while the value that fills it loads.
+   * The row's subtitle is one line of `text-xs`, so a placeholder of that
+   * height keeps the row's settled size: the rows below never move, and the
+   * card does not print loading copy. The caller builds it, because the width
+   * that stands in for the settled text is the caller's.
+   */
+  subtitlePlaceholder?: ReactNode;
+  /**
    * Semantic tone override (good / warn / danger). When omitted the row uses
    * the shared neutral tile, so every row in a settings list carries the same
    * accent instead of a hue hashed from its title.
@@ -64,6 +73,15 @@ type ConfigureRowProps = {
   hue?: RowHue;
   onPress?: () => void;
   disabled?: boolean;
+  /**
+   * Full accessible name of the pressable row. Set it when the row's state or
+   * its action is not readable from the text a reader can already hear:
+   * `accessibilityHint` cannot carry that on Android, where React Native maps
+   * it to the node's tooltip and never to its content description, so the name
+   * is the only place TalkBack reads. Omit it and the name stays the row's
+   * visible text.
+   */
+  accessibilityLabel?: string;
   trailing?: ReactNode;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -76,16 +94,19 @@ export function ConfigureRow({
   title,
   subtitle,
   subtitleNumberOfLines,
+  subtitlePlaceholder,
   tone,
   hue,
   onPress,
   disabled,
+  accessibilityLabel,
   trailing,
   last,
   className,
 }: Readonly<ConfigureRowProps>) {
   const colors = useThemeColors();
-  const { fontScale, width } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   // A narrow window squeezes the flexible text block between the fixed icon
   // tile and the chevron exactly as a large font scale does, until a whole word
   // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
@@ -109,19 +130,38 @@ export function ConfigureRow({
     trailing ??
     (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
 
-  const iconTile = <IconTile icon={Icon} tint={tint} />;
+  // A disabled row dims by token, once, and never by row opacity: halving the
+  // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
+  // card and 1.95:1 on the light one, so the last line of an unavailable row
+  // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
+  // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
+  // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
+  // and the chevron, the pressed feedback and `accessibilityState` are what
+  // still say "unavailable".
+  const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
+
+  const iconTile = <IconTile icon={Icon} tint={iconTint} />;
+
+  let subtitleNode: ReactNode = subtitlePlaceholder ?? null;
+  if (subtitle) {
+    subtitleNode = (
+      <Text numberOfLines={subtitleNumberOfLines} className="mt-0.5 text-xs text-muted-foreground">
+        {subtitle}
+      </Text>
+    );
+  }
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
-      <Text className="text-sm font-medium text-foreground">{title}</Text>
-      {subtitle ? (
-        <Text
-          numberOfLines={subtitleNumberOfLines}
-          className="mt-0.5 text-xs text-muted-foreground"
-        >
-          {subtitle}
-        </Text>
-      ) : null}
+      <Text
+        className={cn(
+          'text-sm font-medium',
+          disabled ? 'text-muted-foreground' : 'text-foreground'
+        )}
+      >
+        {title}
+      </Text>
+      {subtitleNode}
     </View>
   );
 
@@ -131,7 +171,6 @@ export function ConfigureRow({
       className={cn(
         stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
-        disabled && 'opacity-50',
         className
       )}
     >
@@ -159,6 +198,7 @@ export function ConfigureRow({
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: Boolean(disabled) }}
         className={cn(!disabled && 'active:opacity-70')}
       >

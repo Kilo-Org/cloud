@@ -21,8 +21,10 @@ import { Text } from '@/components/ui/text';
 import { type DeviceBudget, deviceFit, estimatedMemoryBytes } from '@/lib/chat/device-fit';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfModelDetail, hfModelName, type HfQuant, isHfRepoId } from '@/lib/chat/hf-catalog';
-import { HfRequestError, useDeviceBudget, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
-import { formatFileSize } from '@/lib/format';
+import { useModelCatalogBack, useModelCatalogHardwareBack } from '@/lib/chat/model-catalog-back';
+import { isHfGone, isHfRestricted } from '@/lib/chat/hf-request';
+import { useDeviceBudget, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
+import { formatFileSize, formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
@@ -51,10 +53,13 @@ function Summary({ detail }: Readonly<{ detail: HfModelDetail }>) {
   const likes = compactNumber(detail.likes, i18n.language);
   const parameters =
     detail.parameters === undefined ? undefined : compactNumber(detail.parameters, i18n.language);
+  // The context window is an exact specification figure, not an approximate
+  // count: compact notation drops grouping below 10 000, so de-DE read
+  // "8192" beside the grouped downloads. Group it in every language.
   const context =
     detail.contextLength === undefined
       ? undefined
-      : compactNumber(detail.contextLength, i18n.language);
+      : formatNumber(detail.contextLength, i18n.language);
   return (
     <View className="gap-4 px-6 pb-2 pt-2">
       <View className="flex-row flex-wrap gap-x-4 gap-y-2">
@@ -163,7 +168,7 @@ function QuantRow({
                 download(quant.model, fit);
               }
         }
-        downloadLabel={t('modelChat.catalog.downloadQuant', { quant: quant.label })}
+        downloadDetail={quant.label}
       />
     </View>
   );
@@ -190,9 +195,16 @@ function DetailBody({ id }: Readonly<{ id: string }>) {
     return <LoadingDetail />;
   }
   if (query.isError) {
-    return query.error instanceof HfRequestError && query.error.status === 404 ? (
-      <QueryError variant="not-found" />
-    ) : (
+    if (isHfGone(query.error)) {
+      return <QueryError variant="not-found" />;
+    }
+    // Hugging Face withholds a private or access-restricted repository behind
+    // the same refusal a lookup without credentials gets, and no retry can
+    // answer that.
+    if (isHfRestricted(query.error)) {
+      return <QueryError variant="permission" />;
+    }
+    return (
       <QueryError
         variant="server"
         title={t('modelChat.catalog.couldNotLoadModel')}
@@ -224,12 +236,17 @@ function DetailBody({ id }: Readonly<{ id: string }>) {
 /** One Hugging Face repository: what it is, and every file this device can download. */
 export function ModelCatalogDetailScreen({ id }: Readonly<{ id: string }>) {
   const valid = isHfRepoId(id);
+  // Both exits land on the catalog list, also when this route was opened
+  // without the list beneath it (a deep link); see `model-catalog-back`.
+  const backToCatalog = useModelCatalogBack();
+  useModelCatalogHardwareBack();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={valid ? hfModelName(id) : undefined}
         eyebrow={valid ? id.split('/')[0] : undefined}
-        backFallback="/model-catalog"
+        showBackButton
+        onBack={backToCatalog}
       />
       {valid ? <DetailBody id={id} /> : <QueryError variant="not-found" />}
     </View>

@@ -250,6 +250,70 @@ describe('worktree session cleanup in Workers', () => {
     await expect(stub.isDeleted()).resolves.toBe(true);
   });
 
+  it('streams bounded bodies through multipart storage and rejects over-limit bodies', async () => {
+    const { kiloUserId, sessionId, stub } = identity();
+    const key = `ingest/${kiloUserId}/${sessionId}/bounded`;
+    const bodySize = 5 * 1024 * 1024 + 17;
+    const acceptedBody = new Uint8Array(bodySize);
+
+    await expect(
+      stub.stageBoundedR2Object(
+        { kiloUserId, sessionId, key },
+        new Blob([acceptedBody]).stream(),
+        bodySize
+      )
+    ).resolves.toBe(true);
+    expect((await env.SESSION_INGEST_R2.head(key))?.size).toBe(bodySize);
+
+    const overflowKey = `${key}-overflow`;
+    const overflowBody = new Uint8Array(bodySize + 1);
+    await expect(
+      stub.stageBoundedR2Object(
+        { kiloUserId, sessionId, key: overflowKey },
+        new Blob([overflowBody]).stream(),
+        bodySize
+      )
+    ).resolves.toBe('too_large');
+    expect(await env.SESSION_INGEST_R2.head(overflowKey)).toBeNull();
+    await stub.clearForWorktree(kiloUserId, sessionId);
+  });
+
+  it('abandons a streamed multipart stage whose reservation etag moved', async () => {
+    const { kiloUserId, sessionId, stub } = identity();
+    const key = `ingest/${kiloUserId}/${sessionId}/raced`;
+    const bodySize = 5 * 1024 * 1024 + 17;
+    const body = new Uint8Array(bodySize);
+
+    await runInDurableObject(stub, async instance => {
+      const original = instance['env'].SESSION_INGEST_R2;
+      Object.assign(instance['env'], {
+        SESSION_INGEST_R2: new Proxy(original, {
+          get(target, property, receiver) {
+            if (property === 'head') {
+              return async () => ({ etag: 'concurrent-writer' });
+            }
+            const value = Reflect.get(target, property, receiver) as unknown;
+            return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+          },
+        }),
+      });
+      try {
+        await expect(
+          instance.stageBoundedR2Object(
+            { kiloUserId, sessionId, key },
+            new Blob([body]).stream(),
+            bodySize
+          )
+        ).rejects.toThrow(/Session R2 reservation changed/);
+      } finally {
+        Object.assign(instance['env'], { SESSION_INGEST_R2: original });
+      }
+    });
+
+    expect((await env.SESSION_INGEST_R2.get(key))?.size).not.toBe(bodySize);
+    await stub.clearForWorktree(kiloUserId, sessionId);
+  });
+
   it('does not let late public bootstrap overwrite an adopted child scope, including after invalidation', async () => {
     const owner = `oauth/cache-scope:${crypto.randomUUID()}`;
     const cache = env.SESSION_ACCESS_CACHE_DO.getByName(owner);

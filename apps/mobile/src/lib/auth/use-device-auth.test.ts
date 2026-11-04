@@ -4,7 +4,7 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
+import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -64,23 +64,27 @@ describe('device-auth polling request', () => {
 // --- Existing 429 tests (unchanged) ---
 
 describe('use-device-auth start path — 429 rate-limit message', () => {
-  it('extracts the server error field from a 429 JSON body', () => {
+  it('carries the server error field as untranslated text', () => {
     const serverBody = {
       error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
     };
-    const message = getDeviceAuth429Message(serverBody);
-    expect(message).toBe(serverBody.error);
+    const error = getDeviceAuth429Error(serverBody);
+    expect(error).toEqual({ kind: 'text', text: serverBody.error });
   });
 
-  it('falls back to a fixed string when the server body has no error field', () => {
+  it('falls back to the catalog key when the server body has no error field', () => {
     const serverBody: { error?: string } = {};
-    const message = getDeviceAuth429Message(serverBody);
-    expect(message).toBe('Too many sign-in attempts. Please wait and try again.');
+    expect(getDeviceAuth429Error(serverBody)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
   });
 
-  it('falls back to the fixed string when JSON parsing fails', () => {
-    const message = getDeviceAuth429Message(undefined);
-    expect(message).toBe('Too many sign-in attempts. Please wait and try again.');
+  it('falls back to the catalog key when JSON parsing fails', () => {
+    expect(getDeviceAuth429Error(undefined)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
   });
 });
 

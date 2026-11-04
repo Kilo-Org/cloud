@@ -5,7 +5,6 @@ import { Pressable, View } from 'react-native';
 import {
   addCommand,
   commandRowA11yLabel,
-  MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
   moveCommand,
   removeCommand,
@@ -17,13 +16,14 @@ import {
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 import { VariableEditForm, VariableRowView } from '@/components/profiles/profile-variables-rows';
+import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 type ManualEnvVarsEditorProps = Readonly<{
   vars: readonly VariableEdit[];
@@ -142,7 +142,7 @@ export function ManualSetupCommandsEditor({
   const [generation, setGeneration] = useState(0);
 
   const controlClass = (controlDisabled: boolean) =>
-    cn('h-11 w-11 items-center justify-center active:opacity-70', controlDisabled && 'opacity-40');
+    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', controlDisabled && 'opacity-40');
 
   return (
     <View className="gap-2">
@@ -152,19 +152,23 @@ export function ManualSetupCommandsEditor({
       {commands.map((command, index) => {
         const isFirst = index === 0;
         const isLast = index === commands.length - 1;
+        // Every row is a command slot, so a blank draft row keeps the position
+        // it occupies in the list and its controls name that command.
+        const position = index + 1;
+        const rowHint = commandRowA11yLabel(index, commands.length);
+        const upLabel = t('profiles.moveCommandUp', { position });
+        const downLabel = t('profiles.moveCommandDown', { position });
+        const deleteLabel = t('profiles.deleteCommand', { position });
+        // The field's label is also its accessible name, so it carries the same
+        // position the row's move and delete controls announce.
+        const commandLabel = t('profiles.commandLabelPosition', { position });
         return (
           <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
-            <FormField
-              label={t('profiles.commandLabel')}
-              defaultValue={command}
-              placeholder={t('profiles.commandPlaceholder')}
-              className="min-h-[44px] leading-[normal]"
+            <SetupCommandField
+              command={command}
+              label={commandLabel}
               disabled={disabled}
-              maxLength={MAX_SETUP_COMMAND_LENGTH}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-              accessibilityHint={commandRowA11yLabel(index, commands.length)}
+              accessibilityHint={rowHint}
               onChangeText={value => {
                 onChange(replaceCommand(commands, index, value));
               }}
@@ -174,7 +178,8 @@ export function ManualSetupCommandsEditor({
                 className={controlClass(isFirst)}
                 disabled={isFirst}
                 accessibilityRole="button"
-                accessibilityLabel={t('profiles.moveUp')}
+                accessibilityLabel={upLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(moveCommand(commands, index, -1));
                   setGeneration(current => current + 1);
@@ -186,7 +191,8 @@ export function ManualSetupCommandsEditor({
                 className={controlClass(isLast)}
                 disabled={isLast}
                 accessibilityRole="button"
-                accessibilityLabel={t('profiles.moveDown')}
+                accessibilityLabel={downLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(moveCommand(commands, index, 1));
                   setGeneration(current => current + 1);
@@ -195,9 +201,10 @@ export function ManualSetupCommandsEditor({
                 <ChevronDown size={20} color={colors.mutedForeground} />
               </Pressable>
               <Pressable
-                className="h-11 w-11 items-center justify-center active:opacity-70"
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
                 accessibilityRole="button"
-                accessibilityLabel={t('common.delete')}
+                accessibilityLabel={deleteLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(removeCommand(commands, index));
                   setGeneration(current => current + 1);

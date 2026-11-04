@@ -13,7 +13,7 @@ import {
   type AndroidNotificationChannelId,
   type PushData,
   pushDataSchema,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 import {
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
@@ -28,6 +28,7 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
+import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
@@ -42,6 +43,7 @@ import {
   setHomeWidgetDetails,
 } from '@/lib/glanceable/home-widget-data';
 import {
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   persistGlanceableSink,
@@ -64,6 +66,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
+  type NeedsInputActionDeps,
   pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
@@ -177,7 +180,7 @@ function scheduleGlanceableTerminalEnd(): void {
     // Eligible work published during the window restarted the activity (the
     // in-app publisher owns the foreground path and never cancels this timer);
     // do not end a restarted activity.
-    const last = getLastGlanceableSnapshot();
+    const last = getGlanceableSnapshotForSignedInScope();
     if (last !== null && isEligibleGlanceableWork(last)) {
       return;
     }
@@ -260,7 +263,9 @@ export async function applyGlanceablePushData(
     // asynchronous surface submission landed. A native failure rejects here,
     // which the background path relies on so the OS retries the push.
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeStart?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeStart?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   } else {
     for (const sink of getGlanceableSinks()) {
@@ -277,7 +282,9 @@ export async function applyGlanceablePushData(
   // Idle work keeps the same card, so only ineligible snapshots wait here.
   if (!eligible) {
     await Promise.all(
-      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
+      getGlanceableSinks()
+        .map(sink => sink.waitForNativeTerminal?.())
+        .filter((pending): pending is Promise<void> => pending !== undefined)
     );
   }
   return true;
@@ -330,7 +337,7 @@ export function setupNotificationHandler() {
             // unchanged. Re-asserting it here would undo a badge iOS applied
             // from a later visible push (the same e7 clobber as an unchanged
             // re-publication), so it goes through the guarded write too.
-            syncAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+            syncAppBadge(getGlanceableSnapshotForSignedInScope()?.needsInput ?? 0);
           }, 0);
         }
         return { ...suppressed, shouldSetBadge: applied };
@@ -614,11 +621,11 @@ export function setupNotificationBackgroundHandler(): void {
   void registerBackgroundNotificationTask();
 }
 
-export function setupNotificationResponseHandler() {
+export function setupNotificationResponseHandler(deps: NeedsInputActionDeps = {}) {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     // Our four action ids run headless or stash the deep link; any other
     // identifier keeps the tap path inside the handler.
-    void handleNeedsInputNotificationResponse(response);
+    void handleNeedsInputNotificationResponse(response, deps);
   });
 
   return subscription;
@@ -664,17 +671,6 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = [
   'active-agents',
   'followed-sessions',
 ] as const;
-
-// Android plays a channel-based post's sound from the channel (the builder's
-// `setSound(null)` is a no-op for a channel post on API 26+), and the framework
-// keeps the sound a channel was created with — so the progress kind is silent
-// here at creation, while needs-input keeps the default sound for its alert.
-// A channel's vibration is independent of its sound: Android defaults it to
-// enabled, so silence also has to disable it explicitly.
-const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
-  'agent-progress',
-  'followed-sessions-lock-screen',
-]);
 
 /** What one Android channel write asks the framework for. */
 export type AndroidChannelWritePlan = {
@@ -726,7 +722,7 @@ function androidChannelConfiguration(
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id)
+    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
       ? { sound: null, enableVibrate: false }
       : {}),
   };
@@ -799,6 +795,7 @@ const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filte
 const CHANNEL_NAME_KEYS = {
   'needs-input': 'glanceable.needsInput',
   'agent-progress': 'notifications.channel.agentProgress',
+  'agent-briefing': 'agentBriefing.title',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
   'followed-sessions-lock-screen': 'notifications.channel.followedSessions',

@@ -7,8 +7,8 @@ import {
   useUpdateOrganizationName,
   useUpdateCompanyDomain,
   useOrganizationWithMembers,
-  useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
+  useUpdateKiloEncrypt,
 } from '@/app/api/organizations/hooks';
 import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
@@ -42,6 +42,7 @@ import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/Tri
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
@@ -67,10 +68,10 @@ const OSS_TIER_NAMES: Record<number, string> = {
   3: 'Seed',
 };
 
-function useCanManagePaymentInfo() {
+function useCanManageBilling() {
   const isKiloAdmin = useIsKiloAdmin();
   const orgRole = useUserOrganizationRole();
-  return isKiloAdmin || orgRole === 'owner' || orgRole === 'billing_manager';
+  return isKiloAdmin || canManageOrganizationBilling(orgRole);
 }
 
 type InnerProps = {
@@ -181,8 +182,8 @@ function Inner(props: InnerProps) {
   const [ossSponsorshipDialogOpen, setOssSponsorshipDialogOpen] = useState(false);
   const updateOrganizationName = useUpdateOrganizationName();
   const updateCompanyDomain = useUpdateCompanyDomain();
-  const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+  const updateKiloEncrypt = useUpdateKiloEncrypt();
 
   const expiringCreditGroups = useExpiringCredits(id);
 
@@ -263,7 +264,7 @@ function Inner(props: InnerProps) {
   const isKiloAdmin = useIsKiloAdmin();
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
-  const isOrgOwner = useCanManagePaymentInfo();
+  const canManageBilling = useCanManageBilling();
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
@@ -279,17 +280,6 @@ function Inner(props: InnerProps) {
     setTrialEndDateDialogOpen(true);
   };
 
-  const handleCodeIndexingToggle = async () => {
-    try {
-      await adminToggleCodeIndexing.mutateAsync({
-        organizationId: id,
-        code_indexing_enabled: !info.settings?.code_indexing_enabled,
-      });
-    } catch (error) {
-      console.error('Failed to toggle code indexing:', error);
-    }
-  };
-
   const handleSuppressTrialMessagingToggle = async () => {
     try {
       await updateSuppressTrialMessaging.mutateAsync({
@@ -298,6 +288,17 @@ function Inner(props: InnerProps) {
       });
     } catch (error) {
       console.error('Failed to toggle suppress trial messaging:', error);
+    }
+  };
+
+  const handleKiloEncryptToggle = async () => {
+    try {
+      await updateKiloEncrypt.mutateAsync({
+        organizationId: id,
+        kilo_encrypt: !info.settings?.kilo_encrypt,
+      });
+    } catch (error) {
+      console.error('Failed to toggle AI Guardrails:', error);
     }
   };
 
@@ -355,7 +356,7 @@ function Inner(props: InnerProps) {
           ) : (
             <div className="mt-1 flex items-center gap-2">
               <p className="text-lg font-semibold">{name}</p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditing(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -412,7 +413,7 @@ function Inner(props: InnerProps) {
                   <span className="text-muted-foreground text-sm">Not set</span>
                 )}
               </p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditingDomain(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -424,7 +425,7 @@ function Inner(props: InnerProps) {
             </div>
           )}
         </div>
-        {isOrgOwner && (
+        {canManageBilling && (
           <div>
             <span className="text-muted-foreground text-sm font-medium">
               <PiggyBank className="mr-1 inline h-4 w-4" />
@@ -545,22 +546,6 @@ function Inner(props: InnerProps) {
               </div>
             </div>
             <div>
-              <label className="text-muted-foreground text-sm font-medium">Managed Indexing</label>
-              <div className="mt-1 flex items-center gap-2">
-                <BooleanBadge positive={info.settings?.code_indexing_enabled ?? false}>
-                  {info.settings?.code_indexing_enabled ? 'Enabled' : 'Disabled'}
-                </BooleanBadge>
-                <button
-                  onClick={handleCodeIndexingToggle}
-                  disabled={adminToggleCodeIndexing.isPending}
-                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Toggle code indexing"
-                >
-                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div>
               <label className="text-muted-foreground text-sm font-medium">
                 Suppress Trial Messaging
               </label>
@@ -573,6 +558,23 @@ function Inner(props: InnerProps) {
                   disabled={updateSuppressTrialMessaging.isPending}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   title="Toggle trial messaging suppression"
+                >
+                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-muted-foreground text-sm font-medium">AI Guardrails</label>
+              <div className="mt-1 flex items-center gap-2">
+                <BooleanBadge positive={info.settings?.kilo_encrypt ?? false}>
+                  {info.settings?.kilo_encrypt ? 'Enabled' : 'Disabled'}
+                </BooleanBadge>
+                <button
+                  onClick={handleKiloEncryptToggle}
+                  disabled={updateKiloEncrypt.isPending}
+                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Toggle AI Guardrails for this organization"
+                  aria-label="Toggle AI Guardrails for this organization"
                 >
                   <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
                 </button>

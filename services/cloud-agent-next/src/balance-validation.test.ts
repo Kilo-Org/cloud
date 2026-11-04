@@ -1,9 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   validateBalanceOnly,
   extractProcedureName,
+  extractProcedureNames,
+  extractBalanceRequestScope,
+  readTrpcCalls,
   extractOrgIdFromUrl,
   fetchOrgIdForSession,
   BALANCE_REQUIRED_MUTATIONS,
@@ -13,7 +20,7 @@ import type { Env } from './types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 
 // Mock the session-service module
-vi.mock('./session-service.js', () => ({
+vi.mock('./session/metadata.js', () => ({
   fetchSessionMetadata: vi.fn(),
 }));
 
@@ -25,7 +32,7 @@ vi.mock('./logger.js', () => ({
   },
 }));
 
-import { fetchSessionMetadata } from './session-service.js';
+import { fetchSessionMetadata } from './session/metadata.js';
 
 describe('balance-validation', () => {
   const originalFetch = global.fetch;
@@ -49,6 +56,54 @@ describe('balance-validation', () => {
   });
 
   describe('validateBalanceOnly', () => {
+    it('attests trusted parent model credentials for balance checks without widening their audience or organization', async () => {
+      const token = jwt.sign(
+        {
+          version: 3,
+          kiloUserId: 'user_123',
+          apiTokenPepper: 'current-pepper',
+          aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          runtimeAuthorization: {
+            id: '12345678-1234-4234-8234-123456789abc',
+            resourceKind: 'cloud-agent-next',
+            resourceId: 'workspace_parent',
+          },
+        },
+        'test-secret',
+        { expiresIn: 3600 }
+      );
+      fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+        const headers = new Headers(init.headers);
+        expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
+        const result = await verifyRuntimeProxyAttestation({
+          secret: 'test-secret',
+          audience: 'kilo-api',
+          userId: 'user_123',
+          bearer: token,
+          value: headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          authorizationId: '12345678-1234-4234-8234-123456789abc',
+          resourceId: 'workspace_parent',
+        });
+        expect(result).toBe(true);
+        return Response.json({ balance: 10, isDepleted: false });
+      });
+      await expect(validateBalanceOnly(token, undefined, mockEnv)).resolves.toEqual({
+        success: true,
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://app.kilo.ai/api/profile/balance',
+        expect.anything()
+      );
+      fetchMock.mockClear();
+      await expect(validateBalanceOnly(token, 'wrong-org', mockEnv)).resolves.toMatchObject({
+        success: false,
+        status: 500,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('fails closed if bearer classification throws', async () => {
       const decode = vi.spyOn(jwt, 'decode').mockImplementationOnce(() => {
         throw new Error('Malformed token');
@@ -344,6 +399,158 @@ describe('balance-validation', () => {
     it('returns null for malformed tRPC paths', () => {
       expect(extractProcedureName('/trpc')).toBeNull();
       expect(extractProcedureName('/trpc/')).toBeNull();
+    });
+  });
+
+  describe('extractProcedureNames', () => {
+    it('returns a single procedure for non-batch requests', () => {
+      expect(extractProcedureNames('/trpc/start', false)).toEqual(['start']);
+      expect(extractProcedureNames('/trpc/start/', false)).toEqual(['start']);
+      expect(extractProcedureNames('/trpc/start,send', false)).toEqual(['start,send']);
+    });
+
+    it('splits batch paths at commas', () => {
+      expect(extractProcedureNames('/trpc/start,send', true)).toEqual(['start', 'send']);
+      expect(extractProcedureNames('/trpc/start,send/', true)).toEqual(['start', 'send']);
+    });
+
+    it('keeps empty batch segments so call positions match their inputs', () => {
+      expect(extractProcedureNames('/trpc/,,send', true)).toEqual(['', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,,send', true)).toEqual(['send', '', 'send']);
+      expect(extractProcedureNames('/trpc/send,', true)).toEqual(['send', '']);
+    });
+
+    it('decodes encoded batch separators before splitting', () => {
+      expect(extractProcedureNames('/trpc/start%2Csend', true)).toEqual(['start', 'send']);
+      expect(extractProcedureNames('/trpc/,,%73end', true)).toEqual(['', '', 'send']);
+    });
+
+    it('returns an empty list for non-tRPC or empty paths', () => {
+      expect(extractProcedureNames('/', true)).toEqual([]);
+      expect(extractProcedureNames('/trpc', true)).toEqual([]);
+      expect(extractProcedureNames('/trpc/', true)).toEqual([]);
+      expect(extractProcedureNames('/trpcextra/start', true)).toEqual([]);
+    });
+
+    it('returns null when the path cannot be decoded', () => {
+      expect(extractProcedureNames('/trpc/start%ZZ', true)).toBeNull();
+    });
+  });
+
+  describe('readTrpcCalls', () => {
+    it('maps each batch input by call index', async () => {
+      const request = new Request('https://worker.test/trpc/start%2Csend?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { options: { kilocodeOrganizationId: 'org-a' } },
+          1: { id: 'b' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: 'start', input: { options: { kilocodeOrganizationId: 'org-a' } } },
+          { procedure: 'send', input: { id: 'b' } },
+        ],
+      });
+    });
+
+    it('keeps inputs attached to their original position around empty segments', async () => {
+      const request = new Request('https://worker.test/trpc/,,send?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { options: { kilocodeOrganizationId: 'org-a' } },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { options: { kilocodeOrganizationId: 'org-a' } } },
+          { procedure: '', input: undefined },
+          { procedure: 'send', input: { id: 'c' } },
+        ],
+      });
+    });
+
+    it('keeps empty positions when an encoded comma adds a procedure', async () => {
+      const request = new Request('https://worker.test/trpc/,start%2Csend?batch=1', {
+        method: 'POST',
+        body: JSON.stringify({
+          0: { id: 'a' },
+          1: { id: 'b' },
+          2: { id: 'c' },
+        }),
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: true,
+        calls: [
+          { procedure: '', input: { id: 'a' } },
+          { procedure: 'start', input: { id: 'b' } },
+          { procedure: 'send', input: { id: 'c' } },
+        ],
+      });
+    });
+
+    it('reads GET inputs from the query parameter', async () => {
+      const input = encodeURIComponent(JSON.stringify({ kilocodeOrganizationId: 'org-a' }));
+      const request = new Request(`https://worker.test/trpc/getSandboxStatus?input=${input}`);
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: true,
+        isBatch: false,
+        calls: [{ procedure: 'getSandboxStatus', input: { kilocodeOrganizationId: 'org-a' } }],
+      });
+    });
+
+    it.each([
+      ['a non-object batch body', JSON.stringify(['start'])],
+      ['invalid JSON', '{'],
+    ])('rejects %s', async (_name, body) => {
+      const request = new Request('https://worker.test/trpc/start?batch=1', {
+        method: 'POST',
+        body,
+      });
+
+      await expect(readTrpcCalls(request, new URL(request.url))).resolves.toEqual({
+        success: false,
+        message: 'Invalid request body',
+      });
+    });
+  });
+
+  describe('extractBalanceRequestScope', () => {
+    it('uses only the nested options organization for start', () => {
+      expect(
+        extractBalanceRequestScope('start', {
+          kilocodeOrganizationId: 'org-top-level',
+          options: { kilocodeOrganizationId: 'org-options' },
+        })
+      ).toEqual({ orgId: 'org-options' });
+
+      expect(
+        extractBalanceRequestScope('start', { kilocodeOrganizationId: 'org-top-level' })
+      ).toEqual({ orgId: undefined, sessionId: undefined });
+    });
+
+    it('reads the session identifier and caller-supplied expected organization', () => {
+      expect(
+        extractBalanceRequestScope('send', {
+          cloudAgentSessionId: 'agent-123',
+          kilocodeOrganizationId: 'org-expected',
+        })
+      ).toEqual({ orgId: 'org-expected', sessionId: 'agent-123' });
+    });
+
+    it('returns an empty scope for non-object inputs', () => {
+      expect(extractBalanceRequestScope('start', null)).toEqual({});
+      expect(extractBalanceRequestScope('start', 'start')).toEqual({});
     });
   });
 

@@ -32,7 +32,6 @@ export function PlanDialog({ organizationId, open, onOpenChange, currentPlan }: 
   const [selectedPlan, setSelectedPlan] = useState<OrganizationPlan>(currentPlan || 'enterprise');
   const updatePlan = useUpdateOrganizationPlan();
 
-  // Reset to current plan when dialog opens
   useEffect(() => {
     if (open && currentPlan) {
       setSelectedPlan(currentPlan);

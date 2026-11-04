@@ -4,8 +4,10 @@ import {
   worktreeChangesComparisonSchema,
   worktreeChangesFileSchema,
   worktreeChangesRevisionSchema,
+  worktreeChangesScopeSchema,
   type WorktreeChangesSnapshot,
   type WorktreeFileRecord,
+  type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { FileDiffMetadata, SelectedLineRange } from '@pierre/diffs';
 import { iterateOverDiff } from '../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js';
@@ -23,6 +25,7 @@ export type WorktreeReviewCapture = {
   workspaceScope: string;
   sourceCloudAgentSessionId: string;
   revision: number;
+  scope?: WorktreeFileQuery['scope'];
   capturedAt: string;
   comparison: WorktreeChangesSnapshot['comparison'];
 };
@@ -90,6 +93,7 @@ const worktreeReviewCaptureSchema = z
     workspaceScope: boundedIdentitySchema,
     sourceCloudAgentSessionId: boundedIdentitySchema,
     revision: worktreeChangesRevisionSchema,
+    scope: worktreeChangesScopeSchema.optional(),
     capturedAt: worktreeChangesCapturedAtSchema,
     comparison: worktreeChangesComparisonSchema,
   })
@@ -166,6 +170,7 @@ function getCaptureError(capture: WorktreeReviewCapture): string | undefined {
     !isBoundedIdentity(capture.workspaceScope) ||
     !isBoundedIdentity(capture.sourceCloudAgentSessionId) ||
     !worktreeChangesRevisionSchema.safeParse(capture.revision).success ||
+    !worktreeChangesScopeSchema.optional().safeParse(capture.scope).success ||
     !worktreeChangesCapturedAtSchema.safeParse(capture.capturedAt).success ||
     !worktreeChangesComparisonSchema.safeParse(capture.comparison).success
   ) {
@@ -296,6 +301,7 @@ function fileDiffError(
 ): string | undefined {
   if (
     file.revision !== capture.revision ||
+    file.scope !== capture.scope ||
     diff.name !== file.path ||
     diff.prevName !== undefined ||
     !worktreeChangesFileSchema.shape.path.safeParse(file.path).success
@@ -512,6 +518,7 @@ export function sameWorktreeReviewCapture(
     sameWorktreeReviewScope(left, right) &&
     left.sourceCloudAgentSessionId === right.sourceCloudAgentSessionId &&
     left.revision === right.revision &&
+    left.scope === right.scope &&
     left.capturedAt === right.capturedAt &&
     left.comparison.baseRef === right.comparison.baseRef &&
     left.comparison.mergeBase === right.comparison.mergeBase &&
@@ -544,7 +551,8 @@ export function rebaseWorktreeReviewComment(
   file: WorktreeFileRecord,
   diff: FileDiffMetadata
 ): WorktreeReviewComment | null {
-  if (comment.anchor.path !== file.path) return comment;
+  if (comment.anchor.path !== file.path || comment.anchor.capture.scope !== capture.scope)
+    return comment;
   if (sameWorktreeReviewCapture(comment.anchor.capture, capture)) return comment;
   if (getCaptureError(capture)) return null;
   const fileError = fileDiffError(capture, file, diff);
@@ -599,7 +607,8 @@ export function rebaseWorktreeReviewCommentsForFile(
   diff: FileDiffMetadata | null
 ): WorktreeReviewComment[] {
   return comments.flatMap(comment => {
-    if (comment.anchor.path !== file.path) return [comment];
+    if (comment.anchor.path !== file.path || comment.anchor.capture.scope !== capture.scope)
+      return [comment];
     if (comment.anchor.capture.sourceCloudAgentSessionId !== capture.sourceCloudAgentSessionId) {
       return [comment];
     }

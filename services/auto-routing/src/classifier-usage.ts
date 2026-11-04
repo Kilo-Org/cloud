@@ -1,18 +1,22 @@
-import { DEFAULT_AUTO_ROUTER, type MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import { ZodError } from 'zod';
+import type { DecisionScope } from './decision-cache';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
 export type ClassifierUsageIdentity = {
+  scope: DecisionScope;
   conversationKey: string;
   classifierModel: string;
   contentHash: string;
   kind: ClassifierCallKind;
   requestStart: string;
+  // The auto model the request named: a platform router or a custom router model ID.
+  requestedModel: string;
 };
 
 type ClassifierUsageEnv = Pick<
@@ -32,7 +36,7 @@ export async function buildClassifierUsage(
 ): Promise<UsageRecordRequest> {
   const hash = await sha256Hex(
     JSON.stringify([
-      payload.router ?? DEFAULT_AUTO_ROUTER,
+      identity.scope,
       identity.conversationKey,
       identity.classifierModel,
       identity.contentHash,
@@ -53,7 +57,7 @@ export async function buildClassifierUsage(
       created_at: createdAt,
       provider: 'openrouter',
       model: 'auto-routing/classifier',
-      requested_model: clean(payload.input.requestedModel.toLowerCase()),
+      requested_model: clean(identity.requestedModel.toLowerCase()),
       cache_discount: null,
       has_error: false,
       abuse_classification: 0,
@@ -94,9 +98,11 @@ export async function buildClassifierUsage(
       feature: null,
       session_id: clean(payload.sessionId),
       mode: clean(payload.mode),
-      auto_model: clean(payload.input.requestedModel.toLowerCase()),
+      auto_model: clean(identity.requestedModel.toLowerCase()),
       reasoning_setting: null,
+      inference_region: null,
       market_cost: Math.round(costUsd * 1_000_000),
+      non_inference_cost: null,
       is_free: false,
       abuse_delay: null,
       abuse_downgraded_from: null,
@@ -146,9 +152,7 @@ export async function recordClassifierUsage(
   await withDORetry(
     () =>
       env.AUTO_ROUTING_DECISION_CACHE.get(
-        env.AUTO_ROUTING_DECISION_CACHE.idFromName(
-          `${payload.router ?? DEFAULT_AUTO_ROUTER}:${identity.conversationKey}`
-        )
+        env.AUTO_ROUTING_DECISION_CACHE.idFromName(`${identity.scope}:${identity.conversationKey}`)
       ),
     stub => stub.recordClassifierUsage(usage),
     'recordClassifierUsage'

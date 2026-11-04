@@ -55,6 +55,7 @@ type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
 type GitTokenService = {
 \tgetTokenForRepo(params: { githubRepo: string; userId: string; orgId?: string }): Promise<GetTokenForRepoResult>;
 \tgetToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+\tgetTokenForIntegration(params: { integrationId: string; userId: string; orgId?: string }): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }>;
 };
 type WastelandRpcSuccess<T> = { success: true; data: T };
 type WastelandRpcFailure = {

@@ -78,6 +78,21 @@ afterEach(() => {
 const pump = () => vi.advanceTimersByTimeAsync(0);
 
 describe('Sandbox notification buffering', () => {
+  it('delivers worktree changes through bounded per-session lanes', async () => {
+    const { dispatcher, calls } = harness(false);
+    const notification: SandboxNotification = {
+      kind: 'worktree_changes',
+      payload: { worktreeId: 'worktree_test', revision: 7 },
+    };
+    for (let index = 0; index < 10; index++) {
+      dispatcher.enqueue(`sibling-${index}`, notification);
+    }
+    await pump();
+    expect(calls).toHaveLength(10);
+    expect(calls.every(call => call.notification === notification)).toBe(true);
+    expect(dispatcher.snapshot()).toMatchObject({ retained: 0, bytes: 0, active: 0 });
+  });
+
   it('bounds critical-only count and rejects newest without overwriting attempts', async () => {
     const { dispatcher, calls, releases, diagnostics } = harness();
     for (let index = 0; index < 1_010; index++)

@@ -51,11 +51,9 @@ export function OssSponsorshipDialog({
   const effectiveMonthlyCredits = isSeedTier ? 0 : monthlyCredits;
 
   const handleSubmit = () => {
-    // If there are credits to add and addInitialGrant is checked, show confirmation
     if (effectiveMonthlyCredits > 0 && addInitialGrant) {
       setConfirmDialogOpen(true);
     } else {
-      // No credits to add or user doesn't want initial grant - proceed directly
       executeEnableOss();
     }
   };

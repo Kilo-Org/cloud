@@ -6,7 +6,7 @@ import { captureMessage } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
-const MAX_ORGANIZATIONS_PER_USER = 5;
+export const MAX_ORGANIZATIONS_PER_USER = 25;
 
 export async function enforceOrganizationCreationLimit(
   tx: DrizzleTransaction,

@@ -359,6 +359,38 @@ describe('CodeReviewStreamView', () => {
     }
   });
 
+  it('wraps the full session identifier instead of hiding it behind an ellipsis', async () => {
+    const sessionId = `agent_${'0123456789abcdef'.repeat(4)}`;
+    mockGetStreamInfo.mockResolvedValue(streamInfo({ cloudAgentSessionId: sessionId }));
+    await renderView();
+
+    const identifier = dom.container.querySelector(`[title="${sessionId}"]`);
+    expect(identifier?.textContent).toBe(sessionId);
+    expect(identifier?.classList.contains('truncate')).toBe(false);
+    expect(identifier?.classList.contains('break-all')).toBe(true);
+  });
+
+  it.each(['live', 'stored'])('renders full multiline %s responses', async source => {
+    const message = `${'Inspecting the changes. '.repeat(20)}\nFinal finding on its own line.`;
+    if (source === 'live') {
+      mockGetStreamInfo.mockResolvedValue(streamInfo({ organizationId: undefined }));
+    } else {
+      mockGetStreamInfo.mockResolvedValue(streamInfo({ status: 'completed' }));
+      mockGetMessages.mockResolvedValue(transcript(message));
+    }
+    await renderView();
+    if (source === 'live') {
+      await settle(() => socket().config.onEvent(textPart(message)));
+    }
+
+    const response = Array.from(dom.container.querySelectorAll('span')).find(
+      element => element.textContent === message
+    );
+    expect(response).toBeDefined();
+    expect(response?.classList.contains('whitespace-pre-wrap')).toBe(true);
+    expect(response?.classList.contains('min-w-0')).toBe(true);
+  });
+
   it('replaces running organization snapshots every 2000 ms without requesting a bot-owner ticket', async () => {
     let snapshot = transcript('Inspecting changed files.', 'Temporary progress row.');
     mockGetMessages.mockImplementation(async () => snapshot);

@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useClipboardPaste } from './use-clipboard-paste';
+import { type ClipboardPasteFailure, useClipboardPaste } from './use-clipboard-paste';
 import { type ClipboardImageFile } from './clipboard-image';
 
 const mocks = vi.hoisted(() => ({
   hasImage: vi.fn<() => Promise<boolean>>(),
+  hasText: vi.fn<() => Promise<boolean>>(),
   hasUrl: vi.fn<() => Promise<boolean>>(),
   readImage: vi.fn<(maxBytes?: number) => Promise<ClipboardImageFile | 'too-large' | null>>(),
   readText: vi.fn<() => Promise<string>>(),
@@ -18,6 +19,7 @@ vi.mock('react', () => ({
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('./clipboard-image', () => ({
   hasClipboardImage: mocks.hasImage,
+  hasClipboardText: mocks.hasText,
   hasClipboardUrl: mocks.hasUrl,
   readClipboardImageFile: mocks.readImage,
   readClipboardText: mocks.readText,
@@ -29,7 +31,7 @@ function options() {
   return {
     addFile: vi.fn<(file: ClipboardImageFile) => Promise<void>>().mockResolvedValue(undefined),
     addText: vi.fn<(text: string) => void>(),
-    onFailure: vi.fn<(reason: 'empty' | 'unreadable' | 'too-large') => void>(),
+    onFailure: vi.fn<(reason: ClipboardPasteFailure) => void>(),
     maxBytes: 20_000_000,
   };
 }
@@ -38,6 +40,7 @@ describe('composer clipboard paste', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.hasImage.mockResolvedValue(false);
+    mocks.hasText.mockResolvedValue(false);
     mocks.hasUrl.mockResolvedValue(false);
     mocks.readText.mockResolvedValue('');
   });
@@ -89,5 +92,16 @@ describe('composer clipboard paste', () => {
     await vi.waitFor(() => {
       expect(callbacks.onFailure).toHaveBeenCalledWith('unreadable');
     });
+  });
+
+  it('reports a denied text read without falling back to an empty clipboard', async () => {
+    const callbacks = options();
+    mocks.hasText.mockResolvedValue(true);
+    useClipboardPaste(callbacks).paste();
+    await vi.waitFor(() => {
+      expect(callbacks.onFailure).toHaveBeenCalledWith('denied');
+    });
+    expect(callbacks.addText).not.toHaveBeenCalled();
+    expect(mocks.hasUrl).not.toHaveBeenCalled();
   });
 });

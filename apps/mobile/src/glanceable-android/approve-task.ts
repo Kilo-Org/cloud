@@ -3,7 +3,11 @@ import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { approveFollowedSession, unfollowDismissedSession } from '@/lib/glanceable/session-follow';
+import {
+  approveFollowedSession,
+  restoreFollowedSessionsFromStorage,
+  unfollowDismissedSession,
+} from '@/lib/glanceable/session-follow';
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
@@ -137,7 +141,7 @@ async function showApproving(ask: WaitingAsk): Promise<void> {
  * process cannot exit with the update still in flight.
  */
 export async function handleApproveTask(input?: unknown): Promise<void> {
-  // A swiped session notification is an Unfollow (spec "Android: actions" 3):
+  // A swiped session notification is an Unfollow (spec "Android: actions" 4):
   // the receiver already cancelled the card; this stops following the session
   // and deletes its server row. Never throws: the worker completes from the
   // task's finish, and a rejection would leave the row behind with no retry.
@@ -155,6 +159,15 @@ export async function handleApproveTask(input?: unknown): Promise<void> {
   const sessionTarget = readSessionApproveTarget(input);
   if (sessionTarget !== null) {
     await applyLanguageBestEffort();
+    // The card is answered under the account and organization it was followed
+    // in, and a cold process holds none of them yet: rebuild the persisted set
+    // first, as the aggregate branch restores its persisted scope. A card
+    // outside the current scope is cancelled there, and a set that cannot be
+    // read answers nothing — the tap then leaves Approve in place.
+    const known = await restoreFollowedSessionsFromStorage();
+    if (!known) {
+      return;
+    }
     await approveFollowedSession(sessionTarget.sessionId, sessionTarget.approvalKey);
     return;
   }
@@ -181,7 +194,9 @@ export async function handleApproveTask(input?: unknown): Promise<void> {
     }
     await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
-    askEnded = result.kind === 'approved' || result.kind === 'gone';
+    // A replaced request ends nothing: the session still waits on the live one,
+    // so the republish must keep its row instead of skipping it.
+    askEnded = result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true);
     if (result.kind === 'gone') {
       // Answered elsewhere or no longer pending: dropping the record drops Approve.
       recordWaitingAsk(null);

@@ -159,6 +159,39 @@ describe('POST /api/sso/organizations', () => {
     }
   );
 
+  describe('while email signups are disabled', () => {
+    beforeEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+      mockIsNewAccountEligibleForMagicLink.mockResolvedValue(false);
+    });
+    afterEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+    });
+
+    it('offers a new address only non-email providers and flags the pause', async () => {
+      const body = await (await POST(request({ email: 'new@example.com' }))).json();
+
+      expect(body).toEqual({
+        kind: 'new',
+        providers: expect.arrayContaining(['google', 'github']),
+        emailSignupDisabled: true,
+      });
+      expect(body.providers).not.toContain('email');
+    });
+
+    it('keeps Email for an existing account', async () => {
+      mockGetAllUserProviders.mockResolvedValue({
+        kind: 'found',
+        user: { kiloUserId: 'user-1', providers: ['email'], primaryEmail: 'user@example.com' },
+      });
+
+      await expect((await POST(request({ email: 'user@example.com' }))).json()).resolves.toEqual({
+        kind: 'existing',
+        providers: ['email'],
+      });
+    });
+  });
+
   it('keeps an unknown Gmail plus alias new and ineligible for Email', async () => {
     mockIsNewAccountEligibleForMagicLink.mockResolvedValue(false);
 

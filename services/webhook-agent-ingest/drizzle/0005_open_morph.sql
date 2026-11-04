@@ -1,0 +1,1 @@
+ALTER TABLE `trigger_config` ADD `execution_user_id` text;

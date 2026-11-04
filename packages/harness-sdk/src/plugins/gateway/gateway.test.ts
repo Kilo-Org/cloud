@@ -1,4 +1,4 @@
-import { Effect, Either, Option, Stream } from 'effect';
+import { Effect, Option, Result, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest, sse, toAsync } from './fake.js';
@@ -49,7 +49,7 @@ const call = async (options: {
     Stream.unwrap,
     Stream.runCollect,
     Effect.map(collected => summary([...collected])),
-    Effect.either,
+    Effect.result,
     Effect.provide(
       testGateway({
         baseUrl: 'https://app.kilocode.ai/',
@@ -112,7 +112,7 @@ it('marks a cache breakpoint on the system block and on the last message', async
 
 it('reads the token counts out of the stream', async () => {
   const { result } = await call({});
-  expect(Either.getOrThrow(result)).toEqual({
+  expect(Result.getOrThrow(result)).toEqual({
     content: 'hi',
     usage: { inputTokens: 7, outputTokens: 3, cacheReadTokens: 900, cacheWriteTokens: 100 },
     stop: 'end',
@@ -142,7 +142,7 @@ it('falls back to the completions shape when a model speaks only that', async ()
   };
   const { calls, result } = await call({ kinds: ['chat_completions'], replies: [completion] });
   expect(calls[0]?.url).toMatch(/\/chat\/completions$/u);
-  expect(Either.getOrThrow(result).usage).toEqual({
+  expect(Result.getOrThrow(result).usage).toEqual({
     inputTokens: 1,
     outputTokens: 3,
     cacheReadTokens: 9,
@@ -153,21 +153,21 @@ it('falls back to the completions shape when a model speaks only that', async ()
 it('reports that a model speaks no shape the gateway serves', async () => {
   const { calls, result } = await call({ kinds: [] });
   expect(calls).toHaveLength(0);
-  expect(result).toMatchObject({ left: { reason: 'unsupported' } });
+  expect(result).toMatchObject({ failure: { reason: 'unsupported' } });
 });
 
 it('reports the status when the gateway rejects the call', async () => {
   const rejected: Reply = { ok: false, status: 402, body: 'no credit' };
   const { calls, result } = await call({ replies: [rejected] });
   expect(calls).toHaveLength(1);
-  expect(result).toMatchObject({ left: { reason: 'status', status: 402 } });
+  expect(result).toMatchObject({ failure: { reason: 'status', status: 402 } });
 });
 
 it('tries again after a rate limit and then succeeds', async () => {
   const limited: Reply = { ok: false, status: 429, body: 'slow down' };
   const { calls, result } = await call({ replies: [limited, limited, reply] });
   expect(calls).toHaveLength(3);
-  expect(Either.getOrThrow(result).content).toBe('hi');
+  expect(Result.getOrThrow(result).content).toBe('hi');
 });
 
 it('reports a credential it could not get as a transport failure, and asks again', async () => {
@@ -190,7 +190,7 @@ it('reports a credential it could not get as a transport failure, and asks again
 
   expect(asked).toBe(3);
   expect(calls).toHaveLength(0);
-  expect(Either.getLeft(result).pipe(Option.map(error => error.reason))).toStrictEqual(
+  expect(Result.getFailure(result).pipe(Option.map(error => error.reason))).toStrictEqual(
     Option.some('transport')
   );
 });
@@ -203,7 +203,7 @@ it('does not try again on a status the gateway will answer the same way', async 
   const { calls, result } = await call({ replies: [refused, reply, reply, reply] });
 
   expect(calls).toHaveLength(1);
-  expect(Either.getLeft(result).pipe(Option.map(error => error.status))).toStrictEqual(
+  expect(Result.getFailure(result).pipe(Option.map(error => error.status))).toStrictEqual(
     Option.some(400)
   );
 });
@@ -215,7 +215,7 @@ it('gives up after the retry budget and reports the last status', async () => {
   /* Two retries on top of the first attempt. A budget that never ran out
      would hold the caller forever on an outage that does not clear. */
   expect(calls).toHaveLength(3);
-  expect(result).toMatchObject({ left: { reason: 'status', status: 429 } });
+  expect(result).toMatchObject({ failure: { reason: 'status', status: 429 } });
 });
 
 it('retries a transport failure, which carries no status to judge', async () => {
@@ -237,11 +237,11 @@ it('retries a transport failure, which carries no status to judge', async () => 
     Stream.unwrap,
     Stream.runCollect,
     Effect.map(collected => summary([...collected])),
-    Effect.either,
+    Effect.result,
     Effect.provide(testGateway({ fetch: failing, retries: 2 })),
     Effect.runPromise
   );
 
   expect(calls).toHaveLength(3);
-  expect(Either.getOrThrow(result).content).toBe('hi');
+  expect(Result.getOrThrow(result).content).toBe('hi');
 });

@@ -22,6 +22,19 @@ export const SYSTEM_GIT_CONFIG_ENV = {
   GIT_CONFIG_VALUE_1: 'false',
 } as const;
 
+/**
+ * The override of the pinned Git configuration above for the environment
+ * builder's processes. A session answers every repository of a host with one
+ * alias, so `credential.useHttpPath` stays `false`. The builder holds a real
+ * token for each repository and writes one path-qualified record for each, so its
+ * multi-repository build asks Git for the request path. Spread this after
+ * `SYSTEM_GIT_CONFIG_ENV`, and only for that process, so the pinned value still
+ * wins everywhere else.
+ */
+export const MULTI_MEMBER_GIT_CREDENTIAL_ENV = {
+  GIT_CONFIG_VALUE_1: 'true',
+} as const;
+
 const SYSTEM_GIT_CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(SYSTEM_GIT_CONFIG_ENV));
 
 /**
@@ -42,6 +55,7 @@ export function isStrippedGitConfigEnvVar(key: string): boolean {
 }
 
 export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
+  'KILO_RUNTIME_CLI_PATH',
   'SANDBOX_CONTROL_CREDENTIAL',
   'SANDBOX_CONTROL_URL',
   'PROVIDER_INSTANCE_ID',
@@ -49,3 +63,26 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
 ] as const;
+
+/**
+ * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them
+ * from what reaches the Kilo process, and the profile package mirrors them for
+ * write-time rejection because it cannot import from this service.
+ */
+export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+
+/**
+ * Root of the directory-keyed homes (plan "Builder and session home"). A
+ * `worktree` runtime allocation keys HOME by directory alone under this root,
+ * so an environment builder and every session of an isolated sandbox share the
+ * one home of `/workspace/app`, and caches its setup wrote there are reused.
+ * `/tmp` is not used: setup scripts clear it and `TMPDIR` would move it.
+ */
+export const CONTROL_HOME_ROOT = '/home';
+
+/**
+ * Directory name, under the OS temporary directory, of the per-scope homes of
+ * allocations that predate directory-keyed homes. Those allocations keep it for
+ * their lifetime; the log uploader reads both roots while they exist.
+ */
+export const LEGACY_CONTROL_HOME_DIR_NAME = 'kilo-worktrees';

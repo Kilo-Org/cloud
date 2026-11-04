@@ -13,14 +13,11 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 type TestCommand = { sequence: number; command: string };
 
-/** The profile detail the mocked `useAgentProfile` returns. */
-export type TestProfileDetail = { id: string; commands: TestCommand[] };
+/** The setup-command list the mocked `useAgentProfileCommands` returns. */
+export type TestCommands = TestCommand[];
 
-export function testProfile(commands: string[] = []): TestProfileDetail {
-  return {
-    id: 'profile-1',
-    commands: commands.map((command, sequence) => ({ sequence, command })),
-  };
+export function testCommands(commands: string[] = []): TestCommands {
+  return commands.map((command, sequence) => ({ sequence, command }));
 }
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
@@ -68,6 +65,44 @@ export function changeRowText(root: ReactTestInstance, index: number, value: str
   act(() => {
     (field.props as { onChangeText: (v: string) => void }).onChangeText(value);
   });
+}
+
+/** Press the header Back control. Callers wait on their own save gates. */
+export function pressBack(root: ReactTestInstance): void {
+  const header = findOne(root, 'ScreenHeader');
+  const handler: unknown = header.props.onBack;
+  if (typeof handler !== 'function') {
+    throw new TypeError('header Back handler was not wired');
+  }
+  const start = handler as () => void;
+  act(() => {
+    start();
+  });
+}
+
+/** Press a plain button rendered by the screen, e.g. the add-command CTA. */
+export function pressButton(root: ReactTestInstance, index = 0): void {
+  const button = findAll(root, 'Button')[index];
+  if (!button) {
+    throw new Error(`button ${index} was not rendered`);
+  }
+  const onPress: unknown = button.props.onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError(`button ${index} has no press handler`);
+  }
+  const press = onPress as () => void;
+  act(() => {
+    press();
+  });
+}
+
+/** Press a row's reorder control by its one-based position label. */
+export function pressMove(
+  root: ReactTestInstance,
+  direction: 'up' | 'down',
+  position: number
+): void {
+  pressPressable(root, `Move command ${position} ${direction}`);
 }
 
 /** Commit a row the way the keyboard's return key does. */

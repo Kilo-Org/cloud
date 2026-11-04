@@ -90,12 +90,6 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  InteractionManager: {
-    runAfterInteractions: (run: () => void) => {
-      run();
-      return { cancel: () => undefined };
-    },
-  },
   Platform: { OS: 'ios' },
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -120,6 +114,11 @@ vi.mock('react-native', () => ({
       )
     ),
 }));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: (run: () => void) => {
+    run();
+  },
+}));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
@@ -139,8 +138,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: () => undefined,
   useRouter: () => ({
+    canGoBack: () => false,
     push: () => undefined,
     replace: () => undefined,
   }),
@@ -150,6 +151,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  History: 'History',
   ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
@@ -172,6 +174,7 @@ vi.mock('@/components/agents/session-list-content', () => ({
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/agents/platform-filter-modal', () => ({
   SessionFilterModal: 'SessionFilterModal',
 }));

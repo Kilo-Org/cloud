@@ -1,10 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
+import { z } from 'zod';
+
+import {
+  cloudAgentAuthorityProcedure,
+  cloudAgentManagedProcedure,
+  internalApiProtectedProcedure,
+  protectedProcedure,
+  publicProcedure,
+  t,
+} from './auth.js';
+
+const { assertCloudAgentManagementRequestMock } = vi.hoisted(() => ({
+  assertCloudAgentManagementRequestMock: vi.fn(),
+}));
+
+vi.mock('../cloud-agent-child-management.js', () => ({
+  assertCloudAgentManagementRequest: assertCloudAgentManagementRequestMock,
+}));
 
 import type { TRPCContext } from '../types.js';
-import { t } from './auth.js';
-
 const testRouter = t.router({
   invalid: t.procedure.query(() => {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid request' });
@@ -91,5 +107,173 @@ describe('tRPC client error formatter', () => {
         },
       },
     });
+  });
+});
+
+describe('scoped Cloud Agent Worker authorization', () => {
+  const authority = {
+    version: 1 as const,
+    ownerId: 'owner',
+    parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+    organizationId: null,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+  };
+  const input = {
+    prompt: 'child',
+    mode: 'code',
+    githubRepo: 'acme/widgets',
+    model: 'kilo/test-model',
+    autoInitiate: true,
+  };
+  const scopedRouter = t.router({
+    prepareSession: internalApiProtectedProcedure
+      .input(z.unknown())
+      .mutation(({ ctx }) => ({ owner: ctx.userId })),
+    updateSession: internalApiProtectedProcedure
+      .input(z.unknown())
+      .mutation(() => ({ forbidden: true })),
+    send: protectedProcedure.input(z.unknown()).mutation(() => ({ forbidden: true })),
+    health: publicProcedure.query(() => ({ forbidden: true })),
+  });
+  const context = (internalApiKey?: string): TRPCContext => ({
+    env: { INTERNAL_API_SECRET: 'internal-fixture' } as TRPCContext['env'],
+    request: new Request('https://worker.test/trpc/prepareSession', {
+      headers: internalApiKey ? { 'x-internal-api-key': internalApiKey } : {},
+    }),
+    userId: authority.ownerId,
+    authToken: 'verified-scoped-fixture',
+    cloudAgentAuthority: authority,
+  });
+
+  it('requires the trusted internal API boundary even for a valid scoped bearer', async () => {
+    for (const key of [undefined, 'wrong-key']) {
+      await expect(
+        scopedRouter.createCaller(context(key)).prepareSession(input)
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession(input)
+    ).resolves.toEqual({ owner: 'owner' });
+  });
+
+  it('refuses every other procedure, including public and internal endpoints', async () => {
+    const caller = scopedRouter.createCaller(context('internal-fixture'));
+    await expect(caller.updateSession(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.send(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.health()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('refuses caller lineage and unsafe config before an input schema can erase them', async () => {
+    const caller = scopedRouter.createCaller(context('internal-fixture'));
+    for (const change of [
+      { parentCloudAgentSessionId: 'workspace_other' },
+      { cloudAgentSpawn: {} },
+      { remainingDepth: 2 },
+      { mcpServers: {} },
+      { profileId: 'profile' },
+    ]) {
+      await expect(caller.prepareSession({ ...input, ...change })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    }
+  });
+  it('accepts other repositories and models at the internal boundary', async () => {
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession({
+        ...input,
+        model: 'kilo/other',
+        githubRepo: 'acme/other',
+      })
+    ).resolves.toEqual({ owner: 'owner' });
+  });
+
+  it('accepts a web-resolved GitHub integration id only across the trusted internal boundary', async () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const launch = { ...input, githubIntegrationId };
+
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession(launch)
+    ).resolves.toEqual({ owner: 'owner' });
+    await expect(scopedRouter.createCaller(context()).prepareSession(launch)).rejects.toMatchObject(
+      { code: 'UNAUTHORIZED' }
+    );
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession({
+        ...input,
+        githubIntegrationId: 'not-a-uuid',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('Cloud Agent management procedures', () => {
+  const authority = {
+    version: 1 as const,
+    ownerId: 'owner',
+    parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+    organizationId: null,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  };
+  const managementRouter = t.router({
+    getSession: cloudAgentManagedProcedure.input(z.unknown()).query(({ input }) => input),
+    listChildSessions: cloudAgentAuthorityProcedure.input(z.unknown()).query(({ input }) => input),
+  });
+  const context = (withAuthority = true): TRPCContext => ({
+    env: {} as TRPCContext['env'],
+    request: new Request('https://worker.test/trpc/getSession'),
+    userId: 'owner',
+    authToken: 'verified-management-fixture',
+    ...(withAuthority ? { cloudAgentAuthority: authority } : {}),
+  });
+
+  beforeEach(() => {
+    assertCloudAgentManagementRequestMock.mockReset();
+    assertCloudAgentManagementRequestMock.mockResolvedValue(undefined);
+  });
+
+  it('validates the raw input and Worker path before the handler runs', async () => {
+    await expect(
+      managementRouter.createCaller(context()).getSession({
+        cloudAgentSessionId: 'workspace_child',
+      })
+    ).resolves.toEqual({ cloudAgentSessionId: 'workspace_child' });
+    expect(assertCloudAgentManagementRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authority,
+        userId: 'owner',
+        authToken: 'verified-management-fixture',
+        path: 'getSession',
+        rawInput: { cloudAgentSessionId: 'workspace_child' },
+      })
+    );
+  });
+
+  it('still requires normal authentication without an authority', async () => {
+    const anonymous = { ...context(false), userId: '', authToken: '' };
+    await expect(
+      managementRouter
+        .createCaller(anonymous)
+        .getSession({ cloudAgentSessionId: 'workspace_child' })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(assertCloudAgentManagementRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects management-list callers without an authority', async () => {
+    await expect(
+      managementRouter.createCaller(context(false)).listChildSessions({})
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('maps a rejected scoped request to FORBIDDEN', async () => {
+    assertCloudAgentManagementRequestMock.mockRejectedValue(
+      new TRPCError({ code: 'FORBIDDEN', message: 'denied' })
+    );
+    await expect(
+      managementRouter
+        .createCaller(context())
+        .getSession({ cloudAgentSessionId: 'workspace_child' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

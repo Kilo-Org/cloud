@@ -5,10 +5,11 @@ the pieces would re-encode the same draft state across files. */
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -21,6 +22,7 @@ import {
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { QueryError } from '@/components/query-error';
@@ -33,6 +35,7 @@ import { FormField } from '@/components/ui/form-field';
 import { KvRow } from '@/components/ui/kv-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatList, formatMoney, formatNumber } from '@/lib/format';
@@ -42,7 +45,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
-const NOTIFICATIONS_HREF = '/(app)/(tabs)/(3_profile)/notifications' as Href;
+const NOTIFICATIONS_HREF = '/(app)/notifications' as Href;
 
 const WINDOW_LABEL_KEYS = {
   '24': 'spendAlerts.window24h',
@@ -347,7 +350,7 @@ function SpendAlertsForm({
     }
     save.mutate(input, {
       onSuccess: () => {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
         // No toast here: the confirmation below the fields is the single
         // announcement owner (AccessibleStatus), and it describes the values
         // that are still on screen. A toast would announce the same sentence a
@@ -363,7 +366,7 @@ function SpendAlertsForm({
     next: boolean,
     apply: (value: boolean) => void
   ) => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     setSaved(false);
     apply(next);
     // Toggling push also writes the caller's notification category (the
@@ -435,7 +438,7 @@ function SpendAlertsForm({
           accessibilityLabel={t('notifications.channel.spend')}
           value={enabled}
           onValueChange={value => {
-            void Haptics.selectionAsync();
+            selectionHaptic();
             setSaved(false);
             setEnabled(value);
             // Off hides the rule fields, so they stop gating Save; on restores
@@ -452,7 +455,7 @@ function SpendAlertsForm({
             subtitle={t('spendAlerts.thresholdSubtitle')}
             enabled={thresholdEnabled}
             onEnabledChange={value => {
-              void Haptics.selectionAsync();
+              selectionHaptic();
               setSaved(false);
               setThresholdEnabled(value);
               // Switching the kind off drops its field from the Save gate.
@@ -475,7 +478,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
-              placeholder="25.00"
+              placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}
@@ -505,7 +508,7 @@ function SpendAlertsForm({
             subtitle={t('spendAlerts.anomalySubtitle')}
             enabled={anomalyEnabled}
             onEnabledChange={value => {
-              void Haptics.selectionAsync();
+              selectionHaptic();
               setSaved(false);
               setAnomalyEnabled(value);
               // Switching the kind off drops its field from the Save gate.

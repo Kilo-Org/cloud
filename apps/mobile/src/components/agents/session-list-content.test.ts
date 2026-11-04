@@ -6,6 +6,7 @@ function surface(overrides: Partial<Parameters<typeof selectSessionListContentSu
   return selectSessionListContentSurface({
     isLoading: false,
     isError: false,
+    isRetrying: false,
     hasAnySessions: true,
     hasHistoryContent: true,
     hasActiveQuery: false,

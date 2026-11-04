@@ -1,6 +1,7 @@
 import {
   bridgeRatio,
   isWindowCoveredByPaidThrough,
+  issuanceBasis,
   monthlyWindowContaining,
   monthlyWindowFromOriginalAnchor,
   roundHalfUpMicrodollars,
@@ -50,6 +51,24 @@ describe('Kilo Pass organization calculations', () => {
         end: new Date('2026-03-14T23:59:59.999Z'),
       })
     ).toBe(false);
+  });
+
+  it('prices a window against the anchored month that contains it', () => {
+    const anchor = new Date('2026-07-01T00:00:00.000Z');
+    const month = monthlyWindowFromOriginalAnchor(anchor, 1);
+    expect(issuanceBasis(anchor, month)).toEqual({ kind: 'regular', prorationWindow: month });
+    expect(
+      issuanceBasis(anchor, {
+        start: new Date('2026-08-15T00:00:00.000Z'),
+        end: month.end,
+      })
+    ).toEqual({ kind: 'bridge', prorationWindow: month });
+    expect(() =>
+      issuanceBasis(anchor, {
+        start: new Date('2026-08-15T00:00:00.000Z'),
+        end: new Date('2026-09-15T00:00:00.000Z'),
+      })
+    ).toThrow('issuance window is not within an agreement month');
   });
 
   it('calculates bridge ratio from the overlap and rounds half up', () => {

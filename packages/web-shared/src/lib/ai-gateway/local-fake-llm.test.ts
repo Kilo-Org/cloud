@@ -117,7 +117,7 @@ describe('local fake deterministic model', () => {
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811/' });
     const provider = getLocalFakeLlmProvider();
     expect(provider).toMatchObject({
-      id: 'custom',
+      type: 'custom',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });
@@ -130,7 +130,7 @@ describe('local fake deterministic model', () => {
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811/' });
     expect(getLocalFakeTranscriptionProvider()).toMatchObject({
-      id: 'openrouter',
+      type: 'openrouter',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });
@@ -141,18 +141,18 @@ describe('local fake deterministic model', () => {
   });
 
   test('isFreeModel is true only when the local fake LLM is enabled', async () => {
-    expect(await isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(false);
-    expect(await isFreeModel('kilo/fake-deterministic')).toBe(false);
-    expect(await isFreeModel('fake-transcribe')).toBe(false);
-    expect(await isFreeModel('fake-transcribe-broken')).toBe(false);
+    expect(isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(false);
+    expect(isFreeModel('kilo/fake-deterministic')).toBe(false);
+    expect(isFreeModel('fake-transcribe')).toBe(false);
+    expect(isFreeModel('fake-transcribe-broken')).toBe(false);
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
-    expect(await isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
-    expect(await isFreeModel('kilo/fake-deterministic')).toBe(true);
-    expect(await isFreeModel('fake-transcribe')).toBe(true);
-    expect(await isFreeModel('fake-transcribe-broken')).toBe(true);
-    expect(await isFreeModel('openai/whisper-1')).toBe(false);
-    expect(await isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
+    expect(isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
+    expect(isFreeModel('kilo/fake-deterministic')).toBe(true);
+    expect(isFreeModel('fake-transcribe')).toBe(true);
+    expect(isFreeModel('fake-transcribe-broken')).toBe(true);
+    expect(isFreeModel('openai/whisper-1')).toBe(false);
+    expect(isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
     env.restore();
   });
 });

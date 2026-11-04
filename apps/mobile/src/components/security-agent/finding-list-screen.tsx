@@ -1,17 +1,17 @@
 import {
   DEFAULT_SECURITY_FINDING_FILTERS,
-  getSecurityRepositoriesInScope,
   hasActiveSecurityFindingFilters,
   isPersonalSecurityScope,
   parseSecurityFindingFilters,
   type SecurityFindingRouteParams,
+  toSecurityFindingParams,
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
@@ -20,22 +20,29 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { FindingRow } from '@/components/security-agent/finding-row';
+import {
+  FindingListSkeletonRows,
+  FindingRowSkeleton,
+} from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 type FindingListScreenProps = {
   scope: string;
@@ -49,7 +56,7 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-lg" />;
+    return <FindingRowSkeleton index={0} />;
   }
   if (error) {
     return (
@@ -82,10 +89,14 @@ const FindingRowSeparator = () => <View className="h-3" />;
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const { t } = useTranslation();
-  const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
+  // Filters live in this route's params: the sheet is pushed with them and
+  // writes them back on apply, so the URL, the visible list and the sheet's
+  // draft can never disagree.
+  const filters = useMemo(() => parseSecurityFindingFilters(routeParams), [routeParams]);
   const [refreshing, setRefreshing] = useState(false);
 
   const config = useSecurityAgentConfig(scope);
@@ -101,10 +112,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
-  const hasAnalysisCapacity =
-    capacity.runningCount !== undefined &&
-    capacity.concurrencyLimit !== undefined &&
-    capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   // Memoized so a pull-to-refresh (`refreshing`) or a filter change does not
   // hand the list a new `data` identity while `pages` is unchanged.
@@ -112,7 +119,26 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     () => findings.data?.pages.flatMap(page => page.findings) ?? [],
     [findings.data?.pages]
   );
-  const hasListContent = items.length > 0 || findings.isFetchNextPageError;
+  // The capacity notice explains a blocked action, so it only appears when a
+  // rendered row actually offers one — never over a list of already-analyzed
+  // findings.
+  const hasAnalyzableRow = useMemo(
+    () => items.some(item => isSecurityFindingAnalyzable(item)),
+    [items]
+  );
+  // Only a delivered page may claim there are no open findings: a read that is
+  // paused, never started, or whose pages were cleared has not answered. An
+  // unsettled connectivity keeps the skeleton instead of naming the connection.
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const body = classifyListBody({
+    rowCount: items.length,
+    hasDeliveredData: (findings.data?.pages.length ?? 0) > 0,
+    hasInlineError: findings.isFetchNextPageError,
+    isError: findings.isError,
+    isFetching: findings.isFetching,
+    fetchStatus: findings.fetchStatus,
+    connectivityKnown,
+  });
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
@@ -122,27 +148,29 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         finding={item}
         scope={scope}
         slaEnabled={slaEnabled}
-        hasAnalysisCapacity={hasAnalysisCapacity}
+        capacityState={capacity.state}
       />
     ),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    [scope, slaEnabled, capacity.state]
   );
   const rowExtraData = useMemo(
-    () => ({ scope, slaEnabled, hasAnalysisCapacity }),
-    [scope, slaEnabled, hasAnalysisCapacity]
+    () => ({ scope, slaEnabled, capacityState: capacity.state }),
+    [scope, slaEnabled, capacity.state]
   );
-  const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
-  // Repos aren't known yet (still loading or the fetch failed) — the filter
-  // stays disabled instead of silently offering a shrunken repository list.
-  const filterUnavailable = repositories.isLoading || repositories.isError;
-
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
       try {
-        // Refresh only — never triggers a new sync.
-        const result = await findings.refetch();
-        if (result.isError) {
+        // Refresh only — never triggers a new sync. The list shows the
+        // repository fetch failure inline, so every list refresh retries it,
+        // and the capacity counters are on screen, so a pull refreshes them
+        // too instead of leaving the notice and the actions on an older read.
+        const [findingsResult] = await Promise.all([
+          findings.refetch(),
+          repositories.refetch(),
+          capacity.refetch(),
+        ]);
+        if (findingsResult.isError) {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
@@ -155,54 +183,60 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.findings')}
+        // One 48dp icon target from IconButton; declaring its width keeps the
+        // one-line title's readable minimum when the row is narrow.
+        headerRightWidth={48}
         headerRight={
-          <Pressable
+          <IconButton
             onPress={() => {
-              if (filterUnavailable) {
-                return;
-              }
-              setSecurityFindingFilterBridge({
-                filters,
-                repositories: scopedRepositories,
-                onApply: setFilters,
+              pushOnce({
+                pathname: '/(app)/security-agent/[scope]/filter',
+                params: { scope, ...toSecurityFindingParams(filters) },
               });
-              router.push(getSecurityAgentPath(scope, 'filter'));
             }}
-            disabled={filterUnavailable}
-            accessibilityRole="button"
             accessibilityLabel={t('securityAgent.filter.title')}
-            accessibilityState={{ disabled: filterUnavailable }}
-            className={cn(
-              'size-11 items-center justify-center active:opacity-70',
-              filterUnavailable && 'opacity-50'
-            )}
           >
             <SlidersHorizontal
               size={20}
               color={filtersActive ? colors.foreground : colors.mutedForeground}
             />
-          </Pressable>
+          </IconButton>
         }
       />
 
-      {findings.isLoading && (
-        <View className="flex-1 gap-3 px-6 pt-4">
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
+      {repositories.isError ? (
+        <QueryError
+          placement="top"
+          message={t('common.couldNotLoadRepositories')}
+          onRetry={() => void repositories.refetch()}
+          isRetrying={repositories.isFetching}
+        />
+      ) : null}
+
+      {body.status === 'loading' && (
+        <View style={listStyle}>
+          <View style={listContentContainerStyle}>
+            {/* The loaded list's `ListHeaderComponent` band, so the first card
+                lands where the first placeholder row stood. */}
+            <View className="pb-3" />
+            <FindingListSkeletonRows />
+          </View>
         </View>
       )}
 
-      {!findings.isLoading && findings.isError && !hasListContent && (
+      {body.status === 'error' && (
         <QueryError
+          variant={body.cause === 'offline' ? 'offline' : 'neutral'}
           message={t('securityAgent.findingList.couldNotLoad')}
           onRetry={() => void findings.refetch()}
+          isRetrying={body.isRetrying}
           refreshControl={refreshControl}
         />
       )}
 
-      {!findings.isLoading && !findings.isError && !hasListContent && (
+      {body.status === 'empty' && (
         <EmptyState
           icon={ShieldCheck}
           refreshControl={refreshControl}
@@ -219,9 +253,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           action={
             filtersActive ? (
               <Button
+                className={STATE_ACTION_CLASS}
                 variant="outline"
                 onPress={() => {
-                  setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
+                  router.setParams(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS));
                 }}
               >
                 <Text>{t('common.clearFilters')}</Text>
@@ -231,7 +266,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         />
       )}
 
-      {!findings.isLoading && hasListContent && (
+      {body.status === 'rows' && (
         <FlashList<SecurityFinding>
           style={listStyle}
           data={items}
@@ -246,6 +281,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             // row, which the item separator does not cover.
             <View className="pb-3">
               <RefreshProgress refreshControl={refreshControl} />
+              {hasAnalyzableRow ? (
+                <AnalysisCapacityNotice
+                  className="pt-2"
+                  state={capacity.state}
+                  onRetry={() => void capacity.refetch()}
+                />
+              ) : null}
             </View>
           }
           refreshControl={refreshControl}

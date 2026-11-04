@@ -51,11 +51,11 @@ export function AccountTypeChoice() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-lg leading-6">✓</span>
-                      <span>Use Kilo in IDEs (VS Code/JetBrains), CLI, Cloud, and App Builder</span>
+                      <span>Use Kilo in IDEs (VS Code/JetBrains), CLI, and Cloud</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-lg leading-6">✓</span>
-                      <span>Unlock all Kilo features to code, review and deploy</span>
+                      <span>Unlock all Kilo features to code and review</span>
                     </li>
                   </ul>
                   <Button

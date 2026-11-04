@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useRef } from 'react';
-import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 
@@ -23,6 +23,8 @@ export function usePreviewUrlTemplate(
     ),
     staleTime: Infinity,
     retry: false,
+    // Chats of a worktree share its sandbox, so a chat switch keeps the preview action in place.
+    placeholderData: keepPreviousData,
   });
   return query.data?.enabled ? query.data.urlTemplate : null;
 }

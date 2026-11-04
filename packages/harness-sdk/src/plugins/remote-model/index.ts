@@ -28,12 +28,12 @@ const remoteModelClient = (
       Effect.sync(() => remoteWireFor(config.apiKind, config.completionTokenField)),
       (wire, handle) => postRemote(config, retry, { wire, request, handle })
     ).pipe(
-      Stream.catchAllCause(cause => {
-        const failure = Cause.failureOption(cause);
+      Stream.catchCause(cause => {
+        const failure = Cause.findErrorOption(cause);
         if (Option.isSome(failure)) {
           return Stream.fail(safeRemoteError(failure.value));
         }
-        return Cause.isInterruptedOnly(cause)
+        return Cause.hasInterruptsOnly(cause)
           ? Stream.failCause(cause)
           : Stream.fail(new ModelError({ reason: 'transport', cause: 'Remote model failure' }));
       })

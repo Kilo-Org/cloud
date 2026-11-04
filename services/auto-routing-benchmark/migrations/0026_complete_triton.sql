@@ -1,0 +1,1 @@
+ALTER TABLE `client_case_results` ADD `pending_grader_usage` text;

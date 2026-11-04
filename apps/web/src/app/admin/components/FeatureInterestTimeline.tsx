@@ -14,7 +14,6 @@ type FeatureInterestTimelineProps = {
 export function FeatureInterestTimeline({ timeline, query }: FeatureInterestTimelineProps) {
   const [showQuery, setShowQuery] = useState(false);
 
-  // Group timeline data by week
   const groupedByWeek = useMemo(() => {
     const grouped = new Map<string, Map<string, number>>();
     const allFeatures = new Set<string>();
@@ -32,12 +31,10 @@ export function FeatureInterestTimeline({ timeline, query }: FeatureInterestTime
     return { grouped, allFeatures: Array.from(allFeatures).sort() };
   }, [timeline]);
 
-  // Get sorted weeks
   const sortedWeeks = useMemo(() => {
     return Array.from(groupedByWeek.grouped.keys()).sort();
   }, [groupedByWeek]);
 
-  // Calculate totals per feature
   const featureTotals = useMemo(() => {
     const totals = new Map<string, number>();
     for (const entry of timeline) {
@@ -46,7 +43,6 @@ export function FeatureInterestTimeline({ timeline, query }: FeatureInterestTime
     return totals;
   }, [timeline]);
 
-  // Sort features by total signups (descending)
   const sortedFeatures = useMemo(() => {
     return groupedByWeek.allFeatures.sort((a, b) => {
       return (featureTotals.get(b) ?? 0) - (featureTotals.get(a) ?? 0);

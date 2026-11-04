@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
 import { Sparkles, X } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
@@ -37,7 +38,7 @@ export function SuggestionCard({
     if (!lockRef.current.tryAcquire()) {
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPending({ kind: 'accept', index });
     setError(null);
     try {
@@ -53,7 +54,7 @@ export function SuggestionCard({
     if (!lockRef.current.tryAcquire()) {
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setPending({ kind: 'dismiss' });
     setError(null);
     try {

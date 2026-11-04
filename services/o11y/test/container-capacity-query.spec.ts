@@ -104,6 +104,32 @@ function makeFetch(responses: Map<string, object>): FetchFn {
 }
 
 describe('queryContainerApplications', () => {
+  it('preserves legacy monitoring when native applications have no legacy capacity fields', async () => {
+    const responses = new Map<string, object>([
+      [
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/containers/dash/applications?page=1&per_page=20`,
+        makeListResponse([
+          sandboxListApp,
+          {
+            id: 'native-id',
+            name: 'cloud-agent-next-sandboxcontainers',
+            scheduling_policy: 'durable_object',
+            health: { instances: { active: 500, starting: 10 } },
+          },
+        ]),
+      ],
+      [
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/containers/applications/sandbox-id`,
+        makeDetailResponse(sandboxDetailApp),
+      ],
+    ]);
+
+    const apps = await queryContainerApplications(makeEnv(), makeFetch(responses));
+    expect(apps).toHaveLength(1);
+    expect(apps[0].name).toBe(sandboxDetailApp.name);
+    expect(apps[0].instances).toBe(sandboxDetailApp.instances);
+  });
+
   it('fetches monitored applications with max_instances from detail endpoint', async () => {
     const responses = new Map<string, object>([
       [

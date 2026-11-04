@@ -16,7 +16,7 @@ function formatDuration(ms: number): string {
 
 export type CloudAgentRulesInput = {
   bashDefaultTimeoutMs?: string | number | null;
-  /** Unknown on the legacy wrapper path; the reserved-port rule is then left out. */
+  /** Omit the reserved-port rule when the sandbox kind is unknown. */
   sandboxProvider?: AgentSandboxProvider;
 };
 
@@ -41,6 +41,11 @@ export function buildCloudAgentRules(input: CloudAgentRulesInput = {}): string {
     "You are running inside a sandboxed cloud container, not on the user's local machine.",
     'The filesystem is ephemeral and will not persist after the session ends.',
     "Do not assume access to the user's local files, browsers, or desktop environment.",
+    '',
+    '## Git Branches',
+    '',
+    'Stay on the branch this session started on. Do not create or switch branches, or move the work to a differently named branch, unless the user explicitly asks for it.',
+    'This rule does not ask you to commit or push. When you do commit or push, use the session branch so the pull request and session history stay linked to it.',
     '',
     '## Command Execution',
     '',

@@ -8,12 +8,14 @@
 // same security ledger) runs inside `mutationFn`. Only
 // `useHoistedOperationKey` is mocked (it holds React ref state that needs a
 // mounted renderer).
+/* eslint-disable max-lines -- one harness for the hooks module: dismissal wiring/rotation, analysis toasts and the findings query options */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
+import { SECURITY_SERVICE_UNAVAILABLE_MESSAGE } from '@/lib/security-agent-ledger';
 import {
   buildSecurityFindingsQueryOptions,
   dismissFindingIntentFingerprint,
@@ -35,9 +37,7 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
 }));
 
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('@/lib/operation-key', async importOriginal => {
   const actual = await importOriginal<typeof OperationKeyModule>();
@@ -234,14 +234,17 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
   // The rest of the retryability matrix belongs to `isSecuritySyncRetryable`
   // (tested in use-security-agent-mutations.test.ts); the hook only needs one
   // retryable and one terminal case.
-  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+  it('regenerates the key on a non-retryable failure and shows the generic copy', async () => {
     const badRequest = new Error('Invalid dismissal reason');
     Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
     personalDismissMutateMock.mockRejectedValueOnce(badRequest);
     useDismissSecurityFinding('personal');
 
+    // The server's English reason is not a catalog string, so the surface reads
+    // the localized terminal-fallback sentence while the raw rejection stays as
+    // `cause`.
     await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
-      message: 'Invalid dismissal reason',
+      message: 'Could not complete this action. The problem needs fixing before you can retry.',
     });
     expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
@@ -250,6 +253,19 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     useDismissSecurityFinding('personal');
     lastCapturedOptions?.onSuccess?.({ success: true, commandId: 'cmd-9' }, DISMISS_VARS);
     expect(trackCommandMock).toHaveBeenCalled();
+  });
+
+  it('regenerates the key when the Worker was unreachable and shows retry copy', async () => {
+    personalDismissMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useDismissSecurityFinding('personal');
+
+    // The server settled the intent's row, so the next submit needs a new key...
+    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
+      message: 'The security service is unavailable. Try again.',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -297,6 +313,17 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
 
     expect(trackCommandMock).not.toHaveBeenCalled();
     expect(invalidateQueriesMock).toHaveBeenCalled();
+  });
+
+  it('toasts the catalog copy for a known server marker and the server text otherwise', () => {
+    useStartSecurityAnalysis('personal');
+
+    lastCapturedOptions?.onError?.(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE));
+    expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
+
+    toastErrorMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('Analysis queue is full'));
+    expect(toastErrorMock).toHaveBeenCalledWith('Analysis queue is full');
   });
 });
 

@@ -2,8 +2,8 @@
  * The reader's copy the Durable Object writes through its safe failure
  * projection (services/cloud-agent-next/src/session/safe-failure-projection.ts
  * and the assistant failures it re-exports from src/shared/assistant-failure.ts)
- * plus the lines session-service.ts supplies directly. None of them is raw
- * provider text, so the status line shows them as-is. A bounded workspace
+ * plus workspace failure lines the server supplies directly. None of them is
+ * raw provider text, so the status line shows them as-is. A bounded workspace
  * failure appends its detail to the projection line, so a message that starts
  * with one of these plus ": " is the same copy.
  */
@@ -53,7 +53,7 @@ const SAFE_FAILURE_MESSAGES = new Set([
   'The model output limit was reached',
   'The model provider blocked the response under its content policy',
   'The model response did not match the required format',
-  // Lines session-service.ts supplies as `safeFailureMessage`.
+  // Historical legacy-plane workspace failures.
   'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.',
   'GitHub credential service is unavailable. Please try again.',
   'GitHub credential resolution failed. Please try again.',

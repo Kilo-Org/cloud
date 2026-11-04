@@ -1,3 +1,5 @@
+import { DatabaseSync } from 'node:sqlite';
+import { createServer } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkRegistryResponseSchema,
@@ -9,12 +11,20 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { app } from './index';
 import type * as DbModule from './db';
+import type * as ExecutableModelsModule from './executable-models';
 import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
+import { BenchmarkModelCatalogSchema } from './platform-models';
+import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
+import {
+  loadSubscriptionSnapshot,
+  type SubscriptionOwner,
+  type SubscriptionSnapshot,
+} from './subscriptions';
 
 const TEST_CONFIG: BenchmarkConfig = {
   router: 'efficient',
@@ -73,6 +83,10 @@ const TEST_CONFIG_ROWS = {
 // Stubs: the db module is mocked at its function boundary (drizzle generates
 // the SQL, so statement-level stubbing would couple tests to its internals).
 
+vi.mock('./executable-models', () => ({
+  fetchExecutableBenchmarkModelCatalog: vi.fn(),
+}));
+
 vi.mock('./scheduler', async importOriginal => ({
   ...(await importOriginal<typeof SchedulerModule>()),
   claimScheduledChunks: vi.fn(),
@@ -96,6 +110,9 @@ vi.mock('./db', async importOriginal => {
     countCaseResultsByLane: vi.fn().mockResolvedValue([]),
     listLaneFailures: vi.fn().mockResolvedValue([]),
     reuseDeciderCaseResults: vi.fn().mockResolvedValue(0),
+    listQueuedRemeasures: vi.fn().mockResolvedValue([]),
+    copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),
@@ -153,19 +170,46 @@ const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
 const queueSend = vi.fn();
 
-function schedulerDatabase(): D1Database {
-  const statement = {
-    bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(null),
-    all: vi.fn().mockResolvedValue({ results: [] }),
-    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
-  };
-  return { prepare: vi.fn(() => statement) } as unknown as D1Database;
+let sqlite: DatabaseSync;
+
+function schedulerDatabase(db: DatabaseSync): D1Database {
+  return {
+    prepare(sql: string) {
+      const bound = (params: unknown[]) => ({
+        bind(...values: unknown[]) {
+          return bound(values);
+        },
+        async first() {
+          return db.prepare(sql).get(...(params as never[])) ?? null;
+        },
+        async all() {
+          return { results: db.prepare(sql).all(...(params as never[])) };
+        },
+        async run() {
+          return { meta: { changes: Number(db.prepare(sql).run(...(params as never[])).changes) } };
+        },
+      });
+      return bound([]);
+    },
+    async batch(statements: D1PreparedStatement[]) {
+      db.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        db.exec('COMMIT');
+        return results;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  } as unknown as D1Database;
 }
 
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
-  BENCH_DB: schedulerDatabase(),
+  BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
+  BENCH_DB: undefined,
   BENCH_QUEUE: { sendBatch: queueSendBatch, send: queueSend },
   BENCHMARK_SCHEDULER_CONFIG: '{}',
   AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
@@ -205,10 +249,56 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
   });
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  sqlite.close();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(`
+    CREATE TABLE benchmark_subscriptions (
+      router TEXT, owner_type TEXT, owner_id TEXT, revision TEXT, snapshot TEXT, updated_at TEXT,
+      PRIMARY KEY (router, owner_type, owner_id)
+    );
+    CREATE TABLE config_decider_models (router TEXT, model TEXT);
+    CREATE TABLE benchmark_profiles (
+      router TEXT, model TEXT, variant TEXT, engine_identity TEXT, repetitions INTEGER,
+      status TEXT, run_id TEXT, failure_reason TEXT, requested_at TEXT, updated_at TEXT,
+      platform_requested INTEGER, user_requested INTEGER,
+      PRIMARY KEY (router, model, variant, engine_identity, repetitions)
+    );
+    CREATE TABLE scheduler_settings (
+      id INTEGER PRIMARY KEY, slots INTEGER, model_concurrency INTEGER,
+      provider_concurrency INTEGER, unknown_provider_concurrency INTEGER,
+      updated_at TEXT, updated_by TEXT
+    );
+    CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT);
+    CREATE TABLE scheduler_runs (run_id TEXT);
+    CREATE TABLE scheduler_chunks (run_id TEXT, model TEXT, variant TEXT, rep INTEGER, status TEXT);
+    CREATE TABLE run_lane_failures (run_id TEXT, model TEXT, variant TEXT, rep INTEGER);
+  `);
+  for (const router of ['efficient', 'frontier']) {
+    for (const model of TEST_CONFIG.deciderModels) {
+      sqlite.prepare('INSERT INTO config_decider_models VALUES (?, ?)').run(router, model.id);
+    }
+  }
+  env.BENCH_DB = schedulerDatabase(sqlite);
+  vi.mocked(fetchExecutableBenchmarkModelCatalog)
+    .mockReset()
+    .mockResolvedValue(
+      BenchmarkModelCatalogSchema.parse({
+        data: [
+          ...TEST_CONFIG.deciderModels.map(model => ({ id: model.id })),
+          { id: 'a/b' },
+          { id: 'platform/a' },
+          { id: 'shared/a' },
+          { id: 'owner/a', opencode: { variants: { high: { reasoning: { effort: 'high' } } } } },
+          ...Array.from({ length: 100 }, (_, i) => ({ id: `m/${i}` })),
+        ],
+      })
+    );
   tokenGet.mockResolvedValue('bench-token');
   vi.stubGlobal(
     'fetch',
@@ -629,6 +719,20 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
+  it('returns 400 before claiming anything when the saved user override is not an internal bot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'human-user' },
+    });
+    const res = await authedPost('/admin/runs', { kind: 'classifier' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(insertRun).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+  });
+
   it('starts a classifier run and returns runId + enqueuedModels', async () => {
     // No prior summaries → every configured model is enqueued.
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
@@ -814,6 +918,21 @@ describe('POST /admin/runs', () => {
   });
 });
 
+describe('POST /admin/debug-cli', () => {
+  it('returns 400 without minting when the saved user override is not an internal bot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, benchmark_user_id: 'human-user' },
+    });
+    const res = await authedPost('/admin/debug-cli', { model: 'a/b', prompt: 'hello' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /admin/registry', () => {
   it.each([
     { query: '', router: 'efficient' as const },
@@ -920,34 +1039,57 @@ describe('GET /admin/classifier-winner', () => {
   });
 });
 
-function stubCatalog(): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn<typeof fetch>().mockImplementation(async () =>
-      Response.json({
-        data: [
-          {
-            id: 'a/b',
-            opencode: {
-              variants: {
-                low: { reasoning: { effort: 'low' } },
-                high: { reasoning: { effort: 'high' } },
-                fast: {},
-              },
+function stubCatalog(aliasTarget = 'a/b'): void {
+  vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(
+    BenchmarkModelCatalogSchema.parse({
+      data: [
+        {
+          id: 'a/b',
+          supported_parameters: ['tools'],
+          opencode: {
+            variants: {
+              low: { reasoning: { effort: 'low' } },
+              high: { reasoning: { effort: 'high' } },
+              fast: {},
             },
           },
-          { id: 'c/d' },
-          { id: '~a/latest', alias_target: 'a/b' },
-          { id: '~a/fast-latest', alias_target: 'a/b' },
-        ],
-      })
-    )
+        },
+        { id: 'c/d', supported_parameters: ['tools'] },
+        { id: '~a/latest', alias_target: aliasTarget },
+        { id: '~a/fast-latest', alias_target: aliasTarget },
+      ],
+    })
   );
+}
+
+function persistSnapshot(
+  snapshot: SubscriptionSnapshot,
+  owner: SubscriptionOwner = { ownerType: 'platform', ownerId: '' }
+): void {
+  if (owner.ownerType === 'platform') {
+    sqlite.prepare("DELETE FROM config_decider_models WHERE router = 'efficient'").run();
+    for (const entry of snapshot) {
+      sqlite.prepare("INSERT INTO config_decider_models VALUES ('efficient', ?)").run(entry.model);
+    }
+  }
+  sqlite
+    .prepare(`
+    INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+    .run(
+      'efficient',
+      owner.ownerType,
+      owner.ownerId,
+      crypto.randomUUID(),
+      JSON.stringify({ entries: snapshot, previousEntries: [] }),
+      '2026-06-01T00:00:00.000Z'
+    );
 }
 
 describe('owner model aliases', () => {
   it.each(['register', 'status'])(
-    'shares concrete pairs and maps %s statuses back to each requested model',
+    'shares persisted concrete pairs and maps %s statuses back to each requested model',
     async action => {
       vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
       stubCatalog();
@@ -962,26 +1104,45 @@ describe('owner model aliases', () => {
       vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
       vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({ statuses });
       const entries = [{ model: '~a/latest' }, { model: '~a/fast-latest' }, { model: 'a/b' }];
+      const pairs = [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ];
+      const owner = { ownerType: 'user' as const, ownerId: 'u1' };
+      if (action === 'status') {
+        persistSnapshot(
+          entries.map(({ model }) => ({
+            model,
+            pairs,
+            servingPairs: pairs,
+            resolutionError: null,
+          })),
+          owner
+        );
+        stubCatalog('c/d');
+      }
       const response = await authedPost(`/admin/profiles/${action}`, {
-        ownerType: 'user',
-        ownerId: 'u1',
+        ...owner,
         entries,
         retryEntries: [{ model: '~a/latest' }],
       });
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        statuses: statuses.flatMap(status =>
-          entries.map(entry => ({ ...status, entry: { ...status.entry, model: entry.model } }))
+        statuses: entries.flatMap(entry =>
+          statuses.map(status => ({ ...status, entry: { ...status.entry, model: entry.model } }))
         ),
       });
-      const pairs = [
-        { model: 'a/b', variant: 'low' },
-        { model: 'a/b', variant: 'high' },
-      ];
+      expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual(
+        entries.map(({ model }) => ({
+          model,
+          pairs,
+          servingPairs: action === 'status' ? pairs : [],
+          resolutionError: null,
+        }))
+      );
       if (action === 'register') {
         expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
-          ownerType: 'user',
-          ownerId: 'u1',
+          ...owner,
           pairs,
           retryPairs: pairs,
         });
@@ -989,25 +1150,219 @@ describe('owner model aliases', () => {
         expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
           pairs,
         });
+        expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
       }
     }
   );
 
-  it('assembles custom tables from the resolved pairs of alias pool entries', async () => {
-    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+  it('reuses the registered alias snapshot instead of retargeting on another admission', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     stubCatalog();
-    const response = await authedPost('/admin/custom-routing-table', {
-      entries: [{ model: '~a/latest' }, { model: 'a/b' }],
-    });
+    const owner = { ownerType: 'org' as const, ownerId: 'o1' };
+    const entries = [{ model: '~a/latest' }];
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    const statuses = pairs.map(entry => ({
+      entry,
+      status: 'pending' as const,
+      failureReason: null,
+    }));
+    vi.mocked(registerProfiles).mockResolvedValue({ statuses });
+    const first = await authedPost('/admin/profiles/register', { ...owner, entries });
+    expect(first.status).toBe(200);
+    const saved = await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner);
+    stubCatalog('c/d');
+    const response = await authedPost('/admin/profiles/register', { ...owner, entries });
     expect(response.status).toBe(200);
-    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.anything(),
-      [
+    await expect(response.json()).resolves.toEqual({
+      statuses: statuses.map(status => ({
+        ...status,
+        entry: { model: '~a/latest', variant: status.entry.variant },
+      })),
+    });
+    expect(registerProfiles).toHaveBeenLastCalledWith(env.BENCH_DB, expect.anything(), {
+      ...owner,
+      pairs,
+      retryPairs: [],
+    });
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual(saved);
+  });
+
+  it.each([false, true])(
+    'repairs an unresolved first alias on re-registration with explicit retry=%s',
+    async explicitRetry => {
+      vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+      vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(
+        BenchmarkModelCatalogSchema.parse({ data: [] })
+      );
+      const owner = { ownerType: 'user' as const, ownerId: 'retry-owner' };
+      const entries = [{ model: '~a/latest' }];
+      const first = await authedPost('/admin/profiles/register', { ...owner, entries });
+      expect(first.status).toBe(200);
+      await expect(first.json()).resolves.toMatchObject({
+        statuses: [{ entry: { model: '~a/latest', variant: null }, status: 'failed' }],
+      });
+      expect(registerProfiles).not.toHaveBeenCalled();
+      stubCatalog();
+      const pairs = [
         { model: 'a/b', variant: 'low' },
         { model: 'a/b', variant: 'high' },
-      ]
+      ];
+      vi.mocked(registerProfiles).mockResolvedValue({
+        statuses: pairs.map(entry => ({ entry, status: 'pending' as const, failureReason: null })),
+      });
+      const response = await authedPost('/admin/profiles/register', {
+        ...owner,
+        entries,
+        ...(explicitRetry ? { retryEntries: entries } : {}),
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        statuses: pairs.map(pair => ({
+          entry: { model: '~a/latest', variant: pair.variant },
+          status: 'pending',
+        })),
+      });
+      expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+        ...owner,
+        pairs,
+        retryPairs: explicitRetry ? pairs : [],
+      });
+      expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual([
+        { model: '~a/latest', pairs, servingPairs: [], resolutionError: null },
+      ]);
+    }
+  );
+
+  it('does not reuse a removed target when the same alias is saved as a new subscription', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const owner = { ownerType: 'user' as const, ownerId: 'readded-owner' };
+    const entries = [{ model: '~a/latest' }];
+    vi.mocked(registerProfiles).mockResolvedValue({ statuses: [] });
+    expect((await authedPost('/admin/profiles/register', { ...owner, entries })).status).toBe(200);
+    expect(
+      (await authedPost('/admin/profiles/subscriptions', { ...owner, entries: null })).status
+    ).toBe(200);
+    stubCatalog('c/d');
+    expect((await authedPost('/admin/profiles/register', { ...owner, entries })).status).toBe(200);
+    expect(registerProfiles).toHaveBeenLastCalledWith(env.BENCH_DB, expect.anything(), {
+      ...owner,
+      pairs: [{ model: 'c/d', variant: null }],
+      retryPairs: [],
+    });
+  });
+
+  it('restores a removed serving snapshot only when compensation is explicit', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const owner = { ownerType: 'user' as const, ownerId: 'restore-owner' };
+    const entries = [{ model: '~a/latest' }];
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    persistSnapshot(
+      [{ model: '~a/latest', pairs, servingPairs: pairs, resolutionError: null }],
+      owner
     );
+    expect(
+      (await authedPost('/admin/profiles/subscriptions', { ...owner, entries: null })).status
+    ).toBe(200);
+    stubCatalog('c/d');
+    vi.mocked(lookupProfileStatuses).mockResolvedValue({
+      statuses: pairs.map(entry => ({ entry, status: 'ready' as const, failureReason: null })),
+    });
+    const response = await authedPost('/admin/profiles/subscriptions', {
+      ...owner,
+      entries,
+      restorePrevious: true,
+    });
+    expect(response.status).toBe(200);
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual([
+      { model: '~a/latest', pairs, servingPairs: pairs, resolutionError: null },
+    ]);
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+  });
+
+  it('assembles custom tables from saved serving pairs without resolving the live alias', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    stubCatalog('c/d');
+    const owner = { ownerType: 'user' as const, ownerId: 'u1' };
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    const snapshot = [
+      {
+        model: '~a/latest',
+        pairs: [{ model: 'c/d', variant: null }],
+        servingPairs: pairs,
+        resolutionError: null,
+      },
+    ];
+    persistSnapshot(snapshot, owner);
+    persistSnapshot(
+      [
+        {
+          model: '~a/latest',
+          pairs: [{ model: 'c/d', variant: null }],
+          servingPairs: [{ model: 'c/d', variant: null }],
+          resolutionError: null,
+        },
+      ],
+      { ownerType: 'org', ownerId: 'u1' }
+    );
+    vi.mocked(listReadyCurrentProfilesForEntries)
+      .mockResolvedValueOnce([])
+      .mockResolvedValue(
+        pairs.map(pair => ({ ...pair, variant: pair.variant ?? '', run_id: 'run-a' }))
+      );
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      pairs.map(pair => ({
+        ...pair,
+        runId: 'run-a',
+        routeKey: 'implementation/code_generation' as const,
+        accuracy: 0.9,
+        avgCostUsd: 0.001,
+        avgLatencyMs: 100,
+        p50LatencyMs: 90,
+        p95LatencyMs: 120,
+        cases: 5,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
+    const response = await authedPost('/admin/custom-routing-table', {
+      ...owner,
+      entries: [{ model: '~a/latest' }, { model: 'c/d' }],
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      table: { routes: Record<string, { model: string; variant: string }[]> };
+    };
+    expect(
+      body.table.routes['implementation/code_generation']
+        .map(({ model, variant }) => ({
+          model,
+          variant,
+        }))
+        .sort((left, right) => left.variant.localeCompare(right.variant))
+    ).toEqual([
+      { model: 'a/b', variant: 'high' },
+      { model: 'a/b', variant: 'low' },
+    ]);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalledTimes(2);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenLastCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      pairs
+    );
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual(snapshot);
   });
 });
 
@@ -1067,7 +1422,125 @@ describe('POST /admin/profiles/register', () => {
         retryPairs: [{ model: 'a/b', variant: null }],
       })
     );
+    expect(
+      await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+        ownerType: 'user',
+        ownerId: 'u1',
+      })
+    ).toEqual([
+      {
+        model: 'a/b',
+        pairs: [{ model: 'a/b', variant: null }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+    ]);
   });
+
+  it.each(['benchmark-org', null])(
+    'uses configured benchmark credentials rather than the requesting owner (%s)',
+    async benchmarkOrgId => {
+      const expectedOrganization = benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID;
+      const catalogToken = 'scope-catalog-token';
+      const server = createServer(async (request, response) => {
+        response.setHeader('content-type', 'application/json');
+        if (request.url === '/api/internal/bot-token') {
+          const chunks: Buffer[] = [];
+          for await (const chunk of request) {
+            if (!Buffer.isBuffer(chunk)) throw new Error('Expected a binary request chunk.');
+            chunks.push(chunk);
+          }
+          const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
+          if (
+            request.headers.authorization !== 'Bearer mint-secret' ||
+            typeof body !== 'object' ||
+            body === null ||
+            !('userId' in body) ||
+            body.userId !== 'bot-internal-benchmark-user' ||
+            !('organizationId' in body) ||
+            body.organizationId !== expectedOrganization
+          ) {
+            response.writeHead(403).end('{}');
+            return;
+          }
+          response.end(JSON.stringify({ token: catalogToken, expiresAt: '2030-01-01T00:00:00Z' }));
+          return;
+        }
+        if (
+          request.url !== `/api/organizations/${expectedOrganization}/models` ||
+          request.headers.authorization !== `Bearer ${catalogToken}` ||
+          request.headers['x-kilocode-organizationid'] !== expectedOrganization
+        ) {
+          response.writeHead(403).end('{}');
+          return;
+        }
+        response.end(JSON.stringify({ data: [{ id: 'a/b', supported_parameters: ['tools'] }] }));
+      });
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address();
+      if (address === null || typeof address === 'string')
+        throw new Error('Expected a loopback port.');
+      const originalWebUrl = env.KILO_WEB_API_BASE_URL;
+      const originalCliUrl = env.KILO_CLI_API_URL;
+      env.KILO_WEB_API_BASE_URL = `http://127.0.0.1:${address.port}`;
+      env.KILO_CLI_API_URL = env.KILO_WEB_API_BASE_URL;
+      vi.unstubAllGlobals();
+      const actual = await vi.importActual<typeof ExecutableModelsModule>('./executable-models');
+      vi.mocked(fetchExecutableBenchmarkModelCatalog).mockImplementation(
+        actual.fetchExecutableBenchmarkModelCatalog
+      );
+      try {
+        vi.mocked(getConfigRows).mockResolvedValueOnce({
+          ...TEST_CONFIG_ROWS,
+          config: {
+            ...TEST_CONFIG_ROWS.config,
+            benchmark_user_id: 'bot-internal-benchmark-user',
+            benchmark_org_id: benchmarkOrgId,
+          },
+        });
+        const statuses = [
+          {
+            entry: { model: 'a/b', variant: null },
+            status: 'pending' as const,
+            failureReason: null,
+          },
+        ];
+        vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
+        const response = await authedPost('/admin/profiles/register', {
+          ownerType: 'org',
+          ownerId: 'requesting-org',
+          entries: [{ model: 'a/b' }],
+        });
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({ statuses });
+        expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+          ownerType: 'org',
+          ownerId: 'requesting-org',
+          pairs: [{ model: 'a/b', variant: null }],
+          retryPairs: [],
+        });
+        expect(
+          await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+            ownerType: 'org',
+            ownerId: 'requesting-org',
+          })
+        ).toEqual([
+          {
+            model: 'a/b',
+            pairs: [{ model: 'a/b', variant: null }],
+            servingPairs: [],
+            resolutionError: null,
+          },
+        ]);
+      } finally {
+        env.KILO_WEB_API_BASE_URL = originalWebUrl;
+        env.KILO_CLI_API_URL = originalCliUrl;
+        await new Promise<void>((resolve, reject) =>
+          server.close(error => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
 
   it('expands each model to every catalog effort and retries only listed models', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
@@ -1099,21 +1572,56 @@ describe('POST /admin/profiles/register', () => {
     );
   });
 
-  it('rejects a model missing from the catalog with 400 before admission', async () => {
+  it('reports unavailable models as failed while admitting unrelated executable pairs', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
     stubCatalog();
-
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    const statuses = pairs.map(entry => ({
+      entry,
+      status: 'pending' as const,
+      failureReason: null,
+    }));
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses });
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
       entries: [{ model: 'a/b' }, { model: 'gone/model' }],
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
-      error: 'Model is unavailable in the current catalog: gone/model',
+      statuses: [
+        ...statuses,
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the executable benchmark catalog.',
+        },
+      ],
     });
-    expect(registerProfiles).not.toHaveBeenCalled();
+    expect(registerProfiles).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
+      ownerType: 'user',
+      ownerId: 'u1',
+      pairs,
+      retryPairs: [],
+    });
+    expect(
+      await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+        ownerType: 'user',
+        ownerId: 'u1',
+      })
+    ).toEqual([
+      { model: 'a/b', pairs, servingPairs: [], resolutionError: null },
+      {
+        model: 'gone/model',
+        pairs: [],
+        servingPairs: [],
+        resolutionError: 'Model is unavailable in the executable benchmark catalog.',
+      },
+    ]);
   });
 
   it('returns 429 with retryAt when quota is exceeded', async () => {
@@ -1140,6 +1648,193 @@ describe('POST /admin/profiles/register', () => {
   });
 });
 
+describe('POST /admin/profiles/subscriptions', () => {
+  it('requires authentication before replacing subscriptions', async () => {
+    const response = await request('/admin/profiles/subscriptions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ownerType: 'user', ownerId: 'u1', entries: null }),
+    });
+    expect(response.status).toBe(401);
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(sqlite.prepare('SELECT * FROM benchmark_subscriptions').all()).toEqual([]);
+  });
+
+  it('returns 400 without a benchmark config', async () => {
+    const response = await authedPost('/admin/profiles/subscriptions', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }],
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Benchmark config is not configured.',
+    });
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ownerType: 'platform', ownerId: 'u1', entries: null },
+    { ownerType: 'user', ownerId: '', entries: null },
+    { ownerType: 'user', ownerId: 'u1', entries: [] },
+    { ownerType: 'user', ownerId: 'u1' },
+  ])('rejects invalid replacement $ownerType/$ownerId', async body => {
+    const response = await authedPost('/admin/profiles/subscriptions', body);
+    expect(response.status).toBe(400);
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(sqlite.prepare('SELECT * FROM benchmark_subscriptions').all()).toEqual([]);
+  });
+
+  it.each(['user', 'org'] as const)(
+    'bootstraps a saved %s pool and reports alias statuses using concrete measurements',
+    async ownerType => {
+      vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+      stubCatalog();
+      const owner = { ownerType, ownerId: 'owner' };
+      const entries = [{ model: '~a/latest' }, { model: 'a/b' }];
+      const pairs = [
+        { model: 'a/b', variant: 'low' },
+        { model: 'a/b', variant: 'high' },
+      ];
+      const statuses = [
+        { entry: pairs[0], status: 'ready' as const, failureReason: null },
+        { entry: pairs[1], status: 'pending' as const, failureReason: null },
+      ];
+      vi.mocked(lookupProfileStatuses).mockResolvedValue({ statuses });
+
+      const response = await authedPost('/admin/profiles/subscriptions', { ...owner, entries });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        statuses: entries.flatMap(({ model }) =>
+          statuses.map(status => ({ ...status, entry: { ...status.entry, model } }))
+        ),
+      });
+      expect(lookupProfileStatuses).toHaveBeenCalledExactlyOnceWith(
+        env.BENCH_DB,
+        expect.objectContaining({ router: 'efficient' }),
+        { pairs }
+      );
+      expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual(
+        entries.map(({ model }) => ({ model, pairs, servingPairs: [], resolutionError: null }))
+      );
+      expect(
+        sqlite
+          .prepare(`
+        SELECT model, variant, status, platform_requested, user_requested
+        FROM benchmark_profiles ORDER BY variant
+      `)
+          .all()
+      ).toEqual([
+        {
+          model: 'a/b',
+          variant: 'high',
+          status: 'pending',
+          platform_requested: 0,
+          user_requested: 1,
+        },
+        {
+          model: 'a/b',
+          variant: 'low',
+          status: 'pending',
+          platform_requested: 0,
+          user_requested: 1,
+        },
+      ]);
+      expect(registerProfiles).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fully replaces and removes only the selected owner pool without retargeting saved aliases', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    stubCatalog();
+    const owner = { ownerType: 'user' as const, ownerId: 'owner' };
+    const otherOwner = { ownerType: 'org' as const, ownerId: 'owner' };
+    const otherSnapshot = [
+      {
+        model: 'c/d',
+        pairs: [{ model: 'c/d', variant: null }],
+        servingPairs: [{ model: 'c/d', variant: null }],
+        resolutionError: null,
+      },
+    ];
+    persistSnapshot(otherSnapshot, otherOwner);
+    const pairs = [
+      { model: 'a/b', variant: 'low' },
+      { model: 'a/b', variant: 'high' },
+    ];
+    vi.mocked(lookupProfileStatuses).mockImplementation(async (_db, _config, { pairs }) => ({
+      statuses: pairs.map(entry => ({ entry, status: 'pending' as const, failureReason: null })),
+    }));
+    const initial = await authedPost('/admin/profiles/subscriptions', {
+      ...owner,
+      entries: [{ model: '~a/latest' }, { model: 'c/d' }],
+    });
+    expect(initial.status).toBe(200);
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockClear();
+    stubCatalog('c/d');
+
+    const replacement = await authedPost('/admin/profiles/subscriptions', {
+      ...owner,
+      entries: [{ model: '~a/latest' }],
+    });
+    expect(replacement.status).toBe(200);
+    await expect(replacement.json()).resolves.toEqual({
+      statuses: pairs.map(pair => ({
+        entry: { model: '~a/latest', variant: pair.variant },
+        status: 'pending',
+        failureReason: null,
+      })),
+    });
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual([
+      { model: '~a/latest', pairs, servingPairs: [], resolutionError: null },
+    ]);
+    expect(lookupProfileStatuses).toHaveBeenLastCalledWith(env.BENCH_DB, expect.anything(), {
+      pairs,
+    });
+    vi.mocked(lookupProfileStatuses).mockClear();
+    const removal = await authedPost('/admin/profiles/subscriptions', { ...owner, entries: null });
+    expect(removal.status).toBe(200);
+    await expect(removal.json()).resolves.toEqual({ statuses: [] });
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual([]);
+    expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', otherOwner)).toEqual(
+      otherSnapshot
+    );
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(lookupProfileStatuses).not.toHaveBeenCalled();
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('keeps unavailable subscriptions failed without blocking an executable subscription', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({
+      statuses: [
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+    const owner = { ownerType: 'user' as const, ownerId: 'u1' };
+    const response = await authedPost('/admin/profiles/subscriptions', {
+      ...owner,
+      entries: [{ model: 'gone/model' }, { model: 'a/b' }],
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      statuses: [
+        {
+          entry: { model: 'gone/model', variant: null },
+          status: 'failed',
+          failureReason: 'Model is unavailable in the executable benchmark catalog.',
+        },
+        { entry: { model: 'a/b', variant: null }, status: 'pending', failureReason: null },
+      ],
+    });
+    expect(sqlite.prepare('SELECT model, variant FROM benchmark_profiles').all()).toEqual([
+      { model: 'a/b', variant: '' },
+    ]);
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /admin/profiles/status', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/status', {
@@ -1151,6 +1846,14 @@ describe('POST /admin/profiles/status', () => {
 
   it('returns current statuses', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    persistSnapshot([
+      {
+        model: 'a/b',
+        pairs: [{ model: 'a/b', variant: null }],
+        servingPairs: [{ model: 'a/b', variant: null }],
+        resolutionError: null,
+      },
+    ]);
     vi.mocked(lookupProfileStatuses).mockResolvedValueOnce({
       statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
     });
@@ -1162,11 +1865,114 @@ describe('POST /admin/profiles/status', () => {
     await expect(res.json()).resolves.toEqual({
       statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
     });
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
   });
 
-  it('looks up every catalog effort and reports missing models as failed', async () => {
+  it('looks up snapshots by both owner type and owner id rather than the platform snapshot', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    stubCatalog('c/d');
+    const user = { ownerType: 'user' as const, ownerId: 'owner' };
+    const org = { ownerType: 'org' as const, ownerId: 'owner' };
+    persistSnapshot(
+      [
+        {
+          model: '~a/latest',
+          pairs: [{ model: 'a/b', variant: 'high' }],
+          servingPairs: [],
+          resolutionError: null,
+        },
+      ],
+      user
+    );
+    persistSnapshot(
+      [
+        {
+          model: '~a/latest',
+          pairs: [{ model: 'c/d', variant: null }],
+          servingPairs: [],
+          resolutionError: null,
+        },
+      ],
+      org
+    );
+    persistSnapshot([
+      {
+        model: '~a/latest',
+        pairs: [{ model: 'platform/old', variant: null }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+    ]);
+    vi.mocked(lookupProfileStatuses)
+      .mockResolvedValueOnce({
+        statuses: [
+          {
+            entry: { model: 'a/b', variant: 'high' },
+            status: 'ready',
+            failureReason: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        statuses: [
+          {
+            entry: { model: 'c/d', variant: null },
+            status: 'pending',
+            failureReason: null,
+          },
+        ],
+      });
+    const userResponse = await authedPost('/admin/profiles/status', {
+      ...user,
+      entries: [{ model: '~a/latest' }],
+    });
+    expect(userResponse.status).toBe(200);
+    await expect(userResponse.json()).resolves.toEqual({
+      statuses: [
+        {
+          entry: { model: '~a/latest', variant: 'high' },
+          status: 'ready',
+          failureReason: null,
+        },
+      ],
+    });
+    const orgResponse = await authedPost('/admin/profiles/status', {
+      ...org,
+      entries: [{ model: '~a/latest' }],
+    });
+    expect(orgResponse.status).toBe(200);
+    await expect(orgResponse.json()).resolves.toEqual({
+      statuses: [
+        {
+          entry: { model: '~a/latest', variant: null },
+          status: 'pending',
+          failureReason: null,
+        },
+      ],
+    });
+    expect(lookupProfileStatuses).toHaveBeenNthCalledWith(1, env.BENCH_DB, expect.anything(), {
+      pairs: [{ model: 'a/b', variant: 'high' }],
+    });
+    expect(lookupProfileStatuses).toHaveBeenNthCalledWith(2, env.BENCH_DB, expect.anything(), {
+      pairs: [{ model: 'c/d', variant: null }],
+    });
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('looks up every persisted effort and reports unsaved models as failed', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
+    persistSnapshot([
+      {
+        model: 'a/b',
+        pairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+        servingPairs: [],
+        resolutionError: null,
+      },
+    ]);
     const statuses = [
       { entry: { model: 'a/b', variant: 'low' }, status: 'ready' as const, failureReason: null },
       { entry: { model: 'a/b', variant: 'high' }, status: 'pending' as const, failureReason: null },
@@ -1180,12 +1986,12 @@ describe('POST /admin/profiles/status', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       statuses: [
-        ...statuses,
         {
           entry: { model: 'gone/model', variant: null },
           status: 'failed',
-          failureReason: 'Model is unavailable in the current catalog.',
+          failureReason: 'Model is unavailable in the executable benchmark catalog.',
         },
+        ...statuses,
       ],
     });
     expect(lookupProfileStatuses).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), {
@@ -1194,11 +2000,11 @@ describe('POST /admin/profiles/status', () => {
         { model: 'a/b', variant: 'high' },
       ],
     });
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
   });
 
-  it('skips lookup when every model is missing from the catalog', async () => {
+  it('skips lookup and live resolution when no requested subscription is persisted', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
 
     const res = await authedPost('/admin/profiles/status', {
       entries: [{ model: 'gone/model' }],
@@ -1210,18 +2016,39 @@ describe('POST /admin/profiles/status', () => {
         {
           entry: { model: 'gone/model', variant: null },
           status: 'failed',
-          failureReason: 'Model is unavailable in the current catalog.',
+          failureReason: 'Model is unavailable in the executable benchmark catalog.',
         },
       ],
     });
     expect(lookupProfileStatuses).not.toHaveBeenCalled();
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
   });
 });
 
 describe('POST /admin/custom-routing-table', () => {
-  it('assembles from every catalog effort of the supported pool models', async () => {
+  it('assembles from every saved serving effort of the requested pool models', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
+    const snapshot = [
+      {
+        model: 'a/b',
+        pairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+        servingPairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+        resolutionError: null,
+      },
+      {
+        model: 'c/d',
+        pairs: [{ model: 'c/d', variant: null }],
+        servingPairs: [{ model: 'c/d', variant: null }],
+        resolutionError: null,
+      },
+    ];
+    persistSnapshot(snapshot);
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValueOnce([]);
 
     const res = await authedPost('/admin/custom-routing-table', {
@@ -1239,11 +2066,11 @@ describe('POST /admin/custom-routing-table', () => {
         { model: 'c/d', variant: null },
       ]
     );
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
   });
 
-  it('returns a null table without a registry read when no model is in the catalog', async () => {
+  it('returns a null table without a registry read when no subscription is persisted', async () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
-    stubCatalog();
 
     const res = await authedPost('/admin/custom-routing-table', {
       entries: [{ model: 'gone/model' }],
@@ -1252,10 +2079,22 @@ describe('POST /admin/custom-routing-table', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ table: null });
     expect(listReadyCurrentProfilesForEntries).not.toHaveBeenCalled();
+    expect(fetchExecutableBenchmarkModelCatalog).not.toHaveBeenCalled();
   });
 });
 
 describe('router selection', () => {
+  it('uses the selected router preset when a configuration omits its pool', async () => {
+    const response = await authedPut('/admin/config?router=frontier', {
+      ...TEST_CONFIG,
+      deciderModels: undefined,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      config: { router: 'frontier', deciderModels: [{ id: '~openai/gpt-sol-latest' }] },
+    });
+  });
+
   it('saves frontier config using query router and its independent thresholds', async () => {
     const response = await authedPut('/admin/config?router=frontier', {
       ...TEST_CONFIG,
@@ -1324,24 +2163,21 @@ describe('router selection', () => {
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
   });
 
-  it('rejects invalid routers and frontier owner profiles', async () => {
+  it('rejects invalid routers', async () => {
     expect((await authedGet('/admin/config?router=unknown')).status).toBe(400);
-    expect((await authedPost('/admin/profiles/register?router=frontier', {})).status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
   });
 
-  it('does not inspect owner queue coverage for frontier', async () => {
+  it('inspects owner queue coverage for frontier', async () => {
     vi.mocked(getConfigRows).mockResolvedValue({
       ...TEST_CONFIG_ROWS,
       config: { ...TEST_CONFIG_ROWS.config, router: 'frontier' },
     });
     const response = await authedGet('/admin/registry?router=frontier');
     expect(response.status).toBe(200);
-    expect(countCurrentProfilesByStatus).toHaveBeenCalledOnce();
     expect(countCurrentProfilesByStatus).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({ router: 'frontier' }),
-      'platform'
+      'user'
     );
   });
 });
@@ -1375,14 +2211,24 @@ describe('body router selection', () => {
     );
   });
 
-  it('rejects frontier owner profiles selected through the body', async () => {
+  it('admits frontier owner profiles under the frontier config', async () => {
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, router },
+    }));
+    vi.mocked(registerProfiles).mockResolvedValueOnce({ statuses: [] });
     const response = await authedPost('/admin/profiles/register', {
       router: 'frontier',
       ownerType: 'user',
       ownerId: 'owner',
       entries: [{ model: 'a/b' }],
     });
-    expect(response.status).toBe(400);
-    expect(registerProfiles).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(registerProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      expect.objectContaining({ ownerId: 'owner' })
+    );
   });
 });

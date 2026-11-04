@@ -4,18 +4,23 @@ import { Button } from '@/components/ui/button';
 import { LockableContainer } from '@/components/organizations/LockableContainer';
 import { Info } from 'lucide-react';
 import type { ModelRow } from '@/components/organizations/providers-and-models/providersAndModels.types';
+import { ByokOnlyTag } from '@/components/organizations/providers-and-models/PolicyPills';
+
+const NO_PROVIDERS: ReadonlySet<string> = new Set();
 
 export function ModelsTab({
   isLoading,
   canEdit,
   search,
-  selectedOnly,
+  enabledOnly,
   onSearchChange,
-  onSelectedOnlyChange,
+  onEnabledOnlyChange,
   allowedModelIds,
   enabledProviderSlugs,
+  byokOnlyProviderSlugs = NO_PROVIDERS,
   filteredModelRows,
   onToggleModelAllowed,
+  onSetModelsAllowed,
   onOpenModelDetails,
   scope = 'organization',
   showDetails = true,
@@ -23,22 +28,32 @@ export function ModelsTab({
   isLoading: boolean;
   canEdit: boolean;
   search: string;
-  selectedOnly: boolean;
+  enabledOnly: boolean;
   onSearchChange: (value: string) => void;
-  onSelectedOnlyChange: (value: boolean) => void;
+  onEnabledOnlyChange: (value: boolean) => void;
   allowedModelIds: ReadonlySet<string>;
   enabledProviderSlugs: ReadonlySet<string>;
+  /** Enabled providers among these only serve the organization's own keys. */
+  byokOnlyProviderSlugs?: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetModelsAllowed: (modelIds: string[], nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
 }) {
+  const modelsToEnable = filteredModelRows
+    .filter(row => !row.unavailableReason && !allowedModelIds.has(row.modelId))
+    .map(row => row.modelId);
+  const modelsToDisable = filteredModelRows
+    .filter(row => allowedModelIds.has(row.modelId))
+    .map(row => row.modelId);
+
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
         {scope === 'organization'
-          ? 'Disable specific models for organization members. New models from enabled providers are allowed by default.'
+          ? 'Disable specific models for organization members. New models from enabled providers are enabled by default.'
           : 'Grant specific models in addition to the organization default access.'}
       </p>
 
@@ -48,37 +63,59 @@ export function ModelsTab({
         </div>
       ) : (
         <LockableContainer>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex-1">
+          <div className="rounded-lg border">
+            <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="text-sm font-medium">Models</div>
+              <div className="text-muted-foreground text-xs">
+                {allowedModelIds.size} enabled • {filteredModelRows.length} shown
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
               <Input
                 value={search}
                 onChange={e => onSearchChange(e.target.value)}
                 placeholder="Search models…"
+                aria-label="Search models"
+                className="min-w-40 flex-1"
               />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={selectedOnly} onCheckedChange={onSelectedOnlyChange} />
-              Selected
-            </label>
-          </div>
-
-          <div className="rounded-lg border">
-            <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
-              <div className="text-sm font-medium">Models</div>
-              <div className="text-muted-foreground text-xs">
-                {allowedModelIds.size} {scope === 'group' ? 'selected' : 'allowed'} •{' '}
-                {filteredModelRows.length} shown
+              <label className="flex shrink-0 items-center gap-2 text-sm">
+                <Checkbox checked={enabledOnly} onCheckedChange={onEnabledOnlyChange} />
+                Show enabled only
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canEdit || modelsToEnable.length === 0}
+                  onClick={() => onSetModelsAllowed(modelsToEnable, true)}
+                >
+                  Enable all shown ({modelsToEnable.length})
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canEdit || modelsToDisable.length === 0}
+                  onClick={() => onSetModelsAllowed(modelsToDisable, false)}
+                >
+                  Disable all shown ({modelsToDisable.length})
+                </Button>
               </div>
             </div>
-
             <div className="max-h-[560px] overflow-y-auto">
               {filteredModelRows.map(row => {
                 const checked = allowedModelIds.has(row.modelId);
                 const providerCount = row.providerSlugs.length;
                 const providerLabel = providerCount === 1 ? 'provider' : 'providers';
-                const enabledProviderCount = row.providerSlugs.filter(slug =>
+                const enabledProviders = row.providerSlugs.filter(slug =>
                   enabledProviderSlugs.has(slug)
-                ).length;
+                );
+                const enabledProviderCount = enabledProviders.length;
+                const enabledByokOnly =
+                  enabledProviderCount > 0 &&
+                  enabledProviders.every(slug => byokOnlyProviderSlugs.has(slug));
                 const enabledProviderEmoji = enabledProviderCount === 0 ? '⚠️' : '✅';
                 const unavailable = Boolean(row.unavailableReason);
                 return (
@@ -136,6 +173,9 @@ export function ModelsTab({
                             </>
                           ) : null}
                         </span>
+                        {scope === 'organization' && checked ? (
+                          <ByokOnlyTag value={enabledByokOnly} />
+                        ) : null}
                       </div>
                     </div>
                   </label>

@@ -1,21 +1,58 @@
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
-import { parseConfigFileTextToJson } from 'typescript';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import { expect, it } from 'vitest';
 
-it('uses a real or automatically provisioned production OAuth KV namespace', () => {
-  const parsed = parseConfigFileTextToJson(
-    'wrangler.jsonc',
-    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
+function readWranglerConfig(): unknown {
+  const errors: ParseError[] = [];
+  const config: unknown = parseJsonc(
+    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
+    errors,
+    { allowTrailingComma: true }
   );
-  expect(parsed.error).toBeUndefined();
-  const config = parsed.config as { kv_namespaces: Array<{ binding: string; id?: string }> };
+  expect(errors).toEqual([]);
+  return config;
+}
+
+it('uses a real or automatically provisioned production OAuth KV namespace', () => {
+  const config = readWranglerConfig() as {
+    kv_namespaces: Array<{ binding: string; id?: string }>;
+  };
   const binding = config.kv_namespaces.find(item => item.binding === 'OAUTH_KV');
   expect(binding).toBeDefined();
   if (binding?.id !== undefined) {
     expect(binding.id).toMatch(/^[a-f0-9]{32}$/);
     expect(binding.id).not.toBe('0'.repeat(32));
   }
+});
+
+it('declares the per-account search allowance in both environments, with distinct counters', () => {
+  // src/index.ts reads `env.SEARCH_RATE_LIMITER` and applies the configured
+  // limit to each grant user, so the binding has to exist in every environment
+  // the worker deploys to. A separate namespace id keeps the dev worker's
+  // counters apart from production's.
+  const config = readWranglerConfig() as {
+    ratelimits?: Array<{
+      name: string;
+      namespace_id: string;
+      simple: { limit: number; period: number };
+    }>;
+    env?: {
+      dev?: {
+        ratelimits?: Array<{
+          name: string;
+          namespace_id: string;
+          simple: { limit: number; period: number };
+        }>;
+      };
+    };
+  };
+  const production = config.ratelimits?.find(item => item.name === 'SEARCH_RATE_LIMITER');
+  const dev = config.env?.dev?.ratelimits?.find(item => item.name === 'SEARCH_RATE_LIMITER');
+  expect(production).toMatchObject({ simple: { limit: 60, period: 60 } });
+  expect(dev).toMatchObject({ simple: { limit: 60, period: 60 } });
+  expect(production?.namespace_id).toBeDefined();
+  expect(dev?.namespace_id).not.toBe(production?.namespace_id);
 });
 
 it('marks the dev AI and Vectorize bindings remote so semantic search is reachable locally', () => {
@@ -26,12 +63,7 @@ it('marks the dev AI and Vectorize bindings remote so semantic search is reachab
   // dev worker to the real dev resources (src/search-knn.ts + wrangler's
   // binding table). Assert it here so a regression is caught in CI instead of
   // silently disabling semantic search at sign-in.
-  const parsed = parseConfigFileTextToJson(
-    'wrangler.jsonc',
-    readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
-  );
-  expect(parsed.error).toBeUndefined();
-  const config = parsed.config as {
+  const config = readWranglerConfig() as {
     env?: {
       dev?: {
         ai?: { binding: string; remote?: boolean };

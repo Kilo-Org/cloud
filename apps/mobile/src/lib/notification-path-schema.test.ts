@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pushDataSchema } from '@kilocode/notifications';
+import { pushDataSchema } from '@kilocode/notifications/schemas';
 
 import { notificationPathForData } from './notification-path';
 
@@ -51,7 +51,7 @@ describe('pushDataSchema', () => {
       scope: 'personal',
     });
     expect(notificationPathForData(personalFinding)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f-parsed?via=push'
+      '/(app)/security-agent/personal/findings/f-parsed?via=push'
     );
 
     const orgFinding = pushDataSchema.parse({
@@ -60,7 +60,7 @@ describe('pushDataSchema', () => {
       scope: 'org-99',
     });
     expect(notificationPathForData(orgFinding)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org-99/findings/f-org?via=push'
+      '/(app)/security-agent/org-99/findings/f-org?via=push'
     );
   });
 

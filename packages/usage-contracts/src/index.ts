@@ -97,7 +97,11 @@ const UsageMetadataSchema = z.object({
   // Like bouncer_usage_event, older gateway senders omit this additive field.
   // Default it to null so parsed metadata still satisfies UsageMetaData.
   reasoning_setting: z.string().nullable().default(null),
+  // Additive like reasoning_setting: older senders omit it.
+  inference_region: z.string().nullable().default(null),
   market_cost: z.number().nullable(),
+  // Additive like reasoning_setting: older senders omit it.
+  non_inference_cost: bigintAsNumber.nullable().default(null),
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),

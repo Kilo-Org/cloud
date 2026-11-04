@@ -17,7 +17,8 @@ import { __resetFilePartUrlResolverForTests } from './file-part-url-resolver';
 
 type FileInstance = {
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
+  writeSync: (content: string, options?: { encoding?: string }) => void;
   text: ReturnType<typeof vi.fn>;
   filename?: string;
 };
@@ -39,7 +40,8 @@ const expoFileSystemMock = vi.hoisted(() => {
         typeof directoryOrUri === 'string'
           ? directoryOrUri
           : `file:///cache/session-file-parts/${filename}`,
-      write: vi.fn(),
+      write: vi.fn().mockResolvedValue(undefined),
+      writeSync: vi.fn(),
       text: fileText,
       filename,
     };
@@ -111,6 +113,8 @@ const safeAreaMock = vi.hoisted(() => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -296,6 +300,48 @@ async function selectActionSheet(index: number): Promise<void> {
 }
 
 describe('FilePartRenderer mounted', () => {
+  it('shows a loading image instead of the inline payload while the cache write is pending', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      directoryOrUri: unknown,
+      filename?: string
+    ) {
+      const instance = {
+        uri:
+          typeof directoryOrUri === 'string'
+            ? directoryOrUri
+            : `file:///cache/session-file-parts/${filename}`,
+        write: vi.fn(() => write.promise),
+        writeSync: vi.fn(),
+        text: expoFileSystemMock.fileText,
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+    const dataUrl = 'data:image/png;base64,QUJD';
+    cacheFilePart('part-1', { url: dataUrl, mime: 'image/png', filename: 'shot.png' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: dataUrl })
+    );
+
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => node.props.accessibilityLabel === 'Loading image')
+    ).toHaveLength(1);
+
+    write.resolve(undefined);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const image = first(findByType(renderer.root, 'Image'));
+    expect(image.props.source).toEqual({ uri: 'file:///cache/session-file-parts/part-1-shot.png' });
+
+    await unmount(renderer);
+  });
+
   it.each([
     { mime: 'image/png', filename: 'shot.png', label: 'Open shot.png full screen' },
     { mime: 'text/markdown', filename: 'readme.md', label: 'Preview readme.md' },

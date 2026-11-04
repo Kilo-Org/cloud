@@ -264,7 +264,6 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     return null;
   }
 
-  // Show loading state
   if (orgLoading || ssoLoading) {
     return (
       <LoadingCard
@@ -275,7 +274,6 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     );
   }
 
-  // Show error state for non-404 errors
   if (error) {
     return (
       <ErrorCard
@@ -287,7 +285,6 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     );
   }
 
-  // Show existing WorkOS organization if it exists
   if (ssoConfig && typeof ssoConfig === 'object') {
     return (
       <Card>
@@ -418,7 +415,6 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
     );
   }
 
-  // Show enrollment button if no WorkOS config exists
   return (
     <Card>
       <CardHeader>

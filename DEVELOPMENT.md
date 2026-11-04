@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 24.14.1 (via nvm)
+### Node.js 24.22.1 (via nvm)
 
-The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
+The project requires Node.js 24.22.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -148,6 +148,8 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. Values that already exist are kept, read from `.env.local` first and from the Worker's `.dev.vars` second, so re-running setup neither rotates a keypair the Worker already stored credentials under nor drops a half that lives only in the Worker file. Without a complete pair the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
@@ -160,9 +162,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -241,6 +244,105 @@ pnpm test
 
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
+
+### CLI session storage verification
+
+After migrating the local database, run the session-copy and account-cleanup
+regressions with:
+
+```bash
+pnpm --filter web exec jest --runInBand src/routers/cli-sessions-router.test.ts src/lib/r2/cli-sessions.test.ts src/lib/user/deletion-queue/handlers/cli-v1.test.ts
+```
+
+Share publication refreshes a stable link with the current session snapshot.
+The blob URL columns identify the current copy folder. `pending_copy_ids`
+records folders awaiting deletion; later publication and deletion lifecycle
+calls retry that work before admitting another copy. Publication copies the
+blobs first and then writes the row in a short transaction, runs one copy at a
+time per account in an instance, and a fork of a shared link attaches its copy
+only while the link still points at the folder that was copied, copying again
+when it does not. Deleting a link records its folders in `pending_copy_ids`,
+deletes those objects, and removes the row only once no publication recorded a
+newer folder.
+
+For migration verification, run `pnpm drizzle:verify-bootstrap` to apply the
+complete chain to a disposable empty database. Also verify an upgrade from the
+base branch's migration chain with existing session and share rows: `is_fork`
+is backfilled from `forked_from`, `pending_copy_ids` defaults to an empty list,
+and `IDX_shared_cli_sessions_kilo_user_id` must be valid after the concurrent
+index build. Run `pnpm drizzle check` and `pnpm drizzle generate` to confirm the
+journal and schema agree after synchronizing the branch with `main`.
+
+
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+The canonical database reconciler remains unconditional by default.
+Lazy balance checks opt into `onlyIfDue`.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/paidCreditAccounting.test.ts \
+  ../../packages/web-shared/src/lib/balance-funding.test.ts \
+  ../../packages/web-shared/src/lib/creditAdjustments.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
+### Native build artifacts
+
+Native build tooling verifies artifact provenance before installation or build reuse.
+Installation accepts successful, completed native workflow runs from the repository itself.
+Push builds must originate from the default branch.
+Manual builds must match the consumer commit, or `GITHUB_SHA` when the gate runs in CI.
+Pull-request artifacts do not qualify for installation.
+The pull-request gate can reuse a successful artifact from that same pull request and head repository.
+Trusted push and manual artifacts remain available for gate reuse.
+Pull-request artifact reuse requires a recorded pull-request association.
+Fork runs without that association require a fresh build.
+
+The native fingerprint includes the artifact trust revision.
+This revision changes remote artifact names and local cache keys.
+Each platform requires a fresh trusted build after this change.
+Existing worktrees must receive the tooling update before they use remote artifacts.
+
+Require a remote iOS build without permitting a local compilation fallback:
+
+```bash
+KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
+```
+
+### Mobile PR review entry
+
+The PR review entry screen keeps the account picker beside the title.
+Recent reviews use separate cards with wrapping titles and repository details.
+Long-press a recent card to open its removal confirmation; failed reviews retain Retry.
+Screen readers expose the same Remove action without requiring the gesture.
+
+Use an isolated backend, a loopback mobile API URL, and `SKIP_STRIPE_API=true` for the native fixture:
+
+```bash
+pnpm dev:seed app:mobile-pr-entry
+```
+
+Sign in with the returned fake account, then open its `deepLink`.
+The fixture seeds local recent reviews and renders the real entry screen.
+The seed provides short and long organization names without connecting providers.
+Use `emptyDeepLink` for empty history.
+The fixture requires a development build and refuses non-loopback API URLs or accounts outside the reserved example domain.
+Keep optional analytics off and avoid billing surfaces; the seed creates no Stripe customer.
 
 ## Common Development Commands
 
@@ -388,6 +490,18 @@ The application consists of the Next.js app plus several Cloudflare Worker servi
 
 AI inference works locally without any extra services. The Next.js app includes an OpenRouter proxy route (`/api/openrouter/[...path]`) that calls real AI providers using API keys from `.env.local`. There are no mocks or local stubs — all inference hits real APIs (OpenRouter, OpenAI, Anthropic, Mistral, etc.).
 
+### Sign in with ChatGPT usage limits
+
+The gateway records plan limits on the connection that serves the request.
+The personal, organization-member, and shared-services settings cards show the recorded notice.
+
+- Consumer limits retain the **Manage usage** action.
+- `subscription_sharing_workplace_individual_usage_limit_exceeded` selects the Business notice.
+- **Copy request for admin** copies a message for the user's ChatGPT workspace admin.
+- Copying does not send the message, change the limit, or switch billing.
+- If clipboard access fails, the notice reveals a selectable request for manual copying.
+- A successful request or a reconnect clears the recorded notice.
+
 ### Running workers locally
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
@@ -477,12 +591,12 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 - **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
-- **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
+- **Cloudflare Containers** (used by Cloud Agent Next) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers
 
-The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews, app builder) will fail gracefully or show connection errors if that worker isn't running.
+The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews) will fail gracefully or show connection errors if that worker isn't running.
 
 ### Multi-worktree support
 
@@ -510,6 +624,13 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 - Every worker command gets `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, because each `wrangler.jsonc` commits a `localConnectionString` on the default port.
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
+
+## Admin webhook inspection
+
+Webhook request records and request logs use the session-viewer permission contract
+(`is_admin` and `can_view_sessions`). Local admin fixtures used to inspect these
+records must have both flags enabled. This applies to personal and organization
+triggers.
 
 ## First credit-pack purchase email
 
@@ -541,7 +662,7 @@ If you see errors about unsupported Node.js versions, ensure you're using the pi
 
 ```bash
 nvm use
-node --version  # Should output v24.14.1
+node --version  # Should output v24.22.1
 ```
 
 ### Database connection errors
@@ -570,3 +691,52 @@ If image/video files appear as small text files with `oid sha256:...`, run:
 ```bash
 git lfs pull
 ```
+
+## Agent morning briefings
+
+Morning briefings are scheduled snapshot digests for explicitly enabled Personal and organization contexts.
+Reading preferences does not enable a context or create a schedule.
+Users configure a timezone, night start, morning start, morning end, model, and finite generation budgets.
+Notifications require a separate opt-in.
+
+The morning scheduler captures recent session metadata once for each enabled context.
+The snapshot contains current status, verified pull request links, available session summaries, and a bounded final-response excerpt.
+It describes the latest available state at capture time, not an exact historical reconstruction.
+Counts describe selected sessions, not exhaustive overnight totals.
+Reports show the capture time and disclose selection limits.
+They do not report overnight spending or infer success from an idle session.
+
+Session ingestion stores one redacted completed-response excerpt per eligible session.
+Streaming fragments, reasoning, and tool output do not become briefing excerpts.
+A newer completed response replaces the previous excerpt.
+Context changes and account deletion clear the excerpt.
+The collector does not maintain a separate event ledger or an evidence retry queue.
+
+The scheduler saves bounded, immutable evidence in `agent_briefing_snapshots`.
+The summary worker atomically claims each due report and generates its summary asynchronously.
+Report reads do not refresh evidence, scan transcripts, or start generation.
+The structured digest remains available while generation runs or fails.
+Saved content requires current context and referenced-session access.
+Reports expire through the existing retention policy.
+Manual creation, historical period selection, preparation drafts, and manual summary retries are not available.
+
+Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
+The gateway preserves bounded-request price ceilings and model access checks.
+Usage receipts retain the existing committed-versus-queued settlement behavior.
+Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
+The default summary model is `~deepseek/deepseek-flash-latest`.
+
+The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
+They use the existing cron authorization, database, gateway, and notification configuration.
+Use `pnpm dev:seed app:agent-briefing --help` for the scheduled snapshot fixture.
+Run local verification with an isolated database, fake accounts, and local notification and inference fixtures.
+
+### Cutover deployment
+
+The generated migration creates the snapshot store and removes the obsolete event and report stores.
+The existing deployment workflow applies migrations before promoting web and worker code.
+Do not apply this destructive cutover while an older producer or summary worker can use the retired stores.
+Disable the old briefing cron jobs and settle outstanding briefing usage before retiring the old report store.
+Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
+Enable contexts explicitly after deployment.
+Do not treat an unshipped user interface as proof that its ingestion code is inactive.

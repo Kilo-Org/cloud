@@ -262,11 +262,28 @@ export function toSpectatorRow(event: CloudAgentEvent, t: TFunction): SpectatorR
     return toRowFromKilocode(timestamp, payload, t);
   }
   if (streamEventType === 'status') {
-    const status = asString(payload?.status);
-    if (status) {
+    const status = sessionStatusLabel(payload?.status);
+    if (status === 'idle') {
       return {
         timestamp,
-        message: t('codeReviewer.reviewDetail.statusWithValue', { status }),
+        message: t('codeReviewer.reviewDetail.agentIdle'),
+        eventType: streamEventType,
+      };
+    }
+    if (status === 'busy') {
+      return {
+        timestamp,
+        message: t('codeReviewer.reviewDetail.agentWorking'),
+        eventType: streamEventType,
+      };
+    }
+    if (status) {
+      // The frame's status token has no declared vocabulary, so the row
+      // announces a localized state rather than a wire word inside translated
+      // copy; `session.status` maps its own two states the same way.
+      return {
+        timestamp,
+        message: t('codeReviewer.reviewDetail.statusWithValue', { status: t('common.unknown') }),
         eventType: streamEventType,
       };
     }

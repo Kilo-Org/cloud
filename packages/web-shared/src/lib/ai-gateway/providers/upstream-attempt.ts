@@ -1,4 +1,4 @@
-import { after, type NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import {
   getToolsAvailable,
@@ -17,13 +17,16 @@ import {
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;
@@ -39,6 +42,8 @@ type SendUpstreamAttemptInput = {
   method: string;
   signal?: AbortSignal;
   vercelRequestId?: string | null;
+  costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
+  dataRegion: OrganizationDataRegion | null;
 };
 
 type SendUpstreamAttemptResult =
@@ -66,6 +71,8 @@ export async function sendUpstreamAttempt({
   method,
   signal,
   vercelRequestId,
+  costLimit,
+  dataRegion,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -79,14 +86,35 @@ export async function sendUpstreamAttempt({
     organizationId,
     sessionId,
     taskId,
-    isNonTrialEnterprise
+    isNonTrialEnterprise,
+    dataRegion
   );
+  if (costLimit) {
+    const decision = await enforceRequestCostLimit(
+      costLimit.maximumMicrodollars,
+      requestedModel,
+      request.body,
+      costLimit.availableBalanceMicrodollars,
+      {
+        id: providerContext.provider.type,
+        userFunded: providerContext.userByok !== null,
+      }
+    );
+    if (decision.refusal)
+      return {
+        type: 'error',
+        response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
+      };
+    if (decision.providerConfig) request.body.provider = decision.providerConfig;
+  }
 
-  if (providerContext.provider.id === 'openrouter') {
-    const transformedModel = request.body.model;
-    if (!transformedModel || !(await isValidOpenRouterModelId(transformedModel))) {
-      return { type: 'invalid-openrouter-model' };
-    }
+  if (
+    (providerContext.provider.type === 'openrouter' ||
+      providerContext.provider.type === 'vercel') &&
+    !isAutoSmallFreeModel(requestedModel) &&
+    !(await isValidOpenRouterModelId(requestedModel))
+  ) {
+    return { type: 'invalid-openrouter-model' };
   }
 
   const result = await upstreamRequest({
@@ -102,7 +130,7 @@ export async function sendUpstreamAttempt({
   });
   if (result.type === 'error') return result;
 
-  if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
+  if (providerContext.provider.type === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
     await syncChatGptUsageLimit(result.response, owner);
     await recordChatGptNotEligible(

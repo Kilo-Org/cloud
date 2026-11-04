@@ -19,7 +19,6 @@ export type RenderProps = {
   placeholder?: string;
   returnSendsMessage?: boolean;
   sendDisabledReason?: string | null;
-  voiceInputAvailable?: boolean;
 };
 
 export function makeProps(overrides: Partial<RenderProps> = {}) {
@@ -53,7 +52,6 @@ export function makeProps(overrides: Partial<RenderProps> = {}) {
     returnSendsMessage: false,
     textInputStyle: {},
     voiceDisabled: false,
-    voiceInputAvailable: false,
     voiceInputStatus: 'idle' as const,
     ...overrides,
   };

@@ -8,6 +8,8 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   View: 'View',

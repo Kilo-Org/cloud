@@ -127,6 +127,13 @@ describe('getRevenueKpiData service fee reporting', () => {
         stripe_payment_id: 'ch_legacy_only',
         created_at: '2025-01-10T12:00:00.000Z',
       },
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: -25_000_000,
+        is_free: false,
+        credit_category: 'credits_expired',
+        created_at: '2025-01-10T13:00:00.000Z',
+      },
     ]);
 
     const { data } = await getRevenueKpiData(false, '2025-01-09', '2025-01-13');

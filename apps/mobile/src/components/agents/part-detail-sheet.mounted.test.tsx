@@ -60,7 +60,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
+vi.mock('./tool-card-image-cache', () => ({
+  isToolCardImagePending: () => false,
+  useToolCardImageUri: () => undefined,
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -249,19 +252,22 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
-// A React Native radio reports its current choice through `checked`, not
-// `selected` — see `radioItemA11y` in @/components/ui/radio-group.
+/** Whether the radio row for `label` is the current choice. */
 function radioSelected(root: TestRenderer.ReactTestInstance, label: string): boolean {
   const state = propOf(radio(root, label), 'accessibilityState') as
-    | { checked: boolean }
+    | { selected: boolean }
     | undefined;
-  return state?.checked === true;
+  return state?.selected === true;
 }
 
 function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {

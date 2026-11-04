@@ -6,5 +6,12 @@
 	<array>
 		<string>group.com.kilocode.kiloapp</string>
 	</array>
+	<!-- Dev-only: lets the domain set testingModes on development builds so the
+	     Files app can open the location without the manual enable step. Apple
+	     does not grant this capability on distribution profiles; the prebuild
+	     plugin strips it for the production profile (see
+	     plugins/withArtifactFileProvider.js). -->
+	<key>com.apple.developer.fileprovider.testing-mode</key>
+	<true/>
 </dict>
 </plist>

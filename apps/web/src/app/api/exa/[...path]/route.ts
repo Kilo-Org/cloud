@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   const isPaidRequest = monthlyUsage >= allowance;
 
   if (isPaidRequest) {
-    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
     if (balance <= 0) {
       return NextResponse.json(
         {

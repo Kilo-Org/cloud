@@ -31,6 +31,7 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 
 import {
   APP_SCHEME,
+  canonicalSystemSearchId,
   deeplinkPathFromHref,
   FINDING_HREF_PREFIX,
   PULL_REQUEST_HREF_PREFIX,
@@ -50,10 +51,11 @@ export type SystemSearchDocument = {
    */
   route: string;
   /**
-   * Stable JSON of the content fields and the route. It changes when title,
-   * description, keywords or the route change and never otherwise, so a
-   * renamed row is re-indexed, an entry indexed before the route existed is
-   * re-indexed, and an unrelated re-render is not.
+   * Stable JSON of the content fields, the route, and the source when the
+   * entry has one. It changes when title, description, keywords, the route or
+   * the source change, so a renamed row is re-indexed, an entry indexed before
+   * the route or the source existed is re-indexed, and an unrelated re-render
+   * is not.
    */
   fingerprint: string;
 };
@@ -62,15 +64,15 @@ export type SystemSearchDocument = {
 export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
 
 /**
- * The three route groups an indexed id is allowed to name, with the source
- * family each belongs to. The family lets the sync keep an indexed id whose
- * source could not be enumerated this run (a cold start hydrates only some
- * queries), so a valid entry is not dropped just because its query is absent.
+ * The three route groups an indexed id is allowed to name. A valid entry is
+ * kept even when its source could not be enumerated this run (a cold start
+ * hydrates only some queries); {@link planSystemSearchUpdate} decides removal
+ * from the source scopes the run did observe.
  */
-const HREF_FAMILIES: readonly { prefix: string; family: SystemSearchFamily }[] = [
-  { prefix: SESSION_HREF_PREFIX, family: 'sessions' },
-  { prefix: PULL_REQUEST_HREF_PREFIX, family: 'pullRequests' },
-  { prefix: FINDING_HREF_PREFIX, family: 'findings' },
+const HREF_FAMILIES: readonly { prefix: string }[] = [
+  { prefix: SESSION_HREF_PREFIX },
+  { prefix: PULL_REQUEST_HREF_PREFIX },
+  { prefix: FINDING_HREF_PREFIX },
 ];
 
 /** The route groups an indexed id is allowed to name. */
@@ -89,7 +91,7 @@ const ROUTE_ID_PATTERNS: readonly RegExp[] = [
   new RegExp(String.raw`^/\(app\)/agent-chat/${ID_SEGMENT}(?:\?[^#]*)?$`),
   new RegExp(String.raw`^/\(app\)/pr-review/${ID_SEGMENT}(?:/${ID_SEGMENT})*(?:\?[^#]*)?$`),
   new RegExp(
-    String.raw`^/\(app\)/\(tabs\)/\(3_profile\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
+    String.raw`^/\(app\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
   ),
 ];
 
@@ -357,8 +359,11 @@ export function findingSearchDocument(
  * navigate.
  */
 export function systemSearchHrefFromId(id: string): string | null {
-  const known = ROUTE_ID_PATTERNS.some(pattern => pattern.test(id));
-  return known ? id : null;
+  // An id indexed before a route moved resolves to where the screen lives now;
+  // the OS hands the old id back until the next sync replaces the entry.
+  const canonical = canonicalSystemSearchId(id);
+  const known = ROUTE_ID_PATTERNS.some(pattern => pattern.test(canonical));
+  return known ? canonical : null;
 }
 
 /** The personal scope name shared by the session and finding sources. */
@@ -387,19 +392,24 @@ export function systemSearchSourceKey(family: SystemSearchFamily, scope: string)
  * cold start hydrates only some queries) is left in place.
  */
 export function systemSearchSourceKeysOfId(id: string): string[] {
-  if (systemSearchHrefFromId(id) === null) {
+  const href = systemSearchHrefFromId(id);
+  if (href === null) {
     return [];
   }
-  if (id.startsWith(SESSION_HREF_PREFIX)) {
+  const canonical = href;
+  if (canonical.startsWith(SESSION_HREF_PREFIX)) {
     return [
-      systemSearchSourceKey('sessions', organizationIdOfSessionId(id) ?? PERSONAL_SOURCE_SCOPE),
+      systemSearchSourceKey(
+        'sessions',
+        organizationIdOfSessionId(canonical) ?? PERSONAL_SOURCE_SCOPE
+      ),
     ];
   }
-  if (id.startsWith(PULL_REQUEST_HREF_PREFIX)) {
-    return [systemSearchSourceKey('pullRequests', providerOfPullRequestId(id))];
+  if (canonical.startsWith(PULL_REQUEST_HREF_PREFIX)) {
+    return [systemSearchSourceKey('pullRequests', providerOfPullRequestId(canonical))];
   }
-  if (id.startsWith(FINDING_HREF_PREFIX)) {
-    const scope = findingScopeOfId(id);
+  if (canonical.startsWith(FINDING_HREF_PREFIX)) {
+    const scope = findingScopeOfId(canonical);
     return scope === null ? [] : [systemSearchSourceKey('findings', scope)];
   }
   return [];
@@ -440,15 +450,13 @@ function findingScopeOfId(id: string): string | null {
 }
 
 /**
- * The id as a link the OS can hand back to the app. Expo Router groups
- * (`(app)`, `(tabs)/(3_profile)`) are app-internal and never appear in a
- * deeplink, so they are stripped; null for an unrecognised id.
+ * The id as a link the OS can hand back to the app. The Expo Router group
+ * (`(app)`) is app-internal and never appears in a deeplink, so it is
+ * stripped; null for an unrecognised id.
  */
 export function systemSearchDeeplinkFromId(id: string): string | null {
-  if (systemSearchHrefFromId(id) === null) {
-    return null;
-  }
-  return `${APP_SCHEME}${deeplinkPathFromHref(id)}`;
+  const href = systemSearchHrefFromId(id);
+  return href === null ? null : `${APP_SCHEME}${deeplinkPathFromHref(href)}`;
 }
 
 /**

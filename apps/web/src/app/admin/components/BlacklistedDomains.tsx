@@ -29,25 +29,50 @@ function EditTab() {
   const { data, isLoading } = useQuery(trpc.admin.blacklistDomains.get.queryOptions());
 
   const [inputValue, setInputValue] = useState('');
+  const [tldInputValue, setTldInputValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [tldHasChanges, setTldHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
       setInputValue(data.domains.join('\n'));
+      setTldInputValue((data.blocked_signup_tlds ?? []).join('\n'));
       setHasChanges(false);
+      setTldHasChanges(false);
     }
   }, [data]);
 
   const mutation = useMutation(
     trpc.admin.blacklistDomains.set.mutationOptions({
-      onSuccess: () => {
+      onSuccess: result => {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.blacklistDomains.get.queryKey(),
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.blacklistDomains.stats.queryKey(),
         });
-        toast.success('Blacklisted domains updated');
+        void queryClient.invalidateQueries({
+          queryKey: ['block-blacklisted-domains-counts'],
+        });
+
+        const { blocked, remaining, failed } = result.backfill;
+        const accountLabel = `${blocked.toLocaleString()} existing ${
+          blocked === 1 ? 'account' : 'accounts'
+        }`;
+
+        if (failed) {
+          toast.warning(
+            'Saved, but blocking existing accounts failed. Run the backfill to finish.'
+          );
+        } else if (remaining) {
+          toast.warning(
+            `Saved. Blocked ${accountLabel}; more remain. Run the backfill to finish the rest.`
+          );
+        } else if (blocked > 0) {
+          toast.success(`Saved. Blocked ${accountLabel}.`);
+        } else {
+          toast.success('Blacklisted domains updated');
+        }
       },
       onError: error => {
         toast.error(error.message || 'Failed to update');
@@ -61,7 +86,14 @@ function EditTab() {
       .map(part => part.trim().toLowerCase())
       .filter(Boolean);
 
-    mutation.mutate({ domains });
+    const blocked_tlds = tldInputValue
+      .split(/[\n|]/)
+      .map(part => part.trim().toLowerCase().replace(/^\.+/, ''))
+      .filter(Boolean);
+
+    // Only send the TLD list when it was edited, so a tab opened before a
+    // deploy cannot reset a list it never loaded.
+    mutation.mutate({ domains, ...(tldHasChanges ? { blocked_tlds } : {}) });
   }
 
   if (isLoading) {
@@ -82,7 +114,8 @@ function EditTab() {
             <CardDescription>
               Email domains that are blocked from registration and access. Enter one domain per line
               (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
-              example.com also blocks subdomain.example.com).
+              example.com also blocks subdomain.example.com). Adding a domain also blocks existing
+              non-admin accounts on it that are not already blocked.
             </CardDescription>
           </div>
           <Badge variant="secondary" className="px-3 py-1">
@@ -102,6 +135,34 @@ function EditTab() {
           className="font-mono text-sm"
         />
 
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label htmlFor="blocked-signup-tlds">Blocked signup TLDs</Label>
+              <p className="text-muted-foreground text-xs">
+                New accounts on these top-level domains are refused for every sign-in method.
+                Existing accounts keep signing in. Enter one TLD per line, with or without the
+                leading dot. An entry here never blocks existing accounts.
+              </p>
+            </div>
+            <Badge variant="secondary" className="px-3 py-1">
+              {(data?.blocked_signup_tlds ?? []).length} TLDs
+            </Badge>
+          </div>
+          <Textarea
+            id="blocked-signup-tlds"
+            placeholder={'shop\ntop\nasia'}
+            value={tldInputValue}
+            onChange={e => {
+              setTldInputValue(e.target.value);
+              setTldHasChanges(true);
+              setHasChanges(true);
+            }}
+            rows={4}
+            className="font-mono text-sm"
+          />
+        </div>
+
         <div className="flex items-center gap-3">
           <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
             {mutation.isPending ? 'Saving...' : 'Save'}
@@ -116,8 +177,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains are stored in Redis for instant updates. Changes take effect immediately without
-            a deploy. The BLACKLIST_DOMAINS env var is used as a fallback if Redis has no data.
+            Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
+            checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
+            env vars are fallbacks when Redis has no data.
           </p>
         </div>
       </CardContent>
@@ -161,34 +223,42 @@ function StatsTab() {
             No blacklisted domains configured
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead className="text-right">Blocked Users</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stats.domains.map(domain => (
-                  <TableRow key={domain.domain}>
-                    <TableCell className="font-medium">
-                      <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {domain.blockedCount > 0 ? (
-                        <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
-                          {domain.blockedCount.toLocaleString()}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
-                    </TableCell>
+          <>
+            {stats.domains.length < stats.totalDomains && (
+              <p className="text-muted-foreground mb-2 text-xs">
+                Showing the {stats.domains.length} domains with the most matching users, of{' '}
+                {stats.totalDomains.toLocaleString()} blacklisted domains.
+              </p>
+            )}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Domain</TableHead>
+                    <TableHead className="text-right">Blocked Users</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {stats.domains.map(domain => (
+                    <TableRow key={domain.domain}>
+                      <TableCell className="font-medium">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {domain.blockedCount > 0 ? (
+                          <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
+                            {domain.blockedCount.toLocaleString()}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

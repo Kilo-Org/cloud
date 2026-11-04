@@ -1,4 +1,5 @@
 import 'server-only';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
@@ -6,6 +7,7 @@ import { NextResponse } from 'next/server';
 import {
   organizationTarget,
   recordKiloAdminElevationForRequest,
+  type AdminAccessSurface,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -18,13 +20,6 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
-// Mirrors routers/organizations/utils.ts: parent-organization roles that
-// inherit access to child organizations.
-const parentOrganizationAccessRoles = [
-  'owner',
-  'admin',
-  'billing_manager',
-] satisfies OrganizationRole[];
 const rolePriority = ['owner', 'admin', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 type UserWithRole = User & {
@@ -50,10 +45,19 @@ function allowedRole(
 export async function getAuthorizedOrgContext(
   id: Organization['id'],
   roles?: OrganizationRole[],
-  // this is used only in testing because mocking getUserFromAuth doesn't work with jest
-  // due to the way next module loading works
-  getUserFromAuthOverride?: typeof getUserFromAuth
+  options: {
+    // used only in testing because mocking getUserFromAuth doesn't work with jest
+    // due to the way next module loading works
+    getUserFromAuthOverride?: typeof getUserFromAuth;
+    /**
+     * How this helper was reached, for the audit event its admin branch emits.
+     * Defaults to `'rest'`; server-component pages and layouts pass
+     * `'server-component'`.
+     */
+    surface?: AdminAccessSurface;
+  } = {}
 ): Promise<DataOrNextError<{ user: UserWithRole; organization: Organization }>> {
+  const { getUserFromAuthOverride, surface } = options;
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
@@ -80,6 +84,7 @@ export async function getAuthorizedOrgContext(
       tokenSource,
       reason: 'organization_access_rest',
       target: organizationTarget(organizationId),
+      surface,
     });
     const organization = await getOrganizationById(organizationId);
     if (!organization) {
@@ -119,7 +124,7 @@ export async function getAuthorizedOrgContext(
       and(
         eq(organization_memberships.organization_id, organizations.parent_organization_id),
         eq(organization_memberships.kilo_user_id, user.id),
-        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     )
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));

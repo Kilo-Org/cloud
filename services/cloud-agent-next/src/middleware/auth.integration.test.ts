@@ -187,12 +187,15 @@ describe('auth middleware with tRPC protected procedures', () => {
     ],
   ])('accepts %s for a protected procedure', async (_name, createToken) => {
     const token = createToken();
-    const response = await request('start', { authorization: `Bearer ${token}` });
+    const response = await request('start', {
+      authorization: `Bearer ${token}`,
+      'x-internal-api-key': INTERNAL_API_SECRET,
+    });
 
     expect(response.status).toBe(200);
     expect(protectedCalls).toEqual([{ userId: USER_ID, authToken: token }]);
     expect(logging.withFields).toHaveBeenCalledWith({ procedure: 'start' });
-    expect(logging.info).toHaveBeenCalledWith('Skipping balance check per header');
+    expect(logging.info).toHaveBeenCalledWith('Skipping balance check per internal request');
   });
 
   it.each(['start', 'internal'] as const)(
@@ -205,7 +208,7 @@ describe('auth middleware with tRPC protected procedures', () => {
 
       await expectUnauthorized(response, 'Invalid or expired token', procedure);
       expect(getWorkerDb).not.toHaveBeenCalled();
-      expect(logging.info).not.toHaveBeenCalledWith('Skipping balance check per header');
+      expect(logging.info).not.toHaveBeenCalledWith('Skipping balance check per internal request');
       expect(internalCalls).toEqual([]);
       expect(protectedCalls).toEqual([]);
     }

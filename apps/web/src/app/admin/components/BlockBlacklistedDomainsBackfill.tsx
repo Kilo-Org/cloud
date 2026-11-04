@@ -5,10 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import type {
-  BlockBlacklistedDomainsCountsResponse,
-  BlockBlacklistedDomainsBackfillResponse,
-} from '../api/backfills/block-blacklisted-domains/route';
+import type { BlockBlacklistedDomainsCountsResponse } from '../api/backfills/block-blacklisted-domains/route';
+import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
 
 type BatchLog = {
   processed: number;

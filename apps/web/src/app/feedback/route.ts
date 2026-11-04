@@ -3,7 +3,8 @@ import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { isFeedbackRateLimitError, submitUserFeedback } from '@/lib/feedback/submit';
+import { isFeedbackRateLimitError } from '@/lib/feedback/rate-limit';
+import { submitUserFeedback } from '@/lib/feedback/submit';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 /**

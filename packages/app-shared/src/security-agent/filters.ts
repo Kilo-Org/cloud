@@ -166,3 +166,26 @@ export function hasActiveSecurityFindingFilters(filters: SecurityFindingFilters)
     Boolean(filters.overdue)
   );
 }
+
+// Inverse of `parseSecurityFindingFilters` for the values a route carries. A
+// value that equals the parse fallback is emitted as `undefined` so applying a
+// filter set overwrites every key and a cleared set leaves no stale param
+// behind. `status` stays out when the selected outcome already implies it,
+// the same rule `toSecurityFindingQuery` follows, so a round trip through the
+// route cannot flip the status the reader picked.
+export function toSecurityFindingParams(
+  filters: SecurityFindingFilters
+): SecurityFindingRouteParams {
+  const statusImpliedByOutcome = STATUS_IMPLYING_OUTCOMES.has(filters.outcome);
+  return {
+    status:
+      filters.status !== DEFAULT_SECURITY_FINDING_FILTERS.status && !statusImpliedByOutcome
+        ? filters.status
+        : undefined,
+    severity: filters.severity !== 'all' ? filters.severity : undefined,
+    outcomeFilter: filters.outcome !== 'all' ? filters.outcome : undefined,
+    repoFullName: filters.repoFullName ?? undefined,
+    sortBy: filters.sortBy !== DEFAULT_SECURITY_FINDING_FILTERS.sortBy ? filters.sortBy : undefined,
+    overdue: filters.overdue ? 'true' : undefined,
+  };
+}

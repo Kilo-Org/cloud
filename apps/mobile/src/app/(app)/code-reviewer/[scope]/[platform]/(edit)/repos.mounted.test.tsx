@@ -1,0 +1,663 @@
+/* eslint-disable max-lines -- one mounted suite covers the picker's resync affordances and its config-read states */
+
+// The repository picker's plain read answers from the integration snapshot, so
+// the screen must offer the two ways out of a short or stale list: the provider
+// settings page that widens installation access, and a resync that ignores the
+// snapshot. A non-empty list is exactly where the old screen offered neither.
+
+import { createElement, type ReactNode, type Ref } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import '@/i18n';
+import { act } from '@/test/renderer';
+import { enteringAncestors } from '@/components/code-reviewer/entering-animation.test-helpers';
+import ReposRoute from './repos';
+import {
+  renderWithProviders,
+  type RenderWithProvidersResult,
+  waitFor,
+} from '@/test/render-with-providers';
+
+type AppStateHandler = (nextState: string) => void;
+
+type ButtonPressProps = { onPress?: () => void; loading?: boolean; disabled?: boolean };
+
+type PullControl = { props: { onRefresh?: () => void; refreshing?: boolean } };
+
+const state = vi.hoisted(() => ({
+  scope: 'org-1',
+  platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
+  repositories: [] as { id: number; fullName: string; private: boolean }[],
+  syncedAt: null as string | null,
+  githubAppInstalled: true,
+  reposLoading: false,
+  reposError: false,
+  resync: vi.fn(() => Promise.resolve()),
+  resyncing: false,
+  readinessRefetch: vi.fn(),
+  readinessFetching: false,
+  readiness: null as unknown,
+  manageAccess: undefined as { handlePress: () => void; pending: boolean } | undefined,
+  accessHandlers: null as { onOpen?: () => void; onReturn?: () => void } | null,
+  appStateHandler: null as AppStateHandler | null,
+  emptyStateClassNames: [] as (string | undefined)[],
+  config: {
+    data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] } as unknown,
+    isError: false,
+    isFetching: false,
+    fetchStatus: 'idle' as string,
+    refetch: vi.fn(),
+  },
+  queryErrorProps: [] as { variant?: string; onRetry?: () => void; isRetrying?: boolean }[],
+}));
+
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => true }),
+}));
+
+vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
+  useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
+}));
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Platform: { OS: 'android' },
+  useColorScheme: () => 'light',
+  AppState: {
+    addEventListener: (event: string, handler: AppStateHandler) => {
+      if (event === 'change') {
+        state.appStateHandler = handler;
+      }
+      return { remove: vi.fn() };
+    },
+  },
+}));
+
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/centered-state', () => ({
+  CenteredState: (props: { children?: ReactNode }) =>
+    createElement('CenteredState', null, props.children),
+}));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }): ReactNode => {
+    state.queryErrorProps.push(props);
+    return createElement('QueryError', props);
+  },
+}));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { title: string; action?: ReactNode; className?: string }) => {
+    state.emptyStateClassNames.push(props.className);
+    return createElement('EmptyState', { title: props.title }, props.action);
+  },
+}));
+vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
+vi.mock('@/components/ui/button', () => ({
+  Button: (props: {
+    children?: ReactNode;
+    onPress?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'Button',
+      { onPress: props.onPress, loading: props.loading, disabled: props.disabled },
+      props.children
+    ),
+}));
+vi.mock('@/components/ui/choice-row', () => ({
+  ChoiceRow: (props: { label: string; selected: boolean; onPress?: () => void }) =>
+    createElement('ChoiceRow', props),
+}));
+vi.mock('@/components/ui/radio-group', () => ({
+  RadioGroup: (props: { children?: ReactNode }) =>
+    createElement('RadioGroup', null, props.children),
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/icons', () => ({
+  FolderGit2: 'FolderGit2',
+  Search: 'Search',
+  SearchX: 'SearchX',
+  X: 'X',
+}));
+vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
+vi.mock('@/components/tab-screen', () => ({
+  TAB_SCREEN_TRAILING_GAP: 16,
+  useTabScreenFrame: () => ({ frameStyle: {}, measureFrame: () => undefined }),
+}));
+// The screen draws its rows through the app's list, so the stub keeps the
+// header, the rows and the empty slot reachable from the mounted tree while the
+// list's own props stay inspectable.
+vi.mock('@shopify/flash-list', async () => {
+  // `vi.mock` factories run before the file's imports bind.
+  const {
+    createElement: create,
+    forwardRef,
+    isValidElement,
+    useImperativeHandle,
+  } = await import('react');
+  const slot = (value: unknown) => (isValidElement(value) ? value : null);
+  return {
+    FlashList: forwardRef(function FlashListStub(
+      props: {
+        data?: unknown[];
+        renderItem: (info: { item: never; index: number }) => ReactNode;
+        ListHeaderComponent?: unknown;
+        ListEmptyComponent?: unknown;
+        ListFooterComponent?: unknown;
+      },
+      ref: Ref<unknown>
+    ) {
+      // The screen resets its offset when the query changes.
+      useImperativeHandle(ref, () => ({ scrollToOffset: () => undefined }), []);
+      const data = props.data ?? [];
+      return create(
+        'FlashList',
+        props,
+        slot(props.ListHeaderComponent),
+        data.map((item, index) =>
+          create('ReviewRow', { key: index }, props.renderItem({ item: item as never, index }))
+        ),
+        data.length === 0 ? slot(props.ListEmptyComponent) : null,
+        slot(props.ListFooterComponent)
+      );
+    }),
+  };
+});
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/integration-urls', () => ({
+  getBitbucketIntegrationUrl: () => 'https://example.test/bitbucket',
+  getGitLabIntegrationUrl: () => 'https://example.test/gitlab',
+}));
+vi.mock('@/lib/utils', () => ({
+  cn: (...values: (string | undefined | false)[]) => values.filter(Boolean).join(' '),
+  parseTimestamp: (value: string) => new Date(value),
+  timeAgo: () => '2 days ago',
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
+vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  PERSONAL_SCOPE: 'personal',
+  isPersonal: (scope: string) => scope === 'personal',
+  useReviewConfig: () => state.config,
+  useSaveReviewConfig: () => ({ mutate: vi.fn() }),
+  useGitHubRepositories: () => ({
+    isLoading: state.reposLoading,
+    isError: state.reposError,
+    isFetching: false,
+    refetch: vi.fn(),
+    data: {
+      repositories: state.platform === 'github' ? state.repositories : [],
+      syncedAt: state.syncedAt,
+      integrationInstalled: state.githubAppInstalled,
+    },
+  }),
+  useGitLabRepositories: () => ({
+    isLoading: state.reposLoading,
+    isError: state.reposError,
+    isFetching: false,
+    refetch: vi.fn(),
+    data: {
+      repositories: state.platform === 'gitlab' ? state.repositories : [],
+      syncedAt: state.syncedAt,
+    },
+  }),
+  useBitbucketReadiness: () => ({
+    isLoading: false,
+    isError: false,
+    isFetching: state.readinessFetching,
+    refetch: state.readinessRefetch,
+    data: state.readiness,
+  }),
+}));
+vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
+  useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: state.resyncing }),
+}));
+vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
+  // The hook owns the tap sequence; this suite owns what the screen does with
+  // its two signals, so the mock hands them back for the test to fire.
+  useManageRepositoryAccess: (
+    _scope: string,
+    _platform: string,
+    handlers?: { onOpen?: () => void; onReturn?: () => void }
+  ) => {
+    state.accessHandlers = handlers ?? null;
+    return state.manageAccess;
+  },
+}));
+vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
+  useRepoSelectionToggle: () => vi.fn(),
+}));
+
+const REPOSITORIES = [
+  { id: 7000001, fullName: 'acme/acme-repo-1', private: false },
+  { id: 7000002, fullName: 'acme/acme-repo-2', private: false },
+];
+
+type Mounted = RenderWithProvidersResult;
+
+function buttons(renderer: Mounted['renderer']) {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Button')
+    .map(node => {
+      const [text] = node.findAll(child => String(child.type) === 'Text');
+      const label = text?.props.children;
+      return {
+        label: typeof label === 'string' ? label : '',
+        props: node.props as ButtonPressProps,
+      };
+    });
+}
+
+function button(renderer: Mounted['renderer'], label: string) {
+  return buttons(renderer).find(candidate => candidate.label === label)?.props;
+}
+
+function pullControl(renderer: Mounted['renderer']) {
+  const [list] = renderer.root.findAll(node => String(node.type) === 'FlashList');
+  const control = list?.props.refreshControl as PullControl | undefined;
+  if (!control) {
+    throw new Error('the repository list rendered no pull control');
+  }
+  return control;
+}
+
+beforeEach(() => {
+  state.scope = 'org-1';
+  state.platform = 'github';
+  state.repositories = REPOSITORIES;
+  state.syncedAt = '2026-10-20T06:04:13.436632+00';
+  state.githubAppInstalled = true;
+  state.reposLoading = false;
+  state.reposError = false;
+  state.resync.mockClear();
+  state.resyncing = false;
+  state.readinessRefetch.mockClear();
+  state.readinessFetching = false;
+  state.readiness = null;
+  state.manageAccess = { handlePress: vi.fn<() => void>(), pending: false };
+  state.accessHandlers = null;
+  state.appStateHandler = null;
+  state.emptyStateClassNames = [];
+  state.config.data = { repositorySelectionMode: 'selected', selectedRepositoryIds: [] };
+  state.config.isError = false;
+  state.config.isFetching = false;
+  state.config.fetchStatus = 'idle';
+  state.config.refetch.mockReset();
+  state.queryErrorProps = [];
+});
+
+describe('repository picker resync affordance', () => {
+  it('offers Manage access, Refresh and the sync time below a non-empty list', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    expect(buttons(renderer).map(candidate => candidate.label)).toEqual([
+      'Refresh',
+      'Manage access',
+    ]);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
+    ).toContain('Last synced 2 days ago');
+    unmount();
+  });
+
+  it('omits the sync time when the response carries none', async () => {
+    state.syncedAt = null;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
+    ).not.toContain('Last synced 2 days ago');
+    unmount();
+  });
+
+  it('keeps Manage access on an empty list and drops the footer', async () => {
+    state.repositories = [];
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    expect(button(renderer, 'Manage access')).toBeDefined();
+    // Selected mode replaces the list at the top of the surface, where the
+    // state's own top air is the only separation it has.
+    expect(state.emptyStateClassNames.at(-1)).toBeUndefined();
+    // The list carries no heading of its own: the screen header names it, and a
+    // second name here labelled nothing but the empty state.
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
+    ).not.toContain('Repositories');
+    unmount();
+  });
+
+  it('forces a sync from the footer button and from the pull gesture', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    button(renderer, 'Refresh')?.onPress?.();
+    expect(state.resync).toHaveBeenCalledTimes(1);
+
+    pullControl(renderer).props.onRefresh?.();
+    expect(state.resync).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('shows the busy state while a forced sync runs', async () => {
+    state.resyncing = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    expect(button(renderer, 'Refresh')?.loading).toBe(true);
+    expect(button(renderer, 'Refresh')?.disabled).toBe(true);
+    expect(pullControl(renderer).props.refreshing).toBe(true);
+    unmount();
+  });
+
+  it('shows the busy state on Manage access while the settings page is opening', async () => {
+    state.manageAccess = { handlePress: vi.fn<() => void>(), pending: true };
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    // The tap is acknowledged from the first frame, and a second tap cannot
+    // start another launch.
+    expect(button(renderer, 'Manage access')?.loading).toBe(true);
+    expect(button(renderer, 'Manage access')?.disabled).toBe(true);
+    // The sync control is an independent action and stays usable.
+    expect(button(renderer, 'Refresh')?.disabled).toBe(false);
+    unmount();
+  });
+
+  it('shows the busy state on the empty-list Manage access action', async () => {
+    state.repositories = [];
+    state.manageAccess = { handlePress: vi.fn<() => void>(), pending: true };
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    expect(button(renderer, 'Manage access')?.loading).toBe(true);
+    expect(button(renderer, 'Manage access')?.disabled).toBe(true);
+    unmount();
+  });
+
+  it('forces one sync when the settings page reports its return', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    // Nothing pending: a foreground return on its own syncs nothing.
+    state.appStateHandler?.('active');
+    expect(state.resync).not.toHaveBeenCalled();
+
+    button(renderer, 'Manage access')?.onPress?.();
+    expect(state.manageAccess?.handlePress).toHaveBeenCalledTimes(1);
+    act(() => state.accessHandlers?.onOpen?.());
+    act(() => state.accessHandlers?.onReturn?.());
+    await waitFor(() => state.resync.mock.calls.length === 1);
+
+    // Android then also reports the next foreground; the first signal consumed
+    // the pending change, so this one must not sync again.
+    state.appStateHandler?.('active');
+    expect(state.resync).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('forces a sync on the foreground when the settings page never reports its dismissal', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    button(renderer, 'Manage access')?.onPress?.();
+    act(() => state.accessHandlers?.onOpen?.());
+    expect(state.resync).not.toHaveBeenCalled();
+
+    state.appStateHandler?.('active');
+    expect(state.resync).toHaveBeenCalledTimes(1);
+
+    // The awaited dismissal arrives afterwards: the first signal already synced.
+    act(() => state.accessHandlers?.onReturn?.());
+    expect(state.resync).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('refetches the Bitbucket workspace snapshot instead of forcing a provider read', async () => {
+    state.platform = 'bitbucket';
+    state.manageAccess = undefined;
+    state.readiness = {
+      repositoryCache: {
+        status: 'available',
+        repositories: [{ id: 'uuid-1', fullName: 'acme/api', private: true }],
+      },
+    };
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    await waitFor(() => buttons(renderer).length > 0);
+
+    expect(button(renderer, 'Manage access')).toBeUndefined();
+    button(renderer, 'Refresh')?.onPress?.();
+    expect(state.readinessRefetch).toHaveBeenCalledTimes(1);
+    expect(state.resync).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+// The repository selection this screen draws is unusable without the reviewer
+// config, so a config read that failed -- or that stayed pending with nothing
+// in flight -- must replace the disabled toggles with the action that resolves
+// it, while the repositories query keeps its own error state.
+describe('repository picker config read states', () => {
+  it('shows the retryable error instead of disabled toggles when the load fails', async () => {
+    state.config.data = null;
+    state.config.isError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(state.queryErrorProps.at(-1)?.variant).toBe('server');
+    // The error owns the body: no repository scroll area behind it. The rows
+    // themselves were already absent here in the failure state (the mode
+    // picker only draws them once a selection mode is chosen), so the scroll
+    // area is the surface that tells the two bodies apart.
+    expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+    unmount();
+  });
+
+  it('retries the config read from the error state', async () => {
+    state.config.data = null;
+    state.config.isError = true;
+    const { unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+    act(() => {
+      state.queryErrorProps.at(-1)?.onRetry?.();
+    });
+
+    expect(state.config.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('names the confirmed-offline pause as the reason the load stopped', async () => {
+    state.config.data = null;
+    state.config.fetchStatus = 'paused';
+    const { unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(state.queryErrorProps.at(-1)?.variant).toBe('offline');
+    unmount();
+  });
+
+  it('keeps the repository rows when cached config backs a failed refetch', async () => {
+    state.config.isError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'RepoToggleRow').length === 2
+    );
+
+    expect(state.queryErrorProps).toHaveLength(0);
+    unmount();
+  });
+
+  it('paints the repository rows with no entering animation above them', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'RepoToggleRow').length === 2
+    );
+
+    // A Reanimated entering animation carries `initialValues: { opacity: 0 }`,
+    // so a row mounted under one stays invisible whenever that entrance is
+    // cancelled or overwritten, under a painted header with no explanation.
+    const row = renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')[0];
+    if (!row) {
+      throw new Error('the repository rows were not rendered');
+    }
+    expect(enteringAncestors(row)).toEqual([]);
+    unmount();
+  });
+});
+
+// "All repositories" reviews every repository the connected GitHub app can
+// reach, so the body it leaves has to say what the choice covers and how many
+// repositories it counts, and keep the sync footer that widens that access.
+describe('all repositories mode body', () => {
+  const PERSONAL_EXPLANATION =
+    'Every repository Kilo can access through your GitHub connection is reviewed automatically.';
+  const ORGANIZATION_EXPLANATION =
+    "Every repository Kilo can access through the organization's GitHub connection is reviewed automatically.";
+
+  function texts(renderer: Mounted['renderer']) {
+    return renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => node.props.children)
+      .filter((text): text is string => typeof text === 'string');
+  }
+
+  const countLines = (renderer: Mounted['renderer']) =>
+    texts(renderer).filter(text => text.startsWith('Repositories available'));
+
+  beforeEach(() => {
+    state.config.data = { repositorySelectionMode: 'all', selectedRepositoryIds: [] };
+  });
+
+  it('explains the choice and counts the snapshot it covers', async () => {
+    state.scope = 'personal';
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(PERSONAL_EXPLANATION));
+
+    expect(countLines(renderer)).toEqual(['Repositories available: 2']);
+    // Every repository is reviewed, so there is no list to toggle.
+    expect(renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')).toHaveLength(0);
+    unmount();
+  });
+
+  it('names the organization connection on an organization scope', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(texts(renderer)).not.toContain(PERSONAL_EXPLANATION);
+    unmount();
+  });
+
+  it('keeps the sync footer that re-reads and widens the access it counts', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(buttons(renderer).map(candidate => candidate.label)).toEqual([
+      'Refresh',
+      'Manage access',
+    ]);
+    expect(texts(renderer)).toContain('Last synced 2 days ago');
+    unmount();
+  });
+
+  it('reserves the count line while the snapshot is loading', async () => {
+    state.reposLoading = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+    expect(countLines(renderer)).toEqual([]);
+    // The footer of a list that has not answered yet is not drawn.
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    unmount();
+  });
+
+  it('offers the way out when the connection reaches no repository', async () => {
+    state.repositories = [];
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    expect(countLines(renderer)).toEqual([]);
+    expect(button(renderer, 'Manage access')).toBeDefined();
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    // The state follows the explanation and the reserved count row, so it drops
+    // the surface-level top air a 'top' placement adds.
+    expect(state.emptyStateClassNames.at(-1)).toBe('pt-4');
+    unmount();
+  });
+
+  it('gives the install prompt the body when the GitHub app is not installed', async () => {
+    state.repositories = [];
+    state.githubAppInstalled = false;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    // Nothing can be reviewed before the app is installed, so the mode choice
+    // offers no effect and its explanation would describe an empty body.
+    expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(0);
+    expect(texts(renderer)).not.toContain(ORGANIZATION_EXPLANATION);
+    expect(countLines(renderer)).toEqual([]);
+    // The prompt replaces the list, so it keeps the surface-level air.
+    expect(state.emptyStateClassNames.at(-1)).toBeUndefined();
+    expect(button(renderer, 'Manage access')).toBeDefined();
+    unmount();
+  });
+
+  it('keeps the repositories error below the explanation', async () => {
+    state.reposError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(texts(renderer)).toContain(ORGANIZATION_EXPLANATION);
+    expect(countLines(renderer)).toEqual([]);
+    unmount();
+  });
+
+  it('describes the mode only after the config read settles', async () => {
+    state.config.data = null;
+    state.config.isFetching = true;
+    state.config.fetchStatus = 'fetching';
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'ChoiceRow').length === 2
+    );
+
+    // The mode shown while the config is pending is only the default; a saved
+    // selected-mode account must not read a sentence about all repositories,
+    // and the footer must not sit above a block that arrives after it.
+    expect(texts(renderer)).not.toContain(ORGANIZATION_EXPLANATION);
+    expect(texts(renderer)).not.toContain(PERSONAL_EXPLANATION);
+    expect(button(renderer, 'Refresh')).toBeUndefined();
+    unmount();
+  });
+});

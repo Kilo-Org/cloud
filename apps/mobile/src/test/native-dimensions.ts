@@ -71,6 +71,12 @@ function compiledLength(value: unknown): number {
   if (!Array.isArray(value)) {
     throw new TypeError(`cannot resolve compiled length ${JSON.stringify(value)}`);
   }
+  // `[guards, '<property>', <term>, ...]` is a whole declaration, not a bare
+  // length: the compiler tags a value it computed (`lineHeight`, for one) with
+  // the property it lands on. Resolve the value it wrapped.
+  if (typeof value[1] === 'string' && value[1] !== 'var' && value[1] !== 'calc') {
+    return compiledLength(value[2]);
+  }
   // A descriptor is either one term ([guards, kind, ...]) or a list of terms.
   const term = (value[1] === 'var' || value[1] === 'calc' ? value : value[0]) as unknown[];
   if (term[1] === 'var') {

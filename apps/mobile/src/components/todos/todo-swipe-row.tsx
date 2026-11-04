@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
 import { type ReactNode, useRef } from 'react';
 import { View } from 'react-native';
 import ReanimatedSwipeable, {
@@ -84,7 +85,7 @@ export function TodoSwipeRow({
         const action = direction === SwipeDirection.RIGHT ? swipeRight : swipeLeft;
         ref.current?.close();
         if (action) {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
           action.onTrigger();
         }
       }}

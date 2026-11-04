@@ -4,11 +4,12 @@ import type { TriggerDO } from '../dos/TriggerDO';
 import { MAX_PAYLOAD_SIZE } from '../util/constants';
 import { logger } from '../util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { withDORetry } from '../util/do-retry';
 import { compareWebhookSecret, type StoredWebhookAuth } from '../util/webhook-auth';
 import { decodeUserIdFromPath } from '@kilocode/worker-utils/user-id-encoding';
 
-type CaptureResult = { success: true; requestId: string } | { success: false; error: string };
+type CaptureResult = Awaited<ReturnType<TriggerDO['captureRequest']>>;
 
 const inbound = new Hono<HonoContext>();
 
@@ -87,13 +88,16 @@ async function handleWebhookCapture(
 
   let body: string;
   try {
-    body = await c.req.text();
+    const rawBody = c.req.raw.body;
+    const read = rawBody
+      ? await readBoundedStream(rawBody as ReadableStream<Uint8Array>, MAX_PAYLOAD_SIZE)
+      : ({ ok: true, bytes: new Uint8Array() } as const);
+    if (!read.ok) {
+      return c.json(resError('Payload too large'), 413);
+    }
+    body = new TextDecoder().decode(read.bytes);
   } catch {
     return c.json(resError('Failed to read request body'), 400);
-  }
-
-  if (body.length > MAX_PAYLOAD_SIZE) {
-    return c.json(resError('Payload too large'), 413);
   }
 
   const headers: Record<string, string> = {};
@@ -121,6 +125,9 @@ async function handleWebhookCapture(
     );
 
     if (!result.success) {
+      if (result.error === 'Unauthorized') return c.json(resError('Unauthorized'), 401);
+      if (result.issues)
+        return c.json({ success: false, error: result.error, issues: result.issues }, 400);
       if (result.error === 'Trigger not configured or inactive') {
         return c.json(resError('Trigger not found'), 404);
       }

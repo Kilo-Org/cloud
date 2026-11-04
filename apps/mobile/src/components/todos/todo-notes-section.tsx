@@ -5,10 +5,12 @@ import { Pressable, TextInput, View } from 'react-native';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SectionHeader } from '@/components/home/section-header';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useTodoItemMutations } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_NOTES_MAX_LENGTH } from '@/lib/todos/todo-model';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
+import { cn } from '@/lib/utils';
 
 /** The editor: the purpose prompt as placeholder, Markdown support as optional help beside it. */
 function TodoNotesEditor({
@@ -34,7 +36,7 @@ function TodoNotesEditor({
         accessibilityLabel={t('todos.item.notes')}
         placeholder={t('todos.item.notesPrompt')}
         placeholderTextColor={colors.mutedForeground}
-        className="min-h-32 rounded-lg border border-border bg-secondary pb-2.5 pl-3 pr-3 pt-2.5 text-base leading-6 text-foreground"
+        className="min-h-32 rounded-lg border border-border bg-secondary pb-2.5 pl-3 pr-3 pt-2.5 text-base leading-[1.5rem] text-foreground"
       />
       <Text className="text-xs text-ink2">{t('todos.item.markdownSupported')}</Text>
     </View>
@@ -49,21 +51,17 @@ function TodoNotesBody({
 }: Readonly<{ hasNotes: boolean; notes: string; onEdit: () => void }>) {
   const { t } = useTranslation();
   if (hasNotes) {
-    return (
-      <Pressable
-        onPress={onEdit}
-        accessibilityRole="button"
-        accessibilityHint={t('chat.messageActions.edit')}
-      >
-        <MarkdownText value={notes} />
-      </Pressable>
-    );
+    // The saved notes stay plain markdown, one accessible text node per
+    // heading, paragraph, list item and table cell. A Pressable around the
+    // whole body merged them into a single unnamed button, so a screen reader
+    // could not read the note at all; editing is the section header's action.
+    return <MarkdownText value={notes} />;
   }
   return (
     <Pressable
       onPress={onEdit}
       accessibilityRole="button"
-      className="min-h-11 justify-center py-1 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'justify-center py-1 active:opacity-70')}
     >
       <Text className="text-sm text-ink2">{t('todos.item.notesPrompt')}</Text>
     </Pressable>

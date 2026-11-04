@@ -51,10 +51,7 @@ export function getTableFromZodSchema<Name extends string, Schema extends z.ZodO
 }> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- z.ZodObject<any> generic taints schema.shape
   const columns = Object.keys(schema.shape) as Extract<keyof z.infer<Schema>, string>[];
-  return getTable({ name, columns }) as TableQueryInterpolator<{
-    name: Name;
-    columns: Extract<keyof z.infer<Schema>, string>[];
-  }>;
+  return getTable({ name, columns });
 }
 
 export type BaseTableQueryInterpolator = TableQueryInterpolator<{

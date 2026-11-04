@@ -9,6 +9,9 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 
 jest.mock('@/lib/device-auth/device-auth', () => ({ cleanupExpiredDeviceAuthRequests: jest.fn() }));
 jest.mock('@/lib/auth/native-admission', () => ({ cleanupExpiredAdmissionChallenges: jest.fn() }));
+jest.mock('@/lib/auth/device-sessions', () => ({
+  cleanupExpiredDeviceRefreshTokens: jest.fn(),
+}));
 jest.mock('@/lib/auth/passkey', () => ({
   cleanupExpiredPasskeyChallenges: jest.fn(),
   cleanupExpiredPasskeySignInTickets: jest.fn(),
@@ -23,6 +26,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import { cleanupExpiredDeviceRefreshTokens } from '@/lib/auth/device-sessions';
 import {
   cleanupExpiredPasskeyChallenges,
   cleanupExpiredPasskeySignInTickets,
@@ -39,6 +43,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
 
   it('emits one success event with all cleanup counts', async () => {
     jest.mocked(cleanupExpiredDeviceAuthRequests).mockResolvedValue(2);
+    jest.mocked(cleanupExpiredDeviceRefreshTokens).mockResolvedValue(7);
     jest.mocked(cleanupExpiredAdmissionChallenges).mockResolvedValue(1);
     jest.mocked(cleanupExpiredPasskeyChallenges).mockResolvedValue(5);
     jest.mocked(cleanupExpiredPasskeySignInTickets).mockResolvedValue(6);
@@ -55,6 +60,7 @@ describe('GET /api/cron/cleanup-device-auth', () => {
     expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
       outcome: 'succeeded',
       deleted_device_auth_request_count: 2,
+      deleted_refresh_token_count: 7,
       deleted_admission_challenge_count: 1,
       deleted_passkey_challenge_count: 5,
       deleted_passkey_sign_in_ticket_count: 6,

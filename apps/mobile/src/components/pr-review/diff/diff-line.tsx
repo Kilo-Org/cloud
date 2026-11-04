@@ -1,5 +1,5 @@
 // A single line of a diff, rendered in JetBrains Mono with syntax
-// highlighting, a gutter for old/new line numbers, and a tinted
+// highlighting, a gutter for the line number, and a tinted
 // background that signals add / del / context.
 //
 // Row height scales with the system font scale (bounded — see
@@ -51,6 +51,7 @@ import { hitSlopForRow } from '@/lib/pr-review/diff/diff-target';
 import {
   buildDiffLineAccessibilityLabel,
   diffLineMarker,
+  diffLineNumber,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
 import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
@@ -75,14 +76,13 @@ type DiffLineProps = {
   isSelected?: boolean;
 };
 
+// The gutter shows the same number the row's accessibility label speaks
+// (`diffLineNumber`): new-file numbering, so a context line reads the same
+// when drawn and when announced, matching the add rows and the RIGHT-side
+// comment anchor. A single 56pt gutter has no room for both numbers at the
+// bounded font scale.
 function gutterTextFor(line: ParsedDiffLine): string {
-  if (line.type === 'add') {
-    return `${line.newLine ?? ''}`;
-  }
-  if (line.type === 'del') {
-    return `${line.oldLine ?? ''}`;
-  }
-  return `${line.oldLine ?? line.newLine ?? ''}`;
+  return `${diffLineNumber(line) ?? ''}`;
 }
 
 function rowBackgroundFor(type: ParsedDiffLine['type']): string {

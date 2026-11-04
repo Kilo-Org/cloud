@@ -1,12 +1,19 @@
 import 'server-only';
 import { type db } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
+  getOpenAiChatGptStoredConnection,
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -20,47 +27,84 @@ export type BalanceCheckModelEligibility = {
  *
  * Skips the check when either:
  * - the model is Kilo-funded (free for the user), or
- * - the model is not Kilo-exclusive AND the user has a BYOK provider
- *   configured that can serve it, so the session is billed against the
- *   user's own key rather than their balance.
- *
- * Kilo-exclusive models (e.g. `stealth/qwen3.6-plus`) are
- * always excluded from the BYOK bypass: they are Kilo-funded and platform
- * billed, so even when `getModelUserByokProviders` reports a provider that
- * can route the model, they must still go through the worker-side balance
- * check and cannot be legitimately served via a user's own BYOK key.
- *
- * The resulting predicate is a strict subset of the
- * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel
- * model picker to filter `hasLimitedAccess` users: this router additionally
- * forces Kilo-exclusive models through the balance check, so the picker
- * may offer a model as free while the router still requires a balance.
+ * - the user has a BYOK provider configured that can serve it, or a "Sign in
+ *   with ChatGPT" connection that serves it, so the session is billed against
+ *   the user's own key or plan rather than their balance.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
   user: Pick<User, 'id'>;
   modelId: string;
   organizationId?: string;
+  includeSharedServicesConnection?: boolean;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = isFreeModel(params.modelId);
-  if (isFree) {
+  // Naming a custom LLM the user cannot call skips this check too, but the
+  // gateway refuses every request for it, so the session cannot run inference.
+  if (isFreeModel(params.modelId)) {
     return { isFree: true, hasUserByokAvailable: false };
-  }
-
-  if (isKiloExclusiveModel(params.modelId)) {
-    return { isFree: false, hasUserByokAvailable: false };
-  }
-
-  const modelProviders = await getModelUserByokProviders(params.modelId);
-  if (modelProviders.length === 0) {
-    return { isFree: false, hasUserByokAvailable: false };
   }
 
   const enabledProviderIds = params.organizationId
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
+  if (enabledProviderIds.length === 0) {
+    return { isFree: false, hasUserByokAvailable: await hasOpenAiChatGptByokForModel(params) };
+  }
 
   const enabled = new Set(enabledProviderIds);
-  const hasUserByokAvailable = modelProviders.some(provider => enabled.has(provider));
-  return { isFree: false, hasUserByokAvailable };
+  const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
+  // Callers authorize organization access first, which also admits Kilo admins
+  // and parent-organization owners who hold no membership row.
+  const decision = params.organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId: params.organizationId,
+          kiloUserId: params.user.id,
+          allowNonMember: true,
+          modelId: params.modelId,
+        })
+      ).decision
+    : undefined;
+  // Like routing, a denial leaves no allowed provider for the model.
+  const allowedProviders = decision
+    ? decision.allowed
+      ? decision.eligibleProviderRoutes
+      : new Set<string>()
+    : undefined;
+  const hasUserByokAvailable = await hasEnabledUserByokForModel({
+    modelId: params.modelId,
+    modelProviders,
+    enabledProviderIds: enabled,
+    allowedProviders,
+  });
+  return {
+    isFree: false,
+    hasUserByokAvailable: hasUserByokAvailable || (await hasOpenAiChatGptByokForModel(params)),
+  };
+}
+
+/**
+ * Whether a "Sign in with ChatGPT" connection serves the model, so the ChatGPT
+ * plan pays instead of the Kilo balance. Service runs also consider the
+ * organization's shared-services connection, which routing tries first.
+ */
+async function hasOpenAiChatGptByokForModel(params: {
+  user: Pick<User, 'id'>;
+  modelId: string;
+  organizationId?: string;
+  includeSharedServicesConnection?: boolean;
+}): Promise<boolean> {
+  if (!(await getOpenAiChatGptCandidateModel('responses', params.modelId))) return false;
+
+  const owners: OpenAiChatGptOwner[] = [];
+  if (params.includeSharedServicesConnection && params.organizationId) {
+    owners.push(openAiChatGptSharedServicesOwner(params.organizationId));
+  }
+  owners.push({ kiloUserId: params.user.id, organizationId: params.organizationId ?? null });
+
+  for (const owner of owners) {
+    const stored = await getOpenAiChatGptStoredConnection(owner);
+    if (stored?.isEnabled && stored.connection.status === 'connected') return true;
+  }
+  return false;
 }

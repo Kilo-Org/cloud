@@ -42,7 +42,7 @@ const sendMessageHandler = protectedProcedure
           type: 'prompt' as const,
           id: input.message.id ?? undefined,
           prompt: input.message.prompt,
-          attachments: input.message.attachments ?? input.message.images,
+          attachments: input.message.attachments,
         },
         agent: input.agent,
         finalization: input.finalization,

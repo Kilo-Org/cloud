@@ -35,9 +35,6 @@ function readSource(name: string): string {
 }
 
 const intents = readSource('KiloAppIntents.swift');
-const bridge = readSource('KiloAppActionBridge.swift');
-const actionsModule = readSource('KiloAppActionsModule.swift');
-const podspec = readSource('KiloAppActions.podspec');
 const configSource = readFileSync(
   fileURLToPath(new URL('../../app.config.ts', import.meta.url)),
   'utf8'
@@ -58,8 +55,8 @@ const INTENT_TYPES = {
   OpenPullRequest: 'OpenPullRequestIntent',
 } as const satisfies Record<AppActionId, string>;
 
-/** The actions that open the app themselves; `StartAgent` runs in the background. */
-const OPEN_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as const;
+/** The actions that also carry a `kiloapp://` URL; `StartAgent` passes a payload instead. */
+const URL_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as const;
 
 /** The lines that hand a label to the App Intents metadata extractor. */
 const LABEL_LINE =
@@ -175,13 +172,12 @@ describe('the four App Intents', () => {
     expect(intents).not.toContain('INIntent');
   });
 
-  it('opens the app for the open actions and stays closed for StartAgent', () => {
-    for (const action of OPEN_ACTIONS) {
+  it('opens the app for every action', () => {
+    for (const action of APP_ACTION_IDS) {
       expect(openAppWhenRun(swiftStruct(INTENT_TYPES[action])), `${action} must open the app`).toBe(
         'true'
       );
     }
-    expect(openAppWhenRun(swiftStruct(INTENT_TYPES.StartAgent))).toBe('false');
   });
 
   it('lists every action in the AppShortcutsProvider', () => {
@@ -222,8 +218,8 @@ describe('the Swift action URLs', () => {
   }
 
   it('declares one URL per open action', () => {
-    expect(literals).toHaveLength(OPEN_ACTIONS.length);
-    expect(new Set(literals).size).toBe(OPEN_ACTIONS.length);
+    expect(literals).toHaveLength(URL_ACTIONS.length);
+    expect(new Set(literals).size).toBe(URL_ACTIONS.length);
   });
 
   it.each(literals)('%s parses with parseAppActionUrl', literal => {
@@ -237,100 +233,6 @@ describe('the Swift action URLs', () => {
     for (const field of ['action', 'prompt', 'repository', 'sessionId', 'pullRequest']) {
       expect(intents, `${field} is not sent`).toContain(`"${field}"`);
     }
-  });
-});
-
-describe('the native handshake', () => {
-  it('registers the JS dispatcher under the module name the JS side requires', () => {
-    // A synchronous `Function` runs on the JS thread. An `AsyncFunction` runs on
-    // a background queue, where replacing the dispatcher crashed (KILO-APP-3JG).
-    expect(actionsModule).toContain('Function("registerAppActionDispatcher")');
-    expect(actionsModule).not.toContain('AsyncFunction("registerAppActionDispatcher")');
-    expect(actionsModule).toContain('JavaScriptActor.assumeIsolated');
-    expect(actionsModule).toContain('Name("KiloAppActions")');
-    expect(actionsModule).toContain('KiloAppActionBridge.shared');
-    expect(bridge).toContain('static let shared = KiloAppActionBridge()');
-  });
-
-  it('bounds the wait for registration and reports a failure', () => {
-    expect(bridge).toContain('waitUntilRegistered');
-    expect(bridge).toMatch(/registrationTimeout: TimeInterval = 25/);
-    expect(bridge).toContain('KiloAppActionError.dispatcherUnavailable');
-    expect(bridge).toContain('func perform(payload: [String: String]) async throws -> String');
-  });
-
-  it('resumes a parked wait from register instead of polling for one', () => {
-    // The old wait re-checked `registered()` and slept 50 ms in a loop for up to
-    // 25 s — up to 500 wakeups for a value `register(...)` can hand over. The
-    // bridge now parks each waiting run's continuation and resumes it from the
-    // registration; one deadline task is the only sleep left.
-    expect(bridge, 'the poll interval is gone').not.toContain('registrationPollInterval');
-    expect(bridge, 'no continuation store').toContain(
-      'waiters: [UUID: CheckedContinuation<DispatcherRegistration, Error>]'
-    );
-
-    const wait = swiftBlock(bridge, 'func waitUntilRegistered');
-    expect(wait).toContain('withCheckedThrowingContinuation');
-    expect(wait, 'the wait must not sleep in a loop').not.toContain('Task.sleep');
-
-    // `register(...)` stores the registration and hands it to every parked waiter.
-    const register = swiftBlock(bridge, 'func register(');
-    expect(register).toMatch(/waiters = \[:\]/);
-    expect(register).toContain('.resume(returning: next)');
-
-    // The one deadline task fails the waiter that outlived registration.
-    expect([...bridge.matchAll(/Task\.sleep/g)], 'one sleep, the deadline').toHaveLength(1);
-    const deadline = swiftBlock(bridge, 'func startDeadline');
-    expect(deadline).toContain('Task.sleep');
-    expect(deadline).toContain('failWaiter(id, seconds: Int(timeout))');
-    expect(swiftBlock(bridge, 'func failWaiter')).toContain(
-      'KiloAppActionError.dispatcherUnavailable(seconds: seconds)'
-    );
-  });
-
-  it('marks the throwing runtime lookup with try', () => {
-    // `AppContext.runtime` is a throwing property: it raises `RuntimeLost` until
-    // the runtime exists, so an unmarked read stops the pod compiling. The ios
-    // job failed on exactly that — `KiloAppActionsModule.swift:19:27: error:
-    // property access can throw but is not marked with 'try'` — and this guard
-    // is where the module reads it.
-    const reads = actionsModule
-      .split('\n')
-      .filter(line => /appContext\?\.runtime|appContext\.runtime/.test(line));
-    expect(reads.length, 'the module no longer reads the runtime').toBeGreaterThan(0);
-    for (const line of reads) {
-      expect(line, `${line.trim()} reads a throwing property`).toMatch(/\btry\b/);
-    }
-  });
-
-  it('lets the runtime teardown release the dispatcher on the JS thread', () => {
-    // The singleton outlives the runtime. On a reload (the RTL language switch),
-    // the module's `OnDestroy` runs off the JS thread, maybe after the runtime is
-    // freed, so it must not release a JSI value (KILO-APP-3JG). The runtime's
-    // long-lived objects own the dispatcher, and their teardown sweep releases it
-    // on the JS thread while the runtime is still valid.
-    expect(actionsModule).not.toContain('OnDestroy');
-    expect(bridge).toContain('private final class DispatcherRegistration: LongLivedObject');
-    expect(swiftBlock(bridge, 'func register(')).toContain('runtime.longLivedObjects.add(next)');
-    const release = swiftBlock(bridge, 'func allowRelease()');
-    expect(release).toContain('dispatcher = nil');
-    expect(release).toContain('KiloAppActionBridge.shared.unregister(self)');
-    // A later runtime's registration survives the earlier runtime's sweep.
-    expect(swiftBlock(bridge, 'func unregister(')).toContain('guard registration === released');
-  });
-
-  it('reads the result fields the JS contract answers with', () => {
-    // The `AppActionResult` fields of src/lib/app-actions/app-action-contract.ts:
-    // a renamed field here would silently turn every run into a malformed result.
-    for (const field of ['ok', 'sessionId', 'message', 'retryable']) {
-      expect(bridge, `${field} is not read from the answer`).toContain(`getProperty("${field}")`);
-    }
-  });
-
-  it('ships the pod the module config autolinks', () => {
-    expect(podspec).toContain("s.name = 'KiloAppActions'");
-    expect(podspec).toContain("s.platforms = { :ios => '16.4' }");
-    expect(podspec).toContain("s.source_files = '**/*.swift'");
   });
 });
 

@@ -1049,7 +1049,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Block new signups from blocked TLDs (existing users can still sign in)
-        if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
+        if (!existingUser && (await isBlockedTLD(accountInfo.google_user_email))) {
           return redirectUrlForCode(`BLOCKED`);
         }
 
@@ -1204,6 +1204,7 @@ export const authOptions: NextAuthOptions = {
             'SIGNUP-RATE-LIMITED',
             'SIGNUP-STEP-UP',
             'EMAIL-ALREADY-USED',
+            'EMAIL-SIGNUP-DISABLED',
           ];
 
           // Only log unexpected errors to Sentry

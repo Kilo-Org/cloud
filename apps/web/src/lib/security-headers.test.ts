@@ -40,7 +40,6 @@ describe('security headers', () => {
     expect(policy).toContain('https://openrouter.ai');
     expect(policy).toContain('https://cdn.jsdelivr.net');
     expect(policy).toContain('https://unpkg.com');
-    expect(policy).toContain('https://*.d.kiloapps.io');
     expect(policy).toContain('https://www.youtube.com');
     expect(policy).toContain("'wasm-unsafe-eval'");
     expect(policy).toContain('wss://cloud-agent.example.com');

@@ -13,6 +13,14 @@ type SessionStorage = {
 
   // Parts (sorted by ID within their message)
   upsertPart(messageId: string, part: Part, eventTime?: number): void;
+  /**
+   * Append one streamed chunk to a text part, seeding the part when it is not
+   * stored yet.
+   *
+   * An implementation may coalesce: it need not apply the chunk or publish it
+   * to `parts:{messageId}` subscribers before this call returns, as long as
+   * `getParts` returns the deltas it has already accepted.
+   */
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
   getParts(messageId: string): readonly Part[];

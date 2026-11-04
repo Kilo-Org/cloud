@@ -9,15 +9,23 @@
 /** What this store binds to a statement. It holds text and numbers, nothing else. */
 type SqlValue = string | number | null;
 
+/** What a call asks for: a write, or one of the three read shapes. */
+type SqlMethod = 'run' | 'all' | 'values' | 'get';
+
 /**
  * Rows come back by position, not by name, which is the shape drizzle maps onto
  * the selected columns.
+ *
+ * `close` is for a driver that keeps a native handle between calls — a prepared
+ * statement, which only the platform adapter can finalize. The store runs it
+ * when the layer is released, so nothing a driver holds outlives the store. A
+ * driver that holds nothing leaves it out: the database belongs to the caller,
+ * and `node.ts` closes none of it.
  */
-type SqlDriver = (
-  sql: string,
-  params: readonly SqlValue[],
-  method: 'run' | 'all' | 'values' | 'get'
-) => Promise<{ rows: unknown[] }>;
+interface SqlDriver {
+  (sql: string, params: readonly SqlValue[], method: SqlMethod): Promise<{ rows: unknown[] }>;
+  readonly close?: () => Promise<void>;
+}
 
 /**
  * A driver and the line every write on it stands in.
@@ -64,5 +72,5 @@ const transact = (connection: Connection, run: () => Promise<void>): Promise<voi
     }
   });
 
-export type { Connection, SqlDriver, SqlValue };
+export type { Connection, SqlDriver, SqlMethod, SqlValue };
 export { connectionOf, transact };

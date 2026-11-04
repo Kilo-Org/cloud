@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { getBuiltinModeLabelKey } from '@/components/agents/mode-options';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { type TodoList } from '@/lib/todos/todo-types';
 
@@ -22,7 +23,7 @@ export function useTodoListDefaultsSummary(
     parts.push(modeKey ? t(modeKey) : list.mode);
   }
   if (list.model) {
-    parts.push(models.find(model => model.id === list.model)?.name ?? list.model);
+    parts.push(modelLabelFromCatalogue(models, list.model));
   }
   return parts.length > 0 ? parts.join(' · ') : null;
 }

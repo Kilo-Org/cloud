@@ -585,6 +585,150 @@ describe('createChatProcessor', () => {
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as PatchPart).files).toEqual(['src/a.ts', 'src/b.ts']);
     });
+
+    // --- unreadable tool state ---
+    // The generated ToolPart declares a full `state`, but the wire does not
+    // guarantee it: the per-event schema is `.passthrough()` and the replay
+    // paths hand stored parts straight to this seam. A tool part with no
+    // readable state is dropped.
+
+    // The cast is the fixture: the wire really sends these shapes.
+    function unstatedToolPart(state: unknown): Part {
+      return {
+        id: 'part-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        callID: 'call-part-tool',
+        tool: 'bash',
+        state,
+      } as unknown as Part;
+    }
+
+    it('drops a tool part with no state and keeps processing later events', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const missing = {
+        id: 'part-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      } as unknown as Part;
+
+      expect(() =>
+        processor.process({ type: 'message.part.updated', part: missing })
+      ).not.toThrow();
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+      expect(onToolAttachment).not.toHaveBeenCalled();
+
+      const valid = makeTextPart('part-text', 'msg-1', 'after the malformed part');
+      processor.process({ type: 'message.part.updated', part: valid });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('after the malformed part');
+    });
+
+    it('drops a tool part whose state is null, an array, or a primitive', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      for (const state of [null, [], 'running']) {
+        expect(() =>
+          processor.process({ type: 'message.part.updated', part: unstatedToolPart(state) })
+        ).not.toThrow();
+      }
+
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('drops a tool part whose status is not a non-empty string', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      for (const state of [{}, { status: 42 }, { status: '' }]) {
+        expect(() =>
+          processor.process({ type: 'message.part.updated', part: unstatedToolPart(state) })
+        ).not.toThrow();
+      }
+
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('keeps a previously stored tool part when an unreadable update arrives', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTaskPart('running', 'part-tool'),
+      });
+      processor.process({ type: 'message.part.updated', part: unstatedToolPart({}) });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ToolPart).state).toEqual({
+        status: 'running',
+        input: {},
+        time: { start: 1 },
+      });
+    });
+
+    it('stores a completed tool part with a non-array attachments field as an empty list', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const part = unstatedToolPart({ status: 'completed', attachments: {} });
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ToolPart).state).toEqual({
+        status: 'completed',
+        attachments: [],
+      });
+      expect(onToolAttachment).not.toHaveBeenCalled();
+    });
+
+    it('emits only the readable attachments of a completed tool part', () => {
+      const storage = createMemoryStorage();
+      const onToolAttachment = jest.fn();
+      const processor = createChatProcessor(storage, { onToolAttachment });
+      const good = { mime: 'image/png', url: 'data:image/png;base64,AAA' };
+      const second = { mime: 'image/jpeg', url: 'data:image/jpeg;base64,BBB' };
+      const part = unstatedToolPart({
+        status: 'completed',
+        attachments: [
+          good,
+          null,
+          'nope',
+          { mime: 42, url: 'data:x' },
+          { mime: 'image/png' },
+          second,
+        ],
+      });
+
+      expect(() => processor.process({ type: 'message.part.updated', part })).not.toThrow();
+
+      expect(onToolAttachment).toHaveBeenCalledTimes(2);
+      expect(onToolAttachment).toHaveBeenCalledWith('part-tool', {
+        mime: 'image/png',
+        dataUrl: 'data:image/png;base64,AAA',
+      });
+      expect(onToolAttachment).toHaveBeenCalledWith('part-tool', {
+        mime: 'image/jpeg',
+        dataUrl: 'data:image/jpeg;base64,BBB',
+      });
+      const stored = storage.getParts('msg-1');
+      expect((stored[0] satisfies Part as ToolPart).state).toMatchObject({
+        attachments: [
+          { mime: 'image/png', url: '' },
+          { mime: 'image/jpeg', url: '' },
+        ],
+      });
+    });
   });
 
   describe('message.part.delta', () => {

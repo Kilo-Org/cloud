@@ -42,6 +42,7 @@ import {
 } from '@kilocode/web-shared/lib/service-fees/checkout';
 import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 function createAutoTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
   const stores = createServiceFeeStores();
@@ -60,7 +61,7 @@ function createAutoTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
 
 type AutoTopUpResult = Result<{ stripe_id: string }, string>;
 
-type AutoTopUpOrganization = Pick<
+export type AutoTopUpOrganization = Pick<
   Organization,
   'id' | 'auto_top_up_enabled' | 'total_microdollars_acquired' | 'microdollars_used'
 >;
@@ -156,12 +157,10 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
               entity.organization.microdollars_used) /
             1_000_000,
         };
-  // Only for users with auto-top-up enabled
   if (!auto_top_up_enabled) {
     return;
   }
 
-  // Only trigger if balance is below threshold
   const maxThreshold =
     entity.type === 'user'
       ? AUTO_TOP_UP_THRESHOLD_DOLLARS
@@ -201,7 +200,6 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     threshold_USD: threshold,
   });
 
-  // Perform the auto-top-up - only user.id is needed, fresh data is fetched inside
   const result = await performAutoTopUpForEntity(entity, traceId);
 
   if (!result.success && result.error === 'concurrent_attempt_in_progress') {
@@ -278,23 +276,24 @@ async function performAutoTopUpForEntity(
     return failureResult('concurrent_attempt_in_progress');
   }
 
-  // Re-check balance after acquiring lock to prevent duplicate top-ups
-  // (another request may have completed a top-up while we were waiting for the lock)
-  // We fetch fresh data from DB and compute balance directly to avoid
-  // calling getBalanceForUser which would create a cycle (it calls maybePerformAutoTopUp)
-  const { currentBalance_USD, stripe_customer_id, accountCreatedAt, accountUsedMicrodollars } =
-    await getEntityBalanceAndStripeCustomer(entity);
+  // Re-check under the lock: another request may have funded the account.
+  const {
+    currentBalance_USD,
+    stripe_customer_id,
+    accountCreatedAt,
+    accountUsedMicrodollars,
+    autoTopUpEnabled,
+  } = await getEntityBalanceAndStripeCustomer(entity);
   const threshold =
     entity.type === 'user'
       ? AUTO_TOP_UP_THRESHOLD_DOLLARS
       : orgThresholdDollars(config.threshold_cents);
-  if (currentBalance_USD >= threshold) {
-    // Balance is now sufficient, release lock and exit
+  if (!autoTopUpEnabled || currentBalance_USD >= threshold) {
     await db
       .update(auto_top_up_configs)
       .set({ attempt_started_at: null })
       .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult('balance_already_sufficient');
+    return failureResult(autoTopUpEnabled ? 'balance_already_sufficient' : 'auto_top_up_disabled');
   }
 
   if (!stripe_customer_id) {
@@ -322,6 +321,7 @@ async function performAutoTopUpForEntity(
       entity.type === 'user'
         ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
         : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
+    invoiceMetadata.paid_credit_policy = getPaidCreditTerms('stripe', new Date());
 
     const flow = entity.type === 'user' ? 'personal_auto_top_up' : 'organization_auto_top_up';
     const invoice = await client.invoices.create({
@@ -422,7 +422,7 @@ async function performAutoTopUpForEntity(
     // These are expected user-facing events, not engineering problems.
     const isCardDecline = error instanceof Stripe.errors.StripeCardError;
     const code = isCardDecline
-      ? (error.decline_code ?? error.code ?? 'unknown_error')
+      ? error.decline_code || error.code || 'unknown_error'
       : 'unknown_error';
 
     if (isCardDecline) {
@@ -455,6 +455,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
   stripe_customer_id: string | null;
   accountCreatedAt: string;
   accountUsedMicrodollars: number;
+  autoTopUpEnabled: boolean;
 }> {
   if (entity.type === 'user') {
     const freshUser = await findUserById(entity.user.id);
@@ -466,6 +467,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
       stripe_customer_id: freshUser.stripe_customer_id,
       accountCreatedAt: freshUser.created_at,
       accountUsedMicrodollars: freshUser.microdollars_used,
+      autoTopUpEnabled: freshUser.auto_top_up_enabled,
     };
   } else {
     const freshOrg = await getOrganizationById(entity.organization.id);
@@ -477,6 +479,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
       stripe_customer_id: freshOrg.stripe_customer_id,
       accountCreatedAt: freshOrg.created_at,
       accountUsedMicrodollars: freshOrg.microdollars_used,
+      autoTopUpEnabled: freshOrg.auto_top_up_enabled,
     };
   }
 }

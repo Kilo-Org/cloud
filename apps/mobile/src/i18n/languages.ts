@@ -96,7 +96,6 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-/** Languages that lay out right-to-left. */
 export const RTL_LANGUAGES = new Set<string>(['ar', 'he', 'fa', 'ur', 'ckb', 'ps']);
 
 /** Each language's name in its own language, for the picker rows. */

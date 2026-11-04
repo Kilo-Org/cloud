@@ -1,0 +1,11 @@
+Keys:
+  Symmetric:
+    Aes:
+      - Metadata:
+          KeyId: 0b7c1f0e-6d52-4e0a-9f4b-5a3c2d1e8f90
+          Description: Local BYOK envelope key
+        BackingKeys:
+          - 5cdaead27fe7da2de47945d73cd6d79e36494e73802f3cd3869f1d2cb0b5d7a9
+Aliases:
+  - AliasName: alias/byok-local
+    TargetKeyId: 0b7c1f0e-6d52-4e0a-9f4b-5a3c2d1e8f90

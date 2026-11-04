@@ -4,19 +4,42 @@ import { i18n } from '@/i18n';
 import {
   type ClipboardImageFile,
   hasClipboardImage,
+  hasClipboardText,
   hasClipboardUrl,
   readClipboardImageFile,
   readClipboardText,
 } from './clipboard-image';
 
-export function clipboardPasteEmptyMessage(): string {
+/** Why a paste produced neither an attachment nor text. */
+export type ClipboardPasteFailure = 'empty' | 'denied' | 'unreadable' | 'too-large';
+
+/** Toast copy when a paste finds an empty clipboard. */
+function clipboardPasteEmptyMessage(): string {
   return i18n.t('chat.attachment.nothingToPaste');
+}
+
+/**
+ * Toast copy for a paste that found nothing usable, or `null` for the reasons
+ * each composer words in its own attachment vocabulary (`'too-large'`,
+ * `'unreadable'`).
+ *
+ * `'denied'` reuses the PR link paste copy: both controls hit the same paste
+ * permission, so one already-translated message keeps them consistent.
+ */
+export function clipboardPasteFailureMessage(reason: ClipboardPasteFailure): string | null {
+  if (reason === 'empty') {
+    return clipboardPasteEmptyMessage();
+  }
+  if (reason === 'denied') {
+    return i18n.t('prReview.linkPasteDenied');
+  }
+  return null;
 }
 
 type UseClipboardPasteOptions = {
   addFile: (file: ClipboardImageFile) => Promise<void>;
   addText?: (text: string) => void;
-  onFailure: (reason: 'empty' | 'unreadable' | 'too-large') => void;
+  onFailure: (reason: ClipboardPasteFailure) => void;
   maxBytes?: number;
 };
 
@@ -49,6 +72,10 @@ export function useClipboardPaste(options: UseClipboardPasteOptions) {
           const text = await readClipboardText();
           if (text !== '') {
             addText(text);
+            return;
+          }
+          if (await hasClipboardText()) {
+            onFailure('denied');
             return;
           }
         }

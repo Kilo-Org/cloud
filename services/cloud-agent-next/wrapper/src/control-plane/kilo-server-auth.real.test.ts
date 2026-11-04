@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 import { fetchKiloServer, kiloServerHeaders } from '../kilo-server-auth.js';
 import { createKiloRuntime } from './kilo-runtime.js';
 
@@ -29,7 +30,7 @@ function socketOutcome(url: URL, headers: Record<string, string>): Promise<Socke
 suite('pinned Kilo server password', () => {
   it('the runtime starts Kilo with a password that only its own clients hold', async () => {
     if (!binary) throw new Error('KILO_781_BINARY is required');
-    expect(Bun.spawnSync([binary, '--version']).stdout.toString().trim()).toBe('7.8.1');
+    expect(Bun.spawnSync([binary, '--version']).stdout.toString().trim()).toBe(KILO_CLI_VERSION);
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-auth-781-'));
     const runtime = createKiloRuntime({
       directory: root,

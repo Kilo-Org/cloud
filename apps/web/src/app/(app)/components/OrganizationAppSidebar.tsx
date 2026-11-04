@@ -11,17 +11,12 @@ import {
   Sliders,
   Sparkles,
   Cable,
-  Rocket,
-  Database,
   Users,
   CreditCard,
   Cloud,
   Key,
   List,
   Shield,
-  Plus,
-  ListChecks,
-  Wrench,
   Webhook,
   Settings,
   MessageSquare,
@@ -59,10 +54,8 @@ export default function OrganizationAppSidebar({
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
-  const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
+  const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -181,15 +174,6 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    ...(isAppBuilderEnabled || isDevelopment
-      ? [
-          {
-            title: 'App Builder',
-            icon: Plus,
-            url: `/organizations/${organizationId}/app-builder`,
-          },
-        ]
-      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -205,8 +189,7 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
-    // Gastown requires non-billing_manager role; hide for billing-only users
-    ...(currentRole !== 'billing_manager'
+    ...((isGastownEnabled || isDevelopment) && currentRole !== 'billing_manager'
       ? [
           {
             title: 'Gas Town',
@@ -225,43 +208,6 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [
-          {
-            title: 'Auto Triage',
-            icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
-          },
-          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
-        ]
-      : []),
-    ...(isDeployEnabled || isDevelopment
-      ? [
-          {
-            title: 'Deploy',
-            icon: Rocket,
-            url: `/organizations/${organizationId}/deploy`,
-          },
-        ]
-      : []),
-    ...(organizationData?.settings?.code_indexing_enabled
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
-          },
-        ]
-      : []),
-    ...(user?.is_admin
-      ? [
-          {
-            title: 'MCP Gateway',
-            icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
-          },
-        ]
-      : []),
   ];
 
   // Account group

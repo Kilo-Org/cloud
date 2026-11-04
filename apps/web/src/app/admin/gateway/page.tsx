@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +11,11 @@ import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
+import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
+import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
+import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
+import { EnkryptUsageContent } from '@/app/admin/gateway/EnkryptUsageContent';
+import { OrganizationFeaturesContent } from '@/app/admin/gateway/OrganizationFeaturesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -20,7 +26,11 @@ const VALID_TABS: readonly string[] = [
   'auto-free',
   'preferred-models',
   'unavailable-models',
+  'provider-order',
+  'custom-pricing',
+  'organization-features',
   'api-request-log',
+  'enkrypt-charges',
 ];
 type Tab =
   | 'sync-providers'
@@ -29,7 +39,11 @@ type Tab =
   | 'auto-free'
   | 'preferred-models'
   | 'unavailable-models'
-  | 'api-request-log';
+  | 'provider-order'
+  | 'custom-pricing'
+  | 'organization-features'
+  | 'api-request-log'
+  | 'enkrypt-charges';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -77,7 +91,7 @@ export default function AdminGatewayPage() {
               Custom LLMs
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
-              Routing
+              Vercel Routing
             </TabsTrigger>
             <TabsTrigger value="auto-free" className={tabTriggerClass}>
               Auto Free
@@ -88,8 +102,20 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="unavailable-models" className={tabTriggerClass}>
               Unavailable Models
             </TabsTrigger>
+            <TabsTrigger value="provider-order" className={tabTriggerClass}>
+              Provider Order
+            </TabsTrigger>
+            <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
+              Custom Pricing
+            </TabsTrigger>
+            <TabsTrigger value="organization-features" className={tabTriggerClass}>
+              Organization Features
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
+            </TabsTrigger>
+            <TabsTrigger value="enkrypt-charges" className={tabTriggerClass}>
+              Enkrypt Usage
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -98,8 +124,9 @@ export default function AdminGatewayPage() {
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
           </TabsContent>
-          <TabsContent value="routing" className="mt-4">
+          <TabsContent value="routing" className="mt-4 flex flex-col gap-y-6">
             <RoutingContent />
+            <VercelModelIdOverridesContent />
           </TabsContent>
           <TabsContent value="auto-free" className="mt-4">
             <AutoFreeContent />
@@ -129,11 +156,22 @@ export default function AdminGatewayPage() {
                   Model IDs the gateway hides from the catalog and rejects for direct requests,
                   stored in the <code>unavailable_models</code> column of{' '}
                   <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
-                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
-                  listed here.
+                  Auto Small&apos;s free fallback, <code>{AUTO_SMALL_TARGET_MODELS.free}</code>, is
+                  internal-only: it is always hidden and rejected for direct requests, independently
+                  of this list. Kilo serves it through <code>{AUTO_SMALL_TARGET_MODELS.paid}</code>{' '}
+                  for users without balance.
                 </>
               }
             />
+          </TabsContent>
+          <TabsContent value="provider-order" className="mt-4">
+            <PreferredProviderOrderContent />
+          </TabsContent>
+          <TabsContent value="custom-pricing" className="mt-4">
+            <CustomPricingContent />
+          </TabsContent>
+          <TabsContent value="organization-features" className="mt-4">
+            <OrganizationFeaturesContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"
@@ -143,6 +181,9 @@ export default function AdminGatewayPage() {
             <div className="mt-8">
               <RequestLoggingOptInsContent />
             </div>
+          </TabsContent>
+          <TabsContent value="enkrypt-charges" className="mt-4">
+            <EnkryptUsageContent />
           </TabsContent>
         </Tabs>
       </div>

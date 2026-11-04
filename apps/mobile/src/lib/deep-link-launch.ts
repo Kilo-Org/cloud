@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the launch capture, the pending slot and its durable mirror share one module so their precedence rules cannot drift */
 import * as Sentry from '@sentry/react-native';
 
 import {
@@ -8,6 +9,8 @@ import {
 
 import { isRemovedMobileDeepLink } from './deep-link-policy';
 import { parsePendingDeepLinkRecord, type PendingDeepLinkRecord } from './deep-link-record';
+import { currentRouteHref } from './current-route-href';
+import { opensDestination, shellRouteHref } from './deep-link-destination';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
@@ -46,7 +49,13 @@ const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
-let launchLinkHandled = false;
+// The href the cold-start capture stashed; 'none' once handled without one;
+// null until the capture has run.
+let launchCapturedHref: string | null = null;
+
+// The launch opened one of the app's own routes (`kiloapp:///(app)/…`): the
+// request this process started for, which the relaunch repair leaves alone.
+let launchCapturedAppRoute = false;
 
 // True while the pending slot holds a universal link the cold-launch capture
 // derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
@@ -419,7 +428,7 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
   }
 
   const { href, source, sessionBound, organizationId } = record;
-  setPendingDeepLink(href, source, { sessionBound, organizationId });
+  setPendingDeepLink(currentRouteHref(href), source, { sessionBound, organizationId });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -476,7 +485,7 @@ export function resumeDeepLinkHref({ href, anchorMessageId }: IncomingResume): s
  * the bare href here would open a resumed session at the bottom.
  */
 export function captureLaunchDeepLink(): void {
-  if (launchLinkHandled) {
+  if (launchCapturedHref !== null) {
     return;
   }
   const url = readLaunchUrl();
@@ -484,24 +493,49 @@ export function captureLaunchDeepLink(): void {
     return;
   }
   const resume = resolveIncomingResume(url);
-  if (resume) {
+  // A launch link that cannot open its destination is not captured at all: the
+  // slot is the layout's only navigation input, so stashing the composer
+  // fallback of an unusable session capture would replace the restored screen
+  // with it. `redirectSystemPath` applies the same rule to a warm arrival.
+  if (resume && opensDestination(resume.href)) {
     // An app-scheme launch URL is the shape the Android system-search tap
     // delivers; flag it so the exact `system-search` route for that tap may
     // replace this lossy web-table mapping. An `https://` link is never flagged.
     // An app-scheme URL that names a family the phone's search indexes is a
     // search result's identifier, so it is session-bound: it must not open for
     // the account that signs in after the one that indexed it.
-    setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link', {
+    launchCapturedHref = resumeDeepLinkHref(resume);
+    setPendingDeepLink(launchCapturedHref, 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
       sessionBound: isSystemSearchFamilyLink(url),
     });
-    launchLinkHandled = true;
+    return;
+  }
+  // A launch that names one of the app's own routes is captured for the same
+  // reason, and latched so the relaunch repair leaves it to the consumer.
+  const appRoute = shellRouteHref(url);
+  if (appRoute !== null) {
+    launchCapturedHref = appRoute;
+    launchCapturedAppRoute = true;
+    setPendingDeepLink(appRoute, 'universal-link', {
+      fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+    });
   }
 }
 
-/** Whether the synchronous launch capture already stashed this process's launch link. */
-export function wasLaunchLinkHandled(): boolean {
-  return launchLinkHandled;
+/**
+ * The href the synchronous launch capture stashed, or null once handled. A
+ * truthy result the caller compares against the pending slot tells the OS's
+ * stale replay (same destination) apart from a live tap (different one).
+ */
+export function wasLaunchLinkHandled(): string | null {
+  return launchCapturedHref === 'none' ? null : launchCapturedHref;
+}
+
+/** Whether the launch opened one of the app's own routes, which the relaunch
+ *  repair must leave to the pending consumer. */
+export function wasLaunchAppRouteCaptured(): boolean {
+  return launchCapturedAppRoute;
 }
 
 /** Test-only: reset module-private latch, pending slot, and listeners between cases. */
@@ -512,7 +546,8 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkSessionBound = false;
   pendingDeepLinkOrganizationId = null;
-  launchLinkHandled = false;
+  launchCapturedHref = null;
+  launchCapturedAppRoute = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
   currentDeepLinkUserId = null;

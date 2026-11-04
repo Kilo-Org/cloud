@@ -36,12 +36,22 @@ export async function encodeLocalImage(uri: string): Promise<LocalImage> {
   // read or a failed save: it holds the decoded pixels, and nothing else does.
   let live: ImageManipulator.ImageRef | undefined = undefined;
   try {
-    live = await ImageManipulator.ImageManipulator.manipulate(uri).renderAsync();
+    // The decoder itself is bounded, so the full-resolution pixels of a large
+    // photo are never materialized: a 12-megapixel camera image otherwise costs
+    // tens of megabytes of native heap before anything is scaled down.
+    live = await ImageManipulator.ImageManipulator.manipulate(uri, {
+      maxWidth: MAX_EDGE,
+      maxHeight: MAX_EDGE,
+    }).renderAsync();
     const { width, height } = live;
+    // A loader that ignores the bounds would still hand back a full-resolution
+    // image, so the size is enforced again here. The resize takes the rendered
+    // image, not the URI: the pixels are already decoded, and reading the file
+    // a second time would put a second full-resolution copy in memory.
     const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
     if (scale < 1) {
       const source = live;
-      live = await ImageManipulator.ImageManipulator.manipulate(uri)
+      live = await ImageManipulator.ImageManipulator.manipulate(source)
         .resize({ width: Math.round(width * scale), height: Math.round(height * scale) })
         .renderAsync();
       source.release();

@@ -28,6 +28,7 @@ const BILLING_CONTEXT_KEY = 'billing:context';
 const BILLING_STATE_KEY = 'billing:state';
 const BILLING_HOURLY_ESTIMATE_KEY = 'billing:estimatedHourlyCharge';
 const RUN_POLICY_KEY = 'container:runPolicy';
+const ACCESS_REVOKED_KEY = 'container:accessRevoked';
 
 /**
  * TownContainer — a Cloudflare Container per town.
@@ -108,7 +109,7 @@ export class TownContainerDO extends Container<Env> {
 
   override async onStart(): Promise<void> {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
-    if ((await this.getRunPolicy()) === 'paused_by_user') {
+    if ((await this.isAccessRevoked()) || (await this.getRunPolicy()) === 'paused_by_user') {
       await this.stop();
       return;
     }
@@ -341,20 +342,31 @@ export class TownContainerDO extends Container<Env> {
 
   async setRunPolicy(policy: ContainerRunPolicy): Promise<GastownBillingStatus> {
     await this.ctx.storage.put(RUN_POLICY_KEY, policy);
-    if (policy === 'paused_by_user') {
-      const state = await this.getUsageState();
-      const canCloseBillingInterval =
-        state.phase === 'running' || (state.phase === 'starting' && state.startRecorded);
-      if (isContainerUsageMeteringEnabled(this.env) && canCloseBillingInterval) {
-        await this.ctx.storage.put(BILLING_STATE_KEY, {
-          ...state,
-          phase: 'stopping',
-          stopReason: 'runtime_signal',
-        } satisfies OpenUsageInterval);
-      }
-      await this.stop();
-    }
+    if (policy === 'paused_by_user') await this.stopForRuntimeSignal();
     return this.getBillingStatus();
+  }
+
+  /**
+   * Blocks every container start while the town owner lacks Gastown access.
+   * Kept apart from the run policy so the owner cannot clear it.
+   */
+  async setAccessRevoked(revoked: boolean): Promise<void> {
+    await this.ctx.storage.put(ACCESS_REVOKED_KEY, revoked);
+    if (revoked) await this.stopForRuntimeSignal();
+  }
+
+  private async stopForRuntimeSignal(): Promise<void> {
+    const state = await this.getUsageState();
+    const canCloseBillingInterval =
+      state.phase === 'running' || (state.phase === 'starting' && state.startRecorded);
+    if (isContainerUsageMeteringEnabled(this.env) && canCloseBillingInterval) {
+      await this.ctx.storage.put(BILLING_STATE_KEY, {
+        ...state,
+        phase: 'stopping',
+        stopReason: 'runtime_signal',
+      } satisfies OpenUsageInterval);
+    }
+    await this.stop();
   }
 
   async destroyWithBilling(): Promise<void> {
@@ -741,7 +753,17 @@ export class TownContainerDO extends Container<Env> {
     return (await this.ctx.storage.get<ContainerRunPolicy>(RUN_POLICY_KEY)) ?? 'automatic';
   }
 
+  private async isAccessRevoked(): Promise<boolean> {
+    return (await this.ctx.storage.get<boolean>(ACCESS_REVOKED_KEY)) ?? false;
+  }
+
   private async assertAutomaticStartsEnabled(): Promise<void> {
+    if (await this.isAccessRevoked()) {
+      throw new ContainerBillingError(
+        'ACCESS_REVOKED',
+        'Gastown access is not enabled for this town'
+      );
+    }
     if ((await this.getRunPolicy()) === 'paused_by_user') {
       throw new ContainerBillingError(
         'CONTAINER_PAUSED',

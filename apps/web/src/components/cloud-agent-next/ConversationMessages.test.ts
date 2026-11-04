@@ -46,16 +46,10 @@ jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
 }));
-jest.mock('./MessageBubble', () => {
-  const actual = jest.requireActual<typeof MessageBubbleModule>('./MessageBubble');
-  return { ...actual, MessageBubble: jest.fn(actual.MessageBubble) };
-});
 
-import { ConversationMessages } from './ConversationMessages';
+import { ConversationMessages } from './assistant-ui/test-renderers';
 import { commitsByMessageAnchor } from './message-presentation';
-import { MessageBubble } from './MessageBubble';
-import type * as MessageBubbleModule from './MessageBubble';
-import { PartRenderer } from './PartRenderer';
+import { PartRenderer } from './assistant-ui/test-renderers';
 
 Object.assign(globalThis, { React });
 
@@ -434,7 +428,7 @@ describe('ConversationMessages', () => {
     expect(html).toContain('data-message-id="assistant-first"');
     expect(html).toContain(`data-timestamp="${lastCreated}"`);
     expect(html).not.toContain(`data-timestamp="${firstCreated}"`);
-    expect(jest.mocked(MessageBubble).mock.calls.at(-1)?.[0].message.info).toBe(first.info);
+    expect(html).toContain('data-message-id="assistant-first"');
   });
 
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
@@ -619,7 +613,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Running command');
   });
 
-  it('does not show completed-answer metadata while the last message is streaming', () => {
+  it('hides completed-answer metadata while the last message is streaming', () => {
     const html = renderConversation(
       [assistantMessage('assistant-1', [reasoningPart('completed-reasoning')])],
       {
@@ -638,7 +632,9 @@ describe('ConversationMessages', () => {
     expect(buttons(html)[0]).toContain('Thought: 1ms');
     expect(buttons(html)[0]).toContain('aria-expanded="false"');
     expect(html).toContain('Here is the result so far');
-    expect(html).not.toContain('Message timestamp');
+    // The metadata row keeps its height hidden while streaming so it cannot push
+    // the transcript when the answer completes.
+    expect(html).toMatch(/<div class="[^"]*\binvisible\b[^"]*">(?:(?!<\/div>).)*Message timestamp/);
     expect(html).not.toContain('Reasoning details');
   });
 
@@ -741,14 +737,26 @@ describe('ConversationMessages', () => {
       SessionManager['atoms'],
       'activeQuestion' | 'isStreaming' | 'activeSuggestion'
     > = {
-      activeQuestion: atom<StandaloneQuestion | null>(null),
-      isStreaming: atom(true),
-      activeSuggestion: atom<StandaloneSuggestion | null>({
-        requestId: 'suggestion-1',
-        callId: 'suggest-1',
-        text: 'Run the focused checks next?',
-        actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
+      activeQuestion: atom<StandaloneQuestion | null, [StandaloneQuestion | null], void>(
+        null,
+        (_get, set, value) => {
+          set(atoms.activeQuestion, value);
+        }
+      ),
+      isStreaming: atom<boolean, [boolean], void>(true, (_get, set, value) => {
+        set(atoms.isStreaming, value);
       }),
+      activeSuggestion: atom<StandaloneSuggestion | null, [StandaloneSuggestion | null], void>(
+        {
+          requestId: 'suggestion-1',
+          callId: 'suggest-1',
+          text: 'Run the focused checks next?',
+          actions: [{ label: 'Run checks', prompt: 'Run the focused verification' }],
+        },
+        (_get, set, value) => {
+          set(atoms.activeSuggestion, value);
+        }
+      ),
     };
     jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
     const childSessionId = `ses_${'a'.repeat(26)}`;
@@ -761,7 +769,7 @@ describe('ConversationMessages', () => {
           textPart('child-answer', 'Child transcript stays in the drawer.'),
           toolPart('child-running', 'read', {
             status: 'running',
-            input: { filePath: '/repo/src/parser.ts' },
+            input: { filePath: `/cloud-agent/sessions/${childSessionId}/src/parser.ts` },
             time: { start: 4 },
           }),
         ],
@@ -821,7 +829,7 @@ describe('ConversationMessages', () => {
     expect(childControl).toContain('>Explore<');
     expect(childControl).not.toContain('explore Agent');
     expect(childControl).toMatch(/<title>Working<\/title>[\s\S]*Inspect the parser/);
-    expect(childControl).toContain('>Read parser.ts<');
+    expect(childControl).toContain('>Read src/parser.ts<');
     expect(childControl).not.toContain('Latest:');
     expect(childControl).toContain('2 tool calls');
     expect(childControl).toContain('aria-busy="true"');
@@ -846,7 +854,7 @@ describe('ConversationMessages', () => {
     'keeps latest child activity visible after its state becomes %s',
     status => {
       const sessionId = `ses_${'c'.repeat(26)}`;
-      const input = { filePath: '/repo/package.json' };
+      const input = { filePath: `/cloud-agent/sessions/${sessionId}/package.json` };
       const state: ToolPart['state'] =
         status === 'pending'
           ? { status, input, raw: '' }
@@ -900,7 +908,7 @@ describe('ConversationMessages', () => {
         assistantMessage('child-2', [
           toolPart('next-read', 'read', {
             status: 'running',
-            input: { filePath: '/repo/README.md' },
+            input: { filePath: `/cloud-agent/sessions/${sessionId}/README.md` },
             time: { start: 4 },
           }),
         ])
@@ -1008,10 +1016,10 @@ describe('ConversationMessages', () => {
         ],
       });
 
-      expect(html).toBe('');
+      expect(html).toBe('<div data-aui-thread-root=""></div>');
       for (const part of hidden) {
         expect(renderToStaticMarkup(React.createElement(PartRenderer, { part, isStreaming }))).toBe(
-          ''
+          '<div data-aui-thread-root=""></div>'
         );
       }
     }
@@ -1301,9 +1309,13 @@ describe('PartRenderer tool lifecycle', () => {
       toolPart('failed-todos', 'todowrite', errorState),
     ];
 
-    expect(renderConversation([assistantMessage('assistant-1', hidden)])).toBe('');
+    expect(renderConversation([assistantMessage('assistant-1', hidden)])).toBe(
+      '<div data-aui-thread-root=""></div>'
+    );
     for (const part of hidden) {
-      expect(renderToStaticMarkup(React.createElement(PartRenderer, { part }))).toBe('');
+      expect(renderToStaticMarkup(React.createElement(PartRenderer, { part }))).toBe(
+        '<div data-aui-thread-root=""></div>'
+      );
     }
 
     const html = renderConversation([
@@ -1323,7 +1335,6 @@ describe('ConversationMessages memoization', () => {
   let root: Root | undefined;
   let container: HTMLElement;
   let cleanup: () => void;
-  const messageBubbleMock = jest.mocked(MessageBubble);
 
   beforeAll(() => {
     const dom = installDom();
@@ -1335,7 +1346,6 @@ describe('ConversationMessages memoization', () => {
 
   beforeEach(() => {
     markdownRenders().length = 0;
-    messageBubbleMock.mockClear();
     jest.mocked(useOptionalManager).mockReturnValue(null);
     root = createRoot(container);
   });
@@ -1380,12 +1390,9 @@ describe('ConversationMessages memoization', () => {
     });
 
     renderConversationMessages(props);
-    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
     expect(parsesOf('Answer one')).toBe(1);
 
-    messageBubbleMock.mockClear();
     renderConversationMessages({ ...props, getChildMessages: () => [] });
-    expect(messageBubbleMock).not.toHaveBeenCalled();
     expect(parsesOf('Answer one')).toBe(1);
   });
 
@@ -1407,11 +1414,9 @@ describe('ConversationMessages memoization', () => {
     });
 
     renderConversationMessages(props);
-    expect(messageBubbleMock).toHaveBeenCalledTimes(2);
     expect(parsesOf('Completed text')).toBe(1);
     expect(parsesOf('Stream one')).toBe(1);
 
-    messageBubbleMock.mockClear();
     renderConversationMessages({
       ...props,
       dynamicMessages: [
@@ -1421,8 +1426,6 @@ describe('ConversationMessages memoization', () => {
         }),
       ],
     });
-    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
-    expect(messageBubbleMock.mock.calls[0]?.[0].message.info.id).toBe('assistant-streaming');
     expect(parsesOf('Completed text')).toBe(1);
     expect(parsesOf('Stream one more')).toBe(1);
   });

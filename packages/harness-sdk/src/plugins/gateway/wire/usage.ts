@@ -22,10 +22,12 @@ const set = (target: Counts, key: keyof ModelUsage, value: number | null | undef
 /**
  * Both OpenAI shapes report the cached tokens inside the input total, so the
  * cached count is subtracted out. They differ only in what the three fields
- * are called.
+ * are called. A reply that reports more cached tokens than input tokens is
+ * inconsistent, but the counts still leave here non-negative: the non-cached
+ * remainder is floored at zero, and the cached count is kept as reported.
  */
 const readCached = (input: number, output: number, cached: number): Partial<ModelUsage> => ({
-  inputTokens: input - cached,
+  inputTokens: Math.max(0, input - cached),
   outputTokens: output,
   cacheReadTokens: cached,
 });

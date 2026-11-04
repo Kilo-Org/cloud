@@ -30,7 +30,7 @@ export function makeFetch(responses: MockResponse[]): {
 } {
   const calls: FetchCall[] = [];
   let i = 0;
-  const fakeFetch = ((url: string | URL | Request, init?: RequestInit) => {
+  const fakeFetch = (url: string | URL | Request, init?: RequestInit) => {
     const stringUrl = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = typeof init?.body === 'string' ? init.body : null;
@@ -53,7 +53,7 @@ export function makeFetch(responses: MockResponse[]): {
     const r = responses[i++] ?? { status: 500, body: { error: 'no more responses' } };
     const text = r.text ?? (r.body !== undefined ? JSON.stringify(r.body) : '');
     return Promise.resolve(new Response(text, { status: r.status }));
-  }) as unknown as typeof fetch;
+  };
   return { fetch: fakeFetch, calls };
 }
 

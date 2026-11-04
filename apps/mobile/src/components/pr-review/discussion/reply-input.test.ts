@@ -191,6 +191,13 @@ function staleVersionError(): Error {
   return error;
 }
 
+/** A server rejection that classifies as terms-required (s6 gate trigger). */
+function termsRequiredError(): Error {
+  const error = new Error('terms_required');
+  Object.assign(error, { data: { code: 'PRECONDITION_FAILED' } });
+  return error;
+}
+
 describe('ensureTermsAcceptedOutcome', () => {
   beforeEach(() => {
     alertCalls.length = 0;
@@ -732,6 +739,19 @@ describe('ReplyInput failure copy and offline gate', () => {
     mountReplyInput(makeFailedReply(ambiguous));
     const shown = mountReplyInput(makeFailedReply(ambiguous));
     expect(inlineErrorText(shown)).toBe(PR_OPERATION_AMBIGUOUS_MESSAGE);
+  });
+
+  it('shows the acceptance-required copy after the gate resolves dismissed', async () => {
+    // The error mirror re-runs the gate; the cancelled gate must surface the
+    // acceptance requirement, not the age-posture copy the dialog itself shows.
+    getTermsStatusMock.mockResolvedValue({ accepted: false, currentVersion: 'v1' });
+    mountReplyInput(makeFailedReply(termsRequiredError()));
+    await flush();
+    pressButton('Cancel');
+    await flush();
+
+    expect(stateValueWritten('You must accept the Terms of Service to post.')).toBe(true);
+    expect(stateValueWritten('You must be 13 or older to post.')).toBe(false);
   });
 
   it('fails a submit while CONFIRMED offline at once — no request, retryable copy, Reply stays enabled', async () => {

@@ -25,7 +25,9 @@ interface TokenSourceService {
   readonly get: () => Effect.Effect<string, TokenError>;
 }
 
-class TokenSource extends Context.Tag('harness/TokenSource')<TokenSource, TokenSourceService>() {}
+class TokenSource extends Context.Service<TokenSource, TokenSourceService>()(
+  'harness/TokenSource'
+) {}
 
 export type { TokenSourceService };
 export { TokenError, TokenSource };

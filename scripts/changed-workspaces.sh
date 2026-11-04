@@ -2,20 +2,24 @@
 set -euo pipefail
 
 # Output a JSON matrix of workspace packages that have file changes and a test script.
-# Excludes the root package and packages listed in --exclude arguments.
+# Excludes the root package and packages listed in --exclude arguments. Each
+# --include dir is selected as if it had file changes.
 #
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
+#   scripts/changed-workspaces.sh --include services/latency-ingest  # also select a dir
 
 excludes=()
+includes=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --exclude)
+    --exclude|--include)
       if [[ $# -lt 2 ]]; then
-        echo "Error: --exclude requires a value" >&2; exit 1
+        echo "Error: $1 requires a value" >&2; exit 1
       fi
-      excludes+=("$2"); shift 2 ;;
+      if [[ "$1" == --exclude ]]; then excludes+=("$2"); else includes+=("$2"); fi
+      shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -99,6 +103,9 @@ if [ -n "$base" ]; then
       sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
     fi
   fi
+fi
+if [ ${#includes[@]} -gt 0 ]; then
+  printf '%s\n' "${includes[@]}" >> "$dependent_dirs_file"
 fi
 
 # Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)

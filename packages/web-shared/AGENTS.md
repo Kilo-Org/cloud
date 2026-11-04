@@ -23,6 +23,35 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
 
+## AI gateway database access
+
+AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
+in `sfo1`, but the read-write `db` from `lib/drizzle` always connects to the
+Frankfurt primary. Do not use it before the upstream inference request starts:
+each query adds an `sfo1` -> `fra1` round trip (a transaction several) and holds
+a primary pool connection that long, contributing to pool exhaustion. Async
+work, work after the upstream request starts, and exceptional paths may use it.
+
+- Read through `readDb`, which uses the US replica in `sfo1`. Its lag is
+  acceptable for auth. Shared helpers keep their `fromDb = db` default for the
+  web app; gateway callers must pass `readDb`, since omitting it selects the
+  primary.
+- Defer writes with `after()`, or forward them to `fra1` like
+  `recordUsageInPrimaryRegion` does.
+- Where correctness needs the primary on a rare path (read-after-write, a row
+  lock, or an optimistic write such as lazy credit expiry), comment why.
+- `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
+  that variable must stay set on the `kilocode-ai-gateway` Vercel project.
+
+## Data collection versus ZDR
+
+`provider.data_collection: 'deny'` only excludes providers that store prompts
+for feedback or training; they may still store prompts for compliance. Only
+`zdr: true` excludes all prompt retention. The organization Data Collection
+Policy maps to `data_collection`, never `zdr`. Provider `training` and
+`retainsPrompts` follow the same split. See
+[OpenRouter's ZDR guide](https://openrouter.ai/docs/guides/features/zdr).
+
 ## Runtime files
 
 - `src/lib/email.ts` reads `src/emails/*.html` from disk, relative to the app's

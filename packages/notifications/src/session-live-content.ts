@@ -1,31 +1,15 @@
-import {
-  SESSION_LIVE_COMMAND_LIMIT,
-  SESSION_LIVE_FAILURE_KINDS,
-  SESSION_LIVE_PLAN_STEP_LIMIT,
-  SESSION_LIVE_STEP_VERBS,
-  SESSION_LIVE_TARGET_LIMIT,
-  sessionLiveChangesSchema,
-  sessionLiveFailureSchema,
-  sessionLivePlanSchema,
-  sessionLiveStepSchema,
-  type SessionLiveChanges,
-  type SessionLiveFailure,
-  type SessionLiveFailureKind,
-  type SessionLivePlan,
-  type SessionLiveStep,
-  type SessionLiveStepVerb,
-} from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
+import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 /**
- * The richer facts of one followed session that its Live Activity shows
- * (`.specs/mobile-session-live-activity.md` "Card data contract"). The shapes
- * come from the ingest derivation contract, so the card, the stored summary,
- * and the derivation cannot disagree.
+ * The card's own content beyond the ingest derivation contract: the outcome
+ * line and the quiet period. The step, plan, changes and failure shapes come
+ * from `@kilocode/session-ingest-contracts` and are imported from there, so
+ * there is one definition of each.
  *
- * They are OPTIONAL in the content state so a card built by an older producer
- * still parses, and so the layout never depends on a field a push did not
- * carry.
+ * The contract shapes are OPTIONAL in the content state so a card built by an
+ * older producer still parses, and so the layout never depends on a field a
+ * push did not carry.
  *
  * Privacy: the step target, the plan step name, and `permissionCommand` are
  * the only request text any glanceable surface carries, and each one is
@@ -33,29 +17,20 @@ import { z } from 'zod';
  * never appears here.
  */
 
-export {
-  SESSION_LIVE_COMMAND_LIMIT,
-  SESSION_LIVE_FAILURE_KINDS,
-  SESSION_LIVE_PLAN_STEP_LIMIT,
-  SESSION_LIVE_STEP_VERBS,
-  SESSION_LIVE_TARGET_LIMIT,
-  sessionLiveChangesSchema,
-  sessionLiveFailureSchema,
-  sessionLivePlanSchema,
-  sessionLiveStepSchema,
-  type SessionLiveChanges,
-  type SessionLiveFailure,
-  type SessionLiveFailureKind,
-  type SessionLivePlan,
-  type SessionLiveStep,
-  type SessionLiveStepVerb,
-};
+/**
+ * The card's status kinds: the shared glanceable vocabulary plus a turn that
+ * failed. The parser (`pushDataSchema`) and the builder (`SessionCardStatusKind`)
+ * both read this one list, so the accepted and the produced kinds cannot drift.
+ */
+export const SESSION_CARD_STATUS_KINDS = [...GLANCEABLE_STATUS_KINDS, 'failed'] as const;
+export type SessionCardStatusKind = (typeof SESSION_CARD_STATUS_KINDS)[number];
 
 /** How a finished session ended, for the outcome line. */
-export type SessionLiveOutcomeKind = 'pr_opened' | 'changes' | 'none';
+export const sessionLiveOutcomeKindSchema = z.enum(['pr_opened', 'changes', 'none']);
+export type SessionLiveOutcomeKind = z.infer<typeof sessionLiveOutcomeKindSchema>;
 
 export const sessionLiveOutcomeSchema = z.object({
-  kind: z.enum(['pr_opened', 'changes', 'none']),
+  kind: sessionLiveOutcomeKindSchema,
 });
 
 /**

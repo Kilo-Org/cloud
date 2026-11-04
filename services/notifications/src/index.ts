@@ -57,6 +57,10 @@ import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
 import { dispatchInternalPushCore } from './lib/internal-dispatch-push';
 import {
+  NOTIFICATION_HISTORY_PRUNE_CRON,
+  pruneNotificationHistory,
+} from './lib/notification-history-prune';
+import {
   dispatchScheduledActionPush,
   type SendScheduledActionNoticeParams,
   type SendScheduledActionNoticeResult,
@@ -150,9 +154,7 @@ app.post('/internal/v1/dispatch', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const result = await dispatchInternalPushCore(parsed.data, {
     getRecipientDOStub: (userId: string) =>
-      c.env.NOTIFICATION_CHANNEL_DO.get(
-        c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-      ) as unknown as RecipientDOStub,
+      c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
   const failedRecipients = result.perRecipient.filter(r => r.outcome === 'failed').length;
@@ -297,15 +299,27 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     return queue(batch as Parameters<typeof queue>[0], this.env);
   }
 
+  /**
+   * Retention sweep for the notification history this worker writes. Any other
+   * cron warns rather than running a sweep the trigger did not ask for.
+   */
+  async scheduled(controller: ScheduledController): Promise<void> {
+    if (controller.cron !== NOTIFICATION_HISTORY_PRUNE_CRON) {
+      console.warn('notifications_worker_unrecognized_cron', { cron: controller.cron });
+      return;
+    }
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const { deleted, hasMore } = await pruneNotificationHistory(db);
+    console.log('notification_history_prune_complete', { deleted, hasMore });
+  }
+
   async sendPushForConversation(
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     return sendPushForConversationCore(input, {
       getRecipientDOStub: (userId: string) =>
-        this.env.NOTIFICATION_CHANNEL_DO.get(
-          this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-        ) as unknown as RecipientDOStub,
+        this.env.NOTIFICATION_CHANNEL_DO.get(this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
       readPreferences: async userId => readPreferencesRow(db, userId),
     });
   }

@@ -334,6 +334,38 @@ describe('organization SSO policy', () => {
 
     selectSpy.mockRestore();
   });
+
+  test('skips the authority query when no organization has an SSO domain', async () => {
+    const standard = await createOrganization({ name: 'No Domain Standard Organization' });
+    const standardParent = await createOrganization({ name: 'No Domain Standard Parent' });
+    const standardChild = await createOrganization({
+      name: 'No Domain Standard Child',
+      parent_organization_id: standardParent.id,
+    });
+    const invalidDomain = await createOrganization({
+      name: 'No Domain Invalid Domain Organization',
+      sso_domain: 'not a domain',
+    });
+    const selectSpy = jest.spyOn(db, 'select');
+
+    const policies = await resolveEffectiveOrganizationSsoPolicies([
+      standard.id,
+      standardChild.id,
+      invalidDomain.id,
+    ]);
+
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+    expect([...policies.entries()]).toEqual([
+      [standard.id, { status: 'not_required', organizationId: standard.id }],
+      [standardChild.id, { status: 'not_required', organizationId: standardChild.id }],
+      [
+        invalidDomain.id,
+        { status: 'misconfigured', organizationId: invalidDomain.id, reason: 'invalid_domain' },
+      ],
+    ]);
+
+    selectSpy.mockRestore();
+  });
 });
 
 type EffectivePolicyExpectation = {

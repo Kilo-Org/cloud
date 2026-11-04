@@ -48,6 +48,65 @@ const ALERT_INPUT = {
   attemptedAt: new Date('2026-09-01T00:00:00.000Z'),
 };
 
+describe('staging test-mode alerts', () => {
+  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+  const originalStripeKey = process.env.STRIPE_SECRET_KEY;
+
+  afterEach(() => {
+    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    if (originalStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = originalStripeKey;
+  });
+
+  it('skips the notification in staging when the event is not livemode', async () => {
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    delete process.env.STRIPE_SECRET_KEY;
+    const { sendMissedServiceFeeAlert } = await loadAlerts();
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
+
+    await sendMissedServiceFeeAlert({ ...ALERT_INPUT, livemode: false }, { sendNotification });
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it('sends the notification in staging for livemode events', async () => {
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    delete process.env.STRIPE_SECRET_KEY;
+    const { sendMissedServiceFeeAlert } = await loadAlerts();
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
+
+    await sendMissedServiceFeeAlert({ ...ALERT_INPUT, livemode: true }, { sendNotification });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the notification in production even when the event is not livemode', async () => {
+    process.env.VERCEL_TARGET_ENV = 'production';
+    delete process.env.STRIPE_SECRET_KEY;
+    const { sendMissedServiceFeeAlert } = await loadAlerts();
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
+
+    await sendMissedServiceFeeAlert({ ...ALERT_INPUT, livemode: false }, { sendNotification });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the Stripe key mode when livemode is missing in staging', async () => {
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    const { sendMissedServiceFeeAlert } = await loadAlerts();
+    const sendNotification = jest.fn<typeof sendAdminSlackNotification>(async () => undefined);
+
+    process.env.STRIPE_SECRET_KEY = 'sk_test_example';
+    await sendMissedServiceFeeAlert(ALERT_INPUT, { sendNotification });
+    expect(sendNotification).not.toHaveBeenCalled();
+
+    process.env.STRIPE_SECRET_KEY = 'sk_live_example';
+    await sendMissedServiceFeeAlert(ALERT_INPUT, { sendNotification });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('sendMissedServiceFeeAlert', () => {
   it('sends only non-sensitive identifiers, amounts, and the failure code', async () => {
     const { buildMissedServiceFeeAlertText, sendMissedServiceFeeAlert } = await loadAlerts();

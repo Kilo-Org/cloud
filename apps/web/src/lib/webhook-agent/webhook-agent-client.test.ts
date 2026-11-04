@@ -183,6 +183,33 @@ describe('webhook agent client sandbox allocation forwarding', () => {
     });
   });
 
+  it('forwards widened flat allocation keys unchanged', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ data: { triggerId: 'trigger', inboundUrl: 'https://inbound' } }),
+            { status: 200 }
+          )
+      );
+
+    await createWorkerTrigger('user-1', undefined, 'trigger', {
+      promptTemplate: 'Run task',
+      sandboxAllocation: 'cloudflare-containers-standard-4',
+    });
+    await updateWorkerTrigger('user-1', undefined, 'trigger', {
+      sandboxAllocation: 'vercel-large',
+    });
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      sandboxAllocation: 'cloudflare-containers-standard-4',
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body))).toEqual({
+      sandboxAllocation: 'vercel-large',
+    });
+  });
+
   it('returns sandbox allocation from worker configuration responses', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(
       new Response(

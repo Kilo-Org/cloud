@@ -7,9 +7,10 @@
 
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic, notificationHaptic } from '@/lib/haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetHeader,
@@ -107,13 +108,13 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   useDraftFlushOnBackground(draftUserId, commentDraftKey, true);
 
   // Edit mode ignores the bridge so editing A never shows B's path/lines.
-  const selection = isEdit ? null : getDiffSelection({ owner, repo, number });
+  const selection = isEdit ? null : getDiffSelection({ owner, repo, number, ref: prRef });
 
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);
   const bodyBaselineRef = useRef<string>(initialBody);
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const [hasBody, setHasBody] = useState(() => initialBody.trim().length > 0);
   // Seed the refs from the settled draft once per identity/destination, before
   // the body field mounts (create mode only). Re-seeding on a key change (and
@@ -187,7 +188,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (draftUserId) {
       void clearDraft(draftUserId, commentDraftKey);
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 
@@ -245,7 +246,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       if (draftUserId) {
         void clearDraft(draftUserId, commentDraftKey);
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
       // Classified into inlineError by the effect above.
@@ -261,7 +262,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     pending.updateComment(mode.pendingItemId, trimmed);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     onDismiss();
   }
 

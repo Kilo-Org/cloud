@@ -334,13 +334,6 @@ function createReadonlyPartView(part: Part): Part {
   });
 }
 
-function applyTextDelta(part: Part, delta: string): Part {
-  if (!('text' in part) || typeof part.text !== 'string') {
-    return part;
-  }
-  return { ...part, text: part.text + delta };
-}
-
 /**
  * Append a batch of streamed chunks to a text part with a single allocation.
  *
@@ -361,6 +354,49 @@ function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
     return part;
   }
   return { ...part, text: part.text + delta };
+}
+
+/**
+ * Returns the stored array unchanged when the chunks change nothing, so a
+ * caller can skip publication on a no-op.
+ */
+function appendPartTextChunks(
+  arr: Part[] | undefined,
+  messageId: string,
+  partId: string,
+  chunks: readonly string[]
+): Part[] {
+  if (!arr) {
+    // First delta for this message — bootstrap a minimal text part.
+    return [createSeedTextPart(messageId, partId, chunks.join(''))];
+  }
+  const idx = arr.findIndex(p => p.id === partId);
+  const existing = idx >= 0 ? arr[idx] : undefined;
+  if (!existing) {
+    // Part not yet known for this message — create it with the chunks as seed.
+    return insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')));
+  }
+  const updatedPart = applyTextDeltas(existing, chunks);
+  if (updatedPart === existing) {
+    return arr;
+  }
+  const nextArr = [...arr];
+  nextArr[idx] = updatedPart;
+  return nextArr;
+}
+
+/**
+ * The snapshot is dropped before the notification, so a subscriber that reads
+ * `getParts` from its callback rebuilds from this change instead of the stale
+ * snapshot.
+ */
+function publishPartsChanged(
+  snapshot: Map<string, Part[] | null>,
+  subscribers: Map<string, Set<() => void>>,
+  messageId: string
+): void {
+  snapshot.set(messageId, null);
+  notify(subscribers, `parts:${messageId}`);
 }
 
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
@@ -384,7 +420,7 @@ const EMPTY_PARTS: readonly Part[] = Object.freeze([]);
 
 export {
   EMPTY_PARTS,
-  applyTextDelta,
+  appendPartTextChunks,
   applyTextDeltas,
   clonePart,
   createReadonlyPartView,
@@ -395,6 +431,7 @@ export {
   orderMessageIds,
   isSupportedDeltaField,
   notify,
+  publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 };
 export type { PartOrderingEvidence };

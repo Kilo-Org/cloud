@@ -9,6 +9,7 @@
       "lowBalance": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್‌ಗೆ ಗಮನ ಬೇಕು",
       "spendAlert": "ನಿಮ್ಮ ಖರ್ಚಿಗೆ ಗಮನ ಬೇಕು",
       "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು",
+      "securityUpdate": "ಭದ್ರತಾ ಪರಿಶೀಲನೆಗೆ ನವೀಕರಣವಿದೆ",
       "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು"
+      "body": "ಭದ್ರತಾ ಪರಿಶೀಲನೆಗೆ ನವೀಕರಣವಿದೆ"
     }
   },
   "instanceLifecycle": {

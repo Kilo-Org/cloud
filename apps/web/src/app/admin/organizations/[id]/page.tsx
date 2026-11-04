@@ -7,7 +7,6 @@ export default async function OrganizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Check authentication first
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     redirect('/admin/unauthorized');

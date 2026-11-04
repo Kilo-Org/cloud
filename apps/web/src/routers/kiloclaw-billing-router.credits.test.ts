@@ -66,6 +66,34 @@ describe('enrollWithCredits', () => {
     return instance;
   }
 
+  it('rejects enrollment funded only by expired principal without a prior balance read', async () => {
+    await createCreditEnrollmentAnchor(user.id);
+    await giveUserCredits(user.id, 60_000_000);
+    const expiry = new Date(Date.now() - 60_000).toISOString();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 60_000_000,
+      is_free: false,
+      expiry_date: expiry,
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Expired KiloClaw enrollment funds',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ next_credit_expiration_at: expiry })
+      .where(eq(kilocode_users.id, user.id));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'Insufficient credit balance'
+    );
+    const payer = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(payer?.microdollars_used).toBe(0);
+  });
+
   it('clears destruction fields and records resume retry state when credit enrollment activates a suspended trial', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 60_000_000);

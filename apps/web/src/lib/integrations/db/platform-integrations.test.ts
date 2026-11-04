@@ -14,6 +14,7 @@ import {
   autoCompleteInstallation,
   createPendingIntegration,
   findIntegrationByInstallationId,
+  findGitLabIntegrationByWebhookToken,
   findGitHubBotLinkIntegrations,
   suspendIntegration,
   suspendIntegrationForOwner,
@@ -517,7 +518,56 @@ describe('upsertPlatformIntegrationForOwner', () => {
     });
     if (!pending) throw new Error('Expected a pending row to be created');
 
-    await autoCompleteInstallation({
+    await expect(
+      autoCompleteInstallation({
+        integrationId: pending.id,
+        installationData: {
+          installation_id: INSTALLATION_ID,
+          account_id: accountId,
+          account_login: 'target-org',
+          repository_selection: 'all',
+          permissions: {},
+          events: [],
+          created_at: new Date().toISOString(),
+        },
+        existingMetadata: pending.metadata as Record<string, unknown>,
+        authorizedRequesterAccountIds: ['github-requester-42'],
+      })
+    ).resolves.toEqual({ ok: true });
+
+    const [completed] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(completed).toMatchObject({
+      integration_status: 'active',
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: 'github-requester-42',
+      github_authorized_at: expect.any(String),
+    });
+  });
+
+  test('autoCompleteInstallation keeps the request pending when the delivery identity is not its requester', async () => {
+    const accountId = `autocomplete-requester-${Date.now()}`;
+    const pending = await createPendingIntegration({
+      userId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester-7', login: 'requester' },
+      githubRequest: {
+        id: 'github-request-7',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+
+    const outcome = await autoCompleteInstallation({
       integrationId: pending.id,
       installationData: {
         installation_id: INSTALLATION_ID,
@@ -529,17 +579,66 @@ describe('upsertPlatformIntegrationForOwner', () => {
         created_at: new Date().toISOString(),
       },
       existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: ['github-requester-8'],
     });
 
-    const [completed] = await db
+    expect(outcome).toEqual({ ok: false, reason: 'requester_mismatch' });
+    const [stillPending] = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, pending.id));
-    expect(completed).toMatchObject({
-      integration_status: 'active',
-      github_authorized_by_user_id: userId,
-      github_authorized_user_id: 'github-requester-42',
-      github_authorized_at: expect.any(String),
+    expect(stillPending).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+      platform_account_id: accountId,
+      github_authorized_user_id: null,
+    });
+  });
+
+  test('autoCompleteInstallation keeps the request pending when it targets another account', async () => {
+    const accountId = `autocomplete-account-${Date.now()}`;
+    const pending = await createPendingIntegration({
+      userId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester-9', login: 'requester' },
+      githubRequest: {
+        id: 'github-request-9',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+
+    const outcome = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: INSTALLATION_ID,
+        account_id: `${accountId}-other`,
+        account_login: 'other-org',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: ['github-requester-9'],
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'account_mismatch' });
+    const [stillPending] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(stillPending).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+      platform_account_id: accountId,
     });
   });
 
@@ -1378,5 +1477,84 @@ describe('updateIntegrationMetadataForOwner', () => {
         integrationId
       )
     ).rejects.toThrow('No github integration found for owner');
+  });
+});
+
+describe('findGitLabIntegrationByWebhookToken', () => {
+  const orgId = crypto.randomUUID();
+
+  beforeEach(async () => {
+    await db.insert(organizations).values({ id: orgId, name: `GitLab lookup org ${Date.now()}` });
+  });
+
+  afterEach(async () => {
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  async function insertGitLabIntegration(values: {
+    platform?: string;
+    integration_status?: string;
+    metadata: Record<string, unknown>;
+  }) {
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: values.platform ?? 'gitlab',
+        integration_type: 'oauth',
+        integration_status: values.integration_status ?? 'active',
+        kilo_requester_user_id: 'requester-1',
+        metadata: values.metadata,
+      })
+      .returning();
+    return integration;
+  }
+
+  test('returns the single integration whose stored secret matches', async () => {
+    const target = await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-target' } });
+    await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-other' } });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-target');
+
+    expect(found?.id).toBe(target.id);
+    expect(found?.webhook_secret).toBe('secret-target');
+    expect(found?.owned_by_organization_id).toBe(orgId);
+  });
+
+  test('resolves an integration that is inactive by status', async () => {
+    const inactive = await insertGitLabIntegration({
+      integration_status: 'suspended',
+      metadata: { webhook_secret: 'secret-inactive' },
+    });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-inactive');
+
+    expect(found?.id).toBe(inactive.id);
+    expect(found?.integration_status).toBe('suspended');
+    expect(found?.suspended_at).toBeNull();
+  });
+
+  test('ignores another platform carrying the same secret key', async () => {
+    await insertGitLabIntegration({
+      platform: 'bitbucket',
+      metadata: { webhook_secret: 'secret-shared' },
+    });
+    const gitlab = await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-shared' } });
+
+    const found = await findGitLabIntegrationByWebhookToken('secret-shared');
+
+    expect(found?.id).toBe(gitlab.id);
+  });
+
+  test('returns null for a secret that matches no row', async () => {
+    await insertGitLabIntegration({ metadata: { webhook_secret: 'secret-known' } });
+
+    expect(await findGitLabIntegrationByWebhookToken('secret-unknown')).toBeNull();
+  });
+
+  test('returns null when GitLab rows carry no stored secret', async () => {
+    await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
+
+    expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
   });
 });

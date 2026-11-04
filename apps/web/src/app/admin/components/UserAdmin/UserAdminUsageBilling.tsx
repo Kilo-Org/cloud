@@ -75,7 +75,6 @@ export function UserAdminUsageBilling({
         if (variables.dryRun) {
           setBalanceResult(data);
         } else {
-          // Fix was applied - reset to unvalidated state and show toast
           setBalanceResult(null);
           void queryClient.invalidateQueries({ queryKey: ['admin-user', id] });
           void queryClient.invalidateQueries({ queryKey: ['admin-user-credit-transactions', id] });

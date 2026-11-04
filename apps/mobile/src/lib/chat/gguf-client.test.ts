@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/consistent-type-assertions, typescript-eslint/no-unsafe-argument, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/no-unsafe-return, typescript-eslint/require-await, require-await, promise/prefer-await-to-then -- a llama.rn context is a JSI object and a download is a pending promise: a test double can only be built by asserting its shape */
 import { type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
-import { Chunk, Effect, Either, Stream } from 'effect';
+import { Effect, Result, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { backendFailureKey } from './backend-target';
@@ -102,7 +102,7 @@ const request: ModelRequest = {
 };
 
 async function collect(stream: Stream.Stream<ModelEvent, unknown>) {
-  return [...Chunk.toReadonlyArray(await Effect.runPromise(Stream.runCollect(stream)))];
+  return [...(await Effect.runPromise(Stream.runCollect(stream)))];
 }
 
 function doneOf(events: readonly ModelEvent[]) {
@@ -116,8 +116,8 @@ function textOf(events: readonly ModelEvent[]) {
 
 /** The promise of an answer's failure, which is how a refusal is observed. */
 async function refusal(stream: Stream.Stream<ModelEvent, unknown>) {
-  const outcome = await Effect.runPromise(Effect.either(Stream.runCollect(stream)));
-  return Either.isLeft(outcome) ? backendFailureKey(outcome.left) : 'none';
+  const outcome = await Effect.runPromise(Effect.result(Stream.runCollect(stream)));
+  return Result.isFailure(outcome) ? backendFailureKey(outcome.failure) : 'none';
 }
 
 describe('an answer over a downloaded model', () => {

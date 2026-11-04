@@ -13,7 +13,8 @@ import type {
 import {
   type User,
   type Organization,
-  custom_llm2,
+  ai_gateway_config,
+  auto_routing_custom_routers,
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
@@ -56,6 +57,11 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
@@ -351,6 +357,52 @@ describe('organizations settings trpc router', () => {
       };
     }
 
+    it('lists only the requested organization routers for fallback and custom-mode pickers', async () => {
+      const organization = await createTestOrganization('Router catalog', owner.id, 0, {}, false);
+      const otherOrganization = await createTestOrganization(
+        'Other router catalog',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const personalSlug = `personal-${randomUUID()}`;
+      const gatewayModel = 'openai/gpt-4o';
+      const routerSettings = {
+        name: 'Coding',
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: gatewayModel }],
+        default_entry_key: `gateway:${gatewayModel}`,
+      };
+      await db.insert(auto_routing_custom_routers).values([
+        { ...routerSettings, slug: 'coding', owned_by_organization_id: organization.id },
+        { ...routerSettings, slug: 'other', owned_by_organization_id: otherOrganization.id },
+        { ...routerSettings, slug: personalSlug, owned_by_user_id: member.id },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(member.id);
+        const result = await caller.organizations.settings.listAvailableModels({
+          organizationId: organization.id,
+        });
+
+        expect(result.data.filter(model => model.id.startsWith('kilo-auto/custom/'))).toEqual([
+          expect.objectContaining({
+            id: 'kilo-auto/custom/org/coding',
+            autoRouting: { models: [gatewayModel] },
+          }),
+        ]);
+      } finally {
+        await db
+          .delete(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.slug, personalSlug));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, otherOrganization.id));
+      }
+    });
+
     it('includes group-only custom LLMs only for members of an allowed group', async () => {
       const organization = await createTestOrganization(
         'Custom LLM Group Access',
@@ -383,10 +435,7 @@ describe('organizations settings trpc router', () => {
         organization_ids: [],
         group_ids: [group.id],
       };
-      await db.insert(custom_llm2).values({
-        public_id: publicId,
-        definition,
-      });
+      await insertCustomLlmForTest(publicId, definition);
 
       try {
         await expect(userHasCustomLlmAccess(definition, organization.id, member.id)).resolves.toBe(
@@ -408,7 +457,7 @@ describe('organizations settings trpc router', () => {
         expect(memberResult.data.some(model => model.id === publicId)).toBe(true);
         expect(ownerResult.data.some(model => model.id === publicId)).toBe(false);
       } finally {
-        await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+        await deleteCustomLlmForTest(publicId);
         await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
@@ -698,9 +747,24 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it.each(['kilo-auto/balanced', 'kilo-internal/private-model'])(
-      'keeps %s defaults exempt from Enterprise model restrictions',
-      async modelId => {
+    it('keeps kilo-auto/balanced defaults exempt from Enterprise model restrictions', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateDefaultModel({
+        organizationId: orgWithModelDenyList.id,
+        default_model: 'kilo-auto/balanced',
+      });
+
+      expect(result.settings.default_model).toBe('kilo-auto/balanced');
+    });
+
+    it('keeps custom LLM defaults exempt when the custom LLM is granted to the organization', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(
+        modelId,
+        customLlmDefinition({ organization_ids: [orgWithModelDenyList.id] })
+      );
+      try {
         const caller = await createCallerForUser(owner.id);
 
         const result = await caller.organizations.settings.updateDefaultModel({
@@ -709,8 +773,27 @@ describe('organizations settings trpc router', () => {
         });
 
         expect(result.settings.default_model).toBe(modelId);
+      } finally {
+        await deleteCustomLlmForTest(modelId);
       }
-    );
+    });
+
+    it('applies Enterprise model restrictions to a custom LLM granted to another organization', async () => {
+      const modelId = `acme/private-${randomUUID()}`;
+      await insertCustomLlmForTest(modelId, customLlmDefinition({ organization_ids: [] }));
+      try {
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.organizations.settings.updateDefaultModel({
+            organizationId: orgWithModelDenyList.id,
+            default_model: modelId,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      } finally {
+        await deleteCustomLlmForTest(modelId);
+      }
+    });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);
@@ -1306,6 +1389,89 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
       expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
+
+  describe('gateway settings', () => {
+    async function enableGatewaySettings(organizationIds: string[]) {
+      const config = { organization_features: { gateway_settings: organizationIds } };
+      await db
+        .insert(ai_gateway_config)
+        .values({ config })
+        .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
+    }
+
+    afterEach(async () => {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      await updateOrganizationSettings(testOrganization.id, {});
+    });
+
+    it('reports whether gateway settings are available', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toEqual({
+        available: true,
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: false,
+        data_region: null,
+      });
+    });
+
+    it('saves gateway settings and records an audit log', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateGatewaySettings({
+        organizationId: testOrganization.id,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+
+      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+      expect(auditLogs.map(log => log.message)).toContain(
+        'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
+      );
+    });
+
+    it('rejects gateway settings while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('rejects gateway settings changes by members', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          data_region: 'us',
+        })
+      ).rejects.toThrow();
     });
   });
 });

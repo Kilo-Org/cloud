@@ -1,15 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
-
-// The kilo-app release workflow wires two release scripts (sibling slice s1) into
-// the pipeline: `kilo-app-release-notes.mjs` writes one changelog section per
-// build, and `kilo-app-release-upload-cap.mjs` holds a run that Apple's rolling
-// upload limit would refuse. Every check below sits beside a mutation applied to
-// a parsed copy, so a dropped gate, a moved step or a wrong destination fails
-// this suite instead of a real release.
 
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 
@@ -19,6 +15,84 @@ function readWorkflow() {
 
 function step(workflow, jobName, id) {
   return workflow.jobs[jobName].steps.find(item => item.id === id);
+}
+
+const mobilePackagePath = 'apps/mobile/package.json';
+const easConfigPath = 'apps/mobile/eas.json';
+const lockfilePath = 'pnpm-lock.yaml';
+
+function readJson(rel) {
+  return JSON.parse(readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8'));
+}
+
+function readLockfile() {
+  return load(readFileSync(new URL(`../${lockfilePath}`, import.meta.url), 'utf8'));
+}
+
+// A build or a submission runs the EAS CLI the workspace installs, so the
+// version recorded in the lockfile is the version that drives it. The manifest,
+// eas.json, the lockfile and the workflow all have to name that same tool.
+function validateEasCli(workflow, mobilePackage, easConfig, lockfile) {
+  const declared = mobilePackage.devDependencies?.['eas-cli'];
+  assert.match(
+    declared ?? '',
+    /^\d+\.\d+\.\d+$/,
+    'eas-cli must be an exact development dependency'
+  );
+  assert.equal(
+    easConfig.cli?.version,
+    declared,
+    'eas.json must select the CLI version the workspace declares'
+  );
+
+  // A frozen install refuses a manifest the graph does not carry, so the
+  // recorded specifier has to be the exact version and the resolution has to
+  // be that same release, not a peer-suffixed variant of another one.
+  const recorded = lockfile.importers?.['apps/mobile']?.devDependencies?.['eas-cli'];
+  assert.equal(
+    recorded?.specifier,
+    declared,
+    'the lockfile must record the exact CLI version the manifest declares'
+  );
+  assert.equal(
+    recorded?.version?.split('(')[0],
+    declared,
+    'the lockfile must resolve the CLI version the manifest declares'
+  );
+  assert.ok(
+    lockfile.packages?.[`eas-cli@${declared}`],
+    'the lockfile must resolve the CLI package the manifest declares'
+  );
+
+  for (const [name, command] of Object.entries(mobilePackage.scripts ?? {})) {
+    if (!/\beas\b/.test(command)) continue;
+    assert.equal(
+      command.split(/\s+/)[0],
+      'eas',
+      `mobile script ${name} must run the workspace eas binary`
+    );
+  }
+
+  const lines = Object.values(workflow.jobs)
+    .flatMap(job => job.steps ?? [])
+    .flatMap(item => (item.run ?? '').split('\n'))
+    .filter(line => /\beas(?:-cli\b| (?:env:|build|submit)\b)/.test(line))
+    .filter(line => !/^\s*echo\b/.test(line));
+  assert.ok(lines.length > 0, 'the workflow must run the EAS CLI');
+  for (const line of lines) {
+    assert.match(
+      line,
+      /\bpnpm exec eas (?:env:|build|submit)\b/,
+      `the workflow must run the installed CLI: ${line.trim()}`
+    );
+    // A step may nest one call inside another, as the build does inside
+    // env:exec, so every call on the line has to name the installed binary.
+    assert.doesNotMatch(
+      line.replace(/\bpnpm exec eas (?=env:|build|submit)/g, ''),
+      /\b(?:pnpx\s+)?eas(?:-cli)?\b/,
+      `every EAS CLI call must run the installed binary: ${line.trim()}`
+    );
+  }
 }
 
 function validate(workflow) {
@@ -174,15 +248,6 @@ function validate(workflow) {
       'bump-version must not open the PR; the changelog job opens it after the section lands'
     );
   }
-  const pending = step(workflow, 'bump-version', 'pending');
-  assert.match(pending.run, /headRefName/, 'the pending step must capture the open PR head branch');
-  // The branch name is a PR head ref, so a stranger can choose it. It is checked
-  // here, before the pipeline hands it to the changelog job.
-  assert.match(
-    pending.run,
-    /grep -qE '\^kilo-app-version-bump-\[0-9\.\]\+\$'/,
-    'the pending step must reject a branch this pipeline did not create'
-  );
   assert.match(
     step(workflow, 'bump-version', 'bump').run,
     /branch=kilo-app-version-bump-\$NEW/,
@@ -283,6 +348,132 @@ test('the release workflow gates the build on the upload cap and lands the chang
   validate(readWorkflow());
 });
 
+test('release retries preserve shipped sections on a bump branch without a PR', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-bump-'));
+  const repo = join(work, 'repo');
+  const remote = join(work, 'remote.git');
+  const output = join(work, 'output');
+  const workflow = readWorkflow();
+  const env = { ...process.env, GITHUB_OUTPUT: output };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const run = (body, cwd = repo) => {
+    writeFileSync(output, '');
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+      cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+  };
+  const runBump = previousPending => {
+    const outputs = previousPending ? { pending: previousPending } : {};
+    for (const item of workflow.jobs['bump-version'].steps.filter(item => item.run)) {
+      if (item.id === 'pending' && previousPending) {
+        continue;
+      }
+      if (item.if) {
+        const condition = /^steps\.([^.]+)\.outputs\.([a-z_]+) == '([^']*)'$/.exec(item.if);
+        assert.ok(condition, `Unsupported fixture condition: ${item.if}`);
+        if (outputs[condition[1]]?.[condition[2]] !== condition[3]) {
+          continue;
+        }
+      }
+      const body = item.run.replaceAll(
+        /\$\{\{\s*steps\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+        (_, id, key) => outputs[id][key]
+      );
+      const result = run(
+        body,
+        item['working-directory'] ? join(repo, item['working-directory']) : repo
+      );
+      if (item.id) {
+        outputs[item.id] = result;
+      }
+    }
+    return outputs;
+  };
+  try {
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' });
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release Test');
+    git('config', 'user.email', 'release@example.invalid');
+    git('remote', 'add', 'origin', remote);
+    writeFileSync(
+      join(repo, 'apps/mobile/app.config.ts'),
+      "export default {\n  version: '1.2.3',\n};\n"
+    );
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Changelog\n');
+    git('add', '.');
+    git('commit', '-m', 'Initial app');
+    const base = git('rev-parse', 'HEAD');
+
+    const first = runBump();
+    assert.equal(first.pending.open, '0');
+    const branch = first.bump.branch;
+    assert.equal(
+      git('show', `${branch}:apps/mobile/app.config.ts`),
+      "export default {\n  version: '1.2.4',\n};"
+    );
+
+    const shipped = '# Changelog\n\n## shipped build\n\n- A shipped change.\n';
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), shipped);
+    git('add', '.');
+    git('commit', '-m', 'Document shipped build');
+    git('push', 'origin', branch);
+    const documented = git('rev-parse', 'HEAD');
+    git('checkout', '--detach', base);
+    git('branch', '-D', branch);
+    const retry = runBump();
+    assert.equal(retry.pending.open, '1');
+    assert.equal(retry.pending.branch, branch);
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+    assert.equal(git('show', `${documented}:apps/mobile/CHANGELOG.md`), shipped.trim());
+
+    assert.throws(
+      () => runBump(first.pending),
+      error => error.status === 1 && /non-fast-forward|fetch first/.test(error.stderr.toString())
+    );
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+
+    git('remote', 'set-url', 'origin', join(work, 'missing.git'));
+    assert.throws(
+      () => runBump(),
+      error =>
+        error.status === 128 &&
+        /missing\.git.*does not appear to be a git repository/.test(error.stderr.toString())
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
+  validateEasCli(
+    readWorkflow(),
+    readJson(mobilePackagePath),
+    readJson(easConfigPath),
+    readLockfile()
+  );
+});
 const mutations = {
   'change detection keeps CHANGELOG.md': workflow => {
     const check = step(workflow, 'check-changes', 'check');
@@ -401,20 +592,9 @@ const mutations = {
   'bump-version drops its branch output': workflow => {
     delete workflow.jobs['bump-version'].outputs.branch;
   },
-  'the pending step does not capture the branch name': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replaceAll('headRefName', 'headRef');
-  },
   'the created branch is not recorded': workflow => {
     const bump = step(workflow, 'bump-version', 'bump');
     bump.run = bump.run.replace('branch=kilo-app-version-bump-$NEW', '');
-  },
-  'the pending step accepts any branch': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replace(
-      "grep -qE '^kilo-app-version-bump-[0-9.]+$'",
-      "grep -qE '^kilo-app-version-bump-'"
-    );
   },
   'changelog drops build-and-submit': workflow => {
     workflow.jobs.changelog.needs = workflow.jobs.changelog.needs.filter(
@@ -506,5 +686,59 @@ for (const [name, mutate] of Object.entries(mutations)) {
     const workflow = readWorkflow();
     mutate(workflow);
     assert.throws(() => validate(workflow), assert.AssertionError);
+  });
+}
+
+const toolchainMutations = {
+  'a mobile script calls another binary': ({ mobilePackage }) => {
+    mobilePackage.scripts.build = mobilePackage.scripts.build.replace(/^eas /, 'eas-cli ');
+  },
+  'eas.json selects another CLI version': ({ mobilePackage, easConfig }) => {
+    easConfig.cli.version = `${mobilePackage.devDependencies['eas-cli']}.1`;
+  },
+  'eas-cli is declared as a range': ({ mobilePackage }) => {
+    mobilePackage.devDependencies['eas-cli'] = `^${mobilePackage.devDependencies['eas-cli']}`;
+  },
+  'a workflow step calls the CLI directly': ({ workflow }) => {
+    const build = workflow.jobs['build-and-submit'].steps.find(item =>
+      /\beas build\b/.test(item.run ?? '')
+    );
+    build.run = build.run.replace('pnpm exec eas build', 'eas build');
+  },
+  'a workflow step bypasses the installed CLI': ({ workflow, mobilePackage }) => {
+    const build = workflow.jobs['build-and-submit'].steps.find(item =>
+      /\beas build\b/.test(item.run ?? '')
+    );
+    build.run = build.run.replace(
+      'pnpm exec eas build',
+      `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} build`
+    );
+  },
+  'a mobile script bypasses the installed CLI': ({ mobilePackage }) => {
+    mobilePackage.scripts.build = `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} ${mobilePackage.scripts.build}`;
+  },
+  'the lockfile records another CLI version': ({ lockfile }) => {
+    lockfile.importers['apps/mobile'].devDependencies['eas-cli'].version = '24.8.0';
+  },
+  'the lockfile records a range for the CLI': ({ lockfile, mobilePackage }) => {
+    lockfile.importers['apps/mobile'].devDependencies['eas-cli'].specifier =
+      `^${mobilePackage.devDependencies['eas-cli']}`;
+  },
+  'the lockfile drops the CLI package': ({ lockfile, mobilePackage }) => {
+    delete lockfile.packages[`eas-cli@${mobilePackage.devDependencies['eas-cli']}`];
+  },
+};
+
+for (const [name, mutate] of Object.entries(toolchainMutations)) {
+  test(`the mobile toolchain validator rejects: ${name}`, () => {
+    const workflow = readWorkflow();
+    const mobilePackage = readJson(mobilePackagePath);
+    const easConfig = readJson(easConfigPath);
+    const lockfile = readLockfile();
+    mutate({ workflow, mobilePackage, easConfig, lockfile });
+    assert.throws(
+      () => validateEasCli(workflow, mobilePackage, easConfig, lockfile),
+      assert.AssertionError
+    );
   });
 }

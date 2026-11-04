@@ -8,7 +8,7 @@ import { z } from 'zod';
  * insufficient for validating the entire shape of a user-supplied JSON
  * document (e.g. an admin editing a custom-LLM definition).
  *
- * Handled wrappers: object, optional, nullable, array, record, union
+ * Handled wrappers: object, optional, nullable, array, tuple, record, union
  * (covers `z.discriminatedUnion`, which shares `type: 'union'`), and
  * intersection. These include the wrappers used by `CustomLlmDefinitionSchema`
  * today.
@@ -17,7 +17,7 @@ import { z } from 'zod';
  * template_literal, bigint, symbol, null, undefined, void, never, any,
  * unknown, nan, file) are returned unchanged.
  *
- * Any other Zod type (tuple, map, set, nonoptional, default, prefault,
+ * Any other Zod type (map, set, nonoptional, default, prefault,
  * readonly, catch, pipe, lazy, transform, promise, function,
  * custom, success) throws, so a future schema change that introduces a new
  * wrapper surfaces here instead of silently skipping deep-strict and
@@ -90,6 +90,16 @@ export function deepStrict<T extends z.ZodType>(schema: T): z.ZodType<z.infer<T>
     case 'array': {
       const element = (anySchema as z.ZodArray<z.ZodTypeAny>).element;
       return z.array(deepStrict(element)) as unknown as z.ZodType<z.infer<T>>;
+    }
+    case 'tuple': {
+      const tuple = anySchema as z.ZodTuple;
+      const items = tuple.def.items.map(item =>
+        deepStrict(item as z.ZodTypeAny)
+      ) as unknown as readonly [z.ZodTypeAny, ...z.ZodTypeAny[]];
+      const rest = tuple.def.rest as z.ZodTypeAny | null;
+      return (rest ? z.tuple(items, deepStrict(rest)) : z.tuple(items)) as unknown as z.ZodType<
+        z.infer<T>
+      >;
     }
     case 'record': {
       const rec = anySchema as z.ZodRecord;

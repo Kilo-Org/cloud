@@ -2,9 +2,11 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -20,7 +22,16 @@ import {
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import {
+  logMicrodollarUsageAndReportToBouncer,
+  mapToUsageStats,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import type {
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -35,9 +46,12 @@ import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
@@ -48,8 +62,32 @@ import {
   startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
+/**
+ * One upstream System One call, from the fetch through the last body byte. The
+ * route's maxDuration leaves room for the deferred usage work after it.
+ */
+const SYSTEM_ONE_UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Only a body that carries a generation id can have its cost reconciled. */
+const generationIdSchema = z.object({ id: z.string().min(1) });
+
+/** A body the gateway could not use may still name the model the provider billed. */
+const providerModelSchema = z.object({ model: z.string().trim().min(1) });
+
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
+}
+
+/**
+ * `AbortSignal.timeout` rejects the fetch with its own `TimeoutError` reason, so
+ * this tells a duration bound from a provider or transport failure without
+ * trusting the error message.
+ */
+function isUpstreamTimeoutError(error: unknown): boolean {
+  if (error instanceof DOMException) return error.name === 'TimeoutError';
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'TimeoutError') return true;
+  return error.cause instanceof DOMException && error.cause.name === 'TimeoutError';
 }
 
 async function isSystemOneModel(modelId: string) {
@@ -87,6 +125,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
+  const isFree = isFreeModel(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,
@@ -94,11 +133,38 @@ export async function handleSystemOneRequest(request: NextRequest) {
       404
     );
   }
+  const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user);
-  if (balance <= 0) {
+    await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
+  if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
+  }
+
+  // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
+  // carry, and the bound prices those bytes plus the answer generation at the model's current
+  // rates.
+  const [catalog, customPricingConfig] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getCustomPricingConfig(),
+  ]);
+  const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
+  const estimatedMaxCostMicrodollars = metadata
+    ? systemOneRequestCostBound(metadata, parsed.data, customPricingConfig)
+    : null;
+  if (estimatedMaxCostMicrodollars === null) {
+    errorExceptInTest(
+      'System One request cost unavailable',
+      metadata ? `unusable pricing for '${resolvedModel}'` : `no metadata for '${resolvedModel}'`
+    );
+    return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
+  }
+  if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {
+    return errorResponse(
+      'This request can cost more than the available balance covers. Add credits or send a smaller request.',
+      'insufficient_credits',
+      402
+    );
   }
 
   const providerConfig = getOrganizationProviderPrivacy(settings);
@@ -114,8 +180,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
-      modelId: await resolveOpenRouterModelAlias(requestedModel),
+      modelId: resolvedModel,
       providerLookup: getProviderSlugsForModel,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
@@ -157,7 +224,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
       isStreaming: false,
       userByok: false,
       mode: mode || undefined,
-      provider: OPENROUTER.id,
+      provider: OPENROUTER.type,
       inferenceProvider: inferenceProvider || undefined,
       requestedModel,
       resolvedModel: normalizeModelId(requestedModel),
@@ -173,8 +240,178 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
 
+  const editorName = extractHeaderAndLimitLength(request, 'x-kilocode-editorname');
+  const machineId = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
+  const sessionId = extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId');
+
+  const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
+    api_kind: 'systemone',
+    kiloUserId: user.id,
+    provider: 'openrouter',
+    requested_model: requestedModel,
+    is_free: isFree,
+    custom_llm_pricing: null,
+    promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+    max_tokens: null,
+    has_middle_out_transform: null,
+    reasoning_setting: null,
+    inference_region: null,
+    fraudHeaders,
+    isStreaming: false,
+    organizationId,
+    prior_microdollar_usage: user.microdollars_used,
+    posthog_distinct_id: user.google_user_email,
+    project_id: projectId,
+    status_code: statusCode,
+    editor_name: editorName,
+    machine_id: machineId,
+    user_byok: false,
+    has_tools: false,
+    botId,
+    tokenSource,
+    feature,
+    session_id: sessionId,
+    mode,
+    auto_model: null,
+    ttfb_ms: ttfb,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(startedAtMs),
+      accountId: bouncerAccountId(user.id, organizationId),
+      clientIp: payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      requestedLogprobs: false,
+      samples: null,
+      // System One input is a typed classification payload, not a conversation,
+      // so there is no prompt text to hash (and no raw state leaves the gateway).
+      promptSimHash: null,
+      spendWatch: bouncerVerdict?.spendWatch === true,
+    },
+  });
+
+  /**
+   * A request that reached the provider but whose cost the gateway cannot read
+   * still owes a ledger row and a bouncer event, so its spend stays visible. The
+   * row carries no debit: the gateway never charges a cost it did not observe.
+   */
+  const zeroCostUsageStats = ({
+    messageId,
+    model = resolvedModel,
+    statusCode,
+    cancelled,
+    ttfb,
+  }: {
+    messageId: string | null;
+    /** The provider's own model id, when the response body named one. */
+    model?: string;
+    statusCode: number;
+    cancelled: boolean;
+    ttfb: number | null;
+  }): MicrodollarUsageStats => ({
+    messageId,
+    model,
+    responseContent: '',
+    hasError: true,
+    inference_provider: null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: ttfb,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled,
+    status_code: statusCode,
+    cost_mUsd: 0,
+    market_cost: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+  });
+
+  const deferZeroCostUsage = (
+    messageId: string | null,
+    statusCode: number,
+    ttfb: number | null,
+    model?: string
+  ) => {
+    const stats = zeroCostUsageStats({
+      messageId,
+      model,
+      statusCode,
+      cancelled: request.signal.aborted,
+      ttfb,
+    });
+    const context = usageContextOf(statusCode, ttfb);
+    after(async () => {
+      await logMicrodollarUsageAndReportToBouncer(stats, context);
+    });
+  };
+
+  /**
+   * The provider answered, so it may already have billed the generation, but the
+   * body did not carry a usable cost. Reconcile it through the generation
+   * endpoint the rest of the gateway uses for the same purpose.
+   */
+  const deferReconciledUsage = (generationId: string, ttfb: number, model?: string) => {
+    const cancelled = request.signal.aborted;
+    const context = usageContextOf(502, ttfb);
+    after(async () => {
+      const generation = await fetchGeneration(generationId, OPENROUTER);
+      if (!generation) {
+        await logMicrodollarUsageAndReportToBouncer(
+          zeroCostUsageStats({ messageId: generationId, model, statusCode: 502, cancelled, ttfb }),
+          context
+        );
+        return;
+      }
+      const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
+      await logMicrodollarUsageAndReportToBouncer(
+        {
+          ...reconciled,
+          hasError: true,
+          status_code: 502,
+          cancelled,
+          // The generation lookup carries no latency, so the gateway's own
+          // measurement is the one this row reports, as it does for the other rows.
+          latency: ttfb,
+          // Same split the answered path records: the provider cost stays on the
+          // row as `market_cost`, and a free model charges nothing.
+          cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
+          market_cost: reconciled.cost_mUsd,
+        },
+        context
+      );
+    });
+  };
+
+  /**
+   * A failed upstream call still owes its attempt row. The row reports the first-byte time the
+   * gateway measured, which is absent only when no response ever arrived.
+   */
+  const upstreamFailureResponse = (error: unknown, measuredTtfbMs: number | null) => {
+    deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+    if (request.signal.aborted) {
+      return errorResponse(
+        'The client disconnected before the response was sent, so the request was cancelled.',
+        'client_disconnect',
+        499
+      );
+    }
+    return errorResponse('Upstream request failed', 'upstream_error', 502);
+  };
+
+  // Nothing has reached the provider yet, so this request owes no usage row.
+  if (request.signal.aborted) {
+    return errorResponse(
+      'The client disconnected before the response was sent, so the request was cancelled.',
+      'client_disconnect',
+      499
+    );
+  }
+
   let response: Response;
-  let responseBody: unknown;
   let ttfbMs: number;
   try {
     response = await fetch(`${OPENROUTER.apiUrl}/systemone`, {
@@ -189,100 +426,85 @@ export async function handleSystemOneRequest(request: NextRequest) {
         provider: providerPolicy,
         user: generateProviderSpecificHash(user.id, OPENROUTER),
       }),
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(10 * 60 * 1000)]),
+      // The provider's outcome decides what this request costs, and a client that
+      // leaves does not undo a generation the provider already started. Only the
+      // duration bound stops the call, so a disconnect still reaches the usage
+      // record below instead of discarding it.
+      signal: AbortSignal.timeout(SYSTEM_ONE_UPSTREAM_TIMEOUT_MS),
     });
     ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
+  } catch (error) {
+    // No response arrived, so this request has no first byte to report.
+    errorExceptInTest('OpenRouter System One request failed', error);
+    return upstreamFailureResponse(error, null);
+  }
+
+  if (!response.ok) {
     if (response.status === 402) {
       await response.body?.cancel();
-      emitMetrics(response.status, ttfbMs);
       errorExceptInTest('OpenRouter System One balance exhausted');
-      return errorResponse('Service temporarily unavailable', 'upstream_error', 503);
     }
-    if (!response.ok) {
-      emitMetrics(response.status, ttfbMs);
-      return wrapInSafeNextResponse(response);
-    }
+    emitMetrics(response.status, ttfbMs);
+    // The row reports the provider's own answer, so it agrees with the metrics
+    // and with the ledger of every other upstream error response.
+    deferZeroCostUsage(null, response.status, ttfbMs);
+    return response.status === 402
+      ? errorResponse('Service temporarily unavailable', 'upstream_error', 503)
+      : wrapInSafeNextResponse(response);
+  }
+
+  let responseBody: unknown;
+  try {
     responseBody = await response.json();
   } catch (error) {
-    errorExceptInTest('OpenRouter System One request failed', error);
-    return errorResponse('Upstream request failed', 'upstream_error', 502);
+    // The provider received the request and may have billed it, so this row keeps the
+    // first-byte time the gateway measured before the body turned out to be unreadable.
+    errorExceptInTest('OpenRouter System One response body was unreadable', error);
+    return upstreamFailureResponse(error, ttfbMs);
   }
 
   const result = systemOneResponseSchema.safeParse(responseBody);
   emitMetrics(response.status, ttfbMs, result.success ? result.data.provider : undefined);
   if (!result.success) {
     errorExceptInTest('Invalid OpenRouter System One response or missing usage');
+    // A body the gateway could not accept may still name the model the provider
+    // billed, and the row must attribute the attempt the same way an answered
+    // request does.
+    const reportedModel = providerModelSchema.safeParse(responseBody);
+    const model = reportedModel.success ? reportedModel.data.model : undefined;
+    const generationId = generationIdSchema.safeParse(responseBody);
+    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs, model);
+    else deferZeroCostUsage(null, 502, ttfbMs, model);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 
   const { id, model, provider, usage } = result.data;
   const cost = toMicrodollars(usage.cost);
+  const stats: MicrodollarUsageStats = {
+    messageId: id,
+    model,
+    responseContent: '',
+    hasError: false,
+    inference_provider: provider ?? null,
+    upstream_id: null,
+    finish_reason: null,
+    latency: ttfbMs,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: false,
+    cancelled: request.signal.aborted,
+    status_code: response.status,
+    cost_mUsd: isFree ? 0 : cost,
+    market_cost: cost,
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+  };
+  const context = usageContextOf(response.status, ttfbMs);
   after(async () => {
-    await logMicrodollarUsageAndReportToBouncer(
-      {
-        messageId: id,
-        model,
-        responseContent: '',
-        hasError: false,
-        inference_provider: provider ?? null,
-        upstream_id: null,
-        finish_reason: null,
-        latency: ttfbMs,
-        moderation_latency: null,
-        generation_time: null,
-        streamed: false,
-        cancelled: false,
-        status_code: response.status,
-        cost_mUsd: cost,
-        market_cost: cost,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        cacheWriteTokens: 0,
-        cacheHitTokens: 0,
-        is_byok: false,
-      },
-      {
-        api_kind: 'systemone',
-        kiloUserId: user.id,
-        provider: 'openrouter',
-        requested_model: requestedModel,
-        promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
-        max_tokens: null,
-        has_middle_out_transform: null,
-        reasoning_setting: null,
-        fraudHeaders,
-        isStreaming: false,
-        organizationId,
-        prior_microdollar_usage: user.microdollars_used,
-        posthog_distinct_id: user.google_user_email,
-        project_id: projectId,
-        status_code: response.status,
-        editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-        machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-        user_byok: false,
-        has_tools: false,
-        botId,
-        tokenSource,
-        feature,
-        session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
-        mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
-        auto_model: null,
-        ttfb_ms: ttfbMs,
-        bouncer: {
-          requestId: bouncerRequestId,
-          occurredAt: new Date(startedAtMs),
-          accountId: bouncerAccountId(user.id, organizationId),
-          clientIp: payerSharingIp(bouncerIp, feature),
-          clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
-          requestedLogprobs: false,
-          samples: null,
-          // System One input is a typed classification payload, not a conversation,
-          // so there is no prompt text to hash (and no raw state leaves the gateway).
-          promptSimHash: null,
-          spendWatch: bouncerVerdict?.spendWatch === true,
-        },
-      }
-    );
+    await logMicrodollarUsageAndReportToBouncer(stats, context);
   });
   return NextResponse.json(responseBody);
 }

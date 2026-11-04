@@ -7,17 +7,24 @@ import {
   transitionSecurityAgentCommandWithCurrentState,
   type SecurityAgentCommandTransitionOutcome,
 } from '@kilocode/db';
-import { security_audit_log } from '@kilocode/db/schema';
+import {
+  security_audit_log,
+  security_analysis_owner_state,
+  security_analysis_queue,
+  security_findings,
+} from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
-  countOwnerInflightAnalyses,
   ensureManualAnalysisQueueRow,
   getAnalysisActorById,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
   prepareActiveAnalysisRestart,
+  releaseOrphanedStartReservation,
   transitionManualAnalysisQueueFromStart,
+  tryAcquireAnalysisStartLease,
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
@@ -130,14 +137,111 @@ export async function processManualAnalysisStart(params: {
     return { status: 'finding-missing' };
   }
   const isActiveRestart = params.command.restartActive === true;
-  if (!finding.platform_integration_id) return { status: 'token-missing' };
+  if (!finding.platform_integration_id) {
+    // The command has no launch path; clear the pending admission state.
+    await releaseOrphanedStartReservation(params.db, finding.id);
+    return { status: 'token-missing' };
+  }
+  let preReserved = false;
   if (!isActiveRestart) {
-    const inflight = await countOwnerInflightAnalyses(params.db, owner);
-    if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+    // Admission decision under the per-owner lock (the same
+    // `security_analysis_owner_state` row the scheduled claim path locks).
+    // A finding already `pending` carries the web's admission reservation, so
+    // its slot is already counted at reservation time and the count here must
+    // not include it again.
+    const admission = await params.db.transaction(async tx => {
+      const ownerValues =
+        owner.type === 'org'
+          ? { owned_by_organization_id: owner.id, owned_by_user_id: null }
+          : { owned_by_organization_id: null, owned_by_user_id: owner.id };
+      await tx.insert(security_analysis_owner_state).values(ownerValues).onConflictDoNothing();
+      await tx
+        .select({ id: security_analysis_owner_state.id })
+        .from(security_analysis_owner_state)
+        .where(
+          owner.type === 'org'
+            ? eq(security_analysis_owner_state.owned_by_organization_id, owner.id)
+            : eq(security_analysis_owner_state.owned_by_user_id, owner.id)
+        )
+        .for('update')
+        .limit(1);
+
+      const [findingStatus] = await tx
+        .select({
+          analysisStatus: security_findings.analysis_status,
+          status: security_findings.status,
+        })
+        .from(security_findings)
+        .where(eq(security_findings.id, params.command.findingId))
+        .limit(1);
+      const status = findingStatus?.analysisStatus ?? null;
+      if (findingStatus && findingStatus.status !== 'open') {
+        return { kind: 'not_eligible' } as const;
+      }
+      if (status === 'running') {
+        return { kind: 'in_progress' } as const;
+      }
+      if (status === 'pending') {
+        return { kind: 'pre_reserved' } as const;
+      }
+
+      // Inflight = findings already pending/running plus scheduled queue
+      // claims that reserve a slot while the finding status is still null.
+      // Distinct by finding so a counted finding cannot add a second slot.
+      const [inflight] = await tx
+        .select({ total: sql<number>`count(distinct ${security_findings.id})` })
+        .from(security_findings)
+        .leftJoin(
+          security_analysis_queue,
+          eq(security_analysis_queue.finding_id, security_findings.id)
+        )
+        .where(
+          and(
+            owner.type === 'org'
+              ? eq(security_findings.owned_by_organization_id, owner.id)
+              : eq(security_findings.owned_by_user_id, owner.id),
+            or(
+              inArray(security_findings.analysis_status, ['pending', 'running']),
+              and(
+                isNull(security_findings.analysis_status),
+                inArray(security_analysis_queue.queue_status, ['pending', 'running'])
+              )
+            ),
+            ne(security_findings.id, params.command.findingId)
+          )
+        );
+      if ((inflight?.total ?? 0) >= SECURITY_ANALYSIS_OWNER_CAP) {
+        return { kind: 'owner_cap' } as const;
+      }
+      const leased = await tryAcquireAnalysisStartLease(tx, params.command.findingId);
+      if (!leased) {
+        return { kind: 'in_progress' } as const;
+      }
+      return { kind: 'leased' } as const;
+    });
+
+    if (admission.kind === 'owner_cap') {
+      await releaseOrphanedStartReservation(params.db, finding.id);
+      return { status: 'owner-cap' };
+    }
+    if (admission.kind === 'not_eligible') {
+      await releaseOrphanedStartReservation(params.db, finding.id);
+      return { status: 'finding-missing' };
+    }
+    if (admission.kind === 'in_progress') {
+      return { status: 'duplicate' };
+    }
+    // Both `pre_reserved` (web admission) and `leased` (taken here) leave the
+    // finding `pending`; the lease step in `startSecurityAnalysis` must not
+    // run again against that state.
+    preReserved = true;
   }
 
   const actor = await getAnalysisActorById(params.db, params.command.actorUserId);
-  if (!actor) return { status: 'actor-missing' };
+  if (!actor) {
+    await releaseOrphanedStartReservation(params.db, finding.id);
+    return { status: 'actor-missing' };
+  }
 
   let claimToken: string;
   let tokenResult: GitTokenForRepoResult;
@@ -210,6 +314,7 @@ export async function processManualAnalysisStart(params: {
         failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
         errorMessage: 'GitHub token unavailable',
       });
+      await releaseOrphanedStartReservation(params.db, finding.id);
       return { status: 'token-missing' };
     }
 
@@ -246,6 +351,7 @@ export async function processManualAnalysisStart(params: {
       callbackTokenSecret,
       forceSandbox: isActiveRestart ? true : params.command.forceSandbox,
       retrySandboxOnly: isActiveRestart ? true : params.command.retrySandboxOnly,
+      preReserved: isActiveRestart ? false : preReserved,
       lifecycleClaim: {
         source: 'manual',
         findingId: finding.id,
@@ -297,6 +403,7 @@ export async function processManualAnalysisStart(params: {
         failureCode: 'START_CALL_AMBIGUOUS',
         errorMessage: result.error ?? null,
       });
+      await releaseOrphanedStartReservation(params.db, finding.id);
     }
     return { status: 'failed' };
   }

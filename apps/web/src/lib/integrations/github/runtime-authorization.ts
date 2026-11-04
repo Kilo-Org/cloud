@@ -3,6 +3,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
+import { effectiveAppTypeCondition } from '@/lib/integrations/db/predicates';
 import {
   github_app_installations,
   kilocode_users,
@@ -39,15 +40,6 @@ export class GitHubRuntimeAuthorizationError extends Error {
     super('GitHub installation is unavailable for runtime use');
     this.name = 'GitHubRuntimeAuthorizationError';
   }
-}
-
-function effectiveAppTypeCondition(appType: GitHubAppType) {
-  return appType === 'standard'
-    ? or(
-        eq(platform_integrations.github_app_type, 'standard'),
-        isNull(platform_integrations.github_app_type)
-      )
-    : eq(platform_integrations.github_app_type, 'lite');
 }
 
 type RuntimeAssociation = {

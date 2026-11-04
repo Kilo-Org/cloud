@@ -175,6 +175,13 @@ function providerTargetUrl(base: string, path: string, search: string): URL | nu
     provider.search = search;
     return provider;
   }
+  // Local stacks and CLI configuration use the API root as the provider base.
+  // Resolve its model routes to the same OpenRouter endpoint as the CLI.
+  if (provider.pathname.replace(/\/+$/, '').endsWith('/api')) {
+    provider.pathname = `${provider.pathname.replace(/\/+$/, '')}/openrouter${path}`;
+    provider.search = search;
+    return provider;
+  }
   return targetUrl(base, path, search);
 }
 

@@ -246,6 +246,20 @@ describe('validateMcpForm', () => {
       )
     ).toBeNull();
   });
+
+  it('refuses a name another server of the profile already uses', () => {
+    expect(validateMcpForm(formState({ name: ' docs ' }), ['search', 'docs'])).toBe(
+      'name-conflict'
+    );
+  });
+
+  it('accepts a name that differs only in case, matching the unique index', () => {
+    expect(validateMcpForm(formState({ name: 'Docs' }), ['docs'])).toBeNull();
+  });
+
+  it('accepts a name no other server uses', () => {
+    expect(validateMcpForm(formState({ name: 'docs' }), ['search', 'browser'])).toBeNull();
+  });
 });
 
 describe('buildMcpServerPayload', () => {

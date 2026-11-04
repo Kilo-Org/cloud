@@ -12,4 +12,11 @@ export const SENTRY_NATIVE_OPTIONS = {
   enableMetricKit: true,
   enableAppHangTracking: false,
   tracesSampleRate: 0,
+  // This file reaches the native SDK through the Expo plugin, and native init
+  // runs before any JS. Leaving the NDK in-process handler off here means a
+  // crash in that window can never be replaced by the handler's own
+  // std::bad_alloc abort while it parses /proc/self/maps. JS init enables the
+  // handler again below Android 12, where no tombstone exists and it is the
+  // only native crash source (sentry-init.ts).
+  enableNdk: false,
 };

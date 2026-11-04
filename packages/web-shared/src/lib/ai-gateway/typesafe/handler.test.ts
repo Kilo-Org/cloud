@@ -3,12 +3,14 @@ import { z } from 'zod';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
+import type { StoredModel } from '@kilocode/db';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -24,14 +26,22 @@ import {
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import {
+  logMicrodollarUsageAndReportToBouncer,
+  mapToUsageStats,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   systemOneRequestSchema,
+  SYSTEM_ONE_MAX_QUESTIONS,
+  SYSTEM_ONE_MAX_STATE_BYTES,
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -60,6 +70,7 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
@@ -67,9 +78,12 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
@@ -84,7 +98,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter', () => ({
   OPENROUTER: {
-    id: 'openrouter',
+    type: 'openrouter',
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: 'test-platform-openrouter-key',
   },
@@ -94,14 +108,36 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providerHash', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
   logMicrodollarUsageAndReportToBouncer: jest.fn(),
+  mapToUsageStats: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () => ({
+  fetchGeneration: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
+// The handler reads `performance.now()` once per measured point: request start, first byte, then
+// the metrics read. Advancing by one step per read makes each measured interval exact.
+const CLOCK_START_MS = 1_000;
+const CLOCK_STEP_MS = 500;
+const METERED_LATENCY_MS = CLOCK_STEP_MS;
+const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
+const pricedSystemOneModels: Record<string, StoredModel> = {
+  [TYPESAFE_MODEL]: {
+    id: TYPESAFE_MODEL,
+    name: 'TypeSafe: Jev 1.13',
+    endpoints: [{ pricing: { prompt: '0.000000042', completion: '0' } }],
+  },
+  [OTHER_SYSTEM_ONE_MODEL]: {
+    id: OTHER_SYSTEM_ONE_MODEL,
+    name: 'Respan: Span-01 Lite (free)',
+    endpoints: [{ pricing: { prompt: '0', completion: '0' } }],
+  },
+};
 const user = {
   id: 'oauth/test-user',
   google_user_email: 'test@example.com',
@@ -142,17 +178,45 @@ const memberDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' as const },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 };
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(body: unknown = requestBody, headers: Record<string, string> = {}) {
+const reconciledStats = {
+  messageId: upstreamBody.id,
+  model: TYPESAFE_MODEL,
+  responseContent: '',
+  hasError: false,
+  inference_provider: 'TypeSafe upstream',
+  upstream_id: null,
+  finish_reason: null,
+  latency: null,
+  moderation_latency: null,
+  generation_time: null,
+  streamed: false,
+  cancelled: null,
+  status_code: 200,
+  cost_mUsd: 124,
+  inputTokens: 23,
+  outputTokens: 7,
+  cacheWriteTokens: 0,
+  cacheHitTokens: 0,
+  is_byok: false,
+};
+
+function makeRequest(
+  body: unknown = requestBody,
+  headers: Record<string, string> = {},
+  signal?: AbortSignal
+) {
   return new NextRequest(routeUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
+    signal,
   });
 }
 
@@ -193,6 +257,12 @@ function mockVerdict(verdict: DecideResponse | null) {
   jest.mocked(startBouncerDecide).mockResolvedValue(verdict);
 }
 
+/** Pins every `performance.now()` read to a fixed cadence so the measured times are exact. */
+function mockMeteredClock() {
+  let now = CLOCK_START_MS;
+  jest.spyOn(performance, 'now').mockImplementation(() => (now += CLOCK_STEP_MS));
+}
+
 describe('handleSystemOneRequest', () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -206,6 +276,7 @@ describe('handleSystemOneRequest', () => {
     jest
       .mocked(getOpenRouterSystemOneModelsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest
       .mocked(resolveOpenRouterModelAlias)
       .mockImplementation(async modelId =>
@@ -232,10 +303,13 @@ describe('handleSystemOneRequest', () => {
       )
     );
     mockedFetch.mockImplementation(async () => Response.json(upstreamBody));
+    jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+    jest.mocked(mapToUsageStats).mockReturnValue(reconciledStats);
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    jest.restoreAllMocks();
   });
 
   it('supports the TypeSafe SDK contract through a custom fetch transport', async () => {
@@ -359,6 +433,7 @@ describe('handleSystemOneRequest', () => {
         kiloUserId: user.id,
         provider: 'openrouter',
         requested_model: TYPESAFE_MODEL,
+        is_free: false,
         organizationId: 'org-123',
         prior_microdollar_usage: 123,
         posthog_distinct_id: user.google_user_email,
@@ -525,24 +600,27 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
-    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL },
-    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL },
-  ])('forwards OpenRouter System One model $model unchanged', async ({ model, policyModel }) => {
-    setAuth('org-123');
+    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
+    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
+  ])(
+    'forwards OpenRouter System One model $model unchanged',
+    async ({ model, policyModel, isFree }) => {
+      setAuth('org-123');
 
-    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
-    expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe(model);
-    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: policyModel })
-    );
-    await runAfter();
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ requested_model: model })
-    );
-  });
+      expect(response.status).toBe(200);
+      expect(upstreamRequest().body.model).toBe(model);
+      expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ modelId: policyModel })
+      );
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ cost_mUsd: isFree ? 0 : 124, market_cost: 124 }),
+        expect.objectContaining({ requested_model: model, is_free: isFree })
+      );
+    }
+  );
 
   it.each(['openai/gpt-4o', 'jev-latest', 'respan/span-01-lite', 'jev-2.0'])(
     'rejects %s when it is not an OpenRouter System One model',
@@ -557,15 +635,33 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('leaves model validation to OpenRouter without System One model metadata', async () => {
+  it('answers 503 when the catalog has no metadata for the model', async () => {
     jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
       makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })
     );
 
-    expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe('vendor/unlisted-decide');
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error_type: 'temporarily_unavailable' });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('answers 503 when the catalog cannot price the model', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      ...pricedSystemOneModels,
+      [TYPESAFE_MODEL]: { id: TYPESAFE_MODEL, name: 'TypeSafe: Jev 1.13', endpoints: [] },
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(503);
+    expect(errorExceptInTest).toHaveBeenCalledWith(
+      'System One request cost unavailable',
+      expect.stringContaining('unusable pricing')
+    );
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -578,7 +674,7 @@ describe('handleSystemOneRequest', () => {
       JSON.stringify({ ...requestBody, provider: { data_collection: 'invalid' } }),
     ],
     ['string ZDR', JSON.stringify({ ...requestBody, provider: { zdr: 'false' } })],
-  ])('rejects %s before balance checks or upstream work', async (_name, body) => {
+  ])('rejects %s', async (_name, body) => {
     const response = await handleSystemOneRequest(
       new NextRequest(routeUrl, {
         method: 'POST',
@@ -630,7 +726,12 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await handleSystemOneRequest(makeRequest())).toBe(blockedResponse);
-    expect(getBalanceAndOrgSettings).toHaveBeenCalledWith('org-123', user);
+    const [organizationId, balanceUser, fromDb, funding] =
+      jest.mocked(getBalanceAndOrgSettings).mock.lastCall ?? [];
+    expect(organizationId).toBe('org-123');
+    expect(balanceUser).toEqual(user);
+    expect(fromDb).toBe(readDb);
+    expect(funding).toBe('usage');
     expect(creditsBlockedResponse).toHaveBeenCalledWith({
       user,
       balance,
@@ -650,12 +751,15 @@ describe('handleSystemOneRequest', () => {
     });
 
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
-    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith({
+    const { fromDb, ...decisionParams } =
+      jest.mocked(resolveOrganizationMemberModelDecision).mock.lastCall?.[0] ?? {};
+    expect(decisionParams).toEqual({
       organizationId: 'org-123',
       kiloUserId: user.id,
       modelId: TYPESAFE_MODEL,
       providerLookup: getProviderSlugsForModel,
     });
+    expect(fromDb).toBe(readDb);
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
@@ -723,7 +827,7 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('cancels the upstream body on credit exhaustion and returns a service error without charging', async () => {
+  it('cancels the upstream body on credit exhaustion and records the attempt row', async () => {
     const cancel = jest.fn();
     mockedFetch.mockResolvedValue(new Response(new ReadableStream({ cancel }), { status: 402 }));
 
@@ -737,12 +841,22 @@ describe('handleSystemOneRequest', () => {
     });
     expect(errorExceptInTest).toHaveBeenCalledWith('OpenRouter System One balance exhausted');
     expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
-    expect(deferredUsageCallbacks()).toHaveLength(0);
-    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: null,
+        hasError: true,
+        cancelled: false,
+        status_code: 402,
+        cost_mUsd: 0,
+        market_cost: 0,
+      }),
+      expect.objectContaining({ api_kind: 'systemone', status_code: 402 })
+    );
   });
 
   it.each([400, 429, 500])(
-    'delegates upstream HTTP %s to the safe response wrapper',
+    'delegates upstream HTTP %s to the safe response wrapper and records the attempt',
     async status => {
       const upstream = Response.json({ error: 'upstream failure' }, { status });
       const safeResponse = NextResponse.json({ error: 'upstream failure' }, { status });
@@ -751,34 +865,73 @@ describe('handleSystemOneRequest', () => {
 
       expect(await handleSystemOneRequest(makeRequest())).toBe(safeResponse);
       expect(wrapInSafeNextResponse).toHaveBeenCalledWith(upstream);
-      expect(deferredUsageCallbacks()).toHaveLength(0);
-      expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, status_code: status, cost_mUsd: 0 }),
+        expect.objectContaining({ status_code: status })
+      );
       expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: status, inferenceProvider: undefined })
       );
     }
   );
 
-  it.each(['network failure', 'non-JSON success'])('handles %s without charging', async failure => {
-    if (failure === 'network failure') {
-      mockedFetch.mockRejectedValue(new Error('connection failed'));
-    } else {
-      mockedFetch.mockResolvedValue(new Response('not JSON', { status: 200 }));
+  it.each([
+    {
+      case: 'a transport failure',
+      arrange: () => mockedFetch.mockRejectedValue(new Error('connection failed')),
+      message: 'OpenRouter System One request failed',
+      latency: null,
+    },
+    {
+      case: 'an unreadable success body',
+      arrange: () => mockedFetch.mockResolvedValue(new Response('not JSON', { status: 200 })),
+      message: 'OpenRouter System One response body was unreadable',
+      latency: METERED_LATENCY_MS,
+    },
+  ])(
+    'records a zero-cost attempt row when the upstream call ends with $case',
+    async ({ arrange, message, latency }) => {
+      mockMeteredClock();
+      arrange();
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        message: 'Upstream request failed',
+        error_type: 'upstream_error',
+      });
+      expect(errorExceptInTest).toHaveBeenCalledWith(
+        message,
+        expect.objectContaining({ message: expect.any(String) })
+      );
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: null,
+          hasError: true,
+          status_code: 502,
+          latency,
+          cost_mUsd: 0,
+        }),
+        expect.objectContaining({ status_code: 502, ttfb_ms: latency })
+      );
     }
+  );
 
-    const response = await handleSystemOneRequest(makeRequest());
-
-    expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({
-      message: 'Upstream request failed',
-      error_type: 'upstream_error',
-    });
-    expect(errorExceptInTest).toHaveBeenCalledWith(
-      'OpenRouter System One request failed',
-      expect.objectContaining({ message: expect.any(String) })
+  it('records a duration-bound attempt row when the upstream call times out', async () => {
+    mockedFetch.mockRejectedValue(
+      new DOMException('The operation was aborted due to timeout', 'TimeoutError')
     );
-    expect(deferredUsageCallbacks()).toHaveLength(0);
-    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, status_code: 504, cost_mUsd: 0 }),
+      expect.objectContaining({ status_code: 504 })
+    );
   });
 
   it.each([
@@ -790,8 +943,12 @@ describe('handleSystemOneRequest', () => {
     ['missing input tokens', { output_tokens: 7, cost: 0.01 }],
     ['negative tokens', { ...upstreamBody.usage, input_tokens: -1 }],
     ['fractional tokens', { ...upstreamBody.usage, output_tokens: 1.5 }],
-  ])('rejects upstream %s without scheduling billing', async (_name, usage) => {
+  ])('reconciles the cost of an upstream %s rejection', async (_name, usage) => {
+    mockMeteredClock();
     mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
 
     const response = await handleSystemOneRequest(makeRequest());
 
@@ -803,8 +960,152 @@ describe('handleSystemOneRequest', () => {
     expect(errorExceptInTest).toHaveBeenCalledWith(
       'Invalid OpenRouter System One response or missing usage'
     );
+    await runAfter();
+    expect(fetchGeneration).toHaveBeenCalledWith(
+      upstreamBody.id,
+      expect.objectContaining({ type: 'openrouter' })
+    );
+    expect(mapToUsageStats).toHaveBeenCalledWith(expect.anything(), '', user.id, 'openrouter');
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ttfbMs: METERED_LATENCY_MS,
+        completeRequestMs: METERED_COMPLETE_REQUEST_MS,
+      })
+    );
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        status_code: 502,
+        latency: METERED_LATENCY_MS,
+        cost_mUsd: 124,
+        market_cost: 124,
+      }),
+      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
+    );
+  });
+
+  it('records a zero-cost row when an invalid body carries no generation id', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({ ...upstreamBody, id: undefined, usage: undefined })
+    );
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    expect(fetchGeneration).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: null, hasError: true, cost_mUsd: 0, status_code: 502 }),
+      expect.objectContaining({ status_code: 502 })
+    );
+  });
+
+  it('records a zero-cost row when the generation lookup has no answer', async () => {
+    mockMeteredClock();
+    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage: undefined }));
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    expect(fetchGeneration).toHaveBeenCalledTimes(1);
+    expect(mapToUsageStats).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: upstreamBody.id,
+        hasError: true,
+        latency: METERED_LATENCY_MS,
+        cost_mUsd: 0,
+        status_code: 502,
+      }),
+      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
+    );
+  });
+
+  it('attributes an unusable body to the model the provider named', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({
+        id: upstreamBody.id,
+        model: OTHER_SYSTEM_ONE_MODEL,
+        answers: { billing: { type: 'noul', noul: 0.5 } },
+      })
+    );
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+    await runAfter();
+    expect(mapToUsageStats).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: upstreamBody.id, model: OTHER_SYSTEM_ONE_MODEL }),
+      expect.anything()
+    );
+  });
+
+  it('attributes an unusable body without a model name to the resolved model', async () => {
+    mockedFetch.mockResolvedValue(Response.json({ answers: { billing: { type: 'noul' } } }));
+
+    expect(
+      (await handleSystemOneRequest(makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })))
+        .status
+    ).toBe(502);
+
+    await runAfter();
+    expect(fetchGeneration).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: null, model: TYPESAFE_MODEL, cost_mUsd: 0 }),
+      expect.anything()
+    );
+  });
+
+  it('keeps the reconciled provider cost as market cost and charges a free model nothing', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({ ...upstreamBody, model: OTHER_SYSTEM_ONE_MODEL, usage: undefined })
+    );
+    jest.mocked(fetchGeneration).mockResolvedValue({
+      data: { id: upstreamBody.id },
+    } as OpenRouterGeneration);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: OTHER_SYSTEM_ONE_MODEL })
+    );
+
+    expect(response.status).toBe(502);
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
+      expect.objectContaining({ is_free: true })
+    );
+  });
+
+  it('answers 499 without sending or recording when the client left before the upstream call', async () => {
+    const controller = new AbortController();
+    jest.mocked(startBouncerDecide).mockImplementation(async () => {
+      controller.abort();
+      return null;
+    });
+
+    const response = await handleSystemOneRequest(makeRequest(requestBody, {}, controller.signal));
+
+    expect(response.status).toBe(499);
+    expect(await response.json()).toMatchObject({ error_type: 'client_disconnect' });
+    expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
-    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+  });
+
+  it('keeps the upstream call alive and bills the reported cost when the client leaves', async () => {
+    const controller = new AbortController();
+    mockedFetch.mockImplementation(async (_input, init) => {
+      controller.abort();
+      expect(init?.signal?.aborted).toBe(false);
+      return Response.json(upstreamBody);
+    });
+
+    const response = await handleSystemOneRequest(makeRequest(requestBody, {}, controller.signal));
+
+    expect(response.status).toBe(200);
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cancelled: true, cost_mUsd: 124, status_code: 200 }),
+      expect.objectContaining({ status_code: 200 })
+    );
   });
 
   it('starts one decide and rejects an enforced throttle before upstream', async () => {
@@ -844,5 +1145,91 @@ describe('handleSystemOneRequest', () => {
         bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
       })
     );
+  });
+
+  it('serves a request when the balance covers its cost bound', async () => {
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.001 });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 402 when the balance is below the cost bound', async () => {
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.000001 });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({
+      message: expect.stringContaining('balance'),
+      error_type: 'insufficient_credits',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(startBouncerDecide).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('prices an alias through its target model', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      ...pricedSystemOneModels,
+      [SYSTEM_ONE_ALIAS]: {
+        id: SYSTEM_ONE_ALIAS,
+        name: 'TypeSafe: Jev Latest',
+        alias_target: { slug: TYPESAFE_MODEL },
+        endpoints: [],
+      },
+    });
+    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 0.001 });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 503 for an alias without target pricing', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [SYSTEM_ONE_ALIAS]: {
+        id: SYSTEM_ONE_ALIAS,
+        name: 'TypeSafe: Jev Latest',
+        alias_target: { slug: TYPESAFE_MODEL },
+        endpoints: [],
+      },
+    });
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an oversized state', { ...requestBody, state: 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES) }],
+    [
+      'too many questions',
+      {
+        ...requestBody,
+        questions: Object.fromEntries(
+          Array.from({ length: SYSTEM_ONE_MAX_QUESTIONS + 1 }, (_, index) => [
+            `q${index}`,
+            { type: 'noul' },
+          ])
+        ),
+      },
+    ],
+  ])('rejects %s', async (_name, body) => {
+    const response = await handleSystemOneRequest(makeRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_type: 'invalid_request' });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 });

@@ -31,8 +31,17 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
     return mockConfig.APPLE_APP_BUNDLE_ID;
   },
 }));
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
+  getEnvVariable: (name: string) => process.env[name],
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { set: jest.fn() },
+}));
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
 import {
@@ -40,16 +49,21 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from './native-id-tokens';
 import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { captureMessage } from '@sentry/nextjs';
+
+const mockIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);
 const mockGetFederatedSignonCertsAsync = jest.fn();
 const mockVerifySignedJwtWithCertsAsync = jest.fn();
 const mockGetToken = jest.fn();
 const mockVerifyIdToken = jest.fn();
-const mockCaptureMessage = jest.mocked(captureMessage);
 
 (OAuth2Client as unknown as jest.Mock).mockImplementation(() => ({
   getFederatedSignonCertsAsync: mockGetFederatedSignonCertsAsync,
@@ -62,15 +76,23 @@ describe('verifyNativeAppleIdToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp';
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
+    mockIsReleaseToggleEnabled.mockResolvedValue(true);
+    delete process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE;
   });
 
   it('verifies against the configured Apple bundle ID and returns sub/email', async () => {
     mockConfig.APPLE_APP_BUNDLE_ID = 'com.kilocode.kiloapp.dev';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update('audience-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'audience-nonce');
 
     expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp.dev');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
@@ -79,10 +101,15 @@ describe('verifyNativeAppleIdToken', () => {
   it('falls back to the default bundle ID when APPLE_APP_BUNDLE_ID is not configured', async () => {
     mockConfig.APPLE_APP_BUNDLE_ID = '';
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: createHash('sha256').update('fallback-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'fallback-nonce');
 
     expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
@@ -90,10 +117,15 @@ describe('verifyNativeAppleIdToken', () => {
 
   it('accepts a string "true" email_verified claim', async () => {
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
-      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: 'true' })
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: 'true',
+        nonce: createHash('sha256').update('verified-claim-nonce').digest('hex'),
+      })
     );
 
-    const result = await verifyNativeAppleIdToken('a-token');
+    const result = await verifyNativeAppleIdToken('a-token', 'verified-claim-nonce');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
   });
 
@@ -102,7 +134,7 @@ describe('verifyNativeAppleIdToken', () => {
       applePayload({ sub: 'apple-sub-1', email_verified: true })
     );
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow();
+    await expect(verifyNativeAppleIdToken('a-token', 'missing-email-nonce')).rejects.toThrow();
   });
 
   it('throws when email_verified is not true', async () => {
@@ -110,13 +142,15 @@ describe('verifyNativeAppleIdToken', () => {
       applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: false })
     );
 
-    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow();
+    await expect(verifyNativeAppleIdToken('a-token', 'unverified-email-nonce')).rejects.toThrow();
   });
 
   it('propagates AppleJwtClientError from the underlying jwks verifier', async () => {
     mockVerifyAppleJwtWithJwks.mockRejectedValue(new AppleJwtClientError('bad jwt'));
 
-    await expect(verifyNativeAppleIdToken('bad-token')).rejects.toThrow(AppleJwtClientError);
+    await expect(verifyNativeAppleIdToken('bad-token', 'any-nonce')).rejects.toThrow(
+      AppleJwtClientError
+    );
   });
 
   // C12: Apple nonce binding
@@ -134,7 +168,10 @@ describe('verifyNativeAppleIdToken', () => {
 
     const result = await verifyNativeAppleIdToken('a-token', rawNonce);
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
-    expect(mockCaptureMessage).not.toHaveBeenCalled();
+    expect(redisClient.set).toHaveBeenCalledWith(`auth:apple-signin-nonce:${expectedDigest}`, '1', {
+      nx: true,
+      ex: 600,
+    });
   });
 
   it('throws NativeIdTokenError when the nonce does not match', async () => {
@@ -156,7 +193,111 @@ describe('verifyNativeAppleIdToken', () => {
     );
   });
 
-  it('accepts a token without a nonce and records legacy use', async () => {
+  it('accepts a nonce digest only once', async () => {
+    const rawNonce = 'second-use-raw-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
+    );
+    jest.mocked(redisClient.set).mockResolvedValue(null);
+    await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
+      'Apple nonce already used'
+    );
+  });
+
+  it('refuses the sign-in when the nonce record cannot be written', async () => {
+    const rawNonce = 'store-unavailable-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 600,
+      })
+    );
+    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+
+    await expect(verifyNativeAppleIdToken('a-token', rawNonce)).rejects.toThrow(
+      NonceStoreUnavailableError
+    );
+  });
+
+  it('derives the record TTL from the token expiry, capped at ten minutes', async () => {
+    const rawNonce = 'ttl-derivation-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const call = jest.mocked(redisClient.set).mock.calls[0];
+    const options = call[2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBeLessThanOrEqual(300);
+    expect(options.ex).toBeGreaterThan(290);
+  });
+
+  it('caps the record TTL at ten minutes for a long-lived token', async () => {
+    const rawNonce = 'ttl-cap-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBe(600);
+  });
+
+  it('uses the ten-minute cap when the token carries no exp claim', async () => {
+    const rawNonce = 'ttl-default-nonce';
+    const expectedDigest = createHash('sha256').update(rawNonce).digest('hex');
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({
+        sub: 'apple-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        nonce: expectedDigest,
+      })
+    );
+
+    await verifyNativeAppleIdToken('a-token', rawNonce);
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { nx: boolean; ex: number };
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBe(600);
+  });
+
+  it('requires the nonce field after the transition closes', async () => {
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('allows requests before the transition closes', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
       applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
     );
@@ -165,6 +306,151 @@ describe('verifyNativeAppleIdToken', () => {
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
     expect(mockCaptureMessage).toHaveBeenCalledWith('native_apple_nonce_legacy_count: 1');
   });
+
+  it('keeps the transition off when the toggle is off', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    Object.assign(process.env, { NODE_ENV: 'production' });
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    }
+  });
+
+  it('honors the toggle in production mode', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    Object.assign(process.env, { NODE_ENV: 'production' });
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+      mockIsReleaseToggleEnabled.mockResolvedValue(true);
+
+      const result = await verifyNativeAppleIdToken('a-token');
+      expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+      expect(mockIsReleaseToggleEnabled).toHaveBeenCalled();
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    }
+  });
+
+  it('keeps the requirement after the transition closes', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() - 60_000).toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  it('applies the transition deadline', async () => {
+    const now = new Date('2026-10-22T12:00:00.000Z');
+    jest.useFakeTimers({ now });
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = now.toISOString();
+    mockVerifyAppleJwtWithJwks.mockResolvedValue(
+      applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+    );
+
+    try {
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE;
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the requirement when the toggle check cannot complete', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    mockIsReleaseToggleEnabled.mockRejectedValue(new Error('posthog down'));
+    const previousNodeEnv = process.env.NODE_ENV;
+    Object.assign(process.env, { NODE_ENV: 'production' });
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+      expect(mockCaptureMessage).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    }
+  });
+
+  it('opens the transition in development with the explicit local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousVercelEnv = process.env.VERCEL_ENV;
+    delete process.env.VERCEL_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL = 'true';
+    try {
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      const result = await verifyNativeAppleIdToken('a-token');
+      expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
+      expect(mockIsReleaseToggleEnabled).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+      if (previousVercelEnv === undefined) {
+        delete process.env.VERCEL_ENV;
+      } else {
+        process.env.VERCEL_ENV = previousVercelEnv;
+      }
+      delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    }
+  });
+
+  it('keeps the transition closed under Vercel even with the local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousVercelEnv = process.env.VERCEL_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development', VERCEL_ENV: 'production' });
+    process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL = 'true';
+    try {
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+      if (previousVercelEnv === undefined) {
+        delete process.env.VERCEL_ENV;
+      } else {
+        process.env.VERCEL_ENV = previousVercelEnv;
+      }
+      delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    }
+  });
+
+  it('keeps the transition closed in development without the local opt-in', async () => {
+    process.env.NATIVE_APPLE_NONCE_REQUIRED_SINCE = new Date(Date.now() + 60_000).toISOString();
+    const previousNodeEnv = process.env.NODE_ENV;
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    delete process.env.NATIVE_APPLE_NONCE_TRANSITION_LOCAL;
+    try {
+      mockIsReleaseToggleEnabled.mockResolvedValue(false);
+      mockVerifyAppleJwtWithJwks.mockResolvedValue(
+        applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
+      );
+
+      await expect(verifyNativeAppleIdToken('a-token')).rejects.toThrow(NativeIdTokenError);
+    } finally {
+      Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+    }
+  });
 });
 
 describe('verifyNativeGoogleIdToken', () => {
@@ -172,6 +458,7 @@ describe('verifyNativeGoogleIdToken', () => {
     jest.clearAllMocks();
     mockConfig.GOOGLE_IOS_CLIENT_ID = 'ios-client-id';
     mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
   });
 
   it('verifies against [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID] audience and returns the payload', async () => {
@@ -259,12 +546,124 @@ describe('verifyNativeGoogleIdToken', () => {
       ['accounts.google.com', 'https://accounts.google.com']
     );
   });
+
+  it('records the verified token once, keyed on its digest', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const [key, value, options] = jest.mocked(redisClient.set).mock.calls[0] as [
+      string,
+      string,
+      { nx: boolean; ex: number },
+    ];
+    expect(key).toBe(
+      `auth:google-signin-token:${createHash('sha256').update('g-token').digest('hex')}`
+    );
+    expect(value).toBe('1');
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBeGreaterThan(290);
+    expect(options.ex).toBeLessThanOrEqual(300);
+  });
+
+  it('refuses a token that was already spent', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValue(null);
+
+    await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow(
+      'Google ID token already used'
+    );
+  });
+
+  it('accepts only one overlapping verification of the same Google token', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+    const results = await Promise.allSettled([
+      verifyNativeGoogleIdToken('g-token'),
+      verifyNativeGoogleIdToken('g-token'),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('caps the record TTL at the longest Google token lifetime', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 7200,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { ex: number };
+    expect(options.ex).toBe(3600);
+  });
+
+  it('uses the lifetime cap when the token carries no exp claim', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { ex: number };
+    expect(options.ex).toBe(3600);
+  });
+
+  it('refuses the sign-in when the single-use record cannot be written', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+
+    await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow(NonceStoreUnavailableError);
+  });
+
+  it('writes no record for a token the verifier rejects', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockRejectedValue(new Error('invalid signature'));
+
+    await expect(verifyNativeGoogleIdToken('bad-token')).rejects.toThrow(NativeIdTokenError);
+    expect(redisClient.set).not.toHaveBeenCalled();
+  });
 });
 
 describe('exchangeNativeGoogleAuthCode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfig.GOOGLE_CLIENT_SECRET = 'web-client-secret';
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
   });
 
   it('exchanges a serverAuthCode and returns verified Google user data', async () => {
@@ -298,6 +697,28 @@ describe('exchangeNativeGoogleAuthCode', () => {
       { key: 'certificate' },
       ['web-client-id'],
       ['accounts.google.com', 'https://accounts.google.com']
+    );
+  });
+
+  it('records the ID token the exchange returned', async () => {
+    mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
+    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValue(null);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toThrow(
+      'Google ID token already used'
+    );
+    expect(redisClient.set).toHaveBeenCalledWith(
+      `auth:google-signin-token:${createHash('sha256').update('exchanged-id-token').digest('hex')}`,
+      '1',
+      expect.objectContaining({ nx: true })
     );
   });
 

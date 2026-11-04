@@ -20,6 +20,8 @@ import type { CodeReviewTriggerSource } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
+import { isTerminalCodeReviewStatus } from './dispatch/dispatch-constants';
+
 /**
  * The ledger intent for a review's trigger source. `trigger_source` is null
  * for legacy rows, which predate webhook triggers and were always manual.
@@ -31,23 +33,22 @@ export function codeReviewLedgerIntent(triggerSource: string | null): CodeReview
 /**
  * Maps a review terminal state to a terminal ledger outcome. Non-terminal
  * states map to null, so a settle for a still-running review is a no-op.
+ *
+ * The status set comes from the shared terminal definition, so a new terminal
+ * status reaches the exhaustiveness check below instead of silently mapping to
+ * null.
  */
 export function codeReviewTerminalOutcome(
   status: string,
   terminalReason: string | null
 ): TerminalOperationStatus | null {
-  switch (status) {
-    case 'completed':
-      return 'completed';
-    case 'failed':
-      return 'failed';
-    case 'cancelled':
-      if (terminalReason === 'superseded') return 'superseded';
-      if (terminalReason === 'interrupted') return 'interrupted';
-      return 'no_op';
-    default:
-      return null;
+  if (!isTerminalCodeReviewStatus(status)) return null;
+  if (status === 'cancelled') {
+    if (terminalReason === 'superseded') return 'superseded';
+    if (terminalReason === 'interrupted') return 'interrupted';
+    return 'no_op';
   }
+  return status;
 }
 
 /**

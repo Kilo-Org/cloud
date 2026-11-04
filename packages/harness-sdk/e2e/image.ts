@@ -68,7 +68,7 @@ const runShape = async (model: string, kind: ApiKind, colour: string) => {
     return { named, background };
   });
 
-  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+  return Effect.runPromise(Effect.result(Effect.scoped(Effect.provide(program, layers))));
 };
 
 const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
@@ -105,22 +105,24 @@ for (const model of models) {
        them: that is a relay having a bad minute. Twice is a finding. */
     const first = await runShape(model, kind, colour);
     const result =
-      first._tag === 'Right' && word(first.right.named) === colour
+      first._tag === 'Success' && word(first.success.named) === colour
         ? first
         : await runShape(model, kind, colour);
-    if (result._tag === 'Left') {
-      if (cannotSee(result.left)) {
+    if (result._tag === 'Failure') {
+      if (cannotSee(result.failure)) {
         console.log(`${kind.padEnd(18)}${colour.padEnd(10)}the model takes no pictures`);
         blind = true;
         continue;
       }
-      console.log(`${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.left)}`);
+      console.log(
+        `${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.failure)}`
+      );
       fail(`${kind}: the call failed`);
       continue;
     }
 
-    const named = word(result.right.named);
-    const background = word(result.right.background);
+    const named = word(result.success.named);
+    const background = word(result.success.background);
     console.log(`${kind.padEnd(18)}${colour.padEnd(10)}${named.padEnd(10)}${background}`);
     read.push({ named, colour, background });
   }

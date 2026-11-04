@@ -1,13 +1,17 @@
 import * as z from 'zod';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
+  organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
+} from '@kilocode/db';
+import {
   platform_integrations,
   organization_memberships,
   kilocode_users,
   organizations,
   github_app_installations,
 } from '@kilocode/db/schema';
-import { eq, and, exists, isNull, isNotNull, notExists, or, sql } from 'drizzle-orm';
+import { eq, and, desc, exists, isNull, isNotNull, notExists, or, sql } from 'drizzle-orm';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -191,14 +195,18 @@ function buildAuthorizedInstallationsQuery(
     .where(
       and(
         eq(platform_integrations.platform, 'github'),
-        authorizationMode === 'managed' &&
-          params.accessPurpose === 'agent' &&
-          params.expectedIntegrationId !== undefined
-          ? or(
-              eq(platform_integrations.github_connection_role, 'workflow'),
-              eq(platform_integrations.github_connection_role, 'agent_only')
-            )
-          : eq(platform_integrations.github_connection_role, 'workflow'),
+        or(
+          eq(platform_integrations.github_connection_role, 'workflow'),
+          and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            organizationWorkflowGitHubConnectionSql()
+          ),
+          authorizationMode === 'managed' &&
+            params.accessPurpose === 'agent' &&
+            params.expectedIntegrationId !== undefined
+            ? eq(platform_integrations.github_connection_role, 'agent_only')
+            : undefined
+        ),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
         isNull(platform_integrations.suspended_at),
@@ -258,7 +266,8 @@ function buildAuthorizedInstallationsQuery(
       )
     )
     .orderBy(
-      sql`CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END`
+      sql`CASE WHEN ${platform_integrations.owned_by_organization_id} IS NOT NULL THEN 0 ELSE 1 END`,
+      desc(organizationWorkflowGitHubPreferenceSql())
     );
 }
 
@@ -468,7 +477,13 @@ export class InstallationLookupService {
       .where(
         and(
           eq(platform_integrations.platform, 'github'),
-          eq(platform_integrations.github_connection_role, 'workflow'),
+          or(
+            eq(platform_integrations.github_connection_role, 'workflow'),
+            and(
+              isNotNull(platform_integrations.owned_by_organization_id),
+              organizationWorkflowGitHubConnectionSql()
+            )
+          ),
           eq(platform_integrations.integration_type, 'app'),
           eq(platform_integrations.integration_status, 'active'),
           isNull(platform_integrations.suspended_at),
@@ -530,16 +545,55 @@ export class InstallationLookupService {
     }
   }
 
+  /**
+   * Resolves an active workflow integration that belongs to `owner`: a
+   * personal integration of `owner.userId`, or, with `owner.orgId`, an
+   * organization integration of an org that `owner.userId` belongs to.
+   *
+   * This lookup backs the id-based mint RPC and keeps the stored workflow role:
+   * its caller already holds the integration id it authorized. Every product
+   * path that resolves an organization's installation — the Security Agent
+   * operations and the repository-scoped mint — uses
+   * `assertActiveAssociationForInstallation` or the authorized-installations
+   * query, which follow the shared organization workflow connection definition.
+   */
   async findActiveAssociationById(
-    integrationId: string
+    integrationId: string,
+    owner: { userId: string; orgId?: string }
   ): Promise<
     | { success: true; installationId: string; githubAppType: 'standard' | 'lite' }
     | { success: false }
   > {
-    if (!this.isConfigured() || !z.string().uuid().safeParse(integrationId).success) {
+    if (
+      !this.isConfigured() ||
+      !z.string().uuid().safeParse(integrationId).success ||
+      owner.userId.length === 0 ||
+      (owner.orgId !== undefined && !z.string().uuid().safeParse(owner.orgId).success)
+    ) {
       return { success: false };
     }
     const db = this.getDb();
+    const integrationOwner =
+      owner.orgId === undefined
+        ? and(
+            eq(platform_integrations.owned_by_user_id, owner.userId),
+            isNull(platform_integrations.owned_by_organization_id)
+          )
+        : and(
+            eq(platform_integrations.owned_by_organization_id, sql`${owner.orgId}::uuid`),
+            isNull(platform_integrations.owned_by_user_id),
+            exists(
+              db
+                .select({ id: organization_memberships.id })
+                .from(organization_memberships)
+                .where(
+                  and(
+                    eq(organization_memberships.organization_id, sql`${owner.orgId}::uuid`),
+                    eq(organization_memberships.kilo_user_id, owner.userId)
+                  )
+                )
+            )
+          );
     const rows = await db
       .select({
         installationId: sql<
@@ -559,6 +613,7 @@ export class InstallationLookupService {
       .where(
         and(
           eq(platform_integrations.id, integrationId),
+          integrationOwner,
           eq(platform_integrations.github_connection_role, 'workflow'),
           eq(platform_integrations.platform, 'github'),
           eq(platform_integrations.integration_type, 'app'),

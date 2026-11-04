@@ -2,16 +2,31 @@
 // Edit goal dialog (prose that can hold a long unbroken line). A single-line
 // field scrolls horizontally and clips the start of a long value, so the goal
 // dialog opts into the wrapping field. These tests pin both field contracts:
-// multi-line wraps with a bounded height, single-line keeps its old styling.
+// multi-line wraps with a bounded height, single-line keeps its old styling,
+// and only the single-line field submits from the keyboard's Done key with the
+// same guards as the Save button. The field also owns what the user typed: a
+// caller's cache write and its rollback never re-seed it, so a refused save
+// leaves the typed name in place beside the inline error.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RenameModal } from './rename-modal';
 
+// The dialog's text ownership differs by platform: Android needs the typed text
+// as the field's `value` (its native input re-applies the committed props text),
+// iOS keeps the uncontrolled `defaultValue` seed because this app never
+// controls text with `value` plus state there. The mock exposes a mutable OS so
+// a test can mount either.
+const platform = vi.hoisted((): { os: 'android' | 'ios' } => ({ os: 'ios' }));
+
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -41,29 +56,44 @@ const LONG_GOAL =
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 
 beforeEach(() => {
+  platform.os = 'ios';
   for (const renderer of mounted.splice(0)) {
     renderer.unmount();
   }
 });
 
-/** Resolves the save promise the modal awaits; these tests never press Save. */
+/** Resolves the save promise the modal awaits; tests that never submit use this. */
 async function resolveSave(): Promise<void> {
   await Promise.resolve();
 }
 
-function mount(multiline: boolean): TestRenderer.ReactTestRenderer {
+type MountOverrides = {
+  onSave?: (name: string) => Promise<void>;
+  onClose?: () => void;
+  initialValue?: string;
+};
+
+function modalElement(
+  initialValue: string,
+  multiline: boolean,
+  overrides: MountOverrides
+): ReactElement {
+  return createElement(RenameModal, {
+    title: 'Edit goal',
+    placeholder: 'Describe the goal',
+    initialValue,
+    multiline,
+    maxLength: 500,
+    onSave: overrides.onSave ?? resolveSave,
+    onClose: overrides.onClose ?? (() => undefined),
+  });
+}
+
+function mount(multiline: boolean, overrides: MountOverrides = {}): TestRenderer.ReactTestRenderer {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     holder.current = TestRenderer.create(
-      createElement(RenameModal, {
-        title: 'Edit goal',
-        placeholder: 'Describe the goal',
-        initialValue: LONG_GOAL,
-        multiline,
-        maxLength: 500,
-        onSave: resolveSave,
-        onClose: () => undefined,
-      })
+      modalElement(overrides.initialValue ?? LONG_GOAL, multiline, overrides)
     );
   });
   const renderer = holder.current;
@@ -79,6 +109,10 @@ function fieldProps(renderer: TestRenderer.ReactTestRenderer) {
     multiline?: boolean;
     textAlignVertical?: string;
     defaultValue?: string;
+    value?: string;
+    returnKeyType?: string;
+    onChangeText?: (value: string) => void;
+    onSubmitEditing?: () => void;
   };
 }
 
@@ -89,11 +123,149 @@ describe('RenameModal field wrapping', () => {
     // scrolling horizontally and hiding the start of the value.
     expect(props.multiline).toBe(true);
     expect(props.textAlignVertical).toBe('top');
-    expect(props.defaultValue).toBe(LONG_GOAL);
+    expect(props.value ?? props.defaultValue).toBe(LONG_GOAL);
   });
 
   it('keeps the rename field single-line', () => {
     const props = fieldProps(mount(false));
     expect(props.multiline).toBeFalsy();
+  });
+});
+
+describe('RenameModal typed value', () => {
+  // Android's text input applies the committed props text on every commit of
+  // this dialog, so there the typed text has to be the field's `value`.
+  beforeEach(() => {
+    platform.os = 'android';
+  });
+
+  it('keeps the typed name when the caller writes and rolls back its data', () => {
+    const overrides: MountOverrides = { initialValue: 'Old name' };
+    const renderer = mount(false, overrides);
+    expect(fieldProps(renderer).value).toBe('Old name');
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // A refused save first writes the typed name into the caller's cache, which
+    // re-renders the dialog with that name as the initial value.
+    act(() => {
+      renderer.update(modalElement('Neue Organisation', false, overrides));
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // Then the failed write rolls the cache back to the old name.
+    act(() => {
+      renderer.update(modalElement('Old name', false, overrides));
+    });
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+  });
+
+  it('keeps the typed name beside the inline error after a refused save', async () => {
+    const onSave = vi
+      .fn<(name: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Rename refused'))
+      .mockResolvedValueOnce(undefined);
+    const onClose = vi.fn<() => void>();
+    const renderer = mount(false, { onSave, onClose, initialValue: 'Old name' });
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith('Neue Organisation');
+    expect(onClose).not.toHaveBeenCalled();
+    const copies = renderer.root.findAllByType('Text').map(node => node.props.children);
+    expect(copies).toContain('Rename refused');
+    expect(fieldProps(renderer).value).toBe('Neue Organisation');
+
+    // The same typed name is still what a retry submits.
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenNthCalledWith(2, 'Neue Organisation');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('RenameModal typed value on iOS', () => {
+  it('keeps the seed as the only props text and retries the typed name', async () => {
+    const overrides: MountOverrides = {
+      initialValue: 'Old name',
+      onSave: vi
+        .fn<(name: string) => Promise<void>>()
+        .mockRejectedValueOnce(new Error('Rename refused'))
+        .mockResolvedValueOnce(undefined),
+    };
+    const renderer = mount(false, overrides);
+    // This app never controls text with `value` plus state on iOS
+    // (apps/mobile/CLAUDE.md): the field stays uncontrolled and its props text
+    // is the value the dialog opened with, whatever the caller's data does.
+    expect(fieldProps(renderer).value).toBeUndefined();
+    expect(fieldProps(renderer).defaultValue).toBe('Old name');
+
+    act(() => {
+      fieldProps(renderer).onChangeText?.('Neue Organisation');
+    });
+    act(() => {
+      renderer.update(modalElement('Neue Organisation', false, overrides));
+    });
+    act(() => {
+      renderer.update(modalElement('Old name', false, overrides));
+    });
+    expect(fieldProps(renderer).defaultValue).toBe('Old name');
+
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(overrides.onSave).toHaveBeenNthCalledWith(2, 'Neue Organisation');
+  });
+});
+
+describe('RenameModal keyboard submit', () => {
+  it('marks the single-line field with a Done return key', () => {
+    expect(fieldProps(mount(false)).returnKeyType).toBe('done');
+  });
+
+  it('saves the typed value when the single-line field is submitted', async () => {
+    const onSave = vi.fn<(name: string) => Promise<void>>().mockResolvedValue(undefined);
+    const onClose = vi.fn<() => void>();
+    const renderer = mount(false, { onSave, onClose, initialValue: 'Old name' });
+    act(() => {
+      fieldProps(renderer).onChangeText?.('  New name  ');
+    });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith('New name');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('ignores the return key while the value still matches the opening one', async () => {
+    const onSave = vi.fn<(name: string) => Promise<void>>().mockResolvedValue(undefined);
+    const renderer = mount(false, { onSave, initialValue: 'Old name' });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps Return as a new line in the multi-line field', () => {
+    const props = fieldProps(mount(true));
+    expect(props.onSubmitEditing).toBeUndefined();
+    expect(props.returnKeyType).toBeUndefined();
   });
 });

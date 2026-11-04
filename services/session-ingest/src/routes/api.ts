@@ -1,22 +1,36 @@
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
   sessionIdSchema,
+  sessionShareOptionsSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
-import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
-import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import {
+  activeOrganizationJoinCondition,
+  organizationMembershipJoinCondition,
+  parentOrganizationJoinCondition,
+  parentOrganizationMembershipJoinCondition,
+  parentOrganizationsTable,
+  parentOrganizationMembershipsTable,
+  personalOrInheritedOrganizationCondition,
+  zodJsonValidator,
+  withDORetry,
+} from '@kilocode/worker-utils';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
+import { getSessionIngestDO, SHARE_INFO_TOO_LARGE_ERROR } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { createConnectionTicket } from '../dos/connection-ticket';
@@ -28,6 +42,11 @@ import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
+import { clearSessionLocalState } from '../services/session-local-state';
+import {
+  lockAndAssertWorkspaceRootSurvives,
+  HostedWorkspaceSessionDeleteError,
+} from '../services/hosted-workspace-session';
 
 export type ApiContext = {
   Bindings: Env;
@@ -80,28 +99,6 @@ function notifyUserSessionEventFromContext(
 
 type SessionDeleteRow = typeof cli_sessions_v2.$inferSelect;
 
-async function clearSessionLocalState(
-  env: Env,
-  kiloUserId: string,
-  sessionId: string
-): Promise<void> {
-  await withDORetry(
-    () => getSessionAccessCacheDO(env, { kiloUserId }),
-    sessionCache => sessionCache.remove(sessionId),
-    'SessionAccessCacheDO.remove'
-  );
-  await withDORetry(
-    () => getSessionIngestDO(env, { kiloUserId, sessionId }),
-    stub => stub.clear(),
-    'SessionIngestDO.clear'
-  );
-  await withDORetry(
-    () => getUserConnectionDO(env, { kiloUserId }),
-    stub => stub.clearSession(sessionId),
-    'UserConnectionDO.clearSession'
-  );
-}
-
 function notifySessionDeleted(
   c: Context<ApiContext>,
   kiloUserId: string,
@@ -151,55 +148,69 @@ async function deleteOwnedLeafSession(
     return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
   }
 
-  const outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
-    if (existing.cloud_agent_session_scope_id) {
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
+  let outcome: 'deleted' | 'gone' | 'not_leaf';
+  try {
+    outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+      if (existing.cloud_agent_session_scope_id) {
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
+          )
+          .limit(1)
+          .for('update');
+      }
+
+      const lockedRows = await tx
+        .select()
         .from(cli_sessions_v2)
         .where(
           and(
-            eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         )
         .limit(1)
         .for('update');
-    }
+      if (!lockedRows[0]) {
+        return 'gone';
+      }
 
-    const lockedRows = await tx
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1)
-      .for('update');
-    if (!lockedRows[0]) {
-      return 'gone';
-    }
-
-    const childRows = await tx
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.parent_session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      const childRows = await tx
+        .select({ session_id: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.parent_session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
         )
-      )
-      .limit(1);
-    if (childRows[0]) {
-      return 'not_leaf';
-    }
+        .limit(1);
+      if (childRows[0]) {
+        return 'not_leaf';
+      }
 
-    await tx
-      .delete(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      );
-    return 'deleted';
-  });
+      await tx
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+      return 'deleted';
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
+    }
+    throw error;
+  }
 
   if (outcome === 'not_leaf') {
     return c.json({ success: false, error: 'session_not_leaf' }, 409);
@@ -360,7 +371,8 @@ api.delete('/session/:sessionId', async c => {
     )
     SELECT
       tree.session_id,
-      tree.organization_id IS NULL OR EXISTS (
+      tree.organization_id IS NULL
+      OR EXISTS (
         SELECT 1
         FROM ${organization_memberships}
         INNER JOIN ${organizations}
@@ -368,6 +380,22 @@ api.delete('/session/:sessionId', async c => {
           AND ${organizations.deleted_at} IS NULL
         WHERE ${organization_memberships.organization_id} = tree.organization_id
           AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM ${organizations} AS active_target_organization
+        INNER JOIN ${organizations} AS active_parent_organization
+          ON active_parent_organization.id = active_target_organization.parent_organization_id
+          AND active_parent_organization.deleted_at IS NULL
+        INNER JOIN ${organization_memberships} AS active_parent_membership
+          ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+          AND active_parent_membership.kilo_user_id = ${kiloUserId}
+          AND active_parent_membership.role IN (${sql.join(
+            ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+            sql`, `
+          )})
+        WHERE active_target_organization.id = tree.organization_id
+          AND active_target_organization.deleted_at IS NULL
       ) AS has_access
     FROM tree
     ORDER BY depth DESC
@@ -390,35 +418,54 @@ api.delete('/session/:sessionId', async c => {
   const deletionSessionScopeId = deletedRows.find(
     row => row.session_id === parsed.data
   )?.cloud_agent_session_scope_id;
+  const deletionTarget = deletedRows.find(row => row.session_id === parsed.data);
 
-  await db.transaction(async tx => {
-    if (deletionSessionScopeId) {
-      // Bootstrap and metadata mutations lock the session scope root before children.
-      // Match that order even when deleting a subtree rooted at a child.
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+  try {
+    await db.transaction(async tx => {
+      if (deletionTarget) {
+        await lockAndAssertWorkspaceRootSurvives(tx, {
+          kiloUserId,
+          row: {
+            session_id: deletionTarget.session_id,
+            cloud_agent_session_id: deletionTarget.cloud_agent_session_id,
+            cloud_agent_worktree_id: deletionTarget.cloud_agent_worktree_id,
+            parent_session_id: deletionTarget.parent_session_id,
+          },
+        });
+      }
+      if (deletionSessionScopeId) {
+        // Bootstrap and metadata mutations lock the session scope root before children.
+        // Match that order even when deleting a subtree rooted at a child.
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
           )
-        )
-        .limit(1)
-        .for('update');
+          .limit(1)
+          .for('update');
+      }
+      for (const sessionId of orderedSessionIds) {
+        await tx
+          .delete(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
     }
-    for (const sessionId of orderedSessionIds) {
-      await tx
-        .delete(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-  });
+    throw error;
+  }
 
   const deletedAt = new Date().toISOString();
   const deletedRowsBySessionId = new Map(deletedRows.map(row => [row.session_id, row]));
@@ -583,7 +630,7 @@ api.get('/session/:sessionId/messages', async c => {
   const beforeParsed =
     beforeParam === undefined
       ? { success: true as const, data: undefined }
-      : z.string().min(1).max(1024).safeParse(beforeParam);
+      : z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).safeParse(beforeParam);
   if (!beforeParsed.success) {
     return c.json({ success: false, error: 'Invalid before' }, 400);
   }
@@ -614,16 +661,19 @@ api.get('/session/:sessionId/messages', async c => {
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, kiloUserId)
-      )
+      organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
+    )
+    .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .leftJoin(
+      parentOrganizationMembershipsTable,
+      parentOrganizationMembershipJoinCondition(kiloUserId)
     )
     .where(
       and(
         eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
         eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+        personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id)
       )
     )
     .limit(1);
@@ -737,45 +787,147 @@ api.get('/session/:sessionId/messages', async c => {
   );
 });
 
-api.post('/session/:sessionId/share', async c => {
+api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
+  const shareOptions = sessionShareOptionsSchema.safeParse(
+    c.req.raw.body === null ? {} : await c.req.json().catch(() => null)
+  );
+  if (!shareOptions.success) {
+    return c.json({ success: false, error: 'Invalid share options' }, 400);
+  }
+
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
-  const publicId = crypto.randomUUID();
-  const shareResult = await db.execute<{ public_id: string }>(sql`
-    UPDATE ${cli_sessions_v2}
-    SET public_id = COALESCE(${cli_sessions_v2.public_id}, ${publicId})
-    WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
-      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
-      AND (
-        ${cli_sessions_v2.organization_id} IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM ${organization_memberships}
-          INNER JOIN ${organizations}
-            ON ${organizations.id} = ${organization_memberships.organization_id}
-            AND ${organizations.deleted_at} IS NULL
-          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
-            AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
-        )
-      )
-    RETURNING ${cli_sessions_v2.public_id}
-  `);
-
-  const sharedSession = shareResult.rows[0];
-  if (!sharedSession) {
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!accessibleSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const shareToken = await signSessionShareToken(c.env, {
-    sessionId: parsed.data,
-    publicId: sharedSession.public_id,
-  });
+  const publicId = crypto.randomUUID();
+  const removeSnapshot = () =>
+    withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(publicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+
+  // Freeze the public info and mint the capability before mutating the row so
+  // a snapshot or signing failure leaves the previous generation untouched.
+  let sharedAt = Date.now();
+  try {
+    if (!shareOptions.data.include_new_messages) {
+      sharedAt = await withDORetry(
+        () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+        stub => stub.captureShareInfo(publicId, shareOptions.data.duration),
+        'SessionIngestDO.captureShareInfo'
+      );
+    }
+  } catch (error) {
+    await removeSnapshot();
+    if (error instanceof Error && error.message === SHARE_INFO_TOO_LARGE_ERROR) {
+      return c.json({ success: false, error: 'share_snapshot_too_large' }, 413);
+    }
+    if (error instanceof Error && error.message === 'Session deleted') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    throw error;
+  }
+
+  let shareToken: string;
+  try {
+    shareToken = await signSessionShareToken(
+      c.env,
+      {
+        sessionId: parsed.data,
+        publicId,
+        ...shareOptions.data,
+      },
+      { now: () => new Date(sharedAt) }
+    );
+  } catch (error) {
+    await removeSnapshot();
+    throw error;
+  }
+
+  // Every share rotates `public_id`, which invalidates the predecessor even
+  // while its signature is still valid. Snapshot links use the capture timestamp
+  // as their signed cutoff and expiry origin.
+  const sharedSession = await db
+    .transaction(async tx => {
+      const [previous] = await tx
+        .select({ publicId: cli_sessions_v2.public_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.data),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!previous) return null;
+      const result = await tx.execute<{ public_id: string }>(sql`
+      UPDATE ${cli_sessions_v2}
+      SET public_id = ${publicId}
+      WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
+        AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+        AND (
+          ${cli_sessions_v2.organization_id} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${organization_memberships}
+            INNER JOIN ${organizations}
+              ON ${organizations.id} = ${organization_memberships.organization_id}
+              AND ${organizations.deleted_at} IS NULL
+            WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+              AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM ${organizations} AS active_target_organization
+            INNER JOIN ${organizations} AS active_parent_organization
+              ON active_parent_organization.id = active_target_organization.parent_organization_id
+              AND active_parent_organization.deleted_at IS NULL
+            INNER JOIN ${organization_memberships} AS active_parent_membership
+              ON active_parent_membership.organization_id = active_target_organization.parent_organization_id
+              AND active_parent_membership.kilo_user_id = ${kiloUserId}
+              AND active_parent_membership.role IN (${sql.join(
+                ORGANIZATION_PARENT_ACCESS_ROLES.map((role: string) => sql`${role}`),
+                sql`, `
+              )})
+            WHERE active_target_organization.id = ${cli_sessions_v2.organization_id}
+              AND active_target_organization.deleted_at IS NULL
+          )
+        )
+      RETURNING ${cli_sessions_v2.public_id}
+    `);
+      return result.rows[0] ? previous : null;
+    })
+    .catch(async error => {
+      await removeSnapshot();
+      throw error;
+    });
+
+  if (!sharedSession) {
+    await removeSnapshot();
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+  const previousPublicId = sharedSession.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(() => undefined);
+  }
 
   return c.json({ success: true, share_token: shareToken }, 200);
 });
@@ -798,24 +950,46 @@ api.post('/session/:sessionId/unshare', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  if (!sessionRows[0]) {
+  const previous = await db.transaction(async tx => {
+    const [session] = await tx
+      .select({ publicId: cli_sessions_v2.public_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1)
+      .for('update');
+    if (!session) return null;
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.data),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      );
+    return session;
+  });
+  if (!previous) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
-
-  await db
-    .update(cli_sessions_v2)
-    .set({ public_id: null })
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    );
+  const previousPublicId = previous.publicId;
+  if (previousPublicId) {
+    await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+      stub => stub.deleteShareInfo(previousPublicId),
+      'SessionIngestDO.deleteShareInfo'
+    ).catch(error => {
+      console.warn('Failed to clear share snapshot after unshare', {
+        sessionId: parsed.data,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   return c.json({ success: true }, 200);
 });

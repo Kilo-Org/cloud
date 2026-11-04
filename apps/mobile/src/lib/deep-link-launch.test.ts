@@ -43,6 +43,7 @@ import {
   setCurrentDeepLinkUserId,
   setPendingDeepLink,
   subscribeToPendingDeepLink,
+  wasLaunchAppRouteCaptured,
 } from './deep-link-launch';
 /* eslint-enable import/first */
 
@@ -519,6 +520,48 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
     });
 
+    it.each([
+      [
+        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1?source=push',
+        '/(app)/security-agent/personal/findings/finding-1?source=push',
+      ],
+      ['/(app)/(tabs)/(3_profile)/security-agent', '/(app)/security-agent'],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github',
+        '/(app)/code-reviewer/personal/github',
+      ],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer?scope=personal',
+        '/(app)/code-reviewer?scope=personal',
+      ],
+      ['/(app)/security-agent/personal', '/(app)/security-agent/personal'],
+      ['/(app)/(tabs)/(3_profile)/profiles/p1', '/(app)/(tabs)/(3_profile)/profiles/p1'],
+      [
+        '/(app)/(tabs)/(3_profile)/code-reviewer-extra',
+        '/(app)/(tabs)/(3_profile)/code-reviewer-extra',
+      ],
+    ])('restores the current destination for persisted href %s', async (href, expected) => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href,
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: 'user-a',
+          organizationId: 'org-1',
+        })
+      );
+      setCurrentDeepLinkUserId('user-a');
+
+      await restorePersistedPendingDeepLink();
+
+      expect(consumePendingDeepLink()).toEqual({
+        href: expected,
+        organizationId: 'org-1',
+      });
+      expect(consumePendingDeepLink()).toBeNull();
+    });
+
     it('discards a record captured for a different user', async () => {
       store.set(
         PENDING_DEEP_LINK_KEY,
@@ -754,22 +797,42 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();
       // Assert immediately — no await. The point of the test is synchronicity.
-      expect(getPendingDeepLink()).toBe(
-        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings'
-      );
+      expect(getPendingDeepLink()).toBe('/(app)/security-agent/personal/findings');
     });
 
     it('carries the resume anchor of a cold launch URL into the stash', () => {
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg%2042');
+      _setGetLinkingURLForTests(
+        () => 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop?at=msg%2042'
+      );
       captureLaunchDeepLink();
       // Assert immediately — no await. The point of the test is synchronicity.
-      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg%2042');
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/agent-chat/ses_0123456789abcdefghijklmnop?at=msg%2042'
+      );
     });
 
     it('keeps an anchor-less session launch href byte-identical', () => {
-      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1');
+      _setGetLinkingURLForTests(
+        () => 'https://app.kilo.ai/cloud/sessions/ses_0123456789abcdefghijklmnop'
+      );
       captureLaunchDeepLink();
-      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_0123456789abcdefghijklmnop');
+    });
+
+    it("captures a launch that opened one of the app's own routes", () => {
+      _setGetLinkingURLForTests(() => 'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices');
+      captureLaunchDeepLink();
+      // Assert immediately - no await. The point of the test is synchronicity.
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)/organization/invoices');
+      // The relaunch repair must leave this launch to the pending consumer.
+      expect(wasLaunchAppRouteCaptured()).toBe(true);
+    });
+
+    it('does not mark a universal-link launch as an app-route launch', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+      expect(wasLaunchAppRouteCaptured()).toBe(false);
     });
 
     it('is a no-op when the latch is already set (slot not overwritten)', () => {
@@ -840,6 +903,20 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => 'not a url');
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBeNull();
+    });
+
+    it('does not capture a session link whose capture cannot open', () => {
+      // The slot is the layout's only navigation input, so capturing a
+      // destination that resolves to the composer would replace the restored
+      // screen with it on the next launch.
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/not-a-real-session');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBeNull();
+
+      // The latch stayed unset, so a later mapped launch still captures.
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
     });
   });
 

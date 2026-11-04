@@ -46,7 +46,7 @@ export function ReasoningPartRenderer({
         <View className="mt-2">
           <Text
             selectable={isStreaming ? false : textSelectable}
-            className="text-sm leading-5 text-muted-foreground"
+            className="text-sm leading-[1.25rem] text-muted-foreground"
           >
             {text}
           </Text>

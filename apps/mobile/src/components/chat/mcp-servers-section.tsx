@@ -1,12 +1,14 @@
 import { type ReactNode } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 import { type RemoteMcpServerRow } from './mcp-settings-state';
 
@@ -201,6 +203,7 @@ function McpServerRow({
             key={retrying ? 'retrying' : 'idle'}
             variant="secondary"
             size="sm"
+            className={STATE_ACTION_CLASS}
             loading={retrying}
             accessibilityLabel={t('modelChat.mcp.retryServerA11y', { name: row.name })}
             onPress={onRetry}

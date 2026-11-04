@@ -247,6 +247,25 @@ describe('readSweepCompletion', () => {
     });
   });
 
+  it.each([
+    [
+      'the provider-billed upstream cost for BYOK',
+      { cost: 0.0004, is_byok: true, cost_details: { upstream_inference_cost: 0.008 } },
+      0.008,
+    ],
+    [
+      'the router cost without BYOK',
+      { cost: 0.012, is_byok: false, cost_details: { upstream_inference_cost: 0.009 } },
+      0.012,
+    ],
+    ['an unknown cost when BYOK omits the upstream cost', { cost: 0.0004, is_byok: true }, null],
+  ])('reports %s', async (_label, usage, expected) => {
+    const response = new Response(
+      `data: {"choices":[{"delta":{"content":"answer"}}]}\n\ndata: ${JSON.stringify({ choices: [], usage })}\n\ndata: [DONE]\n\n`
+    );
+    expect((await readSweepCompletion(response, 100, () => 175)).costUsd).toBe(expected);
+  });
+
   it('accepts explicit null error fields in answer and usage chunks', async () => {
     const response = new Response(
       [

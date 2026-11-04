@@ -132,18 +132,17 @@ describe('condense-tool-calls store', () => {
     unsubscribe();
   });
 
-  it('keeps the in-memory value and toasts common.couldNotSaveSetting when the write fails', async () => {
+  it('keeps the last stored value and toasts common.couldNotSaveSetting when the write fails', async () => {
     getItemAsync.mockResolvedValue(null);
     setItemAsync.mockRejectedValue(new Error('disk full'));
     const store = await makeStore();
 
     store.set(true);
-    expect(store.get()).toBe(true);
-
-    await flushMicrotasks();
+    await store.whenPersisted();
 
     expect(toastError).toHaveBeenCalledWith('Could not save setting');
-    expect(store.get()).toBe(true);
+    // Nothing was stored, so the row keeps showing the stored value.
+    expect(store.get()).toBe(false);
   });
 
   it('toasts common.couldNotSaveSetting when the real preference write fails', async () => {

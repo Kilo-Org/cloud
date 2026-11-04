@@ -3,7 +3,6 @@ import { getWorktreeFileViewMode } from './worktree-file';
 import {
   CHAT_TAB_ID,
   addTerminalTab as addOwnedTerminalTab,
-  clearFileTabs,
   closeFileTab,
   closeTerminalTab,
   createWorkspaceTabsState,
@@ -156,17 +155,14 @@ describe('saved file tabs', () => {
     content: { status: 'available', source: 'current', text: '# Saved file\n' },
   };
 
-  it('clears selected-session files without replacing worktree terminal owners or selection', () => {
+  it('preserves worktree files and terminal owners when selecting another chat', () => {
     const terminal = addOwnedTerminalTab(createWorkspaceTabsState(), 'pty', 'workspace-original');
     const files = setFileTabMode(openFileTab(terminal, 'README.md'), 'README.md', 'preview');
-    const cleared = clearFileTabs(files);
-    expect(cleared.files).toEqual([]);
-    expect(cleared.activeTabId).toBe(CHAT_TAB_ID);
-    expect(cleared.terminals).toBe(terminal.terminals);
-    expect(clearFileTabs(selectWorkspaceTab(files, terminalTabId('pty'))).activeTabId).toBe(
-      terminalTabId('pty')
-    );
-    expect(openFileTab(cleared, 'README.md').files).toEqual([{ path: 'README.md' }]);
+    const chat = selectWorkspaceTab(files, CHAT_TAB_ID);
+    expect(chat.files).toBe(files.files);
+    expect(chat.activeTabId).toBe(CHAT_TAB_ID);
+    expect(chat.terminals).toBe(terminal.terminals);
+    expect(openFileTab(chat, 'README.md').files).toEqual([{ path: 'README.md', mode: 'preview' }]);
   });
 
   it('opens files without choosing a mode before saved data is available, then defaults to diff', () => {
@@ -194,17 +190,64 @@ describe('saved file tabs', () => {
       'chat',
       'terminal:tab-a',
     ];
-    const opened = paths.reduce(openFileTab, createWorkspaceTabsState());
-    const reopened = paths.toReversed().reduce(openFileTab, opened);
+    const opened = paths.reduce(
+      (state, path) => openFileTab(state, path),
+      createWorkspaceTabsState()
+    );
+    const reopened = paths.toReversed().reduce((state, path) => openFileTab(state, path), opened);
 
     expect(opened.files).toEqual(paths.map(path => ({ path })));
     expect(reopened.files).toBe(opened.files);
     expect(reopened.activeTabId).toBe(fileTabId(paths[0]));
-    expect(new Set(paths.map(fileTabId)).size).toBe(paths.length);
+    expect(new Set(paths.map(path => fileTabId(path))).size).toBe(paths.length);
     for (const path of paths) {
       expect(fileTabId(path)).not.toMatch(/\s/);
       expect(selectWorkspaceTab(opened, fileTabId(path)).activeTabId).toBe(fileTabId(path));
     }
+  });
+
+  it('keeps scoped and legacy tabs distinct at the same path without identity collisions', () => {
+    const path = 'src/with %:space.ts';
+    let state = openFileTab(createWorkspaceTabsState(), path);
+    state = openFileTab(state, path, 'uncommitted');
+    state = openFileTab(state, path, 'against-base-branch');
+    expect(state.files).toEqual([
+      { path },
+      { path, scope: 'uncommitted' },
+      { path, scope: 'against-base-branch' },
+    ]);
+    expect(state.activeTabId).toBe(fileTabId(path, 'against-base-branch'));
+    expect(openFileTab(state, path, 'against-base-branch')).toBe(state);
+    expect(fileTabId(path)).toBe(`file:${encodeURIComponent(path)}`);
+    expect(fileTabId(`uncommitted:${path}`)).not.toBe(fileTabId(path, 'uncommitted'));
+    for (const scope of [undefined, 'uncommitted', 'against-base-branch'] as const) {
+      expect(selectWorkspaceTab(state, fileTabId(path, scope)).activeTabId).toBe(
+        fileTabId(path, scope)
+      );
+    }
+    expect(selectWorkspaceTab(state, fileTabId('missing', 'uncommitted'))).toBe(state);
+  });
+
+  it('changes modes and closes only the exact scoped tab with a scoped focus fallback', () => {
+    const path = 'README.md';
+    let state = openFileTab(createWorkspaceTabsState(), path);
+    state = openFileTab(state, path, 'uncommitted');
+    state = openFileTab(state, path, 'against-base-branch');
+    const updated = setFileTabMode(state, path, 'expanded', 'against-base-branch');
+    expect(updated.files).toEqual([
+      { path },
+      { path, scope: 'uncommitted' },
+      { path, scope: 'against-base-branch', mode: 'expanded' },
+    ]);
+    expect(setFileTabMode(updated, path, 'expanded', 'against-base-branch')).toBe(updated);
+    const closed = closeFileTab(updated, path, 'against-base-branch');
+    expect(closed.files).toEqual([{ path }, { path, scope: 'uncommitted' }]);
+    expect(closed.activeTabId).toBe(fileTabId(path, 'uncommitted'));
+    expect(closeFileTab(closed, path).activeTabId).toBe(fileTabId(path, 'uncommitted'));
+    expect(closeFileTab(closed, path, 'against-base-branch')).toBe(closed);
+    expect(closeFileTab(closeFileTab(closed, path), path, 'uncommitted')).toEqual(
+      createWorkspaceTabsState()
+    );
   });
 
   const modes = ['diff', 'expanded', 'preview'] satisfies WorktreeFileViewMode[];
@@ -340,7 +383,7 @@ describe('saved file tabs', () => {
   ])('uses the left neighbor as the focus target when %s closes', (path, focusTarget) => {
     const state = selectWorkspaceTab(
       ['first.ts', 'second.ts', 'third.ts'].reduce(
-        openFileTab,
+        (state, path) => openFileTab(state, path),
         addTerminalTab(createWorkspaceTabsState(), 'tab-a')
       ),
       fileTabId(path)

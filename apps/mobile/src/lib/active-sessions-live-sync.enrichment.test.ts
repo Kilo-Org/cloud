@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import * as sessionsLive from '@/lib/active-sessions-live';
 import {
+  acceptScope,
   ActiveSessionsLiveSync,
   makeCached,
   makeConnection,
@@ -65,7 +65,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     await sync.getWriteQueue();
     await sync.getFetchQueue();
     expect(sync.getPendingReasons().has('enrichment')).toBe(true);
-    // The enrichment fetch fails. The reason stays pending for now.
     qc.__triggerFetchReject(new Error('network down'));
     await sync.getFetchCompletion();
     expect(sync.getPendingReasons().has('enrichment')).toBe(true);
@@ -85,7 +84,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
   it('does NOT schedule enrichment when every row is already enriched', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
-    qc.__setCached({ sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -94,6 +92,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       queryFn,
     });
     sync.attach();
+    await acceptScope(qc, sync, { sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
     const heartbeat: SystemEvent = {
       event: 'sessions.heartbeat',
       data: {
@@ -105,7 +104,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     await sync.getWriteQueue();
     await sync.getFetchQueue();
     expect(sync.getPendingReasons().has('enrichment')).toBe(false);
-    expect(queryFn).toHaveBeenCalledTimes(0);
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
   it('rate-limits enrichment retries ≥10s apart', async () => {
@@ -253,9 +252,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
   it('heartbeat-after-empty-snapshot repopulates the cache (enrichment preserved)', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
-    qc.__setCached({
-      sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })],
-    });
+    const enriched = makeCached({ id: 'a', createdOnPlatform: 'cli' });
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
@@ -264,6 +261,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       queryFn,
     });
     sync.attach();
+    await acceptScope(qc, sync, { sessions: [enriched] });
     // Empty snapshot arrives (degraded ingest path).
     const emptySnapshot: SystemEvent = {
       event: 'sessions.list',
@@ -290,32 +288,5 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const cached = qc.__getCached();
     expect(cached?.sessions.map(s => s.id)).toEqual(['a']);
     expect(cached?.sessions[0]?.createdOnPlatform).toBe('cli');
-  });
-});
-
-describe('merge enrichment — associatedPr preservation', () => {
-  const associatedPr = {
-    url: 'https://github.com/org/repo/pull/42',
-    number: 42,
-    state: 'open',
-    title: 'Fix deploy',
-    headSha: null,
-    lastSyncedAt: '2026-01-01T00:00:00.000Z',
-    reviewDecision: null,
-    reviewDecisionPending: false,
-    platform: 'github',
-  };
-
-  it('keeps associatedPr through heartbeat and snapshot merges', () => {
-    const current = [makeCached({ id: 'a', createdOnPlatform: 'cli', associatedPr })];
-    const afterHeartbeat = sessionsLive.mergeHeartbeatForActiveSessions(current, {
-      connectionId: 'c1',
-      sessions: [{ id: 'a', status: 'running', title: 'A' }],
-    });
-    const afterSnapshot = sessionsLive.mergeSnapshotForActiveSessions(current, [
-      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
-    ]);
-    expect(afterHeartbeat[0]?.associatedPr).toEqual(associatedPr);
-    expect(afterSnapshot[0]?.associatedPr).toEqual(associatedPr);
   });
 });

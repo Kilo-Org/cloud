@@ -16,8 +16,9 @@ describe('buildClientMetadataHeaders', () => {
     platformMock.OS = 'ios';
   });
 
-  it('returns the mobile client, ios platform, and version headers', () => {
+  it('returns the user agent, mobile client, ios platform, and version headers', () => {
     expect(buildClientMetadataHeaders()).toEqual({
+      'User-Agent': 'Kilo-Code/1.0.4 (ios)',
       'x-kilo-client': 'mobile',
       'x-kilo-app-platform': 'ios',
       'x-kilo-app-version': '1.0.4',

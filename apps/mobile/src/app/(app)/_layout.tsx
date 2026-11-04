@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { EventServiceProvider } from '@/components/event-service-provider';
+import { PickerLaunchRestoreMount } from '@/components/agents/picker-launch-restore-mount';
+import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mount';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
@@ -20,13 +22,17 @@ import {
 } from '@/lib/auth/push-registration-reconciliation';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
+import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
+import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -94,6 +100,16 @@ function AppWideFreshnessMount() {
   return null;
 }
 
+export const unstable_settings = {
+  // The anchor a `withAnchor` navigation into `(app)` starts from (the relaunch
+  // repair and the pending-deep-link navigator both use it). Without it those
+  // navigations build the target as the group's only route, so the restored
+  // screen has no back stack: no back control in its header and no tab to
+  // return to. `/` itself resolves straight to this anchor: it seeds the tab
+  // navigator, so the group needs no `index` redirect of its own.
+  anchor: '(tabs)',
+};
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
@@ -114,84 +130,120 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <LeaveSettleMount />
+      <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
+      <PickerLaunchRestoreMount />
       <TourAutoOpen />
       <EventServiceProvider>
-        <Stack
-          screenLayout={appUnlockScreenLayout}
-          screenOptions={{
-            contentStyle: { backgroundColor: colors.background },
-            headerShown: false,
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.foreground,
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
-          <Stack.Screen name="pr-review/[owner]/[repo]/[number]" options={{ headerShown: false }} />
-          <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
-          <Stack.Screen name="agent-chat/[session-id]" />
-          <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
-          <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
-          <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
-          <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
-          <Stack.Screen
-            name="agent-chat/mode-picker"
-            options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
-          />
-          <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
-          <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
-          <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
-          <Stack.Screen name="todos/[list-id]" />
-          <Stack.Screen name="todos/item/[item-id]" />
-          <Stack.Screen name="todos/list-settings" options={sheetOptions} />
-          <Stack.Screen name="share-gate" options={sheetOptions} />
-          <Stack.Screen name="language-picker" options={searchSheetOptions} />
-          <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
-          <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
-          <Stack.Screen
-            name="kilo-pass"
-            options={{
-              presentation: 'modal',
+        {/* The root stack draws no tab bar: the tabs live inside `(tabs)`,
+              whose layout publishes its own decision for every tab screen. */}
+        <TabBarLabelContext value={null}>
+          <Stack
+            screenLayout={appScreenLayout}
+            screenOptions={{
+              contentStyle: { backgroundColor: colors.background },
               headerShown: false,
+              headerStyle: { backgroundColor: colors.background },
+              headerTintColor: colors.foreground,
             }}
-          />
-          <Stack.Screen
-            name="credits"
-            options={{
-              presentation: 'modal',
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="tour"
-            options={{
-              presentation: 'modal',
-              headerShown: false,
-              // A swipe-down dismissal would bypass the tour's per-account
-              // decision, so only its controls and Android Back may dismiss.
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="consent"
-            options={{
-              presentation: 'modal',
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="consent-details"
-            options={{
-              headerShown: false,
-            }}
-          />
-        </Stack>
+          >
+            <Stack.Screen name="(tabs)" />
+            {/* The profile tree's screens land without a transition when the
+                  stack repair pushes them (`profile-route-stack.ts`), so a
+                  profile link opened without its parents does not slide the
+                  rebuilt screens past the reader. */}
+            {getProfileRouteNames('app').map(name => (
+              <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+            ))}
+            <Stack.Screen
+              name="model-catalog/[owner]/[repo]"
+              options={{
+                // Back from a model detail belongs to the catalog list, and
+                // the screen's own rule names it (`lib/chat/model-catalog-back`).
+                // A native swipe pop bypasses that rule and reveals whatever
+                // route sits beneath a detail opened without the list, so the
+                // header control is this screen's only Back affordance.
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="pr-review/[owner]/[repo]/[number]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
+            <Stack.Screen name="agent-chat/[session-id]" />
+            <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
+            <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
+            <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
+            <Stack.Screen
+              name="agent-chat/mode-picker"
+              options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
+            />
+            <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+            <Stack.Screen name="todos/[list-id]" />
+            <Stack.Screen name="todos/item/[item-id]" />
+            <Stack.Screen
+              name="todos/list-settings"
+              options={{ ...sheetOptions, gestureEnabled: false }}
+            />
+            <Stack.Screen name="agent-briefing/index" />
+            <Stack.Screen name="agent-briefing/[report-id]" />
+            <Stack.Screen name="agent-briefing/settings" />
+            <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={searchSheetOptions} />
+            <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
+            <Stack.Screen
+              name="kilo-pass"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="credits"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="tour"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                // A swipe-down dismissal would bypass the tour's own dismissal
+                // (which records the per-account decision). Match `consent`:
+                // the only exits are the tour's own controls and
+                // Android hardware Back, both of which record first.
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="consent"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="consent-details"
+              options={{
+                headerShown: false,
+              }}
+            />
+          </Stack>
+        </TabBarLabelContext>
       </EventServiceProvider>
     </UserWebConnectionProvider>
   );

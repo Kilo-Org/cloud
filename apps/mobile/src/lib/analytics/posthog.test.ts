@@ -604,7 +604,7 @@ describe('discard serialization', () => {
     const firstDiscard = discardPostHog();
 
     // Let the synchronous part of the first discard run (seal, clear
-    // queues, client=null, flagListeners.clear).
+    // queues, client=null).
     await new Promise<void>(resolve => {
       void setTimeout(resolve, 0);
     });

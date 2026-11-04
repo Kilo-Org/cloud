@@ -19,6 +19,7 @@ export type MissedServiceFeeAlertInput = {
   stripeInvoiceId?: string | null;
   stripePaymentIntentId?: string | null;
   stripeChargeId?: string | null;
+  livemode?: boolean;
   eligibleSubtotalMinor: number;
   expectedFeeMinor: number;
   currency: string;
@@ -49,6 +50,19 @@ function attemptedAtIso(value: Date | string): string {
   return date.toISOString();
 }
 
+function isStripeTestModeKey(): boolean {
+  const key = process.env.STRIPE_SECRET_KEY?.trim() ?? '';
+  return key.startsWith('sk_test_') || key.startsWith('rk_test_');
+}
+
+export function shouldSendMissedServiceFeeAlert(
+  input: Pick<MissedServiceFeeAlertInput, 'livemode'>
+): boolean {
+  if (process.env.VERCEL_TARGET_ENV !== 'staging') return true;
+  if (input.livemode !== undefined) return input.livemode;
+  return !isStripeTestModeKey();
+}
+
 export function buildMissedServiceFeeAlertText(input: MissedServiceFeeAlertInput): string {
   const lines = [
     'Missed service fee',
@@ -76,6 +90,8 @@ export async function sendMissedServiceFeeAlert(
   input: MissedServiceFeeAlertInput,
   deps: MissedServiceFeeAlertDependencies = {}
 ): Promise<void> {
+  if (!shouldSendMissedServiceFeeAlert(input)) return;
+
   const sendNotification = deps.sendNotification ?? sendAdminSlackNotification;
   const capture = deps.captureException ?? captureException;
 

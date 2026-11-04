@@ -8,7 +8,8 @@ import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { QueryError } from '@/components/query-error';
-import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
+import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { parseParam } from '@/lib/route-params';
@@ -79,17 +80,10 @@ export function PrReviewMergeScreen() {
   const method: PrMergeMethod = MERGE_METHODS.has(params.method as PrMergeMethod)
     ? (params.method as PrMergeMethod)
     : 'merge';
-  const sheetTitle = (() => {
-    if (mode === 'enable-auto-merge') {
-      return t('prReview.merge.enableAutoMerge');
-    }
-    if (providerRef && providerRef.platform !== 'github') {
-      return t('prReview.merge.mergeTermTitle', {
-        term: t(providerPrNounKey(providerRef.platform)),
-      });
-    }
-    return t('prReview.merge.mergePullRequest');
-  })();
+  const sheetTitle =
+    mode === 'enable-auto-merge'
+      ? t('prReview.merge.enableAutoMerge')
+      : providerPrMergeTitles(t, providerRef ? providerRef.platform : 'github').action;
   const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();
@@ -162,12 +156,10 @@ export function PrReviewMergeScreen() {
         repoName={repo}
         number={number}
         headSha={pr.data.headSha}
-        headRef={pr.data.headRef}
         isCrossRepo={pr.data.isCrossRepo}
         prNodeId={pr.data.prNodeId}
         title={pr.data.title}
         bodyMarkdown={pr.data.bodyMarkdown}
-        baseRef={pr.data.baseRef}
         repo={pr.data.repo}
         initialMethod={method}
         mode={mode}

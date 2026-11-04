@@ -9,13 +9,43 @@ export const FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 /**
  * Statuses a review can hold while it still has work outstanding.
  *
- * Anything not listed here has reached a terminal state and will never move
- * again. Callers that select or guard on "still in flight" should reference this
- * rather than repeat the literals, so adding or renaming a status is a single
- * edit. Several older call sites still inline the same array; they predate this
- * constant and can adopt it as they are touched.
+ * A review in one of these states can still move; the states it can move to are
+ * {@link TERMINAL_CODE_REVIEW_STATUSES}. Callers that select or guard on "still
+ * in flight" reference this rather than repeating the literals, so adding or
+ * renaming a status is a single edit.
  */
 export const NON_TERMINAL_CODE_REVIEW_STATUSES = ['pending', 'queued', 'running'] as const;
+
+export function isNonTerminalCodeReviewStatus(status: string): boolean {
+  return (NON_TERMINAL_CODE_REVIEW_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Statuses a review holds once it has stopped moving, i.e. the complement of
+ * {@link NON_TERMINAL_CODE_REVIEW_STATUSES} among the statuses this app
+ * persists.
+ *
+ * `interrupted` is deliberately absent: it is listed in
+ * `CODE_REVIEW_STATUSES` for clients and legacy rows, but the status callback
+ * maps a cloud-agent `interrupted` to `cancelled` before persisting, so no
+ * review row this app writes holds it. Leaving it out keeps the auto
+ * `completed_at` stamp tied to the statuses that actually end a review.
+ */
+export const TERMINAL_CODE_REVIEW_STATUSES = ['completed', 'failed', 'cancelled'] as const;
+
+export type TerminalCodeReviewStatus = (typeof TERMINAL_CODE_REVIEW_STATUSES)[number];
+
+export function isTerminalCodeReviewStatus(status: string): status is TerminalCodeReviewStatus {
+  return (TERMINAL_CODE_REVIEW_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Renders the in-flight status literals for raw SQL that cannot use
+ * `inArray` — CTEs that filter an aliased column such as `attempts.status`.
+ */
+export function nonTerminalCodeReviewStatusListSql(): SQL {
+  return sql.raw(NON_TERMINAL_CODE_REVIEW_STATUSES.map(status => `'${status}'`).join(', '));
+}
 
 export const STALE_QUEUED_CODE_REVIEW_MINUTES = 5;
 export const STALE_RUNNING_CODE_REVIEW_MINUTES = 90;

@@ -2,13 +2,20 @@
 
 import { Suspense } from 'react';
 import { CloudChatPage } from '@/components/cloud-agent-next/CloudChatPage';
+import type { KnownModel } from '@/components/cloud-agent-next/known-models';
 
-export function CloudChatPageWrapperNext({ currentUserId }: { currentUserId: string }) {
+type CloudChatPageWrapperNextProps = {
+  currentUserId: string;
+  knownModels: KnownModel[];
+};
+
+export function CloudChatPageWrapperNext({
+  currentUserId,
+  knownModels,
+}: CloudChatPageWrapperNextProps) {
   return (
-    <Suspense
-      fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
-    >
-      <CloudChatPage currentUserId={currentUserId} />
+    <Suspense fallback={<div className="h-full" />}>
+      <CloudChatPage currentUserId={currentUserId} knownModels={knownModels} />
     </Suspense>
   );
 }

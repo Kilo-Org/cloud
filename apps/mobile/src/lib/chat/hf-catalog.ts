@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type CatalogModel, GGUF_CATALOG } from './gguf-catalog';
+import { bytesPerParameterOf } from './hf-quant-size';
 
 const HF_ORIGIN = 'https://huggingface.co';
 const HF_LIST = `${HF_ORIGIN}/api/models`;
@@ -14,6 +15,9 @@ const SPLIT_FILE = /-\d{5}-of-\d{5}\.gguf$/i;
 const PROJECTOR_FILE = /mmproj/i;
 const QUANT =
   /(?:^|[-_.])((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|TQ\d_\d|MXFP4(?:_MOE)?|BF16|FP16|F16|F32))(?=[-_.]|$)/i;
+/** Auxiliary weights: not a quantization of the repository's model. */
+const AUXILIARY_FILE =
+  /(?:^|\/)(?:mtp|dflash|draft|adapter|imatrix|lilicorr)[-_.]|\.imatrix\.|[-_.](?:fast)?mtp[-_.]|(?:^|[-_.])embeddings?[-_.](?:UD-)?(?:I?Q\d|TQ\d_\d|MXFP4(?:_MOE)?|BF16|F16|FP16|F32)[^/]*\.gguf$|(?:^|[-_.])embeddings?\.gguf$/i;
 
 const count = z.number().nonnegative().default(0);
 const entries = z.array(z.unknown());
@@ -165,9 +169,40 @@ const resolveUrl = (id: string, revision: string, path: string) =>
 
 export type HfRepoInfo = z.infer<typeof hfRepoInfo>;
 
+/** SPDX ids a card may state, mapped to the license's own display name. */
+const LICENSE_NAMES = {
+  'agpl-3.0': 'AGPL 3.0',
+  'apache-2.0': 'Apache 2.0',
+  'bsd-2-clause': 'BSD 2-Clause',
+  'bsd-3-clause': 'BSD 3-Clause',
+  'cc-by-4.0': 'CC BY 4.0',
+  'cc-by-nc-4.0': 'CC BY-NC 4.0',
+  'cc-by-nc-sa-4.0': 'CC BY-NC-SA 4.0',
+  'cc-by-nc-nd-4.0': 'CC BY-NC-ND 4.0',
+  'cc-by-nd-4.0': 'CC BY-ND 4.0',
+  'cc-by-sa-4.0': 'CC BY-SA 4.0',
+  'cc0-1.0': 'CC0 1.0',
+  'gpl-2.0': 'GPL 2.0',
+  'gpl-3.0': 'GPL 3.0',
+  'lgpl-2.1': 'LGPL 2.1',
+  'lgpl-3.0': 'LGPL 3.0',
+  llama2: 'Llama 2',
+  llama3: 'Llama 3',
+  'llama3.1': 'Llama 3.1',
+  'llama3.2': 'Llama 3.2',
+  'llama3.3': 'Llama 3.3',
+  mit: 'MIT',
+  'mpl-2.0': 'MPL 2.0',
+  'qwen-research': 'Qwen Research',
+  unlicense: 'Unlicense',
+} satisfies Readonly<Record<string, string>>;
+
 function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
   const license = Array.isArray(card?.license) ? card.license[0] : card?.license;
-  return license === 'other' ? (card?.license_name ?? license) : license;
+  const named = license === 'other' ? (card?.license_name ?? license) : license;
+  return named === undefined
+    ? undefined
+    : LICENSE_NAMES[named.toLowerCase() as keyof typeof LICENSE_NAMES] || named;
 }
 
 function quantOf(path: string): string | undefined {
@@ -204,20 +239,39 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
 }
 
 /**
- * The model files, smallest first. When the repository names its
- * quantizations, a file without one is a draft model or an importance matrix,
- * not a quantization of the model.
+ * The model files, smallest first. Auxiliary weights (MTP, draft, adapter,
+ * importance matrix, embedding) are never the model, and neither is a file far
+ * too small for the stated parameters at its quantization's bytes per weight.
+ * The 0.65 factor leaves room for tied embeddings and a smaller vocabulary; a
+ * file without a quantization name, or a repository with no stated parameter
+ * count, is not judged.
  */
-function quantFiles(files: readonly HfFile[]): readonly HfFile[] {
-  const models = files.filter(file => !PROJECTOR_FILE.test(file.path));
+function quantFiles(files: readonly HfFile[], parameters: number | undefined): readonly HfFile[] {
+  const models = files.filter(file => {
+    if (PROJECTOR_FILE.test(file.path) || AUXILIARY_FILE.test(file.path)) {
+      return false;
+    }
+    if (parameters === undefined) {
+      return true;
+    }
+    const quant = quantOf(file.path);
+    const bytesPerParameter = quant === undefined ? undefined : bytesPerParameterOf(quant);
+    return (
+      bytesPerParameter === undefined || file.sizeBytes >= parameters * bytesPerParameter * 0.65
+    );
+  });
   const named = models.filter(file => quantOf(file.path) !== undefined);
   return named.length > 0 ? named : models;
 }
 
-/** The bytes of the smallest quantization and its projector: the best fit the repository offers. */
-export function smallestDownloadBytes(tree: unknown): number | undefined {
+/**
+ * The bytes of the smallest quantization and its projector: the best fit the
+ * repository offers. The parameter count filters files that cannot be the
+ * model the entry claims to be.
+ */
+export function smallestDownloadBytes(tree: unknown, parameters?: number): number | undefined {
   const files = ggufFiles(tree);
-  const [smallest] = quantFiles(files);
+  const [smallest] = quantFiles(files, parameters);
   if (smallest === undefined) {
     return undefined;
   }
@@ -247,7 +301,7 @@ export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail 
   const projectors = files.filter(file => PROJECTOR_FILE.test(file.path));
   const license = licenseOf(info.cardData);
   const name = hfModelName(info.id);
-  const quants = quantFiles(files).map((file): HfQuant => {
+  const quants = quantFiles(files, info.gguf?.total).map((file): HfQuant => {
     const label = quantLabel(file.path);
     const curated = CURATED.get(file.sha256);
     if (curated !== undefined) {

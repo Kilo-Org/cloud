@@ -2,7 +2,7 @@ import {
   agent_environment_profiles,
   agent_environment_profile_repo_bindings,
 } from '@kilocode/db/schema';
-import { eq, and, sql, isNotNull, count } from 'drizzle-orm';
+import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import type { ProfileDatabase, ProfileOwner, RepositoryPlatform } from './types';
 
 export function canonicalRepoFullName(repoFullName: string): string {
@@ -126,18 +126,6 @@ export async function deleteBindingForRepo(
         buildBindingOwnerCondition(owner)
       )
     );
-}
-
-/** Number of repository bindings that reference a profile. */
-export async function countBindingsForProfile(
-  db: ProfileDatabase,
-  profileId: string
-): Promise<number> {
-  const [row] = await db
-    .select({ value: count() })
-    .from(agent_environment_profile_repo_bindings)
-    .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
-  return Number(row?.value ?? 0);
 }
 
 /**

@@ -3,11 +3,16 @@ import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
+  OrganizationFeaturesInputSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
-import type { GatewayConfig } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import type {
+  GatewayConfig,
+  OrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -23,30 +28,44 @@ async function readConfig(): Promise<GatewayConfig> {
   }
 }
 
+/** Each admin form owns some keys of the stored configuration, so a save must keep the others. */
+async function mergeIntoConfig(values: Record<string, unknown>): Promise<void> {
+  await db
+    .insert(ai_gateway_config)
+    .values({ config: values })
+    .onConflictDoUpdate({
+      target: ai_gateway_config.id,
+      set: { config: sql`${ai_gateway_config.config} || ${JSON.stringify(values)}::jsonb` },
+    });
+}
+
 export const adminGatewayConfigRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
     return readConfig();
   }),
 
   set: adminProcedure.input(GatewayConfigInputSchema).mutation(async ({ input, ctx }) => {
-    const optOutModels = [
-      ...new Set(
-        input.vercel_routing_opt_out_models.map(model => model.trim().toLowerCase()).filter(Boolean)
-      ),
-    ];
     const config: GatewayConfig = {
-      vercel_routing_percentage: input.vercel_routing_percentage,
-      vercel_routing_percentage_free: input.vercel_routing_percentage_free,
-      vercel_routing_opt_out_models: optOutModels,
+      vercel_routing_enabled: input.vercel_routing_enabled,
+      vercel_routing_opt_out_models: input.vercel_routing_opt_out_models,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,
       note: input.note,
     };
-    await db.insert(ai_gateway_config).values({ config }).onConflictDoUpdate({
-      target: ai_gateway_config.id,
-      set: { config },
-    });
+    await mergeIntoConfig(config);
     return config;
   }),
+
+  getOrganizationFeatures: adminProcedure.query(async () => {
+    return readOrganizationFeatures(db);
+  }),
+
+  setOrganizationFeatures: adminProcedure
+    .input(OrganizationFeaturesInputSchema)
+    .mutation(async ({ input }) => {
+      const organization_features: OrganizationFeatures = input;
+      await mergeIntoConfig({ organization_features });
+      return organization_features;
+    }),
 });

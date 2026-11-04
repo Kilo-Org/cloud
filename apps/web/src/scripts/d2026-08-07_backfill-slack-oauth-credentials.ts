@@ -1,24 +1,26 @@
 /**
- * Backfills existing plaintext Slack bot tokens from
- * `platform_integrations.metadata.access_token` into the encrypted
- * `slack_oauth_credentials` store.
+ * Brings existing Slack integrations onto the encrypted `slack_oauth_credentials`
+ * store.
  *
- * This is Step 2 of the Slack bot token remediation. It is additive only: the
- * plaintext copy is left in place, and nothing reads the new store yet. Deleting the
- * plaintext copy happens in a later step, after reads have moved over and been
- * verified.
+ * Pass one writes a credential row for integrations that have none. It is idempotent:
+ * integrations that already have a credential row are skipped rather than
+ * re-encrypted, so re-running does not churn `credential_version` (each bump
+ * invalidates the previous ciphertext, since the version is inside the AAD). The skip
+ * is enforced by the write itself, so a credential written mid-run is kept.
  *
- * Idempotent by design: integrations that already have a credential row are skipped
- * rather than re-encrypted, so re-running does not churn `credential_version` (each
- * bump invalidates the previous ciphertext, since the version is inside the AAD). The
- * skip is enforced by the write itself, so a reinstall that lands mid-run keeps its
- * fresh token instead of being overwritten by this run's older metadata snapshot.
+ * Pass two runs by default with --execute (opt out with --no-normalize) and applies
+ * only to integrations whose stored credential is current: either this run wrote it,
+ * or it decrypts to the value the integration records. Anything else is reported and
+ * left unchanged, so the operation is safe to re-run after the reported rows are
+ * resolved. Run this only after the release whose read paths use the credential
+ * store.
  *
- * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints token material.
+ * Requires SLACK_CREDENTIAL_KEYSET_JSON. Never prints credential material.
  *
  * Usage:
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts
  *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute
+ *   pnpm --filter web script src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts --execute --no-normalize
  */
 
 import '../lib/load-env';
@@ -26,25 +28,35 @@ import '../lib/load-env';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
+import type { SlackOAuthCredential } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
-import { createSlackCredentialIfAbsent } from '@/lib/integrations/platforms/slack/credential-store';
+import {
+  createSlackCredentialIfAbsent,
+  decryptSlackBotToken,
+  getSlackCredentialByIntegrationId,
+} from '@/lib/integrations/platforms/slack/credential-store';
 import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
 
 type SkipReason =
   | 'already_migrated'
-  | 'no_plaintext_token'
+  | 'no_metadata_credential'
   | 'no_owner'
   | 'no_team_id'
-  | 'write_failed';
+  | 'write_failed'
+  | 'normalize_not_current'
+  | 'normalize_failed';
 
-function parseArgs(): { execute: boolean; batchSize: number } {
+function parseArgs(): { execute: boolean; normalize: boolean; batchSize: number } {
   let execute = false;
+  let normalize = true;
   let batchSize = 200;
 
   for (const arg of process.argv.slice(2)) {
     if (arg === '--execute') {
       execute = true;
+    } else if (arg === '--no-normalize') {
+      normalize = false;
     } else if (arg.startsWith('--batch-size=')) {
       const parsed = Number(arg.slice('--batch-size='.length));
       if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -56,18 +68,18 @@ function parseArgs(): { execute: boolean; batchSize: number } {
     }
   }
 
-  return { execute, batchSize };
+  return { execute, normalize, batchSize };
 }
 
-function readPlaintextToken(metadata: unknown): string | null {
+function readMetadataCredential(metadata: unknown): string | null {
   if (metadata === null || typeof metadata !== 'object') return null;
   if (!('access_token' in metadata)) return null;
-  const value = (metadata as { access_token?: unknown }).access_token;
+  const value = metadata.access_token;
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 async function main(): Promise<void> {
-  const { execute, batchSize } = parseArgs();
+  const { execute, normalize, batchSize } = parseArgs();
 
   // Fail fast rather than discovering a bad keyset partway through a run.
   const { active } = requireSlackCredentialKeyset();
@@ -96,20 +108,27 @@ async function main(): Promise<void> {
 
   const skipped: Record<SkipReason, number> = {
     already_migrated: 0,
-    no_plaintext_token: 0,
+    no_metadata_credential: 0,
     no_owner: 0,
     no_team_id: 0,
     write_failed: 0,
+    normalize_not_current: 0,
+    normalize_failed: 0,
   };
   let migrated = 0;
   let eligible = 0;
+  let normalized = 0;
+  // Integrations whose credential row this run can vouch for: either the row was
+  // written by this run, or it decrypts to the metadata value (checked below).
+  // Only these are eligible for the normalization pass.
+  const normalizationCandidateIds = new Set<string>();
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
     const batch = integrations.slice(offset, offset + batchSize);
 
     // Cheap pre-filter only: it avoids opening a transaction per already-migrated
     // integration. `createSlackCredentialIfAbsent` is what actually guarantees we never
-    // replace a row, since this snapshot can go stale before the write.
+    // replace a row, since the metadata can change between this read and the write.
     const existingRows = await db
       .select({ integrationId: slack_oauth_credentials.platform_integration_id })
       .from(slack_oauth_credentials)
@@ -124,12 +143,31 @@ async function main(): Promise<void> {
     for (const integration of batch) {
       if (alreadyMigrated.has(integration.id)) {
         skipped.already_migrated += 1;
+        // Only rows whose stored credential is current qualify for the second pass.
+        // The comparison below admits the row on an exact match; any other result
+        // keeps it unchanged.
+        if (execute && normalize && readMetadataCredential(integration.metadata)) {
+          const fresh = await storedCredentialMatches(integration.id, integration);
+          if (fresh === true) {
+            normalizationCandidateIds.add(integration.id);
+          } else if (fresh === false) {
+            skipped.normalize_not_current += 1;
+            console.warn(
+              `Left metadata unchanged for integration ${integration.id}: stored credential does not match it`
+            );
+          } else {
+            skipped.normalize_failed += 1;
+            console.warn(
+              `Left metadata unchanged for integration ${integration.id}: stored credential could not be read`
+            );
+          }
+        }
         continue;
       }
 
-      const botToken = readPlaintextToken(integration.metadata);
+      const botToken = readMetadataCredential(integration.metadata);
       if (!botToken) {
-        skipped.no_plaintext_token += 1;
+        skipped.no_metadata_credential += 1;
         continue;
       }
 
@@ -163,12 +201,44 @@ async function main(): Promise<void> {
           skipped.already_migrated += 1;
         } else {
           migrated += 1;
+          normalizationCandidateIds.add(integration.id);
         }
       } catch (error) {
         skipped.write_failed += 1;
         // Message only: the stack of an encryption failure can carry key material.
         console.error(
           `Failed integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
+    }
+  }
+
+  // Pass two: finalize the integration row for every eligible integration.
+  // - A row is eligible only when its stored credential is current: this run wrote it,
+  //   or the stored credential decrypts to the same value. Every other row is reported
+  //   and left unchanged so the script can be repeated after it is resolved.
+  // The update changes only that key (`jsonb -`), so concurrent writes to other
+  // metadata fields between the snapshot above and this update survive.
+  if (execute && normalize) {
+    for (const integration of integrations) {
+      if (!normalizationCandidateIds.has(integration.id)) continue;
+      const metadata = integration.metadata;
+      if (metadata === null || typeof metadata !== 'object') continue;
+      if (!('access_token' in metadata)) continue;
+
+      try {
+        await db
+          .update(platform_integrations)
+          .set({
+            metadata: sql`${platform_integrations.metadata} - 'access_token'`,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, integration.id));
+        normalized += 1;
+      } catch (error) {
+        skipped.normalize_failed += 1;
+        console.error(
+          `Failed to normalize integration ${integration.id}: ${error instanceof Error ? error.message : 'unknown error'}`
         );
       }
     }
@@ -181,8 +251,11 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
+  console.log(`Metadata fields normalized:  ${normalized}`);
+  console.log(`Kept (credential not current): ${skipped.normalize_not_current}`);
+  console.log(`Failed normalizations:       ${skipped.normalize_failed}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
-  console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);
+  console.log(`Skipped (no metadata value): ${skipped.no_metadata_credential}`);
   console.log(`Skipped (no owner):          ${skipped.no_owner}`);
   console.log(`Skipped (no team ID):        ${skipped.no_team_id}`);
   console.log(`Failed writes:               ${skipped.write_failed}`);
@@ -211,8 +284,44 @@ function readOwner(integration: {
 function readBotUserId(metadata: unknown): string | null {
   if (metadata === null || typeof metadata !== 'object') return null;
   if (!('bot_user_id' in metadata)) return null;
-  const value = (metadata as { bot_user_id?: unknown }).bot_user_id;
+  const value = metadata.bot_user_id;
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Whether the integration's stored credential is exactly its current metadata value.
+ *
+ * Returns true on an exact match, false when the credential row is absent, revoked,
+ * or the integration has no exclusive owner, and null when the row could not be
+ * read. The caller reports the distinction so each outcome gets the right follow-up.
+ * Never logs or prints credential material.
+ */
+async function storedCredentialMatches(
+  integrationId: string,
+  integration: {
+    owned_by_organization_id: string | null;
+    owned_by_user_id: string | null;
+    metadata: unknown;
+  }
+): Promise<boolean | null> {
+  const botToken = readMetadataCredential(integration.metadata);
+  if (!botToken) return false;
+  const owner = readOwner(integration);
+  if (!owner) return false;
+
+  let credential: SlackOAuthCredential | null;
+  try {
+    credential = await getSlackCredentialByIntegrationId(integrationId);
+  } catch {
+    return null;
+  }
+  if (!credential) return false;
+
+  try {
+    return decryptSlackBotToken(credential, owner) === botToken;
+  } catch {
+    return null;
+  }
 }
 
 void main()

@@ -16,8 +16,8 @@ import type {
   PreparationStepSnapshot,
 } from './types';
 import {
-  cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
+  isValidCloudAgentEvent,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
   messagePartUpdatedDataSchema,
@@ -35,6 +35,7 @@ import {
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
+  permissionAskedIdentitySchema,
   permissionRepliedDataSchema,
   suggestionShownDataSchema,
   suggestionAcceptedDataSchema,
@@ -102,6 +103,16 @@ export type ServiceEvent =
       metadata: Record<string, unknown>;
       always: string[];
     }
+  | {
+      /**
+       * A permission request is waiting that this app cannot read: its scope
+       * did not parse, so no consent card can be offered for it. The request is
+       * still pending for the CLI, so the user is told it exists rather than
+       * seeing it vanish.
+       */
+      type: 'permission.unreadable';
+      requestId: string;
+    }
   | { type: 'permission.replied'; requestId: string }
   | {
       type: 'suggestion.shown';
@@ -162,6 +173,7 @@ export type ServiceEvent =
   | { type: 'autocommit_started'; messageId: string; message?: string | undefined }
   | {
       type: 'autocommit_completed';
+      repository?: string | undefined;
       messageId: string;
       success: boolean;
       message?: string | undefined;
@@ -450,7 +462,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'question.asked',
         requestId: r.data.id,
-        questions: r.data.questions as QuestionInfo[] | undefined,
+        questions: r.data.questions,
       };
     }
 
@@ -468,15 +480,23 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'permission.asked',
-        requestId: r.data.id,
-        permission: r.data.permission,
-        patterns: r.data.patterns,
-        metadata: r.data.metadata,
-        always: r.data.always,
-      };
+      if (r.success) {
+        return {
+          type: 'permission.asked',
+          requestId: r.data.id,
+          permission: r.data.permission,
+          patterns: r.data.patterns,
+          metadata: r.data.metadata,
+          always: r.data.always,
+        };
+      }
+      // A request whose scope does not parse cannot be offered as a decision:
+      // forwarding an empty scope would describe settings the app never read.
+      // It is not dropped either, because the CLI keeps waiting for an answer
+      // the app would otherwise never mention.
+      const identity = permissionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
+      return { type: 'permission.unreadable', requestId: identity.data.id };
     }
 
     case 'permission.replied': {
@@ -585,6 +605,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'autocommit_completed',
+        repository: r.data.repository,
         messageId: r.data.messageId,
         success: r.data.success,
         message: r.data.message,
@@ -708,7 +729,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
  * Returns null for invalid or unrecognized events.
  */
 export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
-  if (!cloudAgentEventSchema.safeParse(raw).success) return null;
+  if (!isValidCloudAgentEvent(raw)) return null;
 
   if (raw.streamEventType === 'cloud.worktree.changes.ready') {
     const r = cloudWorktreeChangesReadyDataSchema.safeParse(raw.data);
@@ -733,9 +754,10 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event?.type === 'autocommit_completed' &&
-    event.commitHash &&
-    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+  // Only a completion that carries a storable commit hash gets the envelope
+  // timestamp the commit record is anchored to. The schema already dropped a
+  // hash that could not be stored, so its presence is the whole test.
+  return event?.type === 'autocommit_completed' && event.commitHash !== undefined
     ? { ...event, timestamp: raw.timestamp }
     : event;
 }

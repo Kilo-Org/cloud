@@ -7,8 +7,10 @@ import { eq } from 'drizzle-orm';
 import {
   disconnectGitHubUserAuthorization,
   exchangeAndStoreGitHubUserAuthorization,
+  revokeStoredGitHubUserAuthorization,
 } from './user-authorization';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
+import { evictGitHubUserAccessTokenCache } from './user-token-client';
 
 const mockGetAuthenticated = jest.fn();
 const mockEncryptKeyedEnvelope = jest.fn(
@@ -17,6 +19,7 @@ const mockEncryptKeyedEnvelope = jest.fn(
 const mockDisconnectStoredGitHubUserAuthorization = jest.mocked(
   disconnectStoredGitHubUserAuthorization
 );
+const mockEvictGitHubUserAccessTokenCache = jest.mocked(evictGitHubUserAccessTokenCache);
 const mockTokenEncryptionConfig = {
   keyId: 'github-token-key-v1',
   publicKey: Buffer.from('test-public-key').toString('base64'),
@@ -57,6 +60,10 @@ jest.mock('./user-authorization-client', () => ({
   disconnectStoredGitHubUserAuthorization: jest.fn(),
 }));
 
+jest.mock('./user-token-client', () => ({
+  evictGitHubUserAccessTokenCache: jest.fn(),
+}));
+
 function exchangeResponse() {
   return Response.json({
     access_token: 'new-access-token',
@@ -92,6 +99,8 @@ describe('GitHub user authorization', () => {
         codeVerifier: 'code-verifier',
       })
     ).resolves.toEqual({ status: 'connected', githubLogin: 'octocat' });
+
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
 
     const accessAad = `github-user-authorization:v1:${user.id}:standard:101:access`;
     const refreshAad = `github-user-authorization:v1:${user.id}:standard:101:refresh`;
@@ -181,6 +190,7 @@ describe('GitHub user authorization', () => {
     await disconnectGitHubUserAuthorization(user.id);
 
     expect(mockDisconnectStoredGitHubUserAuthorization).toHaveBeenCalledWith(user.id);
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
     expect(fetchMock).not.toHaveBeenCalled();
     await expect(
       db
@@ -197,9 +207,47 @@ describe('GitHub user authorization', () => {
 
     await expect(disconnectGitHubUserAuthorization(user.id)).rejects.toThrow(serviceError);
 
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
     expect(captureException).toHaveBeenCalledWith(serviceError, {
       tags: { source: 'github_user_authorization_disconnect' },
     });
+  });
+
+  it('revokes the stored authorization and evicts the cached credential for its Kilo user', async () => {
+    const user = await insertTestUser();
+    await db.insert(user_github_app_tokens).values({
+      kilo_user_id: user.id,
+      github_app_type: 'standard',
+      github_user_id: '101',
+      github_login: 'octocat',
+      access_token_encrypted: 'opaque-access-envelope',
+      access_token_expires_at: '2030-01-01T00:00:00.000Z',
+      refresh_token_encrypted: 'opaque-refresh-envelope',
+      refresh_token_expires_at: '2030-01-01T00:00:00.000Z',
+    });
+
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'standard', 'github_app_authorization')
+    ).resolves.toEqual({ kiloUserId: user.id });
+
+    expect(mockEvictGitHubUserAccessTokenCache).toHaveBeenCalledWith(user.id);
+    const [authorization] = await db
+      .select()
+      .from(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.kilo_user_id, user.id));
+    expect(authorization?.revoked_at).not.toBeNull();
+    expect(authorization?.revocation_reason).toBe('github_app_authorization');
+  });
+
+  it('does not evict when the revocation matches no standard authorization', async () => {
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'standard', 'github_app_authorization')
+    ).resolves.toBeNull();
+    await expect(
+      revokeStoredGitHubUserAuthorization('101', 'lite', 'github_app_authorization')
+    ).resolves.toBeNull();
+
+    expect(mockEvictGitHubUserAccessTokenCache).not.toHaveBeenCalled();
   });
 
   it('revokes the transient callback grant when replacing an existing identity', async () => {

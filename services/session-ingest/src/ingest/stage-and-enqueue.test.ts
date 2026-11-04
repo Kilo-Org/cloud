@@ -81,3 +81,32 @@ describe('stageAndEnqueue', () => {
     expect(new TextDecoder().decode(body)).toBe('{"data":[]}');
   });
 });
+
+describe('bounded stageAndEnqueue', () => {
+  it('sends a bounded stream to the storage method without buffering it', async () => {
+    const stageBoundedR2Object = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ stageBoundedR2Object } as never);
+    const body = new Blob([encoder.encode('streamed')]).stream();
+
+    await expect(stageAndEnqueue(makeEnv(), params, body, undefined, 1024)).resolves.toBe(true);
+
+    expect(stageBoundedR2Object).toHaveBeenCalledWith(
+      { kiloUserId: params.kiloUserId, sessionId: params.sessionId, key: params.r2Key },
+      body,
+      1024
+    );
+  });
+
+  it('converts the storage byte-limit result into a staging overflow', async () => {
+    const stageBoundedR2Object = vi.fn(async () => 'too_large' as const);
+    const send = vi.fn(async () => undefined);
+    const env = { ...makeEnv(), INGEST_QUEUE: { send } } as unknown as Env;
+    vi.mocked(getSessionIngestDO).mockReturnValue({ stageBoundedR2Object } as never);
+    const body = new Blob([encoder.encode('streamed')]).stream();
+
+    await expect(stageAndEnqueue(env, params, body, undefined, 4)).rejects.toThrow(
+      'Ingest body exceeds the staging byte budget'
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+});

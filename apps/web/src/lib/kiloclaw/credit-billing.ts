@@ -4,6 +4,7 @@ import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
@@ -485,9 +486,12 @@ export async function applyStripeFundedKiloClawPeriod(
   let settlementWasDuplicate = false;
 
   await db.transaction(async tx => {
-    const user = await tx.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, userId),
-    });
+    const [user] = await tx
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .for('update')
+      .limit(1);
 
     if (!user) {
       logWarning('User not found for credit settlement', {
@@ -562,15 +566,55 @@ export async function applyStripeFundedKiloClawPeriod(
       return;
     }
 
-    if (stripeOwnerRow && stripeOwnerRow.subscription.id !== resolvedTarget.subscription.id) {
-      await clearTransferredSettlementStripeOwnership({
-        tx,
-        row: stripeOwnerRow,
-        reason: 'stripe_invoice_settlement_reconciled_to_successor',
+    const [targetRow] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, resolvedTarget.subscription.id))
+      .for('update')
+      .limit(1);
+    if (
+      !targetRow ||
+      targetRow.user_id !== userId ||
+      targetRow.instance_id !== resolvedTarget.subscription.instance_id ||
+      targetRow.transferred_to_subscription_id !== null
+    ) {
+      logWarning('Stripe-funded settlement quarantined: target changed during resolution', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        subscription_id: resolvedTarget.subscription.id,
       });
+      return;
     }
-
-    const targetRow = resolvedTarget.subscription;
+    if (
+      targetRow.stripe_subscription_id !== null &&
+      targetRow.stripe_subscription_id !== stripeSubscriptionId
+    ) {
+      const confirmedAt = Date.parse(params.checkoutConfirmedAt ?? '');
+      const isConfirmedCanceledRejoin =
+        targetRow.status === 'canceled' &&
+        metadataInstanceId === targetRow.instance_id &&
+        plan === 'standard' &&
+        priceVersion ===
+          resolveKiloClawEnrollmentPriceVersion({
+            status: targetRow.status,
+            kiloclawPriceVersion: targetRow.kiloclaw_price_version,
+          }) &&
+        Number.isFinite(confirmedAt) &&
+        (targetRow.current_period_start === null ||
+          confirmedAt >= Date.parse(targetRow.current_period_start));
+      if (!isConfirmedCanceledRejoin) {
+        logWarning(
+          'Stripe-funded settlement quarantined: target belongs to another Stripe subscription',
+          {
+            user_id: userId,
+            stripe_subscription_id: stripeSubscriptionId,
+            subscription_id: targetRow.id,
+            current_stripe_subscription_id: targetRow.stripe_subscription_id,
+          }
+        );
+        return;
+      }
+    }
     if (targetRow.kiloclaw_price_version !== priceVersion) {
       logWarning('Stripe-funded settlement quarantined: invoice price version mismatch', {
         user_id: userId,
@@ -580,6 +624,14 @@ export async function applyStripeFundedKiloClawPeriod(
         invoice_price_version: priceVersion,
       });
       return;
+    }
+
+    if (stripeOwnerRow && stripeOwnerRow.subscription.id !== resolvedTarget.subscription.id) {
+      await clearTransferredSettlementStripeOwnership({
+        tx,
+        row: stripeOwnerRow,
+        reason: 'stripe_invoice_settlement_reconciled_to_successor',
+      });
     }
 
     wasSuspended = !!targetRow.suspended_at;
@@ -631,6 +683,7 @@ export async function applyStripeFundedKiloClawPeriod(
         skipPostTopUpFreeStuff: true,
         dbOrTx: tx,
         creditDescription: `KiloClaw ${plan} settlement`,
+        paidCredit: { source: 'settlement', purchasedAt: periodStart },
       }
     );
 
@@ -684,6 +737,8 @@ export async function applyStripeFundedKiloClawPeriod(
           kilo_user_id: userId,
           amount_microdollars: -amountMicrodollars,
           is_free: false,
+          paid_credit_policy: 'settlement',
+          credit_source: 'settlement',
           description: `KiloClaw ${plan} period deduction`,
           credit_category: deductionCategory,
           check_category_uniqueness: true,
@@ -711,6 +766,8 @@ export async function applyStripeFundedKiloClawPeriod(
           kilo_user_id: userId,
           amount_microdollars: -amountMicrodollars,
           is_free: false,
+          paid_credit_policy: 'settlement',
+          credit_source: 'settlement',
           description: `KiloClaw ${plan} period deduction`,
           credit_category: deductionCategory,
           check_category_uniqueness: true,
@@ -1472,7 +1529,12 @@ export async function enrollWithCredits(params: {
       effectiveThreshold !== null && projectedUsage >= effectiveThreshold
         ? await getKiloPassStateForUser(tx, userId, { forUpdate: true })
         : null;
-    const balance = user.total_microdollars_acquired - user.microdollars_used;
+    const creditState = await reconcileCreditExpirationsInTransaction(
+      { type: 'user', id: userId },
+      tx,
+      now
+    );
+    const balance = creditState.total_microdollars_acquired - creditState.microdollars_used;
     const { effectiveBalanceMicrodollars: effectiveBalance } =
       await getEffectiveCreditBalancePreview({
         userId,

@@ -4,13 +4,12 @@
  * `formatDirectByokModelId` in
  * packages/web-shared/src/lib/ai-gateway/providers/direct-byok/index.ts.
  *
- * Source of truth is `DIRECT_BYOK_PROVIDERS_META` in
- * packages/web-shared/src/lib/ai-gateway/providers/direct-byok/direct-byok-meta.ts.
- * This copy exists because Cloudflare Workers cannot import from apps/web.
- * A drift-guard test keeps the two lists equal.
+ * This is the source of truth: it lives here so Cloudflare Workers can use it,
+ * and web-shared derives its direct BYOK schema and display names from it.
  */
 export const DIRECT_BYOK_PROVIDER_IDS = [
   'alibaba-token-plan',
+  'bedrock-byok',
   'byteplus-coding',
   'chutes-byok',
   'edenai',
@@ -24,10 +23,13 @@ export const DIRECT_BYOK_PROVIDER_IDS = [
   'opencode-go',
   'orcarouter',
   'synthetic',
+  'vertex-byok',
   'xiaomi-token-plan-ams',
   'xiaomi-token-plan-sgp',
   'zai-coding',
 ] as const;
+
+export type DirectByokProviderId = (typeof DIRECT_BYOK_PROVIDER_IDS)[number];
 
 const ids: ReadonlySet<string> = new Set(DIRECT_BYOK_PROVIDER_IDS);
 

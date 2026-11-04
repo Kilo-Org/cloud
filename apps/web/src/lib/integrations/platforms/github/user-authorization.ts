@@ -8,6 +8,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { getGitHubAppCredentials, type GitHubAppType } from './app-selector';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
+import { evictGitHubUserAccessTokenCache } from './user-token-client';
 import { encryptUserGithubTokenEnvelope } from './user-token-envelope';
 
 const GitHubUserTokenResponseSchema = z.object({
@@ -139,7 +140,7 @@ export async function exchangeAndStoreGitHubUserAuthorization(input: {
   const githubUserId = user.id.toString();
 
   try {
-    return await db.transaction(async tx => {
+    const result: StoreGitHubUserAuthorizationResult = await db.transaction(async tx => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${authorizationGrantLockKey(githubUserId)}))`
       );
@@ -221,6 +222,11 @@ export async function exchangeAndStoreGitHubUserAuthorization(input: {
       }
       return { status: 'connected', githubLogin: currentUser.login };
     });
+    if (result.status === 'connected') {
+      // A stored grant replaces whatever the process had cached for this user.
+      evictGitHubUserAccessTokenCache(input.kiloUserId);
+    }
+    return result;
   } catch (error) {
     const [conflict] = await withDevelopmentFailureStage('credential_conflict_lookup_failed', () =>
       db
@@ -305,6 +311,10 @@ export async function disconnectGitHubUserAuthorization(kiloUserId: string): Pro
       tags: { source: 'github_user_authorization_disconnect' },
     });
     throw error;
+  } finally {
+    // The authorization may be gone even when the disconnect request failed
+    // partway, so the local cache entry is never trusted afterwards.
+    evictGitHubUserAccessTokenCache(kiloUserId);
   }
 }
 
@@ -324,5 +334,7 @@ export async function revokeStoredGitHubUserAuthorization(
       )
     )
     .returning({ kiloUserId: user_github_app_tokens.kilo_user_id });
-  return authorization ?? null;
+  if (!authorization) return null;
+  evictGitHubUserAccessTokenCache(authorization.kiloUserId);
+  return authorization;
 }

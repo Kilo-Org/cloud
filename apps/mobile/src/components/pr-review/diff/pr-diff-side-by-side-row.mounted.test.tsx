@@ -114,6 +114,28 @@ describe('SideBySideRow code direction', () => {
   });
 });
 
+describe('SideBySideRow column numbers', () => {
+  // Each column carries its own file's numbering — the left column the old
+  // number, the right column the new one — and the row's spoken label names
+  // the line text only, so no column draws a number the label contradicts.
+  // This pins that split so a single-gutter refactor cannot reintroduce it.
+  it('shows the old number on the left and the new number on the right', () => {
+    const contextLine = line({ type: 'context', oldLine: 4, newLine: 6 });
+    const renderer = mountRow({ left: { line: contextLine }, right: { line: contextLine } });
+
+    const gutterTexts = renderer.root
+      .findAll(
+        node =>
+          node.type === ('RNText' as never) &&
+          typeof node.props.children === 'string' &&
+          /^\d+$/.test(node.props.children)
+      )
+      .map(node => node.props.children as string);
+
+    expect(gutterTexts).toEqual(['4', '6']);
+  });
+});
+
 describe('SideBySideRow gutter alignment', () => {
   // Same defect class as the unified DiffLine gutter: a wrapped code line
   // makes the column several visual lines tall, and a centered number would

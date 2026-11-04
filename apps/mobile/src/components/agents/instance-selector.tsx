@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils';
 
 type InstanceSelectorProps = {
   /**
-   * `null` means the user has the default Cloud Agent target selected.
+   * `null` means the user has the default Cloud Agent target selected, or —
+   * with `pendingComputer` — the computer target with no computer bound yet.
    * Any non-null value is a live `kilo remote` CLI instance the picker
    * chose.
    */
@@ -25,6 +26,12 @@ type InstanceSelectorProps = {
    */
   instances: InstancePickerInstance[];
   isLoading: boolean;
+  /**
+   * The computer target is selected with no computer bound yet (the tour's
+   * computer path with zero connected computers): the closed selector names
+   * that state instead of the Cloud Agent default.
+   */
+  pendingComputer?: boolean;
   onChange: (value: InstancePickerInstance | null) => void;
   disabled?: boolean;
 };
@@ -32,15 +39,20 @@ type InstanceSelectorProps = {
 function selectorLabel({
   value,
   isLoading,
+  pendingComputer = false,
 }: {
   value: InstancePickerInstance | null;
   isLoading: boolean;
+  pendingComputer?: boolean;
 }): string {
   if (value) {
     return formatInstanceTarget(value);
   }
   if (isLoading) {
     return i18n.t('common.loading');
+  }
+  if (pendingComputer) {
+    return i18n.t('agentChat.instancePicker.noCliInstances');
   }
   return cloudAgentTargetLabel();
 }
@@ -49,6 +61,7 @@ export function InstanceSelector({
   value,
   instances,
   isLoading,
+  pendingComputer,
   onChange,
   disabled = false,
 }: Readonly<InstanceSelectorProps>) {
@@ -59,7 +72,12 @@ export function InstanceSelector({
   // The Cloud Agent default is always selectable, even when the list is
   // loading or empty — only the "open the picker" path is gated.
   const canOpenPicker = !disabled;
-  const label = selectorLabel({ value, isLoading });
+  const label = selectorLabel({ value, isLoading, pendingComputer });
+  // A target is selected in every state but the loading copy and the unbound
+  // computer: the Cloud Agent default is a real value, not a placeholder, so it
+  // takes the same foreground ink as a bound instance. Placeholder ink would
+  // read as "nothing chosen yet" beside the account value above it.
+  const isPlaceholder = value === null && (isLoading || pendingComputer);
 
   function handlePress() {
     if (!canOpenPicker) {
@@ -68,6 +86,7 @@ export function InstanceSelector({
     instancePickerSlot.set(UNFENCED_ROUTE_KEY, {
       instances,
       currentValue: value,
+      pendingComputer: pendingComputer && value === null,
       onSelect: onChange,
     });
     // See ModelSelector: the sheet never re-anchors after the keyboard hides,
@@ -89,7 +108,10 @@ export function InstanceSelector({
       )}
     >
       <Text
-        className={cn('flex-1 text-base', value ? 'text-foreground' : 'text-muted-foreground')}
+        className={cn(
+          'flex-1 text-base',
+          isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
+        )}
         numberOfLines={1}
       >
         {label}

@@ -4,6 +4,8 @@ import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server'
 import { DeviceAuthClient } from './DeviceAuthClient';
 import { buildDeviceAuthPath, isDeviceAuthAppMode } from './device-auth-url';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
+import { getDeviceAuthRequest, isDeviceAuthRequestExpired } from '@/lib/device-auth/device-auth';
+import { requestingClientOfRow, type RequestingClient } from '@/lib/device-auth/requesting-client';
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -16,6 +18,17 @@ const deviceAuthSearchParamsSchema = z.object({
   }, z.string().min(1).optional()),
   app: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+/**
+ * The OAuth client this request asks to connect, or null when the request
+ * names none (or is no longer actionable). The approver sees it and confirms
+ * it before the request is approved.
+ */
+async function loadRequestingClient(code: string): Promise<RequestingClient | null> {
+  const request = await getDeviceAuthRequest(code);
+  if (!request || isDeviceAuthRequestExpired(request)) return null;
+  return requestingClientOfRow(request);
+}
 
 export default async function DeviceAuthPage({ searchParams }: PageProps) {
   const params = deviceAuthSearchParamsSchema.parse(await searchParams);
@@ -34,12 +47,14 @@ export default async function DeviceAuthPage({ searchParams }: PageProps) {
   );
 
   const viewerToken = createDeviceAuthViewerToken(code, user.id);
+  const requestingClient = await loadRequestingClient(code);
 
   return (
     <DeviceAuthClient
       code={code}
       viewerToken={viewerToken}
       isAppMode={isAppMode}
+      requestingClient={requestingClient}
       user={{
         name: user.google_user_name,
         email: user.google_user_email,

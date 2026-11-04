@@ -28,8 +28,16 @@ import {
 } from '@kilocode/db/schema-types';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
+import {
+  resolvePaidCreditPolicy,
+  type PaidCreditGrant,
+  type PaidCreditTerms,
+} from '@kilocode/web-shared/lib/paidCreditPolicy';
 import {
   bridgeRatio,
+  issuanceBasis,
   monthlyWindowFromOriginalAnchor,
   monthlyWindowContaining,
   roundHalfUpMicrodollars,
@@ -494,6 +502,40 @@ export async function createPendingAgreement(input: {
   });
 }
 
+async function paidTermCreditTerms(
+  tx: DrizzleTransaction,
+  agreementId: string,
+  paidFrom: string
+): Promise<PaidCreditTerms> {
+  const [capture] = await tx
+    .select({ terms: kilo_pass_org_audit_records.after_json })
+    .from(kilo_pass_org_audit_records)
+    .where(
+      eq(
+        kilo_pass_org_audit_records.idempotency_key,
+        `paid-credit-terms:${agreementId}:${new Date(paidFrom).toISOString()}`
+      )
+    )
+    .limit(1);
+  if (capture) return capture.terms?.paidCreditTerms === 'one_year' ? 'one_year' : 'legacy';
+  const [credit] = await tx
+    .select({ policy: credit_transactions.paid_credit_policy })
+    .from(kilo_pass_org_issuance_snapshots)
+    .innerJoin(
+      credit_transactions,
+      eq(credit_transactions.id, kilo_pass_org_issuance_snapshots.base_credit_transaction_id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_org_issuance_snapshots.agreement_id, agreementId),
+        sql`${kilo_pass_org_issuance_snapshots.window_end} > ${paidFrom}`
+      )
+    )
+    .orderBy(asc(kilo_pass_org_issuance_snapshots.window_start))
+    .limit(1);
+  return credit?.policy === 'one_year' ? 'one_year' : 'legacy';
+}
+
 async function grant(
   tx: DrizzleTransaction,
   input: {
@@ -503,16 +545,20 @@ async function grant(
     identity: string;
     description: string;
     expiresAt?: Date;
+    paidCredit?: PaidCreditGrant;
   }
 ) {
   if (input.microdollars === 0) return null;
-  const [organization] = await tx
-    .select({ microdollarsUsed: organizations.microdollars_used })
-    .from(organizations)
-    .where(eq(organizations.id, input.organizationId))
-    .for('update');
-  if (!organization) throw new Error('allocation container no longer exists');
-  const expiresAt = input.expiresAt?.toISOString();
+  const organization = await reconcileCreditExpirationsInTransaction(
+    { type: 'organization', id: input.organizationId },
+    tx
+  );
+  const paidPolicy = input.paidCredit ? resolvePaidCreditPolicy(input.paidCredit) : undefined;
+  const expiresAt = paidPolicy?.expiry_date ?? input.expiresAt?.toISOString();
+  const baseline = Math.min(
+    organization.microdollars_used,
+    organization.total_microdollars_acquired
+  );
   const [credit] = await tx
     .insert(credit_transactions)
     .values({
@@ -523,12 +569,21 @@ async function grant(
       description: input.description,
       credit_category: input.identity,
       check_category_uniqueness: true,
+      ...(paidPolicy ?? {}),
+      credit_source: paidPolicy?.credit_source ?? 'promotion',
       expiry_date: expiresAt ?? null,
-      expiration_baseline_microdollars_used: expiresAt ? organization.microdollarsUsed : null,
-      original_baseline_microdollars_used: organization.microdollarsUsed,
+      expiration_baseline_microdollars_used: expiresAt ? baseline : null,
+      original_baseline_microdollars_used: organization.microdollars_used,
     })
     .returning({ id: credit_transactions.id });
   if (!credit) throw new Error('organization credit grant failed');
+  await recordRefundDebtRepayment(tx, {
+    owner: { type: 'organization', id: input.organizationId },
+    transactionId: credit.id,
+    priorAcquired: organization.total_microdollars_acquired,
+    priorUsed: organization.microdollars_used,
+    amountMicrodollars: input.microdollars,
+  });
   const updated = await tx
     .update(organizations)
     .set({
@@ -550,8 +605,7 @@ async function issue(
     agreementId: string;
     recipientUserId: string;
     window: IssuanceWindow;
-    kind: 'regular' | 'bridge';
-    bridgeProrationWindow?: IssuanceWindow;
+    paidCreditTerms?: PaidCreditTerms;
   }
 ) {
   const [row] = await tx
@@ -568,6 +622,8 @@ async function issue(
   // A bridge may cover only part of its containing agreement month. Keep the
   // immutable paid service interval on the snapshot, but price it against the
   // complete anchored month so a partial invoice cannot receive a full month.
+  // The basis derives from the window and the agreement anchor, so a recovered
+  // window keeps the pricing of its original issuance.
   const runKey = `kpo:run:${row.agreement.id}:${input.window.start.toISOString()}`;
   const [existingRun] = await tx
     .select({
@@ -598,14 +654,15 @@ async function issue(
   const window = existingRun
     ? { start: asDate(existingRun.windowStart), end: asDate(existingRun.windowEnd) }
     : input.window;
-  const containingWindow =
-    input.bridgeProrationWindow ??
-    monthlyWindowContaining(asDate(row.agreement.issuance_anchor_at), window.start);
+  const basis = issuanceBasis(asDate(row.agreement.issuance_anchor_at), window);
   const ratio =
-    input.kind === 'bridge'
-      ? bridgeRatio(containingWindow, window)
+    basis.kind === 'bridge'
+      ? bridgeRatio(basis.prorationWindow, window)
       : { numerator: 1, denominator: 1 };
   if (!ratio.numerator) throw new Error('issuance window is not paid');
+  const paidCreditTerms =
+    input.paidCreditTerms ??
+    (await paidTermCreditTerms(tx, row.agreement.id, row.agreement.paid_from));
   const { plan, allocations } = await effectivePlan(tx, row.agreement.id, window.start);
   await assertParentAndChildren(tx, row.agreement.parent_organization_id, allocations);
   const valid = validateAllocation(
@@ -706,6 +763,12 @@ async function issue(
       microdollars: base,
       identity: grantKey,
       description: 'Kilo Pass organization base issuance',
+      paidCredit: {
+        source: 'pass',
+        purchasedAt: row.agreement.paid_from,
+        issuedAt: window.start,
+        terms: paidCreditTerms,
+      },
     });
     const bonusId =
       row.term.bonus_mode === KiloPassOrgBonusMode.Upfront
@@ -728,7 +791,7 @@ async function issue(
       window_end: window.end.toISOString(),
       qualifying_spend_starts_at: window.start.toISOString(),
       kind:
-        input.kind === 'bridge' ? KiloPassOrgIssuanceKind.Bridge : KiloPassOrgIssuanceKind.Regular,
+        basis.kind === 'bridge' ? KiloPassOrgIssuanceKind.Bridge : KiloPassOrgIssuanceKind.Regular,
       tranche_key: 'base',
       allocated_pass_capacity: multiplier,
       base_credit_microdollars: base,
@@ -786,6 +849,7 @@ export async function activatePaidAgreement(input: {
   /** Immutable paid provider interval for a bridge snapshot. */
   paidBridgeInterval?: IssuanceWindow;
   providerEventId?: string;
+  paidCreditTerms?: PaidCreditTerms;
 }) {
   if (input.paidFrom >= input.paidUntil) throw new Error('paid interval must be non-empty');
   return db.transaction(async tx => {
@@ -802,6 +866,20 @@ export async function activatePaidAgreement(input: {
       existing.paid_until && asDate(existing.paid_until) > input.paidUntil
         ? asDate(existing.paid_until)
         : input.paidUntil;
+    const paidCreditTerms =
+      existing.paid_from && existing.paid_until && input.paidFrom < asDate(existing.paid_until)
+        ? await paidTermCreditTerms(tx, existing.id, existing.paid_from)
+        : (input.paidCreditTerms ?? 'legacy');
+    await tx
+      .insert(kilo_pass_org_audit_records)
+      .values({
+        agreement_id: existing.id,
+        action: 'paid_credit_terms_captured',
+        reason: 'paid_term_started',
+        after_json: { paidCreditTerms, paidFrom: input.paidFrom.toISOString() },
+        idempotency_key: `paid-credit-terms:${existing.id}:${input.paidFrom.toISOString()}`,
+      })
+      .onConflictDoNothing();
     const pendingCapacityEffectiveAt = existing.next_capacity_effective_at
       ? asDate(existing.next_capacity_effective_at)
       : null;
@@ -852,9 +930,7 @@ export async function activatePaidAgreement(input: {
       agreementId: input.agreementId,
       recipientUserId: input.recipientUserId,
       window: firstWindow,
-      kind: input.isBridge ? 'bridge' : 'regular',
-      bridgeProrationWindow:
-        input.isBridge && input.paidBridgeInterval ? input.firstWindow : undefined,
+      paidCreditTerms,
     });
   });
 }
@@ -985,7 +1061,6 @@ export async function retryOrganizationPassRun(input: { agreementId: string; run
         agreementId: input.agreementId,
         recipientUserId: retry.recipientUserId,
         window: retry.window,
-        kind: 'regular',
       })
     );
   } catch (error) {
@@ -1216,6 +1291,16 @@ export async function createParentSupplement(input: {
       microdollars: baseAmount,
       identity: `kpo:supplement:base:${input.providerInvoiceLineId}`,
       description: 'Kilo Pass organization supplement',
+      paidCredit: {
+        source: 'pass',
+        purchasedAt: agreement.agreement.paid_from ?? input.window.start,
+        issuedAt: input.now,
+        terms: await paidTermCreditTerms(
+          tx,
+          input.agreementId,
+          agreement.agreement.paid_from ?? input.window.start.toISOString()
+        ),
+      },
     });
     const bonusId =
       agreement.term.bonus_mode === KiloPassOrgBonusMode.Upfront
@@ -2021,7 +2106,6 @@ export async function runOrganizationPassIssuanceCron(
             agreementId: agreement.agreementId,
             recipientUserId,
             window,
-            kind: 'regular',
           });
           if (outcome.blocked) {
             didBlock += 1;

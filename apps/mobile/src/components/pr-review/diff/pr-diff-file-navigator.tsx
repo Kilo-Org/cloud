@@ -31,10 +31,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
@@ -45,7 +47,9 @@ import {
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -116,6 +120,11 @@ export function PrDiffFileNavigator({
   const scope = useProviderPrScope({ owner, repo, number });
   const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
+  // The terminal states speak the scope's provider: a GitLab merge request
+  // never says "pull request", and only GitHub can blame a missing Kilo
+  // GitHub App. Same selector the Files tab uses, so the two surfaces cannot
+  // drift.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const hasActiveSearch = searchRef.current.trim().length > 0;
 
@@ -153,7 +162,7 @@ export function PrDiffFileNavigator({
 
   const handleSelectFile = useCallback(
     (path: string) => {
-      requestScrollToFile({ owner, repo, number, path });
+      requestScrollToFile({ owner, repo, number, ref: scope.ref, path });
       if (onDismiss) {
         onDismiss();
         return;
@@ -162,7 +171,7 @@ export function PrDiffFileNavigator({
         router.back();
       }
     },
-    [owner, repo, number, onDismiss, router]
+    [owner, repo, number, scope.ref, onDismiss, router]
   );
 
   const handleToggleViewed = useCallback(
@@ -216,15 +225,27 @@ export function PrDiffFileNavigator({
 
   let body: ReactNode = null;
   if (firstPageErrorState?.kind === 'not-found') {
+    // GitLab folds its connection failures into the same NOT_FOUND a deleted
+    // merge request produces, so provider scopes offer the read retry and the
+    // connection check instead of a dead end (GitHub keeps the terminal copy).
+    const isProviderScope = scope.ref.platform !== 'github';
     body = (
       <CenteredState>
         <View className="items-center px-6">
           <Text className="text-center text-lg font-semibold text-foreground">
-            {t('prReview.pullRequestUnavailable')}
+            {copy.unavailableTitle}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
-            {t('prReview.pullRequestUnavailableDescription')}
+            {copy.unavailableMessage}
           </Text>
+          {isProviderScope ? (
+            <PrReviewUnavailableActions
+              onRetry={() => {
+                void query.refetch();
+              }}
+              isRetrying={query.isFetching}
+            />
+          ) : null}
         </View>
       </CenteredState>
     );
@@ -236,7 +257,7 @@ export function PrDiffFileNavigator({
             {t('common.accessDenied')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
-            {t('prReview.accessDeniedDescription')}
+            {copy.accessDeniedMessage}
           </Text>
         </View>
       </CenteredState>
@@ -255,7 +276,10 @@ export function PrDiffFileNavigator({
             onPress={() => {
               void query.refetch();
             }}
-            className="mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70"
+            className={cn(
+              STATE_ACTION_CLASS,
+              'mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70'
+            )}
             accessibilityRole="button"
             accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
@@ -390,7 +414,10 @@ export function PrDiffFileNavigator({
             <Text className="text-xs text-destructive">{retryMessage}</Text>
             <Pressable
               onPress={() => void retryAction()}
-              className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
+              className={cn(
+                STATE_ACTION_CLASS,
+                'rounded-md border border-border bg-card px-3 py-1 active:opacity-70'
+              )}
               accessibilityRole="button"
               accessibilityLabel={retryLabel}
             >

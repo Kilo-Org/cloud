@@ -386,24 +386,6 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Usage prompt cleanup progress is invalid',
     action: 'Inspect the task progress and repair it before retrying the cleanup.',
   },
-  csa_unauthorized: {
-    title: 'CSA rejected the support-DB scrub',
-    action:
-      'Confirm SUPPORT_API_SECRET matches CSA KILO_SUPPORT_API_SECRET and CSA_VERCEL_PROTECTION_BYPASS matches CSA Vercel automation bypass, then Retry.',
-  },
-  csa_blocked_email: {
-    title: 'CSA refused this email as a relay or internal target',
-    action:
-      'This should have been blocked at intake. Confirm the target email, then cancel or Retry.',
-  },
-  csa_response_unparsed: {
-    title: 'CSA scrub response could not be parsed',
-    action: 'Retry. If it keeps failing, check CSA logs for this request id.',
-  },
-  csa_base_url_missing: {
-    title: 'CSA base URL is not configured',
-    action: 'Set CSA_APP_BASE_URL, then Retry.',
-  },
 };
 
 export function deletionAttentionHint(

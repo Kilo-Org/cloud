@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import type { Part, StepFinishPart, StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   formatSessionCost,
+  formatSessionTotalCost,
   getDisplayedSessionCostBreakdown,
   getSessionCostBreakdown,
   getSessionTotalCostUsd,
@@ -102,6 +103,28 @@ describe('formatSessionCost', () => {
     'formats invalid or negative costs as zero: %s',
     costUsd => {
       expect(formatSessionCost(costUsd)).toBe('$0.00');
+    }
+  );
+});
+
+describe('formatSessionTotalCost', () => {
+  it.each([
+    [0, '$0.00'],
+    [0.000001, '<$0.01'],
+    [0.004999, '<$0.01'],
+    [0.0049995, '$0.01'],
+    [0.005, '$0.01'],
+    [0.0149, '$0.01'],
+    [0.015, '$0.02'],
+    [1.234, '$1.23'],
+  ])('formats %s USD as %s, marking positive sub-cent totals', (costUsd, expected) => {
+    expect(formatSessionTotalCost(costUsd)).toBe(expected);
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -0.01])(
+    'formats invalid or negative totals as zero: %s',
+    costUsd => {
+      expect(formatSessionTotalCost(costUsd)).toBe('$0.00');
     }
   );
 });

@@ -26,7 +26,7 @@ const store = createSecureStorePreference<boolean>({
 store.preload();
 
 export function isSettingsToolsEnabled(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function setSettingsToolsEnabled(enabled: boolean): void {

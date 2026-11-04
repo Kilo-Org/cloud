@@ -19,6 +19,8 @@ const safeAreaMock = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Modal: 'Modal',
   View: 'View',
   Pressable: 'Pressable',
@@ -39,6 +41,9 @@ vi.mock('react-native', () => ({
 // the fix must not rewrite that context, only the header's own top clearance.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeAreaMock.insets,
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ addListener: () => () => undefined }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));

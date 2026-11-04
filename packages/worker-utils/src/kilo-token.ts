@@ -1,5 +1,9 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { z } from 'zod';
+import {
+  CloudAgentAuthoritySchema,
+  validateCloudAgentAuthorityClaims,
+} from './cloud-agent-authority';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
@@ -41,6 +45,7 @@ export const kiloTokenPayload = z.object({
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
   runtimeAdmission: runtimeAdmission.optional(),
   runtimeAuthorization: runtimeAuthorization.optional(),
+  cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
   // Standard JWT claims
   iat: z.number().optional(),
   exp: z.number().optional(),
@@ -134,6 +139,13 @@ export async function verifyKiloToken(
   });
   if (options?.audience === undefined && payload.aud !== undefined) {
     throw new Error('Unexpected token audience');
+  }
+
+  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
+    validateCloudAgentAuthorityClaims(payload);
+    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
+      throw new Error('Token issued in the future');
+    }
   }
 
   return kiloTokenPayload.parse(payload);

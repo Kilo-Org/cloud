@@ -18,6 +18,13 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
+import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
+import {
+  isUpstreamUrlPolicyEnforced,
+  rejectDisallowedUpstreamUrls,
+  rejectUpstreamRedirect,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -253,6 +260,33 @@ function upstreamFetchFailureResponse(
   );
 }
 
+async function buildSignedBedrockRequest({
+  url,
+  method,
+  headers,
+  body,
+  credentials,
+}: {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  credentials: CustomLlmAwsBedrockCredentials;
+}) {
+  const serializedBody = JSON.stringify(body);
+  return {
+    url,
+    headers: await signBedrockRequest({
+      url,
+      method,
+      headers,
+      body: serializedBody,
+      credentials,
+    }),
+    body: serializedBody,
+  };
+}
+
 export async function upstreamRequest({
   chatApi,
   search,
@@ -285,7 +319,7 @@ export async function upstreamRequest({
     }
   } else if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
-  } else {
+  } else if (!provider.awsBedrock) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
   headers.set('Content-Type', 'application/json');
@@ -332,17 +366,54 @@ export async function upstreamRequest({
           upstreamHeaders: headers,
           body,
         })
-      : { url: targetUrl, headers, body: JSON.stringify(body) };
+      : provider.awsBedrock
+        ? await buildSignedBedrockRequest({
+            url: targetUrl,
+            method,
+            headers,
+            body,
+            credentials: provider.awsBedrock,
+          })
+        : { url: targetUrl, headers, body: JSON.stringify(body) };
+
+    // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
+    // upstream URL from the relay body, so both hops are checked.
+    const enforceUrlPolicy = isUpstreamUrlPolicyEnforced();
+    const urlRejection = enforceUrlPolicy
+      ? await rejectDisallowedUpstreamUrls({
+          urls: provider.secureProxy ? [outgoing.url, targetUrl] : [outgoing.url],
+          providerId: provider.type,
+          vercelRequestId,
+          signal: combinedSignal,
+        })
+      : null;
+    if (urlRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: urlRejection };
+    }
 
     const response = await fetch(outgoing.url, {
       method,
       headers: outgoing.headers,
       body: outgoing.body,
+      redirect: enforceUrlPolicy ? 'manual' : 'follow',
       // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
       duplex: 'half',
       signal: combinedSignal,
     });
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
+    const redirectRejection = enforceUrlPolicy
+      ? await rejectUpstreamRedirect({
+          response,
+          url: outgoing.url,
+          providerId: provider.type,
+          vercelRequestId,
+        })
+      : null;
+    if (redirectRejection) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return { type: 'error', response: redirectRejection };
+    }
     return { type: 'success', response };
   } catch (error) {
     // No response body to bound; a later fallback attempt must not be blamed
@@ -363,7 +434,7 @@ export async function upstreamRequest({
       const causeMessage = getCauseMessage(cause);
       failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
-        providerId: provider.id,
+        providerId: provider.type,
         targetHost: getProviderTargetHost(apiUrl),
         ...(provider.secureProxy && {
           secureProxyHost: getProviderTargetHost(provider.secureProxy.url),
@@ -384,7 +455,7 @@ export async function upstreamRequest({
           level: 'error',
           tags: {
             source: 'ai-gateway-upstream-fetch',
-            provider: provider.id,
+            provider: provider.type,
             failure_family: failureFamily,
           },
           extra: failureMetadata,
@@ -434,7 +505,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
   } catch (error) {
     captureException(error, {
       level: 'info',
-      tags: { source: `${provider.id}_generation_fetch` },
+      tags: { source: `${provider.type}_generation_fetch` },
       extra: { messageId },
     });
     return;
@@ -444,7 +515,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
     const responseText = await response.text();
     captureMessage(`Timed out fetching openrouter generation`, {
       level: 'info',
-      tags: { source: `${provider.id}_generation_fetch` },
+      tags: { source: `${provider.type}_generation_fetch` },
       extra: {
         messageId,
         status: response.status,

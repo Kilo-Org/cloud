@@ -1,90 +1,23 @@
-/* eslint-disable max-lines -- Merge-sheet form sub-components share the sheet's keyboard-visibility and footer contracts. */
-// Form sub-components for the S8 merge sheet. Extracted out of
-// `pr-merge-sheet.tsx` to keep that file under the repo's 300-line limit.
-
 import { type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Switch, TextInput, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import {
-  type AllowedMergeMethod,
-  prMergeDescription,
-} from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-
-const METHOD_LABEL_KEYS = {
-  merge: 'prReview.merge.methods.merge',
-  squash: 'prReview.merge.methods.squash',
-  rebase: 'prReview.merge.methods.rebase',
-} as const satisfies Record<AllowedMergeMethod, string>;
-
-function MethodPicker({
-  methodOptions,
-  method,
-  isDisabled,
-  onChange,
-}: Readonly<{
-  methodOptions: MergeMethodOption[];
-  method: AllowedMergeMethod;
-  isDisabled: boolean;
-  onChange: (next: AllowedMergeMethod) => void;
-}>) {
-  const { t } = useTranslation();
-  return (
-    <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.methodLabel')}
-      </Text>
-      <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
-        {methodOptions.map(option => {
-          const active = method === option.value;
-          // Long labels stay readable via accessibilityLabel; chip shows short text.
-          return (
-            <Pressable
-              key={option.value}
-              disabled={isDisabled}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                onChange(option.value);
-              }}
-              {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
-              accessibilityHint={prMergeDescription(option.value)}
-              className={cn(
-                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
-                active && 'border-primary bg-primary',
-                !active && isDisabled && 'border-hair-soft bg-secondary',
-                !active && !isDisabled && 'border-border bg-secondary'
-              )}
-            >
-              <Text
-                className={cn(
-                  'text-sm font-medium',
-                  active && 'text-primary-foreground',
-                  !active && isDisabled && 'text-muted-foreground',
-                  !active && !isDisabled && 'text-foreground'
-                )}
-              >
-                {t(METHOD_LABEL_KEYS[option.value])}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </RadioGroup>
-    </View>
-  );
-}
+import { MethodPicker } from '@/components/pr-review/merge/pr-merge-method-picker';
 
 function CommitTitleField({
   titleRef,
@@ -102,7 +35,7 @@ function CommitTitleField({
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitTitle')}</Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={titleRef.current}
         editable={!isDisabled}
@@ -113,7 +46,7 @@ function CommitTitleField({
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -143,7 +76,7 @@ function CommitMessageField({
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.commitMessage')}
       </Text>
-      <TextInput
+      <Input
         ref={inputRef}
         defaultValue={messageRef.current}
         editable={!isDisabled}
@@ -154,7 +87,7 @@ function CommitMessageField({
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring',
           tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}
@@ -192,6 +125,59 @@ function DeleteBranchToggle({
         onValueChange={onChange}
       />
     </View>
+  );
+}
+
+/**
+ * Stand-in for the form while the account's draft read settles.
+ *
+ * `PrMergeSheet` keeps the uncontrolled fields unmounted until the stored
+ * draft is known, so without this the sheet presents with an empty body under
+ * a finished header and the whole form then arrives in one frame. The
+ * placeholder repeats the form's own gutters and settled row heights, so the
+ * sheet reads as loading and the form replaces it in place.
+ */
+export function MergeSheetFormSkeleton(props: {
+  methodOptions: MergeMethodOption[];
+  showTitle: boolean;
+  showDeleteBranchToggle: boolean;
+}): ReactNode {
+  return (
+    <>
+      <View className="gap-4 px-6 pt-4">
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-16" />
+          {props.methodOptions.length === 0 ? (
+            <Skeleton className="h-11 rounded-md" />
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {props.methodOptions.map(option => (
+                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+              ))}
+            </View>
+          )}
+        </View>
+        {props.showTitle ? (
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-11" />
+          </View>
+        ) : null}
+        <View className="gap-1.5">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-24" />
+        </View>
+        {props.showDeleteBranchToggle ? (
+          <View className="rounded-lg bg-secondary px-4 py-3">
+            <Skeleton className="h-[44px]" />
+          </View>
+        ) : null}
+      </View>
+      <PrFormSheetFooter>
+        <Skeleton className="h-[44px]" />
+        <Skeleton className="mt-2 h-[44px]" />
+      </PrFormSheetFooter>
+    </>
   );
 }
 

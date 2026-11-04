@@ -1,7 +1,7 @@
-import * as Haptics from 'expo-haptics';
-import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
+import { Tabs, usePathname, useSegments } from 'expo-router';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Bot, House, MessageCircle, UserRound } from '@/components/ui/icons';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -10,10 +10,9 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
-import { Text } from '@/components/ui/text';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
-import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -23,17 +22,17 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { publishRenderedTabBarHeight, TabBarLabelContext } from '@/lib/tab-bar-clearance';
+import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
   getTabBarIconSize,
   shouldHideTabBar,
   shouldShowTabLabel,
-  TAB_LABEL_MINIMUM_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
-  tabLabelLineCount,
+  tabLabelLines,
   VISIBLE_TAB_COUNT,
 } from '@/lib/tab-bar-layout';
 
@@ -41,9 +40,6 @@ const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
 } satisfies ViewStyle;
-
-/** The plain tab press: the same feedback for every tab without its own move. */
-const TAB_PRESS_HAPTICS = { tabPress: () => void Haptics.selectionAsync() };
 
 export const unstable_settings = {
   initialRouteName: '(0_home)',
@@ -57,84 +53,56 @@ function TabBarBackground() {
   );
 }
 
-/**
- * One tab label, on the lines the bar reserves for it (`tabLabelLineCount`).
- * On the single reserved line a label too wide for its tab would wrap into a
- * second line the bar has no height for and render clipped at the bar's edge
- * ("PROFIL E" at 160 dp, e1, 2026-09-21), so the label is pinned to one line and
- * asks the platform to shrink it to fit (`adjustsFontSizeToFit`, implemented on
- * both iOS and Android) and to tail-truncate whatever still overflows. That
- * shrink is a residual guard, not the legibility rule: the window-width rule
- * (`shouldShowTabLabel`) drops the labels whenever a full-size label would not
- * fit its tab, so a label that renders never has to shrink that far on either
- * platform. `minimumFontScale` caps the residual shrink on iOS only — Android's
- * Fabric autosize floors at RN's own platform minimum. Where the bar does
- * reserve a second line (the wrap font scale) the shared `TabBarLabel` renders
- * it: the two-line copy that carries its own break, and one truncated line for
- * every other label.
- */
-function TabLabel({
-  label,
-  focused,
-  allowWrap,
-}: Readonly<{ label: string; focused: boolean; allowWrap: boolean }>) {
-  if (allowWrap) {
-    return <TabBarLabel label={label} focused={focused} />;
-  }
-  return (
-    <Text
-      accessible={false}
-      className={
-        focused
-          ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
-          : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
-      }
-      numberOfLines={1}
-      adjustsFontSizeToFit
-      minimumFontScale={TAB_LABEL_MINIMUM_FONT_SCALE}
-      ellipsizeMode="tail"
-    >
-      {label}
-    </Text>
-  );
-}
-
 export default function TabsLayout() {
   const pathname = usePathname();
   const segments = useSegments();
-  const router = useRouter();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
-  const { width, fontScale } = useWindowDimensions();
-  const tabLabelLines = tabLabelLineCount(fontScale);
-  const allowLabelWrap = tabLabelLines > 1;
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const hideTabs = shouldHideTabBar(pathname, segments);
   const tabCount = VISIBLE_TAB_COUNT;
   // The label box is the tab item minus the bar's side safe areas and the
   // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
-  // width was never measured leaves the box unknown — the same missing
-  // measurement `shouldStackHeaderActions` treats as its default — so the
-  // width rule stays out of it and the font-scale rule alone decides.
+  // width was never measured leaves the box unknown, so it is treated as
+  // unbounded and every label keeps one line.
   const tabBarContentWidth = width - left - right;
   const tabItemWidth = Number.isFinite(tabBarContentWidth)
     ? tabBarContentWidth / tabCount
-    : undefined;
+    : Number.POSITIVE_INFINITY;
   const { t } = useTranslation();
   const homeLabel = t('tabs.home');
   const agentsLabel = t('common.agents');
   const chatLabel = t('common.chat');
   const profileLabel = t('common.profile');
-  // The label set in render order, so the visible/dropped decision measures
-  // exactly the strings each `TabBarLabel` renders.
-  const tabLabels = [homeLabel, agentsLabel, chatLabel, profileLabel];
-  const showTabLabel = shouldShowTabLabel(fontScale, tabItemWidth, tabLabels);
+  // Each surviving tab keeps its own line count; reserve the tallest label.
+  const homeLines = tabLabelLines(homeLabel, tabItemWidth, fontScale);
+  const agentsLines = tabLabelLines(agentsLabel, tabItemWidth, fontScale);
+  const chatLines = tabLabelLines(chatLabel, tabItemWidth, fontScale);
+  const profileLines = tabLabelLines(profileLabel, tabItemWidth, fontScale);
+  const labelLines = Math.max(homeLines, agentsLines, chatLines, profileLines) as 1 | 2;
+  const showTabLabel = shouldShowTabLabel(fontScale);
+  const labelState = useMemo(
+    () => ({ showLabel: showTabLabel, labelLines }),
+    [showTabLabel, labelLines]
+  );
   const tabBarHeight = getEffectiveTabBarHeight({
     bottomInset: bottom,
     platform: Platform.OS,
     fontScale,
     showLabel: showTabLabel,
+    labelLines,
   });
   const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
+  // The toaster sits above this navigator, so it cannot read the label context:
+  // publish the bar it must clear, and withdraw it when the bar is off screen or
+  // this navigator unmounts.
+  useEffect(() => {
+    publishRenderedTabBarHeight(hideTabs ? null : tabBarHeight);
+    return () => {
+      publishRenderedTabBarHeight(null);
+    };
+  }, [hideTabs, tabBarHeight]);
   const tabIconSize = getTabBarIconSize(fontScale);
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({
@@ -153,7 +121,10 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
-    isAcked: isAttentionAcked(session.id, session.status),
+    isAcked: isAttentionAcked(session.id, {
+      raiseId: session.statusUpdatedAt ?? session.status,
+      status: session.status,
+    }),
   }));
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
@@ -179,18 +150,18 @@ export default function TabsLayout() {
   // in a short landscape window and parked its second line and action behind
   // the bar (landscape spot defect e8).
   //
-  // The label decision is published to the tab screens, whose content
-  // clearance must match the height this layout renders (the width rule can
-  // drop the labels without the callers seeing the window width).
+  // Publish the label decision so each tab screen clears the same height,
+  // including the second line a narrow tab's label may need.
   const tabsLayout = (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight}>
       <Tabs
+        screenLayout={TabSwitchInputSettle}
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,
           // The row palette colours a destination inside a screen; a tab tint
           // says which tab is selected — a state, not a destination. One accent
-          // per tab would put six accents on the bar and fight the rows below
+          // per tab would put four accents on the bar and fight the rows below
           // it, and an icon-only recolour would disagree with `TabBarLabel`,
           // which draws its label from its own `text-foreground` /
           // `text-muted-foreground` classes and ignores the navigator tint.
@@ -231,13 +202,13 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={homeLabel} focused={focused} allowWrap={allowLabelWrap} />
+              <TabBarLabel label={homeLabel} focused={focused} lines={homeLines} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(2_agents)"
@@ -252,13 +223,13 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={agentsLabel} focused={focused} allowWrap={allowLabelWrap} />
+              <TabBarLabel label={agentsLabel} focused={focused} lines={agentsLines} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(4_chat)"
@@ -270,13 +241,13 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={chatLabel} focused={focused} allowWrap={allowLabelWrap} />
+              <TabBarLabel label={chatLabel} focused={focused} lines={chatLines} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={TAB_PRESS_HAPTICS}
+          listeners={tabPressListeners}
         />
         <Tabs.Screen
           name="(3_profile)"
@@ -288,25 +259,19 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={profileLabel} focused={focused} allowWrap={allowLabelWrap} />
+              <TabBarLabel label={profileLabel} focused={focused} lines={profileLines} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: event => {
-              void Haptics.selectionAsync();
-              event.preventDefault();
-              router.navigate(PROFILE_TAB_ROOT);
-            },
-          }}
+          listeners={profileTabPressListeners(segments)}
         />
       </Tabs>
     </StateSurfaceInsets>
   );
   return (
-    <TabBarLabelContext value={showTabLabel}>
+    <TabBarLabelContext value={labelState}>
       {tabsLayout}
       <SessionPreviewOverlay />
     </TabBarLabelContext>

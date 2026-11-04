@@ -28,20 +28,24 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
-import { providerPrTerm } from '@kilocode/app-shared/provider-review';
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
-import { type ProviderPrScope, providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrScope,
+  type ProviderPrTriple,
+  providerPrTriple,
+} from '@/lib/pr-review/provider-pr-ref';
 import {
   providerFingerprintInput,
   providerWriteIdentity,
-  type ReviewWriteRef,
-  useReviewWriteScope,
-} from '@/lib/pr-review/use-pr-review-mutations';
+} from '@/lib/pr-review/provider-write-identity';
+import { type ReviewWriteRef, useReviewWriteScope } from '@/lib/pr-review/use-pr-review-mutations';
 import {
   assertMergeResult,
   gateMergeResult,
@@ -54,8 +58,6 @@ import {
   mapPrOperationError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
-
-type PrRef = { owner: string; repo: string; number: number };
 
 type RouterInputs = inferRouterInputs<MobileRouter>;
 type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
@@ -141,6 +143,22 @@ function githubMergeResult(
 }
 
 /**
+ * The merge-failure sentence with its provider noun filled in. Most catalogs
+ * open that sentence with `{{term}}`, and the noun key is the mid-sentence
+ * lowercase form, so the noun is capitalized only when it leads the rendered
+ * sentence; a catalog that names the noun later keeps the lowercase form.
+ */
+function mergeNotCompletedMessage(platform: ProviderPrPlatform): string {
+  const term = i18n.t(providerPrNounKey(platform));
+  const message = i18n.t('prReview.operation.mergeResultNotCompleted', { term });
+  if (term.length === 0 || !message.startsWith(term)) {
+    return message;
+  }
+  const initial = term.slice(0, 1).toLocaleUpperCase(i18n.language);
+  return initial + term.slice(1) + message.slice(term.length);
+}
+
+/**
  * The provider merge arm. One call per platform arm: a conditional spread
  * inside a single literal would cross-multiply the identity union and hand
  * the server gitlab-only fields on a bitbucket call. The layer reports no
@@ -198,9 +216,7 @@ async function providerMergeResult(
   if (!merged.done) {
     throw new MergeNotCompletedError({
       sha: vars.expectedHeadSha,
-      message: i18n.t('prReview.operation.mergeResultNotCompleted', {
-        term: providerPrTerm(scope.ref.platform),
-      }),
+      message: mergeNotCompletedMessage(scope.ref.platform),
     });
   }
   return { merged: true, sha: vars.expectedHeadSha, branchDeleted: false };
@@ -265,7 +281,7 @@ export function useMergePullRequestMutation(ref: ReviewWriteRef) {
   });
 }
 
-export function useUpdateBranchMutation(ref: PrRef) {
+export function useUpdateBranchMutation(ref: ProviderPrTriple) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const keys = useMergeKeys({ ref: { platform: 'github', ...ref }, organizationId: null });

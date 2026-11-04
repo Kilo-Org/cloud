@@ -13,9 +13,13 @@ jest.mock('next-auth', () => ({
   getServerSession: (...args: unknown[]) => mockGetServerSession(...args),
 }));
 
-jest.mock('@/lib/device-auth/device-auth', () => ({
-  approveDeviceAuthRequest: (...args: unknown[]) => mockApproveDeviceAuthRequest(...args),
-}));
+jest.mock('@/lib/device-auth/device-auth', () => {
+  const actual = jest.requireActual('@/lib/device-auth/device-auth');
+  return {
+    ...actual,
+    approveDeviceAuthRequest: (...args: unknown[]) => mockApproveDeviceAuthRequest(...args),
+  };
+});
 
 import { POST } from './route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -50,7 +54,7 @@ describe('POST /api/device-auth/tokens integration', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
-    expect(mockApproveDeviceAuthRequest).toHaveBeenCalledWith('ABCD-EFGH', user.id);
+    expect(mockApproveDeviceAuthRequest).toHaveBeenCalledWith('ABCD-EFGH', user.id, {});
   });
 
   test.each(['valid bearer', 'empty authorization'])(

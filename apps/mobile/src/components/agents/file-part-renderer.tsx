@@ -17,8 +17,10 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { AlertCircle, File as FileIcon, Share } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { cn } from '@/lib/utils';
 import {
   downloadRemoteFile,
   getSafeCacheFilename,
@@ -44,7 +46,10 @@ function cacheFilenameForPart(part: Pick<FilePart, 'id' | 'mime' | 'filename'>):
 }
 
 /** Write a base64 `data:` payload to the cache and return the file. */
-function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>): File {
+async function writeDataUrlToCache(
+  url: string,
+  part: Pick<FilePart, 'id' | 'mime' | 'filename'>
+): Promise<File> {
   const payload = stripDataUrlBase64Prefix(url, part.mime);
   if (payload === undefined) {
     throw new Error('decode-failed');
@@ -52,7 +57,7 @@ function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | '
   const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
   directory.create({ idempotent: true, intermediates: true });
   const file = new File(directory, cacheFilenameForPart(part));
-  file.write(payload, { encoding: 'base64' });
+  await file.write(payload, { encoding: 'base64' });
   return file;
 }
 
@@ -63,7 +68,7 @@ async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' |
   }
 
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     return file.text();
   }
 
@@ -87,7 +92,7 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
     return;
   }
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     await shareLocalFile(file.uri, { mimeType: part.mime });
     return;
   }
@@ -396,7 +401,10 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
           onPress={() => {
             resolved.retry?.();
           }}
-          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          className={cn(
+            STATE_ACTION_CLASS,
+            'my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900'
+          )}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
         >
@@ -429,7 +437,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
         className="my-1 flex-row items-center gap-2 rounded-lg bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
       >
         {sharing || resolved.status === 'resolving' ? (
-          <ActivityIndicator />
+          <ActivityIndicator size={14} color={colors.mutedForeground} />
         ) : (
           <FileIcon size={14} color={colors.mutedForeground} />
         )}
@@ -617,7 +625,10 @@ function FilePreviewModal({
             }}
             accessibilityRole="button"
             accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
-            className="rounded-md border border-border px-4 py-2 active:opacity-70"
+            className={cn(
+              STATE_ACTION_CLASS,
+              'rounded-md border border-border px-4 py-2 active:opacity-70'
+            )}
           >
             <Text className="text-center text-sm font-medium text-foreground">
               {t('common.retry')}
@@ -638,7 +649,7 @@ function FilePreviewModal({
   }
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} dismissible>
       <SheetHeader
         // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
         // which languages inflect by number; this key is the standalone noun label.
@@ -652,7 +663,7 @@ function FilePreviewModal({
       />
       <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
       {status === 'error' || (status === 'ready' && text === '') ? (
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <View className="items-center py-6">{renderBody()}</View>
         </CenteredState>
       ) : (

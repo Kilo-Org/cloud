@@ -16,17 +16,20 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
+import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/briefing-notification-toggle';
+import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   applyAgentPushOptimistic,
   deriveAgentPushEditable,
@@ -91,7 +94,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   const { t } = useTranslation();
   return (
     <Pressable
-      className="flex-row items-center gap-1 active:opacity-70"
+      className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -255,8 +258,10 @@ function CategoryRow({
       <Icon size={18} color={colors.secondaryForeground} />
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity: blanket opacity
-            drops every label below the 4.5:1 text minimum. The Switch renders
-            its own disabled appearance. */}
+            drops every label below the 4.5:1 text minimum. The switch carries
+            the other half: a disabled `Switch` paints the palette's muted pair
+            on Android, where the platform draws none, so an unavailable row
+            never shows a full-strength accent beside it. */}
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
           {title}
         </Text>
@@ -534,10 +539,16 @@ export function NotificationsScreen() {
   const handleEnableNotifications = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();
     if (currentStatus === 'denied') {
-      Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-      ]);
+      Alert.alert(
+        t('notifications.disabledTitle'),
+        t('notifications.disabledMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+        ],
+        // Android back dismisses, which equals the no-op Cancel.
+        { cancelable: true }
+      );
       return;
     }
     setIsTogglingPermission(true);
@@ -591,10 +602,16 @@ export function NotificationsScreen() {
   }, [queryClient, registerToken, t]);
 
   const handleDisableNotifications = useCallback(() => {
-    Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-    ]);
+    Alert.alert(
+      t('notifications.disableTitle'),
+      t('notifications.disableMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ],
+      // Android back dismisses, which equals the no-op Cancel.
+      { cancelable: true }
+    );
   }, [t]);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;
@@ -682,7 +699,7 @@ export function NotificationsScreen() {
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">{t('common.notifications')}</Text>
+              <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
@@ -717,7 +734,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('common.notifications')}
+                  accessibilityLabel={t('notifications.deviceTitle')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {
@@ -820,6 +837,7 @@ export function NotificationsScreen() {
               ))}
             </>
           )}
+          <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
         </View>
 
         {/* Message previews */}

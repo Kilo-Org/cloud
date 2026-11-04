@@ -40,7 +40,7 @@ export const REVIEW_PAGE_SIZE = 50;
  */
 export const REVIEW_LIST_MAX_PAGES = 10;
 
-/** Poll cadence for page one while a review on it is still running. */
+/** Poll cadence for a running review: the page-one probe and the review detail screen. */
 const REVIEW_POLL_INTERVAL_MS = 5000;
 
 /**
@@ -369,7 +369,7 @@ export function useReviewDetail(reviewId: string) {
       if (!data?.success) {
         return false;
       }
-      return isInFlightReviewStatus(data.review.status) ? 5000 : false;
+      return isInFlightReviewStatus(data.review.status) ? REVIEW_POLL_INTERVAL_MS : false;
     },
   });
 }
@@ -377,9 +377,7 @@ export function useReviewDetail(reviewId: string) {
 function useInvalidateReviews(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const listQueryKey = isPersonal(scope)
-    ? trpc.codeReviews.listForUser.queryKey()
-    : trpc.codeReviews.listForOrganization.queryKey({ organizationId: scope });
+  const listQueryKey = buildReviewListQueryKey(trpc, scope);
   return (reviewId?: string) => {
     void queryClient.invalidateQueries({ queryKey: listQueryKey });
     if (reviewId) {
@@ -418,10 +416,13 @@ export function useCancelReview(scope: string) {
 
 export async function retriggerReviewMutationFn(vars: { reviewId: string }) {
   // Same typed-error pattern as cancelReviewMutationFn: a domain failure throws
-  // so React Query runs onError (toast) rather than onSuccess (haptic).
+  // so React Query runs onError (toast) rather than onSuccess (haptic). The
+  // server answers `{success:false}` when dispatch marked the review failed
+  // again, so the toast says the retry did not start instead of echoing a
+  // server sentence. The detail screen owns the reason, localized from the row.
   const result = await trpcClient.codeReviews.retrigger.mutate({ reviewId: vars.reviewId });
   if (!result.success) {
-    throw new Error(result.error);
+    throw new Error(i18n.t('codeReviewer.reviewDetail.retryNotStarted'));
   }
   return result;
 }
@@ -434,7 +435,11 @@ export function useRetriggerReview(scope: string) {
     onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
     },
-    onError: error => {
+    onError: (error, vars) => {
+      // A retry that fails to start still rewrote the row (status, end time,
+      // reason) and a terminal review never refetches on its own, so the
+      // screen would keep the pre-retry row next to the toast.
+      invalidateReviews(vars.reviewId);
       announcingToast.error(error.message);
     },
   });
@@ -466,7 +471,10 @@ export async function createManualReviewMutationFn(scope: string, vars: CreateMa
   return result;
 }
 
-export function useCreateManualReview(scope: string) {
+export function useCreateManualReview(
+  scope: string,
+  { silent = false }: { silent?: boolean } = {}
+) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
@@ -475,7 +483,11 @@ export function useCreateManualReview(scope: string) {
       invalidateReviews();
     },
     onError: error => {
-      announcingToast.error(error.message);
+      // A screen that renders the failure inline owns the feedback channel
+      // (the cloud-create pattern), so the hook stays silent for it.
+      if (!silent) {
+        announcingToast.error(error.message);
+      }
     },
   });
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
+  AGENT_BRIEFING_CHANNEL_APP_VERSION,
   AGENT_CHANNEL_SPLIT_APP_VERSION,
   AGENT_NOTIFICATION_KINDS,
   ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
@@ -14,10 +15,10 @@ import {
   androidChannelIdForPushDataToAppVersion,
   LEGACY_AGENT_ANDROID_CHANNEL_ID,
   androidChannelIdForRegisteredClient,
-  genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
 } from './push-presentation';
+import { genericPushContentForPushData } from './push-copy';
 
 // One representative payload per `pushDataSchema` variant, plus both
 // `cloud_agent_session` categories (attention vs status vs absent). The
@@ -42,6 +43,7 @@ const channelCases = [
   ],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
+  [{ type: 'agent_briefing', url: '/agent-briefing' }, 'agent-briefing'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
   [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
@@ -108,6 +110,7 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
     expect(ANDROID_NOTIFICATION_CHANNELS).toEqual([
       { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
       { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+      { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
       { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -422,6 +425,20 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     ).toBe('balance');
   });
 
+  it('keeps the brief on its earlier channel until every build creates its own', () => {
+    const brief = { type: 'agent_briefing', url: '/agent-briefing' } as const;
+    // Builds of 1.0.15 shipped without `agent-briefing`; Android 8+ would drop
+    // a push addressed to it, so those tokens stay on `agent-progress`.
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.15')).toBe('agent-progress');
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.12')).toBe('agent-progress');
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.11')).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(brief, null)).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(brief, AGENT_BRIEFING_CHANNEL_APP_VERSION)).toBe(
+      'agent-briefing'
+    );
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.1.0')).toBe('agent-briefing');
+  });
+
   it('shares the channel gate and preserves the legacy glanceable route', () => {
     expect(ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION).toBe(AGENT_CHANNEL_SPLIT_APP_VERSION);
     expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
@@ -466,8 +483,8 @@ describe('genericPushContentForPushData', () => {
     }
   });
 
-  it('returns the security lifecycle copy for the security_lifecycle variant', () => {
-    const parsed = pushDataSchema.parse({
+  it('gives each security payload type its own body', () => {
+    const lifecycle = pushDataSchema.parse({
       type: 'security_lifecycle',
       event: 'remediation_failed',
       findingId: 'f1',
@@ -475,9 +492,19 @@ describe('genericPushContentForPushData', () => {
       remediationId: 'r1',
       prUrl: 'https://github.com/org/repo/pull/1',
     });
-    expect(genericPushContentForPushData(parsed)).toEqual({
+    const finding = pushDataSchema.parse({
+      type: 'security_finding',
+      findingId: 'f1',
+      scope: 'org',
+    });
+
+    expect(genericPushContentForPushData(finding)).toEqual({
       title: 'Kilo',
       body: 'A security finding needs attention',
+    });
+    expect(genericPushContentForPushData(lifecycle)).toEqual({
+      title: 'Kilo',
+      body: 'A security check has an update',
     });
   });
 

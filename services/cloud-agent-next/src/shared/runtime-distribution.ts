@@ -1,9 +1,9 @@
 export const RUNTIME_DISTRIBUTION = {
   nodeMajor: '24',
-  bun: '1.3.14',
-  pnpm: '11.1.2',
-  glab: '1.93.0',
-  gh: '2.82.1',
+  bun: '1.4.4',
+  pnpm: '12.14.0',
+  glab: '1.124.0',
+  gh: '2.103.3',
 } as const;
 
 export type WrapperBundle = {
@@ -14,12 +14,6 @@ export type WrapperBundle = {
 };
 
 export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
-  {
-    entry: 'src/main.ts',
-    distName: 'wrapper.js',
-    installName: 'kilocode-wrapper.js',
-    executable: false,
-  },
   {
     entry: 'src/restore-session.ts',
     distName: 'restore-session.js',
@@ -44,7 +38,20 @@ export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
     installName: 'kilocode-control-plane-wrapper.js',
     executable: false,
   },
+  {
+    entry: 'src/environment-builder/main.ts',
+    distName: 'environment-builder.js',
+    installName: 'kilocode-environment-builder.js',
+    executable: false,
+  },
 ];
+
+/**
+ * The Bun binary that runs a bundle as a container's main process. It is an
+ * absolute path so the main-process identity check can match `/proc/1/cmdline`
+ * exactly; both images install Bun there.
+ */
+export const RUNTIME_BUN_PATH = '/usr/local/bin/bun';
 
 export const CONTROL_PLANE_SUPERVISOR = {
   wrapperPath: 'control-plane-supervisor.sh',
@@ -59,6 +66,7 @@ export const GIT_CREDENTIAL_HELPER = {
 } as const;
 
 export const RUNTIME_INSTALL_DIR = '/usr/local/bin';
+export const RUNTIME_RESERVED_ROOT = '/opt/kilo-cloud';
 
 export function runtimeInstallPath(installName: string): string {
   return `${RUNTIME_INSTALL_DIR}/${installName}`;
@@ -81,3 +89,21 @@ export const RUNTIME_REQUIRED_BINARIES = [
   'rg',
   'kilo',
 ] as const;
+
+/** The bootstrap owns this value. User or profile env must not select the runtime. */
+export function selectedRuntimeCli(env: Record<string, string | undefined>): string {
+  const selected = env.KILO_RUNTIME_CLI_PATH;
+  if (selected === undefined) return 'kilo';
+  if (
+    !selected.startsWith(`${RUNTIME_RESERVED_ROOT}/cli/`) ||
+    selected.includes('\0') ||
+    selected.includes('\r') ||
+    selected.includes('\n') ||
+    selected
+      .slice(1)
+      .split('/')
+      .some(part => !part || part === '.' || part === '..')
+  )
+    throw new Error('Invalid selected runtime CLI');
+  return selected;
+}

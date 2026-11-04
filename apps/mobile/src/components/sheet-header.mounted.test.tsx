@@ -25,6 +25,12 @@ vi.mock('react-native', () => ({
       return rn.statusHeight;
     },
   },
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
+}));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn() }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
@@ -106,10 +112,7 @@ function findSafeAreaWrapper(root: TestRenderer.ReactTestInstance): TestRenderer
  * top-inset mode, and returns the inset wrapper's style, so the test can
  * compare platforms.
  */
-async function sheetHeaderTopInsetStyle(
-  os: string,
-  topInset: 'bottom-form-sheet' | 'ios-page-sheet'
-): Promise<unknown> {
+async function sheetHeaderTopInsetStyle(os: string, topInset: 'ios-page-sheet'): Promise<unknown> {
   rn.os = os;
   rn.statusHeight = 48;
   safeArea.top = 59;
@@ -229,7 +232,7 @@ describe('SheetHeader', () => {
   it.each([
     { title: 'Language', doneLabel: 'Done', cancelLabel: 'Cancel' },
     { title: 'اللغة', doneLabel: 'تم', cancelLabel: 'إلغاء' },
-  ])('gives $doneLabel and $cancelLabel matching neutral rounded controls', async labels => {
+  ])('gives $doneLabel and $cancelLabel the same rounded control frame', async labels => {
     const onDone = vi.fn<() => void>();
     const onCancel = vi.fn<() => void>();
     const renderer = await mountElement(
@@ -248,9 +251,17 @@ describe('SheetHeader', () => {
     }
     expect(done?.props.onPress).toBe(onDone);
     expect(cancel?.props.onPress).toBe(onCancel);
-    expect(renderer.root.findByProps({ children: labels.doneLabel }).props.className).toBe(
-      renderer.root.findByProps({ children: labels.cancelLabel }).props.className
-    );
+    const doneLabelClass = renderer.root.findByProps({ children: labels.doneLabel }).props
+      .className as string;
+    const cancelLabelClass = renderer.root.findByProps({ children: labels.cancelLabel }).props
+      .className as string;
+    // The commit label carries the accent so it reads as the sheet's primary
+    // action; Cancel stays a neutral label.
+    expect(doneLabelClass).toContain('font-semibold');
+    expect(doneLabelClass).toContain('text-primary');
+    expect(cancelLabelClass).toContain('font-medium');
+    expect(cancelLabelClass).toContain('text-foreground');
+    expect(cancelLabelClass).not.toContain('text-primary');
 
     renderer.unmount();
   });
@@ -295,7 +306,7 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('keeps Run on and action text with native font scaling and unlimited action lines', async () => {
+  it('keeps Run on and action text with native font scaling and single-line labels', async () => {
     const title = 'Run on';
     const cancelLabel = 'Previous picker';
     const doneLabel = 'Confirm selection';
@@ -315,7 +326,10 @@ describe('SheetHeader', () => {
     );
     for (const text of texts) {
       if (text.props.accessibilityRole !== 'header') {
-        expect(text.props.numberOfLines).toBeUndefined();
+        // Action labels stay on one line so the buttons size to their labels;
+        // native font scaling still applies (no fit-to-width).
+        expect(text.props.numberOfLines).toBe(1);
+        expect(text.props.ellipsizeMode).toBe('clip');
       }
       expect(text.props.allowFontScaling).not.toBe(false);
       expect(text.props.maxFontSizeMultiplier).toBeUndefined();
@@ -356,25 +370,6 @@ describe('SheetHeader', () => {
     }
   );
 
-  it('gives every action a growing target of at least 44 points', async () => {
-    const renderer = await mount({
-      title: 'report.pdf',
-      onDone: () => undefined,
-      onCancel: () => undefined,
-      onShare: () => undefined,
-    });
-    for (const label of ['Done', 'Cancel', 'Share report.pdf']) {
-      const buttons = pressablesByLabel(renderer.root, label);
-      expect(buttons).toHaveLength(1);
-      expect(buttons[0]?.props.className).toContain('min-h-11');
-      expect(buttons[0]?.props.className).toContain('min-w-11');
-      expect(buttons[0]?.props.className).not.toMatch(/(?:^|\s)(?:absolute|h-|max-h-)/);
-      expect(buttons[0]?.props.hitSlop).toBe(8);
-    }
-
-    renderer.unmount();
-  });
-
   it('disables and restores all supplied controls without marking Share busy', async () => {
     const props = {
       title: 'report.pdf',
@@ -400,6 +395,22 @@ describe('SheetHeader', () => {
     for (const label of ['Done', 'Cancel', 'Share report.pdf']) {
       expect(pressablesByLabel(renderer.root, label)[0]?.props.disabled).toBe(false);
     }
+
+    renderer.unmount();
+  });
+
+  it('disables only Done when the commit is what waits', async () => {
+    const props = {
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    };
+    const renderer = await mount({ ...props, doneDisabled: true });
+
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.props.disabled).toBe(true);
+    // A full-window sheet no longer dismisses by a drag, so Cancel has to stay
+    // usable while the commit waits or the sheet has no way out.
+    expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.props.disabled).toBe(false);
 
     renderer.unmount();
   });
@@ -552,11 +563,10 @@ describe('SheetHeader', () => {
     }
   );
 
-  it.each(['ios', 'android'])('drops the top clearance for a bottom formSheet (%s)', async os => {
-    // p7: a bottom-anchored sheet never draws under the status bar, so the
-    // resolved window inset is only a dead band above the header — one rule
-    // reserves nothing on either platform.
-    rn.os = os;
+  it('drops the top clearance for a bottom formSheet on iOS', async () => {
+    // On iOS the native sheet presents below the status bar, so the resolved
+    // window inset is only a dead band above the header.
+    rn.os = 'ios';
     rn.statusHeight = 48;
     safeArea.top = 24;
     const renderer = await mount({
@@ -572,19 +582,84 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('reserves the same bottom-form-sheet top clearance regardless of Platform.OS', async () => {
-    // Regression for the removed platform fork: with a resolved top inset the
-    // old iOS branch kept 59 while Android dropped it. One implementation now
-    // drops it under identical inputs on both OS values.
-    const iosStyle = await sheetHeaderTopInsetStyle('ios', 'bottom-form-sheet');
-    const androidStyle = await sheetHeaderTopInsetStyle('android', 'bottom-form-sheet');
+  it('drops the top clearance for a bottom formSheet on Android when the window has one', async () => {
+    // The detent cap subtracts the window's top inset, so the sheet edge
+    // settles at the status bar on the first frame; padding the header would
+    // reserve a dead band and drop it once the sheet landed.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
 
-    expect(iosStyle).toBeUndefined();
-    expect(androidStyle).toBe(iosStyle);
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toBeUndefined();
+
+    renderer.unmount();
   });
 
   it.each(['ios', 'android'])(
-    'keeps landscape side insets for a bottom formSheet while dropping the top clearance (%s)',
+    'drops the top clearance for a bottom formSheet when only the status bar is known (%s)',
+    async os => {
+      // The detent cap subtracts the same status-bar fallback, so the sheet
+      // edge already sits at it: padding again would be a dead band, and the
+      // later arrival of the real inset must not change that.
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 0;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'bottom-form-sheet',
+      });
+
+      const wrapper = findSafeAreaWrapper(renderer.root);
+      expect(wrapper.props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it('keeps a bottom formSheet header still when the safe-area inset arrives late', async () => {
+    // Android can report top: 0 for the frame a sheet first lays out. The
+    // status-bar fallback keeps the decision on `drop` for both frames; a
+    // measurement-driven decision would drop the padding here instead and
+    // move the header by the inset.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 0;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+    expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+    safeArea.top = 24;
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        createElement(SheetHeader, {
+          title: 'Voice language',
+          onDone: () => undefined,
+          onCancel: () => undefined,
+          topInset: 'bottom-form-sheet',
+        })
+      );
+    });
+    expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it.each(['ios', 'android'])(
+    'keeps landscape side insets for a bottom formSheet (%s)',
     async os => {
       rn.os = os;
       rn.statusHeight = 48;
@@ -606,10 +681,40 @@ describe('SheetHeader', () => {
   );
 
   it.each(['ios', 'android'])(
+    'keeps the landscape corner clearance when no top inset is known at all (%s)',
+    async os => {
+      // A side status area leaves the top inset at zero beside rounded corners
+      // (#8042): with no top inset and no status-bar height the sheet reaches
+      // the window top, so the header keeps the corner clearance.
+      rn.os = os;
+      rn.statusHeight = 0;
+      safeArea.top = 0;
+      safeArea.left = 47;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'bottom-form-sheet',
+      });
+
+      const wrapper = findSafeAreaWrapper(renderer.root);
+      expect(wrapper.props.style).toEqual(
+        os === 'android'
+          ? { paddingTop: 24, paddingLeft: 47, paddingRight: 8 }
+          : { paddingLeft: 47, paddingRight: 8 }
+      );
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
     'passes the bottom-form-sheet top-inset mode through PickerSheet (%s)',
     async os => {
-      // The picker shells are bottom formSheets: they sit below the status
-      // bar, so the shell must not reserve the window's top inset.
+      // The picker shells are bottom formSheets: on iOS they sit below the
+      // status bar and reserve nothing; on Android the detent cap already
+      // settles the sheet edge at the status bar, so the shell reserves
+      // nothing there either.
       rn.os = os;
       rn.statusHeight = 48;
       safeArea.top = 24;
@@ -626,6 +731,51 @@ describe('SheetHeader', () => {
       // className-less shell, or this assertion is vacuous.
       expect(pressablesByLabel(renderer.root, 'Done')[0]?.parent?.parent).toBe(wrapper);
       expect(wrapper.props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'drops the top clearance for a never-inset sheet on both platforms (%s)',
+    async os => {
+      // Half-detent-only sheets cannot reach the window top, so the inset the
+      // header reads would only be a dead band above the title.
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'never',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'keeps landscape side insets for a never-inset sheet while dropping the top clearance (%s)',
+    async os => {
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      safeArea.left = 47;
+      safeArea.right = 59;
+      const renderer = await mount({
+        title: 'Voice language',
+        onDone: () => undefined,
+        onCancel: () => undefined,
+        topInset: 'never',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toEqual({
+        paddingLeft: 47,
+        paddingRight: 59,
+      });
 
       renderer.unmount();
     }

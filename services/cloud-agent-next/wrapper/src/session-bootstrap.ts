@@ -1,5 +1,5 @@
+import { runSetupScript } from './setup-script.js';
 import { writeRuntimeSkills } from './runtime-skills.js';
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -12,6 +12,7 @@ import {
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
 import type { PreparationStepKind } from '../../src/shared/protocol.js';
+import { parseControlPlaneCredential } from '../../src/shared/control-plane-credential.js';
 import { writeCloudAgentRulesFile } from './cloud-agent-rules-file.js';
 import {
   createSafeProcessDiagnostic,
@@ -30,6 +31,7 @@ import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-erro
 import { reportRestoreIncomplete } from './restore-incomplete.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
+import { credentialFreeGitUrl, requireGitCredentialRecord } from './control/git-credentials.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 // Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
@@ -237,14 +239,7 @@ function longGitOptions(
 
 function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
   const raw = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  try {
-    const url = new URL(raw);
-    url.username = '';
-    url.password = '';
-    return url.toString();
-  } catch {
-    return raw;
-  }
+  return credentialFreeGitUrl(raw);
 }
 
 function isHelperBackedRemote(
@@ -276,50 +271,13 @@ function sessionAuthFilePath(sessionHome: string): string {
 async function materializeRepositoryCredentials(
   request: WrapperSessionReadyRequest
 ): Promise<void> {
-  const credentialsPath = path.join(
-    request.workspace.sessionHome,
-    '.local/share/kilo/cloud-agent/git-credentials'
-  );
   const repo = request.repo;
-  if (!repo?.token) {
-    await fs.rm(credentialsPath, { force: true });
-    return;
-  }
-
-  const repositoryUrl = repo.kind === 'github' ? new URL('https://github.com') : new URL(repo.url);
-  if (repositoryUrl.protocol !== 'https:' || !repositoryUrl.host) {
-    throw new Error('Repository Git credentials require an HTTPS URL');
-  }
-
-  const username =
-    repo.kind === 'git' && repo.platform === 'gitlab'
-      ? 'oauth2'
-      : repo.kind === 'git' && repo.platform === 'bitbucket'
-        ? 'x-token-auth'
-        : 'x-access-token';
-  const values = ['https', repositoryUrl.host, username, repo.token];
-  if (values.some(value => value.includes('\r') || value.includes('\n') || value.includes('\0'))) {
-    throw new Error('Repository Git credentials contain invalid characters');
-  }
-
-  const credentials = `protocol=https\nhost=${repositoryUrl.host}\nusername=${username}\npassword=${repo.token}\n`;
-  const credentialsDirectory = path.dirname(credentialsPath);
-  await fs.mkdir(credentialsDirectory, { recursive: true, mode: 0o700 });
-  await fs.chmod(credentialsDirectory, 0o700);
-  const temporaryPath = path.join(credentialsDirectory, `git-credentials.${randomUUID()}.tmp`);
-
-  try {
-    const handle = await fs.open(temporaryPath, 'wx', 0o600);
-    try {
-      await handle.writeFile(credentials, 'utf8');
-    } finally {
-      await handle.close();
-    }
-    await fs.rename(temporaryPath, credentialsPath);
-  } catch (error) {
-    await fs.rm(temporaryPath, { force: true }).catch(() => {});
-    throw error;
-  }
+  await requireGitCredentialRecord({
+    home: request.workspace.sessionHome,
+    url: repo ? canonicalGitUrl(repo) : '',
+    token: repo?.token,
+    platform: repo?.kind === 'github' ? 'github' : repo?.platform,
+  });
 }
 
 // The marker is removed before re-bootstrapping and written only after restore
@@ -362,39 +320,25 @@ async function cleanupWorkspace(
   ]);
 }
 
-function isCodeReviewSession(request: WrapperSessionReadyRequest): boolean {
-  return request.materialized.env.KILO_PLATFORM === 'code-review';
-}
-
-function isBitbucketReviewSession(
-  request: WrapperSessionReadyRequest
-): request is WrapperSessionReadyRequest & {
-  repo: Extract<NonNullable<WrapperSessionReadyRequest['repo']>, { kind: 'git' }>;
-} {
-  const repo = request.repo;
-  return isCodeReviewSession(request) && repo?.kind === 'git' && repo.platform === 'bitbucket';
-}
-
 // Wire-format prefix of a Bitbucket outbound session capability (see the
 // git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
 // qualifies the session for blobless clone; the credential helper authenticates
 // later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
-function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
+export function isBloblessReviewCloneEligible(
+  origin: string | undefined,
+  platform: string | undefined,
+  token: string | undefined
+): boolean {
+  if (origin !== 'code-review') return false;
+  if (platform === 'github' || platform === 'gitlab') return true;
   return (
-    isBitbucketReviewSession(request) &&
-    typeof request.repo.token === 'string' &&
-    request.repo.token.startsWith(BITBUCKET_CAPABILITY_PREFIX)
+    platform === 'bitbucket' &&
+    token !== undefined &&
+    (token.startsWith(BITBUCKET_CAPABILITY_PREFIX) ||
+      parseControlPlaneCredential(token)?.purpose === 'bitbucket')
   );
-}
-
-function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
-  if (!isCodeReviewSession(request)) return false;
-  const repo = request.repo;
-  if (repo?.kind === 'github') return true;
-  if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
-  return hasBitbucketReviewCapability(request);
 }
 
 async function cloneRepository(
@@ -418,7 +362,11 @@ async function cloneRepository(
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
   // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
-  const useBlobless = isBloblessReviewCloneEligible(request);
+  const useBlobless = isBloblessReviewCloneEligible(
+    request.materialized.env.KILO_PLATFORM,
+    platform,
+    repo.token
+  );
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
     await removePath(request.workspace.workspacePath, signal);
@@ -831,12 +779,16 @@ async function runSetupCommands(
       commandIndex: index,
       commandCount: setupCommands.length,
     });
-    const result = await run('sh', ['-lc', command], {
-      cwd: request.workspace.workspacePath,
-      inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-      hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
-      onOutput: outputReporter.onOutput,
-    });
+    const result = await runSetupScript(
+      command,
+      {
+        cwd: request.workspace.workspacePath,
+        inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
+        hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+        onOutput: outputReporter.onOutput,
+      },
+      run
+    );
     outputReporter.flush();
     logToFile(
       `bootstrap setup command finished kiloSessionId=${request.kiloSessionId} index=${index + 1} count=${setupCommands.length} elapsedMs=${Date.now() - startedAt} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? '(none)'}`
@@ -1289,7 +1241,10 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
 
-      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills);
+      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills, {
+        signal,
+        onProgress: detail => progress?.('setup_commands', detail),
+      });
 
       progress?.(
         'kilo_session',

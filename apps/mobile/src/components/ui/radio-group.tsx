@@ -1,11 +1,13 @@
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type AccessibilityRole, type AccessibilityState, View } from 'react-native';
+
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 
 /**
  * Accessible single-choice group. Renders a `radiogroup` container whose
  * accessible name is the required `label` — the visible group name above
- * the list. Radio items inside must expose `checked` state via
- * `radioItemA11y`, never `selected`.
+ * the list. Radio items inside must expose their selection via
+ * `radioItemA11y`.
  */
 export function RadioGroup({
   label,
@@ -25,20 +27,16 @@ export function RadioGroup({
 }
 
 type RadioItemA11y = {
-  accessibilityRole: 'radio';
+  accessibilityRole: AccessibilityRole;
   accessibilityLabel: string;
-  accessibilityState: {
-    checked: boolean;
-    disabled: boolean;
-    busy: boolean;
-  };
+  accessibilityState: AccessibilityState;
 };
 
 /**
- * Accessibility props for one radio item, spread onto a Pressable. Exposes
- * the radio role, an explicit label, and `checked`/`disabled`/`busy` state.
- * React Native radios report their current choice through `checked`, not
- * `selected`.
+ * Accessibility props for one radio item, spread onto a Pressable. Exposes the
+ * radio role on Android, an explicit label, and `checked`/`disabled`/`busy`
+ * state. `selectableRowA11y` maps the row onto a button with the `selected`
+ * trait on iOS, where React Native has no radio trait.
  */
 export function radioItemA11y({
   label,
@@ -52,8 +50,7 @@ export function radioItemA11y({
   busy?: boolean;
 }>): RadioItemA11y {
   return {
-    accessibilityRole: 'radio',
     accessibilityLabel: label,
-    accessibilityState: { checked, disabled, busy },
+    ...selectableRowA11y({ multi: false, selected: checked, disabled, busy }),
   };
 }

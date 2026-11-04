@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -108,7 +109,7 @@ export function SessionContextMetrics({
               accessibilityElementsHidden
               importantForAccessibility="no"
             >
-              {content.secondary}
+              {isolateLtrBidiText(content.secondary)}
             </Text>
           ) : null}
         </View>

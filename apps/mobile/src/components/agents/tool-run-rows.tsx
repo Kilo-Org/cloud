@@ -10,6 +10,7 @@ import { useOpenToolRun } from './open-tool-run-context';
 import { buildToolRunCountLabel, buildToolRunLabel, buildToolRunRows } from './session-tool-run';
 import { getToolDisplay } from './tool-card-display';
 import { getToolRowIcon } from './tool-row-icon';
+import { toolStatusLabel } from './tool-status-label';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
 /**
@@ -42,7 +43,7 @@ export function ToolOneLineRow({
         status={part.state.status}
         accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
           name: label,
-          status: part.state.status,
+          status: toolStatusLabel(t, part.state.status),
         })}
         onPress={onPress ?? defaultPress}
       />
@@ -83,7 +84,10 @@ export function CondensedToolRunRow({ parts }: Readonly<{ parts: readonly ToolPa
   }
 
   // `pending` is not final: the hook keeps re-asking while this row is mounted,
-  // so the count-only label resolves as soon as the translation lands.
+  // so the count-only label resolves as soon as the translation lands. Once the
+  // retry budget is spent (`failed`), the row stops waiting: the label settles
+  // on the count plus the last summary the app would show, and the icon-only
+  // failure badge explains why no translation arrived.
   const label = translation.pending
     ? buildToolRunCountLabel(rows, t)
     : buildToolRunLabel(rows, t, translation.text);
@@ -98,6 +102,8 @@ export function CondensedToolRunRow({ parts }: Readonly<{ parts: readonly ToolPa
       translatable={false}
       status={last?.status}
       accessibilityLabel={label}
+      failureIcon
+      translationFailed={translation.failed}
       onPress={
         openToolRun
           ? () => {

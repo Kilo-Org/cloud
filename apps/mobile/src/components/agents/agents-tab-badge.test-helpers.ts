@@ -84,6 +84,8 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  History: 'History',
+  Search: 'Search',
   Plus: 'Plus',
   House: 'House',
   MessageCircle: 'MessageCircle',
@@ -104,6 +106,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,

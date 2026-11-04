@@ -8,7 +8,9 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, ChevronRight } from '@/components/ui/icons';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { withRtlWritingDirection } from '@/lib/rtl-text';
+import { cn } from '@/lib/utils';
 
 /**
  * `<details>` as a collapsible block, collapsed unless it carries `open`. The
@@ -27,7 +29,7 @@ export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, st
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
-        className="min-h-11 flex-row items-center gap-1.5 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1.5 active:opacity-70')}
         onPress={() => {
           setExpanded(current => !current);
         }}

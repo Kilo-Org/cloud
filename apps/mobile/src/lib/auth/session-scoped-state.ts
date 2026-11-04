@@ -12,9 +12,12 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearFormDrafts } from '@/lib/form-draft';
+import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -84,15 +87,17 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
- * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
+ * caches, typed profile form drafts, per-session auto-approve and goal-disclosure
+ * flags, the remote MCP
  * connection and the stored servers behind it, the app-settings-tools group
- * switch, the browsable artifact mirror, app-owned temp copies, the stored PR
- * recents, and the phone's own search index. Every member is best-effort; one
- * member's throw falls through to the members after it, and to the caller's own
- * sign-in/sign-out state reset. The recents delete and OS search clear are
- * fired without awaiting, so the function stays synchronous; a rejection is
- * reported through telemetry, and the signed-out-launch re-clear retries the
- * index clear.
+ * switch, the debounced repository-selection send state, the browsable
+ * artifact mirror, app-owned temp copies, the stored PR recents, the retained
+ * PR discussion conversation, and the phone's own search index. Every member is
+ * best-effort; one member's throw falls through to the members after it, and to
+ * the caller's own sign-in/sign-out state reset. The recents delete and OS
+ * search clear are fired without awaiting, so the function stays synchronous;
+ * a rejection is reported through telemetry, and the signed-out-launch re-clear
+ * retries the index clear.
  *
  * Both boundaries call this: the sign-out body and the account switch. A clear
  * that only the sign-out path ran would let a direct switch hand the next
@@ -108,11 +113,20 @@ export function clearSessionScopedState(): void {
   runClear(clearToolCardImageCache);
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
+  // Profile form drafts hold what someone typed, including a secret value, in
+  // this process's memory, so the account boundary drops them with the other
+  // stores: a form left open under the previous account must not reopen under
+  // the next one.
+  runClear(clearFormDrafts);
   runClear(clearSessionAutoApprove);
   runClear(forgetRemoteMcp);
   runClear(clearRemoteMcpServers);
   runClear(clearChatBackends);
   runClear(clearSettingsToolsEnabled);
+  // The debounced repository selection keeps a pending toggle, its timer, and
+  // the server baseline it diffs against, so the account boundary drops them
+  // with the other account-scoped members.
+  runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
@@ -132,6 +146,11 @@ export function clearSessionScopedState(): void {
   // index itself. Without this, an account switch re-indexes the previous
   // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
+  // Cross-account separation for the retained PR discussion conversation: the
+  // sign-in account switch and the sign-out clear it with the other
+  // account-scoped members. Within one account, the organization component of
+  // `conversationRetentionKey` separates organizations' reads of the same PR.
+  runClear(clearConversationRetention);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a

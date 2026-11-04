@@ -9,6 +9,7 @@
       "lowBalance": "Iwọntunwọnsi rẹ nilo akiyesi",
       "spendAlert": "Inawo rẹ nilo akiyesi",
       "securityFinding": "Wiwa aabo nilo akiyesi",
+      "securityUpdate": "Ayẹwo aabo ni imudojuiwọn",
       "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Wiwa aabo nilo akiyesi"
+      "body": "Ayẹwo aabo ni imudojuiwọn"
     }
   },
   "instanceLifecycle": {

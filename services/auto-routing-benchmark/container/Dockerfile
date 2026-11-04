@@ -8,6 +8,7 @@
 # pick up a newer stable CLI.
 FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 g++ make \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @kilocode/cli@latest
 WORKDIR /app

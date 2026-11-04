@@ -78,6 +78,11 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useUpdateBranchMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useDisableAutoMergeMutation: () => ({ isPending: false, mutateAsync: vi.fn() }),
 }));
+// This suite asserts the action buttons' variants; the blocked panel's rows
+// have their own selector tests.
+vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
+  useMergeBlockedReasons: () => ({ reasons: [] }),
+}));
 
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -98,6 +103,7 @@ vi.mock('@/components/pr-review/pr-review-overview-parts', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/icons', () => {
   const names = [
@@ -194,6 +200,40 @@ describe('PrReviewOverview action hierarchy', () => {
     // Exactly one primary action in the overview body.
     const primaries = buttons.filter(node => (node.props.variant ?? 'default') === 'default');
     expect(primaries).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('offers no review re-entry once the pull request is merged', async () => {
+    query.data = { ...MERGEABLE_OVERVIEW, state: 'merged' };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    expect(
+      buttons.find(node => node.props.accessibilityLabel === 'Review pull request')
+    ).toBeUndefined();
+
+    unmount();
+  });
+
+  it('starts the loaded body one section gap below the tab selector', async () => {
+    // The band under the Overview/Files/Discussion tabs measured 56 dp against
+    // the overview's 17.5 dp section gap: the scroll view renders its
+    // reduced-motion progress row as the first child, so the body's `gap-5`
+    // landed after that row, and the row reserves its 31.5 dp whenever reduced
+    // motion is on. `pt-3` (10.5 dp) under the tab wrapper's `pb-2` (7 dp) is
+    // the 17.5 dp rhythm the discussion tab already starts with, and the band
+    // is out of flow so the first block keeps that edge in both motion modes.
+    query.data = MERGEABLE_OVERVIEW;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewOverview, overviewProps)
+    );
+
+    const scroller = renderer.root.find(node => String(node.type) === 'ScrollView');
+    expect(scroller.props.contentContainerClassName).toBe('gap-5 px-4 pt-3');
+    expect(scroller.props.overlayRefreshProgress).toBe(true);
 
     unmount();
   });

@@ -108,6 +108,24 @@ export async function organizationExists(db: WorkerDb, orgId: string): Promise<b
   return rows.length > 0;
 }
 
+export async function isDirectOrgMember(
+  db: WorkerDb,
+  orgId: string,
+  userId: string
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: organization_memberships.id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, orgId),
+        eq(organization_memberships.kilo_user_id, userId)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
 export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<BotUserForToken> {
   const botId = generateBotUserId(orgId);
   const botEmail = generateBotUserEmail(orgId);

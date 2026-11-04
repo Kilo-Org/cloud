@@ -62,7 +62,30 @@ describe('keyed envelopes', () => {
     expect(() => parseKeyedEnvelope('{', scheme)).toThrow(EncryptionFormatError);
     expect(() =>
       parseKeyedEnvelope(JSON.stringify({ scheme, version: 1, keyId: 'active-key' }), scheme)
-    ).toThrow('malformed ciphertext');
+    ).toThrow('Invalid envelope: must be an object');
+  });
+
+  test('reports the detailed envelope format errors of direct decryption', () => {
+    const ciphertext = {
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+      encryptedData: 'encrypted-data',
+      encryptedDEK: 'encrypted-dek',
+    };
+    const serialized = (value: unknown) =>
+      JSON.stringify({ scheme, version: 1, keyId: 'active-key', ciphertext: value });
+
+    expect(() =>
+      parseKeyedEnvelope(serialized({ ...ciphertext, algorithm: 'aes-128-cbc' }), scheme)
+    ).toThrow('Unsupported algorithm: aes-128-cbc. Expected: rsa-aes-256-gcm');
+
+    expect(() => parseKeyedEnvelope(serialized({ ...ciphertext, version: 2 }), scheme)).toThrow(
+      'Unsupported version: 2. Expected: 1'
+    );
+
+    expect(() =>
+      parseKeyedEnvelope(serialized({ ...ciphertext, encryptedDEK: '' }), scheme)
+    ).toThrow('Invalid envelope: missing encryptedData or encryptedDEK');
   });
 
   test('decrypts old ciphertext from a configured retired slot', () => {

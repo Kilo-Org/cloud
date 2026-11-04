@@ -1,19 +1,29 @@
-import { describe, expect, it } from '@jest/globals';
-import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
-  candidateModelIdsFromSources,
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  resolveOrganizationMemberModelPolicy,
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import {
+  getOrganizationByokProviderIds,
+  hasInferenceProviderUserByokForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  deniedAutoRoutingCandidates,
+  deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
-  getAutoRoutingSettings: jest.fn(),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));
@@ -21,6 +31,25 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(),
+    getProviderSlugsForModel: jest.fn(),
+  })
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
+  getOrganizationByokProviderIds: jest.fn(async () => []),
+  hasInferenceProviderUserByokForModel: jest.fn(async () => false),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
+  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    ...jest.requireActual<object>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ),
+    resolveOrganizationMemberModelPolicy: jest.fn(),
   })
 );
 
@@ -32,11 +61,10 @@ function policy(
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
     ...overrides,
   };
 }
-
-const owner = { userId: 'user-1', organizationId: 'org-1' };
 
 describe('policyNeedsCandidateEvaluation', () => {
   it('is false for an unrestricted policy with an inactive baseline deny list', () => {
@@ -81,13 +109,199 @@ describe('policyNeedsCandidateEvaluation', () => {
 
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+    await expect(collectDeniedAutoRoutingModelIds(policy(), 'efficient')).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  it('denies platform routing-table candidates outside the member grant', async () => {
+    jest.mocked(getCachedRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'anthropic/claude-sonnet-4.6' },
+          { model: 'openai/gpt-5' },
+          { model: 'kilo-auto/balanced' },
+        ],
+      },
+    } as never);
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['anthropic/claude-sonnet-4.6'],
+            providerAllowList: [],
+          },
+        }),
+        'efficient'
+      )
+    ).resolves.toEqual(['openai/gpt-5']);
+  });
+
+  it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
+    jest.mocked(getCachedRoutingTable).mockClear();
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
+        'efficient'
+      )
+    ).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  describe('with an organization provider allowlist', () => {
+    const providerCeilingPolicy = policy({
+      memberGrant: { mode: 'organization_baseline' },
+      organizationProviderCeiling: ['anthropic'],
+    });
+
+    beforeEach(() => {
+      jest.mocked(getCachedRoutingTable).mockReset();
+      jest.mocked(getCachedRoutingTable).mockImplementation(
+        async router =>
+          (router === 'frontier'
+            ? { routes: { 'implementation/code_generation': [{ model: 'openai/gpt-5' }] } }
+            : {
+                routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
+              }) as never
+      );
+      jest
+        .mocked(getProviderSlugsForModel)
+        .mockImplementation(async modelId =>
+          modelId.startsWith('openai/') ? new Set(['openai']) : new Set(['anthropic'])
+        );
+    });
+
+    it('denies a frontier table model blocked by the provider allowlist and absent from the efficient table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'frontier')
+      ).resolves.toEqual(['openai/gpt-5']);
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+      expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
+    });
+
+    it('uses the efficient platform table instead of the frontier table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'efficient')
+      ).resolves.toEqual([]);
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
+    });
+  });
+});
+
+describe('deniedAutoRoutingCandidates with organization inference provider keys', () => {
+  // Catalog-mode keys serving Kimi through Moonshot AI and GLM through Z.AI.
+  const catalogServingProviders = [
+    ['moonshotai/kimi-k2.6', 'moonshotai'],
+    ['z-ai/glm-5.2', 'z-ai'],
+  ] as const;
+
+  beforeEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockClear().mockResolvedValue(['openai']);
+    jest
+      .mocked(getDirectByokCatalogModelIds)
+      .mockClear()
+      .mockImplementation(async (_owner, isServingAllowed) => {
+        const served = new Set<string>();
+        for (const [modelId, providerId] of catalogServingProviders) {
+          if (await isServingAllowed?.(modelId, providerId)) served.add(modelId);
+        }
+        return served;
+      });
+    jest
+      .mocked(hasInferenceProviderUserByokForModel)
+      .mockClear()
+      .mockImplementation(async modelId => modelId !== 'deepseek/deepseek-v4');
+    jest
+      .mocked(getProviderSlugsForModel)
+      .mockImplementation(async modelId =>
+        modelId.startsWith('anthropic/') ? new Set(['anthropic']) : new Set(['other'])
+      );
+  });
+
+  afterEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValue([]);
+    jest.mocked(getDirectByokCatalogModelIds).mockReset().mockResolvedValue(new Set());
+    jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
+  });
+
+  it('admits models outside the provider allow-list that an inference provider key serves', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationProviderCeiling: ['anthropic'],
+        organizationModelDenyList: ['openai/o3'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5', 'openai/o3', 'deepseek/deepseek-v4']
+    );
+
+    expect(denied.sort()).toEqual(['deepseek/deepseek-v4', 'openai/o3']);
+    expect(jest.mocked(getOrganizationByokProviderIds).mock.calls).toEqual([[readDb, 'org-1']]);
+    expect(getDirectByokCatalogModelIds).toHaveBeenCalledWith(
+      { type: 'organization', id: 'org-1' },
+      expect.any(Function)
+    );
+    expect(
+      jest
+        .mocked(hasInferenceProviderUserByokForModel)
+        .mock.calls.map(([id]) => id)
+        .sort()
+    ).toEqual(['deepseek/deepseek-v4', 'openai/gpt-5']);
+  });
+
+  it('keeps denying models outside the member grant', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: ['anthropic/claude'],
+          providerAllowList: [],
+        },
+        organizationProviderCeiling: ['anthropic'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5']
+    );
+
+    expect(denied).toEqual(['openai/gpt-5']);
+    expect(getOrganizationByokProviderIds).not.toHaveBeenCalled();
+  });
+
+  it('admits a catalog model only when the provider allow-list names its key provider', async () => {
+    jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
+
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationProviderCeiling: ['anthropic', 'z-ai'],
+      }),
+      ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2']
+    );
+
+    expect(denied).toEqual(['moonshotai/kimi-k2.6']);
+  });
+
+  it('admits a catalog model whose key provider a selected grant names', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: [],
+          providerAllowList: ['z-ai'],
+        },
+      }),
+      ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2']
+    );
+
+    expect(denied).toEqual(['moonshotai/kimi-k2.6']);
+    expect(hasInferenceProviderUserByokForModel).not.toHaveBeenCalled();
   });
 });
 
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
   it('returns routing candidates that cannot be served without data collection', async () => {
-    jest.mocked(getAutoRoutingSettings).mockResolvedValue({ status: 404, body: {} } as never);
     jest.mocked(getCachedRoutingTable).mockResolvedValue({
       routes: {
         'implementation/code_generation': [
@@ -102,10 +316,116 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('efficient')).resolves.toEqual([
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
+  });
+
+  it('uses frontier candidates for privacy denials rather than the efficient table', async () => {
+    jest.mocked(getCachedRoutingTable).mockReset();
+    jest.mocked(getCachedRoutingTable).mockImplementation(
+      async router =>
+        (router === 'frontier'
+          ? {
+              routes: {
+                'implementation/code_generation': [
+                  { model: 'frontier/private-model' },
+                  { model: 'frontier/ordinary-model' },
+                ],
+              },
+            }
+          : {
+              routes: { 'implementation/code_generation': [{ model: 'efficient/private-model' }] },
+            }) as never
+    );
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['frontier/private-model', 'efficient/private-model']));
+
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('frontier')).resolves.toEqual([
+      'frontier/private-model',
+    ]);
+    expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+    expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
+  });
+});
+
+describe('deniedAutoRoutingModelIdsForMember', () => {
+  const member = { userId: 'user-1', organizationId: '22222222-2222-4222-8222-222222222222' };
+
+  it('applies the organization deny list to a baseline grant', async () => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationModelDenyList: ['openai/gpt-4o'],
+      })
+    );
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['openai/gpt-4o:free', 'anthropic/claude'],
+      })
+    ).resolves.toEqual(['openai/gpt-4o', 'openai/gpt-4o:free']);
+  });
+
+  it('denies candidates outside the member group policy grant', async () => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: ['anthropic/claude-sonnet-4.6'],
+          providerAllowList: [],
+        },
+      })
+    );
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['anthropic/claude-sonnet-4.6', 'openai/gpt-5', 'kilo-auto/frontier'],
+      })
+    ).resolves.toEqual(['openai/gpt-5']);
+    const { fromDb, ...policyParams } =
+      jest.mocked(resolveOrganizationMemberModelPolicy).mock.lastCall?.[0] ?? {};
+    expect(policyParams).toEqual({
+      organizationId: member.organizationId,
+      kiloUserId: member.userId,
+    });
+    expect(fromDb).toBe(readDb);
+  });
+
+  it('denies data-collection-required candidates when the organization denies data collection', async () => {
+    jest
+      .mocked(resolveOrganizationMemberModelPolicy)
+      .mockResolvedValue(policy({ dataCollection: 'deny' }));
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor']));
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: [
+          'meta/muse-spark-1.3-contributor',
+          'provider/free-model:free',
+          'anthropic/claude',
+        ],
+      })
+    ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
+  });
+
+  it('keeps data-collection-required candidates when the organization allows data collection', async () => {
+    jest
+      .mocked(resolveOrganizationMemberModelPolicy)
+      .mockResolvedValue(policy({ dataCollection: 'allow' }));
+    jest.mocked(getDataCollectionRequiredModelIds).mockClear();
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['meta/muse-spark-1.3-contributor', 'provider/free-model:free'],
+      })
+    ).resolves.toEqual([]);
+    expect(getDataCollectionRequiredModelIds).not.toHaveBeenCalled();
   });
 });
 
@@ -157,7 +477,7 @@ describe('deniedModelIdsForCandidates', () => {
     ).toEqual(['example/model', 'example/model:suffix']);
   });
 
-  it('denies a custom-pool-only model excluded by a selected member grant', () => {
+  it('denies a candidate excluded by a selected member grant', () => {
     expect(
       deniedModelIdsForCandidates(
         policy({
@@ -168,50 +488,29 @@ describe('deniedModelIdsForCandidates', () => {
             providerAllowList: [],
           },
         }),
-        ['pool/only-model', 'anthropic/claude'],
+        ['other/model', 'anthropic/claude'],
         modelId => modelId === 'anthropic/claude'
       )
-    ).toEqual(['pool/only-model']);
+    ).toEqual(['other/model']);
   });
 });
 
-describe('candidateModelIdsFromSources', () => {
-  it('uses the custom pool instead of the platform table when a pool is configured', () => {
-    const ids = candidateModelIdsFromSources(
-      {
+describe('candidateModelIdsFromTable', () => {
+  it('includes each concrete routing-table model once', () => {
+    expect(
+      candidateModelIdsFromTable({
         routes: {
-          'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+          'implementation/code_generation': [
+            { model: 'google/gemini-2.5-flash' },
+            { model: 'kilo-auto/balanced' },
+          ],
+          'implementation/debugging': [{ model: 'google/gemini-2.5-flash' }],
         },
-      },
-      ['pool/only-model']
-    );
-    expect(ids).toEqual(['pool/only-model']);
-    expect(ids).not.toContain('google/gemini-2.5-flash');
+      })
+    ).toEqual(['google/gemini-2.5-flash']);
   });
 
-  it('includes only concrete routing-table models when no pool is configured', () => {
-    expect(
-      candidateModelIdsFromSources(
-        {
-          routes: {
-            'implementation/code_generation': [
-              { model: 'google/gemini-2.5-flash' },
-              { model: 'kilo-auto/balanced' },
-            ],
-          },
-        },
-        null
-      )
-    ).toEqual(['google/gemini-2.5-flash']);
-    const ids = candidateModelIdsFromSources(
-      {
-        routes: {
-          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
-        },
-      },
-      null
-    );
-    expect(ids).not.toContain('kilo-auto/balanced');
-    expect(ids).not.toContain('moonshotai/kimi-k3');
+  it('returns no candidates without a routing table', () => {
+    expect(candidateModelIdsFromTable(null)).toEqual([]);
   });
 });

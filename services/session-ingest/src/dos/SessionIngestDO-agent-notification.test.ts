@@ -170,7 +170,7 @@ beforeEach(() => {
 
 function makeHarness() {
   const state = {
-    storage: { setAlarm: vi.fn() },
+    storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
     waitUntil: vi.fn(),
     blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
   } as unknown as DurableObjectState;

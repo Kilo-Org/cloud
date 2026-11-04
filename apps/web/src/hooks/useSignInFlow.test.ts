@@ -443,6 +443,53 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(mounted.container.querySelector('#state')?.textContent).toBe('magic-link-sent');
   });
 
+  it('returns a refused sign-up Email to the provider buttons with the pause notice', async () => {
+    fetchMock.mockResolvedValueOnce(response({ success: true }));
+    mockSendMagicLink.mockResolvedValueOnce({
+      success: false,
+      error: 'EMAIL-SIGNUP-DISABLED',
+    } as never);
+    mounted = mountFlow({ searchParams: {}, isSignUp: true });
+
+    act(() => button(mounted!.container, 'show-email').click());
+    act(() => button(mounted!.container, 'new-email').click());
+    act(() => button(mounted!.container, 'submit-email').click());
+    await act(async () => {
+      button(mounted!.container, 'first').click();
+      await flushAsyncWork();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(mounted.container.querySelector('#state')?.textContent).toBe('landing');
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('false');
+    expect(mounted.container.querySelector('#error')?.textContent).toBe('EMAIL-SIGNUP-DISABLED');
+  });
+
+  it('shows the pause notice beside new-account providers when discovery flags it', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response({ success: true }))
+      .mockResolvedValueOnce(
+        response({ kind: 'new', providers: ['google', 'github'], emailSignupDisabled: true })
+      );
+    mounted = mountFlow();
+
+    act(() => button(mounted!.container, 'new-email').click());
+    act(() => button(mounted!.container, 'submit-email').click());
+    await act(async () => {
+      button(mounted!.container, 'first').click();
+      await flushAsyncWork();
+    });
+
+    expect(mounted.container.querySelector('#state')?.textContent).toBe('provider-select');
+    expect(mounted.container.querySelector('#error')?.textContent).toBe('EMAIL-SIGNUP-DISABLED');
+  });
+
+  it('accepts the email signup pause as a callback error', () => {
+    mounted = mountFlow({ searchParams: {}, error: 'EMAIL-SIGNUP-DISABLED' });
+
+    expect(mounted.container.querySelector('#error')?.textContent).toBe('EMAIL-SIGNUP-DISABLED');
+  });
+
   it('does not auto-verify a prefilled explicit sign-up email', async () => {
     mounted = mountFlow({ searchParams: { email: 'new@example.com' }, isSignUp: true });
 

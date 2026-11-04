@@ -45,29 +45,35 @@ When enabled, Cloudflare uses contained sandbox classes and the existing credent
 broker; Vercel uses native network policies. Each worktree has stable credential
 aliases shared by its registered Kilo roots, while different worktrees have
 separate Kilo authentication contexts. Containment failures never fall back to
-raw credentials. When disabled, authorized Kilo and repository credentials are
-provided directly to the sandbox without alias redemption or credential injection.
-Control-plane ownership, attachment scope, terminal authorization, and billing
-checks still apply; direct API credentials retain their underlying access scope.
-Expired direct-credential terminal leases require a session reattachment rather
-than renewing only the server-side grant.
+raw credentials. When disabled, a session whose token has modern runtime
+authorization uses the session-bound runtime credential proxy; managed SCM
+credentials may still be resolved directly for the repository scope. A session
+without either safe Kilo path is refused rather than receiving a native user
+token. Control-plane ownership, attachment scope, terminal authorization, and
+billing checks still apply.
 
 Cloudflare's native outbound handler intercepts ports 80 and 443. With containment
 enabled, local targets such as `http://host.docker.internal:<offset-port>` can
 bypass interception and reject aliases with HTTP 401. Contained E2E runs therefore
 need sandbox-facing endpoints that traverse the native handler, plus the running
-`cloudflare-git-token-service` and its capability-encryption configuration. The
-local-dev direct-credential mode supports the generated high-port HTTP endpoints.
+`cloudflare-git-token-service` and its capability-encryption configuration. Local
+development requires modern resource-token issuance in either containment mode
+so sessions receive a runtime credential proxy. Direct Kilo tokens and
+legacy Kilo broker capabilities are not supported execution paths.
 
 For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
 is enabled unless this variable is set to `false`. Local `dev` defaults to
 `false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Devcontainer support is retired; existing sessions
-can be stopped or deleted but cannot start or resume.
+proxy-compatible upstreams. Enable modern resource-token issuance for the
+runtime credential proxy in either containment mode. Devcontainer support is
+retired; existing sessions can be stopped or deleted but cannot start or resume.
 
 Legacy containment flags are persisted at session creation, so changing the
-variable affects new legacy sessions, not existing ones.
+variable affects new legacy sessions, not existing ones. Existing sessions without
+modern runtime authorization fail on start/restore/resume, including contained
+sessions. Their metadata remains readable for viewing, Stop, deletion, and
+cleanup. Start a new session to continue execution.
 
 ## Running
 
@@ -102,11 +108,11 @@ timer or sandbox acceptance:
 
 ```bash
 cd services/cloud-agent-next/wrapper
-KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.17 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
 ```
 
 The local production-timer driver discovers this worktree's ports, uses the seeded
-GitHub-enabled account, checks Kilo 7.8.1 and the running wrapper hash, and records
+GitHub-enabled account, checks the pinned Kilo CLI and the running wrapper hash, and records
 native continuation, unchanged Cloud outcomes, allocation activity and physical
 idle shutdown. It leaves the stopped chat available for browser/recovery checks:
 
@@ -150,7 +156,7 @@ and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.1`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.17`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts
@@ -165,6 +171,35 @@ then proves SDK attach/chat behavior: warm and cold projected reads, cold event
 wake-up plus `promptAsync()`, intentional `prompt()` rejection, active `abort()`,
 stable warm/cold message pagination, and selector rejection without transcript mutation.
 It stops owned sandbox families and releases any fake-LLM gate in cleanup.
+
+Hosted native facade acceptance (production-shaped `/kilo` surface):
+
+```bash
+pnpm --filter cloud-agent-next exec tsx test/e2e/native-facade-acceptance.ts
+```
+
+This driver runs against the real local Worker, real Durable Objects, real
+Postgres, a real Docker sandbox and the real `kilo serve`, faking only the LLM.
+It proves discovery/pagination, live stream integrity, native questions and
+human-required permissions, the `kilo.native.fence` snapshot boundary,
+same-key start replay with changed-intent rejection, abort of one in-flight turn,
+cold no-wake reads and message-triggered recovery. Results land in
+`dev/logs/<runID>.json` (`NATIVE_E2E_REPORT` overrides the path). Checks that
+prove an owned acceptance criterion fail rather than report `blocked`.
+
+Automatic idle shutdown is a separate invocation. It needs the interactive
+idle window shortened without changing the session's IDE origin, so set
+`CONTROL_PLANE_TIMER_DIVISOR=10` in `services/cloud-agent-next/.dev.vars`,
+restart the stack (the divisor also shortens the reconnect window, so do not mix
+this leg with long sequences), and run:
+
+```bash
+NATIVE_E2E_IDLE_LEG=1 pnpm --filter cloud-agent-next exec tsx test/e2e/native-facade-acceptance.ts
+```
+
+The leg creates its own `desktop`-origin session, waits for Cloud's own idle
+deadline to reclaim the sandbox, proves detail/transcript/attach read without
+waking it, then resumes it with ordinary input.
 
 Focused lifecycle scenario:
 
@@ -198,8 +233,7 @@ tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 # proxy. The running Worker must set PREVIEW_HOST_SUFFIX=localhost in its
 # .dev.vars; the scenario fails immediately if dispatch is off. Requests carry an explicit
 # `Host: p<port>-<hex>.localhost` and a manual cookie jar. Needs
-# E2E_CONTROL_PLANE_V2=1 and CONTROL_PLANE_IDS enrollment; it declares
-# `controlPlaneRuntime`, so it is `unsupported` on the HTTP profiles. See
+# Runtime inspection through `controlPlaneRuntime` is required, so it is `unsupported` on the HTTP profiles. See
 # "Preview HTTP (hostname dispatch)" below.
 tsx services/cloud-agent-next/test/e2e/run.ts preview-http _
 
@@ -262,7 +296,7 @@ below): one `run.ts` child per scenario under one pool, each with its own
 sandboxes the Docker VM holds beside the stack (about 1.5 GiB each), at most 4;
 `--parallel` or `E2E_PARALLEL` overrides it and warns when it exceeds that
 number. Pass the offset-prefixed `WORKER_URL`, `FAKE_LLM_URL`, and
-`KILO_SESSION_INGEST_URL`, plus `E2E_CONTROL_PLANE_V2=1` and `E2E_USER_EMAIL`
+`KILO_SESSION_INGEST_URL` and `E2E_USER_EMAIL`
 when the matrix includes worktree scenarios. The local dev container caps in
 `wrangler.jsonc` (6 for the small classes the matrix boots) are sized for a
 12 GiB Docker VM; restart `cloud-agent-next` after changing them.
@@ -314,11 +348,11 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `WORKER_URL` | `http://localhost:8794` |
 | `FAKE_LLM_URL` | `http://localhost:8811` (host-side view) |
 | `E2E_GIT_URL` | `https://github.com/octocat/Hello-World.git` |
+| `E2E_SECOND_GIT_URL` | `https://github.com/octocat/Spoon-Knife.git`. Second public HTTPS repository used by `hosted-workspace-contract` to prove a separate workspace sandbox; must differ from `E2E_GIT_URL`. |
 | `E2E_GITHUB_REPO` | unset. When set (`owner/repo`), start uses GitHub-app clone instead of `gitUrl`. Pair with `E2E_USER_EMAIL` for the seeded installation. |
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
-| `E2E_CONTROL_PLANE_V2` | unset. Set to `1` to advertise the new-plane (`workspace_*`) capability so the C1-gated scenarios run instead of reporting `unsupported`. It does not replace the per-scenario `controlPlaneRuntime` proof that the container runs the new-plane wrapper, so it cannot be used to false-pass against the legacy plane. |
 | `E2E_FAKE_SCOPE` | unset. `[A-Za-z0-9_-]{1,64}` attribution token prepended to every prompt as `__e2e_scope__:<token>`. `fetchFakeRequests` then reads `GET /test/requests?scope=<token>` instead of the global total, so a parallel shard asserts only on its own completions. The fake strips the marker before parsing the directive or echoing, so it never reaches scenario-visible content. A malformed value fails the run. |
 | `E2E_INTERNAL_API_SECRET` | unset. Required in the launcher shell for the local HTTP e2e profile (`cloud-agent-next-http`): the render command writes it into the generated `.wrangler/.dev.vars` as the Worker's `INTERNAL_API_SECRET`. The shared rules (`requireE2eInternalSecret`) reject the development default, values shorter than 16 characters, and whitespace; the renderer additionally rejects values outside `[A-Za-z0-9._~-]`, because only it writes a dotenv line. Must differ from production's `INTERNAL_API_SECRET`. The local-HTTP driver resolves it like the deployed driver — the exported value or the auth file's `e2eInternalApiSecret` — so both ends must agree. |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
@@ -350,6 +384,81 @@ tunnel-restart path reloads `cloud-agent-next` rather than the HTTP variant. Sto
 the HTTP group and start a fresh launcher session with
 `E2E_INTERNAL_API_SECRET` exported (the same value the driver uses), and never
 type the secret into a logged pane command.
+
+## Local Kilo Integration
+
+`e2e:local-kilo` tests the complete path through a separate local `kilo serve`:
+
+```text
+test driver -> local Kilo -> local Cloud Agent stack -> sandbox runtime
+```
+
+Start the `cloud-agent` group first. Use an existing funded local account and a
+Kilo source checkout with its locked dependencies installed. Select the Bun
+version in that checkout's `packageManager` field.
+
+```bash
+pnpm --filter cloud-agent-next run e2e:local-kilo \
+  --kilo-repo /path/to/kilocode \
+  --bun /path/to/pinned/bun \
+  --email your-local-test-account@example.com
+```
+
+The driver discovers ports with `dev:status`, validates local database ownership,
+and creates an owned profile and workspace. It launches Kilo with a separate
+`HOME`, all XDG directories, local-only service origins, and an in-memory local
+credential. It does not change normal Kilo authentication or load project config.
+
+Coverage is grouped by topic. Every scenario asserts behavior and records
+pass/fail in `report.json`; one failure never skips cleanup or an independent
+later scenario.
+
+- **workspace** (`workspace.*`): catalog listing, creation and idempotent replay,
+  detail, a second session in that workspace, preparation and sandbox-status SSE,
+  native snapshot/fence/live delivery, and follow-up turns with persisted
+  transcript checks.
+- **hosted** (`hosted.start`): a cold hosted start, the same `operationKey`
+  replaying idempotently, changed intent under the same key rejected, immediate
+  listing, attach while the snapshot is still pending, and `cloud.status` on the
+  system feed during start.
+- **turns** (`turns.*`): prompts sent while a turn is busy are all persisted
+  once and the session ends with a completed reply (the driver does not pair
+  replies with prompts; queued prompts may steer a running turn), aborting a slow turn then
+  following up, duplicate `messageID` deduplication, provider-error surfacing and
+  recovery, a slash command, and native transcript pagination.
+- **questions** (`questions.*`): ask, list through `GET /question`, reply, then
+  idle with an empty list; a rejection with no request body (regression for
+  `6b660026ca`); and a pending question that survives re-attach.
+- **validation** (`validation.*`): detached, unknown, and mismatched selectors
+  rejected; the `x-kilo-workspace` header selector accepted; an oversized prompt
+  rejected while the session stays readable; and invalid prompt bodies rejected.
+- **auth** (`auth.*`): a signed-out Kilo gets 401 on hosted start; an account
+  without balance gets 402. Both use a second local Kilo with its own `HOME`.
+
+Pass `--only <name>` (repeatable or comma-separated) to run specific scenarios:
+
+```bash
+pnpm --filter cloud-agent-next run e2e:local-kilo \
+  --kilo-repo /path/to/kilocode --email you@example.com \
+  --only hosted.start,turns.queued
+```
+
+By default every non-opt-in scenario runs. Two scenarios are opt-in only:
+
+- `real-model` drives `kilo-auto/efficient` for a cold turn and a tool follow-up.
+- `idle-stream` holds `/event` on an idle session for about 30 s and asserts no
+  `kilo.native.resnapshot` and no close. This is the manual check for the native tail fix, not a
+  CI gate.
+
+The local Docker sandbox cannot clone for a second workspace while another
+sandbox is alive, so the runner releases one sandbox family before it starts the
+next.
+
+The model is `kilo/fake-deterministic`; the sandbox, wrapper, Kilo processes,
+Durable Objects, and database are real. The public Git fixture needs network access.
+Reports and redacted traces are stored under `dev/logs/local-kilo-*`; `--out`
+selects a new evidence directory. Cleanup removes only this run's workspaces,
+profile, attachments, and local Kilo processes.
 
 ## Deployed profile (`E2E_PROFILE=deployed`)
 
@@ -761,6 +870,7 @@ reusable catalog of planned and existing scenarios, see
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
 | `worktree-chat` | Creates a worktree chat through the public tRPC surface; verifies workspace/worktree identity, idempotent same-key replay, a cold echo boot, and one hot echo turn with stable allocation references. |
 | `worktree-multi-chat` | Boots a root chat, lazily creates a sibling in the same worktree/sandbox, and proves: shared uncommitted file write→read→overwrite (parsed echo equals an independent writer nonce), sequential question ownership/replay/answer isolation (asked in the root while the sibling is idle), targeted interrupt of the sibling while the root holds a paced turn (root nonterminal then completing, allocation unchanged), and targeted delete of the sibling leaving the root accepting another turn. The runtime serializes streaming model turns, so it does not claim two chats streaming at one instant. |
+| `hosted-workspace-contract` | Proves the complete workspace-first Cloud contract on the real Worker, Durable Objects, Docker sandbox and fake LLM: owner/current-org authorization and non-leakage, same-key replay plus changed-intent conflict for workspace and sibling creation, three roots on one shared sandbox, independent turn abort, middle-child deletion and final-root rejection, passive catalog/get/status and durable transcript reads while idle-stopped (no new provider container, no allocation, unchanged billing interval), automatic idle shutdown plus wake-on-input, a second-repository workspace on its own sandbox, and journaled `deleteWorktree` with a completed tombstone, replay and post-delete rejection. Needs `sessionSandbox` + `sandbox` + `database`; budget ~50 minutes. |
 | `long-conversation` | One cold `echo:cold` turn plus twelve hot turns — nine `echo:<token>`, one paced `slow:2:50`, and a real `file:write`/`file:read` pair whose parsed echo body equals the writer nonce. Every hot turn completes with no re-preparation and a stable allocation reference. |
 | `leave-and-return` | Boots, completes a boot echo turn, then leaves the session unattended; requires the allocation to disappear, then a resume turn on a distinct non-null allocation with the boot content replayed from a fresh stream. |
 | `large-stream` | Stages a real file and asks the model to read it; requires a correlated completed read whose persisted output meets the byte floor, plus a paced follow-up on the same session. |
@@ -801,22 +911,12 @@ over HTTP, where the Worker self-fetches the minted URL.
 
 ### New-plane (`workspace_*`) scenarios
 
-These scenarios are written against the control-plane V2 (`workspace_*`) sessions
-described in `docs/control-plane.md`. C1 (the routing cutover) is not done yet, so
-they declare `controlPlaneV2`, which the local profiles advertise only when the
-operator sets `E2E_CONTROL_PLANE_V2=1`. Without it they report `unsupported` with
-the missing-capability reason. They are listed in the matrix and are
-expected-unsupported until then.
+Every session uses the control plane (`workspace_*`). Local profiles advertise
+control-plane support automatically. No enrollment flag is required.
 
-The opt-in flag alone is **not** the plane proof: the legacy plane also issues
-`workspace_*` ids. Every new-plane scenario also declares `controlPlaneRuntime`,
-which is a local-Docker capability. After boot it captures the new-plane control
-wrapper (`kilocode-control-plane-wrapper.js`) uniquely in the owned container and
-returns its identity; a legacy container has no such process, so `proveNewPlane`
-throws and an opted-in run against a still-legacy plane fails loudly instead of
-false-passing. `prepareBrowserSession` already sets `createdOnPlatform:
-'cloud-agent-web'`, so once C1 lands, the cutover routes these sessions to the
-new plane; the scenario does not need a separate create path.
+Each scenario also requires `controlPlaneRuntime`. This capability verifies
+`kilocode-control-plane-wrapper.js` in the owned container before the test
+continues. HTTP profiles report `unsupported` when they cannot inspect that runtime.
 
 | Lifecycle | What it does |
 |---|---|
@@ -870,8 +970,7 @@ scenario fails immediately with a message naming this variable. The web app need
 no preview setting: it learns availability from the Worker and opens
 `<worker>/preview/open?ticket=<jwt>`, which the Worker redirects to the preview host.
 
-Run (from the repository root, with a running local stack,
-`E2E_CONTROL_PLANE_V2=1`, and the driver user enrolled in `CONTROL_PLANE_IDS`):
+Run from the repository root with a running local stack:
 
 ```bash
 WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
@@ -935,6 +1034,11 @@ delivery sends no Kilo credential, so ingest authenticates with its unguessable
 path token. Mint (`POST /__e2e/callbacks`), read/delete (`GET`/`DELETE
 /__e2e/callbacks/:token`) and any extra or trailing path segment stay behind both
 gates.
+
+Callback URLs use the lowercase UUIDv4 format emitted by `crypto.randomUUID()`.
+Delivery records belong to an active minted token, with the sink's one-hour
+lifetime and per-token record cap. Owner-authenticated reads preserve arrival
+order; deletion completes the token's lifecycle.
 
 Security consequence, recorded honestly. Holding the e2e secret with no JWT lets
 a caller replace any sandbox's wrapper credential by id

@@ -384,6 +384,10 @@ grants billing access without consuming a seat.
    subscription. If two concurrent requests both pass the
    existing-schedule check, the second MUST fail rather than create
    a duplicate schedule.
+   When the payment processor confirms another active or pending
+   change for that same subscription, the losing request MUST return
+   a client-correctable error, not an internal server error, and MUST
+   leave the winning schedule unchanged.
 2. A billing cycle change MUST take effect at the next renewal date;
    it MUST NOT be applied immediately.
 3. The system MUST NOT prorate or issue immediate charges or credits

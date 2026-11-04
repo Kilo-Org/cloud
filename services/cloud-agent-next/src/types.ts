@@ -467,6 +467,9 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  CLOUD_AGENT_SENTRY_DSN?: string;
+  CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
+  CF_VERSION_METADATA?: { id: string };
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;

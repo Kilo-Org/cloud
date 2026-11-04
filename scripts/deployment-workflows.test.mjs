@@ -19,6 +19,37 @@ const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
 
+test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
+  for (const [job, selector] of [
+    ['deploy-manual', 'inputs.worker'],
+    ['deploy-changed', 'matrix.worker'],
+    ['deploy-cloud-agent-after-session-ingest', undefined],
+  ]) {
+    const steps = workers.jobs[job].steps;
+    const deploy = steps.find(step => step.id === (selector ? 'deploy' : 'deploy-cloud-agent'));
+    const retry = steps.find(step => step.name?.endsWith('(retry)'));
+    const maps = steps.find(step => step.name === 'Upload Cloud Agent Sentry source maps');
+    assert.equal(maps['continue-on-error'], true);
+    assert.equal(maps.if, selector ? `${selector} == 'services/cloud-agent-next'` : undefined);
+    assert.doesNotMatch(maps.if ?? '', /always\(|failure\(/);
+    assert.ok(steps.indexOf(maps) > steps.indexOf(retry));
+    assert.equal(maps.run, 'pnpm run sentry:sourcemaps');
+    assert.equal(maps.env.SENTRY_AUTH_TOKEN, '${{ secrets.SENTRY_AUTH_TOKEN }}');
+    assert.equal(retry.if, `steps.${deploy.id}.outcome == 'failure'`);
+    assert.equal(retry['continue-on-error'], undefined);
+    assert.equal(deploy['continue-on-error'], true);
+    assert.equal(workers.jobs[job]['continue-on-error'], undefined);
+    assert.equal(retry.with.command, deploy.with.command);
+    for (const upload of [deploy, retry]) {
+      assert.equal(upload.env.CLOUD_AGENT_DEPLOY_ENVIRONMENT, '${{ inputs.target_environment }}');
+      assert.equal(
+        upload.with.preCommands.trim(),
+        'if [ "$(jq -r \'.scripts.predeploy // empty\' package.json)" != "" ]; then pnpm run predeploy; fi'
+      );
+    }
+  }
+});
+
 test('both Worker deployment paths prepare usage queues before direct consumer deployment', () => {
   for (const [job, selector] of [
     ['deploy-manual', 'inputs.worker'],
@@ -69,9 +100,50 @@ test('both Worker deployment paths prepare usage queues before direct consumer d
     assert.doesNotMatch(steps[consumerIndex].if, /always\(|failure\(/);
     assert.equal(
       steps[consumerIndex].with.command,
-      "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} " +
+      `\${{ ${selector} == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ` +
         "${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}"
     );
+  }
+});
+
+test('both upload attempts preserve prepared commands and append artifacts only for Cloud Agent', () => {
+  for (const job of [
+    'deploy-manual',
+    'deploy-changed',
+    'deploy-cloud-agent-after-session-ingest',
+  ]) {
+    const uploads = workers.jobs[job].steps.filter(step =>
+      step.uses?.startsWith('cloudflare/wrangler-action@')
+    );
+    assert.equal(uploads.length, 2);
+    for (const step of uploads) {
+      const expression = step.with.command.match(/^\$\{\{ (.*?) \}\}/)[1];
+      const selectedWorkers =
+        job === 'deploy-cloud-agent-after-session-ingest'
+          ? ['services/cloud-agent-next']
+          : ['services/cloud-agent-next', 'services/usage-ingest', 'services/other-worker'];
+      for (const worker of selectedWorkers) {
+        for (const environment of ['production', 'staging']) {
+          for (const prepared of [undefined, 'deploy --config prepared.jsonc']) {
+            const actual = runInNewContext(expression, {
+              inputs: { worker, target_environment: environment },
+              matrix: { worker },
+              steps: { runtime: { outputs: { command: prepared } } },
+              format: (template, ...values) =>
+                template.replace(/\{(\d+)\}/g, (_, index) => values[Number(index)]),
+            });
+            const command =
+              prepared || (environment === 'production' ? 'deploy' : 'deploy --env staging');
+            assert.equal(
+              actual,
+              worker === 'services/cloud-agent-next'
+                ? `${command} dist/worker/index.js --no-bundle --upload-source-maps`
+                : command
+            );
+          }
+        }
+      }
+    }
   }
 });
 

@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
+import { getSentryConfig } from '../shared/sentry.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
 
 export type ContainersOutboundProps = {
@@ -11,7 +12,10 @@ export type ContainersOutboundProps = {
   allocationRef?: string;
 };
 
-export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
+export class ContainersOutbound extends WorkerEntrypoint<
+  Cloudflare.Env & Parameters<typeof getSentryConfig>[0],
+  ContainersOutboundProps
+> {
   async fetch(request: Request): Promise<Response> {
     const { containerId, egressAllowlist, egressAudit, allocationRef } = this.ctx.props;
     if (
@@ -29,7 +33,18 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       return new Response('Egress policy unavailable', { status: 502 });
     }
     const url = new URL(request.url);
-    const allowed = policy.data === undefined || isAllowedEgressUrl(url, policy.data);
+    let allowed = policy.data === undefined || isAllowedEgressUrl(url, policy.data);
+    if (!allowed) {
+      const sentry = getSentryConfig(this.env);
+      const dsn = sentry ? new URL(sentry.dsn) : undefined;
+      allowed =
+        dsn !== undefined &&
+        request.method === 'POST' &&
+        url.origin === dsn.origin &&
+        !url.username &&
+        !url.password &&
+        url.pathname === `/api${dsn.pathname}/envelope/`;
+    }
     if (egressAudit === true) {
       try {
         const input = EgressAuditRequestSchema.parse({

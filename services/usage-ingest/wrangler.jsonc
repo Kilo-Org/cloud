@@ -13,7 +13,20 @@
   "vars": {
     "USAGE_INGEST_PARALLELISM": "2",
     "USAGE_WRITER_URL": "https://app.kilo.ai/api/internal/usage/record",
+    // Direct lane: off | on_stall | first. See README "Direct lane".
+    "USAGE_INGEST_DIRECT_MODE": "off",
+    "USAGE_INGEST_DIRECT_TIMEOUT_MS": "2000",
+    "USAGE_INGEST_STALL_HEDGE_MS": "2000",
   },
+  // Approximate and per Cloudflare location, not a fleet-wide limit. Roughly 3x the
+  // observed 420/s peak release rate over the shortest allowed period (10 s).
+  "ratelimits": [
+    {
+      "name": "USAGE_DIRECT_LIMITER",
+      "namespace_id": "1040",
+      "simple": { "limit": 12600, "period": 10 },
+    },
+  ],
   "queues": {
     "producers": [
       { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-eu" },
@@ -39,7 +52,17 @@
       "vars": {
         "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+        "USAGE_INGEST_DIRECT_MODE": "on_stall",
+        "USAGE_INGEST_DIRECT_TIMEOUT_MS": "2000",
+        "USAGE_INGEST_STALL_HEDGE_MS": "2000",
       },
+      "ratelimits": [
+        {
+          "name": "USAGE_DIRECT_LIMITER",
+          "namespace_id": "1041",
+          "simple": { "limit": 12600, "period": 10 },
+        },
+      ],
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },

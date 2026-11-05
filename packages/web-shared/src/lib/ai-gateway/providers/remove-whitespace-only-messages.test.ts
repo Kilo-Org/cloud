@@ -143,14 +143,35 @@ describe('removeWhitespaceOnlyMessages', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('keeps a whitespace-only final user message', () => {
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi' },
+      { role: 'user', content: [{ type: 'text', text: '\n\n' }] },
+    ];
+    const body = makeBody(structuredClone(messages));
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toEqual(messages);
+  });
+
+  it('removes a whitespace-only final assistant prefill', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const body = makeBody([
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+    ]);
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toEqual([{ role: 'user', content: 'Hello' }]);
+  });
+
   it.each<Anthropic.MessageParam['role']>(['user', 'assistant'])(
-    'keeps a whitespace-only final %s message',
+    'keeps a lone whitespace-only %s message',
     role => {
-      const messages: Anthropic.MessageParam[] = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi' },
-        { role, content: [{ type: 'text', text: '\n\n' }] },
-      ];
+      const messages: Anthropic.MessageParam[] = [{ role, content: '\n\n' }];
       const body = makeBody(structuredClone(messages));
 
       removeWhitespaceOnlyMessages(body);

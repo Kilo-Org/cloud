@@ -49,9 +49,12 @@ function addCacheControl(
  * Anthropic rejects a message whose content is only whitespace text with "text content blocks
  * must contain non-whitespace text", while whitespace text next to any other block is accepted.
  * Such a message carries nothing for the model, so it is removed; Anthropic, Bedrock, and Vertex
- * all accept the resulting consecutive same-role messages. The final message is kept so the
- * request still ends on the same turn. A cache breakpoint on a removed message moves to the
- * preceding message, the closest prefix that still exists.
+ * all accept the resulting consecutive same-role messages. A final whitespace-only user message is
+ * kept: removing it would end the request on an assistant message, which newer Claude models
+ * reject as unsupported prefill and older ones continue instead of answering. A final
+ * whitespace-only assistant prefill is removed so the request ends on the turn before it. A cache
+ * breakpoint on a removed message moves to the preceding message, the closest prefix that still
+ * exists.
  */
 export function removeWhitespaceOnlyMessages(body: GatewayMessagesRequest) {
   const lastIndex = body.messages.length - 1;
@@ -59,7 +62,9 @@ export function removeWhitespaceOnlyMessages(body: GatewayMessagesRequest) {
   const removedRoles: Anthropic.MessageParam['role'][] = [];
 
   body.messages.forEach((message, index) => {
-    if (index === lastIndex || !isWhitespaceOnlyMessage(message)) {
+    const isRequiredFinalMessage =
+      index === lastIndex && (message.role === 'user' || keptMessages.length === 0);
+    if (isRequiredFinalMessage || !isWhitespaceOnlyMessage(message)) {
       keptMessages.push(message);
       return;
     }

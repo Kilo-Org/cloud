@@ -15,6 +15,9 @@ import { findManifestPort, readManifest, type Manifest } from './manifest';
 
 const DEFAULT_PORT = 8081;
 const DEFAULT_ERROR_WINDOW_MS = 4000;
+// A window longer than the child's own deadline would report the kill as a CLI failure.
+const MAX_ERROR_WINDOW_MS = 120_000;
+const CLI_TIMEOUT_MS = 180_000;
 
 export type DiagnosticsCommand = 'status' | 'errors';
 
@@ -104,6 +107,11 @@ export function parseDuration(value: string): number {
   const amount = Number(match[1]);
   const ms = match[2] === 's' ? amount * 1000 : amount;
   if (ms <= 0) throw new DiagnosticsError('The duration must be positive');
+  if (ms > MAX_ERROR_WINDOW_MS) {
+    throw new DiagnosticsError(
+      `The duration must be ${MAX_ERROR_WINDOW_MS / 1000}s or less; the diagnostics command stops the CLI before that.`
+    );
+  }
   return ms;
 }
 
@@ -296,7 +304,7 @@ function main(): void {
             cwd: mobileProjectRoot,
             env: sandboxEnv(),
             maxBuffer: 32 * 1024 * 1024,
-            timeout: 180_000,
+            timeout: CLI_TIMEOUT_MS,
           });
           return { code: 0, stdout, stderr: '' };
         } catch (error) {

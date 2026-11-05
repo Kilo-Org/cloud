@@ -197,4 +197,5 @@ test('bad arguments are rejected before anything runs', () => {
   assert.throws(() => parseDuration('soon'), /not a duration/);
   assert.equal(parseDuration('1500'), 1500);
   assert.equal(parseDuration('5s'), 5000);
+  assert.throws(() => parseDuration('600000'), /or less/);
 });

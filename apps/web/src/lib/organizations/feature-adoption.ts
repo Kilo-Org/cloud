@@ -2,6 +2,9 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { markOrganizationFeatureAdoptionCompleted } from '@kilocode/web-shared/lib/organizations/organizations';
+import type { Organization } from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 export const FEATURE_ADOPTION_KEYS = [
   'source-control-integration',
@@ -161,12 +164,74 @@ export async function getFeatureAdoptionState(
   };
 }
 
+export function isFeatureAdoptionComplete(state: FeatureAdoptionState): boolean {
+  return (
+    state.sourceControlConnected &&
+    state.codeReviewerEnabled &&
+    state.securityAgentEnabled &&
+    state.teamIntegrationConnected &&
+    state.cloudAgentUsed
+  );
+}
+
+export function hasRecordedFeatureAdoptionCompletion(
+  settings: OrganizationSettings | null | undefined
+): boolean {
+  return Boolean(settings?.feature_adoption_completed_at);
+}
+
+/**
+ * Persists the sticky completion flag the first time every adoption check
+ * passes. Returns whether the organization is (now) complete.
+ */
+export async function recordFeatureAdoptionCompletion(
+  organizationId: string,
+  settings: OrganizationSettings | null | undefined,
+  state: FeatureAdoptionState
+): Promise<boolean> {
+  if (hasRecordedFeatureAdoptionCompletion(settings)) return true;
+  if (!isFeatureAdoptionComplete(state)) return false;
+  await markOrganizationFeatureAdoptionCompleted(organizationId);
+  return true;
+}
+
+type FeatureAdoptionCompletionInput = {
+  organizationId: string;
+  plan: Organization['plan'];
+  settings: OrganizationSettings | null | undefined;
+};
+
+/**
+ * Resolves sticky completion and, when live checks had to be evaluated, also
+ * returns them so callers can reuse the result instead of querying again.
+ */
+export async function resolveFeatureAdoption({
+  organizationId,
+  plan,
+  settings,
+}: FeatureAdoptionCompletionInput): Promise<{
+  complete: boolean;
+  checks: FeatureAdoptionCheck[] | null;
+}> {
+  if (plan !== 'enterprise') return { complete: false, checks: null };
+  if (hasRecordedFeatureAdoptionCompletion(settings)) return { complete: true, checks: null };
+  const state = await getFeatureAdoptionState(organizationId);
+  const complete = await recordFeatureAdoptionCompletion(organizationId, settings, state);
+  return { complete, checks: buildFeatureAdoptionChecks(organizationId, state) };
+}
+
+export async function resolveFeatureAdoptionCompletion(
+  input: FeatureAdoptionCompletionInput
+): Promise<boolean> {
+  return (await resolveFeatureAdoption(input)).complete;
+}
+
 export async function getOrganizationFeatureAdoption(organizationId: string): Promise<{
   plan: 'teams' | 'enterprise';
   checks: FeatureAdoptionCheck[];
 }> {
   const organizationRows = await readDb
-    .select({ plan: organizations.plan })
+    .select({ plan: organizations.plan, settings: organizations.settings })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
@@ -179,6 +244,7 @@ export async function getOrganizationFeatureAdoption(organizationId: string): Pr
   }
 
   const state = await getFeatureAdoptionState(organizationId);
+  await recordFeatureAdoptionCompletion(organizationId, organization.settings, state);
 
   return {
     plan: organization.plan,

@@ -47,6 +47,7 @@ import {
   addUserToOrganization,
   markOrganizationAsDeleted,
   mutateOrganizationSettings,
+  updateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -494,10 +495,7 @@ export const organizationAdminRouter = createTRPCRouter({
         suppress_trial_messaging,
       };
 
-      await db
-        .update(organizations)
-        .set({ settings: updatedSettings })
-        .where(eq(organizations.id, organizationId));
+      await updateOrganizationSettings(organizationId, updatedSettings);
 
       await recordAdminAction(ctx, {
         action: 'organization.trial_messaging.set',

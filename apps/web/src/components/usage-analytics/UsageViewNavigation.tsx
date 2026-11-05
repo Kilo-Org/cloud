@@ -10,16 +10,28 @@ const VIEW_LABELS: Array<{ value: OrganizationUsageView; label: string }> = [
   { value: 'ai-usage', label: 'AI usage' },
 ];
 
+export function getVisibleUsageViews({
+  isSalesDemo = false,
+  featureAdoptionComplete = false,
+}: {
+  isSalesDemo?: boolean;
+  featureAdoptionComplete?: boolean;
+}): OrganizationUsageView[] {
+  if (isSalesDemo || featureAdoptionComplete) return ['ai-usage'];
+  return VIEW_LABELS.map(view => view.value);
+}
+
 export function UsageViewNavigation({
   value,
   onValueChange,
-  isSalesDemo = false,
+  views: visibleViews,
 }: {
   value: OrganizationUsageView;
   onValueChange: (value: OrganizationUsageView) => void;
-  isSalesDemo?: boolean;
+  views: readonly OrganizationUsageView[];
 }) {
-  const views = isSalesDemo ? VIEW_LABELS.filter(view => view.value === 'ai-usage') : VIEW_LABELS;
+  const views = VIEW_LABELS.filter(view => visibleViews.includes(view.value));
+  if (views.length < 2) return null;
 
   return (
     <nav

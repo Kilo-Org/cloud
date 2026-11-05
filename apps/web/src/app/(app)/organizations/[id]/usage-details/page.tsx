@@ -1,5 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
+import { OrganizationUsageDashboardServer } from './OrganizationUsageDashboardServer';
 
 export default async function OrganizationUsageStatsPage({
   params,
@@ -11,15 +11,7 @@ export default async function OrganizationUsageStatsPage({
       params={params}
       fullBleed
       render={({ organization, role }) => (
-        <UsageAnalyticsDashboard
-          context="organization"
-          organizationId={organization.id}
-          organizationName={organization.name}
-          callerRole={role}
-          organizationPlan={organization.plan}
-          isSalesDemo={organization.settings.is_sales_demo === true}
-          title={`Usage — ${organization.name}`}
-        />
+        <OrganizationUsageDashboardServer organization={organization} role={role} />
       )}
     />
   );

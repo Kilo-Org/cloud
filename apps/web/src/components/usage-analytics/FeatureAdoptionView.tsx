@@ -9,7 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { FeatureAdoptionKey } from '@/lib/organizations/feature-adoption';
+import type {
+  FeatureAdoptionCheck,
+  FeatureAdoptionKey,
+} from '@/lib/organizations/feature-adoption';
 import { StatusDonutChart } from './StatusDonutChart';
 
 export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
@@ -20,19 +23,27 @@ export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'cloud-agent-used': Cloud,
 };
 
+const INITIAL_CHECKS_STALE_TIME_MS = 60_000;
+
 export function FeatureAdoptionView({
   organizationId,
   compact = false,
+  initialChecks,
   onViewDetails,
 }: {
   organizationId: string;
   compact?: boolean;
+  initialChecks?: FeatureAdoptionCheck[];
   onViewDetails?: () => void;
 }) {
   const trpc = useTRPC();
   const featureAdoptionQuery = useQuery({
     ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
     enabled: compact,
+    ...(initialChecks && {
+      initialData: { checks: initialChecks },
+      staleTime: INITIAL_CHECKS_STALE_TIME_MS,
+    }),
   });
   const recommendationsQuery = useQuery({
     ...trpc.organizations.usageDetails.getRecommendations.queryOptions({ organizationId }),

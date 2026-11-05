@@ -37,7 +37,25 @@ export const ORG_SCOPE_ALL_ORGS = 'all-orgs';
 const VALID_PERIODS: PeriodOption[] = ['today', 'yesterday', '7d', '30d', '1y'];
 const VALID_GRANULARITIES: Granularity[] = ['hour', 'day', 'week', 'month'];
 const VALID_DIMENSIONS: Dimension[] = ['feature', 'model', 'mode', 'user', 'provider', 'project'];
-const VALID_USAGE_VIEWS: OrganizationUsageView[] = ['overview', 'feature-adoption', 'ai-usage'];
+export const ALL_USAGE_VIEWS: readonly OrganizationUsageView[] = [
+  'overview',
+  'feature-adoption',
+  'ai-usage',
+];
+const DEFAULT_USAGE_VIEW: OrganizationUsageView = 'overview';
+
+/**
+ * Maps a raw `view` URL value to a view the caller may see. Missing, unknown,
+ * or disallowed values fall back to `defaultView`.
+ */
+export function resolveUsageView(
+  raw: string | null,
+  allowedViews: readonly OrganizationUsageView[],
+  defaultView: OrganizationUsageView
+): OrganizationUsageView {
+  const match = allowedViews.find(view => view === raw);
+  return match ?? defaultView;
+}
 
 const INCLUDE_DIM_KEYS: (keyof UsageFilters)[] = [
   'features',
@@ -177,10 +195,15 @@ function isValidDimension(value: string): value is Dimension {
   return VALID_DIMENSIONS.includes(value as Dimension);
 }
 
-export function useUsageDashboardState(defaultState?: Partial<DashboardState>): {
+export function useUsageDashboardState(
+  defaultState?: Partial<DashboardState>,
+  options?: { allowedViews?: readonly OrganizationUsageView[] }
+): {
   state: DashboardState;
   setState: (updates: Partial<DashboardState>) => void;
 } {
+  const defaultUsageView = defaultState?.usageView ?? DEFAULT_USAGE_VIEW;
+  const allowedViews = options?.allowedViews ?? ALL_USAGE_VIEWS;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [state, setStateInternal] = useState<DashboardState>(() => {
@@ -211,10 +234,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
 
     const orgScope = params.get('scope') ?? defaultState?.orgScope ?? ORG_SCOPE_SELF;
 
-    const usageViewRaw = params.get('view');
-    const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
-      ? (usageViewRaw as OrganizationUsageView)
-      : (defaultState?.usageView ?? 'overview');
+    const usageView = resolveUsageView(params.get('view'), allowedViews, defaultUsageView);
 
     const filters = deserializeFiltersFromParams(params);
 
@@ -267,10 +287,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
           : state.groupBy;
       const personalView = params.get('personalView') ?? state.personalView;
       const orgScope = params.get('scope') ?? state.orgScope;
-      const usageViewRaw = params.get('view');
-      const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
-        ? (usageViewRaw as OrganizationUsageView)
-        : 'overview';
+      const usageView = resolveUsageView(params.get('view'), allowedViews, defaultUsageView);
       const filters = deserializeFiltersFromParams(params);
 
       setStateInternal({
@@ -303,6 +320,8 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     state.personalView,
     state.orgScope,
     state.usageView,
+    allowedViews,
+    defaultUsageView,
   ]);
 
   // Sync state to URL parameters when state changes
@@ -345,7 +364,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     // Drop the legacy org-wide param once migrated to `scope` (see dashboard).
     params.delete('viewAs');
 
-    if (state.usageView === 'overview') {
+    if (state.usageView === defaultUsageView) {
       params.delete('view');
     } else {
       params.set('view', state.usageView);
@@ -362,7 +381,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     // key from `state` anyway, so stale searchParams never produces incorrect
     // output and including it would cause spurious re-runs after router.replace.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, state]);
+  }, [router, state, defaultUsageView]);
 
   const setState = useCallback((updates: Partial<DashboardState>) => {
     setStateInternal(prev => ({ ...prev, ...updates }));

@@ -379,7 +379,10 @@ function checkPullRequestTerm(values, label) {
  */
 const ARMENIAN_SENTENCE_TERMINATORS = new Set(['hy']);
 const ARMENIAN_UPPERCASE_AFTER_MARK = /^\s*[\u0531-\u0556]/;
+const ARMENIAN_LOWERCASE_AFTER_SPACE = /^\s+[\u0561-\u0587]/;
 const LATIN_AFTER_DOT = /[A-Za-z0-9]/;
+/** Abbreviations that keep an ASCII `.` in place: «Էլ. փոստ», «օր. 50». */
+const ARMENIAN_ABBREVIATION_BEFORE_DOT = /(?:^|[\s(«"'])(?:Էլ|էլ|օր|հր)$/;
 
 /** Reject a sentence in the Armenian catalog that ends with an ASCII mark. */
 function checkArmenianSentenceTerminator(tag, values, label) {
@@ -400,6 +403,16 @@ function checkArmenianSentenceTerminator(tag, values, label) {
         continue;
       }
       const rest = value.slice(index + 1);
+      if (
+        mark === '.' &&
+        ARMENIAN_LOWERCASE_AFTER_SPACE.test(rest) &&
+        !ARMENIAN_ABBREVIATION_BEFORE_DOT.test(value.slice(0, index))
+      ) {
+        fail(
+          `${label}: "${key}" joins two sentences with the ASCII "."; Armenian writes «։» and «՝»`
+        );
+        continue;
+      }
       if (rest.trim() !== '' && !ARMENIAN_UPPERCASE_AFTER_MARK.test(rest)) {
         continue;
       }

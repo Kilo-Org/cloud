@@ -980,6 +980,28 @@ for (const [name, value, mark] of [
   });
 }
 
+test('rejects Armenian copy with a period that joins two sentences', context => {
+  const result = runChecker(context, {
+    language: 'hy',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Մուտքագրեք հասցեն. այն պահպանվում է',
+        waiting: 'Սպասում ենք...',
+        retry: 'Կրկին փորձել',
+        host: 'Բացել kilo.ai',
+        note: 'Էլ. հասցե',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/hy: "work\.empty" joins two sentences with the ASCII "\."; Armenian writes «։» and «՝»/
+  );
+});
+
 test('leaves another locale’s ASCII sentence terminator alone', context => {
   const result = runChecker(context, {
     language: 'ru',

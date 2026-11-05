@@ -54,7 +54,8 @@ const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
  * title — so the two surfaces read as one pattern for one condition.
  */
 const EMPTY_BLOCK_CLASS = 'min-h-[195px] items-center justify-center gap-4 px-4 py-3';
-const EMPTY_ICON_CLASS = 'h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card';
+const EMPTY_ICON_CLASS =
+  'h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
   return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';

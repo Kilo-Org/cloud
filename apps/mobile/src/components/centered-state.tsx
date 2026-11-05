@@ -87,7 +87,9 @@ export function CenteredState({
       // then jump back to its measured position. The measurement publishes a
       // fresh object each run, so compare the band, not the identity.
       setViewport(previous =>
-        previous !== null && previous.surface.top === frame.top && previous.surface.bottom === frame.bottom
+        previous !== null &&
+        previous.surface.top === frame.top &&
+        previous.surface.bottom === frame.bottom
           ? previous
           : null
       );

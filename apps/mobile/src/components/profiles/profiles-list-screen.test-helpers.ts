@@ -9,6 +9,9 @@ import { type ReactTestInstance } from '@/test/renderer';
 /** The catalog title of the repo-defaults entry the list hosts. */
 const REPO_DEFAULTS_TITLE = 'Default Profiles for Repos';
 
+/** The catalog word over the settings group that hosts the entry. */
+export const REPO_DEFAULTS_HEADING = 'Repositories';
+
 /** The profile summary shape the mocked `agentProfiles.list` answers with. */
 export type ProfileSummary = {
   id: string;
@@ -66,4 +69,42 @@ export function repoDefaultsRow(root: ReactTestInstance): ReactTestInstance {
     throw new Error('repo defaults entry missing');
   }
   return row;
+}
+
+/** A row by its title, wherever the list renders it. */
+export function rowByTitle(root: ReactTestInstance, title: string): ReactTestInstance {
+  const row = findAll(root, 'ConfigureRow').find(candidate => candidate.props.title === title);
+  if (!row) {
+    throw new Error(`${title} row missing`);
+  }
+  return row;
+}
+
+/** The container element that directly holds `row`, with nothing else mixed in. */
+export function rowGroup(root: ReactTestInstance, row: ReactTestInstance): ReactTestInstance {
+  for (const view of findAll(root, 'View')) {
+    if (view.children.includes(row)) {
+      return view;
+    }
+  }
+  throw new Error('row group missing');
+}
+
+/** The elements directly inside `group`, without the text fragments between them. */
+export function groupChildren(group: ReactTestInstance): ReactTestInstance[] {
+  return group.children.filter((child): child is ReactTestInstance => typeof child !== 'string');
+}
+
+/** The `Text` elements a group renders, its heading first. */
+export function groupTexts(group: ReactTestInstance): ReactTestInstance[] {
+  return findAll(group, 'Text');
+}
+
+/** The heading that opens the group hosting the repo-defaults entry. */
+export function repoDefaultsHeading(root: ReactTestInstance): ReactTestInstance {
+  const [heading] = groupTexts(rowGroup(root, repoDefaultsRow(root)));
+  if (!heading) {
+    throw new Error('repo defaults group has no heading');
+  }
+  return heading;
 }

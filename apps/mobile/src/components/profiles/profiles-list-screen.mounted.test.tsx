@@ -295,14 +295,16 @@ describe('ProfilesListScreen', () => {
     unmount();
   });
 
-  it('personal context: renders one untitled section', async () => {
+  it('personal context: renders no owner heading', async () => {
     organizationState.organizationId = null;
     listState.personalProfiles = [profile({ id: 'personal-1', name: 'Personal profile' })];
 
     const { renderer, unmount } = await mount();
 
     expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default Profiles for Repos']);
-    expect(textChildren(renderer.root)).not.toContain('Organization');
+    // No owner groups means no owner heading; the settings group keeps its own,
+    // so the list reads as rows plus one settings group.
+    expect(textChildren(renderer.root)).toEqual(['Repositories']);
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
 

@@ -5,9 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
 import {
+  groupChildren,
+  groupTexts,
   profile,
   type ProfileSummary,
+  REPO_DEFAULTS_HEADING,
+  repoDefaultsHeading,
   repoDefaultsRow,
+  rowByTitle,
+  rowGroup,
 } from '@/components/profiles/profiles-list-screen.test-helpers';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -112,6 +118,26 @@ describe('ProfilesListScreen repo defaults entry', () => {
       (repoDefaultsRow(renderer.root).props as { onPress: () => void }).onPress();
     });
     expect(h.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/profiles/repo-bindings');
+
+    unmount();
+  });
+
+  it('heads the entry with a group of its own, styled and spaced like a profile group', async () => {
+    const { renderer, unmount } = await mount();
+
+    const heading = repoDefaultsHeading(renderer.root);
+    expect(heading.props.children).toBe(REPO_DEFAULTS_HEADING);
+    // One heading over one row: the settings entry is a group, not a fifth
+    // row of the personal group above it.
+    const settingsGroup = rowGroup(renderer.root, repoDefaultsRow(renderer.root));
+    expect(groupChildren(settingsGroup)).toHaveLength(2);
+
+    // The owner groups are the reference, so the two cannot drift apart.
+    const ownerGroup = rowGroup(renderer.root, rowByTitle(renderer.root, 'Personal profile'));
+    const ownerHeading = groupTexts(ownerGroup)[0];
+    expect(ownerHeading?.props.children).toBe('Personal');
+    expect(heading.props.className).toBe(ownerHeading?.props.className);
+    expect(settingsGroup.props.className).toBe(ownerGroup.props.className);
 
     unmount();
   });

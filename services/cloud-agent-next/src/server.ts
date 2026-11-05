@@ -48,6 +48,7 @@ import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerWorktreeSnapshotRoutes } from './sandbox-control/worktree-snapshot-routes.js';
 import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
@@ -315,6 +316,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerWorktreeSnapshotRoutes(app);
 registerRuntimeArtifactRoutes(app);
 registerStartupFailureRoute(app);
 registerEnvironmentBuildRoutes(app);

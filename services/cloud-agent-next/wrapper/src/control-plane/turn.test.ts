@@ -236,6 +236,7 @@ function createHarness(
   options: {
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    requestWorktreeCapture?: TurnManagerDeps['requestWorktreeCapture'];
     materializeAttachments?: (
       message: { prompt?: string; parts?: unknown[] },
       deps?: { signal?: AbortSignal }
@@ -291,6 +292,9 @@ function createHarness(
     runCondense:
       options.runCondense ?? (async () => ({ wasAborted: false, success: true }) as never),
     runAutoCommit: options.runAutoCommit ?? ((async () => ({ success: true })) as never),
+    ...(options.requestWorktreeCapture === undefined
+      ? {}
+      : { requestWorktreeCapture: options.requestWorktreeCapture }),
   });
 
   function observeDispatch(id: string): void {
@@ -3537,5 +3541,131 @@ describe('native session outcome transitions', () => {
     );
     h.setState(KILO_SESSION, undefined);
     expect(h.manager.activeTurnCount()).toBe(1);
+  });
+});
+
+describe('worktree capture requests during finalization', () => {
+  function finalizingPayload(extra: FinalizationExtra['finalization']) {
+    return promptPayload('m1', { finalization: extra });
+  }
+
+  it('requests a capture after a successful auto-commit and before condense', async () => {
+    const order: string[] = [];
+    const h = createHarness({
+      runAutoCommit: async () => {
+        order.push('auto-commit');
+        return { success: true };
+      },
+      requestWorktreeCapture: directory => order.push(`capture:${directory}`),
+      runCondense: (async () => {
+        order.push('condense');
+        return { wasAborted: false, success: true };
+      }) as never,
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, finalizingPayload({ autoCommit: true, condenseOnComplete: true }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(order).toEqual(['auto-commit', `capture:${DIRECTORY}`, 'condense']);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+  });
+
+  it('requests a capture when auto-commit is skipped', async () => {
+    const order: string[] = [];
+    const h = createHarness({
+      runAutoCommit: (async () => {
+        order.push('auto-commit');
+        return { success: true };
+      }) as never,
+      requestWorktreeCapture: directory => order.push(`capture:${directory}`),
+      runCondense: (async () => {
+        order.push('condense');
+        return { wasAborted: false, success: true };
+      }) as never,
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, finalizingPayload({ condenseOnComplete: true }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(order).toEqual([`capture:${DIRECTORY}`, 'condense']);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+  });
+
+  it('requests a capture after a failed auto-commit and before condense', async () => {
+    const order: string[] = [];
+    const h = createHarness({
+      runAutoCommit: (async () => {
+        order.push('auto-commit');
+        throw new Error('auto-commit boom');
+      }) as never,
+      requestWorktreeCapture: directory => order.push(`capture:${directory}`),
+      runCondense: (async () => {
+        order.push('condense');
+        return { wasAborted: false, success: true };
+      }) as never,
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, finalizingPayload({ autoCommit: true, condenseOnComplete: true }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(order).toEqual(['auto-commit', `capture:${DIRECTORY}`, 'condense']);
+    expect(
+      eventFrames(h.frames).some(
+        event =>
+          event.type === 'error' &&
+          event.properties.fatal === false &&
+          String(event.properties.error).includes('auto-commit boom')
+      )
+    ).toBe(true);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+  });
+
+  it('does not wait for the capture callback before completing the outcome', async () => {
+    let captured = 0;
+    const h = createHarness({
+      requestWorktreeCapture: (() => {
+        captured += 1;
+        return new Promise<void>(() => undefined);
+      }) as unknown as TurnManagerDeps['requestWorktreeCapture'],
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, finalizingPayload({ condenseOnComplete: true }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(captured).toBe(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('does not let Stop wait for a capture while condense is in flight', async () => {
+    let captured = 0;
+    let releaseCondense: ((value: { wasAborted: boolean; success: boolean }) => void) | undefined;
+    const h = createHarness({
+      requestWorktreeCapture: (() => {
+        captured += 1;
+        return new Promise<void>(() => undefined);
+      }) as unknown as TurnManagerDeps['requestWorktreeCapture'],
+      runCondense: () => new Promise(resolve => (releaseCondense = resolve)),
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, finalizingPayload({ condenseOnComplete: true }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(captured).toBe(1);
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.manager.abort(SESSION_ID);
+    await settle();
+
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'cancelled' }]);
+    releaseCondense?.({ wasAborted: true, success: false });
   });
 });

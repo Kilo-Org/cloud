@@ -16,7 +16,10 @@ import {
   type ControlPlaneWrapperFrame,
   type WorkspaceConfig,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import {
+  WORKTREE_SNAPSHOT_RESTORE_MS,
+  type ControlPlaneTimers,
+} from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { fetchKiloServer } from '../kilo-server-auth.js';
@@ -80,6 +83,7 @@ import {
   type PrepareRoot,
   type RouteRoot,
 } from './workspace-roots.js';
+import type { WorktreeSnapshots } from './worktree-snapshots.js';
 
 /** Spec §7: Kilo runtime start and Kilo session each get one retry. */
 const STEP_RETRY_ATTEMPTS = 2;
@@ -137,6 +141,7 @@ export type PrepareDeps = {
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
   recoverWorktree?: typeof restoreWorktreeRecovery;
+  worktreeSnapshots?: Pick<WorktreeSnapshots, 'restore' | 'register' | 'unregister'>;
   seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
   sessionExists?: (
@@ -168,7 +173,9 @@ type PreparedRoute = {
 type PreparingRoute = {
   promise: Promise<void>;
   released: boolean;
+  directory: string;
   skillInstallController?: AbortController;
+  recoveryController?: AbortController;
   /** `runtimeKey(spec)` captured before the first await, for last-route release. */
   runtimeKey: string;
   /** A credentials frame that arrived before the route was prepared. */
@@ -489,19 +496,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   async function withinStep<T>(
     step: ControlPlanePreparationStep,
     timeoutMs: number,
-    operation: (signal: AbortSignal) => Promise<T>
+    operation: (signal: AbortSignal) => Promise<T>,
+    externalSignal?: AbortSignal
   ): Promise<T> {
     const controller = new AbortController();
+    const signal = externalSignal
+      ? AbortSignal.any([controller.signal, externalSignal])
+      : controller.signal;
     const timer = setTimeout(() => controller.abort(new Error(`${step} timed out`)), timeoutMs);
     try {
-      return await withTimeoutAndAbort(operation(controller.signal), {
+      return await withTimeoutAndAbort(operation(signal), {
         timeoutMs,
         timeoutMessage: `${step} timed out`,
         abortMessage: `${step} aborted`,
+        signal,
       });
     } catch (error) {
       if (error instanceof WrapperBootstrapError) throw error;
-      if (isTimeoutMessage(step, error)) {
+      if (controller.signal.aborted || isTimeoutMessage(step, error)) {
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
           ...(step === 'clone'
@@ -792,14 +804,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     env: Record<string, string>,
     redact: (text: string) => string,
     setStep: (step: ControlPlanePreparationStep) => void,
-    onReplacementWorkspace?: () => Promise<boolean>
+    onReplacementWorkspace?: (legacyRecovery: boolean) => Promise<{
+      applied: boolean;
+      snapshotRecovery?: true;
+    }>
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
-    deferredStamps: Array<{ directory: string; commit: string; workspacePrepared?: false }> | null;
+    deferredStamps: Array<{
+      directory: string;
+      commit: string;
+      workspacePrepared?: false;
+      snapshotRecovery?: true;
+    }> | null;
+    snapshotRecovery?: true;
   }> {
     const workspaceStartedAt = Date.now();
     let sessionInspection: WorkspaceInspection | undefined;
     let sessionStamp: WorkspaceStamp | null = null;
+    const routeStamp: { current: WorkspaceStamp | null } = { current: null };
     if (spec.sessionSnapshot !== undefined) {
       setStep('restore');
       const inspected = await inspectWorkspace(spec.directory);
@@ -857,7 +879,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         `control-plane workspace inspect session=${spec.sessionId} inspection=${sessionInspection} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       if (sessionInspection === 'same' || sessionStamp?.allocationId === deps.allocationId)
-        return { outcome: 'same', deferredStamps: null };
+        return {
+          outcome: 'same',
+          deferredStamps: null,
+          ...(sessionStamp?.snapshotRecovery ? { snapshotRecovery: true } : {}),
+        };
       emitProgress(spec.sessionId, 'restore', 'Restoring session disk snapshot');
       if (spec.git) {
         await withinStep('restore', timers.restoreMs, signal =>
@@ -877,8 +903,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             directory: spec.directory,
             commit: await headCommit(spec.directory, env),
             ...(sessionStamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
+            ...(sessionStamp?.snapshotRecovery ? { snapshotRecovery: true } : {}),
           },
         ],
+        ...(sessionStamp?.snapshotRecovery ? { snapshotRecovery: true } : {}),
       };
     }
     const inspectStartedAt = Date.now();
@@ -888,7 +916,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const cloneBudget = createStepBudget(timers.cloneMs);
     const reconciled = await reconcileRoots(roots, {
       inspect: async root => {
-        const { inspection } = await inspectWorkspace(root.directory);
+        const { inspection, stamp } = await inspectWorkspace(root.directory);
+        if (root.directory === spec.directory) routeStamp.current = stamp;
         return inspection;
       },
       adopt: root => adoptWorkspace(root, env, redact, setStep, restoreBudget),
@@ -906,34 +935,71 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${reconciled.inspections.join(',')} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
+    if (reconciled.kind === 'same')
+      return {
+        outcome: 'same',
+        deferredStamps: null,
+        ...(routeStamp.current?.snapshotRecovery ? { snapshotRecovery: true } : {}),
+      };
     const { adopted, cloning } = reconciled;
     setStep('setup');
     await runSetupCommands(spec, spec.directory, env, redact, new AbortController().signal);
+    // A worktree snapshot is captured from the route directory, so it only
+    // applies to a route whose single root is that directory.
+    const snapshotRootDirectory =
+      spec.roots === undefined &&
+      spec.kilo?.scopeId.startsWith('worktree_') === true &&
+      deps.worktreeSnapshots !== undefined
+        ? roots[0]?.directory
+        : undefined;
+    const replacement = cloning || adopted;
+    // A retry after a failed preparation has no stamp: the snapshot is still the
+    // newest saved state, and capturing again before restoring it would overwrite it.
+    const recoverUnstamped =
+      snapshotRootDirectory !== undefined && reconciled.inspections.includes('unstamped');
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
-    const recoveryApplied =
-      cloning || adopted ? ((await onReplacementWorkspace?.()) ?? false) : false;
-    const stamps: Array<{ directory: string; commit: string }> = [];
+    const recovered =
+      replacement || recoverUnstamped ? await onReplacementWorkspace?.(replacement) : undefined;
+    const snapshotRecovery = recovered?.snapshotRecovery === true;
+    const stamps: Array<{
+      directory: string;
+      commit: string;
+      snapshotRecovery?: true;
+    }> = [];
     for (const root of roots) {
-      stamps.push({ directory: root.directory, commit: await headCommit(root.directory, env) });
+      stamps.push({
+        directory: root.directory,
+        commit: await headCommit(root.directory, env),
+        ...(snapshotRecovery && root.directory === snapshotRootDirectory
+          ? { snapshotRecovery: true }
+          : {}),
+      });
     }
     // Recovery requested but not applied: defer the current-allocation stamp until
     // after the deferred import, so a crash in between cannot leave a stamp that
     // makes the next preparation look like a surviving workspace.
-    if (spec.worktreeRecovery !== undefined && !recoveryApplied) {
+    if (spec.worktreeRecovery !== undefined && !recovered?.applied) {
       log(
         `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: stamps };
     }
     for (const stamp of stamps) {
-      await writeStamp(stamp.directory, { allocationId: deps.allocationId, commit: stamp.commit });
+      await writeStamp(stamp.directory, {
+        allocationId: deps.allocationId,
+        commit: stamp.commit,
+        ...(stamp.snapshotRecovery ? { snapshotRecovery: true } : {}),
+      });
     }
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
-    return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: null };
+    return {
+      outcome: adopted ? 'adopted' : 'cloned',
+      deferredStamps: null,
+      ...(snapshotRecovery ? { snapshotRecovery: true } : {}),
+    };
   }
 
   async function runSetupCommands(
@@ -1066,6 +1132,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     sessionId: string;
     spec: ControlPlaneRouteSpec;
   }): void {
+    const directoryInUse =
+      [...prepared.values()].some(route => route.directory === input.spec.directory) ||
+      [...preparing.entries()].some(
+        ([sessionId, owner]) =>
+          sessionId !== input.sessionId &&
+          !owner.released &&
+          owner.directory === input.spec.directory
+      );
+    if (!directoryInUse) deps.worktreeSnapshots?.unregister(input.spec.directory);
     if (!hasRoutesForKey(input.key, input.sessionId)) {
       deps.runtimes.release(input.key);
       profileMaterializer.release(routeHome(input.spec, homeRoots));
@@ -1217,6 +1292,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
       let replacementWorkspace = false;
       let localRecoveryApplied = false;
+      let snapshotRecovery = false;
       let deferredRuntimeStarted = false;
       let runtimeWasReused = false;
       const recovery = spec.worktreeRecovery;
@@ -1235,6 +1311,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const restoreFilesFor = (): boolean =>
         spec.sessionSnapshot === undefined &&
         spec.continuation !== true &&
+        !snapshotRecovery &&
         !(replacementWorkspace && localRecoveryApplied) &&
         !(recovery !== undefined && workspace === 'same');
       // One owner for runtime profile, runtime start and session resolution, shared
@@ -1308,46 +1385,111 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           step => {
             currentStep = step;
           },
-          async () => {
+          async legacyRecovery => {
             replacementWorkspace = true;
-            if (!recovery || owner.released) return false;
+            if (owner.released) return { applied: false };
             currentStep = 'restore';
+            const recoveryController = new AbortController();
+            owner.recoveryController = recoveryController;
             try {
-              emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
-              const diffs = await restoreRootRecoveries({
-                cwd: directory,
-                roots: routeRoots(spec),
-                recovery,
-                env: builtEnv,
-                signal: AbortSignal.timeout(30_000),
-                restore: deps.recoverWorktree ?? restoreWorktreeRecovery,
-                onRoot: (rootDirectory, recovered) => {
-                  if (recovered) recoveredRoots.add(rootDirectory);
-                },
-              });
-              log(
-                `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
-              );
-              localRecoveryApplied = recoveredRoots.size === roots.length;
-              const incomplete = await reportRestoreIncomplete({
-                diffs,
-                identity: `kiloSessionId=${spec.kiloSessionId}`,
-                log,
-              });
-              if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
-              return localRecoveryApplied;
-            } catch {
-              log(`local worktree recovery session=${sessionId} failed; continuing`);
-              emitProgress(
-                sessionId,
-                'restore',
-                'Saved worktree changes could not be restored; continuing'
-              );
-              return false;
+              const snapshots = deps.worktreeSnapshots;
+              if (
+                spec.roots === undefined &&
+                kiloConfig.scopeId.startsWith('worktree_') &&
+                snapshots
+              ) {
+                emitProgress(sessionId, 'restore', 'Checking saved worktree snapshot');
+                try {
+                  const snapshot = await withinStep(
+                    'restore',
+                    WORKTREE_SNAPSHOT_RESTORE_MS,
+                    signal =>
+                      snapshots.restore({
+                        directory,
+                        worktreeId: kiloConfig.scopeId,
+                        signal,
+                      }),
+                    recoveryController.signal
+                  );
+                  recoveryController.signal.throwIfAborted();
+                  if (snapshot.found) {
+                    const conflicts = snapshot.conflicts ?? [];
+                    emitProgress(
+                      sessionId,
+                      'restore',
+                      snapshot.invalid
+                        ? 'Saved worktree snapshot could not be read; continuing without saved changes'
+                        : `Restored ${snapshot.applied ?? 0} worktree changes; omitted ${snapshot.omitted ?? 0}; conflicts ${conflicts.length}${snapshot.partial ? ' (partial snapshot)' : ''}${conflicts.length ? `. Conflicting paths saved under .git/kilo-recovered/: ${conflicts.slice(0, 20).join(', ')}` : ''}`
+                    );
+                    return { applied: true, snapshotRecovery: true as const };
+                  }
+                } catch (error) {
+                  if (owner.released) throw error;
+                  const message =
+                    'Saved worktree changes could not be downloaded or restored. Send another message to retry.';
+                  emitProgress(sessionId, 'restore', message);
+                  throw new WrapperBootstrapError({
+                    code: 'WORKSPACE_SETUP_FAILED',
+                    message,
+                    retryable: true,
+                  });
+                }
+              }
+              if (!legacyRecovery || !recovery) return { applied: false };
+              const signal = AbortSignal.any([
+                recoveryController.signal,
+                AbortSignal.timeout(30_000),
+              ]);
+              try {
+                emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
+                const diffs = await withTimeoutAndAbort(
+                  restoreRootRecoveries({
+                    cwd: directory,
+                    roots: routeRoots(spec),
+                    recovery,
+                    env: builtEnv,
+                    signal,
+                    restore: deps.recoverWorktree ?? restoreWorktreeRecovery,
+                    onRoot: (rootDirectory, recovered) => {
+                      if (recovered) recoveredRoots.add(rootDirectory);
+                    },
+                  }),
+                  {
+                    timeoutMs: 30_000,
+                    timeoutMessage: 'local worktree recovery timed out',
+                    abortMessage: 'local worktree recovery aborted',
+                    signal,
+                  }
+                );
+                signal.throwIfAborted();
+                log(
+                  `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
+                );
+                localRecoveryApplied = recoveredRoots.size === roots.length;
+                const incomplete = await reportRestoreIncomplete({
+                  diffs,
+                  identity: `kiloSessionId=${spec.kiloSessionId}`,
+                  log,
+                });
+                if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
+                return { applied: localRecoveryApplied };
+              } catch (error) {
+                if (owner.released) throw error;
+                log(`local worktree recovery session=${sessionId} failed; continuing`);
+                emitProgress(
+                  sessionId,
+                  'restore',
+                  'Saved worktree changes could not be restored; continuing'
+                );
+                return { applied: false };
+              }
+            } finally {
+              owner.recoveryController = undefined;
             }
           }
         );
         workspace = preparedWorkspace.outcome;
+        snapshotRecovery ||= preparedWorkspace.snapshotRecovery === true;
         if (spec.git) {
           for (const root of roots) {
             const origin = await normalizeOriginCredential({
@@ -1369,6 +1511,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               allocationId: deps.allocationId,
               commit: stamp.commit,
               ...(stamp.workspacePrepared === false ? { workspacePrepared: false } : {}),
+              ...(stamp.snapshotRecovery ? { snapshotRecovery: true } : {}),
             });
           }
         }
@@ -1433,6 +1576,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (owner.released) return;
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
+      if (kiloConfig.scopeId.startsWith('worktree_')) {
+        deps.worktreeSnapshots?.register({
+          directory,
+          worktreeId: kiloConfig.scopeId,
+        });
+      }
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) return;
@@ -1529,6 +1678,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           promise: Promise.resolve(),
           released: false,
           runtimeKey: runtimeKey(spec),
+          directory: spec.directory,
         };
         owner.promise = existing.promise
           .then(() => {
@@ -1552,6 +1702,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         promise: Promise.resolve(),
         released: false,
         runtimeKey: runtimeKey(spec),
+        directory: spec.directory,
       };
       const route = prepared.get(spec.sessionId);
       if (route) {
@@ -1594,6 +1745,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation) {
         preparation.released = true;
         preparation.skillInstallController?.abort();
+        preparation.recoveryController?.abort();
       }
       const route = prepared.get(sessionId);
       if (!route) return;

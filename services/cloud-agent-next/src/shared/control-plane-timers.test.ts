@@ -4,6 +4,7 @@ import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
   sandboxIdlePolicyForOrigins,
+  WORKTREE_SNAPSHOT_RESTORE_MS,
 } from './control-plane-timers.js';
 
 describe('control-plane idle timers', () => {
@@ -50,6 +51,7 @@ describe('control-plane preparation attempt budget', () => {
       sandbox.wrapperHelloMs +
       wrapper.restoreMs +
       wrapper.cloneMs +
+      WORKTREE_SNAPSHOT_RESTORE_MS +
       // Kilo runtime start and the Kilo session each retry once inside the
       // attempt, so each can consume two of its own bounds.
       2 * wrapper.kiloRuntimeStartMs +

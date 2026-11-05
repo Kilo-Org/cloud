@@ -85,6 +85,14 @@ import {
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import {
+  decideWorktreeSnapshotAuthorization,
+  purgeWorktreeSnapshot,
+  worktreeSnapshotAuthorizationInputSchema,
+  worktreeSnapshotTombstoneInputSchema,
+  worktreeSnapshotTombstoneKey,
+  worktreeSnapshotWritesEnabled,
+} from '../../sandbox-control/worktree-snapshot-grant.js';
 import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
 import { selectStartup } from '../../sandbox-control/startup-selection.js';
 import {
@@ -1113,6 +1121,43 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Whether the current allocation may read or write a worktree snapshot.
+   * Checked on every request: the grant identity alone cannot prove the
+   * sandbox still owns the allocation or that the worktree was not deleted.
+   */
+  async authorizeWorktreeSnapshot(input: {
+    allocationId: string;
+    worktreeId: string;
+  }): Promise<boolean> {
+    await this.initialized;
+    const parsed = worktreeSnapshotAuthorizationInputSchema.parse(input);
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const routes = await listRoutes(this.db);
+      const tombstone = await this.ctx.storage.get(worktreeSnapshotTombstoneKey(parsed.worktreeId));
+      return decideWorktreeSnapshotAuthorization({
+        allocationId: parsed.allocationId,
+        currentAllocationId: state.allocationId,
+        allocationKind: state.kind,
+        routeScopeIds: routes
+          .map(route => route.credentialSource?.scopeId)
+          .filter((scopeId): scopeId is string => scopeId !== undefined),
+        worktreeId: parsed.worktreeId,
+        tombstoned: tombstone !== undefined,
+      });
+    });
+  }
+
+  async isWorktreeSnapshotTombstoned(input: { worktreeId: string }): Promise<boolean> {
+    await this.initialized;
+    const parsed = worktreeSnapshotTombstoneInputSchema.parse(input);
+    return this.enqueue(async () => {
+      const tombstone = await this.ctx.storage.get(worktreeSnapshotTombstoneKey(parsed.worktreeId));
+      return tombstone !== undefined;
+    });
+  }
+
+  /**
    * Worker -> Sandbox DO (spec §6 "Billing, credentials and deletion"). Port of
    * the legacy DO cleanup: when the provider stop or the shared runtime is
    * confirmed, the worktree's routes are removed; otherwise it throws
@@ -1179,6 +1224,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         await this.revokeWorktreeRoutes(handoff.targetSessionIds);
         this.worktreeChanges.purge(parsed.worktreeId);
+        await this.purgeWorktreeSnapshotStorage(parsed.worktreeId);
         const journal = await finishWorktreeDeletion(
           this.ctx.storage,
           parsed.worktreeId,
@@ -1205,6 +1251,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
       this.worktreeChanges.purge(parsed.worktreeId);
+      await this.purgeWorktreeSnapshotStorage(parsed.worktreeId);
       if (handoff.plan.action === 'stop') {
         // Fence by allocation identity: a sibling prepare may have created a new
         // allocation while the provider stop ran off-queue.
@@ -1220,6 +1267,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       );
       return { deleted: true, sessionIds: journal.sessionIds };
     });
+  }
+
+  private async purgeWorktreeSnapshotStorage(worktreeId: string): Promise<void> {
+    const purged = await purgeWorktreeSnapshot({
+      worktreeId,
+      storage: this.ctx.storage,
+      ...(this.env.WORKTREE_SNAPSHOTS_BUCKET ? { bucket: this.env.WORKTREE_SNAPSHOTS_BUCKET } : {}),
+    });
+    if (!purged) {
+      logControlDiagnostic('worktree_snapshot_delete_failed', { worktreeId }, 'warn');
+    }
   }
 
   /**
@@ -5471,6 +5529,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         provider,
         credential: launchCredential,
         diagnostics: { allocationId, signingSecret },
+        worktreeSnapshotWrites: worktreeSnapshotWritesEnabled(this.env),
         ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
       }),
       [CONTROL_PLANE_ALLOCATION_ID_ENV]: allocationId,

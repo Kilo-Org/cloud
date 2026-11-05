@@ -27,6 +27,7 @@ export type CapabilityName =
   | 'sandboxFaults'
   | 'controlPlaneV2'
   | 'controlPlaneRuntime'
+  | 'worktreeSnapshots'
   | 'credentialContainment'
   | 'attachments'
   | 'reports';
@@ -190,6 +191,42 @@ export type ControlPlaneRuntimeObservation = {
   ): Promise<PreviewFixtureHandle>;
   /** The loopback port of the session's `kilo serve` in the owned container. */
   kiloServerPort?(this: void, allocation: SandboxFaultAllocation): Promise<number>;
+  /**
+   * Whether a relative path exists in the owned workspace. Used after recovery
+   * to prove a conflict-free restore did not leave `.git/kilo-recovered`.
+   */
+  workspacePathExists?(
+    this: void,
+    allocation: SandboxFaultAllocation,
+    input: { path: string }
+  ): Promise<boolean>;
+};
+
+/**
+ * Local-only observation of the wrapper's worktree snapshot uploads. It reads
+ * the in-container wrapper log, so it can time a container kill to the state the
+ * E2E scenario is about (a snapshot accepted by the Worker) without guessing a
+ * debounce interval.
+ *
+ * This capability is provided only when the Worker enables BOTH snapshot writes
+ * and reads. The scenario it gates is therefore `unsupported`, never a silent
+ * pass, when the local `.dev.vars` leaves the default-off flags off.
+ */
+export type WorktreeSnapshotObservation = {
+  /** Current count of accepted uploads for this worktree in the owned container. */
+  uploadCount(input: { allocation: SandboxFaultAllocation; worktreeId: string }): Promise<number>;
+  /**
+   * Wait for an upload after `afterCount`. Resolves with the new count and the
+   * accepted upload record; throws when the owned container disappears or the
+   * budget expires.
+   */
+  waitForUpload(input: {
+    allocation: SandboxFaultAllocation;
+    worktreeId: string;
+    afterCount: number;
+    timeoutMs: number;
+    signal?: AbortSignal;
+  }): Promise<{ count: number; record: string }>;
 };
 
 /**
@@ -445,6 +482,7 @@ export type ScenarioEnvironment = {
   sandboxFaults?: SandboxFaultObservation;
   controlPlaneV2?: ControlPlaneV2Observation;
   controlPlaneRuntime?: ControlPlaneRuntimeObservation;
+  worktreeSnapshots?: WorktreeSnapshotObservation;
   credentialContainment?: CredentialContainmentObservation;
   attachments?: AttachmentsObservation;
   reports?: ReportsObservation;

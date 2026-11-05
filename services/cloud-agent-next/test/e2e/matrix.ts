@@ -62,6 +62,7 @@ import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import {
   createLocalScenarioEnvironment,
   credentialContainmentEnabled,
+  worktreeSnapshotsEnabled,
 } from './capabilities-local.js';
 import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
 import { loadDevVars, loadRepoEnvFiles } from './auth.js';
@@ -296,9 +297,14 @@ async function scenarioEnvironment(profile: Profile): Promise<ScenarioEnvironmen
   // The local Worker's own settings decide credential containment, and the
   // report capability needs the Postgres URL the children will also load.
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
-  const containment = credentialContainmentEnabled(loadDevVars(SERVICE_PACKAGE_DIR));
+  const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
+  const containment = credentialContainmentEnabled(devVars);
+  const snapshots = worktreeSnapshotsEnabled(devVars);
   if (profile === 'local') {
-    return createLocalScenarioEnvironment({ credentialContainmentEnabled: containment });
+    return createLocalScenarioEnvironment({
+      credentialContainmentEnabled: containment,
+      worktreeSnapshotsEnabled: snapshots,
+    });
   }
   const deployed = bootstrapDeployedProfile();
   return createLocalHttpScenarioEnvironment({

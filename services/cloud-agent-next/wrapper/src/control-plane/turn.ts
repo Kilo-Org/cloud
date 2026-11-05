@@ -90,6 +90,7 @@ export type TurnManagerDeps = {
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
+  requestWorktreeCapture?: (directory: string) => void;
   runCondense?: (input: {
     kiloClient: WrapperKiloClient;
     kiloSessionId: string;
@@ -814,6 +815,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       emitEvents(sessionId, [{ type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} }]);
       try {
         await runAutoCommitStep(turn, controller.signal);
+        deps.requestWorktreeCapture?.(turn.route.directory);
         await runCondenseStep(turn, controller.signal);
       } finally {
         scheduler.clearTimeout(timer);

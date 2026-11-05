@@ -1,0 +1,99 @@
+/**
+ * Rules for the root screen a tab's Stack keeps beneath every screen of that
+ * tab.
+ *
+ * A screen pushed from a tab's root has the root beneath it, so Back returns
+ * to the root and a press on the already-selected tab pops back to it. A
+ * screen delivered as a FRESH navigation destination — the relaunch restore
+ * after the process died on a subpage — is the Stack's only route instead:
+ * expo-router builds a fresh destination from the target alone and only adds a
+ * Stack's anchor when it can READ that layout's `unstable_settings`. On a
+ * release build `getLayoutAnchor` cannot load a layout the cold-start URL did
+ * not already touch (`loadLayout` returns a promise, so the first read answers
+ * `undefined`): the `(tabs)` anchor is loaded and the tab's own Stack anchor is
+ * not. Back then leaves the tab for Home, and pressing the selected tab again
+ * cannot reach the root, because the tab's press plan reads the Stack as
+ * already at its root.
+ *
+ * These rules name the root such a Stack is missing, and the insertion that
+ * puts it back beneath the screen the reader is on.
+ *
+ * No React or React Native imports: every function here is unit-tested
+ * directly in `tab-stack-root-repair.test.ts`.
+ */
+
+/** The route every tab Stack declares as its `unstable_settings` anchor. */
+export const TAB_STACK_ROOT_ROUTE_NAME = 'index';
+
+/** A route of a tab's Stack, as these rules read and rebuild it. */
+export type TabStackRoute = {
+  readonly key: string;
+  readonly name: string;
+  readonly params?: object;
+};
+
+/** The parts of a Stack's state these rules read. */
+export type TabStackState = {
+  /** The index of the focused route in `routes`. */
+  readonly index: number;
+  /** The routes of the Stack, bottom first. */
+  readonly routes: readonly TabStackRoute[];
+};
+
+/**
+ * Whether the focused screen has the tab's root beneath it.
+ *
+ * Only the routes BELOW the focused one count: a root above it is a screen the
+ * reader moved on from, not a parent. The root itself needs no parent, and a
+ * state with no routes is left alone rather than filled with a lone root.
+ */
+export function isTabStackRootMissing({ index, routes }: TabStackState): boolean {
+  const focused = routes[index];
+  if (focused === undefined || focused.name === TAB_STACK_ROOT_ROUTE_NAME) {
+    return false;
+  }
+  return !routes
+    .slice(0, Math.max(index, 0))
+    .some(route => route.name === TAB_STACK_ROOT_ROUTE_NAME);
+}
+
+/** The Stack state with the tab's root inserted beneath the focused screen. */
+export type TabStackRootInsertion = {
+  readonly routes: TabStackRoute[];
+  /** The index of the focused screen after the insertion. */
+  readonly index: number;
+};
+
+/**
+ * The Stack state with the tab's root inserted directly beneath the focused
+ * screen, or null when the root is already there.
+ *
+ * The insertion keeps every existing route, and so its key: the screen the
+ * reader is on keeps its identity and its state (a half-filled form, a draft)
+ * and only falls to the next index. It is a reset that leaves the focused
+ * route focused, so the Android native stack never sees a screen removed and
+ * another inserted in one commit (`stack-safe-replace.ts`).
+ *
+ * The inserted key is derived from the screen it is inserted under, so it is
+ * unique in this state and a second repair after the app replaced that screen
+ * gets a new one. The root takes no params: it is a tab's landing screen.
+ */
+export function tabStackRootRepair({
+  index,
+  routes,
+}: TabStackState): TabStackRootInsertion | null {
+  if (!isTabStackRootMissing({ index, routes })) {
+    return null;
+  }
+  const focused = routes[index];
+  if (focused === undefined) {
+    return null;
+  }
+  const repaired = [...routes];
+  repaired.splice(index, 0, {
+    key: `${focused.key}:${TAB_STACK_ROOT_ROUTE_NAME}`,
+    name: TAB_STACK_ROOT_ROUTE_NAME,
+    params: {},
+  });
+  return { routes: repaired, index: index + 1 };
+}

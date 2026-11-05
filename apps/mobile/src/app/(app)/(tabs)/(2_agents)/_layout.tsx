@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { appSceneLayout } from '@/components/app-screen-layout';
+import { TabStackRootRepairSceneLayout } from '@/components/tab-stack-root-repair-scene-layout';
 
 import { TabStackErrorBoundary } from '@/components/tab-stack-error-boundary';
 import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
@@ -41,7 +41,7 @@ export default function AgentsLayout() {
       queryPrefixes={AGENTS_STACK_QUERY_PREFIXES}
     >
       <Stack
-        screenLayout={appSceneLayout}
+        screenLayout={TabStackRootRepairSceneLayout}
         screenOptions={{ headerShown: false }}
         // A push or a pop moves a screen that is still the touch target until
         // the transition ends, so that is where the input window can close for

@@ -68,9 +68,6 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      - name: Check runtime publication workflow admission
-        run: pnpm --filter cloud-agent-next test:runtime-ci
-
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -348,6 +345,9 @@ jobs:
       # broken admission still blocks the merge.
       - name: Check stacked CI admission
         run: node --test scripts/stacked-ci.test.mjs
+
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
 
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs

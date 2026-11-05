@@ -16,7 +16,7 @@ jest.mock('next/server', () => ({
 
 const originalFetch = global.fetch;
 
-function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt_user_id: boolean) {
+function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_id: boolean) {
   return buildDirectProvider(
     'custom',
     ['chat_completions'],
@@ -24,7 +24,7 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
       internal_id: 'upstream-model',
       base_url: 'https://secure-proxy.example.com/api/proxy',
       disable_url_suffix,
-      prompt_cache_key_as_mt_user_id,
+      user_hash_as_mt_user_id,
       extra_headers: { 'x-definition-header': 'definition' },
     },
     {
@@ -43,7 +43,7 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
 
 async function sendThroughSecureProxy(
   disable_url_suffix: boolean,
-  prompt_cache_key_as_mt_user_id = false,
+  user_hash_as_mt_user_id = false,
   prompt_cache_key = 'task-cache-key'
 ) {
   const fetchMock = jest.fn(
@@ -55,7 +55,7 @@ async function sendThroughSecureProxy(
     messages: [{ role: 'user' as const, content: 'hi' }],
     prompt_cache_key,
   };
-  const provider = secureProxyProvider(disable_url_suffix, prompt_cache_key_as_mt_user_id);
+  const provider = secureProxyProvider(disable_url_suffix, user_hash_as_mt_user_id);
   const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,

@@ -181,10 +181,10 @@ describe('buildDirectProvider Mt-User-Id header', () => {
   );
   const expectedUserId = 'kilo:' + generateProviderSpecificHash('user-1', provider);
 
-  it.each([true, false])('accepts prompt_cache_key_as_mt_user_id=%s', enabled => {
+  it.each([true, false])('accepts user_hash_as_mt_user_id=%s', enabled => {
     const config = {
       base_url: 'https://llm.example.com/v1',
-      prompt_cache_key_as_mt_user_id: enabled,
+      user_hash_as_mt_user_id: enabled,
     };
 
     expect(CustomLlmApiConfigSchema.parse(config)).toEqual(config);
@@ -204,7 +204,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       body: { model: 'public-model', max_tokens: 100, messages: [] },
     },
   ])('includes the prefixed user hash for $kind when enabled', async request => {
-    const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
+    const headers = await transformRequest(request, { user_hash_as_mt_user_id: true });
 
     expect(headers['Mt-User-Id']).toBe(expectedUserId);
     if (request.kind !== 'messages') {
@@ -224,7 +224,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
 
     const headers = await transformRequest(
       request,
-      { prompt_cache_key_as_mt_user_id: true },
+      { user_hash_as_mt_user_id: true },
       userId,
       sessionId
     );
@@ -238,7 +238,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     request.body.prompt_cache_key = 'task-cache-key';
 
     return expect(
-      transformRequest(request, { prompt_cache_key_as_mt_user_id: enabled })
+      transformRequest(request, { user_hash_as_mt_user_id: enabled })
     ).resolves.not.toHaveProperty('Mt-User-Id');
   });
 
@@ -248,7 +248,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       const request = makeRequest();
       Object.assign(request.body, { prompt_cache_key: cacheKey });
 
-      const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
+      const headers = await transformRequest(request, { user_hash_as_mt_user_id: true });
 
       expect(headers['Mt-User-Id']).toBe(expectedUserId);
     }
@@ -259,7 +259,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     request.body.prompt_cache_key = 'task-cache-key';
 
     const headers = await transformRequest(request, {
-      prompt_cache_key_as_mt_user_id: true,
+      user_hash_as_mt_user_id: true,
       remove_from_body: ['prompt_cache_key'],
     });
 
@@ -272,7 +272,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     request.body.prompt_cache_key = 'task-cache-key';
 
     const headers = await transformRequest(request, {
-      prompt_cache_key_as_mt_user_id: true,
+      user_hash_as_mt_user_id: true,
       extra_headers: { 'Mt-User-Id': 'static-key', 'mt-user-id': 'other-key', 'x-custom': 'kept' },
     });
 

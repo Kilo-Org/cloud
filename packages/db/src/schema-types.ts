@@ -2811,7 +2811,7 @@ export const CustomLlmApiConfigSchema = z.object({
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
-  prompt_cache_key_as_mt_user_id: z.boolean().optional(),
+  user_hash_as_mt_user_id: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),

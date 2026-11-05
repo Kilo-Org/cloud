@@ -155,10 +155,25 @@ export class SessionPresenceDO extends DurableObject<Env> {
       await migrate(this.db, migrations);
       const active = new Set<string>();
       for (const ws of ctx.getWebSockets()) {
-        const saved = attachmentSchema.safeParse(ws.deserializeAttachment());
+        let value: unknown;
+        try {
+          value = ws.deserializeAttachment();
+        } catch {
+          value = undefined;
+        }
+        const saved = attachmentSchema.safeParse(value);
         if (saved.success && !saved.data.closed) {
           active.add(saved.data.connectionID);
           this.attachments.set(ws, saved.data);
+        } else {
+          try {
+            ws.close(
+              saved.success ? 1000 : 1008,
+              saved.success ? 'Connection already closed' : 'Invalid connection metadata'
+            );
+          } catch {
+            // A transport that already disconnected has no open socket to reclaim.
+          }
         }
       }
       for (const row of this.db.select().from(presenceAdvertisements).all()) {

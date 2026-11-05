@@ -368,9 +368,23 @@ export class SessionRelayDO extends DurableObject<Env> {
   private attachment(ws: WebSocket): Attachment | undefined {
     const cached = this.attachments.get(ws);
     if (cached) return cached;
-    const parsed = attachmentSchema.safeParse(ws.deserializeAttachment());
-    if (!parsed.success) return undefined;
-    if (!parsed.data.closed) this.attachments.set(ws, parsed.data);
+    let value: unknown;
+    try {
+      value = ws.deserializeAttachment();
+    } catch {
+      ws.close(1008, 'Invalid relay attachment');
+      return undefined;
+    }
+    const parsed = attachmentSchema.safeParse(value);
+    if (!parsed.success) {
+      ws.close(1008, 'Invalid relay attachment');
+      return undefined;
+    }
+    if (parsed.data.closed) {
+      ws.close(1000, 'Relay connection closed');
+      return undefined;
+    }
+    this.attachments.set(ws, parsed.data);
     return parsed.data;
   }
 
@@ -481,7 +495,12 @@ export class SessionRelayDO extends DurableObject<Env> {
           sessionID: subject.sessionID,
           watching,
         });
-        if (!watching)
+        const stillWatching =
+          !this.purged &&
+          this.sockets().some(
+            ([, state]) => state.ticket.role !== 'runner' && state.ticket.userID === subject.userID
+          );
+        if (!watching && !stillWatching)
           this.db.delete(relayWatches).where(eq(relayWatches.user_id, subject.userID)).run();
       })
       .catch(() => {
@@ -521,9 +540,19 @@ export class SessionRelayDO extends DurableObject<Env> {
       return;
     }
     for (const entry of this.ring) {
-      if (entry.seq > afterSeq) ws.send(entry.encoded);
+      if (entry.seq > afterSeq && !this.sendEncoded(ws, state, entry.encoded)) return;
     }
     this.control(ws, 'subscribed', { seq: this.seq });
+  }
+
+  private sendEncoded(ws: WebSocket, state: Attachment, encoded: string): boolean {
+    try {
+      ws.send(encoded);
+      return true;
+    } catch {
+      this.close(ws, state, 1011, 'Event delivery failed');
+      return false;
+    }
   }
 
   private publish(ws: WebSocket, ticket: LiveTicket, event: z.infer<typeof eventSchema>): void {
@@ -559,12 +588,7 @@ export class SessionRelayDO extends DurableObject<Env> {
     let fanout = 0;
     for (const [viewer, state] of this.sockets()) {
       if (state.ticket.role !== 'runner' && state.subscribed) {
-        try {
-          viewer.send(encoded);
-          fanout++;
-        } catch {
-          this.close(viewer, state, 1011, 'Event delivery failed');
-        }
+        if (this.sendEncoded(viewer, state, encoded)) fanout++;
       }
     }
     liveMetric(this.env, {

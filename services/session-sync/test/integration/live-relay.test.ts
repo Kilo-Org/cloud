@@ -16,7 +16,7 @@ import {
   relayWatches,
 } from '../../src/db/relay-sqlite-schema';
 import { getPresenceStub } from '../../src/dos/SessionPresenceDO';
-import { getRelayStub } from '../../src/dos/SessionRelayDO';
+import { getRelayStub, SessionRelayDO } from '../../src/dos/SessionRelayDO';
 import type { Env } from '../../src/env';
 import { LIVE_LIMITS } from '../../src/live/protocol';
 import { mintTicket, type LiveRole, type LiveTicket } from '../../src/live/ticket';
@@ -1175,3 +1175,207 @@ it('rebuilds attachment caches from hibernation metadata and keeps subscription/
     expect(relay.attachments.size).toBe(1);
   });
 });
+
+it('retains watch renewal debt when a viewer reconnects during watch(false)', async () => {
+  const fixture = await setup();
+  await fixture.connect('viewer');
+  const token = await fixture.ticket('viewer');
+  await runInDurableObject(fixture.stub, async (instance, state) => {
+    const relay = instance as unknown as { env: Env; watchSerial: Promise<void> };
+    await relay.watchSerial;
+    const originalEnv = relay.env;
+    const namespace = originalEnv.SESSION_PRESENCE_DO;
+    const stopEntered = Promise.withResolvers<void>();
+    const stopRelease = Promise.withResolvers<void>();
+    const startEntered = Promise.withResolvers<void>();
+    const startRelease = Promise.withResolvers<void>();
+    const calls: boolean[] = [];
+    relay.env = {
+      ...originalEnv,
+      SESSION_PRESENCE_DO: {
+        idFromName: namespace.idFromName.bind(namespace),
+        get: () => ({
+          watch: async ({ watching }: { watching: boolean }) => {
+            calls.push(watching);
+            if (watching) {
+              startEntered.resolve();
+              await startRelease.promise;
+            } else {
+              stopEntered.resolve();
+              await stopRelease.promise;
+            }
+          },
+        }),
+      } as unknown as Env['SESSION_PRESENCE_DO'],
+    };
+    const server = state.getWebSockets()[0];
+    if (!server) throw new Error('Missing original viewer socket');
+    let replacement: WebSocket | undefined;
+    const replacementClosed = Promise.withResolvers<CloseEvent>();
+    const closing = instance.webSocketClose(server, 1000, 'Viewer left', true);
+    const stopping = relay.watchSerial;
+    try {
+      await stopEntered.promise;
+      const response = await instance.fetch(
+        new Request('https://relay.test/', {
+          headers: { upgrade: 'websocket', authorization: `Bearer ${token}` },
+        })
+      );
+      if (!response.webSocket) throw new Error('Replacement viewer did not upgrade');
+      replacement = response.webSocket;
+      replacement.addEventListener('close', replacementClosed.resolve, { once: true });
+      replacement.accept();
+      const refreshing = relay.watchSerial;
+      stopRelease.resolve();
+      await stopping;
+      await startEntered.promise;
+      expect(drizzle(state.storage).select().from(relayWatches).all()).toHaveLength(1);
+      startRelease.resolve();
+      await refreshing;
+      expect(calls).toEqual([false, true]);
+      expect(drizzle(state.storage).select().from(relayWatches).all()).toHaveLength(1);
+    } finally {
+      stopRelease.resolve();
+      startRelease.resolve();
+      await closing;
+      if (replacement) {
+        replacement.close(1000, 'Test completed');
+        await replacementClosed.promise;
+      }
+      await relay.watchSerial;
+      relay.env = originalEnv;
+    }
+  });
+});
+
+it('keeps watch stop debt until watch(false) succeeds after a stale watch(true)', async () => {
+  const fixture = await setup();
+  await fixture.connect('viewer');
+  await runInDurableObject(fixture.stub, async (instance, state) => {
+    const relay = instance as unknown as {
+      env: Env;
+      watchSerial: Promise<void>;
+      notifyWatch: (subject: {
+        userID: string;
+        tenant: Principal['tenant'];
+        sessionID: string;
+      }) => Promise<void>;
+    };
+    await relay.watchSerial;
+    const originalEnv = relay.env;
+    const namespace = originalEnv.SESSION_PRESENCE_DO;
+    const startEntered = Promise.withResolvers<void>();
+    const startRelease = Promise.withResolvers<void>();
+    const stopEntered = Promise.withResolvers<void>();
+    const stopRelease = Promise.withResolvers<void>();
+    relay.env = {
+      ...originalEnv,
+      SESSION_PRESENCE_DO: {
+        idFromName: namespace.idFromName.bind(namespace),
+        get: () => ({
+          watch: async ({ watching }: { watching: boolean }) => {
+            if (watching) {
+              startEntered.resolve();
+              await startRelease.promise;
+            } else {
+              stopEntered.resolve();
+              await stopRelease.promise;
+            }
+          },
+        }),
+      } as unknown as Env['SESSION_PRESENCE_DO'],
+    };
+    try {
+      const refreshing = relay.notifyWatch({ ...fixture.principal, sessionID: fixture.sessionID });
+      await startEntered.promise;
+      const server = state.getWebSockets()[0];
+      if (!server) throw new Error('Missing viewer socket');
+      await instance.webSocketClose(server, 1000, 'Viewer left', true);
+      startRelease.resolve();
+      await refreshing;
+      await stopEntered.promise;
+      expect(drizzle(state.storage).select().from(relayWatches).all()).toHaveLength(1);
+      stopRelease.resolve();
+      await relay.watchSerial;
+      expect(drizzle(state.storage).select().from(relayWatches).all()).toEqual([]);
+    } finally {
+      startRelease.resolve();
+      stopRelease.resolve();
+      await relay.watchSerial;
+      relay.env = originalEnv;
+    }
+  });
+});
+
+it('contains a failed raw replay send, closes that viewer, and still schedules cleanup', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  runner.ws.send(
+    JSON.stringify({ channel: 'events', type: 'replay-fixture', body: { text: 'opaque' } })
+  );
+  await viewer.next('replay-fixture');
+  const closed = whenClosed(viewer.ws);
+  await runInDurableObject(fixture.stub, async (instance, state) => {
+    const server = state.getWebSockets().find(ws => {
+      const saved = ws.deserializeAttachment() as { ticket: { role: string } };
+      return saved.ticket.role === 'viewer';
+    });
+    if (!server) throw new Error('Missing replay viewer socket');
+    const relay = instance as unknown as { schedule: () => Promise<void> };
+    const scheduling = vi.spyOn(relay, 'schedule');
+    const sending = vi.spyOn(server, 'send').mockImplementation(() => {
+      throw new Error('Synthetic replay transport failure');
+    });
+    try {
+      await expect(
+        instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }))
+      ).resolves.toBeUndefined();
+      expect(scheduling).toHaveBeenCalled();
+    } finally {
+      sending.mockRestore();
+      scheduling.mockRestore();
+    }
+  });
+  expect((await closed).code).toBe(1011);
+});
+
+it.each(['invalid', 'closed', 'deserialize-throws'] as const)(
+  'closes a native socket with %s attachment metadata during real constructor reconstruction',
+  async corruption => {
+    const fixture = await setup();
+    const viewer = await fixture.connect('viewer');
+    const closed = whenClosed(viewer.ws);
+    await runInDurableObject(fixture.stub, async (_instance, state) => {
+      const server = state.getWebSockets()[0];
+      if (!server) throw new Error('Missing native viewer socket');
+      if (corruption === 'invalid') server.serializeAttachment({ ticket: 'invalid' });
+      if (corruption === 'closed') {
+        const saved = server.deserializeAttachment() as Record<string, unknown>;
+        server.serializeAttachment({ ...saved, closed: true });
+      }
+      const reading =
+        corruption === 'deserialize-throws'
+          ? vi.spyOn(server, 'deserializeAttachment').mockImplementation(() => {
+              throw new Error('Synthetic invalid native attachment');
+            })
+          : undefined;
+      const initialize = vi.spyOn(state, 'blockConcurrencyWhile');
+      try {
+        const restored = new SessionRelayDO(state, testEnv);
+        const initialization = initialize.mock.results.at(-1);
+        if (initialization?.type !== 'return')
+          throw new Error('Relay initialization was not captured');
+        await initialization.value;
+        const cache = restored as unknown as { attachments: Map<WebSocket, unknown> };
+        expect(cache.attachments.size).toBe(0);
+        expect(state.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN)).toEqual([]);
+      } finally {
+        initialize.mockRestore();
+        reading?.mockRestore();
+      }
+    });
+    expect((await closed).code).toBe(corruption === 'closed' ? 1000 : 1008);
+  }
+);

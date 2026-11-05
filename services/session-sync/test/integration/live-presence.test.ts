@@ -844,6 +844,54 @@ describe('live instance commands', () => {
     });
   });
 
+  it.each([
+    { metadata: 'corrupt', closeCode: 1008 },
+    { metadata: 'closed', closeCode: 1000 },
+  ])(
+    'closes $metadata native sockets on reconstruction and prunes their routing state',
+    async ({ metadata, closeCode }) => {
+      const { principal, stub, runner, controller, instanceID } = await headlessHost();
+      const command = instanceCommand(instanceID, 'list_agents');
+      controller.ws.send(JSON.stringify(command));
+      await runner.next('list_agents');
+      await controller.next('command_status');
+      await runInDurableObject(stub, (_instance, state) => {
+        for (const ws of state.getWebSockets()) {
+          const saved = ws.deserializeAttachment() as { ticket: { role: string }; closed: boolean };
+          if (saved.ticket.role === 'runner') {
+            ws.serializeAttachment(
+              metadata === 'closed' ? { ...saved, closed: true } : { corrupt: true }
+            );
+          }
+        }
+      });
+      await reconstruct(stub, async (restored, state) => {
+        const db = drizzle(state.storage);
+        expect(db.select().from(presenceAdvertisements).all()).toEqual([]);
+        expect(db.select().from(presenceCommandRoutes).all()).toEqual([]);
+        expect(await restored.list()).toEqual([]);
+      });
+      expect((await runner.closed).code).toBe(closeCode);
+      expect((await controller.next('command_status')).body).toEqual({
+        commandID: command.commandID,
+        instanceID,
+        status: 'unknown',
+      });
+      await runInDurableObject(stub, (_instance, state) => {
+        expect(state.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN)).toHaveLength(
+          1
+        );
+      });
+      const replacement = await connect(principal, 'runner');
+      await heartbeat(replacement, instanceID);
+      await runInDurableObject(stub, (_instance, state) => {
+        expect(state.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN)).toHaveLength(
+          2
+        );
+      });
+    }
+  );
+
   it('returns an HTTP reply through the real instance-addressed Worker route', async () => {
     const { principal, runner, instanceID } = await headlessHost();
     const commandID = crypto.randomUUID();

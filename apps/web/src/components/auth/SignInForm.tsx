@@ -58,10 +58,8 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
-  const offeredOAuthProviderIds = withLaunchedClaudeSignIn(
-    OAuthProviderIds,
-    useClaudeSignInEnabled()
-  );
+  const claudeSignInEnabled = useClaudeSignInEnabled();
+  const offeredOAuthProviderIds = withLaunchedClaudeSignIn(OAuthProviderIds, claudeSignInEnabled);
 
   // An Enterprise SSO request for a different address than the signed-in
   // session cannot proceed; offer the one-tap switch before any normal
@@ -146,7 +144,7 @@ export function SignInForm({
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
-          providers={flow.availableProviders}
+          providers={withLaunchedClaudeSignIn(flow.availableProviders, claudeSignInEnabled)}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
           purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}
@@ -229,7 +227,10 @@ export function SignInForm({
 
                 // The remembered provider is the whole list; "see other
                 // sign-in methods" below opens the full group.
-                const displayedProviders = [lastAuthMethod];
+                const displayedProviders = withLaunchedClaudeSignIn(
+                  [lastAuthMethod],
+                  claudeSignInEnabled
+                );
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">

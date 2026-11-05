@@ -2878,6 +2878,7 @@
       "windowUnavailable": "មិនមានព័ត៌មានអំពីទំហំបង្អួចបរិបទទេ",
       "tapToViewDetails": " ប៉ះដើម្បីមើលព័ត៌មានលម្អិតនៃបរិបទ។",
       "costClause": ", ថ្លៃចំណាយ {{cost}}",
+      "loadingCostSpoken": "ចំណាយ {{cost}}។",
       "tokensWindowUnavailable": "បរិបទប្រើតូខេន {{used}} មិនមានព័ត៌មានអំពីទំហំបង្អួចបរិបទទេ{{costClause}}។",
       "tokensUsage": "បរិបទប្រើតូខេន {{used}} ក្នុងចំណោម {{window}} បានប្រើ {{percentage}}{{costClause}}។",
       "title": "ការប្រើប្រាស់បរិបទ",

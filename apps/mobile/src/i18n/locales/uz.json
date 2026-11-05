@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Kontekst oynasining hajmi noma'lum",
       "tapToViewDetails": " Kontekst tafsilotlarini ko'rish uchun bosing.",
       "costClause": ", xarajat {{cost}}",
+      "loadingCostSpoken": "xarajati {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} ta token, oyna hajmi noma'lum{{costClause}}.",
       "tokensUsage": "Kontekst: {{window}} ta tokendan {{used}} tasi ishlatilgan, {{percentage}}{{costClause}}.",
       "title": "Kontekstdan foydalanish",

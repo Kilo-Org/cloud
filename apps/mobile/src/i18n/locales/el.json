@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Μη διαθέσιμο μέγεθος παραθύρου συμφραζομένων",
       "tapToViewDetails": " Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
       "costClause": ", κόστος {{cost}}",
+      "loadingCostSpoken": "κόστος {{cost}}.",
       "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου{{costClause}}.",
       "tokensUsage": "Συμφραζόμενα: {{used}} από {{window}} διακριτικά, χρήση {{percentage}}{{costClause}}.",
       "title": "Χρήση συμφραζομένων",

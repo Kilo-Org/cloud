@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Kontekstiakna suurus pole saadaval",
       "tapToViewDetails": " Konteksti üksikasjade vaatamiseks puuduta.",
       "costClause": ", kulu {{cost}}",
+      "loadingCostSpoken": "kulu {{cost}}.",
       "tokensWindowUnavailable": "Kontekstis {{used}} tokenit, kontekstiakna suurus pole saadaval{{costClause}}.",
       "tokensUsage": "Kontekstis {{used}} tokenit {{window}} tokenist, {{percentage}} kasutatud{{costClause}}.",
       "title": "Konteksti kasutus",

@@ -2978,6 +2978,7 @@
       "windowUnavailable": "Памер кантэкстнага акна невядомы",
       "tapToViewDetails": " Націсніце, каб убачыць падрабязнасці кантэксту.",
       "costClause": ", кошт {{cost}}",
+      "loadingCostSpoken": "кошт {{cost}}.",
       "tokensWindowUnavailable": "Токенаў у кантэксце: {{used}}, памер кантэкстнага акна невядомы{{costClause}}.",
       "tokensUsage": "Токенаў у кантэксце: {{used}} з {{window}}, выкарыстана {{percentage}}{{costClause}}.",
       "title": "Выкарыстанне кантэксту",

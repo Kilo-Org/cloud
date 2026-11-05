@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Madhësia e dritares së kontekstit nuk është e disponueshme",
       "tapToViewDetails": " Prek për të parë detajet e kontekstit.",
       "costClause": ", kostoja {{cost}}",
+      "loadingCostSpoken": "kostoja {{cost}}.",
       "tokensWindowUnavailable": "Konteksti: {{used}} tokenë, madhësia e dritares nuk është e disponueshme{{costClause}}.",
       "tokensUsage": "Konteksti: {{used}} nga {{window}} tokenë, përdorimi: {{percentage}}{{costClause}}.",
       "title": "Përdorimi i kontekstit",

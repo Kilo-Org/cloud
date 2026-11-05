@@ -2339,6 +2339,7 @@
       "windowUnavailable": "Không có thông tin về giới hạn ngữ cảnh",
       "tapToViewDetails": " Chạm để xem chi tiết ngữ cảnh.",
       "costClause": ", chi phí {{cost}}",
+      "loadingCostSpoken": "chi phí {{cost}}.",
       "tokensWindowUnavailable": "Ngữ cảnh đã dùng {{used}} token, chưa rõ giới hạn{{costClause}}.",
       "tokensUsage": "Ngữ cảnh đã dùng {{used}} trong tổng số {{window}} token, chiếm {{percentage}}{{costClause}}.",
       "title": "Mức sử dụng ngữ cảnh",

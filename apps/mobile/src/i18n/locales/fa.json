@@ -2884,6 +2884,7 @@
       "windowUnavailable": "اندازه پنجره زمینه در دسترس نیست",
       "tapToViewDetails": " برای مشاهدهٔ جزئیات زمینه، بزنید.",
       "costClause": "، هزینه {{cost}}",
+      "loadingCostSpoken": "هزینه {{cost}}.",
       "tokensWindowUnavailable": "زمینه: {{used}} توکن، اندازهٔ پنجره در دسترس نیست{{costClause}}.",
       "tokensUsage": "زمینه: {{used}} از {{window}} توکن، {{percentage}} استفاده‌شده{{costClause}}.",
       "title": "میزان استفاده از زمینه",

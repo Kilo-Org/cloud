@@ -3078,6 +3078,7 @@
       "windowUnavailable": "Nid yw maint y ffenestr gyd-destun ar gael",
       "tapToViewDetails": " Tapio i weld manylion y cyd-destun.",
       "costClause": ", cost: {{cost}}",
+      "loadingCostSpoken": "cost o {{cost}}.",
       "tokensWindowUnavailable": "Cyd-destun: {{used}} tocyn, nid yw maint y ffenestr ar gael{{costClause}}.",
       "tokensUsage": "Cyd-destun: {{used}} o {{window}} tocyn, {{percentage}} wedi'i ddefnyddio{{costClause}}.",
       "title": "Defnydd cyd-destun",

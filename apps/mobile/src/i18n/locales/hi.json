@@ -2312,6 +2312,7 @@
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",
       "tapToViewDetails": " संदर्भ का विवरण देखने के लिए टैप करें।",
       "costClause": ", लागत {{cost}}",
+      "loadingCostSpoken": "लागत {{cost}}।",
       "tokensWindowUnavailable": "संदर्भ में {{used}} टोकन, विंडो का आकार उपलब्ध नहीं{{costClause}}।",
       "tokensUsage": "संदर्भ में {{window}} में से {{used}} टोकन, {{percentage}} उपयोग हुआ{{costClause}}।",
       "cacheRate": "कैश दर",

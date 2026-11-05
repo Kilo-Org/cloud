@@ -2878,6 +2878,7 @@
       "windowUnavailable": "സന്ദർഭ പരിധി ലഭ്യമല്ല",
       "tapToViewDetails": " സന്ദർഭ വിശദാംശങ്ങൾ കാണാൻ ടാപ്പ് ചെയ്യുക.",
       "costClause": ", ചെലവ് {{cost}}",
+      "loadingCostSpoken": "ചെലവ് {{cost}}.",
       "tokensWindowUnavailable": "സന്ദർഭത്തിൽ {{used}} ടോക്കണുകൾ, സന്ദർഭ പരിധി ലഭ്യമല്ല{{costClause}}.",
       "tokensUsage": "സന്ദർഭത്തിലെ {{window}} ടോക്കണുകളിൽ {{used}} ഉപയോഗിച്ചു, {{percentage}} ഉപയോഗം{{costClause}}.",
       "title": "സന്ദർഭ ഉപയോഗം",

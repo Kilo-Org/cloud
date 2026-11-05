@@ -2978,6 +2978,7 @@
       "windowUnavailable": "Velikost kontextového okna není k dispozici",
       "tapToViewDetails": " Klepnutím zobrazíte podrobnosti kontextu.",
       "costClause": ", náklady {{cost}}",
+      "loadingCostSpoken": "náklady {{cost}}.",
       "tokensWindowUnavailable": "Kontext: {{used}} tokenů, velikost kontextového okna není k dispozici{{costClause}}.",
       "tokensUsage": "Kontext: {{used}} z {{window}} tokenů, využito {{percentage}}{{costClause}}.",
       "title": "Využití kontextu",

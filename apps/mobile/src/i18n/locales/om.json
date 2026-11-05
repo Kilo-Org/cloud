@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Hammi daangaa odeeffannoo haalaa hin argamu",
       "tapToViewDetails": " Ibsa odeeffannoo haalaa ilaaluuf tuqi.",
       "costClause": ", baasii {{cost}}",
+      "loadingCostSpoken": "baasii {{cost}}.",
       "tokensWindowUnavailable": "Odeeffannoo haalaa tookanoota {{used}}, daangaan hin argamu{{costClause}}.",
       "tokensUsage": "Odeeffannoo haalaa tookanoota {{window}} keessaa {{used}}, {{percentage}} fayyadameera{{costClause}}.",
       "title": "Fayyadama odeeffannoo haalaa",

@@ -2878,6 +2878,7 @@
       "windowUnavailable": "सन्दर्भ विन्डोको आकार उपलब्ध छैन",
       "tapToViewDetails": " सन्दर्भ विवरण हेर्न ट्याप गर्नुहोस्।",
       "costClause": ", लागत {{cost}}",
+      "loadingCostSpoken": "लागत {{cost}}।",
       "tokensWindowUnavailable": "सन्दर्भमा {{used}} टोकन, विन्डोको आकार उपलब्ध छैन{{costClause}}।",
       "tokensUsage": "सन्दर्भमा {{window}} टोकनमध्ये {{used}} प्रयोगमा, {{percentage}} प्रयोग भएको{{costClause}}।",
       "title": "सन्दर्भ प्रयोग",

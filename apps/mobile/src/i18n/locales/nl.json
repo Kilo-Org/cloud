@@ -2339,6 +2339,7 @@
       "windowUnavailable": "Grootte van het contextvenster niet beschikbaar",
       "tapToViewDetails": " Tik om contextdetails te bekijken.",
       "costClause": ", kosten {{cost}}",
+      "loadingCostSpoken": "kosten {{cost}}.",
       "tokensWindowUnavailable": "Context: {{used}} tokens, grootte van het contextvenster niet beschikbaar{{costClause}}.",
       "tokensUsage": "Context: {{used}} van {{window}} tokens, {{percentage}} gebruikt{{costClause}}.",
       "title": "Contextgebruik",

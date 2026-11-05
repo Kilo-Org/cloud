@@ -432,7 +432,7 @@ describe('getMetricsAccessibilityLabel', () => {
         interactive: false,
         usageUnavailable: false,
       })
-    ).toBe('cost 8 cents');
+    ).toBe('Cost so far 8 cents.');
   });
 
   it('names usage unavailable when there is no info or cost', () => {
@@ -532,6 +532,18 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
     ).toBe('コンテキスト使用状況を利用できません、コスト 8 セント。');
   });
 
+  it('ends the loading cost sentence with the Japanese full stop before the hint', async () => {
+    await i18n.changeLanguage('ja');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: true,
+        usageUnavailable: false,
+      })
+    ).toBe('コスト 8 セント。タップするとコンテキストの詳細を表示します。');
+  });
+
   it('keeps the tap hint a separate sentence where no body mark closes the sentence', async () => {
     // "th" ends no sentence with a terminator, so the hint's own leading space
     // is the only thing that keeps the two sentences apart.
@@ -559,6 +571,7 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
         info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
       },
       { tag: 'none', info: undefined },
+      { tag: 'loading', info: undefined, usageUnavailable: false },
     ];
     for (const language of SUPPORTED_LANGUAGES) {
       await i18n.changeLanguage(language); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
@@ -570,7 +583,7 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
               info: usage.info,
               totalCostMicrodollars: cost,
               interactive,
-              usageUnavailable: usage.info === undefined,
+              usageUnavailable: usage.usageUnavailable ?? true,
             });
             expect(label, where).not.toMatch(ADJACENT_TERMINATORS);
           }

@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Kontekstvinduets størrelse er ukendt",
       "tapToViewDetails": " Tryk for at se oplysninger om konteksten.",
       "costClause": ", pris {{cost}}",
+      "loadingCostSpoken": "pris {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokens, kontekstvinduets størrelse er ukendt{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} af {{window}} tokens, {{percentage}} brugt{{costClause}}.",
       "title": "Kontekstforbrug",

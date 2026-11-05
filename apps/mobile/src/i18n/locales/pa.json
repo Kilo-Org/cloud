@@ -2884,6 +2884,7 @@
       "windowUnavailable": "ਸੰਦਰਭ ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ",
       "tapToViewDetails": " ਸੰਦਰਭ ਦੇ ਵੇਰਵੇ ਵੇਖਣ ਲਈ ਟੈਪ ਕਰੋ।",
       "costClause": ", ਲਾਗਤ {{cost}}",
+      "loadingCostSpoken": "ਲਾਗਤ {{cost}}।",
       "tokensWindowUnavailable": "ਸੰਦਰਭ ਵਿੱਚ {{used}} ਟੋਕਨ, ਵਿੰਡੋ ਦਾ ਆਕਾਰ ਉਪਲਬਧ ਨਹੀਂ{{costClause}}।",
       "tokensUsage": "ਸੰਦਰਭ ਵਿੱਚ {{window}} ਵਿੱਚੋਂ {{used}} ਟੋਕਨ, {{percentage}} ਵਰਤੋਂ{{costClause}}।",
       "title": "ਸੰਦਰਭ ਦੀ ਵਰਤੋਂ",

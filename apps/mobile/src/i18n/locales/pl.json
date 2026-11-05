@@ -2397,6 +2397,7 @@
       "windowUnavailable": "Rozmiar okna kontekstu niedostępny",
       "tapToViewDetails": " Dotknij, aby zobaczyć szczegóły kontekstu.",
       "costClause": ", koszt {{cost}}",
+      "loadingCostSpoken": "koszt {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokenów, rozmiar okna niedostępny{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} z {{window}} tokenów, wykorzystano {{percentage}}{{costClause}}.",
       "title": "Wykorzystanie kontekstu",

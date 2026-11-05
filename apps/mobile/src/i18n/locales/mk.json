@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Големината на контекстниот прозорец не е достапна",
       "tapToViewDetails": " Допри за да ги видиш деталите за контекстот.",
       "costClause": ", трошок {{cost}}",
+      "loadingCostSpoken": "трошок {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токени, големината на контекстниот прозорец не е достапна{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} од {{window}} токени, искористени {{percentage}}{{costClause}}.",
       "title": "Искористеност на контекстот",

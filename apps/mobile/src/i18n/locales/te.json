@@ -2878,6 +2878,7 @@
       "windowUnavailable": "సందర్భ పరిమితి అందుబాటులో లేదు",
       "tapToViewDetails": " సందర్భ వివరాలను చూడటానికి నొక్కండి.",
       "costClause": ", ఖర్చు {{cost}}",
+      "loadingCostSpoken": "ఖర్చు {{cost}}.",
       "tokensWindowUnavailable": "సందర్భంలో {{used}} టోకెన్లు, పరిమితి అందుబాటులో లేదు{{costClause}}.",
       "tokensUsage": "సందర్భంలో {{window}} టోకెన్లకు గాను {{used}} వాడారు, వినియోగం {{percentage}}{{costClause}}.",
       "title": "సందర్భ వినియోగం",

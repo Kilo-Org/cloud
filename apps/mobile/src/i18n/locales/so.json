@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Cabbirka daaqadda macnaha guud lama heli karo",
       "tapToViewDetails": " Taabo si aad u aragto faahfaahinta macnaha guud.",
       "costClause": ", kharash {{cost}}",
+      "loadingCostSpoken": "kharashka {{cost}}.",
       "tokensWindowUnavailable": "Macnaha guud: {{used}} halbeeg qoraal, cabbirka daaqadda lama heli karo{{costClause}}.",
       "tokensUsage": "Macnaha guud: {{used}} ka mid ah {{window}} halbeeg qoraal, {{percentage}} waa la isticmaalay{{costClause}}.",
       "title": "Isticmaalka macnaha guud",

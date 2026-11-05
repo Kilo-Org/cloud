@@ -2884,6 +2884,7 @@
       "windowUnavailable": "Tsy fantatra ny fetra ho an'ny angon'ny resaka",
       "tapToViewDetails": " Tsindrio hahitana ny antsipirian'ny angon'ny resaka.",
       "costClause": ", vidiny {{cost}}",
+      "loadingCostSpoken": "sarany {{cost}}.",
       "tokensWindowUnavailable": "Sombin-tsoratra {{used}} ao amin'ny angon'ny resaka, tsy fantatra ny fetra{{costClause}}.",
       "tokensUsage": "Sombin-tsoratra {{used}} amin'ny {{window}} ao amin'ny angon'ny resaka, {{percentage}} no ampiasaina{{costClause}}.",
       "title": "Fampiasana ny angon'ny resaka",

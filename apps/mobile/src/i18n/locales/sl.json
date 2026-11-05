@@ -2978,6 +2978,7 @@
       "windowUnavailable": "Velikost kontekstnega okna ni na voljo",
       "tapToViewDetails": " Tapni za prikaz podrobnosti konteksta.",
       "costClause": ", strošek {{cost}}",
+      "loadingCostSpoken": "strošek {{cost}}.",
       "tokensWindowUnavailable": "Žetoni v kontekstu: {{used}}, velikost okna ni na voljo{{costClause}}.",
       "tokensUsage": "Žetoni v kontekstu: {{used}} od {{window}}, poraba: {{percentage}}{{costClause}}.",
       "title": "Poraba konteksta",

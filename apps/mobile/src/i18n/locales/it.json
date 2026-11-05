@@ -2335,6 +2335,7 @@
       "windowUnavailable": "Dimensione della finestra di contesto non disponibile",
       "tapToViewDetails": " Tocca per visualizzare i dettagli del contesto.",
       "costClause": ", costo {{cost}}",
+      "loadingCostSpoken": "costo {{cost}}.",
       "tokensWindowUnavailable": "Contesto: {{used}} token, dimensione della finestra non disponibile{{costClause}}.",
       "tokensUsage": "Contesto: {{used}} token su {{window}}, {{percentage}} utilizzato{{costClause}}.",
       "title": "Utilizzo del contesto",

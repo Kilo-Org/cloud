@@ -2397,6 +2397,7 @@
       "windowUnavailable": "Розмір контекстного вікна невідомий",
       "tapToViewDetails": " Торкніться, щоб переглянути відомості про контекст.",
       "costClause": ", вартість {{cost}}",
+      "loadingCostSpoken": "вартість {{cost}}.",
       "tokensWindowUnavailable": "Токенів у контексті: {{used}}, розмір вікна невідомий{{costClause}}.",
       "tokensUsage": "Контекст: {{used}} із {{window}} токенів, використано {{percentage}}{{costClause}}.",
       "title": "Використання контексту",

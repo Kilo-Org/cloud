@@ -2878,6 +2878,7 @@
       "windowUnavailable": "ບໍ່ມີຂໍ້ມູນຂະໜາດບໍລິບົດສູງສຸດ",
       "tapToViewDetails": " ແຕະເພື່ອເບິ່ງລາຍລະອຽດບໍລິບົດ.",
       "costClause": ", ຄ່າໃຊ້ຈ່າຍ {{cost}}",
+      "loadingCostSpoken": "ຄ່າໃຊ້ຈ່າຍ {{cost}}.",
       "tokensWindowUnavailable": "ບໍລິບົດ {{used}} ໂທເຄັນ, ບໍ່ມີຂໍ້ມູນຂະໜາດສູງສຸດ{{costClause}}.",
       "tokensUsage": "ບໍລິບົດ {{used}} ຈາກ {{window}} ໂທເຄັນ, ໃຊ້ແລ້ວ {{percentage}}{{costClause}}.",
       "title": "ການໃຊ້ບໍລິບົດ",

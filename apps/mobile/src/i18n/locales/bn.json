@@ -2884,6 +2884,7 @@
       "windowUnavailable": "কনটেক্সট উইন্ডোর আকার জানা যাচ্ছে না",
       "tapToViewDetails": " কনটেক্সটের বিস্তারিত দেখতে ট্যাপ করুন।",
       "costClause": ", খরচ {{cost}}",
+      "loadingCostSpoken": "খরচ {{cost}}।",
       "tokensWindowUnavailable": "কনটেক্সটে {{used}}টি টোকেন, উইন্ডোর আকার জানা যাচ্ছে না{{costClause}}।",
       "tokensUsage": "কনটেক্সটের {{window}}টি টোকেনের মধ্যে {{used}}টি ব্যবহৃত, ব্যবহারের হার {{percentage}}{{costClause}}।",
       "title": "কনটেক্সটের ব্যবহার",

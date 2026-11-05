@@ -2339,6 +2339,7 @@
       "windowUnavailable": "컨텍스트 창 크기 확인 불가",
       "tapToViewDetails": " 컨텍스트 세부 정보를 보려면 누르세요.",
       "costClause": ", 비용 {{cost}}",
+      "loadingCostSpoken": "비용 {{cost}}.",
       "tokensWindowUnavailable": "컨텍스트 토큰 {{used}}개 사용, 컨텍스트 창 크기 확인 불가{{costClause}}.",
       "tokensUsage": "컨텍스트 토큰 {{window}}개 중 {{used}}개 사용, {{percentage}} 사용{{costClause}}.",
       "title": "컨텍스트 사용량",

@@ -2978,6 +2978,7 @@
       "windowUnavailable": "Konteksto lango dydis nežinomas",
       "tapToViewDetails": " Bakstelėkite, kad pamatytumėte konteksto informaciją.",
       "costClause": ", kaina {{cost}}",
+      "loadingCostSpoken": "kaina {{cost}}.",
       "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas{{costClause}}.",
       "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}{{costClause}}.",
       "title": "Konteksto naudojimas",

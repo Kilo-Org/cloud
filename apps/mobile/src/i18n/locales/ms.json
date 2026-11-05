@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Saiz tetingkap konteks tidak tersedia",
       "tapToViewDetails": " Ketik untuk melihat butiran konteks.",
       "costClause": ", kos {{cost}}",
+      "loadingCostSpoken": "kos {{cost}}.",
       "tokensWindowUnavailable": "Konteks menggunakan {{used}} token, saiz tetingkap tidak tersedia{{costClause}}.",
       "tokensUsage": "Konteks menggunakan {{used}} daripada {{window}} token, {{percentage}} digunakan{{costClause}}.",
       "title": "Penggunaan konteks",

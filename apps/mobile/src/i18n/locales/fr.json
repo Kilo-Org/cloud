@@ -2273,6 +2273,7 @@
       "windowUnavailable": "Taille de la fenêtre de contexte indisponible",
       "tapToViewDetails": " Touchez pour voir les détails du contexte.",
       "costClause": ", coût {{cost}}",
+      "loadingCostSpoken": "coût de {{cost}}.",
       "tokensWindowUnavailable": "Contexte : {{used}} jetons, taille de la fenêtre indisponible{{costClause}}.",
       "tokensUsage": "Contexte : {{used}} jetons sur {{window}}, {{percentage}} utilisés{{costClause}}.",
       "title": "Utilisation du contexte",

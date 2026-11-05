@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Կոնտեքստի պատուհանի չափը հասանելի չէ",
       "tapToViewDetails": " Հպեք՝ կոնտեքստի մանրամասները տեսնելու համար։",
       "costClause": ", արժեքը {{cost}}",
+      "loadingCostSpoken": "արժեքը՝ {{cost}}։",
       "tokensWindowUnavailable": "Կոնտեքստ՝ {{used}} տոկեն, պատուհանի չափն անհասանելի է{{costClause}}։",
       "tokensUsage": "Կոնտեքստ՝ {{used}} տոկեն՝ {{window}}-ից, օգտագործված է {{percentage}}{{costClause}}։",
       "title": "Կոնտեքստի օգտագործում",

@@ -2339,6 +2339,7 @@
       "windowUnavailable": "Bağlam penceresinin boyutu bilinmiyor",
       "tapToViewDetails": " Bağlam ayrıntılarını görüntülemek için dokun.",
       "costClause": ", maliyet {{cost}}",
+      "loadingCostSpoken": "maliyet: {{cost}}.",
       "tokensWindowUnavailable": "Bağlamda {{used}} token var, pencere boyutu bilinmiyor{{costClause}}.",
       "tokensUsage": "Bağlam: {{used}} / {{window}} token, {{percentage}} kullanıldı{{costClause}}.",
       "title": "Bağlam kullanımı",

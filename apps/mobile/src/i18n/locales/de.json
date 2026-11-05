@@ -2339,6 +2339,7 @@
       "windowUnavailable": "Größe des Kontextfensters nicht verfügbar",
       "tapToViewDetails": " Tippe, um Kontextdetails anzusehen.",
       "costClause": ", kostet {{cost}}",
+      "loadingCostSpoken": "kostet {{cost}}.",
       "tokensWindowUnavailable": "Kontext: {{used}} Tokens, Größe des Kontextfensters nicht verfügbar{{costClause}}.",
       "tokensUsage": "Kontext: {{used}} von {{window}} Tokens, {{percentage}} genutzt{{costClause}}.",
       "title": "Kontextnutzung",

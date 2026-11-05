@@ -2878,6 +2878,7 @@
       "windowUnavailable": "კონტექსტის ფანჯრის ზომა მიუწვდომელია",
       "tapToViewDetails": " შეეხეთ კონტექსტის დეტალების სანახავად.",
       "costClause": ", ღირებულება {{cost}}",
+      "loadingCostSpoken": "ღირებულება {{cost}}.",
       "tokensWindowUnavailable": "კონტექსტი: {{used}} ტოკენი, ფანჯრის ზომა უცნობია{{costClause}}.",
       "tokensUsage": "კონტექსტი: {{window}} ტოკენიდან გამოყენებულია {{used}}, ანუ {{percentage}}{{costClause}}.",
       "title": "კონტექსტის გამოყენება",

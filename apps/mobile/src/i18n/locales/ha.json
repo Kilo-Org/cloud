@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Ba a samun iyakar mahalli",
       "tapToViewDetails": " Danna don duba cikakkun bayanan mahallin.",
       "costClause": ", kuɗi {{cost}}",
+      "loadingCostSpoken": "farashi {{cost}}.",
       "tokensWindowUnavailable": "Mahalli: guntayen rubutu {{used}}, ba a samun iyaka{{costClause}}.",
       "tokensUsage": "Mahalli: guntayen rubutu {{used}} cikin {{window}}, an yi amfani da {{percentage}}{{costClause}}.",
       "title": "Yawan amfani da mahalli",

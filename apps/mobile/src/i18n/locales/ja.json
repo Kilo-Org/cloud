@@ -2339,6 +2339,7 @@
       "windowUnavailable": "コンテキストウィンドウのサイズは不明",
       "tapToViewDetails": "タップするとコンテキストの詳細を表示します。",
       "costClause": "、コスト {{cost}}",
+      "loadingCostSpoken": "コスト {{cost}}。",
       "tokensWindowUnavailable": "コンテキストは{{used}}トークン使用、ウィンドウのサイズは不明{{costClause}}。",
       "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用{{costClause}}。",
       "title": "コンテキスト使用量",

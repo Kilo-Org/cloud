@@ -2878,6 +2878,7 @@
       "windowUnavailable": "د سیاق د کړکۍ اندازه نه ده معلومه",
       "tapToViewDetails": " د سیاق د جزیاتو د لیدلو لپاره ټک وکړئ.",
       "costClause": "، لګښت {{cost}}",
+      "loadingCostSpoken": "لګښت {{cost}}.",
       "tokensWindowUnavailable": "سیاق: {{used}} ټوکنونه، د کړکۍ اندازه نه ده معلومه{{costClause}}.",
       "tokensUsage": "سیاق: له {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي{{costClause}}.",
       "title": "د سیاق کارونه",

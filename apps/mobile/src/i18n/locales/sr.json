@@ -2928,6 +2928,7 @@
       "windowUnavailable": "Veličina kontekstnog prozora nije dostupna",
       "tapToViewDetails": " Dodirni da prikažeš detalje konteksta.",
       "costClause": ", trošak {{cost}}",
+      "loadingCostSpoken": "trošak {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokena, veličina kontekstnog prozora nije dostupna{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} od {{window}} tokena, iskorišćeno {{percentage}}{{costClause}}.",
       "title": "Iskorišćenost konteksta",

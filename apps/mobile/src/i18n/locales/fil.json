@@ -2884,6 +2884,7 @@
       "windowUnavailable": "Hindi makuha ang kapasidad ng konteksto",
       "tapToViewDetails": " I-tap para tingnan ang mga detalye ng konteksto.",
       "costClause": ", gastos {{cost}}",
+      "loadingCostSpoken": "gastos na {{cost}}.",
       "tokensWindowUnavailable": "Konteksto: {{used}} na token, hindi makuha ang kapasidad{{costClause}}.",
       "tokensUsage": "Konteksto: {{used}} sa {{window}} na token, {{percentage}} ang nagamit{{costClause}}.",
       "title": "Paggamit ng konteksto",

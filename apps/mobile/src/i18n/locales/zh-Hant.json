@@ -2339,6 +2339,7 @@
       "windowUnavailable": "無法取得上下文視窗大小",
       "tapToViewDetails": "點一下即可檢視上下文詳細資料。",
       "costClause": "，費用 {{cost}}",
+      "loadingCostSpoken": "費用 {{cost}}。",
       "tokensWindowUnavailable": "上下文已用 {{used}} 個詞元，無法取得視窗大小{{costClause}}。",
       "tokensUsage": "上下文已用 {{used}} 個詞元，上限為 {{window}} 個，已使用 {{percentage}}{{costClause}}。",
       "title": "上下文用量",

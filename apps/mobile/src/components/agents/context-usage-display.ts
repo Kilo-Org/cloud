@@ -240,7 +240,10 @@ export function getContextSheetContent(
  */
 function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
   if (!usageUnavailable) {
-    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+    // The loading placeholder speaks only the cost. Its sentence ends the way
+    // the catalog closes one, so the tap hint after it stays a separate
+    // sentence in a locale that writes no space there.
+    return spoken ? i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: spoken }) : '';
   }
   return i18n.t('agentChat.contextUsage.usageUnavailable', {
     costClause: spokenCostClause(spoken),

@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Контекстийн багтаамж тодорхойгүй",
       "tapToViewDetails": " Контекстийн дэлгэрэнгүйг харахын тулд товшино уу.",
       "costClause": ", зардал {{cost}}",
+      "loadingCostSpoken": "зардал {{cost}}.",
       "tokensWindowUnavailable": "Контекст: {{used}} токен, багтаамж тодорхойгүй{{costClause}}.",
       "tokensUsage": "Контекст: {{window}} токеноос {{used}} токен буюу {{percentage}} ашигласан{{costClause}}.",
       "title": "Контекстийн ашиглалт",

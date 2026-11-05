@@ -2884,6 +2884,7 @@
       "windowUnavailable": "ಸಂದರ್ಭದ ಗರಿಷ್ಠ ಗಾತ್ರ ಲಭ್ಯವಿಲ್ಲ",
       "tapToViewDetails": " ಸಂದರ್ಭ ವಿವರಗಳನ್ನು ವೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "costClause": ", ವೆಚ್ಚ {{cost}}",
+      "loadingCostSpoken": "ವೆಚ್ಚ {{cost}}.",
       "tokensWindowUnavailable": "ಸಂದರ್ಭದಲ್ಲಿ {{used}} ಟೋಕನ್‌ಗಳಿವೆ, ಗರಿಷ್ಠ ಗಾತ್ರ ಲಭ್ಯವಿಲ್ಲ{{costClause}}.",
       "tokensUsage": "ಸಂದರ್ಭಕ್ಕೆ ಲಭ್ಯವಿರುವ {{window}} ಟೋಕನ್‌ಗಳಲ್ಲಿ {{used}} ಬಳಸಲಾಗಿದೆ, ಬಳಕೆ {{percentage}}{{costClause}}.",
       "title": "ಸಂದರ್ಭ ಬಳಕೆ",

@@ -3028,6 +3028,7 @@
       "windowUnavailable": "Méid na fuinneoige comhthéacs gan fáil",
       "tapToViewDetails": " Tapáil le sonraí comhthéacs a fheiceáil.",
       "costClause": ", costas {{cost}}",
+      "loadingCostSpoken": "costas {{cost}}.",
       "tokensWindowUnavailable": "Comhthéacs: {{used}} comhartha, méid na fuinneoige gan fáil{{costClause}}.",
       "tokensUsage": "Comhthéacs: {{used}} comhartha as {{window}}, {{percentage}} in úsáid{{costClause}}.",
       "title": "Úsáid comhthéacs",

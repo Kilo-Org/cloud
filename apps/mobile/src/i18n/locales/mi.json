@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Kāore e wātea ana te rahi o te matapihi horopaki",
       "tapToViewDetails": " Pāwhiria hei tiro i ngā taipitopito o te horopaki.",
       "costClause": ", utu {{cost}}",
+      "loadingCostSpoken": "utu {{cost}}.",
       "tokensWindowUnavailable": "Horopaki: {{used}} tōkena, kāore e wātea ana te rahi o te matapihi{{costClause}}.",
       "tokensUsage": "Horopaki: {{used}} o te {{window}} tōkena, {{percentage}} kua whakamahia{{costClause}}.",
       "title": "Te whakamahinga horopaki",

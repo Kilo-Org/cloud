@@ -2878,6 +2878,7 @@
       "windowUnavailable": "Konteksti-ikkunan koko ei ole saatavilla",
       "tapToViewDetails": " Näytä kontekstin tiedot napauttamalla.",
       "costClause": ", kustannus {{cost}}",
+      "loadingCostSpoken": "kustannus {{cost}}.",
       "tokensWindowUnavailable": "Kontekstissa {{used}} tokenia, konteksti-ikkunan koko ei ole saatavilla{{costClause}}.",
       "tokensUsage": "Kontekstissa {{used}} tokenia {{window}} tokenista, {{percentage}} käytetty{{costClause}}.",
       "title": "Kontekstin käyttö",

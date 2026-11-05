@@ -2928,6 +2928,7 @@
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
       "tapToViewDetails": " Atinge pentru a vedea detaliile contextului.",
       "costClause": ", costul {{cost}}",
+      "loadingCostSpoken": "cost de {{cost}}.",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă{{costClause}}.",
       "tokensUsage": "Context: {{used}} din {{window}} tokenuri, {{percentage}} utilizat{{costClause}}.",
       "title": "Utilizarea contextului",

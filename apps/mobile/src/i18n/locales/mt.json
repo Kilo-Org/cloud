@@ -3028,6 +3028,7 @@
       "windowUnavailable": "Id-daqs tat-tieqa tal-kuntest mhux disponibbli",
       "tapToViewDetails": " Tektek biex tara d-dettalji tal-kuntest.",
       "costClause": ", spiża {{cost}}",
+      "loadingCostSpoken": "spiża ta' {{cost}}.",
       "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli{{costClause}}.",
       "tokensUsage": "Kuntest: {{used}} minn {{window}} unitajiet tat-test, {{percentage}} użat{{costClause}}.",
       "title": "Użu tal-kuntest",

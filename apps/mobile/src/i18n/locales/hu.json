@@ -2878,6 +2878,7 @@
       "windowUnavailable": "A kontextusablak mérete nem érhető el",
       "tapToViewDetails": " A kontextus részleteihez koppints.",
       "costClause": ", költség: {{cost}}",
+      "loadingCostSpoken": "költség: {{cost}}.",
       "tokensWindowUnavailable": "Kontextus: {{used}} token, a kontextusablak mérete nem érhető el{{costClause}}.",
       "tokensUsage": "Kontextus: {{used}} token az összesen {{window}} tokenből, {{percentage}} felhasználva{{costClause}}.",
       "title": "Kontextushasználat",

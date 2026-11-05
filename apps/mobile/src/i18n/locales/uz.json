@@ -2552,6 +2552,7 @@
       "assistantStopped": "Javob yaratish to'xtatildi.",
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
       "assistantProviderError": "Provayder xato qaytardi.",
+      "assistantProviderRefused": "Provayder bu so'rovni rad etdi va uni qayta urinish mumkin emas.",
       "assistantOutputLimit": "Javob modelning chiqish chegarasiga yetdi.",
       "assistantStructuredOutput": "Javob kerakli formatga mos kelmadi.",
       "assistantFailed": "Javobni yaratib bo'lmadi."

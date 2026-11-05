@@ -2552,6 +2552,7 @@
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
+      "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."

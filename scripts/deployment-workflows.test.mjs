@@ -489,6 +489,15 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
 });
 
 test('one database gate per deployment checks out, installs and migrates once', () => {
+  const dbGateInstall =
+    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
+  // The deploy gate narrows its install to the workspace set the CI drizzle
+  // check already proves: the probe and drizzle-kit both resolve there.
+  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
+    step => step.name === 'Install dependencies'
+  ).run;
+  assert.equal(dbGateInstall, ciDrizzleInstall);
+
   for (const [name, deployment, startupStep, migrateStep, environment] of [
     [
       'production',
@@ -511,7 +520,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
-    assert.equal(steps.filter(step => step.run === 'pnpm install --frozen-lockfile').length, 1);
+    assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
     assert.equal(
       steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
       '${{ needs.check-changes.outputs.target_sha }}'
@@ -519,7 +528,7 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
-    const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
+    const installIndex = steps.findIndex(step => step.run === dbGateInstall);
     assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
     assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
     assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');

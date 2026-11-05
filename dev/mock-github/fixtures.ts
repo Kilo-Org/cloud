@@ -73,8 +73,7 @@ export function pullRequestFixture(number: number) {
     },
     commits: 3,
     changed_files: PULL_REQUEST_FILE_COUNT,
-    additions: 12,
-    deletions: 4,
+    ...pullRequestFileTotals(),
     comments: 0,
     review_comments: 0,
     created_at: '2026-10-01T10:00:00Z',
@@ -113,18 +112,34 @@ export function pullRequestFilesFixture() {
   return Array.from({ length: PULL_REQUEST_FILE_COUNT }, (_unused, index) => {
     const labelled = LABELLED_FILES[index];
     const filename = labelled?.filename ?? `src/generated/file-${index}.ts`;
+    const status = labelled?.status ?? 'modified';
+    // A file that only arrived has no deleted lines, and one that only left has
+    // no added lines; every other status changes one line each way.
+    const additions = status === 'removed' ? 0 : 1;
+    const deletions = status === 'added' ? 0 : 1;
     return {
       sha: `${index}`.padStart(40, 'd'),
       filename,
       previous_filename:
         labelled !== undefined && 'previous' in labelled ? labelled.previous : null,
-      status: labelled?.status ?? 'modified',
-      additions: 1,
-      deletions: 1,
-      changes: 2,
+      status,
+      additions,
+      deletions,
+      changes: additions + deletions,
       patch: FILE_PATCH.join('\n'),
     };
   });
+}
+
+/** The line totals the pull-request fixture reports for its file list. */
+export function pullRequestFileTotals() {
+  return pullRequestFilesFixture().reduce(
+    (totals, file) => ({
+      additions: totals.additions + file.additions,
+      deletions: totals.deletions + file.deletions,
+    }),
+    { additions: 0, deletions: 0 }
+  );
 }
 
 /** The overview enrichment query: review decision, reviewers, viewer. */

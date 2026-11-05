@@ -22,7 +22,7 @@ import {
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gt, gte, like, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, lte, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { isRequestLogsEnabled } from '@/lib/request-logs/availability';
 import {
@@ -32,6 +32,7 @@ import {
   REQUEST_LOGS_WINDOW_HOURS,
   isRequestLogStartTimeInBounds,
 } from '@/lib/request-logs/filters';
+import { microdollarUsageModelStartsWith } from '@/lib/request-logs/model-prefix';
 import { formatRequestLogProvider } from '@/lib/request-logs/provider-label';
 import {
   parseRoutingDetails,
@@ -77,17 +78,6 @@ function withinRequestLogWindow(startTime: string | undefined) {
       microdollar_usage.created_at,
       sql`${windowEnd} - make_interval(hours => ${REQUEST_LOGS_WINDOW_HOURS})`
     )
-  );
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[%_\\]/g, '\\$&');
-}
-
-function modelStartsWith(prefix: string) {
-  return like(
-    sql`coalesce(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
-    `${escapeLikePattern(prefix)}%`
   );
 }
 
@@ -172,7 +162,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
               input.userId === undefined
                 ? undefined
                 : eq(microdollar_usage.kilo_user_id, input.userId),
-              input.modelPrefix ? modelStartsWith(input.modelPrefix) : undefined
+              input.modelPrefix ? microdollarUsageModelStartsWith(input.modelPrefix) : undefined
             )
           )
           .orderBy(desc(microdollar_usage.created_at))

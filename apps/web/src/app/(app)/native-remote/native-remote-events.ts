@@ -30,7 +30,10 @@ export function pendingRequests(events: NativeEvent[]) {
   const questions = new Map<string, PendingQuestion>();
   for (const event of events) {
     const wrapper = record.safeParse(event.body);
-    if (event.type === 'remote.state' && wrapper.success) {
+    if (event.type === 'remote.state') {
+      // The complete inventory replaces pending state even when a field is unreadable.
+      permissions.clear();
+      questions.clear();
       const inventory = z
         .object({
           permissions: z.array(
@@ -38,10 +41,8 @@ export function pendingRequests(events: NativeEvent[]) {
           ),
           questions: z.array(z.object({ requestID: z.string(), fields: z.array(field) })),
         })
-        .safeParse(wrapper.data.pending);
+        .safeParse(wrapper.success ? wrapper.data.pending : undefined);
       if (inventory.success) {
-        permissions.clear();
-        questions.clear();
         for (const item of inventory.data.permissions) {
           permissions.set(item.requestID, {
             id: item.requestID,
@@ -102,6 +103,31 @@ export function transcriptText(content: unknown): string {
   const value = record.safeParse(content);
   if (value.success && typeof value.data.text === 'string') return value.data.text;
   return JSON.stringify(content, null, 2) ?? '';
+}
+
+export type CommandOutcome = { error?: string; commandID?: string };
+export type CommandRunner = (operation: () => Promise<string>) => Promise<boolean>;
+
+/**
+ * Runs one command at a time. A repeated press while a command is in flight is
+ * ignored, so a double click cannot submit the same action twice.
+ */
+export function commandRunner(settle: (outcome: CommandOutcome) => void): CommandRunner {
+  let running = false;
+  return async operation => {
+    if (running) return false;
+    running = true;
+    settle({ error: '' });
+    try {
+      settle({ commandID: await operation() });
+      return true;
+    } catch (cause) {
+      settle({ error: cause instanceof Error ? cause.message : 'Command failed' });
+      return false;
+    } finally {
+      running = false;
+    }
+  };
 }
 
 export async function sendNativePrompt(

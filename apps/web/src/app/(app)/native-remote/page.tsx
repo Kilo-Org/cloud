@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   commandResult,
+  commandRunner,
   pendingRequests,
   transcriptText,
   sendNativePrompt,
@@ -148,16 +149,14 @@ function NativeRemoteDemo() {
       void sessions.refetch();
     },
   });
-  async function run(operation: () => Promise<string>) {
-    setError('');
-    try {
-      setCommandID(await operation());
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Command failed');
-      return false;
-    }
-  }
+  const run = useMemo(
+    () =>
+      commandRunner(outcome => {
+        if (outcome.error !== undefined) setError(outcome.error);
+        if (outcome.commandID !== undefined) setCommandID(outcome.commandID);
+      }),
+    []
+  );
   async function submit() {
     const connection = sessionRef.current;
     if (!connection || !prompt.trim()) return;

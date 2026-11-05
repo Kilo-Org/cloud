@@ -8,9 +8,11 @@ import { NativeSyncClient, type NativeEvent } from '@kilocode/cloud-agent-sdk';
 import NativeRemotePage from './page';
 import {
   commandResult,
+  commandRunner,
   pendingRequests,
   transcriptText,
   sendNativePrompt,
+  type CommandOutcome,
 } from './native-remote-events';
 function event(type: string, data: unknown, seq = 1): NativeEvent {
   return {
@@ -107,6 +109,36 @@ it('sends prompts with explicit offline queue choice and only safe slash command
   expect(connection.sendCommand).toHaveBeenCalledWith('models', 'provider/model');
   await expect(sendNativePrompt(connection, '/shell rm -rf', true)).rejects.toThrow('Use /compact');
   expect(connection.sendCommand).toHaveBeenCalledTimes(1);
+});
+it('clears pending state when the inventory cannot be read', () => {
+  const asked = event('permission.asked', {
+    id: 'per_1',
+    sessionID: 'ses_1',
+    action: 'shell',
+    resources: ['pwd'],
+  });
+  const malformed: NativeEvent = { ...event('remote.state', {}, 2), body: { pending: 'pending' } };
+  expect(pendingRequests([asked]).permissions).toHaveLength(1);
+  expect(pendingRequests([asked, malformed])).toEqual({ permissions: [], questions: [] });
+});
+it('runs one command at a time and reports its outcome', async () => {
+  const outcomes: CommandOutcome[] = [];
+  const run = commandRunner(outcome => outcomes.push(outcome));
+  let finish: (value: string) => void = () => {};
+  const pending = run(
+    () =>
+      new Promise<string>(resolve => {
+        finish = resolve;
+      })
+  );
+  await expect(run(() => Promise.resolve('second'))).resolves.toBe(false);
+  expect(outcomes).toEqual([{ error: '' }]);
+  finish('first');
+  await expect(pending).resolves.toBe(true);
+  expect(outcomes).toEqual([{ error: '' }, { commandID: 'first' }]);
+  await expect(run(() => Promise.reject(new Error('No permission')))).resolves.toBe(false);
+  expect(outcomes.at(-1)).toEqual({ error: 'No permission' });
+  await expect(run(() => Promise.resolve('after'))).resolves.toBe(true);
 });
 it('clears only the local view and sends no runner command', async () => {
   const connection = {

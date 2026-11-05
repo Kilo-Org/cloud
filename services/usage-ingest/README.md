@@ -176,8 +176,8 @@ After attempting queue publication, the gateway never falls back to a billing
 writer. Existing direct fallbacks for missing publisher configuration or failed
 lifetime registration remain safe because no publication was attempted. The
 Cloudflare HTTP publisher retries transient failures up to four total attempts,
-with up to ten seconds for the first confirmation and five seconds for each later
-one, inside a 25-second overall elapsed retry budget. Before retries it uses
+with up to twenty seconds for the first confirmation and five seconds for each later
+one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of

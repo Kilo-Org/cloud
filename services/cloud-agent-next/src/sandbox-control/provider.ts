@@ -166,7 +166,8 @@ export type ProviderAdapter = {
   logs(ref: string): Promise<string>;
   /** Present on a provider that can start a session from an environment snapshot. */
   readonly environmentSnapshots?: true;
-  readonly sessionSnapshots?: {
+  readonly workspaceSnapshots?: {
+    currentImage(image: 'all-in-one' | 'runtime-free'): Promise<string>;
     capture(ref: string, captureId: string): Promise<NativeCaptureResult>;
   };
   /**

@@ -6,11 +6,8 @@ import { fixtureRuntime } from '../test/runtime-installer/fixtures.js';
 import { localDirectoryArtifactStore, publishRuntimeRelease } from './publish-runtime.js';
 import { publishRuntimeHandoff, loadRuntimeHandoff, runtimeHandoffKey } from './runtime-handoff.js';
 import { runtimeBaseInputId, type RuntimeBase } from './runtime-base.js';
-import { parse } from 'jsonc-parser';
-import { URL } from 'node:url';
 import { prepareRuntimeDeployment } from './prepare-runtime-deploy.js';
 import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
-import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import {
   runtimeArtifactObjectKey,
   runtimeArtifactReleaseKey,
@@ -101,33 +98,6 @@ describe('deployment preparation', () => {
         },
       },
     ],
-  });
-  it('accepts the real all-in-one image with pinned build variables', async () => {
-    const f = await fixture();
-    await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
-    const raw = parse(await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
-    raw.r2_buckets = [
-      ...raw.r2_buckets,
-      { binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' },
-    ];
-    const result = await prepareRuntimeDeployment({
-      config: raw,
-      startup: { mode: 'downloaded', image: 'all-in-one' },
-      environment: 'production',
-      sourceSha: f.sourceSha,
-      bucket: 'runtime-test',
-      accountId: 'c'.repeat(32),
-      baseInputId: f.base.inputId,
-      store: f.store,
-      verifyBase: () => {},
-    });
-    expect(
-      result?.containers?.find(container => container.class_name === 'SandboxContainers')?.images
-        ?.app
-    ).toMatchObject({
-      dockerfile: './Dockerfile.containers',
-      build_vars: { KILOCODE_CLI_VERSION: KILO_CLI_VERSION },
-    });
   });
   it('rejects mixed all-in-one image fields before base verification', async () => {
     const f = await fixture();

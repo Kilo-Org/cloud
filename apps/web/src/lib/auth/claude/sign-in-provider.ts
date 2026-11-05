@@ -164,6 +164,11 @@ export const claudeSignInProvider: OAuthConfig<Profile> = {
   token: {
     async request({ params, checks, client, provider }) {
       if (!params.code) throw new ClaudeSignInError('Claude callback has no authorization code');
+      // A custom token exchange replaces openid-client's callback, including
+      // its comparison of the returned state with the authenticated cookie.
+      if (!checks.state || params.state !== checks.state) {
+        throw new ClaudeSignInError('Claude callback state does not match');
+      }
       // NextAuth types the checks as a union of the OAuth and OpenID shapes;
       // only the OpenID shape carries the nonce this provider always sends.
       const nonce = 'nonce' in checks ? checks.nonce : undefined;

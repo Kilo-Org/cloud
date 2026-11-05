@@ -246,23 +246,23 @@ queue-admission limits. The harness asserts incremental sampled used heap below
 32 MiB; the practical sampled-CPU review target is 100 ms, not a flaky timing test.
 
 Measured 2026-11-05 on the disposable Linux work VM (workerd via Workers pool
-0.16.13, Vitest 4.1.12): **7 tests passed**, 17 profiled scenarios, 7.23 s total.
+0.16.13, Vitest 4.1.12): **7 tests passed**, 17 profiled scenarios, 7.81 s total.
 Heap columns are MiB; CPU is sampled active milliseconds.
 
 | Boundary | CPU ms | Peak used heap | Peak V8 reserved heap | Incremental used heap |
 |---|---:|---:|---:|---:|
-| 512 KiB batch / 64 KiB inline values | 44.119 | 58.34 | 64.25 | 2.97 |
-| 64 changes | 34.840 | 55.07 | 59.49 | 0.17 |
-| 64 inline container levels | 10.854 | 55.40 | 57.99 | 0.45 |
-| 32,768 batch nodes / 8,192 value nodes | 23.310 | 56.12 | 60.24 | 0.99 |
-| Exact 2 MiB page | 42.346 | 63.04 | 69.24 | 7.91 |
-| 100-item page | 30.692 | 56.44 | 58.99 | 1.49 |
-| Full 4 MiB write queue: reject next call | 6.682 | 55.56 | 57.99 | 0.08 |
-| Full eight-call queue: reject next call | 6.256 | 55.05 | 57.49 | 0.06 |
+| 512 KiB batch / 64 KiB inline values | 41.301 | 58.31 | 63.75 | 2.91 |
+| 64 changes | 38.450 | 55.13 | 59.24 | 0.21 |
+| 64 inline container levels | 14.187 | 55.42 | 57.49 | 0.46 |
+| 32,768 batch nodes / 8,192 value nodes | 22.796 | 56.19 | 59.74 | 1.04 |
+| Exact 2 MiB page | 58.316 | 63.07 | 68.74 | 7.91 |
+| 100-item page | 34.973 | 56.43 | 58.74 | 1.46 |
+| Full 4 MiB write queue: reject next call | 8.110 | 55.58 | 57.74 | 0.08 |
+| Full eight-call queue: reject next call | 7.418 | 55.07 | 57.24 | 0.06 |
 
-Over-budget JSON and 10,000-level pre-parse depth attacks took at most 9.136 ms
-sampled CPU and 0.47 MiB incremental used heap. The largest incremental heap
-was the 2 MiB page (42.346 ms / 7.91 MiB incremental used heap); this includes the
+Over-budget JSON and 10,000-level pre-parse depth attacks took at most 12.991 ms
+sampled CPU and 0.49 MiB incremental used heap. The largest incremental heap
+was the 2 MiB page (58.316 ms / 7.91 MiB incremental used heap); this includes the
 test client's response buffering, JSON parsing, and schema validation, not just
 the DO's streaming path. All samples stayed below the practical review targets.
 These observations support the deterministic bounds; they do not prove an

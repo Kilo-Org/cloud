@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The chip's copy regressions (long name, vendor prefix, unlisted model) stay beside each other. */
 import { type ComponentProps, createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -152,6 +153,25 @@ function cliCatalogModelOptions(): SessionModelOption[] {
   }).options;
 }
 
+// The gateway catalogue names the reported model `DeepSeek: DeepSeek V4.1 Flash
+// 1017`. The session that reported it was a CLI session whose catalogue could
+// not name the model, so the chip fell back to the raw reference.
+const REPORTED_RAW_MODEL_ID = 'deepseek/deepseek-v4.1-flash-1017';
+
+function reportedRemoteOptions(): SessionModelOption[] {
+  const gatewayModels = toModelOptions({
+    data: [{ id: REPORTED_RAW_MODEL_ID, name: 'DeepSeek: DeepSeek V4.1 Flash 1017' }],
+  });
+  return buildSessionModelOptions({
+    activeSessionType: 'remote',
+    remoteModelState: { ownerConnectionId: 'cli-owner', protocol: 'unknown', refresh: 'idle' },
+    observedModel: { model: { providerID: 'kilo', modelID: REPORTED_RAW_MODEL_ID } },
+    remoteModelOverride: null,
+    gatewayModels,
+    gatewayModelsLoading: false,
+  }).options;
+}
+
 function renderToolbar(
   model = 'deepseek/deepseek-v4.1-flash',
   modelOptions: SessionModelOption[] = MODEL_OPTIONS,
@@ -213,6 +233,24 @@ function nearestSharedAncestor(
   const ancestorSet = new Set(ancestorsOf(b));
   return ancestorsOf(a).find(candidate => ancestorSet.has(candidate));
 }
+
+describe('ChatToolbar chip for a model the CLI catalogue cannot name', () => {
+  it('shows the catalogue name instead of the raw model reference', () => {
+    const options = reportedRemoteOptions();
+    const renderer = renderToolbar('remote-unavailable-model', options);
+
+    const modelChip = findPressable(renderer, label => label === 'DeepSeek V4.1 Flash 1017');
+    expect(modelChip).toBeDefined();
+
+    const rawReference = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === REPORTED_RAW_MODEL_ID
+    );
+    expect(rawReference).toHaveLength(0);
+  });
+});
 
 describe('ChatToolbar long model name', () => {
   it('keeps the toolbar a single nowrap row', () => {

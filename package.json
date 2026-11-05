@@ -24,7 +24,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --list-different .",
     "format:changed": "git diff --name-only $(git merge-base origin/main HEAD) --diff-filter=ACMR -- '**/*.js' '**/*.jsx' '**/*.ts' '**/*.tsx' '**/*.json' '**/*.css' '**/*.md' | xargs -r oxfmt --no-error-on-unmatched-pattern",
-    "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",
+    "validate": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run dependency-cycle-check",
     "drizzle": "pnpm --filter @kilocode/db exec drizzle-kit",
     "drizzle:verify-bootstrap": "bash scripts/verify-drizzle-bootstrap.sh",
     "test:e2e": "pnpm --filter web run test:e2e",
@@ -52,10 +52,12 @@
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
     "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts",
-    "web:env": "tsx scripts/web-env/index.ts"
+    "web:env": "tsx scripts/web-env/index.ts",
+    "dev:mobile:diagnostics": "tsx dev/local/mobile-diagnostics.ts"
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
+    "@expo/agent-cli": "1.0.22",
     "@expo/fingerprint": "~0.21.5",
     "@kilocode/db": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",

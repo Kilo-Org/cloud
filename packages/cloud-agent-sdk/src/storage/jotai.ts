@@ -4,6 +4,7 @@ import type { createStore } from 'jotai';
 import type { Part } from '@kilocode/app-shared/opencode';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
+import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
@@ -125,7 +126,7 @@ function createJotaiStorage(
     schedule(flushPendingDeltas);
   }
 
-  return {
+  const storage: JotaiSessionStorage = {
     atoms: {
       messageIds: messageIdsAtom,
       messages: messagesAtom,
@@ -156,10 +157,16 @@ function createJotaiStorage(
       return store.get(messagesAtom).get(messageId);
     },
 
-    upsertPart(messageId, part, eventTime) {
+    upsertPart(messageId, part, eventTime, authoritative) {
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
-      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence);
+      const nextArr = upsertPartDroppingStaleSyntheticParts(
+        arr,
+        part,
+        eventTime,
+        partEvidence,
+        authoritative
+      );
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
       publishPartsChanged(partsSnapshot, subscribers, messageId);
@@ -190,6 +197,7 @@ function createJotaiStorage(
     },
 
     deletePart(messageId, partId) {
+      forgetPartVersion(storage, messageId, partId);
       flushPendingDeltas();
       const arr = partsMap.get(messageId);
       if (!arr) return;
@@ -233,6 +241,7 @@ function createJotaiStorage(
     },
 
     clear() {
+      storageVersions.delete(storage);
       flushPendingDeltas();
       const existingMessageIds = store.get(messageIdsAtom);
       const existingPartMessageIds = [...partsMap.keys()];
@@ -254,6 +263,7 @@ function createJotaiStorage(
     },
 
     deleteMessage(messageId) {
+      forgetMessageVersions(storage, messageId);
       flushPendingDeltas();
       // A buffered delta can create parts before the message row (see
       // `applyPartDelta`), so part state is dropped regardless of the row.
@@ -285,6 +295,7 @@ function createJotaiStorage(
       notify(subscribers, 'messageIds');
     },
   };
+  return storage;
 }
 
 export { createJotaiStorage };

@@ -15,8 +15,10 @@ export async function fixtureRuntime(
     probeFailure?: boolean;
     missingSupervisor?: boolean;
     extraControl?: { path: string; bytes: Uint8Array; mode: number }[];
+    cliExecutable?: string;
   } = {}
 ) {
+  const cliExecutable = options.cliExecutable ?? 'package/bin/kilo';
   const version = cliId === 'A' ? '1.0.0' : '2.0.0';
   const cli = `#!/usr/local/bin/node
 import fs from 'node:fs';
@@ -56,10 +58,10 @@ console.log('wrapper:${controlId}');
   ];
   return packageRuntimeRelease({
     cliTarball: gzipSync(
-      writeTarEntries([{ path: 'package/bin/kilo', mode: 0o755, bytes: Buffer.from(cli) }])
+      writeTarEntries([{ path: cliExecutable, mode: 0o755, bytes: Buffer.from(cli) }])
     ),
     cliVersion: version,
-    cliExecutable: 'package/bin/kilo',
+    cliExecutable,
     wrapperSdkVersion: '7.8.1',
     protocol: '1',
     abi: RUNTIME_BASE_ABI,

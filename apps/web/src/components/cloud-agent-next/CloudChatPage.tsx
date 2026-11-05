@@ -47,6 +47,7 @@ import {
   type CustomModeOption,
 } from './session-config';
 import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
+import { useCloudAgentEnvironment } from '@/hooks/useCloudAgentEnvironments';
 import {
   formatSessionTotalCost,
   getSessionCostBreakdown,
@@ -372,6 +373,10 @@ export default function CloudChatPage({
     storedChat?.branch ??
     getWorktreeBranch(selectedWorktreeId, worktreeChats) ??
     undefined;
+  const { data: environment } = useCloudAgentEnvironment(
+    isCurrentSession ? (fetchedSessionData?.environmentId ?? null) : null,
+    { organizationId }
+  );
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
   // A local chat shows the settings it copied from its source until its own load.
@@ -1862,6 +1867,7 @@ export default function CloudChatPage({
                                 worktreeId={selectedWorktreeId ?? undefined}
                                 repository={composerRepository}
                                 branch={composerBranch}
+                                environmentName={environment?.name}
                                 contextTokens={contextUsage?.contextTokens}
                                 contextWindow={contextWindow}
                               />

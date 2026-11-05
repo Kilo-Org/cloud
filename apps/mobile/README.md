@@ -42,6 +42,16 @@ server save finishes, so reopening the form does not restore an older cached
 choice. Older in-flight preference reads are cancelled before that update.
 The existing server, local, and default-model fallback order is unchanged.
 
+## Organization credit-activity links
+
+Credit activity treats a scalar `org` or the first value of a repeated `org`
+parameter as its explicit scope. An empty first value means no explicit scope;
+later values are not fallbacks. The route guard and screen share this rule.
+Explicit links remain on their named organization after an account switch, while
+plain account-scoped routes leave. Membership validation still gates the data
+query: a foreign or malformed explicit organization never falls back to the
+selected organization's transactions.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.

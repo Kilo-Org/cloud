@@ -5,7 +5,7 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatDuration } from '@/lib/format';
+import { formatDurationIncludingZero } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SESSION_FOOTER_ROW_ITEM_PADDING } from './session-working-state';
 import { computeMessageStatus } from './compute-status';
@@ -58,7 +58,7 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
     }
   }
 
-  const time = formatDuration(elapsed, i18n.language);
+  const time = formatDurationIncludingZero(elapsed, i18n.language);
 
   return (
     <Animated.View

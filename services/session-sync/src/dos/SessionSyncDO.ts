@@ -8,13 +8,16 @@ import migrations from '../../drizzle/migrations';
 import type { Env } from '../env';
 import { DataRateLimit } from '../data-rate-limit';
 import { toHex } from '../hex';
+import { isOverloaded, overloaded } from '../overload';
 import {
   LIMITS,
+  batchJsonWithinBudget,
   batchRequestSchema,
   blobRefSchema,
   cursorSchema,
   fail,
   hashSchema,
+  isBoundedJson,
   ok,
   principalSchema,
   registerRequestSchema,
@@ -28,6 +31,7 @@ import {
 } from '../protocol';
 import * as batches from './session-sync/batch';
 import { getTenantStub } from './SessionSyncTenantDO';
+import { getRelayStub } from './SessionRelayDO';
 import * as blob from './session-sync/blob';
 import * as erase from './session-sync/erase';
 import * as page from './session-sync/page';
@@ -63,14 +67,44 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): Result<T> {
 
 /** Parses and validates the exact batch body that the digest covers. */
 function parseBatch(body: string) {
-  if (utf8Bytes(body) > LIMITS.batchBytes) {
-    return fail('request_too_large', `The body exceeds ${LIMITS.batchBytes} bytes`);
+  if (!batchJsonWithinBudget(body)) {
+    return fail('json_budget_exceeded', 'The batch exceeds the JSON depth or node budget', {
+      depth: LIMITS.jsonBatchDepth,
+      nodes: LIMITS.jsonBatchNodes,
+    });
   }
   let value: unknown;
   try {
     value = JSON.parse(body);
   } catch {
     return fail('invalid_request', 'The body is not valid JSON');
+  }
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    'changes' in value &&
+    Array.isArray(value.changes)
+  ) {
+    const changes: unknown[] = value.changes;
+    for (const change of changes) {
+      const budget = { nodes: 0, exceeded: false };
+      if (
+        change !== null &&
+        typeof change === 'object' &&
+        'value' in change &&
+        !isBoundedJson(change.value, 0, budget) &&
+        budget.exceeded
+      ) {
+        return fail(
+          'json_budget_exceeded',
+          'An inline value exceeds the JSON depth or node budget',
+          {
+            depth: LIMITS.jsonDepth,
+            nodes: LIMITS.jsonValueNodes,
+          }
+        );
+      }
+    }
   }
   return parse(batchRequestSchema, value);
 }
@@ -84,7 +118,12 @@ function parseBatch(body: string) {
 export class SessionSyncDO extends DurableObject<Env> {
   private db: session.Db;
   private quotaGate: Promise<void> = Promise.resolve();
+  private pendingBatchBytes = 0;
+  private pendingBatches = 0;
   private purgeRetryAt = 0;
+  private relayUsed = false;
+  private relayPurged = false;
+  private relayPurgeRetryAt = 0;
   private leaseReconcilePending = false;
   private pendingRegistration:
     | { tenant: Tenant; sessionID: string; creatorID?: string }
@@ -97,6 +136,9 @@ export class SessionSyncDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
+      this.relayUsed = (await ctx.storage.get<boolean>('relayUsed')) ?? false;
+      this.relayPurged = (await ctx.storage.get<boolean>('relayPurged')) ?? false;
+      this.relayPurgeRetryAt = (await ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
       this.leaseReconcilePending =
         (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
       this.pendingRegistration = await ctx.storage.get('pendingRegistration');
@@ -131,6 +173,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     try {
       return await fn();
     } catch (error) {
+      if (isOverloaded(error)) return overloaded();
       console.error('session-sync tenant admission failed', {
         error: error instanceof Error ? error.name : typeof error,
       });
@@ -325,6 +368,25 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
   }
 
+  /** Live tickets can only be minted for a non-deleted, owner-authorized session. */
+  async authorizeLive(input: unknown): Promise<Result<{ role: 'owner' }>> {
+    const parsed = parse(stateInput, input);
+    if (!parsed.ok) return parsed;
+    const { principal, sessionID } = parsed.value;
+    return this.serial(async () => {
+      const authorized = this.tx(() => {
+        session.live(this.db, principal, sessionID);
+        return { role: 'owner' as const };
+      });
+      if (!authorized.ok || this.relayUsed) return authorized;
+      // Share the deletion gate while persisting activation: a successful ticket
+      // authorization must never race past a tombstone without a durable purge intent.
+      await this.ctx.storage.put('relayUsed', true);
+      this.relayUsed = true;
+      return authorized;
+    });
+  }
+
   async getState(input: unknown): Promise<Result<SessionState>> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
@@ -342,23 +404,43 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(batchInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, body } = parsed.value;
-    const admitted = await this.dataRateLimit.admit(
-      this.env.USER_DATA_BLOCK_LIMITER,
-      principal.userID
-    );
-    if (!admitted.ok) return admitted;
-    const batch = parseBatch(body);
-    if (!batch.ok) return batch;
-    // Hash before the transaction: every check and write below runs synchronously.
-    const digest = await sha256Hex(body);
-    const applied = await this.leased(principal, sessionID, () =>
-      batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now())
-    );
-    if (applied.ok) await this.scheduleSweep();
-    return applied;
+    if (body.length > LIMITS.batchBytes || utf8Bytes(body) > LIMITS.batchBytes) {
+      return fail('request_too_large', `The body exceeds ${LIMITS.batchBytes} bytes`);
+    }
+    // Reserve conservative UTF-16 storage before the first await, including the
+    // active write. Count also caps tiny/empty calls and their pending promises.
+    const retainedBytes = body.length * 2;
+    if (
+      this.pendingBatchBytes + retainedBytes > LIMITS.batchQueueBytes ||
+      this.pendingBatches >= LIMITS.batchQueueRequests
+    ) {
+      return overloaded();
+    }
+    this.pendingBatchBytes += retainedBytes;
+    this.pendingBatches++;
+    try {
+      const admitted = await this.dataRateLimit.admit(
+        this.env.USER_DATA_BLOCK_LIMITER,
+        principal.userID
+      );
+      if (!admitted.ok) return admitted;
+      // Hash before the transaction: checks and writes below run synchronously.
+      const digest = await sha256Hex(body);
+      const applied = await this.leased(principal, sessionID, () => {
+        // Queued writes never retain parsed trees across tenant RPC I/O.
+        const batch = parseBatch(body);
+        if (!batch.ok) throw new session.SyncFailure(batch.error);
+        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now());
+      });
+      if (applied.ok) await this.scheduleSweep();
+      return applied;
+    } finally {
+      this.pendingBatchBytes -= retainedBytes;
+      this.pendingBatches--;
+    }
   }
 
-  async readEntities(input: unknown): Promise<Result<string>> {
+  async readEntities(input: unknown): Promise<Result<ReadableStream<Uint8Array>>> {
     const parsed = parse(pageInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, ...query } = parsed.value;
@@ -367,7 +449,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       principal.userID
     );
     if (!admitted.ok) return admitted;
-    return this.tx(() => JSON.stringify(page.read(this.db, principal, sessionID, query)));
+    return this.tx(() => page.read(this.db, principal, sessionID, query));
   }
 
   async beginBlob(input: unknown): Promise<Result<blob.Begin>> {
@@ -481,6 +563,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     let r2Ms = 0;
     try {
       await this.scheduleSweep();
+      const purged = await this.purgeRelay();
+      if (!purged.ok) return purged;
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) return reconciled;
     } finally {
@@ -511,9 +595,14 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
     if (!erased.ok) return erased;
     await this.scheduleSweep();
-    const reconciled = await this.reconcileLease();
-    if (!reconciled.ok) return reconciled;
-    await this.cleanup();
+    try {
+      const purged = await this.purgeRelay();
+      if (!purged.ok) return purged;
+      const reconciled = await this.reconcileLease();
+      if (!reconciled.ok) return reconciled;
+    } finally {
+      await this.cleanup();
+    }
     return ok(null);
   }
 
@@ -534,13 +623,46 @@ export class SessionSyncDO extends DurableObject<Env> {
           if (!erased.ok) throw new Error(erased.error.message);
         }
       });
+      const purged = await this.purgeRelay();
       await this.cleanup();
+      if (!purged.ok) return;
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
     } catch (error) {
       await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
       throw error;
     }
+  }
+
+  /** A used relay's sync tombstone is its purge intent; persist acknowledgement after cleanup. */
+  private async purgeRelay(): Promise<Result<null>> {
+    return this.serial(async () => {
+      const meta = session.load(this.db);
+      if (!meta || meta.deleted_at === null || !this.relayUsed || this.relayPurged) return ok(null);
+      if (Date.now() >= this.relayPurgeRetryAt) {
+        try {
+          await getRelayStub(
+            this.env,
+            { type: meta.tenant_type, id: meta.tenant_id },
+            meta.session_id
+          ).purge();
+          await this.ctx.storage.put({ relayPurged: true, relayPurgeRetryAt: 0 });
+          this.relayPurged = true;
+          this.relayPurgeRetryAt = 0;
+          return ok(null);
+        } catch (error) {
+          console.error('session-sync relay purge failed', {
+            error: error instanceof Error ? error.name : typeof error,
+          });
+          this.relayPurgeRetryAt = Date.now() + PURGE_RETRY_MS;
+          await this.ctx.storage.put('relayPurgeRetryAt', this.relayPurgeRetryAt);
+        }
+      }
+      await this.scheduleSweep();
+      return fail('tenant_unavailable', 'Live relay cleanup is temporarily unavailable', {
+        retryAt: this.relayPurgeRetryAt,
+      });
+    });
   }
 
   /** Claims at most one bounded page before yielding, then finalizes those exact attempts. */
@@ -591,13 +713,18 @@ export class SessionSyncDO extends DurableObject<Env> {
           meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes))
         ? Date.now() + PURGE_RETRY_MS
         : null;
-    const blobDue = blob.nextSweep(this.db);
+    const nextBlobSweep = blob.nextSweep(this.db);
+    const blobDue = nextBlobSweep === null ? null : Math.max(nextBlobSweep, this.purgeRetryAt);
+    const relayDue =
+      meta && meta.deleted_at !== null && this.relayUsed && !this.relayPurged
+        ? Math.max(Date.now() + 1, this.relayPurgeRetryAt)
+        : null;
     const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
-    const deadlines = [blobDue, leaseDue, retentionDue].filter(value => value !== null);
+    const deadlines = [blobDue, leaseDue, retentionDue, relayDue].filter(value => value !== null);
     if (deadlines.length === 0) return;
     const due = Math.min(...deadlines);
     const current = await this.ctx.storage.getAlarm();
-    const scheduled = Math.max(Date.now() + 1, due, this.purgeRetryAt);
+    const scheduled = Math.max(Date.now() + 1, due);
     if (current === null || current <= Date.now() || current > scheduled) {
       await this.ctx.storage.setAlarm(scheduled);
     }

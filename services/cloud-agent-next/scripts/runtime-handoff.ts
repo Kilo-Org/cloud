@@ -6,6 +6,7 @@ import {
 } from '../src/sandbox-control/runtime-artifact-keys.js';
 import {
   parseRuntimeRelease,
+  runtimeReleaseHarness,
   serializeRuntimeRelease,
   type RuntimeReleaseDescriptor,
 } from '../src/sandbox-control/runtime-release.js';
@@ -19,6 +20,8 @@ export const runtimeHandoffSchema = z
     sourceSha: z.string().regex(/^[a-f0-9]{40}$/),
     base: runtimeBaseSchema,
     descriptorSha256: hash,
+    /** The Kilo v2 release published from the same source and verified on the same base. */
+    kilo2DescriptorSha256: hash.optional(),
     artifacts: z.tuple([
       z.object({ role: z.literal('cli'), sha256: hash }).strict(),
       z.object({ role: z.literal('control'), sha256: hash }).strict(),
@@ -65,16 +68,47 @@ export async function verifyStoredRuntime(
   return descriptor;
 }
 
+function releaseCompatibility(descriptor: RuntimeReleaseDescriptor) {
+  return {
+    abi: descriptor.abi,
+    bootstrap: descriptor.bootstrap,
+    protocol: descriptor.protocol,
+    platform: descriptor.platform,
+  };
+}
+
+/** The v2 release must name its harness and share the v1 release's base and Worker contract. */
+async function verifyStoredKilo2Runtime(
+  store: ArtifactObjectStore,
+  descriptorSha256: string,
+  v1: RuntimeReleaseDescriptor
+): Promise<RuntimeReleaseDescriptor> {
+  const descriptor = await verifyStoredRuntime(store, descriptorSha256);
+  if (
+    runtimeReleaseHarness(descriptor) !== 'kilo2' ||
+    JSON.stringify(releaseCompatibility(descriptor)) !== JSON.stringify(releaseCompatibility(v1))
+  )
+    throw new Error('Kilo v2 release is not compatible with the Kilo v1 release');
+  return descriptor;
+}
+
 export async function publishRuntimeHandoff(input: {
   store: ArtifactObjectStore;
   sourceSha: string;
   base: RuntimeBase;
   descriptor: RuntimeReleaseDescriptor;
+  kilo2Descriptor?: RuntimeReleaseDescriptor;
 }): Promise<RuntimeHandoff> {
   const descriptorSha256 = sha256(serializeRuntimeRelease(input.descriptor));
   const descriptor = await verifyStoredRuntime(input.store, descriptorSha256);
   if (descriptor.abi !== input.base.abi)
     throw new Error('Runtime base ABI does not match the release');
+  if (runtimeReleaseHarness(descriptor) !== 'kilo')
+    throw new Error('Runtime handoff requires a Kilo v1 release');
+  const kilo2DescriptorSha256 =
+    input.kilo2Descriptor && sha256(serializeRuntimeRelease(input.kilo2Descriptor));
+  if (kilo2DescriptorSha256)
+    await verifyStoredKilo2Runtime(input.store, kilo2DescriptorSha256, descriptor);
   const cli = descriptor.artifacts.find(artifact => artifact.role === 'cli');
   const control = descriptor.artifacts.find(artifact => artifact.role === 'control');
   if (!cli || !control) throw new Error('Runtime release lacks required payloads');
@@ -83,16 +117,12 @@ export async function publishRuntimeHandoff(input: {
     sourceSha: input.sourceSha,
     base: input.base,
     descriptorSha256,
+    ...(kilo2DescriptorSha256 ? { kilo2DescriptorSha256 } : {}),
     artifacts: [
       { role: 'cli', sha256: cli.sha256 },
       { role: 'control', sha256: control.sha256 },
     ],
-    compatibility: {
-      abi: descriptor.abi,
-      bootstrap: descriptor.bootstrap,
-      protocol: descriptor.protocol,
-      platform: descriptor.platform,
-    },
+    compatibility: releaseCompatibility(descriptor),
   });
   await publishImmutableObject(
     input.store,
@@ -107,19 +137,18 @@ export async function loadRuntimeHandoff(
   store: ArtifactObjectStore,
   sourceSha: string,
   expectedBaseInputId: string
-): Promise<{ handoff: RuntimeHandoff; descriptor: RuntimeReleaseDescriptor }> {
+): Promise<{
+  handoff: RuntimeHandoff;
+  descriptor: RuntimeReleaseDescriptor;
+  kilo2Descriptor?: RuntimeReleaseDescriptor;
+}> {
   const bytes = await store.getBytes(runtimeHandoffKey(sourceSha));
   if (!bytes) throw new Error('Exact-SHA runtime handoff is missing');
   const handoff = runtimeHandoffSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
   if (handoff.sourceSha !== sourceSha || handoff.base.inputId !== expectedBaseInputId)
     throw new Error('Runtime handoff source or base inputs changed');
   const descriptor = await verifyStoredRuntime(store, handoff.descriptorSha256);
-  const expected = {
-    abi: descriptor.abi,
-    bootstrap: descriptor.bootstrap,
-    protocol: descriptor.protocol,
-    platform: descriptor.platform,
-  };
+  const expected = releaseCompatibility(descriptor);
   if (
     JSON.stringify(handoff.compatibility) !== JSON.stringify(expected) ||
     descriptor.abi !== handoff.base.abi ||
@@ -131,5 +160,11 @@ export async function loadRuntimeHandoff(
     )
   )
     throw new Error('Runtime handoff compatibility or payload references changed');
-  return { handoff, descriptor };
+  if (handoff.kilo2DescriptorSha256 === undefined) return { handoff, descriptor };
+  const kilo2Descriptor = await verifyStoredKilo2Runtime(
+    store,
+    handoff.kilo2DescriptorSha256,
+    descriptor
+  );
+  return { handoff, descriptor, kilo2Descriptor };
 }

@@ -1,10 +1,12 @@
 import { SELF, runInDurableObject } from 'cloudflare:test';
-import { expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 
 import { app } from '../../src/app';
 import { getSessionSyncDOStub } from '../../src/dos/SessionSyncDO';
 import type { Env } from '../../src/env';
 import { batch, client, grant, newSessionID, personal, testEnv } from '../helpers';
+
+afterEach(() => vi.restoreAllMocks());
 
 it('limits exchange by IP before credential verification with a retry deadline', async () => {
   const ip = `192.0.2.${Math.floor(Math.random() * 200) + 1}`;
@@ -74,6 +76,8 @@ it('returns the session budget denial with the existing retry contract', async (
 });
 
 it('calls the user block binding once per ten admitted batch requests', async () => {
+  // Count purchases within one prepaid window.
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now());
   const principal = personal(`batch-limit-${crypto.randomUUID()}`);
   const id = newSessionID();
   const sourceID = crypto.randomUUID();
@@ -150,7 +154,7 @@ it('keeps one user within its aggregate prepaid ceiling across many session obje
   // Spread further requests over all sessions, consuming purchased credits only.
   // Window expiry may discard unused credits, but must never increase admission.
   for (let round = 0; round < 10; round++) {
-    for (const id of ids) await check(await api.state(id));
+    for (const response of await Promise.all(ids.map(id => api.state(id)))) await check(response);
   }
   expect(admitted).toBeLessThanOrEqual(10 * blockLimit);
   for (const id of ids) {
@@ -158,4 +162,4 @@ it('keeps one user within its aggregate prepaid ceiling across many session obje
     expect(response.status).toBe(429);
     await check(response);
   }
-});
+}, 15_000);

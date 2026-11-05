@@ -62,10 +62,19 @@ function errorPage(title: string, message: string, status: number): Response {
 
 /**
  * Require a submission from this app's own origin: the confirmation page and
- * the route are served from the same origin, so any other origin, and a
- * request without one, is refused.
+ * the route are served from the same origin, so anything else is refused.
+ *
+ * Browsers set `Sec-Fetch-Site` themselves and page scripts cannot forge it, so
+ * it is authoritative whenever it is present. The confirmation page sends
+ * `Referrer-Policy: no-referrer`, which makes browsers send `Origin: null` on
+ * its own form POST, so `Origin` cannot be the primary signal. `Origin` is only
+ * the fallback for browsers that send no Fetch Metadata, and `null` never
+ * matches it.
  */
 function isSameOriginRequest(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite) return fetchSite === 'same-origin';
+
   const origin = request.headers.get('origin');
   if (!origin) return false;
 

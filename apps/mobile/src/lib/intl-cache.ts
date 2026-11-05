@@ -192,11 +192,53 @@ export function deviceDecimalSeparator(): string | null {
   return deviceDecimalSeparatorValue;
 }
 
+/**
+ * How often the cached date formatters re-check the device time zone. `Intl`
+ * fixes a formatter's zone when it is constructed, so a formatter cached
+ * before the device zone moved writes the old wall clock for the rest of the
+ * process — the session list showed yesterday's clock time for a session whose
+ * detail already read the new zone. A fresh formatter resolves the zone the
+ * device is in now, so one probe per second detects the move and drops the
+ * cached formatters; the next caller builds them in the new zone. The interval
+ * keeps the probe (one formatter construction) away from every format call a
+ * list makes inside that second.
+ */
+const DEVICE_TIME_ZONE_CHECK_MS = 1000;
+
+/** The zone the cached date formatters were built in; `null` before the first check. */
+let cachedDeviceTimeZone: string | null = null;
+let deviceTimeZoneCheckedAt = 0;
+
+/**
+ * Drop the cached date formatters when the device time zone moved. A clock that
+ * stepped backwards reads as a stale check rather than a negative age, so the
+ * next call probes again instead of waiting for the clock to catch up.
+ */
+function dropDateFormattersForNewDeviceZone(): void {
+  const now = Date.now();
+  const sinceLastCheck = now - deviceTimeZoneCheckedAt;
+  if (
+    cachedDeviceTimeZone !== null &&
+    sinceLastCheck >= 0 &&
+    sinceLastCheck < DEVICE_TIME_ZONE_CHECK_MS
+  ) {
+    return;
+  }
+  deviceTimeZoneCheckedAt = now;
+  const zone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+  if (zone === cachedDeviceTimeZone) {
+    return;
+  }
+  cachedDeviceTimeZone = zone;
+  dateTimeFormats.clear();
+}
+
 export function dateTimeFormat(
   /** Omitted only to read the device's own resolved options, e.g. its time zone. */
   locale: string | undefined,
   options: Intl.DateTimeFormatOptions
 ): Intl.DateTimeFormat {
+  dropDateFormattersForNewDeviceZone();
   // Through `localeOrEnglish` like every other formatter: this used to carry
   // its own `pt` special case and so missed the `sr` one added beside it.
   const activeLocale = locale === undefined ? undefined : localeOrEnglish(locale);

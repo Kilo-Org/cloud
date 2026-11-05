@@ -25,7 +25,10 @@ export type FakeWrapperHelloInput = {
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
   installsSkillsSh?: boolean;
+  workspaceSnapshots?: boolean;
+  /** The retired capability sent by wrappers built before workspace snapshots. */
   sessionSnapshots?: boolean;
+  startCommands?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -170,7 +173,9 @@ export class FakeWrapper {
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
+      ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
+      ...(input.startCommands ? { startCommands: true } : {}),
     });
     return this.next();
   }

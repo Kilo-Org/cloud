@@ -14,6 +14,7 @@ import { TRPCProvider } from '@/lib/trpc/utils';
 import { buildInfo } from '@/lib/buildInfo';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createNoRetryEventSource } from '@/lib/trpc/noRetryEventSource';
+import { stepUpLink } from '@/lib/trpc/step-up-link';
 
 function getUrl() {
   const base = (() => {
@@ -70,6 +71,7 @@ export function TRPCContext(props: { children: React.ReactNode }) {
 
     return createTRPCClient<RootRouter>({
       links: [
+        stepUpLink(),
         splitLink({
           condition: op => op.path === 'admin.gatewayConfig.previewOrganizationFeatures',
           true: httpLink({ url: getUrl(), methodOverride: 'POST' }),

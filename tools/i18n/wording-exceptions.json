@@ -321,6 +321,7 @@
     "manual review",
     "merge",
     "no changes needed",
+    "only adding {{accepted}} of {{total}} files (max {{max}})",
     "open",
     "open pull request",
     "pr opened",
@@ -396,6 +397,7 @@
     "deleted",
     "dismissed",
     "manual review",
+    "merge",
     "open",
     "open pull request",
     "pr opened",
@@ -404,6 +406,7 @@
     "remediation failed",
     "remediation requested",
     "review",
+    "stopped",
     "superseded",
     "tokens"
   ],

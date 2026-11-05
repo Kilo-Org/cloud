@@ -199,11 +199,12 @@ describe('listInstanceModels', () => {
     });
   });
 
-  it('classifies the old-CLI invalid list_models command as unsupported', async () => {
+  it.each([
+    new CommandDeliveredError('unknown command: list_models'),
+    new CommandDeliveredError('invalid list_models command'),
+  ])('classifies %p as unsupported', async error => {
     const connection = makeFakeConnection();
-    connection.sendCommandToConnection.mockRejectedValue(
-      new CommandDeliveredError('invalid list_models command')
-    );
+    connection.sendCommandToConnection.mockRejectedValue(error);
 
     await expect(listInstanceModels(connection, 'cli-owner-1')).resolves.toEqual({
       ok: false,

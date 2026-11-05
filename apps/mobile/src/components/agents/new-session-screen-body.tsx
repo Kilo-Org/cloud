@@ -101,8 +101,9 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { remoteStartPlanRefusal } from '@/lib/remote-spawn-admission';
+import { startPlanRefusal } from '@/lib/remote-spawn-admission';
 import {
+  followLiveRunOn,
   PRESELECT_CLOUD_RUN_ON,
   PRESELECT_COMPUTER_RUN_ON,
   readPreselectRunOn,
@@ -631,6 +632,22 @@ export function NewSessionScreenBody() {
     preselectRunOn,
   ]);
 
+  // The chosen target is a snapshot of the row, not a durable identity: a host
+  // that reboots reconnects its CLI with the same name and project under a new
+  // connectionId. Follow the live row so the launch folder, the model catalog
+  // and the CLI agents keep reading a connected instance, and so the picker
+  // marks the row the form actually shows. A target the live list no longer
+  // represents keeps its value here; the spawn path reports that case.
+  useEffect(() => {
+    if (instancesData === undefined || runOnInstance === null) {
+      return;
+    }
+    const live = followLiveRunOn(runOnInstance, instanceList);
+    if (live !== null && live.connectionId !== runOnInstance.connectionId) {
+      setRunOnInstance(live);
+    }
+  }, [instanceList, instancesData, runOnInstance]);
+
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
   // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
@@ -1014,17 +1031,18 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
-  // The organization subscription gate's own verdict for a remote start under
-  // the selected account. `organizations.list` carries the predicate the
-  // server middleware classifies with, so the form reads the verdict instead
-  // of re-deriving a plan. Read while rendering, before the press: a lapsed
-  // organization never looks startable, its explanation sits under the
-  // composer, and Start keeps the disabled style until the plan (or the
-  // account) changes. A personal start, an unsettled list, and a list without
-  // the organization stay allowed — the app never blocks a start on a verdict
-  // it does not have.
-  const planRefusal = remoteStartPlanRefusal({
-    isRemoteTargetSelected,
+  // The organization subscription gate's own verdict for a start under the
+  // selected account, whatever the run target. `organizations.list` carries the
+  // predicate the server middleware classifies with, so the form reads the
+  // verdict instead of re-deriving a plan. Read while rendering, before the
+  // press: a lapsed organization never looks startable, its explanation sits
+  // under the composer, and Start keeps the disabled style until the plan (or
+  // the account) changes. The Cloud Agent create is an organization mutation
+  // that the same gate refuses, so the explanation precedes that rejection too;
+  // the footer therefore names no other blocker while it shows. A personal
+  // start, an unsettled list, and a list without the organization stay allowed
+  // — the app never blocks a start on a verdict it does not have.
+  const planRefusal = startPlanRefusal({
     organizationId,
     organizations: useOrganizationsList().data,
   });

@@ -298,7 +298,10 @@ describe('SpendAlertsScreen happy state', () => {
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
     expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('2');
     expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe('$1.5');
-    expect(switchByLabel(renderer, i18n.t('notifications.channel.spend'))?.props.value).toBe(true);
+    // An amount stays copyable and in the monospace face.
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.selectable).toBe(true);
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.valueFace).toBe('mono');
+    expect(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts'))?.props.value).toBe(true);
     expect(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle'))?.props.value).toBe(true);
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
 
@@ -382,6 +385,11 @@ describe('SpendAlertsScreen happy state', () => {
     expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe(
       i18n.t('spendAlerts.noSpend')
     );
+    // The row keeps the Account row's one-line height: the placeholder is not
+    // selectable (a selectable value drops the row's line clamp) and paints in
+    // the sans face.
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.selectable).toBe(false);
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.valueFace).toBe('text');
   });
 });
 
@@ -605,18 +613,16 @@ describe('SpendAlertsScreen with an alert kind switched off', () => {
   });
 });
 
-describe('SpendAlertsScreen empty state', () => {
-  it('shows the off copy with the master switch as the only call to action', async () => {
+describe('SpendAlertsScreen off state', () => {
+  it('shows the master switch as the only call to action while alerts are off', async () => {
     const { renderer } = await mountLoaded({ enabled: false });
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(1);
 
-    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), true);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), true);
 
-    expect(texts(renderer)).not.toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(2);
     expect(byType(renderer, 'Button')).toHaveLength(1);
   });
@@ -624,9 +630,8 @@ describe('SpendAlertsScreen empty state', () => {
   it('keeps Save with the switch when it is turned off, so the disable can be posted', async () => {
     const { renderer } = await mountLoaded();
 
-    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(0);
 
     const saveButton = buttonByVariant(renderer);
@@ -640,7 +645,7 @@ describe('SpendAlertsScreen empty state', () => {
   it('keeps the saved confirmation after a disable save lands', async () => {
     const { renderer, queryClient } = await mountLoaded();
 
-    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
     press(buttonByVariant(renderer));
 
     await waitFor(() => saveMutationFn.mock.calls.length === 1);
@@ -656,14 +661,13 @@ describe('SpendAlertsScreen empty state', () => {
       queryClient.setQueryData(['spendAlerts', 'get', {}], settingsFixture({ enabled: false }));
     });
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBe(
       i18n.t('spendAlerts.saved')
     );
     expect(byType(renderer, 'Button')).toHaveLength(1);
 
     // A draft edit clears it again, so the message never outlives its values.
-    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), true);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), true);
     expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
   });
 });
@@ -676,7 +680,7 @@ describe('SpendAlertsScreen master switch over an invalid hidden field', () => {
     type(renderer, LIMIT, '');
     expect(buttonByVariant(renderer).props.disabled).toBe(true);
 
-    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
 
     // The rule cards are gone, so no hidden field can gate Save any more.
     expect(byType(renderer, 'FormField')).toHaveLength(0);

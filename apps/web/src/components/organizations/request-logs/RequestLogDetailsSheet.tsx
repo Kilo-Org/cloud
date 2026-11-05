@@ -24,7 +24,6 @@ import {
 } from './format';
 import { RoutingDecisionFlow } from './RoutingDecisionFlow';
 import { gatewayName } from './routing-labels';
-import { VercelRoutingSection } from './VercelRoutingSection';
 
 type RequestLogsOutputs = inferRouterOutputs<RootRouter>['organizations']['requestLogs'];
 export type RequestLogRow = RequestLogsOutputs['list'][number];
@@ -51,6 +50,7 @@ function RequestSummary({ row, details }: { row: RequestLogRow; details?: Reques
             value: request?.requested_model ?? row.model ?? '—',
             mono: true,
           },
+          { label: 'Auto model', value: request?.auto_model ?? '—', mono: true },
           { label: 'Served model', value: request?.model ?? '—', mono: true },
           { label: 'Provider', value: row.provider ?? '—' },
           {
@@ -73,8 +73,6 @@ function RequestSummary({ row, details }: { row: RequestLogRow; details?: Reques
           { label: 'Error', value: row.has_error ? 'Yes' : 'No' },
           { label: 'API', value: request?.api_kind ?? '—', mono: true },
           { label: 'Streamed', value: yesNo(request?.streamed ?? null) },
-          { label: 'Cancelled', value: yesNo(request?.cancelled ?? null) },
-          { label: 'Free', value: yesNo(request?.is_free ?? null) },
           { label: 'Requested region', value: request?.inference_region ?? 'Global' },
           { label: 'Feature', value: row.feature ?? '—' },
           { label: 'Project', value: row.project_id ?? '—' },
@@ -111,7 +109,6 @@ function RoutingSections({ metadata }: { metadata: RequestLogDetails['metadata']
       >
         <RoutingDecisionFlow routing={routing} />
       </DetailSection>
-      {routing.vercel && <VercelRoutingSection routing={routing.vercel} />}
       {routing.enkrypt && <EnkryptReportSection report={routing.enkrypt} />}
       {routing.enkrypt_output && <EnkryptOutputReportSection report={routing.enkrypt_output} />}
     </>

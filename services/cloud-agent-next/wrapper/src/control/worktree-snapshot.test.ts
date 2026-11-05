@@ -419,6 +419,7 @@ describe('worktree snapshot capture', () => {
       expect(snapshot).not.toBeNull();
       if (!snapshot) throw new Error('expected snapshot');
       try {
+        expect(snapshot.manifest.version).toBe(2);
         const listing = execFileSync('tar', ['-tzf', snapshot.archivePath], {
           encoding: 'utf8',
         });
@@ -1942,7 +1943,7 @@ describe('worktree snapshot apply', () => {
             tarEntry('files/a.txt', Buffer.from('mode'), '0', 0o600),
           ])
         ),
-        gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ version: 2 }))])),
+        gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ version: 3 }))])),
         gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ capturedAt: '..' }))])),
         gzipSync(
           tarArchive([tarEntry('snapshot.json', manifestBytes({ capturedAt: 'not-a-time' }))])

@@ -36,7 +36,7 @@ import {
   type WorktreeFileState,
 } from './worktree-file-capture.js';
 
-export const WORKTREE_SNAPSHOT_VERSION = 1;
+export const WORKTREE_SNAPSHOT_VERSION = 2;
 export const MAX_WORKTREE_SNAPSHOT_FILES = 10_000;
 export const MAX_WORKTREE_SNAPSHOT_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_WORKTREE_SNAPSHOT_TOTAL_BYTES = 50 * 1024 * 1024;
@@ -73,7 +73,7 @@ const omissionSchema = z.object({
   reason: omissionReasonSchema,
 });
 const manifestSchema = z.object({
-  version: z.literal(WORKTREE_SNAPSHOT_VERSION),
+  version: z.union([z.literal(1), z.literal(WORKTREE_SNAPSHOT_VERSION)]),
   worktreeId: z.string().min(1),
   branch: z.string().nullable(),
   base: z.string().regex(COMMIT_PATTERN),

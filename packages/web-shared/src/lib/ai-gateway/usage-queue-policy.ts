@@ -9,12 +9,7 @@ export function isSfoUsageQueueSelected(
   config: UsageQueueSfoConfig,
   context: UsageQueuePayer
 ): boolean {
-  if (
-    !config.enabled ||
-    config.exposure === 0 ||
-    !context.kiloUserId ||
-    (config.userIds !== null && !config.userIds.has(context.kiloUserId))
-  ) {
+  if (!config.enabled || config.exposure === 0 || !context.kiloUserId) {
     return false;
   }
 

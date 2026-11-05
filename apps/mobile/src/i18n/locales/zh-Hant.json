@@ -189,6 +189,7 @@
     "resendCode": "重新傳送驗證碼",
     "termsPrefix": "繼續即表示你同意我們的",
     "terms": "條款",
+    "termsInSentence": "條款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登入選項",

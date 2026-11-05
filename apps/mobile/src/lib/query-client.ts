@@ -239,7 +239,7 @@ export function createKiloAppQueryClient(): QueryClient {
         // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
         // still refetches, and call sites that pass `staleTime: 0` still override.
         staleTime: DEFAULT_QUERY_STALE_TIME_MS,
-        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           const code = (error as { data?: { code?: string } } | null)?.data?.code;

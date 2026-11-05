@@ -80,7 +80,6 @@ test.each(
       process.env.USAGE_QUEUE_ONLY_ENABLED = master;
       process.env.USAGE_QUEUE_SFO_EXPOSURE = exposure;
       process.env.BYOK_ENCRYPTION_KEY = 'synthetic-key';
-      delete process.env.USAGE_QUEUE_SFO_USER_IDS;
       if (transport === undefined) delete process.env.USAGE_QUEUE_TRANSPORT;
       else process.env.USAGE_QUEUE_TRANSPORT = transport;
       jest.isolateModules(() => {

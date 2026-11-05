@@ -1062,6 +1062,95 @@ describe('worktree snapshot apply', () => {
     }
   });
 
+  it('removes a preparation-recreated file when the captured deletion was pushed upstream', async () => {
+    const fixture = await createFixture('snapshot-pushed-deletion-');
+    try {
+      await fs.unlink(path.join(fixture.work, 'deleted.txt'));
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.deleted).toEqual(['deleted.txt']);
+        git(fixture.work, ['add', '-A']);
+        git(fixture.work, ['commit', '-m', 'push deletion']);
+        git(fixture.work, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        expect(
+          await fs.access(path.join(target, 'deleted.txt')).then(
+            () => true,
+            () => false
+          )
+        ).toBe(false);
+        await fs.writeFile(path.join(target, 'deleted.txt'), 'recreated by preparation\n');
+
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 1, omitted: 0, conflicts: [], partial: false });
+        expect(
+          await fs.access(path.join(target, 'deleted.txt')).then(
+            () => true,
+            () => false
+          )
+        ).toBe(false);
+
+        const repeated = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(repeated).toEqual({ applied: 0, omitted: 0, conflicts: [], partial: false });
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('preserves an upstream modification of a path captured as deleted', async () => {
+    const fixture = await createFixture('snapshot-pushed-deletion-modified-');
+    try {
+      await fs.unlink(path.join(fixture.work, 'deleted.txt'));
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.deleted).toEqual(['deleted.txt']);
+        const upstream = await clone(fixture, 'upstream');
+        await fs.writeFile(path.join(upstream, 'deleted.txt'), 'upstream modification\n');
+        git(upstream, ['commit', '-am', 'keep modified']);
+        git(upstream, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({
+          applied: 0,
+          omitted: 0,
+          conflicts: ['deleted.txt'],
+          partial: false,
+        });
+        expect(await fs.readFile(path.join(target, 'deleted.txt'), 'utf8')).toBe(
+          'upstream modification\n'
+        );
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
   it('carries recovered conflict payloads into the next snapshot across a second recycle', async () => {
     const fixture = await createFixture('snapshot-recovery-cycle-');
     const upstream = await clone(fixture, 'upstream');

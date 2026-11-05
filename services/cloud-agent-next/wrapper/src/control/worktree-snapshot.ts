@@ -1853,8 +1853,7 @@ async function applyExtracted(
     clock.remaining();
     let conflict = allConflict;
     if (!allConflict && head && changed.has(path)) {
-      if (!(await headPathExists(root, head, path, env, signal, clock))) continue;
-      conflict = true;
+      conflict = await headPathExists(root, head, path, env, signal, clock);
     }
     if (conflict) {
       conflicts.add(path);

@@ -1,5 +1,5 @@
 import { act } from '@/test/renderer';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   dismissDialogSheet,
@@ -25,14 +25,16 @@ describe('useNewSessionDiscardGuard with the keyboard open', () => {
     resetGuardHarness();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it.each(PLATFORMS)('presents the confirm only after the keyboard has closed (%s)', os => {
     platform.os = os;
     focusedInput.current = {};
     setKeyboardVisible(true);
     const { renderer } = mountGuard(true, noOpDiscard);
 
-    triggerPreventRemoveInAct();
-    // A second leave while the keyboard closes keeps the one pending request.
     triggerPreventRemoveInAct();
 
     expect(keyboardDismissMock).toHaveBeenCalledTimes(1);
@@ -42,6 +44,49 @@ describe('useNewSessionDiscardGuard with the keyboard open', () => {
 
     expect(renderedLabels(renderer)).toContain('Discard draft?');
 
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens on another Back when the keyboard-hide event is missing', async () => {
+    focusedInput.current = {};
+    setKeyboardVisible(true);
+    const { renderer } = mountGuard(true, noOpDiscard);
+
+    triggerPreventRemoveInAct();
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    triggerPreventRemoveInAct();
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+    pressDialogButton(renderer, 'bg-destructive');
+    dismissDialogSheet(renderer);
+    await flushMicrotasks();
+
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('bounds the wait when the keyboard-hide event never arrives', () => {
+    vi.useFakeTimers();
+    focusedInput.current = {};
+    setKeyboardVisible(true);
+    const { renderer } = mountGuard(true, noOpDiscard);
+
+    triggerPreventRemoveInAct();
+    act(() => vi.advanceTimersByTime(999));
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(renderedLabels(renderer)).toContain('Discard draft?');
+    pressDialogButton(renderer, 'border-border');
+    dismissDialogSheet(renderer);
+
+    act(() => vi.runAllTimers());
+    expect(renderedLabels(renderer)).not.toContain('Discard draft?');
+    expect(dispatchMock).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

@@ -71,18 +71,42 @@ index 800407998ed12d559a6fde732dde1a6ae8b3f172..4bb4e2d1c40f0678e913f606c4be8de3
          InsetsObserverProxy.removeOnApplyWindowInsetsListener(this)
      }
 diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
-index 5da11964f5932cb44e1131c44a2480803c0a62b5..14fe061acf36f6111c40e1db89cddda85f89bc53 100644
+index 5da11964f5932cb44e1131c44a2480803c0a62b5..e6fe3dee90800cc4be730638006fe5251835a198 100644
 --- a/ios/RNSScreenStack.mm
 +++ b/ios/RNSScreenStack.mm
-@@ -870,6 +870,22 @@ RNS_IGNORE_SUPER_CALL_END
+@@ -1,4 +1,5 @@
+ #import "RNSScreenStack.h"
++#import <math.h>
+ #import <React/RCTConversions.h>
+ #import <React/RCTFabricComponentsPlugins.h>
+ #import <React/RCTFabricSurface.h>
+@@ -870,6 +871,40 @@ RNS_IGNORE_SUPER_CALL_END
  }
  
  - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
 +{
++  RNSScreenView *topScreen = _reactSubviews.lastObject;
++#if !TARGET_OS_TV && !TARGET_OS_VISION
++  if (topScreen.preventNativeDismiss && [gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]]) {
++    CGPoint velocity = [(UIPanGestureRecognizer *)gestureRecognizer velocityInView:gestureRecognizer.view];
++    BOOL isVertical = topScreen.swipeDirection == RNSScreenSwipeDirectionVertical;
++    CGFloat along = isVertical ? velocity.y : velocity.x;
++    CGFloat across = isVertical ? velocity.x : velocity.y;
++    BOOL isRTL = _controller.view.semanticContentAttribute == UISemanticContentAttributeForceRightToLeft;
++    if (!isVertical && isRTL) {
++      along = -along;
++    }
++    if (topScreen.stackAnimation == RNSScreenStackAnimationSlideFromLeft) {
++      along = -along;
++    }
++    if (along <= 0 || fabs(along) <= fabs(across)) {
++      return NO;
++    }
++  }
++#endif
 +  if (![self dismissGestureShouldBegin:gestureRecognizer]) {
 +    return NO;
 +  }
-+  RNSScreenView *topScreen = _reactSubviews.lastObject;
 +  if (!topScreen.preventNativeDismiss) {
 +    return YES;
 +  }

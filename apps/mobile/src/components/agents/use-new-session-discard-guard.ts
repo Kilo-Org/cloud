@@ -112,6 +112,20 @@ export function useNewSessionDiscardGuard({
     setConfirmPhase('open');
   }
 
+  useEffect(() => {
+    if (confirmPhase !== 'awaiting-keyboard') {
+      return undefined;
+    }
+    // An interactive hide can miss its completion event. Never trap the draft
+    // behind that event; a repeated Back also opens the confirm immediately.
+    const timeout = setTimeout(() => {
+      setConfirmPhase('open');
+    }, 1000);
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [confirmPhase]);
+
   const closeConfirm = useCallback(() => {
     pendingLeaveRef.current = null;
     focusedInputRef.current = null;
@@ -182,7 +196,11 @@ export function useNewSessionDiscardGuard({
       return;
     }
     pendingLeaveRef.current = leave;
-    if (confirmPhase !== 'closed') {
+    if (confirmPhase === 'awaiting-keyboard') {
+      setConfirmPhase('open');
+      return;
+    }
+    if (confirmPhase === 'open') {
       return;
     }
     if (!keyboardVisible) {

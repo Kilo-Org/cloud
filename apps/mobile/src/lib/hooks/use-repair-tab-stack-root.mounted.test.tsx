@@ -17,12 +17,20 @@ type NavigationHarness = {
   state: () => State;
   /** A navigation the app dispatched: the state changes and listeners fire. */
   deliver: (next: State) => void;
+  /** Apply the resets recorded so far, then notify the state listeners. */
+  commitResets: () => void;
 };
 
 /**
- * A tab Stack's navigation: the state the repair reads, the reset it dispatches
- * (which, like the navigator, commits the new state and notifies the state
- * listeners), and the listener the repair subscribes.
+ * A tab Stack's navigation: the state the repair reads, the resets it
+ * dispatches, and the listeners it subscribes.
+ *
+ * A reset is only RECORDED; `commitResets` applies it and notifies the state
+ * listeners. A navigator commits a reset within the same dispatch, but every
+ * scene of the Stack runs this hook from its own effect, and they all read the
+ * state from before that commit. Deferring the commit here is what reproduces
+ * that: it is the only way to see whether the repair acts once per state or
+ * once per scene.
  */
 function createNavigation(initial: State): NavigationHarness {
   // A Stack always declares its route names; every state below is one of a
@@ -41,11 +49,17 @@ function createNavigation(initial: State): NavigationHarness {
     }
   };
 
+  const commitResets = () => {
+    const last = resets.at(-1);
+    if (last !== undefined) {
+      commit(last);
+    }
+  };
+
   const navigation: TabStackNavigation = {
     getState: () => state as never,
     reset: next => {
       resets.push(next as unknown as State);
-      commit(next as unknown as State);
     },
     addListener: (_event, listener) => {
       const entry = () => {
@@ -58,7 +72,7 @@ function createNavigation(initial: State): NavigationHarness {
     },
   };
 
-  return { navigation, resets, state: () => state, deliver: commit };
+  return { navigation, resets, state: () => state, deliver: commit, commitResets };
 }
 
 /**
@@ -94,6 +108,9 @@ describe('useRepairTabStackRoot', () => {
     mount(harness);
 
     expect(harness.resets).toHaveLength(1);
+    act(() => {
+      harness.commitResets();
+    });
     // The inserted root is keyless: the reset action mints its key from the
     // state's own sequence, which is the chain the tab's screens derive from.
     expect(harness.state()).toMatchObject({
@@ -111,7 +128,7 @@ describe('useRepairTabStackRoot', () => {
 
   it('inserts once for every scene of the same state', () => {
     // Every scene of the Stack mounts this hook, and they all read the state
-    // object from before the first reset committed.
+    // object from before the first reset committed: three scenes, one insert.
     const harness = createNavigation({
       index: 0,
       routes: [{ name: 'history', key: 'history' }],
@@ -156,6 +173,10 @@ describe('useRepairTabStackRoot', () => {
       });
     });
 
+    expect(harness.resets).toHaveLength(1);
+    act(() => {
+      harness.commitResets();
+    });
     expect(harness.state()).toMatchObject({
       index: 1,
       routes: [

@@ -44,20 +44,19 @@ export type TabStackState = {
 };
 
 /**
- * Whether the focused screen has the tab's root beneath it.
+ * Whether the Stack holds no copy of the tab's root.
  *
- * Only the routes BELOW the focused one count: a root above it is a screen the
- * reader moved on from, not a parent. The root itself needs no parent, and a
- * state with no routes is left alone rather than filled with a lone root.
+ * The root is a Stack's BASE, so any copy anywhere in it already keeps every
+ * screen above it reachable; the resolution is by name and not by position,
+ * because inserting a second root would split the screens the reader actually
+ * came through. A state with no routes is left alone rather than filled with a
+ * lone root.
  */
-export function isTabStackRootMissing({ index, routes }: TabStackState): boolean {
-  const focused = routes[index];
-  if (focused === undefined || focused.name === TAB_STACK_ROOT_ROUTE_NAME) {
+export function isTabStackRootMissing({ routes }: TabStackState): boolean {
+  if (routes.length === 0) {
     return false;
   }
-  return !routes
-    .slice(0, Math.max(index, 0))
-    .some(route => route.name === TAB_STACK_ROOT_ROUTE_NAME);
+  return !routes.some(route => route.name === TAB_STACK_ROOT_ROUTE_NAME);
 }
 
 /** The Stack state with the tab's root inserted beneath the focused screen. */
@@ -68,8 +67,8 @@ export type TabStackRootInsertion = {
 };
 
 /**
- * The Stack state with the tab's root inserted directly beneath the focused
- * screen, or null when the root is already there.
+ * The Stack state with the tab's root inserted at the Bottom, or null when the
+ * Stack already holds it.
  *
  * The inserted root carries an EMPTY key on purpose. Expo Router derives a
  * nested navigator's state key and every route key under it from the parent
@@ -78,6 +77,16 @@ export type TabStackRootInsertion = {
  * navigator would fail on the next render. The reset action mints a key for a
  * route that has none, from the same sequence as every other key in the state
  * (`routers/BaseRouter.js`, `RESET`), which is the only key that fits.
+ *
+ * The insertion goes at the BOTTOM, not beneath the focused screen: the root is
+ * the Stack's base, so `[profiles, overview, section]` becomes
+ * `[index, profiles, overview, section]` and Back still steps through the
+ * screens the reader came through. Inserting beneath the focused screen would
+ * put the tab root between the overview and its section, and Back from the
+ * section would land on the tab root instead of its parent. The bottom
+ * position also makes the order independent of the profile parent repair
+ * (`useRepairProfileRouteStack`), which pushes its parents above whatever is
+ * already there.
  *
  * The insertion keeps every existing route, and so its key: the screen the
  * reader is on keeps its identity and its state (a half-filled form, a draft)
@@ -91,15 +100,8 @@ export function tabStackRootRepair({ index, routes }: TabStackState): TabStackRo
   if (!isTabStackRootMissing({ index, routes })) {
     return null;
   }
-  const focused = routes[index];
-  if (focused === undefined) {
-    return null;
-  }
-  const repaired = [...routes];
-  repaired.splice(index, 0, {
-    key: '',
-    name: TAB_STACK_ROOT_ROUTE_NAME,
-    params: {},
-  });
-  return { routes: repaired, index: index + 1 };
+  return {
+    routes: [{ key: '', name: TAB_STACK_ROOT_ROUTE_NAME, params: {} }, ...routes],
+    index: index + 1,
+  };
 }

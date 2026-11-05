@@ -189,6 +189,7 @@
     "resendCode": "Retrimite codul",
     "termsPrefix": "Dacă continui, accepți ",
     "terms": "Termenii de utilizare",
+    "termsInSentence": "Termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",

@@ -189,6 +189,7 @@
     "resendCode": "Reenviar código",
     "termsPrefix": "Ao continuar aceptas os nosos ",
     "terms": "Termos",
+    "termsInSentence": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Máis opcións de inicio de sesión",

@@ -189,6 +189,7 @@
     "resendCode": "کوډ بیا ولېږئ",
     "termsPrefix": "په دوام ورکولو سره، تاسو زموږ دا موارد منئ: ",
     "terms": "شرایط",
+    "termsInSentence": "شرایط",
     "termsConnector": " او ",
     "termsSuffix": ".",
     "moreSignInOptions": "د ننوتلو نور غوراوي",

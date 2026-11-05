@@ -189,6 +189,7 @@
     "resendCode": "Nosūtīt kodu vēlreiz",
     "termsPrefix": "Turpinot, tu piekrīti mūsu ",
     "terms": "Noteikumiem",
+    "termsInSentence": "Noteikumiem",
     "termsConnector": " un ",
     "termsSuffix": ".",
     "moreSignInOptions": "Citas pierakstīšanās iespējas",

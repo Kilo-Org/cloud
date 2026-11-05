@@ -189,6 +189,7 @@
     "resendCode": "Кодты қайта жіберу",
     "termsPrefix": "Жалғастыру арқылы мына құжаттармен келісесіз: ",
     "terms": "Шарттар",
+    "termsInSentence": "Шарттар",
     "termsConnector": " және ",
     "termsSuffix": ".",
     "moreSignInOptions": "Басқа кіру тәсілдері",

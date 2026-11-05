@@ -189,6 +189,7 @@
     "resendCode": "कोड फिर से भेजें",
     "termsPrefix": "आगे बढ़ने का मतलब है कि आप इनसे सहमत हैं: ",
     "terms": "शर्तें",
+    "termsInSentence": "शर्तें",
     "termsConnector": " और ",
     "termsSuffix": "।",
     "moreSignInOptions": "साइन इन करने के और विकल्प",

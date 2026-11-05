@@ -189,6 +189,7 @@
     "resendCode": "ኮዱን እንደገና ይላኩ",
     "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦ ",
     "terms": "ውሎች",
+    "termsInSentence": "ውሎች",
     "termsConnector": " እና ",
     "termsSuffix": "።",
     "moreSignInOptions": "ተጨማሪ የመግቢያ አማራጮች",

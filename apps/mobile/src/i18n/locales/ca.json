@@ -189,6 +189,7 @@
     "resendCode": "Torna a enviar el codi",
     "termsPrefix": "En continuar, acceptes les nostres ",
     "terms": "Condicions d'ús",
+    "termsInSentence": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Més opcions d'inici de sessió",

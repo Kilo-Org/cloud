@@ -189,6 +189,7 @@
     "resendCode": "Send kode igen",
     "termsPrefix": "Ved at fortsætte accepterer du vores ",
     "terms": "Vilkår",
+    "termsInSentence": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere muligheder for login",

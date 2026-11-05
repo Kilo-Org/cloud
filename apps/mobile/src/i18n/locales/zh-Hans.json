@@ -189,6 +189,7 @@
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
     "terms": "条款",
+    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",

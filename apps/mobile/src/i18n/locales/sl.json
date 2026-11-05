@@ -189,6 +189,7 @@
     "resendCode": "Znova pošlji kodo",
     "termsPrefix": "Z nadaljevanjem sprejemaš naslednja dokumenta: ",
     "terms": "Pogoji",
+    "termsInSentence": "Pogoji",
     "termsConnector": " in ",
     "termsSuffix": ".",
     "moreSignInOptions": "Več možnosti prijave",

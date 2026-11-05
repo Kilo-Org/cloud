@@ -189,6 +189,7 @@
     "resendCode": "कोड पुन्हा पाठवा",
     "termsPrefix": "पुढे गेल्याने तुम्ही खालील बाबींना सहमती देता: ",
     "terms": "अटी",
+    "termsInSentence": "अटी",
     "termsConnector": " आणि ",
     "termsSuffix": ".",
     "moreSignInOptions": "साइन इन करण्याचे आणखी पर्याय",

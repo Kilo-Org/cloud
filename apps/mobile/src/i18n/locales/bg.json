@@ -189,6 +189,7 @@
     "resendCode": "Изпрати кода отново",
     "termsPrefix": "Като продължиш, приемаш нашите ",
     "terms": "Условия",
+    "termsInSentence": "Условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",

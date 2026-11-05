@@ -189,6 +189,7 @@
     "resendCode": "إعادة إرسال الرمز",
     "termsPrefix": "بالمتابعة، توافق على ",
     "terms": "الشروط",
+    "termsInSentence": "الشروط",
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "المزيد من خيارات تسجيل الدخول",

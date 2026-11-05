@@ -189,6 +189,7 @@
     "resendCode": "Skicka koden igen",
     "termsPrefix": "Genom att fortsätta godkänner du våra ",
     "terms": "Villkor",
+    "termsInSentence": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fler inloggningsalternativ",

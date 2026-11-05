@@ -189,6 +189,7 @@
     "resendCode": "Gửi lại mã",
     "termsPrefix": "Khi tiếp tục, bạn đồng ý với ",
     "terms": "Điều khoản",
+    "termsInSentence": "Điều khoản",
     "termsConnector": " và ",
     "termsSuffix": ".",
     "moreSignInOptions": "Thêm tùy chọn đăng nhập",

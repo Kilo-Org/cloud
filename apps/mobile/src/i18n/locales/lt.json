@@ -189,6 +189,7 @@
     "resendCode": "Siųsti kodą iš naujo",
     "termsPrefix": "Tęsdamas sutinki su mūsų ",
     "terms": "Sąlygomis",
+    "termsInSentence": "Sąlygomis",
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",

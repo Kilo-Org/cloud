@@ -189,6 +189,7 @@
     "resendCode": "Кодыг дахин илгээх",
     "termsPrefix": "Үргэлжлүүлснээр та манай дараах баримт бичгийг зөвшөөрнө: ",
     "terms": "Үйлчилгээний нөхцөл",
+    "termsInSentence": "Үйлчилгээний нөхцөл",
     "termsConnector": " болон ",
     "termsSuffix": ".",
     "moreSignInOptions": "Нэвтрэх бусад сонголтууд",

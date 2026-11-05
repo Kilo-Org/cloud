@@ -15,6 +15,10 @@ export type DirectUpstreamAuth =
   | { type: 'secure_proxy'; credentials: CustomLlmSecureProxyCredentials }
   | { type: 'aws_bedrock'; credentials: CustomLlmAwsBedrockCredentials };
 
+function isValidHttpHeaderValue(value: string): boolean {
+  return /^[\t\x20-\x7e\x80-\xff]+$/.test(value);
+}
+
 function resolveRouting(
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
@@ -70,7 +74,7 @@ export function buildDirectProvider(
       if (
         upstream.prompt_cache_key_as_mt_user_id &&
         typeof promptCacheKey === 'string' &&
-        /^[\t\x20-\x7e\x80-\xff]+$/.test(promptCacheKey)
+        isValidHttpHeaderValue(promptCacheKey)
       ) {
         for (const key of Object.keys(context.extraHeaders)) {
           if (key.toLowerCase() === 'mt-user-id') {

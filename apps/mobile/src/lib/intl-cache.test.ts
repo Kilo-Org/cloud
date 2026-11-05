@@ -68,7 +68,11 @@ describe('intl-cache', () => {
 
       restoreZone();
       vi.advanceTimersByTime(2000);
-      expect(dateTimeFormat('en', options).format(instant)).toBe('1:10 AM');
+      // Whatever zone the test host runs in: a formatter built now agrees with
+      // the zone the process is back in, not with the zone it left.
+      expect(dateTimeFormat('en', options).format(instant)).toBe(
+        new Intl.DateTimeFormat('en', options).format(instant)
+      );
     } finally {
       restoreZone();
       vi.useRealTimers();

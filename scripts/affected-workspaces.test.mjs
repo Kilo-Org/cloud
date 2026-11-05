@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-import { isModuleSpecifier, selectAffected } from './affected-workspaces.mjs';
+import { isModuleSpecifier, isNeutral, selectAffected } from './affected-workspaces.mjs';
 
 const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
 const items = [
@@ -18,8 +20,8 @@ const references = [
   ['apps/web/src/lib/preview.ts', 'services/agent/src/shared/preview'],
   ['services/leaf/vitest.config.ts', 'tools/shared'],
 ];
-const select = (changedFiles, lockfileDirs = []) =>
-  selectAffected({ items, changedFiles, lockfileDirs, references });
+const select = (changedFiles, dependencyDirs = []) =>
+  selectAffected({ items, changedFiles, dependencyDirs, references });
 const noTests = { test_only_dirs: [], test_only_packages: [], test_only_files: [] };
 
 test('a leaf change selects only the leaf', () => {
@@ -37,7 +39,7 @@ test('a web .env change selects ai-gateway, which builds with those files', () =
   const result = selectAffected({
     items: [...items, workspace('ai-gateway', 'apps/ai-gateway')],
     changedFiles: ['apps/web/.env.test'],
-    lockfileDirs: [],
+    dependencyDirs: [],
     references: [],
   });
   assert.ok(result.packages.includes('ai-gateway'));
@@ -122,11 +124,74 @@ test('a check script change runs only that check everywhere', () => {
   assert.deepEqual(both.packages, ['leaf']);
 });
 
-test('lockfile changes select the workspaces whose dependencies changed', () => {
-  assert.deepEqual(select(['pnpm-lock.yaml'], ['services/leaf']).packages, ['leaf']);
-  assert.deepEqual(select(['pnpm-lock.yaml'], []).dirs, []);
-  assert.equal(select(['pnpm-lock.yaml'], ['*']).full, true);
-  assert.equal(select(['pnpm-lock.yaml'], ['.']).full, true);
+test('dependency manifest changes select the workspaces whose dependencies changed', () => {
+  for (const manifest of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
+    assert.deepEqual(select([manifest], ['services/leaf']), {
+      full: false,
+      reasons: [],
+      full_checks: [],
+      dirs: ['services/leaf'],
+      packages: ['leaf'],
+      ...noTests,
+    });
+    assert.deepEqual(select([manifest], []).dirs, [], manifest);
+    assert.equal(select([manifest], ['*']).full, true, manifest);
+    assert.equal(select([manifest], ['.']).full, true, manifest);
+  }
+  // Either manifest reaches the readers of the workspace it names.
+  assert.deepEqual(select(['pnpm-workspace.yaml'], ['packages/trpc']).packages, [
+    '@kilocode/trpc',
+    'kilo-app',
+  ]);
+  assert.deepEqual(select(['pnpm-lock.yaml', 'pnpm-workspace.yaml'], ['packages/db']).packages, [
+    '@kilocode/db',
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
+});
+
+test('documents and neutral root locations are the shared neutral set', () => {
+  for (const file of [
+    'README.md',
+    'packages/db/README.md',
+    'packages/db/AGENTS.md',
+    'docs/a.ts',
+    'dev/a.ts',
+    '.github/workflows/deploy.yml',
+    'scripts/affected-workspaces.mjs',
+  ]) {
+    assert.equal(isNeutral(file), true, file);
+  }
+  for (const file of [
+    'packages/db/src/schema.ts',
+    'apps/mobile/src/app/index.tsx',
+    'pnpm-workspace.yaml',
+    'package.json',
+  ]) {
+    assert.equal(isNeutral(file), false, file);
+  }
+});
+
+test('the neutral filter keeps every path a check reads', () => {
+  const script = fileURLToPath(new URL('./affected-workspaces.mjs', import.meta.url));
+  const input = [
+    'README.md',
+    'packages/db/README.md',
+    'packages/db/src/schema.ts',
+    'apps/web/.env.test',
+    'services/leaf/src/index.ts',
+    '',
+  ].join('\n');
+  const output = execFileSync(process.execPath, [script, '--filter-neutral'], {
+    input,
+    encoding: 'utf8',
+  });
+  assert.deepEqual(output.split('\n').filter(Boolean), [
+    'packages/db/src/schema.ts',
+    'apps/web/.env.test',
+    'services/leaf/src/index.ts',
+  ]);
 });
 
 // leaf-reader depends on leaf, so a full edge into leaf reaches it too.
@@ -135,7 +200,7 @@ const dataItems = [
   workspace('leaf-reader', 'services/leaf-reader', { leaf: 'workspace:*' }),
 ];
 const selectData = (changedFiles, references) =>
-  selectAffected({ items: dataItems, changedFiles, lockfileDirs: [], references });
+  selectAffected({ items: dataItems, changedFiles, dependencyDirs: [], references });
 
 test('a test that reads another workspace as data runs only its tests', () => {
   const references = [

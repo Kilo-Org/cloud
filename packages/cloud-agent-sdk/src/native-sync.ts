@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { fetchNativeSnapshot, type NativeMessage } from './native-sync-snapshot';
+import {
+  fetchNativeSnapshot,
+  type NativeMessage,
+  type NativeSnapshot,
+} from './native-sync-snapshot';
 import { cloudAgentSdkRuntime } from './runtime';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
@@ -453,6 +457,7 @@ export class NativeSyncClient {
     let closed = false;
     let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelRecovery: (() => void) | undefined;
+    let recovery: { attempt: number; replay: NativeEvent[] } | undefined;
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
     const publish = (patch: Partial<NativeSessionState>) => {
@@ -460,33 +465,74 @@ export class NativeSyncClient {
       state = { ...state, ...patch };
       listener(state);
     };
-    const snapshot = async () => {
-      const snapshot = await fetchNativeSnapshot(
+    const visible = (messages: NativeMessage[]) =>
+      messages.filter(message => !clearedIDs.has(message.id));
+    const beyond = (frame: NativeEvent, position: number) => {
+      const syncPosition = record(frame.body)['syncPosition'];
+      const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
+      return (
+        typeof syncPosition !== 'number' ||
+        syncPosition > position ||
+        (ephemeral && syncPosition === position)
+      );
+    };
+    const readSnapshot = () =>
+      fetchNativeSnapshot(
         <T>(route: string) => this.request<T>(route, undefined, organizationID),
         sessionID
       );
-      snapshotPosition = snapshot.position;
-      if (!closed)
-        publish({ messages: snapshot.messages.filter(message => !clearedIDs.has(message.id)) });
+    const snapshot = async () => {
+      const next = await readSnapshot();
+      // A recovery read that finished first may already hold a newer durable position.
+      if (next.position < snapshotPosition) return;
+      snapshotPosition = next.position;
+      publish({ messages: visible(next.messages) });
     };
     // The producer uploads asynchronously. Recover omitted or deferred parts only
     // from a complete durable snapshot, never by declaring partial text complete.
-    const recoverIncomplete = async () => {
-      for (let attempt = 0; attempt < 4 && !closed; attempt++) {
-        if (!state.messages.some(message => message.incomplete)) return;
-        await new Promise<void>(resolve => {
-          cancelRecovery = resolve;
-          recoveryTimer = setTimeout(resolve, 250 * 2 ** attempt);
-        });
-        if (closed) return;
-        await snapshot();
+    // Recovery runs beside the live stream and reapplies events newer than each snapshot.
+    const recoverIncomplete = () => {
+      if (recovery) {
+        recovery.attempt = 0;
+        return;
       }
-    };
-    let recoverWhenIdle = false;
-    // Attaching mid-run must not stall live deltas; an active producer is recovered once it is idle.
-    const recoverAfterAttach = async () => {
-      if (state.runnerConnected) recoverWhenIdle = true;
-      else await recoverIncomplete();
+      if (!state.messages.some(message => message.incomplete)) return;
+      const current: { attempt: number; replay: NativeEvent[] } = { attempt: 0, replay: [] };
+      recovery = current;
+      void (async () => {
+        for (;;) {
+          await new Promise<void>(resolve => {
+            cancelRecovery = resolve;
+            recoveryTimer = setTimeout(resolve, 250 * 2 ** current.attempt++);
+          });
+          if (closed) return;
+          let next: NativeSnapshot;
+          try {
+            next = await readSnapshot();
+          } catch (error) {
+            // A transient read keeps the remaining attempts; permanent authorization and
+            // deletion failures end recovery.
+            if (isPermanent(error) || current.attempt >= 4) {
+              publish({ error: reason(error) });
+              return;
+            }
+            continue;
+          }
+          const stale = next.position < snapshotPosition;
+          let messages = next.messages;
+          for (const frame of current.replay)
+            if (beyond(frame, next.position)) messages = applyNativeEvent(messages, frame);
+          // A snapshot behind the published position yields no state; its frames still replay.
+          if (!stale) snapshotPosition = next.position;
+          if (!stale) publish({ messages: visible(messages) });
+          current.replay = current.replay.filter(frame => beyond(frame, next.position));
+          if (!state.messages.some(item => item.incomplete) || current.attempt >= 4) return;
+        }
+      })()
+        .catch((error: unknown) => publish({ error: reason(error) }))
+        .finally(() => {
+          if (recovery === current) recovery = undefined;
+        });
     };
     const connection = this.socket(
       `${path}/live`,
@@ -502,21 +548,17 @@ export class NativeSyncClient {
               lastSeq = frame.seq;
             }
             if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
-            await recoverAfterAttach();
+            recoverIncomplete();
           }
           if (frame.type === 'reset_required') {
             await snapshot();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
-            await recoverAfterAttach();
+            recoverIncomplete();
           }
           if (frame.type === 'runner_status') {
             if (body['runnerConnected'] !== true) identity = undefined;
             publish({ runnerConnected: body['runnerConnected'] === true });
-            if (!state.runnerConnected && recoverWhenIdle) {
-              recoverWhenIdle = false;
-              await recoverIncomplete();
-            }
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
             const parsed = commandStatusSchema.safeParse(body['status']);
@@ -545,27 +587,18 @@ export class NativeSyncClient {
           frame.type === 'remote.state'
             ? [frame]
             : [...(remoteState ? [remoteState] : []), ...recent, frame];
-        const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
-        const beyondSnapshot =
-          typeof body['syncPosition'] !== 'number' ||
-          body['syncPosition'] > snapshotPosition ||
-          (ephemeral && body['syncPosition'] === snapshotPosition);
+        recovery?.replay.push(frame);
         publish({
           events,
-          messages: !beyondSnapshot
-            ? state.messages
-            : applyNativeEvent(state.messages, frame).filter(
-                message => !clearedIDs.has(message.id)
-              ),
+          messages: beyond(frame, snapshotPosition)
+            ? visible(applyNativeEvent(state.messages, frame))
+            : state.messages,
         });
-        const settled =
-          (frame.type.startsWith('session.execution.') &&
-            frame.type !== 'session.execution.started') ||
-          (frame.type === 'remote.state' && body['running'] === false && recoverWhenIdle);
-        if (settled) {
-          recoverWhenIdle = false;
-          await recoverIncomplete();
-        }
+        if (
+          frame.type.startsWith('session.execution.') &&
+          frame.type !== 'session.execution.started'
+        )
+          recoverIncomplete();
       },
       (connection, error) => {
         publish({

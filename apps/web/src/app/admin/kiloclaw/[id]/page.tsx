@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import { KiloclawInstanceDetail } from '../../components/KiloclawInstances/KiloclawInstanceDetail';
 
 export default async function KiloclawInstanceDetailPage({
@@ -8,9 +7,9 @@ export default async function KiloclawInstanceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

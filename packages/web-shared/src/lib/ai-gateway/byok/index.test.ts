@@ -6,6 +6,16 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+// Decrypts read through the data key cache, which has its own tests; here every read is a miss so
+// the fetch mock sees each KMS call.
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(async () => null),
+    set: jest.fn(async () => 'OK'),
+    del: jest.fn(async () => 1),
+  },
+}));
+
 import type * as SentryNextjs from '@sentry/nextjs';
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomBytes } from 'crypto';

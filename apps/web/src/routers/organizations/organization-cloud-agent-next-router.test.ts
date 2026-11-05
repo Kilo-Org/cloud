@@ -271,7 +271,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  fetchGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
   fetchAllGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
 }));
 

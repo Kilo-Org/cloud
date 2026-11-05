@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import {
   blacklistedDomainsFromConfig,
   blockedSignupTldsFromConfig,
+  MAX_BLACKLIST_DOMAINS,
   refreshBlacklistDomainsConfig,
   type BlacklistDomainsConfig,
   type BlacklistDomainsConfigSnapshot,
@@ -32,7 +33,7 @@ export const DEFAULT_BLACKLIST_DOMAINS_CONFIG: BlacklistDomainsConfig = {
 };
 
 export const BlacklistDomainsInputSchema = z.object({
-  domains: z.array(z.string().min(1).trim()),
+  domains: z.array(z.string().min(1).trim()).max(MAX_BLACKLIST_DOMAINS),
   blocked_tlds: z.array(z.string().min(1).trim()).optional(),
 });
 
@@ -68,6 +69,9 @@ const envFallbackDomains = getEnvFallbackDomains();
 const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
 let snapshot: BlacklistDomainsConfigSnapshot | null = null;
+// The last over-cap config this process reported, so the log fires once per loaded config
+// instead of once per cache refresh.
+let reportedDroppedDomains: string | null = null;
 
 /**
  * Reads the operator-maintained config from Redis. Throws when the read or the stored payload
@@ -81,6 +85,13 @@ async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
       snapshot,
       Date.now()
     );
+    const droppedKey = `${snapshot.config?.updated_at ?? ''}:${snapshot.droppedDomains}`;
+    if (snapshot.droppedDomains > 0 && droppedKey !== reportedDroppedDomains) {
+      reportedDroppedDomains = droppedKey;
+      errorExceptInTest('[blacklist-domains] Stored domain list is longer than the cap:', {
+        droppedDomains: snapshot.droppedDomains,
+      });
+    }
     return snapshot;
   } catch (error) {
     errorExceptInTest('[blacklist-domains] Failed to read the blacklisted domains:', error);

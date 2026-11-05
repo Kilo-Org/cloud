@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   commandResult,
+  commandRunner,
   pendingRequests,
   transcriptText,
   sendNativePrompt,
@@ -148,20 +149,18 @@ function NativeRemoteDemo() {
       void sessions.refetch();
     },
   });
-  async function run(operation: () => Promise<string>) {
-    setError('');
-    try {
-      setCommandID(await operation());
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Command failed');
-      return false;
-    }
-  }
+  const run = useMemo(
+    () =>
+      commandRunner(outcome => {
+        if (outcome.error !== undefined) setError(outcome.error);
+        if (outcome.commandID !== undefined) setCommandID(outcome.commandID);
+      }),
+    []
+  );
   async function submit() {
     const connection = sessionRef.current;
     if (!connection || !prompt.trim()) return;
-    if (await run(() => sendNativePrompt(connection, prompt, queue))) setPrompt('');
+    if (await run('prompt', () => sendNativePrompt(connection, prompt, queue))) setPrompt('');
   }
   const pending = pendingRequests(state?.events ?? []);
   const canControl = state?.connection === 'connected' && state.runnerConnected;
@@ -345,7 +344,9 @@ function NativeRemoteDemo() {
                   onClick={() => {
                     const connection = sessionRef.current;
                     if (connection)
-                      void run(() => connection.respondPermission(request.id, 'once'));
+                      void run(`permission:${request.id}`, () =>
+                        connection.respondPermission(request.id, 'once')
+                      );
                   }}
                 >
                   Allow once
@@ -356,7 +357,9 @@ function NativeRemoteDemo() {
                   onClick={() => {
                     const connection = sessionRef.current;
                     if (connection)
-                      void run(() => connection.respondPermission(request.id, 'reject'));
+                      void run(`permission:${request.id}`, () =>
+                        connection.respondPermission(request.id, 'reject')
+                      );
                   }}
                 >
                   Reject
@@ -371,11 +374,15 @@ function NativeRemoteDemo() {
               disabled={!canControl}
               reply={answers => {
                 const connection = sessionRef.current;
-                if (connection) void run(() => connection.replyQuestion(question.id, answers));
+                if (connection)
+                  void run(`question:${question.id}`, () =>
+                    connection.replyQuestion(question.id, answers)
+                  );
               }}
               reject={() => {
                 const connection = sessionRef.current;
-                if (connection) void run(() => connection.rejectQuestion(question.id));
+                if (connection)
+                  void run(`question:${question.id}`, () => connection.rejectQuestion(question.id));
               }}
             />
           ))}
@@ -411,7 +418,7 @@ function NativeRemoteDemo() {
               disabled={!canControl}
               onClick={() => {
                 const connection = sessionRef.current;
-                if (connection) void run(() => connection.interrupt());
+                if (connection) void run('abort', () => connection.interrupt());
               }}
             >
               Abort

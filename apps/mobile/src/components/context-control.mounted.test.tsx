@@ -293,6 +293,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
+    // Memberships of one workspace share their leading words; the label keeps
+    // its tail, which is the part that names the account.
+    expect(picker(ui).findByType(Text).props.ellipsizeMode).toBe('middle');
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
@@ -346,7 +349,9 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(opened.map(row => row.label)).toEqual(['Personal', name]);
     expect(opened.map(row => row.selected)).toEqual([false, true]);
     expect(opened.map(row => row.role)).toEqual(['button', 'button']);
-    expect(opened.map(row => row.divider)).toEqual([true, true]);
+    // Rows divide themselves only: the full rule that closes the list belongs
+    // to the dismiss row's area, not to the last account.
+    expect(opened.map(row => row.divider)).toEqual([true, false]);
     expect(opened.map(row => row.check)).toEqual([false, true]);
     expect(cancelRow(ui).props.accessibilityState).toBeUndefined();
   });

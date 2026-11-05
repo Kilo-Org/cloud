@@ -189,6 +189,7 @@
     "resendCode": "Invia di nuovo il codice",
     "termsPrefix": "Continuando accetti i nostri ",
     "terms": "Termini",
+    "termsInSentence": "Termini",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Altre opzioni di accesso",

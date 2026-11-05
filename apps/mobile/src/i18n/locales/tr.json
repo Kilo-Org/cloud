@@ -189,6 +189,7 @@
     "resendCode": "Kodu yeniden gönder",
     "termsPrefix": "Devam ederek şunları kabul etmiş olursun: ",
     "terms": "Koşullar",
+    "termsInSentence": "Koşullar",
     "termsConnector": " ve ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daha fazla oturum açma seçeneği",

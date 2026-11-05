@@ -189,6 +189,7 @@
     "resendCode": "Saada kood uuesti",
     "termsPrefix": "Jätkates kehtivad sulle meie ",
     "terms": "Kasutustingimused",
+    "termsInSentence": "Kasutustingimused",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",

@@ -34,6 +34,7 @@ const summary = {
   total_providers: 2,
   total_models: 7,
   direct_byok_model_counts: { neuralwatt: 3, 'chutes-byok': 4 },
+  failed_provider_ids: [],
   time: 5,
 };
 

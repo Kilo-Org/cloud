@@ -19,6 +19,7 @@ import {
   type RawModel,
 } from './models-dev';
 import { parseAwsBedrockModelsDevModels } from './bedrock-models';
+import { fetchModelListJson } from './fetch-model-list';
 import { parseGcpVertexModelsDevModels } from './vertex-models';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
@@ -67,13 +68,8 @@ function openAICompatibleFetcher(options: {
   return {
     providerId: options.providerId,
     async fetch() {
-      const response = await fetch(options.url);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
-        );
-      }
-      return parseOpenAICompatibleProviderModels(await response.json());
+      const body = await fetchModelListJson(options.url, `${options.label} models`);
+      return parseOpenAICompatibleProviderModels(body);
     },
   };
 }
@@ -198,16 +194,9 @@ function modelsDevFetcher(
       if (!availableModelsUrl) {
         return parseModelsDevProviderModels(entry, providerId);
       }
-      const response = await fetch(availableModelsUrl);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch ${providerId} available models: ${response.status} ${response.statusText}`
-        );
-      }
+      const body = await fetchModelListJson(availableModelsUrl, `${providerId} available models`);
       const availableModelIds = new Set(
-        OpenAICompatibleModelsResponseSchema.parse(await response.json()).data.map(
-          model => model.id
-        )
+        OpenAICompatibleModelsResponseSchema.parse(body).data.map(model => model.id)
       );
       return parseModelsDevProviderModels(entry, providerId, availableModelIds);
     },
@@ -302,9 +291,22 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
   return models.length;
 }
 
-export async function syncDirectByokModels(): Promise<
-  Partial<Record<DirectUserByokInferenceProviderId, number>>
-> {
+export type DirectByokSyncResult = {
+  direct_byok_model_counts: Partial<Record<DirectUserByokInferenceProviderId, number>>;
+  failed_provider_ids: DirectUserByokInferenceProviderId[];
+};
+
+type ProviderSyncOutcome =
+  | { provider_id: DirectUserByokInferenceProviderId; count: number }
+  | { provider_id: DirectUserByokInferenceProviderId; error: Error };
+
+function hasSyncError(
+  outcome: ProviderSyncOutcome
+): outcome is Extract<ProviderSyncOutcome, { error: Error }> {
+  return 'error' in outcome;
+}
+
+export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
   let catalogPromise: Promise<ModelsDevCatalog> | null = null;
   let catalogModelIdsPromise: Promise<ReadonlyMap<string, string>> | null = null;
   const getModelsDevCatalog = () => (catalogPromise ??= fetchModelsDevCatalog());
@@ -315,15 +317,51 @@ export async function syncDirectByokModels(): Promise<
       return catalogModelIdsPromise;
     },
   };
-  const entries = await Promise.all(
-    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
+  const outcomes = await Promise.all(
+    FETCHERS.map(async (fetcher): Promise<ProviderSyncOutcome> => {
+      try {
+        return { provider_id: fetcher.providerId, count: await syncProvider(fetcher, ctx) };
+      } catch (error) {
+        console.error(
+          `[sync-direct-byok-providers] ${fetcher.providerId} failed, keeping the stored list:`,
+          error
+        );
+        return {
+          provider_id: fetcher.providerId,
+          error: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
+    })
   );
-  return Object.fromEntries(entries);
+
+  const direct_byok_model_counts: Partial<Record<DirectUserByokInferenceProviderId, number>> = {};
+  const failed_provider_ids: DirectUserByokInferenceProviderId[] = [];
+  for (const outcome of outcomes) {
+    if (hasSyncError(outcome)) {
+      failed_provider_ids.push(outcome.provider_id);
+    } else {
+      direct_byok_model_counts[outcome.provider_id] = outcome.count;
+    }
+  }
+
+  // Nothing was skipped in favour of anything else, so the run itself failed.
+  const [firstFailure] = outcomes.filter(hasSyncError);
+  if (firstFailure && failed_provider_ids.length === outcomes.length) {
+    throw firstFailure.error;
+  }
+
+  return { direct_byok_model_counts, failed_provider_ids };
 }
 
 export async function syncAndStoreDirectByokProviders() {
   const startTime = performance.now();
-  const direct_byok_model_counts = await syncDirectByokModels();
+  const { direct_byok_model_counts, failed_provider_ids } = await syncDirectByokModels();
+  if (failed_provider_ids.length > 0) {
+    console.warn(
+      '[sync-direct-byok-providers] providers without a fresh list:',
+      failed_provider_ids
+    );
+  }
   console.log('[sync-direct-byok-providers] model counts:', direct_byok_model_counts);
   const completed_at = await recordSyncCompleted('direct_byok');
   const counts = Object.values(direct_byok_model_counts);
@@ -332,6 +370,7 @@ export async function syncAndStoreDirectByokProviders() {
     total_providers: counts.length,
     total_models: counts.reduce((sum, count) => sum + count, 0),
     direct_byok_model_counts,
+    failed_provider_ids,
     time: performance.now() - startTime,
   };
 }

@@ -417,6 +417,7 @@ describe('syncDirectByokModels database snapshots', () => {
   let chutesModelsDevModels: Record<string, { id: string } & Record<string, unknown>>;
   let chutesModels: Array<{ id: string }>;
   let fetchAvailableModels: () => Promise<Response>;
+  let availableModelsRedirect: Response | null;
 
   beforeEach(async () => {
     await db
@@ -432,6 +433,7 @@ describe('syncDirectByokModels database snapshots', () => {
     openRouterModels = {};
     chutesModelsDevModels = {};
     chutesModels = [];
+    availableModelsRedirect = null;
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
@@ -452,6 +454,9 @@ describe('syncDirectByokModels database snapshots', () => {
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {
+        return availableModelsRedirect ?? fetchAvailableModels();
+      }
+      if (input === 'https://integrate.api.nvidia.com/v1/models-v2') {
         return fetchAvailableModels();
       }
       if (input === 'https://opencode.ai/zen/go/v1/models') {
@@ -486,12 +491,13 @@ describe('syncDirectByokModels database snapshots', () => {
 
   test('persists the normalized download, defaults, and reasoning options in PostgreSQL', async () => {
     const startedAt = Date.now();
-    const counts = await syncDirectByokModels();
+    const { direct_byok_model_counts: counts, failed_provider_ids } = await syncDirectByokModels();
     const snapshot = await readSnapshot();
 
     expect(snapshot.models).toStrictEqual(normalizedModels);
     expect(Date.parse(snapshot.synced_at)).toBeGreaterThanOrEqual(startedAt);
     expect(Date.parse(snapshot.synced_at)).toBeLessThanOrEqual(Date.now());
+    expect(failed_provider_ids).toStrictEqual([]);
     expect(counts[providerId]).toBe(normalizedModels.length);
     expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
       normalizedModels.length
@@ -560,7 +566,7 @@ describe('syncDirectByokModels database snapshots', () => {
     };
     const startedAt = Date.now();
 
-    const counts = await syncDirectByokModels();
+    const { direct_byok_model_counts: counts } = await syncDirectByokModels();
     const snapshot = await readSnapshot();
 
     expect(snapshot.models).toStrictEqual([
@@ -581,7 +587,7 @@ describe('syncDirectByokModels database snapshots', () => {
     await syncDirectByokModels();
     await backdateSnapshot();
     fetchAvailableModels = async () => Response.json({ data: [] });
-    const counts = await syncDirectByokModels();
+    const { direct_byok_model_counts: counts } = await syncDirectByokModels();
     const snapshot = await readSnapshot();
 
     expect(snapshot.models).toStrictEqual([]);
@@ -611,7 +617,7 @@ describe('syncDirectByokModels database snapshots', () => {
       },
     };
 
-    const counts = await syncDirectByokModels();
+    const { direct_byok_model_counts: counts } = await syncDirectByokModels();
     const [snapshot] = await db
       .select()
       .from(direct_byok_model_lists)
@@ -623,19 +629,59 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(counts['opencode-go']).toBe(1);
   });
 
-  test('rejects an upstream failure without replacing the last successful snapshot', async () => {
+  test('keeps a failed provider list and still refreshes the other providers', async () => {
     await syncDirectByokModels();
     await backdateSnapshot();
     const previousSnapshot = await readSnapshot();
     fetchAvailableModels = async () => {
       return new Response(null, { status: 503, statusText: 'Service Unavailable' });
     };
+    chutesModels = [{ id: 'chutes/refreshed' }];
 
-    await expect(syncDirectByokModels()).rejects.toThrow(
-      'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
-    );
+    const { direct_byok_model_counts: counts, failed_provider_ids } = await syncDirectByokModels();
 
+    expect(failed_provider_ids).toStrictEqual([providerId]);
+    expect(counts[providerId]).toBeUndefined();
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+    const [chutes] = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, 'chutes-byok'));
+    expect(chutes.models.map(model => model.id)).toStrictEqual(['chutes/refreshed']);
+  });
+
+  test('keeps the stored list when the provider endpoint redirects to another origin', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    const previousSnapshot = await readSnapshot();
+    availableModelsRedirect = new Response(null, {
+      status: 302,
+      headers: { location: 'https://nvidia.invalid/v1/models' },
+    });
+
+    const { direct_byok_model_counts: counts, failed_provider_ids } = await syncDirectByokModels();
+
+    expect(failed_provider_ids).toStrictEqual([providerId]);
+    expect(counts[providerId]).toBeUndefined();
+    expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  test('follows a redirect that stays on the provider origin and stores the new list', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    availableModelsRedirect = new Response(null, {
+      status: 307,
+      headers: { location: 'https://integrate.api.nvidia.com/v1/models-v2' },
+    });
+    providerModels = { 'nvidia/after-redirect': { id: 'nvidia/after-redirect' } };
+
+    const { direct_byok_model_counts: counts, failed_provider_ids } = await syncDirectByokModels();
+    const snapshot = await readSnapshot();
+
+    expect(failed_provider_ids).toStrictEqual([]);
+    expect(counts[providerId]).toBe(1);
+    expect(snapshot.models.map(model => model.id)).toStrictEqual(['nvidia/after-redirect']);
+    expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
   });
 
   describe('syncAndStoreDirectByokProviders', () => {
@@ -671,13 +717,28 @@ describe('syncDirectByokModels database snapshots', () => {
       expect(new Date(state.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
     });
 
-    test('does not record completion when a provider fetch fails', async () => {
+    test('reports the provider whose list could not be refreshed and records completion', async () => {
       fetchAvailableModels = async () =>
         new Response(null, { status: 503, statusText: 'Service Unavailable' });
 
-      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
-        'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
-      );
+      const summary = await syncAndStoreDirectByokProviders();
+
+      expect(summary.failed_provider_ids).toStrictEqual([providerId]);
+      expect(summary.direct_byok_model_counts[providerId]).toBeUndefined();
+      expect(summary.total_models).toBe(0);
+      expect(
+        new Date((await readSyncState()).direct_byok_last_completed_at ?? '').toISOString()
+      ).toBe(summary.completed_at);
+    });
+
+    test('does not record completion when every provider fails', async () => {
+      jest
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(
+          async () => new Response(null, { status: 503, statusText: 'Service Unavailable' })
+        );
+
+      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(/Failed to fetch/);
 
       expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
     });

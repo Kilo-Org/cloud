@@ -6,6 +6,12 @@ import {
   type ReasoningOption,
 } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { fetchModelListJson } from './fetch-model-list';
+
+// The catalog is a few megabytes today; the cap only has to be generous enough to ride out
+// catalog growth and tight enough to bound what the sync runtime can be made to buffer.
+const MODELS_DEV_CATALOG_MAX_BYTES = 16 * 1024 * 1024;
+const MODELS_DEV_CATALOG_TIMEOUT_MS = 30_000;
 
 export const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
@@ -50,13 +56,11 @@ export const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 export type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 export async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
-  const response = await fetch('https://models.dev/api.json');
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-    );
-  }
-  return ModelsDevCatalogSchema.parse(await response.json());
+  const body = await fetchModelListJson('https://models.dev/api.json', 'models.dev catalog', {
+    maxBytes: MODELS_DEV_CATALOG_MAX_BYTES,
+    timeoutMs: MODELS_DEV_CATALOG_TIMEOUT_MS,
+  });
+  return ModelsDevCatalogSchema.parse(body);
 }
 
 export type RawModel = {

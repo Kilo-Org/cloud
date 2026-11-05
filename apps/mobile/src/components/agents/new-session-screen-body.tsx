@@ -101,7 +101,7 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { remoteStartPlanRefusal } from '@/lib/remote-spawn-admission';
+import { startPlanRefusal } from '@/lib/remote-spawn-admission';
 import {
   followLiveRunOn,
   PRESELECT_CLOUD_RUN_ON,
@@ -1031,17 +1031,18 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
-  // The organization subscription gate's own verdict for a remote start under
-  // the selected account. `organizations.list` carries the predicate the
-  // server middleware classifies with, so the form reads the verdict instead
-  // of re-deriving a plan. Read while rendering, before the press: a lapsed
-  // organization never looks startable, its explanation sits under the
-  // composer, and Start keeps the disabled style until the plan (or the
-  // account) changes. A personal start, an unsettled list, and a list without
-  // the organization stay allowed — the app never blocks a start on a verdict
-  // it does not have.
-  const planRefusal = remoteStartPlanRefusal({
-    isRemoteTargetSelected,
+  // The organization subscription gate's own verdict for a start under the
+  // selected account, whatever the run target. `organizations.list` carries the
+  // predicate the server middleware classifies with, so the form reads the
+  // verdict instead of re-deriving a plan. Read while rendering, before the
+  // press: a lapsed organization never looks startable, its explanation sits
+  // under the composer, and Start keeps the disabled style until the plan (or
+  // the account) changes. The Cloud Agent create is an organization mutation
+  // that the same gate refuses, so the explanation precedes that rejection too;
+  // the footer therefore names no other blocker while it shows. A personal
+  // start, an unsettled list, and a list without the organization stay allowed
+  // — the app never blocks a start on a verdict it does not have.
+  const planRefusal = startPlanRefusal({
     organizationId,
     organizations: useOrganizationsList().data,
   });

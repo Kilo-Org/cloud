@@ -30,6 +30,7 @@ const harnessBuildAction = load(
 const extension = JSON.parse(
   readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8')
 );
+const web = JSON.parse(readFileSync(new URL('../apps/web/package.json', import.meta.url), 'utf8'));
 const rootScript = fileURLToPath(new URL('./typecheck-all.sh', import.meta.url));
 const harnessBuild = 'pnpm --filter @kilocode/harness-sdk run build';
 const pnpmCleanup = fileURLToPath(
@@ -280,11 +281,6 @@ const harnessBuildGuards = [
     'lint-groups',
     "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
   ],
-  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
-    'kilo-app-ci.yml',
-    name,
-    undefined,
-  ]),
   ...['ios', 'android'].map(name => [
     'mobile-native-build.yml',
     name,
@@ -328,6 +324,82 @@ test('every consumer job restores or builds the harness SDK through the action',
   }
 });
 
+// The mobile suite needs one harness SDK build, not one per job: the build
+// resolves the SDK's whole program and, on a miss, compiles the typia
+// transform. Eleven jobs did that concurrently, and actions/cache saves at the
+// end of a job, so the eight shards could not hit each other's save. The shared
+// `prepare` job builds once and every suite job downloads the result.
+const sdkDist = 'packages/harness-sdk/dist';
+const sdkArtifact = 'harness-sdk-dist';
+
+test('kilo-app CI builds the harness SDK once and every suite downloads it', () => {
+  const jobs = workflows['kilo-app-ci.yml'].jobs;
+  const prepare = jobs.prepare;
+  assert.ok(prepare, 'the shared build job exists');
+  assert.equal(prepare.needs, 'mobile-changes', 'the shared build waits for change detection');
+  assert.equal(prepare.if, "needs.mobile-changes.outputs.mobile == 'true'");
+  const prepareSteps = prepare.steps;
+  const prepareInstall = prepareSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = prepareSteps.findIndex(
+    step => step.uses === './.github/actions/harness-sdk-build'
+  );
+  const uploadIndex = prepareSteps.findIndex(step =>
+    step.uses?.startsWith('actions/upload-artifact@')
+  );
+  assert.ok(prepareInstall >= 0 && actionIndex > prepareInstall, 'prepare builds after install');
+  assert.ok(uploadIndex > actionIndex, 'prepare uploads what it built');
+  const upload = prepareSteps[uploadIndex];
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.name, sdkArtifact);
+  assert.equal(upload.with.path, sdkDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['typecheck', 'lint', 'check-unused', 'mobile-test']) {
+    const job = jobs[name];
+    assert.ok([job.needs ?? []].flat().includes('prepare'), `${name} waits for the build`);
+    const steps = job.steps;
+    assert.deepEqual(
+      steps
+        .filter(step => step.uses === './.github/actions/harness-sdk-build')
+        .map(step => step.name),
+      [],
+      `${name} never rebuilds the harness SDK`
+    );
+    assert.deepEqual(
+      steps.filter(step => step.run === harnessBuild).map(step => step.name),
+      [],
+      `${name} never builds the harness SDK outside the action`
+    );
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    const downloadIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/download-artifact@')
+    );
+    assert.ok(
+      installIndex >= 0 && downloadIndex > installIndex,
+      `${name} downloads the build after install`
+    );
+    const download = steps[downloadIndex];
+    assert.match(
+      download.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(download.with.name, sdkArtifact, `${name} takes the shared artifact`);
+    assert.equal(download.with.path, sdkDist, `${name} restores it where the build writes`);
+  }
+
+  // A failed build leaves the suite jobs skipped, and a skipped required check
+  // passes, so the aggregator must carry the failure.
+  assert.ok(
+    [jobs.test.needs].flat().includes('prepare'),
+    'the required test job fails with the shared build'
+  );
+});
+
 test('the harness SDK action restores dist and builds only on a miss', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
@@ -353,9 +425,95 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
   assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
 });
 
+// One job compiles the tRPC declarations per commit. The typecheck and lint
+// matrices both relied on the same cache key and started together, so a miss
+// compiled the program twice and both jobs raced to save one key. The producer
+// keeps the cache and every consumer downloads its artifact.
+test('one job builds the tRPC declarations and both matrices download them', () => {
+  const trpcAction = './.github/actions/trpc-declarations';
+  const ci = workflows['ci.yml'];
+  const producerName = 'trpc-declarations';
+  const actionUsers = Object.entries(ci.jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, [producerName], 'only the producer builds the declarations');
+
+  const producer = ci.jobs[producerName];
+  assert.equal(producer.needs, 'changes');
+  assert.equal(
+    producer.if,
+    "contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')",
+    'a run that selects neither trpc row must not pay for the producer'
+  );
+  const producerInstall = producer.steps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const producerAction = producer.steps.findIndex(step => step.uses === trpcAction);
+  assert.ok(producerInstall >= 0 && producerAction > producerInstall);
+  const upload = producer.steps.find(step =>
+    String(step.uses).startsWith('actions/upload-artifact@')
+  );
+  assert.equal(upload.with.name, 'trpc-declarations');
+  assert.equal(upload.with.path, 'packages/trpc/dist');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error');
+
+  for (const [name, guard] of [
+    ['typecheck-groups', "matrix.group == 'trpc'"],
+    ['lint-groups', "matrix.group == 'trpc'"],
+  ]) {
+    const job = ci.jobs[name];
+    assert.deepEqual(job.needs, ['changes', producerName], `${name} waits for the producer`);
+    assert.match(
+      job.if,
+      /^always\(\) && needs\.changes\.result == 'success' && needs\.changes\.outputs\./,
+      `${name} runs even when the producer is skipped or failed`
+    );
+    assert.deepEqual(
+      job.steps.filter(step => step.uses === trpcAction),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloadIndex = job.steps.findIndex(step =>
+      String(step.uses).startsWith('actions/download-artifact@')
+    );
+    const download = job.steps[downloadIndex];
+    assert.equal(download.with.name, 'trpc-declarations');
+    assert.equal(download.with.path, 'packages/trpc/dist');
+    assert.equal(download.if, guard);
+    const installIndex = job.steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
+  }
+
+  // The trpc typecheck row consumes the declarations, so its group script and
+  // apps/web's typecheck skip their own build there.
+  const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
+    (step.run ?? '').startsWith('scripts/typecheck-all.sh')
+  );
+  assert.equal(
+    typecheck.env.KILO_TYPECHECK_TRPC_BUILT,
+    "${{ matrix.group == 'trpc' && '1' || '' }}"
+  );
+
+  // The required aggregators keep their needs; a failed download fails the
+  // group they already wait for.
+  assert.deepEqual(ci.jobs.typecheck.needs, ['changes', 'typecheck-groups']);
+  assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups']);
+});
+
 function runTypecheck(
   t,
-  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
+  {
+    root = false,
+    changes = '',
+    buildExit = 0,
+    checkExit = 0,
+    built = '',
+    selected = '',
+    script = extension.scripts.typecheck,
+  } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -402,9 +560,7 @@ if (name === 'git') {
   writeFileSync(log, '');
   const result = spawnSync(
     root ? 'bash' : 'sh',
-    root
-      ? [rootScript, ...(changes ? ['--changes-only'] : [])]
-      : ['-c', extension.scripts.typecheck],
+    root ? [rootScript, ...(changes ? ['--changes-only'] : [])] : ['-c', script],
     {
       cwd: dir,
       encoding: 'utf8',
@@ -444,6 +600,23 @@ test('a failed standalone tRPC build prevents extension compilation', t => {
 
 test('extension compiler errors still fail when tRPC is already built', t => {
   assert.equal(runTypecheck(t, { built: '1', checkExit: 9 }).status, 9);
+});
+
+// apps/web typechecks against the built declarations the same way: CI hands
+// them over as an artifact, so the flag must stop the script rebuilding them.
+test('web checks reuse tRPC built by the producer job', t => {
+  const tsgo = 'tsgo --noEmit --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo';
+  const reused = runTypecheck(t, { script: web.scripts.typecheck, built: '1' });
+  assert.equal(reused.status, 0);
+  assert.deepEqual(reused.commands, [tsgo]);
+
+  const standalone = runTypecheck(t, { script: web.scripts.typecheck });
+  assert.equal(standalone.status, 0);
+  assert.deepEqual(standalone.commands, ['pnpm --filter @kilocode/trpc run build', tsgo]);
+
+  const failedBuild = runTypecheck(t, { script: web.scripts.typecheck, buildExit: 7 });
+  assert.equal(failedBuild.status, 7);
+  assert.deepEqual(failedBuild.commands, ['pnpm --filter @kilocode/trpc run build']);
 });
 
 const workspaceFilters = '--filter !kilocode-monorepo --filter !web --filter !@kilocode/trpc';

@@ -2,7 +2,7 @@ import { inArray, isNotNull } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import type { Principal, SessionState } from '../../protocol';
-import { raise, toState, update, visible, type Db, type Meta } from './session';
+import { toState, update, visible, type Db, type Meta } from './session';
 import { SWEEP_MARGIN_MS } from './blob';
 
 /**
@@ -18,9 +18,6 @@ export function tombstone(
 ): { state: SessionState; meta: Meta; created: boolean } {
   const meta = visible(db, principal, sessionID);
   if (meta.deleted_at !== null) return { state: toState(db, meta), meta, created: false };
-  if (meta.creator_id !== principal.userID) {
-    raise('creator_mismatch', 'Only the session creator can delete this session');
-  }
 
   // Primary key columns are never null, so these predicates select every row.
   db.delete(entities).where(isNotNull(entities.kind)).run();

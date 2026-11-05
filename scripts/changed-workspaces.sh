@@ -5,6 +5,10 @@ set -euo pipefail
 # Excludes the root package and packages listed in --exclude arguments. Each
 # --include dir is selected as if it had file changes.
 #
+# A changed document or neutral root location selects nothing: only paths that a
+# check reads count (scripts/affected-workspaces.mjs). Pass --include for a
+# suite that reads a document as data (the test_only_dirs of that detector).
+#
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
@@ -62,7 +66,8 @@ fi
 
 force_all=false
 dependent_dirs_file=$(mktemp)
-trap 'rm -f "$dependent_dirs_file"' EXIT
+changed_files_file=$(mktemp)
+trap 'rm -f "$dependent_dirs_file" "$changed_files_file"' EXIT
 if [ -n "$base" ]; then
   if ! git diff --quiet "$base" -- pnpm-lock.yaml pnpm-workspace.yaml 'patches/**'; then
     if ! node scripts/changed-dependencies.mjs "$base" > "$dependent_dirs_file"; then
@@ -72,10 +77,16 @@ if [ -n "$base" ]; then
     fi
   fi
 
+  # The paths a workspace test can need. A document or a neutral root location
+  # is not one: the same list decides which workspaces lint and typecheck
+  # (scripts/affected-workspaces.mjs). A suite that reads a document as data is
+  # selected with --include instead.
+  git diff --name-only "$base" | node scripts/affected-workspaces.mjs --filter-neutral > "$changed_files_file"
+
   # List files changed under packages/**. Anything that doesn't match
-  # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
+  # `packages/<name>/` (e.g. `packages/index.json`) is a loose file with no
   # single owning package — fall back to force_all.
-  pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
+  pkg_changes=$(grep '^packages/' "$changed_files_file" || true)
   if [ -n "$pkg_changes" ]; then
     loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
     if [ -n "$loose" ]; then
@@ -148,7 +159,7 @@ for dir in $workspace_dirs; do
     if [ -s "$dependent_dirs_file" ] && grep -qxF "$dir" "$dependent_dirs_file"; then
       :
     else
-      changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
+      changed_file=$(awk -v prefix="$dir/" 'index($0, prefix) == 1 { print; exit }' "$changed_files_file")
       [ -n "$changed_file" ] || continue
     fi
   fi

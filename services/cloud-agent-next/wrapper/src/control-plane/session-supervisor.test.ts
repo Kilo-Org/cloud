@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { ActivitySnapshotMessage } from './harness-activity.js';
 import {
   createSessionSupervisor,
   type ExecutionFailure,
@@ -250,9 +251,18 @@ describe('native session supervision', () => {
           retry: { message: 'Rate limit exceeded' },
           messages: [
             {
-              info: { id: 'assistant-root', role: 'assistant', time: { created: 1_000 } },
+              sessionId: 'root',
+              id: 'assistant-root',
+              role: 'assistant',
+              time: { created: 1_000 },
               parts: [
-                { id: 'text', messageID: 'assistant-root', type: 'text', text: 'partial output' },
+                {
+                  sessionId: 'root',
+                  messageId: 'assistant-root',
+                  id: 'text',
+                  kind: 'text',
+                  text: 'partial output',
+                },
               ],
             },
           ],
@@ -582,9 +592,12 @@ describe('native session supervision', () => {
         time: { created: 1, completed: 2 },
       },
     });
-    const completed = (id: string) => ({
-      info: { id, role: 'assistant', time: { created: 1, completed: 2 } },
-      parts: [{ id: `${id}-text`, messageID: id, type: 'text', text: 'old' }],
+    const completed = (id: string): ActivitySnapshotMessage => ({
+      sessionId: 'root',
+      id,
+      role: 'assistant',
+      time: { created: 1, completed: 2 },
+      parts: [{ sessionId: 'root', messageId: id, id: `${id}-text`, kind: 'text', text: 'old' }],
     });
     f.supervisor.reconcile(
       [{ ...observation(), messages: [completed('history')] }],
@@ -616,9 +629,18 @@ describe('native session supervision', () => {
       ...observation(),
       messages: [
         {
-          info: { id: 'recovered', role: 'assistant', time: { created: 10_000 } },
+          sessionId: 'root',
+          id: 'recovered',
+          role: 'assistant' as const,
+          time: { created: 10_000 },
           parts: [
-            { id: 'recovered-text', messageID: 'recovered', type: 'text', text: 'new output' },
+            {
+              sessionId: 'root',
+              messageId: 'recovered',
+              id: 'recovered-text',
+              kind: 'text' as const,
+              text: 'new output',
+            },
           ],
         },
       ],
@@ -671,14 +693,22 @@ describe('native session supervision', () => {
       ...observation('root', 'idle'),
       messages: [
         {
-          info: { id: 'assistant-root', role: 'assistant' },
+          sessionId: 'root',
+          id: 'assistant-root',
+          role: 'assistant',
           parts: [
             {
+              sessionId: 'root',
+              messageId: 'assistant-root',
               id: 'tool',
-              messageID: 'assistant-root',
-              type: 'tool',
-              tool: 'bash',
-              state: { status: 'running', metadata: { output: 'old' } },
+              kind: 'tool',
+              tool: {
+                callId: 'call',
+                name: 'bash',
+                status: 'running',
+                interactive: false,
+                output: 'old',
+              },
             },
           ],
         },

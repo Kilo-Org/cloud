@@ -33,6 +33,7 @@ export function track(db: Db, input: unknown): Result<null> {
       tenant_type: tenant.type,
       tenant_id: tenant.id,
       session_id: sessionID,
+      created_at: Date.now(),
     })
     .onConflictDoNothing()
     .run();

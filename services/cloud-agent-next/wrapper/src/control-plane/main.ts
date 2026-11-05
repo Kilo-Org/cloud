@@ -37,7 +37,7 @@ import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
-import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
+import { createHistoryRequests } from './history-requests.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -176,7 +176,13 @@ export function createControlPlaneLifecycle(
 export function createControlPlaneSessionHost(options: {
   runtime: Omit<
     KiloRuntimesOptions,
-    'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange' | 'onMemoryHold'
+    | 'onEvent'
+    | 'onHarnessActivity'
+    | 'onRestart'
+    | 'onUnavailable'
+    | 'onDeadline'
+    | 'onActivityChange'
+    | 'onMemoryHold'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
@@ -185,6 +191,7 @@ export function createControlPlaneSessionHost(options: {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
     onEvent: event => turns?.observeKiloEvent(event),
+    onHarnessActivity: event => turns?.observeActivity(event),
     onActivityChange: key => turns?.refreshActivity(key),
     onDeadline: (identity, reason, retry, key, stopped) =>
       turns?.onNativeDeadline(identity, reason, retry, key, stopped),
@@ -218,6 +225,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -298,6 +306,9 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
+        return;
+      case 'history.result':
+        deps.historyRequests?.current?.handle(frame);
         return;
       case 'terminal.create':
       case 'terminal.resize':
@@ -389,6 +400,8 @@ export async function runControlPlaneWrapper(
   const kiloRequestsRef: {
     current?: ReturnType<typeof createControlPlaneKiloRequests>;
   } = {};
+  // Wrapper-initiated Cloud history reads answer over the same connection.
+  const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
     runtime: {
@@ -424,13 +437,19 @@ export async function runControlPlaneWrapper(
       worktreeChanges: worktreeChangesRef,
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
+      historyRequests: historyRequestsRef,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
     onShutdown: reason => shutdownRef.current?.(reason),
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
-    onDisconnected: reason => logToFile(`control-plane disconnected: ${reason}`),
+    onDisconnected: reason => {
+      historyRequestsRef.current?.disconnected();
+      logToFile(`control-plane disconnected: ${reason}`);
+    },
   });
+  const historyRequests = createHistoryRequests({ send: frame => connection.send(frame) });
+  historyRequestsRef.current = historyRequests;
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
     wrapperId: connection.wrapperId,
@@ -457,6 +476,7 @@ export async function runControlPlaneWrapper(
     },
     // Route preparation output (progress/ready/failed) out over the connection.
     emit: frame => connection.send(frame),
+    readHistoryPage: request => historyRequests.readPage(request),
     log: logToFile,
     inheritedEnv: env,
     spawnSetup: createSetupSpawn(workload),
@@ -470,9 +490,7 @@ export async function runControlPlaneWrapper(
   worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({
     emit: frame => connection.send(frame),
     clients: directory =>
-      runtimes
-        .runtimesForDirectory(directory)
-        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
+      runtimes.runtimesForDirectory(directory).map(runtime => runtime.client.worktree),
     retireDirectory: async directory => {
       await turnsRef.current?.cancelInterruptedFinalizations(directory);
       await runtimes.retireDirectory(directory);
@@ -485,7 +503,7 @@ export async function runControlPlaneWrapper(
   kiloRequestsRef.current = createControlPlaneKiloRequests({
     emit: frame => connection.send(frame),
     preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
-    clientFor: key => liveRuntimeClient(runtimes.get(key)) ?? null,
+    clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({

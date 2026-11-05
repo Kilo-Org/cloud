@@ -52,6 +52,11 @@ export const NATIVE_FACADE_FENCE_EVENT = 'kilo.native.fence';
  * whole, exactly like the existing `/stream` reconciliation.
  */
 export const NATIVE_MATERIALIZED_EVENT_TYPES = [
+  'session.created',
+  'session.updated',
+  'session.status',
+  'conversation.source',
+  'conversation.message.updated',
   'message.updated',
   'message.part.updated',
   'message.removed',

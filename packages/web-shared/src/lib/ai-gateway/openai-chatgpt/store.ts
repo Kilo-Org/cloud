@@ -258,23 +258,53 @@ export async function readOpenAiChatGptUsageLimit(
 }
 
 /**
- * Records the plan limit OpenAI reported on a delegated request. A missing row
- * is a no-op: the connection was disconnected while the request was in flight,
- * and recreating the row would resurrect a credential nobody owns.
+ * Holds the owner's row lock and runs `write` only while the stored connection
+ * still holds `accessToken`, the credential that served the request which
+ * produced the report.
+ *
+ * A request resolves its token, then the response arrives later. A reconnect in
+ * between replaces the credential and rewrites the row, so an owner-scoped write
+ * would land on a connection that never reported anything. A missing row is a
+ * no-op: the connection was disconnected while the request was in flight, and
+ * recreating the row would resurrect a credential nobody owns.
+ */
+async function withConnectionHoldingToken(
+  owner: OpenAiChatGptOwner,
+  accessToken: string,
+  write: (tx: OpenAiChatGptDatabase, connection: OpenAiChatGptConnection) => Promise<void>
+): Promise<void> {
+  await db.transaction(async tx => {
+    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+    if (!row) return;
+    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+    if (!connection || connection.access_token !== accessToken) return;
+    await write(tx, connection);
+  });
+}
+
+/**
+ * Records the plan limit OpenAI reported on a delegated request. The report is
+ * applied only while `accessToken` is still the owner's stored credential: once
+ * a reconnect has replaced it and cleared the recorded limit, a late report from
+ * the replaced credential must not restore a limit the fresh connection never
+ * reported.
  */
 export async function recordOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,
+  accessToken: string,
   limit: ChatGptUsageLimit
 ): Promise<void> {
-  await db
-    .update(openai_chatgpt_connections)
-    .set({
-      usage_limit_reached_at: new Date().toISOString(),
-      usage_limit_resets_at:
-        limit.resetsAt === null ? null : new Date(limit.resetsAt).toISOString(),
-      usage_limit_error_code: limit.code,
-    })
-    .where(openAiChatGptOwnerWhere(owner));
+  await withConnectionHoldingToken(owner, accessToken, async tx => {
+    await tx
+      .update(openai_chatgpt_connections)
+      .set({
+        usage_limit_reached_at: new Date().toISOString(),
+        usage_limit_resets_at:
+          limit.resetsAt === null ? null : new Date(limit.resetsAt).toISOString(),
+        usage_limit_error_code: limit.code,
+      })
+      .where(openAiChatGptOwnerWhere(owner));
+  });
 }
 
 /**
@@ -286,22 +316,29 @@ export async function recordOpenAiChatGptUsageLimit(
  * window instead would keep the notice up after the person can work again.
  *
  * The update matches only a row that still carries a record, so a success on a
- * connection that never hit a limit writes nothing.
+ * connection that never hit a limit writes nothing. The report is applied only
+ * while `accessToken` is still the owner's stored credential, so a late success
+ * from a replaced credential cannot drop the limit its own connection recorded.
  */
-export async function clearOpenAiChatGptUsageLimit(owner: OpenAiChatGptOwner): Promise<void> {
-  await db
-    .update(openai_chatgpt_connections)
-    .set({
-      usage_limit_reached_at: null,
-      usage_limit_resets_at: null,
-      usage_limit_error_code: null,
-    })
-    .where(
-      and(
-        openAiChatGptOwnerWhere(owner),
-        isNotNull(openai_chatgpt_connections.usage_limit_reached_at)
-      )
-    );
+export async function clearOpenAiChatGptUsageLimit(
+  owner: OpenAiChatGptOwner,
+  accessToken: string
+): Promise<void> {
+  await withConnectionHoldingToken(owner, accessToken, async tx => {
+    await tx
+      .update(openai_chatgpt_connections)
+      .set({
+        usage_limit_reached_at: null,
+        usage_limit_resets_at: null,
+        usage_limit_error_code: null,
+      })
+      .where(
+        and(
+          openAiChatGptOwnerWhere(owner),
+          isNotNull(openai_chatgpt_connections.usage_limit_reached_at)
+        )
+      );
+  });
 }
 
 /**
@@ -351,11 +388,7 @@ export async function markOpenAiChatGptNotEligible(
   refusedAccessToken: string,
   message: string
 ): Promise<void> {
-  await db.transaction(async tx => {
-    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
-    if (!row) return;
-    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
-    if (!connection || connection.access_token !== refusedAccessToken) return;
-    await markOpenAiChatGptConnectionErrored(tx, owner, connection, message);
-  });
+  await withConnectionHoldingToken(owner, refusedAccessToken, (tx, connection) =>
+    markOpenAiChatGptConnectionErrored(tx, owner, connection, message)
+  );
 }

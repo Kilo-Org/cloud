@@ -1,3 +1,4 @@
+import { deleteStepUpRowsForUser } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
@@ -164,6 +165,7 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
+import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
@@ -274,6 +276,7 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -642,6 +645,11 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
+  recordWatchwoodSignupShadow({
+    operationId,
+    provider: args.provider,
+    assessment: trackingContext?.watchwood,
+  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -1286,6 +1294,9 @@ export async function anonymizeCloudUserData(
   // expire. Consumed tickets are removed too: their `kilo_user_id` still names
   // the deleted account.
   await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  // Step-up challenges and proofs are PII and session-bound; a deleted account
+  // must not leave either behind.
+  await deleteStepUpRowsForUser(tx, userId);
 
   // Remove from organizations
   await tx

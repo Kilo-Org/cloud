@@ -917,6 +917,8 @@ export const AdminActionAuditAction = z.enum([
   'email_test.send',
   'admin.platform_access.set',
   'admin.permissions.set',
+  'admin.step_up.verified',
+  'admin.passkey.enrolled',
   'cloud_agent_session.messages.view',
   'cloud_agent_session.api_history.view',
   'webhook_trigger.request_logs.view',

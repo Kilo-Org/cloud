@@ -78,9 +78,9 @@ Sandbox DO.
 | `WORKSPACE_ARTIFACT_RETENTION_MS` | 14 days | From the entry's last update |
 | `WORKSPACE_ARTIFACT_EXCLUDED_SEGMENTS` | `node_modules`, `__pycache__`, `venv`, plus any segment starting with `.` | Excluded paths are never published, deleted, or counted |
 
-Before raising the per-file cap, confirm the account's Worker ingress limit.
-Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
-(`docs/control-plane.md` records only 8 MiB transfers as verified).
+Keep the per-file cap at 50 MiB for V1, regardless of the account's higher
+Worker ingress allowance. Assume Vercel forwarding supports this size; this is
+a planning assumption, not a verified result. Vercel BYOC is not live.
 
 ## 1. Generalize The Existing Sandbox Upload Channel
 
@@ -831,12 +831,13 @@ Run focused formatting, type checks, and tests for
 | Exclusions | Dot-segments, `node_modules`, `__pycache__`, `venv` |
 | Environment snapshot output | No special handling; setup is not expected to write there |
 | Grant renewal ownership | Built here, for logs and artifacts |
+| Per-file cap | 50 MiB for V1; no higher cap planned |
+| Vercel forwarding | Assume support for 50 MiB; not yet verified |
 
 ## Open Questions
 
-1. **Worker ingress limit.** What is the account's limit? It decides whether the
-   50 MiB cap can be raised.
-2. **Vercel at 50 MiB.** Verify forwarding before Vercel BYOC launches.
+None remaining for V1. Vercel end-to-end verification remains deferred, not a
+design blocker.
 
 ## Implementation Order
 

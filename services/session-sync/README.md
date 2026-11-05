@@ -220,8 +220,8 @@ and split batches exceeding total complexity, even when their byte size is small
 Parsing occurs only inside the serialized write transaction; a queued write does
 not retain a parsed tree while tenant admission awaits I/O. Before its first await,
 a batch reserves `body.length * 2` bytes and one call slot, including active work.
-The 4 MiB / eight-call admission cap returns retryable `rate_limited` with `retryAt`
-when full, and releases reservations in `finally` on success, typed rejection, or
+The 4 MiB / eight-call admission cap returns retryable `service_overloaded` with
+`Retry-After: 3` and `retryAt` when full, and releases reservations in `finally` on success, typed rejection, or
 an exception. These are deterministic request/write-queue bounds, not a claim
 that arbitrary concurrent reads, runtime internals, or an entire production
 isolate have a measured absolute memory ceiling.
@@ -382,6 +382,10 @@ counts without wrapping streams. JSON responses declare their exact UTF-8 length
 Known-length responses emit when ready; their total ms excludes later body delivery.
 Unknown-length streams count consumed bytes and emit on completion or cancellation.
 DO RPC duration includes its internal R2 work; these latency fields are not additive.
+For entity pages, DO RPC ms ends when the stream is returned; it excludes later
+page encoding and delivery. Unknown-length page total ms covers consumed body
+delivery, including backpressure. Neither latency field is a DO CPU measurement;
+the boundary profiler above measures the complete page operation for capacity review.
 Metrics do not buffer blobs or page bodies or record user IDs, session IDs, hashes,
 credentials, or content. Tests can omit the Analytics Engine binding.
 

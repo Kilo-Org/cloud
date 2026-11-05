@@ -388,9 +388,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       this.pendingBatchBytes + retainedBytes > LIMITS.batchQueueBytes ||
       this.pendingBatches >= LIMITS.batchQueueRequests
     ) {
-      return fail('rate_limited', 'The session batch queue is full', {
-        retryAt: Date.now() + 1000,
-      });
+      return overloaded();
     }
     this.pendingBatchBytes += retainedBytes;
     this.pendingBatches++;

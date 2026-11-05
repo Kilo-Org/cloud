@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { app } from './app';
 import { getSessionSyncDOStub } from './dos/SessionSyncDO';
 import type { Env } from './env';
-import { client, grant, newSessionID, personal, testEnv } from '../test/helpers';
+import { batch, client, grant, newSessionID, personal, testEnv } from '../test/helpers';
 
 const overloads = [
   () => Object.assign(new Error('Synthetic overload'), { overloaded: true, retryable: true }),
@@ -114,5 +114,32 @@ describe('overload backpressure at the Worker RPC boundary', () => {
       error: { code: 'service_overloaded', retryAt: expect.any(Number) },
     });
     expect((await api.state(sessionID)).status).toBe(404);
+  });
+
+  it('uses the short overload deadline for a full write queue', async () => {
+    const principal = personal(crypto.randomUUID());
+    const api = client(principal);
+    const sessionID = newSessionID();
+    const source = crypto.randomUUID();
+    expect((await api.register(sessionID, source)).status).toBe(201);
+    const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    await runInDurableObject(stub, instance => {
+      const queue = instance as unknown as { pendingBatches: number };
+      queue.pendingBatches = 8;
+    });
+    try {
+      const response = await api.apply(sessionID, batch(source, 0, 1, []));
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBe('3');
+      expect(await response.json()).toMatchObject({
+        error: { code: 'service_overloaded', retryAt: expect.any(Number) },
+      });
+    } finally {
+      await runInDurableObject(stub, instance => {
+        const queue = instance as unknown as { pendingBatches: number };
+        queue.pendingBatches = 0;
+      });
+    }
+    expect((await api.apply(sessionID, batch(source, 0, 1, []))).status).toBe(200);
   });
 });

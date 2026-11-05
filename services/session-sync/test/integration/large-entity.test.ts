@@ -389,7 +389,7 @@ it('caps queued batch strings and tiny requests, releasing admission after succe
         const denied = await measure(large ? 'queue-bytes' : 'queue-requests', () =>
           instance.applyBatch({ principal, sessionID: id, body })
         );
-        expect(denied).toMatchObject({ ok: false, error: { code: 'rate_limited' } });
+        expect(denied).toMatchObject({ ok: false, error: { code: 'service_overloaded' } });
         if (!denied.ok) expect(denied.error.details?.retryAt).toBeTypeOf('number');
       } finally {
         gate.resolve();

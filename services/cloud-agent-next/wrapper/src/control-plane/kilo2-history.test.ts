@@ -91,6 +91,24 @@ describe('restoreKilo2History', async () => {
     expect(calls).toEqual([]);
   });
 
+  it('creates a fresh session when Cloud has only v1 history', async () => {
+    const { api, calls } = fakeApi();
+    const target = input({
+      first: {
+        kind: 'success',
+        source: { version: 'v1' },
+        info: { id: SESSION_ID },
+        messages: [{ info: { id: 'msg_v1' }, parts: [] }],
+        nextCursor: 'older',
+        omittedItemCount: 0,
+      },
+    });
+    expect(await restoreKilo2History(api, target.value)).toBe(false);
+    expect(target.reads).toEqual([undefined]);
+    expect(target.restored).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
   it('imports every page in creation order and reports the restore', async () => {
     const { api, calls, imported } = fakeApi();
     const first = `msg_${'b'.repeat(26)}`;

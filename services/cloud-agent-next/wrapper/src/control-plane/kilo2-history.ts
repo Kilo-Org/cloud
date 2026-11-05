@@ -42,13 +42,20 @@ export async function restoreKilo2History(
     const data = await input.readHistoryPage(cursor);
     const header = pageSchema
       .omit({ source: true, messages: true })
-      .extend({ messages: z.array(z.unknown()) })
+      .extend({ source: z.object({ version: z.string() }), messages: z.array(z.unknown()) })
       .parse(data);
     if (header.info.id !== input.sessionId)
       throw new Error('Cloud history belongs to another native session');
-    omitted += header.omittedItemCount;
     // A new Cloud chat has no native source until its first runtime opens it.
-    if (!messages.length && !header.messages.length && header.nextCursor === null) break;
+    // v1 history needs a separate migration, so its session starts empty.
+    if (header.source.version !== 'v2') {
+      if (header.messages.length || header.nextCursor !== null)
+        logToFile(
+          `kilo2 restore sessionId=${input.sessionId} phase=unsupported_source version=${header.source.version}`
+        );
+      break;
+    }
+    omitted += header.omittedItemCount;
     const page = pageSchema.parse(data);
     if (page.info.id !== input.sessionId || page.source.session.id !== input.sessionId)
       throw new Error('Cloud history belongs to another native session');

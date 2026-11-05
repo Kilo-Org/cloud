@@ -527,6 +527,113 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('upstream thinking');
   });
 
+  it('keeps a legacy reasoning string when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details hold only encrypted entries', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details fold to no text for reasoning upstreams', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details are blank', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [
+      { type: 'reasoning.text', text: '' },
+      { type: 'reasoning.summary', summary: '' },
+    ];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps an empty target field for a legacy reasoning string when reasoning_details is empty', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = '';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a set target field when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('prefers folded reasoning_details over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
   it('drops the legacy reasoning string for Gemini', () => {
     const request = makeReasoningRequest();
     const assistant = request.body.messages[1] as unknown as Record<string, unknown>;

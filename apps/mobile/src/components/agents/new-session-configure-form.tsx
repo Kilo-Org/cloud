@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -17,9 +17,10 @@ import { NewSessionCloudCreateError } from '@/components/agents/new-session-clou
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
+import { resolveNewSessionPromptLineCount } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
-import { resolveNewSessionInlineSections } from '@/components/agents/new-session-section-layout';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
@@ -29,7 +30,6 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
@@ -188,16 +188,17 @@ export function NewSessionConfigureForm({
   // connected yet — the target is the computer either way.
   const isRemote = runOnInstance !== null || pendingComputer === true;
   const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
-  // The Run on section merges its heading into its row on a short window, like
-  // the Account section above it, so the repository picker below them stays
-  // above the pinned footer. The window is read here rather than a measured
-  // frame so the form cannot reflow after the first layout.
+  // The composer keeps its three-line floor wherever the form's first screenful
+  // still holds the repository picker under it, and takes one line where it
+  // cannot. The window decides, not the measured frame, so the card cannot
+  // reflow after the first layout; with the keyboard up the frame owns the fit.
   const windowSize = useWindowDimensions();
-  const inlineSectionHeadings = resolveNewSessionInlineSections(
-    windowSize.width,
-    windowSize.height,
-    useLiveFontScale()
-  );
+  const keyboardVisible = useKeyboardState(state => state.isVisible);
+  const promptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight: windowSize.height,
+    keyboardVisible,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -262,6 +263,7 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
+          lineCount={promptLineCount}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
           autoFocusOnMount={autoFocusPrompt}
@@ -288,7 +290,6 @@ export function NewSessionConfigureForm({
           onRefreshInstances={onRefreshInstances}
           pendingComputer={pendingComputer}
           disabled={isStarting}
-          inlineHeading={inlineSectionHeadings}
         />
       </View>
 

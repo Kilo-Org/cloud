@@ -50,18 +50,12 @@ vi.mock('react', async () => {
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
 // The composer-reveal hook arms the did-events through Keyboard.addListener;
 // the captured subscribers let the repro fire `keyboardDidShow` directly.
-const windowState = vi.hoisted(() => ({ width: 411, height: 914, scale: 2.625, fontScale: 1 }));
-const liveFontScale = vi.hoisted(() => ({ value: 1 }));
-
-// The form reads the live system scale from the app's provider, which this
-// plain-function suite never mounts; the store drives the compact-row decision.
-vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
-  useLiveFontScale: () => liveFontScale.value,
-}));
 const keyboardSubscribers = vi.hoisted(() => ({
   show: null as (() => void) | null,
   hide: null as (() => void) | null,
 }));
+// The base cell's window; a case can swap in a short one.
+const windowSize = vi.hoisted(() => ({ width: 411, height: 891 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The profile row and the environment row render the reanimated `Skeleton`
@@ -95,7 +89,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
-  useWindowDimensions: () => windowState,
+  useWindowDimensions: () => ({ ...windowSize, scale: 1, fontScale: 1 }),
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -471,62 +465,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
       showRunOnSelector: true,
     });
-  });
-
-  it('keeps the Run on heading stacked on a window that holds the stacked form', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      showRunOnSelector: true,
-    }) as Node;
-
-    expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(false);
-  });
-
-  it('merges the Run on heading into its row on a short window', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    windowState.width = 360;
-    windowState.height = 640;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm({
-        ...defaultProps(),
-        showRunOnSelector: true,
-      }) as Node;
-
-      // The heading beside the selector is what keeps the repository picker
-      // above the pinned footer at this window height.
-      expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(true);
-    } finally {
-      windowState.width = 411;
-      windowState.height = 914;
-    }
-  });
-
-  it('keeps the stacked heading at a font scale that leaves one word no room', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    windowState.width = 360;
-    windowState.height = 640;
-    liveFontScale.value = 1.8;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm({
-        ...defaultProps(),
-        showRunOnSelector: true,
-      }) as Node;
-
-      // The row's share of a 360 dp cell no longer holds a long localized word
-      // at this scale, so the form keeps its stacked heading and scrolls.
-      expect(findElementByType(element, 'NewSessionRunTarget')?.inlineHeading).toBe(false);
-    } finally {
-      windowState.width = 411;
-      windowState.height = 914;
-      liveFontScale.value = 1;
-    }
   });
 
   it('renders the account section above the run-target block', async () => {
@@ -1177,5 +1115,24 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
     // The mocked useState holds the initial measurement (0) and never setStates.
     expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
+  });
+
+  // ── Case 16: a short window lowers the prompt's floor ──
+  it("asks the prompt for one line on a window too short for the form's first screenful", async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    windowSize.width = 360;
+    windowSize.height = 640;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+      // Start needs a repository, so the picker below the card must stay on the
+      // first screenful of the 360x640 compact cell.
+      expect(findElementByType(element, 'NewSessionPrompt')?.lineCount).toBe(1);
+    } finally {
+      windowSize.width = 411;
+      windowSize.height = 891;
+    }
   });
 });

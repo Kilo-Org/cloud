@@ -33,10 +33,6 @@ vi.mock('@/components/agents/instance-selector', () => ({
   InstanceSelector: 'InstanceSelector',
 }));
 
-vi.mock('@/components/agents/new-session-section-field', () => ({
-  NewSessionSectionField: 'NewSessionSectionField',
-}));
-
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 vi.mock('@/components/ui/text', () => ({
@@ -126,9 +122,7 @@ describe('NewSessionRunTarget', () => {
       disabled: false,
       onChange: props.onChangeRunOnInstance,
     });
-    // The section names itself on its own field wrapper, which is where the
-    // heading's position is decided.
-    expect(findElementByType(element, 'NewSessionSectionField')).toMatchObject({ label: 'Run on' });
+    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
   });
 
   it.each([false, true])(
@@ -206,26 +200,6 @@ describe('NewSessionRunTarget', () => {
       value: null,
       pendingComputer: true,
       instances: props.instanceList,
-    });
-  });
-
-  it('merges the heading into the selector row only when the form asks for it', async () => {
-    const { NewSessionRunTarget } = await import('./new-session-run-target');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const stacked = NewSessionRunTarget(baseProps()) as Node;
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const inline = NewSessionRunTarget({ ...baseProps(), inlineHeading: true }) as Node;
-
-    // The section's label is the field it names either way, and the control
-    // stays wired to the same props: the compact window only changes where the
-    // heading sits, so the row above the repository picker costs no height.
-    expect(findElementByType(stacked, 'NewSessionSectionField')).toMatchObject({ inline: false });
-    expect(findElementByType(inline, 'NewSessionSectionField')).toMatchObject({ inline: true });
-    expect(findElementByType(inline, 'InstanceSelector')).toMatchObject({
-      value: null,
-      isLoading: false,
-      disabled: false,
     });
   });
 

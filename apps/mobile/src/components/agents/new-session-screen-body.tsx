@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The screen body wires the form, draft, model, and provider hooks end-to-end from the thin route. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, useWindowDimensions, View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -9,9 +9,6 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
-import { NewSessionSectionField } from '@/components/agents/new-session-section-field';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { resolveNewSessionInlineSections } from '@/components/agents/new-session-section-layout';
 import {
   isStoredRepoSelectionGone,
   resetSelectedBranchOverrides,
@@ -150,16 +147,6 @@ export function NewSessionScreenBody() {
   const router = useRouter();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  // A short window cannot hold the stacked Account and Run on headings and the
-  // repository picker above the pinned footer at once, and the picker is the
-  // field Start needs. Reading the window (not the measured form frame) keeps
-  // the choice stable from the first render.
-  const windowSize = useWindowDimensions();
-  const inlineSectionHeadings = resolveNewSessionInlineSections(
-    windowSize.width,
-    windowSize.height,
-    useLiveFontScale()
-  );
   const searchParams = useLocalSearchParams<{
     organizationId?: string;
     shareId?: string;
@@ -281,13 +268,16 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
+  // Stacked like the Run on and Repository sections below it: one label above
+  // one full-width picker, so the form's label-value relation keeps one shape.
   // The label names the account, not the organization: the picker holds either
   // the personal account or one of the reader's organizations, and its sheet is
-  // titled "Select account" (`profile.selectAccount`). Like the Run on section
-  // it merges its heading into the control's row on a short window, where the
-  // stacked heading is what pushed the repository picker under the footer.
+  // titled "Select account" (`profile.selectAccount`).
   const accountSection = (
-    <NewSessionSectionField inline={inlineSectionHeadings} label={t('preferences.account')}>
+    <View className="mt-5">
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('preferences.account')}
+      </Text>
       {isCloneEntry ? (
         <ContextControl
           scope={{ organizationId: organizationId ?? null, isResolved: true }}
@@ -300,7 +290,7 @@ export function NewSessionScreenBody() {
           variant="field"
         />
       )}
-    </NewSessionSectionField>
+    </View>
   );
 
   // Clone entry never touches the shared new-session draft: pass an undefined

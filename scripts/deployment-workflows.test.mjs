@@ -19,6 +19,15 @@ const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
 
+// The detect-changes step as Actions runs it: its two `inputs` expressions
+// resolved, the rest of the script unchanged.
+function detectionScript(baseSha, targetEnvironment = 'production', edit = run => run) {
+  const step = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+  return edit(step.run)
+    .replaceAll('${{ inputs.base_sha }}', baseSha)
+    .replaceAll('${{ inputs.target_environment }}', targetEnvironment);
+}
+
 test('both Worker deployment paths prepare usage queues before direct consumer deployment', () => {
   for (const [job, selector] of [
     ['deploy-manual', 'inputs.worker'],
@@ -518,9 +527,8 @@ test('staging and production Worker changes use independent deployment baselines
   );
   assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
-  assert.equal(detect.run, 'bash scripts/deploy-changed-workers.sh');
-  assert.equal(detect.env.BASE_SHA, '${{ inputs.base_sha }}');
-  assert.equal(detect.env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
+  assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
+  assert.match(detect.run, /elif dir_changed "\$dir"; then/);
   assert.equal(
     production.jobs['deploy-kiloclaw'],
     undefined,
@@ -855,17 +863,9 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
     write('packages/web-shared/package.json', '{"name":"web-shared","private":true}');
     write('packages/web-shared/src/index.ts', 'export const value = 1;\n');
     write('package.json', '{"name":"fixture","private":true}');
-    // The step runs inside the checkout. This fixture is the checkout, so it
-    // carries the script under its repository path.
-    write(
-      'scripts/deploy-changed-workers.sh',
-      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
-    );
     write('pnpm-workspace.yaml', "packages:\n  - 'services/*'\n  - 'packages/*'\n");
     commit('base');
 
-    const detection = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
-    assert.ok(detection, 'detect-changes selects the Workers to deploy');
     // One release: commit these edits, then run detection against the previous
     // commit, the way a scheduled deploy diffs since the last release.
     const release = (reason, ...edits) => {
@@ -877,18 +877,10 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
       commit(reason);
       const output = join(directory, '.git', 'detect-output');
       writeFileSync(output, '');
-      // Inputs reach the step through `env`, which the test asserts once.
-      const script = detection.run;
-      const result = spawnSync('bash', ['-e', '-c', script], {
+      const result = spawnSync('bash', ['-e', '-c', detectionScript(before)], {
         cwd: directory,
         encoding: 'utf8',
-        // The fixture carries the Workers; the classifier and script stay here.
-        env: {
-          ...process.env,
-          GITHUB_OUTPUT: output,
-          BASE_SHA: before,
-          TARGET_ENVIRONMENT: 'production',
-        },
+        env: { ...process.env, GITHUB_OUTPUT: output },
       });
       assert.equal(result.status, 0, `${reason}: ${result.stderr}`);
       const outputs = readFileSync(output, 'utf8');
@@ -903,16 +895,11 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
 
     // The runtime-Markdown list is the only control that keeps a Markdown edit
     // deploying for a Worker that reads it. Exercise it by listing one.
-    const runtimeScript = readFileSync(
-      new URL('deploy-changed-workers.sh', import.meta.url),
-      'utf8'
-    ).replace('RUNTIME_MARKDOWN=()', "RUNTIME_MARKDOWN=('services/usage-ingest')");
-    assert.notEqual(
-      runtimeScript,
-      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
-    );
-    write('scripts/runtime-markdown.sh', runtimeScript);
-    commit('runtime-markdown control');
+    const listRuntimeMarkdown = run => {
+      const listed = run.replace('RUNTIME_MARKDOWN=()', 'RUNTIME_MARKDOWN=(services/usage-ingest)');
+      assert.notEqual(listed, run, 'the step declares RUNTIME_MARKDOWN=()');
+      return listed;
+    };
     {
       const before = execFileSync('git', ['rev-parse', 'HEAD'], {
         cwd: directory,
@@ -922,16 +909,11 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
       commit('runtime Markdown');
       const output = join(directory, '.git', 'detect-runtime-md');
       writeFileSync(output, '');
-      const result = spawnSync('bash', ['scripts/runtime-markdown.sh'], {
-        cwd: directory,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_OUTPUT: output,
-          BASE_SHA: before,
-          TARGET_ENVIRONMENT: 'production',
-        },
-      });
+      const result = spawnSync(
+        'bash',
+        ['-e', '-c', detectionScript(before, 'production', listRuntimeMarkdown)],
+        { cwd: directory, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: output } }
+      );
       assert.equal(result.status, 0, result.stderr);
       assert.deepEqual(
         JSON.parse(readFileSync(output, 'utf8').match(/^matrix=(.*)$/m)[1]),
@@ -1004,12 +986,6 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
     write('services/kilo-chat/PROMPT.md', '# Prompt\n');
     write('services/kilo-chat/docs/old.md', '# Old\n');
     write('package.json', '{"name":"fixture","private":true}');
-    // The step runs inside the checkout. This fixture is the checkout, so it
-    // carries the script under its repository path.
-    write(
-      'scripts/deploy-changed-workers.sh',
-      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
-    );
     write('pnpm-workspace.yaml', "packages:\n  - 'services/*'\n  - 'packages/*'\n");
     write('packages/web-shared/package.json', '{"name":"web-shared","private":true}');
     write('packages/web-shared/src/index.ts', 'export const value = 0;\n');
@@ -1019,8 +995,6 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
     );
     commit('base');
 
-    const detection = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
-    assert.ok(detection, 'detect-changes selects the Workers to deploy');
     // The ordered output, which pulls cloud-agent-next out of the matrix when
     // session-ingest also changed.
     let lastOrdered = '';
@@ -1030,15 +1004,10 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
       commit(reason);
       const output = join(directory, '.git', 'detect-output');
       writeFileSync(output, '');
-      const result = spawnSync('bash', ['-e', '-c', detection.run], {
+      const result = spawnSync('bash', ['-e', '-c', detectionScript(before)], {
         cwd: directory,
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_OUTPUT: output,
-          BASE_SHA: before,
-          TARGET_ENVIRONMENT: 'production',
-        },
+        env: { ...process.env, GITHUB_OUTPUT: output },
       });
       assert.equal(result.status, 0, `${reason}: ${result.stderr}`);
       const outputs = readFileSync(output, 'utf8');
@@ -1128,15 +1097,10 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
     assert.equal(lastOrdered, 'false', 'the ordered cloud-agent-next output stays false');
 
     // A missing base must deploy, never report "no change".
-    const unknownBase = spawnSync('bash', ['-e', '-c', detection.run], {
+    const unknownBase = spawnSync('bash', ['-e', '-c', detectionScript('0'.repeat(40))], {
       cwd: directory,
       encoding: 'utf8',
-      env: {
-        ...process.env,
-        GITHUB_OUTPUT: join(directory, '.git', 'detect-unknown'),
-        BASE_SHA: '0'.repeat(40),
-        TARGET_ENVIRONMENT: 'production',
-      },
+      env: { ...process.env, GITHUB_OUTPUT: join(directory, '.git', 'detect-unknown') },
     });
     assert.equal(unknownBase.status, 0, unknownBase.stderr);
     assert.deepEqual(
@@ -1181,10 +1145,6 @@ test('a changed session-ingest contract orders cloud-agent-next after it', () =>
       '{"full":false,"dirs":["services/session-ingest","services/cloud-agent-next"]}\n'
     );
     write('workspaces.json', '[{"path":"fixture"}]\n');
-    write(
-      'scripts/deploy-changed-workers.sh',
-      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
-    );
     commit('base');
 
     const before = execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -1197,27 +1157,17 @@ test('a changed session-ingest contract orders cloud-agent-next after it', () =>
 
     const output = join(directory, '.git', 'detect-output');
     writeFileSync(output, '');
-    // The classifier prints its fixture: this repository's real script reads it
-    // the way `node scripts/affected-workspaces.mjs` prints its own answer.
+    // `node` and `pnpm` print fixture answers in place of the workspace
+    // classifier and the workspace list; the step's own logic is unchanged.
     const result = spawnSync(
       'bash',
       [
         '-e',
         '-c',
         'node() { cat classifier.json; }; pnpm() { cat workspaces.json; }; ' +
-          'export -f node pnpm; bash scripts/deploy-changed-workers.sh',
+          detectionScript(before),
       ],
-      {
-        cwd: directory,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          SHELLOPTS: 'expand_aliases',
-          GITHUB_OUTPUT: output,
-          BASE_SHA: before,
-          TARGET_ENVIRONMENT: 'production',
-        },
-      }
+      { cwd: directory, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: output } }
     );
     assert.equal(result.status, 0, result.stderr);
     const outputs = readFileSync(output, 'utf8');

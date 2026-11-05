@@ -191,15 +191,205 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # Discover the deployable Workers and select the ones this release changes.
-      # scripts/deploy-changed-workers.sh owns the rules, including which Markdown
-      # a Worker reads at runtime; its test drives the same script on Git fixtures.
       - name: Find changed workers
         id: set-matrix
-        env:
-          BASE_SHA: ${{ inputs.base_sha }}
-          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
-        run: bash scripts/deploy-changed-workers.sh
+        run: |
+          # Auto-discover all deployable workers (folders containing wrangler.jsonc)
+          # and exclude workers outside the automatic deployment pipeline.
+          #
+          # Diff from the last complete deployment so failed runs do not lose
+          # Worker changes. Staging requires an explicitly configured environment.
+          BASE_SHA="${{ inputs.base_sha }}"
+          TARGET_ENVIRONMENT="${{ inputs.target_environment }}"
+
+          has_named_environment() {
+            node - "$1" "$TARGET_ENVIRONMENT" <<'NODE'
+          const fs = require('node:fs');
+
+          const [file, targetEnvironment] = process.argv.slice(2);
+
+          function stripJsonComments(value) {
+            let output = '';
+            let inString = false;
+            let escaped = false;
+
+            for (let index = 0; index < value.length; index += 1) {
+              const current = value[index];
+              const next = value[index + 1];
+
+              if (inString) {
+                output += current;
+                if (escaped) escaped = false;
+                else if (current === '\\') escaped = true;
+                else if (current === '"') inString = false;
+                continue;
+              }
+
+              if (current === '"') {
+                inString = true;
+                output += current;
+                continue;
+              }
+
+              if (current === '/' && next === '/') {
+                while (index < value.length && value[index] !== '\n') index += 1;
+                output += '\n';
+                continue;
+              }
+
+              if (current === '/' && next === '*') {
+                index += 2;
+                while (index < value.length && !(value[index] === '*' && value[index + 1] === '/')) {
+                  if (value[index] === '\n') output += '\n';
+                  index += 1;
+                }
+                index += 1;
+                continue;
+              }
+
+              output += current;
+            }
+
+            return output;
+          }
+
+          const rawConfig = fs.readFileSync(file, 'utf8');
+          const config = JSON.parse(stripJsonComments(rawConfig).replace(/,\s*([}\]])/g, '$1'));
+          process.exit(config.env && Object.hasOwn(config.env, targetEnvironment) ? 0 : 1);
+          NODE
+          }
+
+          # Workers excluded from automatic deployment:
+          EXCLUDED=(
+            services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
+            services/gastown   # Deployed separately
+            services/wasteland # Deployed separately
+            services/user-data-export # Automatic deploy suspended
+          )
+
+          # Discover all workers with a wrangler.jsonc
+          WORKERS=()
+          while IFS= read -r cfg; do
+            dir=$(dirname "$cfg")
+            WORKERS+=("$dir")
+          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not -path "*/test/fixtures/*" | sort)
+
+          # Filter out excluded workers
+          DEPLOYABLE=()
+          for dir in "${WORKERS[@]}"; do
+            skip=false
+            for excluded in "${EXCLUDED[@]}"; do
+              if [[ "$dir" == "$excluded" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == false ]]; then
+              DEPLOYABLE+=("$dir")
+            fi
+          done
+
+          # A Markdown edit alone does not deploy a Worker unless that Worker reads
+          # the file at runtime. No Worker in this workflow does today: none imports
+          # or reads a committed Markdown file from its source. services/kiloclaw
+          # stages container/TOOLS.md, but its Docker image (deploy-kiloclaw.yml)
+          # builds it and it is excluded above. Add a Worker directory here when it
+          # starts reading committed Markdown at runtime; generated Markdown is never
+          # in git diff.
+          RUNTIME_MARKDOWN=()
+
+          # Whether "$1" has a deployable change since BASE_SHA. `git diff -z -M
+          # --name-status` writes a status, then the path, then for a rename or copy
+          # the new path, all NUL-separated. A record is skipped only when all of
+          # its paths are Markdown: an edit, an add, or a rename between Markdown
+          # paths. A deletion always deploys, because a runtime file can leave that
+          # way. The diff goes to a file so its exit status is checked before it is
+          # read: a failed diff deploys, as `! git diff --quiet` did.
+          dir_changed() {
+            local dir="$1" markdown
+            for markdown in "${RUNTIME_MARKDOWN[@]}"; do
+              if [[ "$dir" == "$markdown" ]]; then return 0; fi
+            done
+
+            local changes
+            changes="$(mktemp)"
+            if ! git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/" > "$changes"; then
+              rm -f "$changes"
+              echo "Cannot diff $dir against $BASE_SHA; deploying it" >&2
+              return 0
+            fi
+
+            local status path previous deploy=false
+            while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+              if [[ "$status" == R* || "$status" == C* ]]; then
+                previous="$path"
+                IFS= read -r -d '' path || path=""
+                if [[ "$previous" == *.md && "$path" == *.md ]]; then continue; fi
+              elif [[ "$status" != D* && "$path" == *.md ]]; then
+                continue
+              fi
+              deploy=true
+              break
+            done < "$changes"
+            rm -f "$changes"
+            [[ "$deploy" == true ]]
+          }
+
+
+          # A worker redeploys when its own files change, or when a workspace
+          # it depends on changes (scripts/affected-workspaces.mjs). A change to
+          # an unrelated shared package must not restart the worker: a rollout
+          # kills in-flight containers. If detection fails, selects everything,
+          # or the worker is not a workspace, use the broad rule.
+          AFFECTED_DIRS=""
+          NARROW=false
+          if affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA") \
+            && [ "$(jq -r '.full' <<< "$affected")" = false ] \
+            && AFFECTED_DIRS=$(jq -r '.dirs[]' <<< "$affected") \
+            && WORKSPACE_DIRS=$(set -o pipefail; pnpm ls -r --depth -1 --json | jq -r --arg root "$(pwd -P)/" '.[].path | ltrimstr($root)'); then
+            NARROW=true
+          else
+            echo "Workspace detection unavailable or selected everything; using the broad rule"
+          fi
+
+          CHANGED=()
+          for dir in "${DEPLOYABLE[@]}"; do
+            if [ "$TARGET_ENVIRONMENT" != "production" ] && ! has_named_environment "$dir/wrangler.jsonc"; then
+              echo "Skipping $dir: wrangler.jsonc does not define env.$TARGET_ENVIRONMENT"
+            elif dir_changed "$dir"; then
+              CHANGED+=("$dir")
+            elif [ "$NARROW" = true ] && grep -Fxq "$dir" <<< "$WORKSPACE_DIRS"; then
+              if grep -Fxq "$dir" <<< "$AFFECTED_DIRS"; then
+                CHANGED+=("$dir")
+              fi
+            elif ! git diff --quiet "$BASE_SHA" HEAD -- packages pnpm-lock.yaml pnpm-workspace.yaml patches; then
+              CHANGED+=("$dir")
+            fi
+          done
+
+          DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=false
+          if [ "$TARGET_ENVIRONMENT" = production ] && [ "$NARROW" = true ] \
+            && grep -Fxq services/session-ingest <<< "$AFFECTED_DIRS" \
+            && grep -Fxq services/cloud-agent-next <<< "$AFFECTED_DIRS"; then
+            DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=true
+          fi
+          echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
+
+          FILTERED=()
+          for dir in "${CHANGED[@]}"; do
+            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" != true ] \
+              || [ "$dir" != services/cloud-agent-next ]; then
+              FILTERED+=("$dir")
+            fi
+          done
+          CHANGED=("${FILTERED[@]}")
+
+          if [ ${#CHANGED[@]} -eq 0 ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+          else
+            MATRIX=$(printf '%s\n' "${CHANGED[@]}" | jq -R . | jq -sc .)
+            echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          fi
 
   deploy-changed:
     needs: detect-changes

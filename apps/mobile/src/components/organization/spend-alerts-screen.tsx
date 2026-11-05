@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -443,9 +443,12 @@ function SpendAlertsForm({
         />
       </View>
 
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+      {/* One 44dp row on the same 12dp inset as the KvRow card above: the
+          switch's own box sets the height, so the card adds no vertical
+          padding of its own. */}
+      <View className="min-h-11 flex-row items-center justify-between rounded-lg bg-secondary px-3">
         <Text className="text-sm font-medium">{t('spendAlerts.sendAlerts')}</Text>
-        <Switch
+        <CardSwitch
           accessibilityLabel={t('spendAlerts.sendAlerts')}
           value={enabled}
           onValueChange={value => {
@@ -574,6 +577,27 @@ function SpendAlertsForm({
   );
 }
 
+/**
+ * The shared `Switch`, pulled out to the end padding line of the card row it
+ * sits on.
+ *
+ * The native switch draws its 32dp track inside a box that reserves the
+ * thumb's overhang, so the track ends about 12dp before the box does: on a
+ * `px-3` card the track would sit 24dp from the edge while the row's label
+ * starts at 12dp, and the same card's KvRow values end at 12dp. Pulling the
+ * box out by its own reserved gap puts the track's end on the label's line.
+ * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
+ * the writing direction, where a hand-picked `-mr-3` would land on the label's
+ * side under RTL.
+ */
+function CardSwitch(props: ComponentProps<typeof Switch>) {
+  return (
+    <View className="-me-3">
+      <Switch {...props} />
+    </View>
+  );
+}
+
 type RuleCardProps = Readonly<{
   title: string;
   subtitle: string;
@@ -614,14 +638,19 @@ function RuleCard({
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <View className="flex-1 pr-3">
+      {/* Same 12dp scale as the cards around it: px-3 matches the KvRow card
+          above, and py-3 is that card's row padding, so the title and subtitle
+          keep 12dp from the card's edges. The switch's own box is taller than a
+          single line and taller than the two-line block, so it sets nothing
+          here. */}
+      <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+        <View className="flex-1 pe-3">
           <Text className="text-sm font-medium">{title}</Text>
           <Text variant="muted" className="mt-0.5 text-xs">
             {subtitle}
           </Text>
         </View>
-        <Switch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
+        <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
       </View>
 
       {children}
@@ -631,7 +660,7 @@ function RuleCard({
           <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's kind is composed
               into the switch label, so the two Email rows stay distinct. */}
-          <Switch
+          <CardSwitch
             accessibilityLabel={emailLabel}
             value={emailEnabled}
             onValueChange={onEmailChange}
@@ -654,7 +683,7 @@ function RuleCard({
         ) : (
           <View className="min-h-11 flex-row items-center justify-between">
             <Text className="text-sm">{t('notifications.push')}</Text>
-            <Switch
+            <CardSwitch
               accessibilityLabel={pushLabel}
               value={pushEnabled}
               onValueChange={onPushChange}
@@ -691,7 +720,7 @@ function SpendAlertsSkeleton() {
             spend); each row is py-3 (24) plus a text-sm line (20) = 44, so the
             block reserves 88 and the loaded rows swap in without moving Save. */}
         <Skeleton className="h-[88px] rounded-lg" />
-        <Skeleton className="h-[56px] rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
         <RuleCardSkeleton />
         <RuleCardSkeleton />
         <Skeleton className="h-11 rounded-md" />

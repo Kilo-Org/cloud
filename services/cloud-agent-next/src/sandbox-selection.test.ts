@@ -70,13 +70,8 @@ beforeEach(() => {
 describe('sandbox selection policy', () => {
   it.each([
     {
-      name: 'isolated Cloudflare without an allowlist',
+      name: 'isolated Cloudflare by default',
       overrides: {},
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
-      name: 'isolated Cloudflare with an empty allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
@@ -92,11 +87,6 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'isolated Cloudflare outside the former allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
       name: 'missing Vercel configuration',
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
@@ -105,7 +95,7 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'keeps native containers when containment is disabled',
+      name: 'ignores the obsolete containment opt-out',
       overrides: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
@@ -119,9 +109,8 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'Cloudflare containers when the isolated owner is enrolled',
+      name: 'Cloudflare containers when the owner is enrolled',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
@@ -525,7 +514,6 @@ describe('sandbox selection policy', () => {
   it('offers Cloudflare containers to an enrolled owner under enforced organization billing', () => {
     const env = {
       ...configured,
-      PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
       CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
@@ -543,29 +531,37 @@ describe('sandbox selection policy', () => {
     );
   });
 
-  it('reports a repository-unavailable reason while keeping a provider-available option listed', () => {
-    const gitlab = getSandboxSelectionCapabilities(
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'offers enrolled Vercel compute for managed %s repositories',
+    repositoryType => {
+      const capabilities = getSandboxSelectionCapabilities(
+        { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
+        owner,
+        { repositoryType }
+      );
+      const vercel = capabilities.options.find(
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
+      );
+      expect(vercel?.unavailableReason).toBeUndefined();
+      expect(vercel?.repositoryUnavailableReason).toBeUndefined();
+      expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
+    }
+  );
+
+  it.each(['git'] as const)('offers enrolled Vercel compute for %s', repositoryType => {
+    const capabilities = getSandboxSelectionCapabilities(
       { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
       owner,
       {
-        repositoryType: 'gitlab',
+        repositoryType,
       }
     );
-    const vercel = gitlab.options.find(
+    const vercel = capabilities.options.find(
       option => getSandboxAllocation(option.allocation) === 'vercel-small'
     );
     expect(vercel?.unavailableReason).toBeUndefined();
-    expect(vercel?.repositoryUnavailableReason).toBeTruthy();
-    expect(isSandboxAllocationAvailable(gitlab, 'vercel-small')).toBe(false);
-
-    const github = getSandboxSelectionCapabilities(
-      { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
-      owner,
-      {
-        repositoryType: 'github',
-      }
-    );
-    expect(isSandboxAllocationAvailable(github, 'vercel-small')).toBe(true);
+    expect(vercel?.repositoryUnavailableReason).toBeUndefined();
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
   });
 
   it('marks Vercel unavailable for review and remediation origins while Cloudflare stays eligible', () => {

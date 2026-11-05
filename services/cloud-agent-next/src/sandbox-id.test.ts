@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getSandboxAllocationRequest } from '@kilocode/worker-utils/sandbox-allocation';
 import {
-  deriveSharedSandboxId,
   generateSandboxId,
-  generateSandboxRoutingTarget,
   getDefaultSandboxDestination,
   getManagedOutboundContainerId,
   isOrgInList,
@@ -15,506 +13,36 @@ import {
   parseSandboxBillingInput,
 } from './container-usage-context.js';
 import { CurrentSessionMetadataSchema } from './persistence/session-metadata.js';
-import type { Env, SandboxId } from './types.js';
+import type { Env } from './types.js';
 
 describe('generateSandboxId', () => {
-  const sharedOptions = { sandboxAllocation: 'cloudflare-shared' } as const;
-
-  describe('explicit shared sandbox', () => {
-    it('should generate sandboxId within 63 character limit', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-        'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
-        'agent_session-1',
-        undefined,
-        sharedOptions
-      );
-      expect(sandboxId.length).toBeLessThanOrEqual(63);
-      expect(sandboxId.length).toBe(52);
-    });
-
-    it('should handle long inputs without exceeding limit', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        'a'.repeat(36),
-        'b'.repeat(36),
-        'agent_session-1',
-        'c'.repeat(50),
-        sharedOptions
-      );
-      expect(sandboxId.length).toBe(52);
-    });
-
-    it('should generate same sandboxId for same inputs', async () => {
-      const args = [
-        undefined,
-        '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-        'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
-        'agent_session-1',
-        undefined,
-        sharedOptions,
-      ] as const;
-      expect(await generateSandboxId(...args)).toBe(await generateSandboxId(...args));
-    });
-
-    it('should be deterministic with botId', async () => {
-      const args = [
-        undefined,
-        '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-        'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
-        'agent_session-1',
-        'reviewer',
-        sharedOptions,
-      ] as const;
-      expect(await generateSandboxId(...args)).toBe(await generateSandboxId(...args));
-    });
-
-    it('should produce the same shared ID for different sessionIds', async () => {
-      const id1 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        'session-a',
-        undefined,
-        sharedOptions
-      );
-      const id2 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        'session-b',
-        undefined,
-        sharedOptions
-      );
-      expect(id1).toBe(id2);
-    });
-
-    it.each([
-      [
-        'org',
-        'org-id',
-        undefined,
-        'org-24e81cff051f1c777d9a195efd29467cd7e932aade2f1c5d',
-        'org-49202a75259250e9aa7aab7b3db46255df7f1924b1853594',
-      ],
-      [
-        'usr',
-        undefined,
-        undefined,
-        'usr-a1ef1744b0588fa1911ae6e5aac20b031d9c320edff3575d',
-        'usr-c187e07a11976df96d7c3c7f1137d900b68f3c1f849e3a42',
-      ],
-      [
-        'bot',
-        'org-id',
-        'reviewer',
-        'bot-7fd53dce4239ce8ab031807aff6152643b2cdbf3bdc6b44e',
-        'bot-4658a1198d72203588f4b618e2fcd826ea529187401e537d',
-      ],
-      [
-        'ubt',
-        undefined,
-        'reviewer',
-        'ubt-11703d71602bbf466306a3520532050ee880ce04a079eaa4',
-        'ubt-366b08dbdcf0f5bac6c4b504edf918b02b8223ba06f11474',
-      ],
-    ])(
-      'provides stable base and suffixed IDs for %s shared sandboxes',
-      async (_prefix, orgId, botId, routeKey, failoverSandboxId) => {
-        const target = await generateSandboxRoutingTarget(
-          undefined,
-          orgId,
-          'user-id',
-          'session-a',
-          botId,
-          sharedOptions
-        );
-
-        expect(target).toEqual({
-          kind: 'shared',
-          routeKey,
-        });
-        await expect(deriveSharedSandboxId(routeKey as SandboxId, 'shared-slot-v1')).resolves.toBe(
-          failoverSandboxId
-        );
-        expect(target).toEqual(
-          await generateSandboxRoutingTarget(
-            undefined,
-            orgId,
-            'user-id',
-            'session-b',
-            botId,
-            sharedOptions
-          )
-        );
-      }
-    );
-
-    it.each([
-      [
-        'org',
-        'org-id',
-        undefined,
-        'org-24e81cff051f1c777d9a195efd29467cd7e932aade2f1c5d',
-        'org-7d891a9e4905bb0d5ff8dffcb99ba76973039c70340665b0',
-      ],
-      [
-        'usr',
-        undefined,
-        undefined,
-        'usr-a1ef1744b0588fa1911ae6e5aac20b031d9c320edff3575d',
-        'usr-e4da69a737a38f1fc3283e8159b965e9d88f13d84c23cab1',
-      ],
-      [
-        'bot',
-        'org-id',
-        'reviewer',
-        'bot-7fd53dce4239ce8ab031807aff6152643b2cdbf3bdc6b44e',
-        'bot-b7b5ae452e738ff4c3e88238a0bd903edb1039b22314e3dc',
-      ],
-      [
-        'ubt',
-        undefined,
-        'reviewer',
-        'ubt-11703d71602bbf466306a3520532050ee880ce04a079eaa4',
-        'ubt-5714320d8e828e8d428046c7f8601c126755f3e04d55b0d6',
-      ],
-    ])(
-      'should use the current shared sandbox ID generation for %s IDs',
-      async (_prefix, orgId, botId, expectedId, previousId) => {
-        const id = await generateSandboxId(
-          undefined,
-          orgId,
-          'user-id',
-          'session',
-          botId,
-          sharedOptions
-        );
-
-        expect(id).toBe(expectedId);
-        expect(id).not.toBe(previousId);
-      }
-    );
+  it('generates a deterministic isolated identity within the 63 character limit', async () => {
+    const id = await generateSandboxId('agent_abc123');
+    expect(id).toBe('ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
+    expect(id.length).toBe(52);
+    expect(await generateSandboxId('agent_abc123')).toBe(id);
   });
 
-  describe('explicit shared prefix correctness', () => {
-    it('should use "org" prefix for organization accounts', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      expect(sandboxId).toMatch(/^org-[0-9a-f]{48}$/);
-    });
-
-    it('should use "usr" prefix for personal accounts', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        undefined,
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      expect(sandboxId).toMatch(/^usr-[0-9a-f]{48}$/);
-    });
-
-    it('should use "bot" prefix for org accounts with bot', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        'reviewer',
-        sharedOptions
-      );
-      expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
-    });
-
-    it('should use "ubt" prefix for personal accounts with bot', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        undefined,
-        'user-id',
-        's',
-        'reviewer',
-        sharedOptions
-      );
-      expect(sandboxId).toMatch(/^ubt-[0-9a-f]{48}$/);
-    });
+  it('produces different identities for different sessions', async () => {
+    expect(await generateSandboxId('session-a')).not.toBe(await generateSandboxId('session-b'));
   });
 
-  describe('explicit shared uniqueness', () => {
-    it('should generate different IDs for different orgIds', async () => {
-      const id1 = await generateSandboxId(
-        undefined,
-        'org-1',
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      const id2 = await generateSandboxId(
-        undefined,
-        'org-2',
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      expect(id1).not.toBe(id2);
-    });
-
-    it('should generate different IDs for different userIds', async () => {
-      const id1 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-1',
-        's',
-        undefined,
-        sharedOptions
-      );
-      const id2 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-2',
-        's',
-        undefined,
-        sharedOptions
-      );
-      expect(id1).not.toBe(id2);
-    });
-
-    it('should generate different IDs for different botIds', async () => {
-      const id1 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        'bot-1',
-        sharedOptions
-      );
-      const id2 = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        'bot-2',
-        sharedOptions
-      );
-      expect(id1).not.toBe(id2);
-    });
-
-    it('should differ between org and personal accounts', async () => {
-      const orgId = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      const personal = await generateSandboxId(
-        undefined,
-        undefined,
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      expect(orgId).not.toBe(personal);
-    });
-
-    it('should differ with and without bot', async () => {
-      const withoutBot = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        undefined,
-        sharedOptions
-      );
-      const withBot = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        's',
-        'reviewer',
-        sharedOptions
-      );
-      expect(withoutBot).not.toBe(withBot);
-    });
+  it('keeps the isolated Standard prefix for an explicit allocation', async () => {
+    await expect(
+      generateSandboxId('agent_abc123', { sandboxAllocation: 'isolated-standard' })
+    ).resolves.toBe('istd-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
   });
 
-  describe('edge cases', () => {
-    it('should handle special characters in IDs', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        'org@123',
-        'user#456',
-        's',
-        'bot$789',
-        sharedOptions
-      );
-      expect(sandboxId.length).toBe(52);
-      expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
-    });
-
-    it('should handle empty strings', async () => {
-      const sandboxId = await generateSandboxId(undefined, '', '', '', '');
-      expect(sandboxId.length).toBe(52);
-    });
-
-    it('should handle unicode characters', async () => {
-      const sandboxId = await generateSandboxId(
-        undefined,
-        'org-日本',
-        'user-한국',
-        's',
-        'bot-中国'
-      );
-      expect(sandboxId.length).toBe(52);
-    });
+  it('routes Code Reviewer sessions to dedicated crv sandboxes', async () => {
+    await expect(
+      generateSandboxId('agent_abc123', { createdOnPlatform: 'code-review' })
+    ).resolves.toBe('crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
   });
 
-  describe('per-session sandbox (default)', () => {
-    it('bypasses shared slot routing', async () => {
-      await expect(
-        generateSandboxRoutingTarget(undefined, 'my-org', 'user-id', 'agent_abc123')
-      ).resolves.toEqual({
-        kind: 'isolated',
-        sandboxId: 'ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
-      });
-    });
-
-    it('should preserve the existing per-session ID generation', async () => {
-      const id = await generateSandboxId(undefined, 'my-org', 'user-id', 'agent_abc123');
-      expect(id).toBe('ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
-    });
-
-    it('should be exactly 52 characters', async () => {
-      const id = await generateSandboxId(undefined, 'my-org', 'user-id', 'agent_abc123');
-      expect(id.length).toBe(52);
-    });
-
-    it('should be deterministic for the same session ID', async () => {
-      const sessionId = 'agent_11111111-2222-3333-4444-555555555555';
-      const id1 = await generateSandboxId(undefined, 'org', 'user', sessionId);
-      const id2 = await generateSandboxId(undefined, 'org', 'user', sessionId);
-      expect(id1).toBe(id2);
-    });
-
-    it('should produce different IDs for different session IDs', async () => {
-      const id1 = await generateSandboxId(undefined, 'org', 'user', 'session-a');
-      const id2 = await generateSandboxId(undefined, 'org', 'user', 'session-b');
-      expect(id1).not.toBe(id2);
-    });
-
-    it('should match on any entry in the comma-separated list', async () => {
-      const id = await generateSandboxId('org-a, org-b', 'org-b', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('should trim whitespace around entries', async () => {
-      const id = await generateSandboxId(' org-a , org-b ', 'org-a', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('defaults to isolated when perSessionOrgIds is empty', async () => {
-      const id = await generateSandboxId('', 'org', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('defaults to isolated when perSessionOrgIds is undefined', async () => {
-      const id = await generateSandboxId(undefined, 'org', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('defaults to isolated for orgs not in the list', async () => {
-      const id = await generateSandboxId('other-org', 'org', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('defaults personal sessions to isolated without an allowlist', async () => {
-      const id = await generateSandboxId(undefined, undefined, 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('defaults to isolated when orgId is undefined', async () => {
-      const id = await generateSandboxId('anything', undefined, 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('should treat "*" as wildcard matching any org', async () => {
-      const id = await generateSandboxId('*', 'any-org', 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-
-    it('should use per-session sandbox with "*" even when orgId is undefined', async () => {
-      const id = await generateSandboxId('*', undefined, 'user', 'session');
-      expect(id).toMatch(/^ses-/);
-    });
-  });
-
-  describe('isolated Standard sandbox', () => {
-    it('bypasses organization routing with a deterministic per-session identity', async () => {
-      await expect(
-        generateSandboxRoutingTarget(undefined, 'my-org', 'user-id', 'agent_abc123', undefined, {
-          sandboxAllocation: 'isolated-standard',
-        })
-      ).resolves.toEqual({
-        kind: 'isolated',
-        sandboxId: 'istd-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
-      });
-    });
-
-    it('produces different identities for different sessions', async () => {
-      const first = await generateSandboxId(undefined, 'org', 'user', 'session-a', undefined, {
-        sandboxAllocation: 'isolated-standard',
-      });
-      const second = await generateSandboxId(undefined, 'org', 'user', 'session-b', undefined, {
-        sandboxAllocation: 'isolated-standard',
-      });
-
-      expect(first).toMatch(/^istd-[0-9a-f]{48}$/);
-      expect(second).toMatch(/^istd-[0-9a-f]{48}$/);
-      expect(first).not.toBe(second);
-    });
-  });
-
-  describe('Code Reviewer ephemeral sandbox', () => {
-    it('routes Code Reviewer sessions to dedicated crv sandboxes', async () => {
-      const target = await generateSandboxRoutingTarget(
-        undefined,
-        'org-review',
-        'user-id',
-        'agent_abc123',
-        undefined,
-        {
-          createdOnPlatform: 'code-review',
-        }
-      );
-
-      expect(target).toEqual({
-        kind: 'isolated',
-        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
-      });
-    });
-
-    it('routes orgless Code Reviewer sessions to dedicated crv sandboxes', async () => {
-      await expect(
-        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
-          createdOnPlatform: 'code-review',
-        })
-      ).resolves.toEqual({
-        kind: 'isolated',
-        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
-      });
-    });
+  it('never generates a shared sandbox identity', async () => {
+    await expect(
+      generateSandboxId('agent_abc123', { sandboxAllocation: 'cloudflare-shared' })
+    ).rejects.toThrow('Shared sandboxes are retired');
   });
 });
 
@@ -532,16 +60,14 @@ describe('selectSandboxForNewSession', () => {
     ...{ VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000' },
   };
   const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
-  const otherSessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
-  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+  it.each(['cloudflare-single', 'vercel-small', 'vercel-large'] as const)(
     'routes explicit %s independently of conflicting allocation and provider rollouts',
     async sandboxAllocation => {
       for (const rollout of [undefined, '', '*']) {
         const selection = await selectSandboxForNewSession({
           env: {
             ...completeVercelConfiguration,
-            PER_SESSION_SANDBOX_ORG_IDS: rollout,
             ...{ VERCEL_SANDBOX_ORG_IDS: rollout },
           },
           orgId: 'org-id',
@@ -550,55 +76,14 @@ describe('selectSandboxForNewSession', () => {
           sandboxAllocation,
         });
         expect(selection.provider).toBe(
-          sandboxAllocation === 'cloudflare-single'
-            ? 'cloudflare-containers'
-            : sandboxAllocation.startsWith('vercel-')
-              ? 'vercel'
-              : 'cloudflare'
+          sandboxAllocation === 'cloudflare-single' ? 'cloudflare-containers' : 'vercel'
         );
-        expect(selection.sandboxId).toMatch(
-          sandboxAllocation === 'cloudflare-shared' ? /^org-/ : /^ses-/
-        );
+        expect(selection.sandboxId).toMatch(/^ses-/);
       }
     }
   );
 
-  it('retains the shared identity across rollout changes for an explicit shared preset', async () => {
-    const shared = await generateSandboxRoutingTarget(
-      undefined,
-      'org-id',
-      'user-id',
-      controlSessionId,
-      undefined,
-      {
-        sandboxAllocation: 'cloudflare-shared',
-      }
-    );
-    expect(
-      await generateSandboxRoutingTarget('*', 'org-id', 'user-id', controlSessionId, undefined, {
-        sandboxAllocation: 'cloudflare-shared',
-      })
-    ).toEqual(shared);
-    expect(
-      await generateSandboxRoutingTarget('*', 'org-id', 'other-user', controlSessionId, undefined, {
-        sandboxAllocation: 'cloudflare-shared',
-      })
-    ).not.toEqual(shared);
-    expect(
-      await generateSandboxRoutingTarget(
-        undefined,
-        'org-id',
-        'user-id',
-        otherSessionId,
-        undefined,
-        {
-          sandboxAllocation: 'cloudflare-shared',
-        }
-      )
-    ).toEqual(shared);
-  });
-
-  it.each([{ orgId: 'org-id' }, {}, { orgId: 'org-id', botId: 'bot-id' }, { botId: 'bot-id' }])(
+  it.each([{ orgId: 'org-id' }, {}])(
     'defaults to isolated native containers without an allowlist for %j',
     async owner => {
       const selection = await selectSandboxForNewSession({
@@ -625,17 +110,16 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('keeps an enrolled organization on Cloudflare with an explicit shared allocation', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: { ...completeVercelConfiguration },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: 'session-id',
-      sandboxAllocation: 'cloudflare-shared',
-    });
-
-    expect(selection.provider).toBe('cloudflare');
-    expect(selection.sandboxId).toMatch(/^org-/);
+  it('rejects an explicit shared allocation', async () => {
+    await expect(
+      selectSandboxForNewSession({
+        env: { ...completeVercelConfiguration, CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
+        orgId: 'org-id',
+        userId: 'user-id',
+        sessionId: 'session-id',
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).rejects.toThrow('Shared sandboxes are retired');
   });
 
   it.each(Object.keys(completeVercelConfiguration))(
@@ -644,7 +128,7 @@ describe('selectSandboxForNewSession', () => {
       const configuration = { ...completeVercelConfiguration };
       delete configuration[missingKey as keyof typeof configuration];
       const selection = await selectSandboxForNewSession({
-        env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...configuration },
+        env: configuration,
         orgId: 'org-id',
         userId: 'user-id',
         sessionId: 'session-id',
@@ -658,7 +142,6 @@ describe('selectSandboxForNewSession', () => {
   it('uses native containers outside the explicit Vercel allowlist', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: 'other-org' },
       },
@@ -674,7 +157,6 @@ describe('selectSandboxForNewSession', () => {
   it('ignores the retired wildcard for isolated organizations', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
       },
@@ -690,7 +172,6 @@ describe('selectSandboxForNewSession', () => {
   it('selects Vercel for personal isolated control-plane sessions when enrollment is wildcarded', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
       },
@@ -705,7 +186,6 @@ describe('selectSandboxForNewSession', () => {
   it('uses native containers for invalid Vercel configuration', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_RUNTIME: 'node22' },
       },
@@ -720,7 +200,7 @@ describe('selectSandboxForNewSession', () => {
 
   it('moves isolated control-plane sessions to native containers when the containers gate is unset', async () => {
     const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      env: {},
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
@@ -732,7 +212,7 @@ describe('selectSandboxForNewSession', () => {
 
   it('selects containers for personal isolated control-plane sessions when the gate is wildcarded', async () => {
     const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: '*', CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
+      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
       userId: 'user-id',
       sessionId: controlSessionId,
     });
@@ -743,13 +223,13 @@ describe('selectSandboxForNewSession', () => {
 
   it('selects containers for enrolled and unenrolled isolated control-plane organizations', async () => {
     const enrolled = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
+      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
     });
     const outside = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' },
+      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
@@ -759,23 +239,9 @@ describe('selectSandboxForNewSession', () => {
     expect(outside.provider).toBe('cloudflare-containers');
   });
 
-  it('keeps enrolled shared control-plane sessions on Cloudflare', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: controlSessionId,
-      sandboxAllocation: 'cloudflare-shared',
-    });
-
-    expect(selection.provider).toBe('cloudflare');
-    expect(selection.sandboxId).toMatch(/^org-/);
-  });
-
   it('uses Cloudflare containers when retired Vercel enrollment is also present', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
@@ -792,7 +258,6 @@ describe('selectSandboxForNewSession', () => {
   it('skips Vercel for an enforced dual-enrolled organization and selects containers', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
@@ -811,7 +276,6 @@ describe('selectSandboxForNewSession', () => {
   it('moves an enforced organization without containers enrollment to native containers', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
@@ -829,7 +293,6 @@ describe('selectSandboxForNewSession', () => {
   it('uses Cloudflare containers when enforcement is off', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
@@ -846,7 +309,6 @@ describe('selectSandboxForNewSession', () => {
   it('skips Vercel for a personal owner enforced through the user allowlist', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
@@ -863,7 +325,6 @@ describe('selectSandboxForNewSession', () => {
   it('defaults an enforced owner to containers instead of Vercel', () => {
     const destination = getDefaultSandboxDestination(
       {
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
@@ -905,7 +366,7 @@ describe('legacy sandbox retirement', () => {
     'generates the historical %s / %s sandbox identity',
     async (sandboxAllocation, createdOnPlatform, prefix, expectedProvider) => {
       const sessionId = 'workspace_abc123';
-      const sandboxId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
+      const sandboxId = await generateSandboxId(sessionId, {
         sandboxAllocation,
         createdOnPlatform,
       });

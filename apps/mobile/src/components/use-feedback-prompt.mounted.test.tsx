@@ -24,6 +24,7 @@ const platform = vi.hoisted(() => ({ inApp: true }));
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',

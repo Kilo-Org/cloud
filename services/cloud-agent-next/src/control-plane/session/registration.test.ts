@@ -57,6 +57,45 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('workspace tail snapshot authority', () => {
+  it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+    const registered = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId: workspaceId,
+        },
+      }),
+      selection
+    );
+    expect(registered.credentials.workspaceId).toBe(workspaceId);
+    expect(registered.credentials.scopeId).toBe(workspaceId);
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), selection).credentials.workspaceId
+    ).toBeUndefined();
+  });
+
+  it('rejects caller-supplied workspace restore provenance at both registration boundaries', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+    const spec = {
+      ...registration.spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_00000000-0000-4000-8000-000000000001',
+        directory: registration.spec.directory,
+        sourceAllocationId: 'source',
+      },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(spec).success).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({ spec, credentials: registration.credentials })
+        .success
+    ).toBe(false);
+  });
+});
+
 describe('egress policy registration', () => {
   it.each(
     ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
@@ -381,7 +420,7 @@ describe('runtime authorization admission', () => {
     }
   );
 
-  it('preserves direct SCM admission independently of modern runtime authorization', () => {
+  it('upgrades saved direct selection to mandatory containment', () => {
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',
@@ -396,8 +435,8 @@ describe('runtime authorization admission', () => {
     );
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.sandboxSelection?.containment).toMatchObject({
-      kilocode: false,
-      github: false,
+      kilocode: true,
+      github: true,
     });
   });
 
@@ -419,16 +458,16 @@ describe('runtime authorization admission', () => {
     ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
 
-  it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {
+  it('requires containment on Vercel and rejects invalid modern proxy configuration', () => {
     const vercel = metadata({
       workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel' },
     });
-    expect(() =>
+    expect(
       buildControlPlaneSessionRegistration(vercel, {
         provider: 'vercel',
         containment: { kilocode: false, github: false },
-      })
-    ).toThrow('Vercel requires credential containment');
+      }).sandboxSelection?.containment
+    ).toMatchObject({ kilocode: true, github: true });
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',

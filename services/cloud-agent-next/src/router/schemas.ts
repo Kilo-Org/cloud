@@ -1187,6 +1187,10 @@ export const GetSessionOutput = z.object({
     .nullable()
     .optional()
     .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+  parentCloudAgentSessionId: z
+    .string()
+    .optional()
+    .describe('Canonical parent Cloud Agent session ID when this session was spawned by a parent'),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),

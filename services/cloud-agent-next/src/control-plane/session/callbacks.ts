@@ -2,7 +2,7 @@ import {
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
-import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
+import { isWorkspaceCallbackTargetUrl } from '@kilocode/worker-utils/cloud-agent-authority';
 import { createMessageId, isCanonicalMessageId } from '../../session/message-id.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
 import { renderRecentActivity } from '../../callbacks/recent-activity.js';
@@ -89,7 +89,7 @@ function isCallbackJob(value: unknown): value is CallbackJob {
   }
   const payload = value.payload;
   return (
-    (value.target.url !== PARENT_SESSION_CALLBACK_URL ||
+    (!isWorkspaceCallbackTargetUrl(value.target.url) ||
       (isRecord(value.parentSession) &&
         typeof value.parentSession.userId === 'string' &&
         value.parentSession.userId.length > 0 &&
@@ -230,7 +230,7 @@ export function createMessageCallbacks(
 
     return {
       target: structuredClone(target),
-      ...(target.url === PARENT_SESSION_CALLBACK_URL
+      ...(isWorkspaceCallbackTargetUrl(target.url)
         ? { parentSession: { userId: metadata.identity.userId, messageId: createMessageId() } }
         : {}),
       payload: {

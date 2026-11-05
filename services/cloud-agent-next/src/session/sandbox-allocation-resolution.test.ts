@@ -81,7 +81,7 @@ const v2 = {
 function resolve(
   args: {
     env?: Env;
-    repositoryType?: 'github' | 'gitlab' | 'bitbucket';
+    repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
     capability?: 'review' | 'remediation';
     environmentAllocation?: string;
     environment?: typeof v1 | typeof v2;
@@ -92,7 +92,7 @@ function resolve(
     db,
     env: args.env ?? env,
     owner,
-    repositoryType: args.repositoryType ?? 'github',
+    repositoryType: args.repositoryType ?? 'git',
     ...(args.capability ? { capability: args.capability } : {}),
     ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
     environment: args.environment ?? null,
@@ -177,13 +177,29 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(resolve()).resolves.toBeUndefined();
   });
 
-  it('skips a saved Vercel choice for a GitLab repository', async () => {
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'keeps a ready BYOC Vercel choice for managed %s repositories',
+    async repositoryType => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'vercel-large',
+        contextAllocation: 'cloudflare-single',
+      });
+
+      await expect(
+        resolve({ repositoryType, env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })
+      ).resolves.toBe('vercel-large');
+    }
+  );
+
+  it.each(['git'] as const)('keeps a ready BYOC Vercel choice for %s', async repositoryType => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'vercel-large',
       contextAllocation: 'cloudflare-single',
     });
 
-    await expect(resolve({ repositoryType: 'gitlab' })).resolves.toBeUndefined();
+    await expect(
+      resolve({ repositoryType, env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })
+    ).resolves.toBe('vercel-large');
   });
 
   it.each(['review', 'remediation'] as const)(

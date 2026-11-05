@@ -23,8 +23,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
-  USAGE_QUEUE_ONLY_ENABLED: false,
+  USAGE_QUEUE_SFO_CONFIG: { enabled: false },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
@@ -108,11 +107,6 @@ const { processTokenData } = jest.requireActual<typeof UsageProcessing>(
 const publisher = jest.requireMock<typeof UsagePublisher>(
   '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
 );
-const config = jest.requireMock<{
-  USAGE_QUEUE_ONLY_ENABLED: boolean;
-  USAGE_INGEST_URL: string;
-  USAGE_INGEST_PUBLISH_SECRET: string;
-}>('@kilocode/web-shared/lib/config.server');
 const { db } = jest.requireMock<{
   db: { transaction: jest.Mock; query: { microdollar_usage: { findFirst: jest.Mock } } };
 }>('@kilocode/web-shared/lib/drizzle');
@@ -220,6 +214,7 @@ function requestLifetime(waitUntilAvailable = true) {
 }
 
 beforeEach(() => {
+  jest.replaceProperty(process, 'env', { ...process.env });
   jest.clearAllMocks();
   jest
     .mocked(publisher.enqueueUsage)
@@ -228,7 +223,8 @@ beforeEach(() => {
         '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
       ).enqueueUsage
     );
-  config.USAGE_QUEUE_ONLY_ENABLED = false;
+  process.env.VERCEL_TARGET_ENV = 'preview';
+  process.env.VERCEL_ENV = 'preview';
   queueConfig.USAGE_VERCEL_QUEUE_ENABLED = false;
   jest.mocked(enqueueVercelUsage).mockReset();
   process.env.VERCEL_REGION = 'fra1';
@@ -252,7 +248,8 @@ describe('Vercel queued accounting lifetime', () => {
   )(
     'awaits $region $mode acceptance=$accepted without another transport or writer',
     async ({ region, mode, accepted }) => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       queueConfig.USAGE_VERCEL_QUEUE_ENABLED = true;
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();

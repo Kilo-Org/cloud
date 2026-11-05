@@ -230,15 +230,21 @@ describe('Cloud Agent authority contract', () => {
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', launch, now + 3600)
     ).toEqual(launch);
   });
-  it('accepts only the parent callback destination without widening spawn authority', () => {
-    const request = { ...launch, callbackTarget: { url: 'session:parent' } };
-    expect(
-      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
-    ).toEqual(request);
-    expect(cloudAgentAuthorityInputSchema(scope)).toHaveProperty(
-      'properties.callbackTarget.properties.url.const',
-      'session:parent'
-    );
+  it('accepts only the workspace callback destinations without widening spawn authority', () => {
+    for (const target of [
+      { url: 'workspace:new-chat' },
+      { url: 'workspace:workspace_12345678-1234-4234-8234-123456789abc' },
+    ]) {
+      const request = { ...launch, callbackTarget: target };
+      expect(
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+      ).toEqual(request);
+    }
+    const schema = cloudAgentAuthorityInputSchema(scope);
+    expect(schema).toHaveProperty('properties.callbackTarget.anyOf');
+    expect(JSON.stringify(schema)).toContain('workspace:new-chat');
+    expect(JSON.stringify(schema)).toContain('workspace:workspace_');
+    expect(JSON.stringify(schema)).not.toContain('session:parent');
   });
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },
@@ -264,9 +270,16 @@ describe('Cloud Agent authority contract', () => {
     { runtimeSkills: [] },
     { callbackTarget: {} },
     { callbackTarget: { url: 'https://example.com/callback' } },
+    { callbackTarget: { url: 'session:parent' } },
     { callbackTarget: { url: 'session:workspace_sibling' } },
-    { callbackTarget: { url: 'session:parent', headers: { Authorization: 'private' } } },
-    { callbackTarget: { url: 'session:parent', sessionId: 'workspace_sibling' } },
+    { callbackTarget: { url: 'workspace:not-a-session' } },
+    {
+      callbackTarget: {
+        url: 'workspace:workspace_12345678-1234-4234-8234-123456789abc',
+        token: 'a'.repeat(64),
+      },
+    },
+    { callbackTarget: { url: 'workspace:new-chat', headers: { Authorization: 'private' } } },
     { sandboxAllocation: {} },
     { egressMode: 'allowlist' },
     { egressMode: 'unrestricted' },

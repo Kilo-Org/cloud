@@ -208,7 +208,7 @@ async function setupSiblingPair(): Promise<{
   const sessionB = newSessionId();
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const workspacePath = '/workspace/worktrees/shared';
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
+  const sandboxId = await generateSandboxId(sessionA, {
     sandboxAllocation: 'cloudflare-containers-standard-3',
   });
   const provider = createFakeProvider();
@@ -285,7 +285,7 @@ async function registerOnlySession(): Promise<{
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const stub = sessions.getByName(sessionId);
   const peer = new FakeSandboxPeer();
   await runInDurableObject(stub, instance => {

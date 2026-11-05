@@ -78,6 +78,10 @@ export async function storeGitLabOAuthIntegration(
   const integrationId = existing?.id ?? randomUUID();
   const credentialId = randomUUID();
   const credentialVersion = 1;
+  // The caller fetched `repositories` in this request, so a stored list is a
+  // current snapshot. A null list means the fetch did not complete, which must
+  // stay unsynced so the next repository read retries it.
+  const repositoriesSyncedAt = input.repositories === null ? null : new Date().toISOString();
   const encrypted = encryptGitLabOAuthCredentials({
     credentialId,
     integrationId,
@@ -151,6 +155,7 @@ export async function storeGitLabOAuthIntegration(
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
           repositories: input.repositories,
+          repositories_synced_at: repositoriesSyncedAt,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, integrationId));
@@ -250,6 +255,7 @@ export async function storeGitLabOAuthIntegration(
       repository_access: 'all',
       integration_status: INTEGRATION_STATUS.ACTIVE,
       repositories: input.repositories,
+      repositories_synced_at: repositoriesSyncedAt,
       metadata,
       installed_at: new Date().toISOString(),
     });

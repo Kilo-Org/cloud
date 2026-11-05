@@ -9,24 +9,20 @@ may reduce peak pressure while taking longer to finish the same work.
 
 ## Select each path
 
-With the gateway queue-selection change installed, configure the intended staging
-gateway deployment as follows. Keep the Worker in processing mode with the same
-writer endpoint and queue policy for both runs.
+Staging selects queued accounting under the environment guards below and has no
+direct-accounting selector. This recipe does not provide a direct baseline;
+establish a separately agreed test setup before comparing direct and queued runs.
 
-For both Cloudflare/direct runs, keep `USAGE_QUEUE_TRANSPORT` unset or set to
-`cloudflare`. Setting `USAGE_QUEUE_ONLY_ENABLED=false` alone does not disable the
-[staging Vercel queue prototype](../../packages/usage-queue/README.md).
+For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
+than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
+exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
+Production retains no runtime cohort control;
+[rollout gates](eu-queues.md#production-merge-gate); production Frankfurt is
+queue-selected without an exposure control, and production SFO queues every
+eligible payer. No production change is part of this recipe. Keep the Worker
+processing mode, writer endpoint and queue policy fixed.
 
-| Gateway setting | Direct baseline | Queued run |
-|---|---|---|
-| `USAGE_QUEUE_ONLY_ENABLED` | `false` | `true` |
-
-Apply server environment settings through the gateway deployment. Queue-only is
-enabled by the existing staging controls for this recipe; production SFO selection
-uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
-`USAGE_QUEUE_SFO_USER_IDS` controls and [rollout gates](eu-queues.md#production-merge-gate),
-and is not activated here. Disabling queue-only
-keeps new events on direct accounting. Background shadow publication has been
+Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before
 switching a consumer to processing. After attempting publication, queue-only never falls back to a gateway billing
 writer. Missing publisher configuration and failed lifetime registration retain
@@ -37,9 +33,10 @@ accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
 reuse the same event and may create duplicate deliveries after ambiguous acceptance.
 Include the retry-enabled Cloudflare publisher's 25-second elapsed budget
-(four attempts of up to five seconds plus full-jitter waits, clipped to remaining
-budget) and runtime scheduling overhead, excluding subsequent Bouncer reporting,
-in accounting completion deadlines. Non-retry HTTP publication remains one
+(four attempts, a first of up to ten seconds and later ones of up to five, plus
+full-jitter waits, clipped to remaining budget, so a later attempt can be shorter)
+and runtime scheduling overhead, excluding subsequent Bouncer reporting, in
+accounting completion deadlines. Non-retry HTTP publication remains one
 two-second attempt; Vercel queue transport is unchanged. There is no durable recovery
 for unaccepted events in this path; an ambiguous failure such as a timeout may
 still be followed by consumer persistence, so reconcile those IDs separately.
@@ -109,7 +106,7 @@ Consumer `usage_ingest_processing` events additionally expose:
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
   to settle. Production uses batch size 6, two writer slots
-  and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
+  and invocation cap 225 (up to 450 concurrent writer calls). Its deployment and activation are subject to the
   [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
   does not activate it. An ACK follows a matching recorded/duplicate writer response only.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.

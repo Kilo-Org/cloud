@@ -14,6 +14,7 @@ import { Text } from './text';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
@@ -54,7 +55,6 @@ function render(element: ReactElement) {
 const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
   node.findAll(n => `${n.props.className ?? ''}`.startsWith(BUTTON_BUSY_LABEL_CLASS));
 
-/** The busy mark is the shared indicator, drawn over its own track. */
 const BusyMark = 'ActivityIndicator' as ElementType;
 const busyMarks = (node: TestRenderer.ReactTestInstance) => node.findAllByType(BusyMark);
 

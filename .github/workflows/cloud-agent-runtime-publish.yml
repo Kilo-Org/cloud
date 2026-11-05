@@ -1,4 +1,6 @@
 name: Publish Cloud Agent runtime
+# Deployments find the publication for their exact SHA by this title (runtime-publication-runs.ts).
+run-name: Publish Cloud Agent runtime ${{ github.event.workflow_run.head_sha || inputs.source_sha }}
 
 on:
   workflow_run:
@@ -82,7 +84,9 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.4.4
-      - run: pnpm install --frozen-lockfile
+      # Only the publisher and wrapper dependency graphs; the full workspace install pulls
+      # thousands of unrelated packages and fails publication when the registry is slow.
+      - run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'
       - name: Publish verified runtime and exact-SHA handoff
         working-directory: services/cloud-agent-next
         env:

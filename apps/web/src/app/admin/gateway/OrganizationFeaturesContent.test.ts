@@ -8,7 +8,11 @@ import type { OrganizationFeaturesContent as ContentComponent } from './Organiza
 const activeId = 'aaaaaaaa-1111-4111-8111-111111111111';
 const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
-const emptyFeatures: OrganizationFeatures = { experimental_byok: [], gateway_settings: [] };
+const emptyFeatures: OrganizationFeatures = {
+  experimental_byok: [],
+  gateway_settings: [],
+  request_logs: [],
+};
 const mockMutate = jest.fn();
 const mockRefetchConfig = jest.fn();
 const mockRefetchPreview = jest.fn();
@@ -72,7 +76,7 @@ describe('OrganizationFeaturesContent', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     Object.assign(mockConfigQuery, {
-      data: { experimental_byok: [activeId], gateway_settings: [] },
+      data: { experimental_byok: [activeId], gateway_settings: [], request_logs: [] },
       isLoading: false,
       error: null,
     });
@@ -144,6 +148,7 @@ describe('OrganizationFeaturesContent', () => {
     mockConfigQuery.data = {
       experimental_byok: [activeId, unknownId],
       gateway_settings: [deletedId, activeId],
+      request_logs: [activeId],
     };
     mockPreviewQuery.data?.push({ id: deletedId, name: 'Deleted organization', isDeleted: true });
     render();
@@ -153,7 +158,9 @@ describe('OrganizationFeaturesContent', () => {
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
       'Gateway settings (2)',
+      'Request logs (1)',
     ]);
+    expect(sections[2].querySelector('a')?.textContent).toBe('Active organization');
     expect(sections[0].querySelector('a')?.textContent).toBe('Active organization');
     expect(sections[0].querySelector('a')?.getAttribute('href')).toBe(
       `/admin/organizations/${activeId}`
@@ -183,7 +190,11 @@ describe('OrganizationFeaturesContent', () => {
     edit('experimental_byok', ` ${deletedId.toUpperCase()} \n\n${deletedId}\n `);
     edit('gateway_settings', ` ${deletedId.toUpperCase()} \n${deletedId}\n`);
 
-    const input = { experimental_byok: [deletedId], gateway_settings: [deletedId] };
+    const input = {
+      experimental_byok: [deletedId],
+      gateway_settings: [deletedId],
+      request_logs: [],
+    };
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, {
       enabled: true,
     });
@@ -259,6 +270,7 @@ describe('OrganizationFeaturesContent', () => {
       enabled: false,
     });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual([
+      'No organizations enabled.',
       'No organizations enabled.',
       'No organizations enabled.',
     ]);

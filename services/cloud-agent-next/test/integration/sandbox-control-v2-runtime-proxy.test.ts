@@ -13,10 +13,13 @@ import type {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
+  RUNTIME_PROXY_GRANT_KEY,
 } from '../../src/runtime-credential-proxy.js';
-import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   RUNTIME_AUTHORIZATION_KEY,
   renewStoredRuntimeAuthorization,
@@ -1335,5 +1338,120 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     );
     expect(await wrapper.next(100)).toBeNull();
     expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+});
+
+describe('wrapper history pages', () => {
+  async function setupHistory() {
+    const sessionId = newSessionId();
+    const kiloId = kiloSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const provider = createProvider();
+    await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const sessionStub = await createVercelSession({
+      sessionId,
+      kiloId,
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_history', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    await runInDurableObject(sessionStub, (_instance, state) => {
+      markHistoryHydrated(state.storage);
+    });
+    async function readPage(input: {
+      sessionId?: string;
+      kiloSessionId?: string;
+      cursor?: string;
+    }) {
+      const requestId = crypto.randomUUID();
+      wrapper.send({
+        type: 'history.page',
+        requestId,
+        sessionId: input.sessionId ?? sessionId,
+        kiloSessionId: input.kiloSessionId ?? kiloId,
+        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      });
+      for (;;) {
+        const result = await wrapper.next(5_000);
+        if (result === null) throw new Error('expected history.result');
+        if (result.type === 'history.result' && result.requestId === requestId) return result;
+      }
+    }
+    return { sessionId, kiloId, sessionStub, readPage };
+  }
+
+  it('serves a cold page, then every page of seeded native history', async () => {
+    const { sessionId, kiloId, sessionStub, readPage } = await setupHistory();
+    expect(await readPage({})).toMatchObject({
+      ok: true,
+      page: { kind: 'success', info: { id: kiloId }, messages: [], nextCursor: null },
+    });
+
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: `/workspace/${sessionId}` },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const ids = Array.from({ length: 101 }, () => messageId());
+    await sessionStub.onEvents({
+      events: [
+        { type: 'conversation.source', properties: { sessionID: kiloId, source } },
+        ...ids.map((id, index) => ({
+          type: 'conversation.message.updated',
+          properties: {
+            sessionID: kiloId,
+            source,
+            message: { id, type: 'user', time: { created: index + 1 }, text: `prompt ${index}` },
+          },
+        })),
+      ],
+    });
+
+    const read: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const result = await readPage({ cursor });
+      if (!result.ok) throw new Error(result.error.code);
+      const page = result.page as {
+        source: { version: string };
+        messages: Array<{ message: { id: string } }>;
+        nextCursor: string | null;
+      };
+      expect(page.source.version).toBe('v2');
+      read.push(...page.messages.map(item => item.message.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(read.toSorted()).toEqual(ids.toSorted());
+  });
+
+  it('rejects sessions this sandbox does not host and cursors of another session', async () => {
+    const { readPage } = await setupHistory();
+    const other = await setupHistory();
+    expect(await readPage({ sessionId: newSessionId() })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found', retryable: false },
+    });
+    expect(await readPage({ kiloSessionId: kiloSessionId() })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found', retryable: false },
+    });
+    // The other sandbox's route is not hosted here, even with its own identity.
+    expect(
+      await readPage({ sessionId: other.sessionId, kiloSessionId: other.kiloId })
+    ).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    expect(await readPage({ cursor: 'not-a-cursor' })).toMatchObject({
+      ok: false,
+      error: { code: 'unavailable' },
+    });
   });
 });

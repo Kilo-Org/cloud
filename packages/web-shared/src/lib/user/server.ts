@@ -172,6 +172,7 @@ type GetAuthResponse =
        * false.
        */
       credentialsRejected?: boolean;
+      rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -184,6 +185,7 @@ type GetAuthResponse =
       user: User;
       authFailedResponse: null;
       credentialsRejected?: undefined;
+      rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -514,6 +516,7 @@ function authError(
   kiloUserId: string,
   options?: {
     credentialsRejected?: boolean;
+    rejectionReason?: 'empty_organization_context';
     internalApiUse?: boolean;
     tokenSource?: string;
     cloudAgentAuthority?: CloudAgentAuthority;
@@ -527,6 +530,7 @@ function authError(
     internalApiUse: options?.internalApiUse,
     tokenSource: options?.tokenSource,
     cloudAgentAuthority: options?.cloudAgentAuthority,
+    ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
   };
 }
 
@@ -606,13 +610,14 @@ async function validateUserAuthorization({
     }
   }
 
-  if (organizationId) {
+  if (organizationId !== undefined) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
       return authError(400, 'Invalid organization ID format', kiloUserId, {
         internalApiUse,
         tokenSource,
         cloudAgentAuthority,
+        ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
       });
     }
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);

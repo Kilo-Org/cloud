@@ -555,9 +555,20 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   over the same authenticated routes, clones the default
   branch into `/workspace/app`, runs setup with the directory HOME and `KILO_ENVIRONMENT_BUILD=1`
   (setup commands may use the rest of the build deadline), removes credentials and
-  reflogs, and writes the workspace stamp. The coordinator records the capture as issued before it
+  reflogs, and writes the workspace stamp. Start commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
+- **Setup skip.** A workspace whose every root is `foreign` was restored from the environment
+  snapshot, and the build already ran the environment's setup there. The wrapper skips only the
+  leading `environmentSetupCommandCount` commands, runs any request-supplied setup, then runs
+  `startCommands`. Without the count it conservatively runs all setup. A
+  clone or a mixed workspace runs setup, then `startCommands`. A snapshot of an older revision is
+  not re-set-up: changed setup commands take effect after the next build. Only a wrapper whose
+  hello advertised `startCommands` receives `startCommands`; an older wrapper receives them
+  appended to `setupCommands` (`startCommandsForWrapper`), so admission bounds the combined list
+  by the setup-command limit. An older wrapper restoring a session disk snapshot cannot run
+  these commands; preparation fails immediately with `wrapper_start_commands_unsupported`
+  rather than silently skipping them. The restored disk and snapshot descriptor remain intact.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
@@ -572,49 +583,56 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
-### Session disk snapshots
+### Workspace tail snapshots
 
-Session snapshots are private root-filesystem checkpoints, not reusable environment templates.
-`SESSION_SNAPSHOT_ORG_IDS` and `SESSION_SNAPSHOT_USER_IDS` are independent comma-separated explicit
-allowlists; both default empty and neither accepts `*`. Removing enrollment prevents capture and
-restore. The first rollout supports only isolated native `cloudflare-containers` allocations at
-`/workspace/app` with one interactive session (`cloud-agent-web`, `desktop` or `agent-manager`)
-throughout the allocation's lifetime. Unattended sessions, shared worktrees and other
-providers retain their current recovery behavior.
+Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
+workspaces. `workspace_*` identifies a Cloud Agent session, not the workspace.
+`WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` are explicit allowlists;
+empty or unset disables the feature, and `*` does not enroll owners.
+Standalone sessions never capture or restore tail snapshots.
 
-- **Capture.** `src/control-plane/sandbox/session-snapshot.ts` owns checkpoint metadata, capture
-  and selection. The existing `heartbeat.active` signal and `lastActivityAt` schedule the existing
-  Sandbox DO alarm after two minutes idle (`SESSION_SNAPSHOT_IDLE_MS`). Capture runs outside the
-  serial queue, once per idle period, through the native snapshot API. No Session DO coordination,
-  event classification, new idle detector or capture retry loop is involved.
-- **Ownership and freshness.** Metadata stays in the Sandbox DO. Publication checks the same
-  allocation, connection, activity timestamp, ready route and session identity. Active heartbeats,
-  delivery, Stop and release invalidate the checkpoint. A container that hosted a second session
-  is ineligible even after that route leaves. Capture failure never fails a user turn.
-- **Cold start.** Selection prefers a compatible private session checkpoint, then the existing
-  environment lookup, then the image. Selection reads local metadata without an RPC. Startup
-  mode, image selection and base-image compatibility are checked, not the runtime release.
-  Downloaded startup installs the currently selected Kilo and wrapper over the restored disk.
-  Only a confirmed physical snapshot start adds frame-only
-  `spec.sessionSnapshot: { sourceAllocationId }`; early wrapper
-  hello cannot race this decision. Registration rejects client-supplied provenance. An incompatible
-  wrapper or failed restore/preparation takes the bounded fresh-start fallback, retaining the
-  queued turn and existing ingest/worktree recovery.
-- **Preparation.** The wrapper validates the source allocation in the workspace stamp; session
-  ownership is checked by the Sandbox DO. It preserves local refs and commits, index, dirty/untracked/
-  ignored files, and HOME instead of running environment adoption, checkout or setup again. Current
-  credentials and profile configuration are refreshed. The restored Kilo session is reused; ordinary
-  ingest recovery remains a fallback with file restoration disabled. Saved worktree patches cannot
-  overwrite the disk either. The new stamp is published after session preparation succeeds and
-  remains discoverable if a bare workspace later runs `git init`.
-- **Retention and rollout.** A full disk can contain credentials, configuration, caches and user
-  secrets; these checkpoints must remain private and are not sanitized environment snapshots.
-  Invalidation and session release remove eligibility, not the physical artifact.
-  The provider's existing 30-day unused retention applies; this release has no list/delete API.
-  Ship the capability-bearing wrapper/runtime before enrollment. Native live-disk consistency,
-  database WAL recovery, heartbeat behavior during capture, and startup-configuration replacement
-  still require deployed provider validation before expanding rollout. These are disk checkpoints,
-  not suspended processes or memory snapshots.
+`src/control-plane/sandbox/workspace-snapshot.ts` owns identity, publication and selection.
+The Sandbox DO stores the workspace descriptor and the current allocation binding in
+Drizzle SQLite. Ownership includes workspace ID, user, organization, sandbox ID and canonical
+workspace directory. The source allocation only records capture provenance.
+Legacy `session_disk_snapshot:v1` and `session_disk_allocation:v1` records are discarded lazily,
+without converting ownership or stopping the live allocation.
+
+Only isolated native Cloudflare Containers qualify. A sandbox serves one workspace only. A
+workspace can contain several sibling sessions with one shared runtime and HOME. Other providers
+keep environment snapshots and existing history/worktree recovery.
+
+- **Capture.** Aggregate wrapper compute activity includes preparation, native child executions and pending
+  turns. The separate negotiated `heartbeat.workspaceBusy` signal excludes active terminals
+  from capture without extending compute activity or the provider lease. The existing sandbox alarm schedules capture after one minute idle;
+  the existing shutdown deadline stays unchanged. Capture runs outside the serial queue, once per
+  idle period. Failed capture is best effort. Publication checks allocation, connection, workspace
+  binding, all ready route attempts, activity and the durable mutation generation.
+- **Freshness and deletion.** Delivery, answer, terminal admission, preparation, membership and
+  deletion invalidate older disk state before mutation. Session deletion retains workspace ownership and permits another idle capture.
+  Workspace deletion invalidates the descriptor and pending capture before resource teardown.
+  Current credential grants and native request authorization exclude deleted members after restore.
+- **Cold startup.** Local selection validates ownership, enrollment, provider, startup mode,
+  image class and immutable image compatibility. It prefers the private workspace tail, then the
+  existing environment snapshot, then the image. Compatible downloaded startup installs the
+  selected Kilo and wrapper release over the disk. Only confirmed provider restore adds
+  `spec.workspaceSnapshot: { workspaceId, directory, sourceAllocationId }` to authorized route
+  frames. Every later sibling receives the same provenance. Registration rejects supplied
+  provenance. Explicit `workspaceSnapshots` capability negotiation keeps older peers on ordinary
+  recovery. Failed restore or preparation uses bounded fallback and retains the queued turn.
+- **Preparation.** The wrapper validates workspace ID, directory and source allocation stamp.
+  It preserves local refs, commits, index, dirty/untracked/ignored files, HOME and native databases.
+  It skips environment adoption, checkout, setup replay and older file recovery. The snapshot
+  holds only the disk: like an environment snapshot, restore applies the current credentials,
+  env, secrets and MCP configuration from the route before accepting work.
+  Existing native sessions are reused; missing native sessions use history-only recovery.
+  New chats and later siblings share that runtime and directory without resetting files.
+- **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
+  allocation, capture time, selected source and skip/fallback reason. They never log handles,
+  credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
+  it does not delete the provider artifact. Cloudflare retains snapshots for 30 days after creation
+  or their last restore, and each restore resets this TTL. Disk snapshots do not preserve running
+  processes, terminals or memory. Ship compatible wrapper and Worker before enrollment.
 
 ## 7. Wrapper
 
@@ -737,7 +755,7 @@ decides from the filesystem alone, for each root:
 The workspace is `same` (`session.ready` reports `workspace: 'same'`, with no setup) only when every
 root has a stamp from this allocation. Otherwise a `same` root is left as it is, the others are
 cloned, checked out or adopted, and setup runs once, at the route directory, for the whole
-workspace. The stamps are written after setup, one for each root, so a root cloned before a later failure has
+workspace, followed by the start commands. The stamps are written after setup, one for each root, so a root cloned before a later failure has
 none and the retry reuses its clone.
 
 Adopt preserves each prepared root and selects the route's starting ref explicitly:
@@ -747,7 +765,8 @@ Adopt preserves each prepared root and selects the route's starting ref explicit
 3. Resolve the remote default only for a new session branch or a working branch that has not been pushed.
 4. Check out the target directly, without an intermediate checkout or deleting other local branches.
    Review refs retain their dedicated fetch and checkout path. Set the git author.
-5. Run the setup commands once for the workspace, then write the stamp of each root.
+5. Run the setup commands once for the workspace, skipping only the environment's commands when
+   every root came from its snapshot (see "Setup skip" above), then the start commands, then write the stamp of each root.
 
 Git failures retain the directory, dependencies, setup changes and original stamp. Network failures
 use the bounded git retry policy; missing branches, authentication failures and checkout conflicts
@@ -840,6 +859,13 @@ the legacy profile restrictions.
   wrapper does not send `completed` for that earlier close. Each finalization step has one timeout that
   covers the whole step. A finalization timeout or failure never aborts the Kilo session, so it
   cannot cancel a newer prompt.
+- Native deadline failures are reported immediately. When the interrupted batch opted into
+  auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
+  and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
+  a three-minute budget, keeps the heartbeat active, and parks later prompts without consuming their
+  delivery deadline. Stop, session release, wrapper shutdown and worktree deletion cancel it.
+  Cancellation failure or a root that is still running skips cleanup with a warning; abrupt sandbox
+  loss cannot guarantee a commit or push. Cleanup never changes the failed outcome.
 
 ### Kilo supervision
 
@@ -1380,8 +1406,14 @@ The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktre
 the canonical workspace parent, the original root chat that remains the authorization anchor for
 the existing child-session API. Every grant renewal checks that root's authorization and its owner,
 organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and parent callbacks belong to that root, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity. Built-in credential
+becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
+invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
+either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
+existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
+as the new chat's first message and derives its operation and session identity from the persisted
+callback message ID. The session form checks that the target is a root or sibling chat with the
+same owner, organization and workspace, and that it is still accessible; the invoking chat learns
+its own session id from the `cloud-agent-context` line in its turns. Built-in credential
 refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
 the workspace's MCP set.
 

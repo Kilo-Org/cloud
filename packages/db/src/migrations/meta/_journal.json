@@ -2339,6 +2339,20 @@
       "when": 1793799686440,
       "tag": "0333_enkrypt_usage_guardrail",
       "breakpoints": true
+    },
+    {
+      "idx": 334,
+      "version": "7",
+      "when": 1793873563531,
+      "tag": "0334_enkrypt_inference_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 335,
+      "version": "7",
+      "when": 1793879248266,
+      "tag": "0335_environment_start_commands",
+      "breakpoints": true
     }
   ]
 }

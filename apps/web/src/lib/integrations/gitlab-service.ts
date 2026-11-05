@@ -8,7 +8,11 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
+  type Owner,
+} from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
 import { ownerCondition } from '@/lib/integrations/db/predicates';
@@ -275,7 +279,9 @@ export async function getValidGitLabProjectAccessToken(
 
 /**
  * List repositories accessible by a GitLab integration
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
+ * Returns the cached snapshot by default, including an empty one that has
+ * already synced; reads the provider when the row has no snapshot yet or when
+ * forceRefresh is true
  */
 export async function listGitLabRepositories(
   owner: Owner,
@@ -305,7 +311,16 @@ export async function listGitLabRepositories(
   }
 
   const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
+  // Answer from the cached snapshot unless the caller forces a sync or the
+  // integration has never synced: a synced empty snapshot is the
+  // connected-empty state, not a reason to re-query GitLab on every read.
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
     const accessToken = await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
@@ -320,7 +335,7 @@ export async function listGitLabRepositories(
   }
 
   return {
-    repositories: cachedRepositories,
+    repositories: cachedRepositories ?? [],
     syncedAt: integration.repositories_synced_at,
   };
 }
@@ -1043,7 +1058,7 @@ const GITLAB_REPOSITORY_SYNC_WARNING =
  * A provider refusal here says nothing about the connection itself, so it is
  * reported as a warning on the successful result instead of failing the
  * connect. A new connection, or one whose previous list was dropped, then has
- * an empty cache, so the next repository-list read refetches it (see
+ * no cached list, so the next repository-list read refetches it (see
  * `listGitLabRepositories`); a same-instance reconnect keeps its last
  * successful list until the user refreshes it.
  *

@@ -21,6 +21,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   type InstancePickerListItem,
   instancePickerListItems,
@@ -139,10 +140,22 @@ export default function InstancePickerScreen() {
     [closePicker]
   );
 
-  const currentConnectionId = bridge?.currentValue?.connectionId ?? null;
+  // The bridge carries the form's target as it stood when the sheet opened. A
+  // host that rebooted reconnects its CLI with the same name and project under
+  // a new connectionId, so matching that snapshot by identifier alone marks no
+  // row at all while the form still names the target. Resolve it onto the live
+  // row first, with the same rule the spawn path uses (`resolveLiveInstance`),
+  // so the row the form shows is the row the sheet marks.
+  const formTarget = bridge?.currentValue ?? null;
+  const liveTarget = formTarget === null ? null : resolveLiveInstance(formTarget, instances);
+  const currentConnectionId = liveTarget?.connectionId ?? null;
   // The pending computer target owns the form: neither the Cloud Agent row
   // nor any instance row is the current selection, so no check mark renders.
-  const pendingComputer = bridge?.pendingComputer === true && currentConnectionId === null;
+  const pendingComputer = bridge?.pendingComputer === true && formTarget === null;
+  // The form runs on the Cloud Agent only when it holds no instance. A target
+  // that no live row represents (the host left the list) is not the Cloud
+  // Agent, so it marks no row instead of claiming one.
+  const cloudAgentSelected = formTarget === null && !pendingComputer;
 
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (a poll tick, the bridge refresh); FlashList's memoized cell
@@ -304,7 +317,7 @@ export default function InstancePickerScreen() {
             onPress={handleSelectCloudAgent}
             {...radioItemA11y({
               label: t('agentChat.instancePicker.runOnCloudAgent'),
-              checked: currentConnectionId === null && !pendingComputer,
+              checked: cloudAgentSelected,
             })}
           >
             <Cloud size={18} color={colors.foreground} />
@@ -316,9 +329,7 @@ export default function InstancePickerScreen() {
                 {t('agentChat.instancePicker.cloudAgentDescription')}
               </Text>
             </View>
-            {currentConnectionId === null && !pendingComputer ? (
-              <Check size={18} color={colors.primary} />
-            ) : null}
+            {cloudAgentSelected ? <Check size={18} color={colors.primary} /> : null}
           </Pressable>
         }
         ListEmptyComponent={

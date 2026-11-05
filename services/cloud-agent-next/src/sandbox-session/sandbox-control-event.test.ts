@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   persistSandboxControlSessionEvent,
+  publicEventProperties,
   type SandboxControlSessionEventInput,
 } from './sandbox-control-event.js';
 
@@ -51,6 +52,50 @@ function deliver(payload: SandboxControlSessionEventInput) {
 }
 
 describe('session event public projection', () => {
+  it('sanitizes native v2 assistant and retry failures without changing the source', () => {
+    const error = { type: 'api', message: 'private-provider-body', status: 429 };
+    const message = {
+      id: 'msg_native',
+      type: 'assistant',
+      time: { created: 1 },
+      error,
+      retry: { attempt: 2, at: 3, error },
+    };
+    const projected = publicEventProperties({
+      type: 'conversation.message.updated',
+      properties: { message },
+    });
+    expect(projected).toMatchObject({
+      message: {
+        error: { type: 'api', message: 'Assistant request was rate limited', status: 429 },
+        retry: { error: { message: 'Assistant request was rate limited' } },
+      },
+    });
+    expect(JSON.stringify(projected)).not.toContain('private-provider');
+    expect(message.error.message).toBe('private-provider-body');
+  });
+
+  it('sanitizes native v2 live failure events and retains their identity', () => {
+    const projected = publicEventProperties({
+      type: 'conversation.event',
+      properties: {
+        sessionID: 'ses_native',
+        event: {
+          id: 'evt_native',
+          type: 'session.retry.scheduled',
+          data: {
+            sessionID: 'ses_native',
+            error: { type: 'api', message: 'private-provider-body', status: 503 },
+          },
+        },
+      },
+    });
+    expect(projected).toMatchObject({
+      event: { id: 'evt_native', data: { error: { message: 'Assistant service is unavailable' } } },
+    });
+    expect(JSON.stringify(projected)).not.toContain('private-provider');
+  });
+
   describe.each(carriers)('$type', carrier => {
     it.each([
       {
@@ -66,28 +111,50 @@ describe('session event public projection', () => {
           },
         },
         expected: 'Assistant request was rate limited',
+        sdkError: {
+          name: 'APIError',
+          data: {
+            message: 'Assistant request was rate limited',
+            statusCode: 429,
+            isRetryable: true,
+          },
+        },
       },
       {
         error: { name: 'APIError', data: { message: '[BYOK] fixture', statusCode: 400 } },
         expected:
           '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        sdkError: {
+          name: 'UnknownError',
+          data: {
+            message:
+              '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+          },
+        },
       },
       {
         error: { name: 'MessageAbortedError' },
         expected: 'The message was interrupted by the user',
+        sdkError: {
+          name: 'MessageAbortedError',
+          data: { message: 'The message was interrupted by the user' },
+        },
       },
       {
         error: { name: 'FixtureError', data: { message: 'fixture-detail' } },
         expected: 'Assistant request failed',
+        sdkError: { name: 'UnknownError', data: { message: 'Assistant request failed' } },
       },
-    ])('renders the shared public failure message %#', ({ error, expected }) => {
+    ])('renders the shared public failure message %#', ({ error, expected, sdkError }) => {
       const payload = { type: carrier.type, properties: carrier.properties(error) };
       const original = structuredClone(payload);
       const { live, stored } = deliver(payload);
       const expectedEvent = {
         type: carrier.type,
         event: carrier.type,
-        properties: carrier.properties(expected),
+        properties: carrier.properties(
+          carrier.type === 'message.part.updated' ? sdkError : expected
+        ),
       };
       expect(live).toEqual(expectedEvent);
       expect(stored).toEqual(expectedEvent);

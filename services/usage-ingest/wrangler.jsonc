@@ -27,7 +27,7 @@
         "max_batch_timeout": 0,
         "max_retries": 20,
         "retry_delay": 60,
-        "max_concurrency": 200,
+        "max_concurrency": 225,
         "dead_letter_queue": "usage-ingest-processing-dlq-eu",
       },
     ],

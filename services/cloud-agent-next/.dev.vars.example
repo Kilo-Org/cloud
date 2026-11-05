@@ -73,9 +73,9 @@ BYOC_VERCEL_IDS=
 CLOUDFLARE_CONTAINERS_ORG_IDS=*
 # Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
 ENVIRONMENT_SNAPSHOT_ORG_IDS=*
-# Explicit organization or user IDs allowed to capture and restore per-session disks. No wildcard.
-SESSION_SNAPSHOT_ORG_IDS=
-SESSION_SNAPSHOT_USER_IDS=
+# Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
+WORKSPACE_SNAPSHOT_ORG_IDS=
+WORKSPACE_SNAPSHOT_USER_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

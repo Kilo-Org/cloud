@@ -2,9 +2,10 @@ name: harness SDK build
 description: >-
   Restore packages/harness-sdk/dist from the cache, or build it. The cache key
   hashes every repository file of the tsconfig.build.json program (from
-  `tsgo --listFilesOnly`), the build configuration, and pnpm-lock.yaml, which
-  pins every file under node_modules. A hit therefore restores exactly what the
-  build would write. Run it after `pnpm install`.
+  `tsgo --listFilesOnly`), the build configuration, and the lockfile entries of
+  the package's importer closure, which pin every file the build reads under
+  node_modules. A hit therefore restores exactly what the build would write. Run
+  it after `pnpm install`.
 
 runs:
   using: composite

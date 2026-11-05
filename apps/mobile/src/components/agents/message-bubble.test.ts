@@ -271,12 +271,12 @@ function assistantMessageWithText(id: string): StoredMessage {
 function assistantMessageWithError(
   id: string,
   errorName: string,
-  options: { content?: boolean } = {}
+  options: { content?: boolean; isRetryable?: boolean } = {}
 ): StoredMessage {
   const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
   (message.info as { error?: { name: string; data: unknown } }).error = {
     name: errorName,
-    data: { message: 'raw', isRetryable: true },
+    data: { message: 'raw', isRetryable: options.isRetryable ?? true },
   };
   return message;
 }
@@ -403,6 +403,20 @@ describe('MessageBubble failure footer', () => {
       { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
     );
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a gateway-marked final refusal in the detail line, without Retry', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-terminal', 'APIError', { isRetryable: false }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(true);
+    // The transient failure's line is what the terminal row used to repeat.
+    expect(findText(tree, t => t === 'The provider returned an error.')).toBe(false);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
   });
 
@@ -684,6 +698,45 @@ describe('MessageBubble copy-to-composer human text', () => {
     expect(onCopyToComposer).toHaveBeenCalledWith('prompt');
   });
 
+  it('passes the prompt, not injected server context, to Copy', async () => {
+    const message = userMessage('m-copy-context');
+    message.parts = [
+      {
+        id: 'm-copy-context-synthetic',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-context',
+        type: 'text',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      },
+      {
+        id: 'm-copy-context-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-context',
+        type: 'text',
+        text: 'prompt',
+      },
+    ] as typeof message.parts;
+
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onCopyToComposer,
+    });
+
+    const copy = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Copy to composer'
+    );
+    expect(copy).not.toBeNull();
+    if (!copy) {
+      throw new Error('expected Copy to composer button');
+    }
+    (copy.props.onPress as () => void)();
+    expect(onCopyToComposer).toHaveBeenCalledWith('prompt');
+  });
+
   it('hides Copy for a file-only failed row', async () => {
     const message = userMessage('m-copy-file');
     message.parts = [
@@ -788,6 +841,35 @@ describe('MessageBubble user text join', () => {
       expect(element?.props.value as string).toContain('\n\n');
     }
   );
+
+  it('renders only the prompt, not injected server context', async () => {
+    const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+
+    const message = userMessage('m-context');
+    message.parts = [
+      {
+        id: 'm-context-synthetic',
+        sessionID: 'ses_1',
+        messageID: 'm-context',
+        type: 'text',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      },
+      {
+        id: 'm-context-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm-context',
+        type: 'text',
+        text: 'prompt',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+
+    const element = findElementByTypeFn(tree, MockChatMarkdownText);
+    expect(element).not.toBeNull();
+    expect(element?.props.value).toBe('prompt');
+  });
 });
 
 describe('MessageBubble assistant treatment', () => {

@@ -27,7 +27,7 @@ import { MessageLongPressProvider } from './message-long-press-context';
 import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
-import { firstHumanText, isFilePart, isTextPart } from './part-types';
+import { firstHumanText, humanTextParts, isFilePart } from './part-types';
 import { groupMessageParts } from './session-tool-run';
 import { CondensedToolRunRow } from './tool-run-rows';
 import { useMessageCopy } from './use-message-copy';
@@ -116,8 +116,7 @@ function MessageBubbleImpl({
   const userTextContent = useMemo(
     () =>
       isUser
-        ? parts
-            .filter(part => isTextPart(part))
+        ? humanTextParts(parts)
             .map(p => p.text)
             .join('\n\n')
         : '',

@@ -152,13 +152,16 @@ describe('native durable attachment', () => {
       deriveSessionStatus: () => unknown;
       pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
       preparationRecorders: Map<string, unknown>;
+      historyHydrations: Map<string, Promise<void>>;
     };
     Object.assign(session, {
       initialized: Promise.resolve(),
       registration: { spec: { kiloSessionId: KILO_SESSION_ID } },
       sessionId: SESSION_ID,
       deriveSessionStatus: () => ({ type: 'idle' }),
+      partText: { flush: () => {} },
       preparationRecorders: new Map(),
+      historyHydrations: new Map(),
     });
     return session;
   }
@@ -304,7 +307,7 @@ describe('native durable attachment', () => {
     });
   });
 
-  it('omits a derived idle status while a newer accepted turn is still active', async () => {
+  it('reports busy while a newer accepted turn is active and idle after settlement', async () => {
     const session = attachmentUnit();
     delete (session as { deriveSessionStatus?: unknown }).deriveSessionStatus;
     Object.assign(session, {
@@ -319,7 +322,7 @@ describe('native durable attachment', () => {
       ],
     });
     await expect(session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toMatchObject(
-      { sessionStatus: undefined }
+      { sessionStatus: { type: 'busy' } }
     );
 
     Object.assign(session, { messages: [{ messageId: 'msg_completed', state: 'completed' }] });

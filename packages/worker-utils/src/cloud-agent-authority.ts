@@ -2,11 +2,42 @@ import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
-export const PARENT_SESSION_CALLBACK_URL = 'session:parent';
-export const ParentSessionCallbackTargetSchema = z
-  .object({ url: z.literal(PARENT_SESSION_CALLBACK_URL) })
+export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
+export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
+const WORKSPACE_SESSION_CALLBACK_URL_PATTERN =
+  /^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const ParentWorkspaceCallbackTargetSchema = z
+  .object({ url: z.literal(PARENT_WORKSPACE_CALLBACK_URL) })
   .strict()
-  .describe('Notify the spawning parent session when this child finishes. Omit for no callback.');
+  .describe(
+    'Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback.'
+  );
+export const ParentWorkspaceSessionCallbackTargetSchema = z
+  .object({
+    url: z.string().regex(WORKSPACE_SESSION_CALLBACK_URL_PATTERN),
+  })
+  .strict()
+  .describe(
+    'Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages.'
+  );
+export const ParentCallbackTargetSchema = z
+  .union([ParentWorkspaceCallbackTargetSchema, ParentWorkspaceSessionCallbackTargetSchema])
+  .describe(
+    'Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback.'
+  );
+
+export type ParentWorkspaceSessionCallbackTarget = z.infer<
+  typeof ParentWorkspaceSessionCallbackTargetSchema
+>;
+
+export function parseWorkspaceSessionCallbackTarget(url: string): string | null {
+  if (!WORKSPACE_SESSION_CALLBACK_URL_PATTERN.test(url)) return null;
+  return url.slice(WORKSPACE_SESSION_CALLBACK_PREFIX.length);
+}
+
+export function isWorkspaceCallbackTargetUrl(url: string): boolean {
+  return url === PARENT_WORKSPACE_CALLBACK_URL || parseWorkspaceSessionCallbackTarget(url) !== null;
+}
 
 export const CloudAgentSpawnProcedureSchema = z.enum([
   'cloudAgentNext.prepareSession',
@@ -76,7 +107,7 @@ const scopedPrepareSessionSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
-    callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+    callbackTarget: ParentCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();

@@ -37,6 +37,7 @@ import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 /** The request a response scan belongs to. The scanned text is the response. */
 export type EnkryptOutputScan = Omit<EnkryptGuardrailScan, 'text' | 'coverage'>;
@@ -282,6 +283,7 @@ type GuardEnkryptOutputParams = {
   onReject: (rejection: NextResponse, verdict: EnkryptGuardrailVerdict) => Promise<void>;
   /** Receives the guardrail's report, to read after the response like `after()` work. */
   captureReport?: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
+  captureRequestLogs?: (logs: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>) => void;
 };
 
 /**
@@ -309,13 +311,28 @@ export async function guardEnkryptOutput({
   release,
   onReject,
   captureReport,
+  captureRequestLogs,
 }: GuardEnkryptOutputParams): Promise<NextResponse> {
   // Upstream error bodies are not model output.
   if (!scan || !response.ok || !response.body) return release(response);
   const { body } = response;
   const { blocking, logOnly } = splitEnkryptInputGuardrail(scan.config);
   const format = bodyFormat(response);
-  const deps = { apiKey: ENKRYPT_API_KEY, fetch, timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS, signal };
+  const requestLogs: Promise<EnkryptRequestLog>[] = [];
+  const captureResponse = Promise.withResolvers<boolean>();
+  const deps = {
+    apiKey: ENKRYPT_API_KEY,
+    fetch,
+    timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+    signal,
+    requestLog: captureRequestLogs && {
+      guardrail: 'output' as const,
+      capture: (entry: Promise<EnkryptRequestLog>) => {
+        requestLogs.push(entry);
+      },
+      captureResponse: captureResponse.promise,
+    },
+  };
   const logFields = {
     guardrail: 'output',
     organization_id: scan.organizationId,
@@ -382,7 +399,7 @@ export async function guardEnkryptOutput({
   if (!blocking) {
     const copy = logOnly && response.clone().body;
     if (logOnly && copy) {
-      const logged = (async () => {
+      const scanned = (async () => {
         try {
           const copied = await readBody(copy);
           report.upstream_read_failed = copied.readError !== null;
@@ -391,7 +408,7 @@ export async function guardEnkryptOutput({
           report.output_characters = text.length;
           if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
           const result = await scanOutput(logOnly, text);
-          await recordEnkryptUsageRecords(outputUsageRecords([], result.usageRecords, 0));
+          return outputUsageRecords([], result.usageRecords, 0);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
             ...logFields,
@@ -399,7 +416,13 @@ export async function guardEnkryptOutput({
           });
         }
       })();
+      const logged = scanned.then(records => recordEnkryptUsageRecords(records ?? []));
       after(logged);
+      captureRequestLogs?.(async (shouldCaptureResponse = true) => {
+        captureResponse.resolve(shouldCaptureResponse);
+        await scanned;
+        return Promise.all(requestLogs);
+      });
       captureReport?.(async () => {
         await logged;
         return finalReport();
@@ -483,6 +506,12 @@ export async function guardEnkryptOutput({
   })();
   const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords);
   after(recorded);
+  captureRequestLogs?.(async (shouldCaptureResponse = true) => {
+    captureResponse.resolve(shouldCaptureResponse);
+    const { usageRecords } = await scanned;
+    await usageRecords;
+    return Promise.all(requestLogs);
+  });
   captureReport?.(async () => {
     await recorded;
     return finalReport();

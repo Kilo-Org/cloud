@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
+import * as z from 'zod';
+import { ENKRYPT_DETECTOR_IDS } from '@kilocode/db/schema-types';
 import {
+  guardrailBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -8,17 +11,18 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { joinRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /** When false, every request is scanned in full. */
 export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
 
 /**
- * Bump when key derivation or the meaning of an allowed verdict changes, for example how detector
+ * Bump when key derivation or the meaning of a cached verdict changes, for example how detector
  * results are parsed or which detections block, so entries written by older code stop matching.
  * Extraction changes already change the hashed segments.
  */
-const VERDICT_CACHE_VERSION = 1;
+const VERDICT_CACHE_VERSION = 2;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 6 * 60 * 60;
 
@@ -34,9 +38,25 @@ export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 2_000;
  */
 export const MAX_PROBED_PREFIXES = 128;
 
+const cachedBlockVerdictSchema = z
+  .object({
+    action: z.literal('block'),
+    detectors: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty(),
+  })
+  .strict();
+
+export type EnkryptVerdictCacheEntry = {
+  key: string;
+  verdict: 'allow' | z.infer<typeof cachedBlockVerdictSchema>;
+};
+
 export type EnkryptVerdictCacheStore = {
-  mget(keys: string[]): Promise<(string | null)[]>;
-  set(key: string, value: string, options: { ex: number }): Promise<unknown>;
+  mget(keys: string[]): Promise<unknown[]>;
+  set(
+    key: string,
+    value: EnkryptVerdictCacheEntry['verdict'],
+    options: { ex: number } & ({ nx: true } | { nx?: never })
+  ): Promise<unknown>;
 };
 
 export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'coverage'> & {
@@ -46,8 +66,7 @@ export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'cover
 export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when no scan ran. */
   report: EnkryptGuardrailScanResult['report'] | null;
-  /** Set when the request was allowed and its full content is not cached yet. */
-  allowedKey: string | null;
+  cacheEntry: EnkryptVerdictCacheEntry | null;
 };
 
 type ReadyConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
@@ -95,16 +114,39 @@ export function verdictCacheKeys(
   });
 }
 
-async function cachedSegmentCount(
+async function cachedPrefix(
   organizationId: string,
   keys: string[],
+  config: ReadyConfig,
   store: EnkryptVerdictCacheStore
-): Promise<number | 'error'> {
+): Promise<{ cachedSegments: number; verdict: EnkryptVerdictCacheEntry['verdict'] } | 'error'> {
   const firstProbed = Math.max(0, keys.length - MAX_PROBED_PREFIXES);
   try {
     const values = await store.mget(keys.slice(firstProbed));
-    const lastCached = values.findLastIndex(value => value !== null);
-    return lastCached === -1 ? 0 : firstProbed + lastCached + 1;
+    let cachedSegments = 0;
+    for (const [index, value] of values.entries()) {
+      const segments = firstProbed + index + 1;
+      if (value === 'allow') {
+        cachedSegments = segments;
+        continue;
+      }
+      let parsed: unknown = value;
+      if (typeof value === 'string') {
+        try {
+          parsed = JSON.parse(value);
+        } catch {
+          continue;
+        }
+      }
+      const blocked = cachedBlockVerdictSchema.safeParse(parsed);
+      if (
+        blocked.success &&
+        blocked.data.detectors.every(detector => config.blockingDetectors.includes(detector))
+      ) {
+        return { cachedSegments: segments, verdict: blocked.data };
+      }
+    }
+    return { cachedSegments, verdict: 'allow' };
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache lookup failed; scanning in full', {
       organization_id: organizationId,
@@ -112,14 +154,6 @@ async function cachedSegmentCount(
     });
     return 'error';
   }
-}
-
-/**
- * A log-only scan also allows when it fails or the text is too large to send, so only an allow
- * that Enkrypt itself decided on its final call is cached.
- */
-function enkryptAllowed({ verdict, usageRecords }: EnkryptGuardrailScanResult): boolean {
-  return verdict.action === 'allow' && usageRecords.at(-1)?.decision === 'allowed';
 }
 
 function isLowSurrogate(codeUnit: number): boolean {
@@ -134,8 +168,8 @@ function overlapStart(text: string, cachedCharacters: number): number {
 
 /**
  * Scans only the part of the request that no earlier allowed request with the same scope covered,
- * plus an overlap. A cache failure scans the request in full, so it never lets unscanned content
- * through.
+ * plus an overlap. A cached block rejects requests retaining that prefix. A cache failure scans
+ * the request in full, so it never lets unscanned content through.
  */
 export async function scanRequestWithVerdictCache(
   { segments, ...request }: EnkryptGuardrailRequest,
@@ -152,12 +186,12 @@ export async function scanRequestWithVerdictCache(
   const { config } = request;
   if (!deps.store || config.status !== 'ready' || segments.length === 0) {
     const result = await scanRequest({ ...request, text, coverage: uncached }, deps);
-    return { ...result, allowedKey: null };
+    return { ...result, cacheEntry: null };
   }
 
   const keys = verdictCacheKeys(request, config, segments);
-  const lookup = await cachedSegmentCount(request.organizationId, keys, deps.store);
-  const cachedSegments = lookup === 'error' ? 0 : lookup;
+  const lookup = await cachedPrefix(request.organizationId, keys, config, deps.store);
+  const cachedSegments = lookup === 'error' ? 0 : lookup.cachedSegments;
   const cachedCharacters = joinRequestSegments(segments.slice(0, cachedSegments)).length;
   const fullyCached = cachedSegments === segments.length;
   const coverage: EnkryptScanCoverage = {
@@ -166,25 +200,79 @@ export async function scanRequestWithVerdictCache(
     cachedCharacters,
     cachedSegments,
   };
+  if (lookup !== 'error' && lookup.verdict !== 'allow') {
+    const report: EnkryptGuardrailScanResult['report'] = {
+      scan: 'blocking',
+      detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
+      detectors_blocking: config.blockingDetectors,
+      verdict_cache: 'hit',
+      total_characters: text.length,
+      total_segments: segments.length,
+      cached_characters: cachedCharacters,
+      cached_segments: cachedSegments,
+      scanned_characters: 0,
+      decision: 'blocked',
+      error: null,
+      detectors_fired: lookup.verdict.detectors,
+      attempts: 0,
+      credits_cost: null,
+      latency_ms: 0,
+    };
+    console.debug('[enkrypt-guardrail] decision', {
+      organization_id: request.organizationId,
+      session_id: request.sessionId,
+      client_request_id: request.clientRequestId,
+      api_kind: request.apiKind,
+      scan_tool_results: config.scanToolResults,
+      ...report,
+    });
+    return {
+      verdict: { action: 'block', message: guardrailBlockMessage(lookup.verdict.detectors, null) },
+      usageRecords: [],
+      report,
+      cacheEntry: null,
+    };
+  }
   const scannedText = fullyCached ? '' : text.slice(overlapStart(text, cachedCharacters));
 
   const result = await scanRequest({ ...request, text: scannedText, coverage }, deps);
-  const allowedKey = !fullyCached && enkryptAllowed(result) ? (keys.at(-1) ?? null) : null;
-  return { ...result, allowedKey };
+  const key = keys.at(-1);
+  const finalDecision = result.usageRecords.at(-1)?.decision;
+  const blockingDetectors = result.report.detectors_fired.filter(detector =>
+    config.blockingDetectors.includes(detector)
+  );
+  let cacheEntry: EnkryptVerdictCacheEntry | null = null;
+  if (!fullyCached && key) {
+    if (result.verdict.action === 'allow' && finalDecision === 'allowed') {
+      cacheEntry = { key, verdict: 'allow' };
+    } else if (
+      result.verdict.action === 'block' &&
+      finalDecision === 'blocked' &&
+      blockingDetectors.length > 0
+    ) {
+      cacheEntry = { key, verdict: { action: 'block', detectors: blockingDetectors } };
+    }
+  }
+  return { ...result, cacheEntry };
 }
 
-/** Returns whether the entry was stored. */
-export async function rememberAllowedRequest(
-  key: string,
+export async function rememberRequestVerdict(
+  { key, verdict }: EnkryptVerdictCacheEntry,
   store: EnkryptVerdictCacheStore
-): Promise<boolean> {
+): Promise<EnkryptGuardrailReport['scans'][number]['verdict_cache_write']> {
   try {
-    await store.set(key, '1', { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS });
-    return true;
+    const result = await store.set(
+      key,
+      verdict,
+      verdict === 'allow'
+        ? { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS, nx: true }
+        : { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }
+    );
+    return result === null ? 'skipped' : 'written';
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache write failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return false;
+    return 'failed';
   }
 }

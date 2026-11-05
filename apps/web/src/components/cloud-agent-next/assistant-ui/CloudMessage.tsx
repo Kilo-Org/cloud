@@ -21,6 +21,8 @@ import { getDeliveryBadge } from '../delivery-badge';
 import { isCompactionPart, isFilePart, isTextPart } from '../types';
 import { getVisibleAssistantParts } from '../message-presentation';
 import { parseWorktreeReviewMessage } from '../worktree-review';
+import { parseChildSessionCallbackPrompt } from '@kilocode/worker-utils/cloud-agent-child-callback';
+import { ChildSessionCallbackCard } from '../ChildSessionCallbackCard';
 import { WorktreeReviewMessageCard } from '../WorktreeReviewMessageCard';
 import { PreparationRow } from '../PreparationRow';
 import { CommitCard } from '../CommitCard';
@@ -48,6 +50,8 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const interrupted = error != null && isAssistantInterruptError(error);
   const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
   const review = isUser ? parseWorktreeReviewMessage(text) : null;
+  const callback = isUser ? parseChildSessionCallbackPrompt(text) : null;
+  const userCopyText = callback ? (callback.result ?? callback.errorMessage) : text;
   const files = parts.filter(isFilePart);
   const imageCount = files.filter(part => part.mime.startsWith('image/')).length;
   const badge = getDeliveryBadge(presentation.deliveryState, { sending: presentation.isSending });
@@ -94,9 +98,16 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
             />
           ) : isUser ? (
             <>
-              <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-md px-3 py-2 sm:max-w-[85%] md:max-w-[80%]">
+              <div
+                className={cn(
+                  'relative max-w-[95%] sm:max-w-[85%] md:max-w-[80%]',
+                  callback ? 'w-full' : 'bg-primary text-primary-foreground rounded-md px-3 py-2'
+                )}
+              >
                 {badge && <DeliveryStatusIcon badge={badge} />}
-                {review ? (
+                {callback ? (
+                  <ChildSessionCallbackCard callback={callback} />
+                ) : review ? (
                   <WorktreeReviewMessageCard review={review} />
                 ) : (
                   text && (
@@ -113,7 +124,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
                   ))}
               </div>
               <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
-                {text && <CopyMessageButton getText={() => text} />}
+                {userCopyText && <CopyMessageButton getText={() => userCopyText} />}
                 <TimeAgo
                   timestamp={presentation.displayTimestamp}
                   className="text-muted-foreground/70 text-xs"

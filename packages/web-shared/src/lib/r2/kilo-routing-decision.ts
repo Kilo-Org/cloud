@@ -7,6 +7,7 @@ import type {
   ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
+  aiProviderMetadataKey,
   getAiProviderMetadataBucket,
   scheduleAiProviderMetadataArchive,
 } from '@kilocode/web-shared/lib/r2/ai-provider-metadata-bucket';
@@ -58,7 +59,7 @@ export function createAiProviderMetadataCapture(
         target,
         logSource: LOG_SOURCE,
         logContext: { usageId },
-        key: `${usageId}.json`,
+        key: aiProviderMetadataKey(usageId),
         body: async () => {
           if (parsing) await Promise.race([parsing, vercel.completed]);
           const metadata = vercel.snapshot();

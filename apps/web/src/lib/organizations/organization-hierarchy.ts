@@ -110,10 +110,24 @@ export async function createChildOrganization(
       await enforceOrganizationCreationLimit(tx, userId);
     }
 
+    const [parentOrganization] = await tx
+      .select({ plan: organizations.plan })
+      .from(organizations)
+      .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+
+    if (!parentOrganization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Parent organization not found',
+      });
+    }
+
     const [createdOrganization] = await tx
       .insert(organizations)
       .values({
         name,
+        plan: parentOrganization.plan,
         require_seats: false,
         free_trial_end_at: null,
         parent_organization_id: parentOrganizationId,

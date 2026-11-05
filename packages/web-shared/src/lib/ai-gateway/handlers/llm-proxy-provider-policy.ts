@@ -6,6 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
+  getManagedGatewayFromUrl,
   getOrganizationGatewaySettings,
   isManagedGatewayDisabled,
   NO_ORGANIZATION_GATEWAY_SETTINGS,
@@ -206,6 +207,12 @@ export async function resolveProviderAndPolicy(
   const providerType = providerResult.provider.type;
   if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
     return reject(managedGatewayDisabledResponse(providerType));
+  }
+  const providerBaseUrl =
+    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
+  const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
+  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+    return reject(managedGatewayDisabledResponse(gatewayByDomain));
   }
   if (orgAutoRouteTarget) {
     try {

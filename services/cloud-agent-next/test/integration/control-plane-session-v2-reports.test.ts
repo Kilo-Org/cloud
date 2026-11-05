@@ -493,7 +493,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('persists parent delivery identity and deduplicates its admitted parent turn', async () => {
-    const { sessionId, stub } = await setup('session:parent');
+    const { sessionId, stub } = await setup('workspace:new-chat');
     const captured = await installCapturedQueues(stub);
     await stub.send(promptPayload('child-task'));
     await waitFor(async () => expect(await messageStatus(stub, 'child-task')).toBe('running'));

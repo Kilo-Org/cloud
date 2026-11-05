@@ -11,7 +11,20 @@ import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config'
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
 export const USAGE_ENQUEUE_MAX_ATTEMPTS = 4;
 export const USAGE_ENQUEUE_RETRY_TIMEOUT_MS = 5_000;
-export const USAGE_ENQUEUE_RETRY_BUDGET_MS = 25_000;
+/**
+ * Observed ingress stalls of 5-10 s generally end in acceptance, so a longer first
+ * confirmation avoids a duplicate send when acceptance takes that long. After #9865, stalls
+ * that still retried ran roughly 12-21 s, so the first attempt now covers most of that range;
+ * a stall longer than 20 s still duplicates. A lost first send is still retried; it is now
+ * recovered about 10 s later than with a 10 s first attempt.
+ */
+export const USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS = 20_000;
+/**
+ * Four full windows plus maximum backoff take under 38.5 s, so a lost first send still gets
+ * three full 5 s retries. The budget only shortens or skips an attempt when runtime scheduling
+ * delays the loop.
+ */
+export const USAGE_ENQUEUE_RETRY_BUDGET_MS = 40_000;
 const RETRY_BASE_DELAY_MS = 500;
 const RETRY_MAX_DELAY_MS = 2_000;
 
@@ -82,9 +95,6 @@ export async function enqueueUsage(
   }
 
   const maxAttempts = retryTransientFailures ? USAGE_ENQUEUE_MAX_ATTEMPTS : 1;
-  const attemptTimeoutMs = retryTransientFailures
-    ? USAGE_ENQUEUE_RETRY_TIMEOUT_MS
-    : USAGE_ENQUEUE_TIMEOUT_MS;
   const deadline = retryTransientFailures
     ? performance.now() + USAGE_ENQUEUE_RETRY_BUDGET_MS
     : Number.POSITIVE_INFINITY;
@@ -93,6 +103,14 @@ export async function enqueueUsage(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const remainingAttemptBudgetMs = Math.floor(deadline - performance.now());
     if (remainingAttemptBudgetMs <= 0) break;
+    // Only the first retry-mode attempt gets the longer window; later attempts keep the per-retry
+    // timeout, and every attempt is still clipped to what is left of the total budget.
+    const attemptTimeoutMs =
+      retryTransientFailures && attempt === 1
+        ? USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS
+        : retryTransientFailures
+          ? USAGE_ENQUEUE_RETRY_TIMEOUT_MS
+          : USAGE_ENQUEUE_TIMEOUT_MS;
     const signal = AbortSignal.timeout(Math.min(attemptTimeoutMs, remainingAttemptBudgetMs));
     let retryable: boolean;
     try {

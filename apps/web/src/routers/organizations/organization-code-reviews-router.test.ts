@@ -1090,6 +1090,48 @@ describe('organization review agent router: repository_selection_mode', () => {
     );
   });
 
+  it('runs the GitLab hook sync for the resolved selected mode when the save sends "all"', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [303],
+    });
+
+    // The resolved mode is 'selected', so the stored selection gets its hooks
+    // even though the client asked for 'all'.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [303],
+      [],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
   it('reports selected for the organization GitLab default config and keeps GitHub unchanged', async () => {
     const { owner, organization } = await createFixtureOrganization();
     const caller = await createCallerForUser(owner.id);

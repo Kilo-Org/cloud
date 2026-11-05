@@ -36,7 +36,7 @@ export function InviteSignOutButton({ callbackPath, requireSso }: InviteSignOutB
 
   return (
     <div className="mt-4">
-      <p className="mb-3 text-sm">This signs you out of Kilo on all browsers.</p>
+      <p className="mb-3 text-sm text-red-700">This signs you out of Kilo on all browsers.</p>
       <Button onClick={handleSignOut} disabled={isSigningOut} aria-busy={isSigningOut || undefined}>
         {isSigningOut
           ? 'Signing out…'

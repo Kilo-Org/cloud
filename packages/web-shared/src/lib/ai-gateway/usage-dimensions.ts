@@ -57,9 +57,9 @@ export type EditorName = (typeof EDITOR_NAME_VALUES)[number] | typeof OTHER_EDIT
  * The clients send an application name with its version appended
  * (`vscode.env.appName` plus `vscode.version` from the VS Code family,
  * `fullApplicationName` plus the build string from the JetBrains plugin), so
- * the match is on a prefix: a JetBrains code name such as
- * `Android Studio Ladybug` keeps the family, and an application version maps to
- * the same family.
+ * the match is on a prefix: an edition qualifier such as
+ * `IntelliJ IDEA Ultimate Edition 2024.1` keeps the family, and an application
+ * version maps to the same family.
  */
 const EDITOR_SLUG_PREFIXES: ReadonlyArray<readonly [prefix: string, value: EditorName]> = (
   [
@@ -94,7 +94,9 @@ const EDITOR_SLUG_PREFIXES: ReadonlyArray<readonly [prefix: string, value: Edito
 /**
  * Built-in agent names and legacy Kilo modes. Custom agent names are
  * caller-defined, so they collapse to `other`; add a built-in name here when a
- * client starts sending it.
+ * client starts sending it. `orchestrator` and `custom` are the built-in modes
+ * in `services/cloud-agent-next/src/shared/agent-modes.ts`, whose Worker
+ * forwards `x-kilocode-mode` to the gateway.
  */
 export const MODE_VALUES = [
   'build',
@@ -103,6 +105,8 @@ export const MODE_VALUES = [
   'architect',
   'ask',
   'debug',
+  'orchestrator',
+  'custom',
   'general',
   'explore',
   'scout',
@@ -120,7 +124,8 @@ export type Mode = (typeof MODE_VALUES)[number] | typeof OTHER_MODE;
  */
 export const SYSTEM_PROMPT_PREFIX_BUCKETS = 1 << 16;
 
-const SYSTEM_PROMPT_PREFIX_DIGEST_LENGTH = 4;
+/** Hex characters of the digest that form the key: 16 bits is 4 hex characters. */
+const SYSTEM_PROMPT_PREFIX_DIGEST_LENGTH = Math.log2(SYSTEM_PROMPT_PREFIX_BUCKETS) / 4;
 
 /** Trimmed, lowercased, version-free form of an editor name (`visual-studio-code`). */
 function editorSlug(value: string | null): string | null {

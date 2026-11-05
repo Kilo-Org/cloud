@@ -72,6 +72,9 @@ describe('normalizeMode', () => {
     ['architect', 'architect'],
     ['general', 'general'],
     ['explore', 'explore'],
+    ['orchestrator', 'orchestrator'],
+    ['custom', 'custom'],
+    ['Orchestrator', 'orchestrator'],
     ['BUILD', 'build'],
     ['  Plan  ', 'plan'],
   ])('maps %j to %j', (value, expected) => {

@@ -538,10 +538,10 @@ function invitationAddressesAccount(
 
 /**
  * The account-matching relation for member rows. The query returns the rows that
- * can match — the stored normalized form, a case variant of the address, and the
- * rows that carry no stored normalized form — and the relation itself decides.
- * Rows without a stored normalized form are the only ones the database cannot
- * narrow, and they are the legacy ones.
+ * can match: the stored normalized form, a case variant of the address, and the
+ * rows that carry no stored normalized form. The relation itself decides. Rows
+ * without a stored normalized form are the only ones the database cannot narrow,
+ * and they are the legacy ones.
  */
 async function organizationMembersMatchingEmail(
   tx: DrizzleTransaction,
@@ -581,14 +581,15 @@ async function parentOrganizationMemberIdForEmail(
   const member = members.find(candidate => !candidate.isBot);
   if (!member) return null;
 
-  // Keep the parent membership from disappearing before this transaction commits.
-  await tx
+  // Re-read the row under a share lock: a membership removed between the read
+  // above and this statement no longer counts as a parent member.
+  const [lockedMembership] = await tx
     .select({ id: organization_memberships.id })
     .from(organization_memberships)
     .where(eq(organization_memberships.id, member.membershipId))
     .for('share');
 
-  return member.userId;
+  return lockedMembership ? member.userId : null;
 }
 
 export async function inviteUserToOrganization(

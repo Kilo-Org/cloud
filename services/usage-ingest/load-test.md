@@ -171,3 +171,204 @@ text or parameter values are returned in the snapshot above.
 Sources: [Supabase query statistics](https://supabase.com/docs/guides/database/extensions/pg_stat_statements),
 [database inspection](https://supabase.com/docs/guides/observability/inspect), and
 [resource reports](https://supabase.com/docs/guides/observability/reports).
+
+## Validate the `on_stall` direct lane
+
+Staging commits `USAGE_INGEST_DIRECT_MODE=on_stall`, so deploying the staging
+Worker activates the direct lane there. First check the
+[writer prerequisite](README.md#deployment-prerequisite). This section validates
+the lane in hosted staging. It does not establish production capacity or approve a
+production mode.
+
+### What local tests already cover
+
+These tests are deterministic and need no hosted service. They inject the
+`Queue.send` promise and the writer response:
+
+- `src/publish-usage.test.ts`, suites `direct lane on_stall` and
+  `direct lane on_stall race after the hedge`, cover every race order:
+  - the send settles before the hedge;
+  - the send accepts while the direct write is pending;
+  - the send fails, then the direct write accepts or fails;
+  - the direct write accepts or fails first.
+
+  They also cover strict success (`recorded` or `duplicate` with the same usage
+  ID) against every failure class, and exactly one queue and publish log per
+  request. `waitUntil` and log-sink failures are included.
+- `src/direct-lane.runtime.test.ts` runs the real staging entry in workerd, with
+  the real rate-limit binding and a loopback writer.
+- `packages/web-shared/src/lib/ai-gateway/first-usage-events.test.ts` runs against
+  local Postgres. A second delivery of one usage ID reports `duplicate` and causes
+  no second debit, rollup repair, Bouncer outbox row, PostHog event or Kilo Pass
+  bonus.
+
+A `Queue.send` that blocks for seconds or rejects is covered **only** by these
+local tests. The hosted staging setup cannot make Cloudflare Queues stall or fail on
+demand.
+
+### A normal load run does not prove the lane
+
+With the committed 2000 ms hedge, a healthy `Queue.send` resolves first. A smooth
+staging run can therefore produce only `mode: on_stall, lane: queue` events and
+never call the writer directly. Neither `mode: on_stall` nor successful queue
+traffic shows that the direct lane ran. Report three counts per usage ID, not one:
+
+- **Hedge candidates.** `usage_ingest_publish` events with `direct_outcome` or
+  `direct_pending: true`. A hedge became due; this alone proves no writer request.
+  `direct_pending` can mean the Worker was still waiting on the limiter.
+- **Skips without a writer request.** A `direct_outcome` of `rate_limited`,
+  `limiter_unavailable` or `missing_config`. Take each request's outcome from its
+  `usage_ingest_publish` event, or, when that event has `direct_pending: true`, from
+  its later `usage_ingest_direct_observed` event. One request has at most one of
+  the two, so do not add both streams.
+- **Observed writer attempts.** Writer-side evidence only: distinct usage IDs in
+  `usage_record_completion` with `writer_caller: ingress_direct`, plus
+  `usage_writer_admission` rejections with `writer_caller: ingress_direct`.
+  Admissions are sampled at 1%; rejections are always logged. A Worker-side
+  `direct_outcome` of `recorded` or `duplicate` is also accepted, because the
+  shared client returns it only for a writer acknowledgement with the same usage
+  ID. Other Worker-side outcomes (`timeout`, `http_error`, `request_failed`, …) show
+  that the Worker tried, not that the writer received the request.
+
+Claim direct-path coverage only when observed writer attempts are above zero. With
+zero, report coverage as **absent**, even if candidate or refusal logs exist.
+
+### Controlled delayed-send run
+
+Existing settings can force the hedge without new infrastructure. In a separate
+staging-only change approved for the test window:
+
+1. Set `USAGE_INGEST_STALL_HEDGE_MS` in `env.staging.vars` below the observed
+   `Queue.send` duration, for example `1`.
+2. Deploy staging and run the test.
+3. Revert the setting and deploy again.
+
+This does not simulate a Cloudflare stall. The send is not delayed; the timer just
+overtakes it. It does exercise:
+
+- direct attempts racing a send that is still pending;
+- recovery while direct traffic is in flight: sends that accept while the direct
+  write is pending log `direct_pending: true`, followed by one
+  `usage_ingest_direct_observed`;
+- strict success: a direct `recorded` or `duplicate` answer gives 202 with
+  `lane: direct`;
+- the duplicate path: almost every directly recorded event is also delivered by the
+  queue and must come back as `duplicate`.
+
+Hedged events cost up to two writer calls, so size the offered rate for that.
+
+Two failure cases can be produced with existing settings:
+
+- **Admission rejection.** Enough concurrent direct writes per writer instance
+  exceed the 5-slot ceiling. The publish event shows `direct_outcome: http_error`
+  with `direct_admission_reason: queue_limit`, and the queue lane answers.
+- **Direct timeout.** Also lowering `USAGE_INGEST_DIRECT_TIMEOUT_MS` (for example to
+  `1`) in the same staging-only change makes every direct attempt `timeout`, so the
+  queue decides.
+
+The following cannot be produced in hosted staging, so cover them with the local
+tests above and say so in the report:
+
+- a blocking or rejecting `Queue.send`;
+- writer 5xx;
+- `not_recorded`;
+- a limiter refusal at the configured 12,600 per 10 s.
+
+### Reconcile the same usage IDs
+
+Use dedicated staging test users with no other traffic and no Kilo Pass
+threshold, and a fixed, recorded set of event IDs. If the events carry Bouncer
+usage events, also record their request IDs. Before the run, snapshot each test
+user's `kilocode_users.microdollars_used`.
+
+After the drain below, run these read-only checks against the staging database.
+`$1` is the expected usage IDs, `$2` the test user IDs and `$3` the Bouncer request
+IDs.
+
+```sql
+-- Expected IDs with no row: must return nothing.
+select expected.id
+from unnest($1::uuid[]) as expected(id)
+left join microdollar_usage u on u.id = expected.id
+where u.id is null;
+
+-- Billed rows per test user. Compare with the expected events and costs.
+select kilo_user_id, count(*) as usage_rows, sum(cost) as billed
+from microdollar_usage
+where id = any($1::uuid[])
+group by kilo_user_id;
+
+-- Debit: microdollars_used minus the pre-run snapshot must equal billed above.
+select id, microdollars_used
+from kilocode_users
+where id = any($2::text[]);
+
+-- Bouncer outbox: every expected request ID must have exactly one row.
+-- Returns expected IDs with zero rows as well as duplicates.
+select expected.request_id, count(o.id) as outbox_rows
+from (select distinct unnest($3::text[]) as request_id) as expected
+left join bouncer_usage_event_outbox o on o.request_id = expected.request_id
+group by expected.request_id
+having count(o.id) <> 1;
+```
+
+The primary key already prevents a second row for one usage ID. The debit check is
+the one that would catch a double charge. Once rollup repairs for the run IDs have
+drained, `microdollar_usage_daily.total_cost_microdollars` for the test users should
+also grow by exactly the billed amount. PostHog and Kilo Pass side effects are not
+visible in SQL; the local duplicate test above covers them.
+
+### Shared database pressure
+
+Collect the database impact signals [below](#collect-database-impact-over-the-same-windows)
+for the run, and for a baseline run of the same shape with the committed hedge.
+Also compare these writer signals between the two runs:
+
+- `usage_writer_admission` rejections by `writer_class` and `reason`;
+- `usage_record_timing` pool gauges and `pool_waiting_peak`.
+
+### Stop and drain
+
+Stop the load generator and restore the committed staging settings if any of these
+happens:
+
+- the ingress returns 503;
+- the gateway logs `usage accounting publication failed`;
+- queue-class admission rejections (`writer_class: queue`), or `pool_waiting`
+  sustained above the baseline run;
+- writer `not_recorded` or `error` completions;
+- any DLQ arrival;
+- database CPU or connections exceed the threshold agreed for the test.
+
+To drain:
+
+1. Revert the staging-only settings, or commit `USAGE_INGEST_DIRECT_MODE` as `off`
+   for staging, and deploy.
+2. Track the generated cohort, not the queue, until a completion deadline stated
+   before the run. An empty backlog does not show that billing writes settled: the
+   end of `waitUntil` or a client abort does not cancel a writer or database
+   operation already running. Classify every expected usage ID:
+   - publication: accepted (202), failed (gateway
+     `usage accounting publication failed`, ingress 503), or unresolved (timeout or
+     no response, which may still have been recorded);
+   - writer: a `recorded` or `duplicate` completion, still retrying
+     (`usage_ingest_processing` with `queue_action: retry`), in the DLQ, or no
+     outcome seen;
+   - persistence: whether the reconciliation above finds its row.
+3. The cohort is complete when every accepted or unresolved ID has its row and a
+   `recorded` or `duplicate` completion, no cohort ID is retrying or in the DLQ, and
+   the debit and outbox checks match.
+
+At the deadline, report every ID that is not complete, with its classification, as
+incomplete or failed. Do not declare the run drained from a backlog snapshot. A
+missing expected ID or a debit mismatch is a failure; do not replay anything before
+reconciliation.
+
+Report:
+
+- Worker and writer deployment commits, and all direct-lane settings;
+- hedge candidates, skips and observed writer attempts as defined above, and the
+  duplicate count;
+- the completion deadline and the cohort classification at that deadline;
+- reconciliation results and database pressure;
+- which cases were covered only by local tests.

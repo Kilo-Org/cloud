@@ -54,6 +54,8 @@ it.each([undefined, 'staging'])(
             env,
             vars: {
               USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
+              // Staging commits a direct mode; this test covers queue processing only.
+              USAGE_INGEST_DIRECT_MODE: 'off',
             },
             secrets: {
               USAGE_INGEST_PUBLISH_SECRET: 'local-publisher',

@@ -200,6 +200,14 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLAUDE_OPERATOR_FEDERATION_RULE_ID`, `CLAUDE_OPERATOR_ORGANIZATION_ID`, `CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID` - Identify the Kilo operator service account and the federation rule that maps Kilo-signed JWTs to it. Without them, a connected owner's requests fail with an explicit error instead of falling back to Kilo credits. [SERVER]
 - `CLAUDE_OPERATOR_WORKSPACE_ID` - Optional; needed only when the operator federation rule covers more than one workspace. [SERVER]
 - `CLAUDE_OPERATOR_TOKEN_AUDIENCE` - The audience the operator federation rule expects on the identity JWT Kilo signs. [SERVER]
+
+Customer-billed Claude requests require a current connection check. Frankfurt reads the authoritative connection directly.
+The US gateway delegates this check to the web application with `INTERNAL_API_SECRET`.
+A failed check returns a retryable error; it never selects another payer.
+Keep the internal secret consistent across both applications before enabling customer billing.
+Provider billing failures remain customer failures, including spend-limit refusals.
+Account erasure retries temporary remote cleanup failures before deleting the stored profile identifier.
+
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`

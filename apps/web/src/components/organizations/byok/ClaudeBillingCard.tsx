@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -190,17 +190,33 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [outcome, setOutcome] = useState(() => searchParams.get('claude_billing'));
+  useEffect(() => {
+    const returned = searchParams.get('claude_billing');
+    if (!returned) return;
+    setOutcome(returned);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('claude_billing');
+    const query = params.toString();
+    router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  }, [router, searchParams]);
   const [connecting, setConnecting] = useState(false);
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions({ organizationId }));
   const flagEnabled = useFeatureFlagEnabled(CLAUDE_BILLING_FLAG);
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
-      onSuccess: () =>
-        queryClient.invalidateQueries({
+      onSuccess: () => {
+        setOutcome(null);
+        return queryClient.invalidateQueries({
           queryKey: trpc.claudeBilling.status.queryKey({ organizationId }),
-        }),
+        });
+      },
     })
   );
+  const failureCode = statusQuery.error?.data?.code ?? removeMutation.error?.data?.code;
+  const needsSignIn = failureCode === 'UNAUTHORIZED';
+  const needsAdmin = failureCode === 'FORBIDDEN';
   // Before launch the card appears only for an owner who already has a
   // connection, so they can still see its state and remove it.
   const launched = process.env.NODE_ENV === 'development' || flagEnabled === true;
@@ -211,20 +227,29 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
     <ClaudeBillingCardView
       status={statusQuery.data}
       organizationId={organizationId}
-      outcome={searchParams.get('claude_billing')}
+      outcome={outcome}
       connecting={connecting}
       removing={removeMutation.isPending}
       error={
-        statusQuery.isError
-          ? 'We could not load your Claude connection.'
-          : removeMutation.isError
-            ? 'We could not remove your Claude connection. Try again.'
-            : null
+        needsSignIn
+          ? 'Sign in again to manage this connection.'
+          : needsAdmin
+            ? 'An organization owner or admin must manage this connection.'
+            : statusQuery.isError
+              ? 'We could not load your Claude connection.'
+              : removeMutation.isError
+                ? 'We could not remove your Claude connection. Try again.'
+                : null
       }
-      onRetry={() => {
-        void statusQuery.refetch();
-        removeMutation.reset();
-      }}
+      onRetry={
+        needsSignIn || needsAdmin
+          ? undefined
+          : () => {
+              if (removeMutation.isError && !statusQuery.isError)
+                removeMutation.mutate({ organizationId });
+              else void statusQuery.refetch();
+            }
+      }
       onConnect={() => {
         setConnecting(true);
         const query = new URLSearchParams({

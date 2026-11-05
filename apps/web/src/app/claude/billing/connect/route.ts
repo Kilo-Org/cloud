@@ -10,7 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
 import { saveClaudeBillingPending } from '@/lib/claude-billing/pending';
-import { claudeBillingReturnPath } from '@/lib/claude-billing/return-path';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import { pushClaudeAuthorizationRequest } from '@/lib/claude-billing/protocol';
 import { CLAUDE_BILLING_CALLBACK_PATH } from '@/lib/claude-billing/constants';
 import {
@@ -25,7 +25,8 @@ function failureRedirect(returnPath: string, outcome: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const returnPath = claudeBillingReturnPath(request.nextUrl.searchParams.get('return'));
+  const returnPath =
+    validateReturnPath(request.nextUrl.searchParams.get('return') ?? '/byok') ?? '/byok';
   const ownerParam = request.nextUrl.searchParams.get('owner') ?? 'personal';
   const session = await getUserFromSession();
   if (!session) {

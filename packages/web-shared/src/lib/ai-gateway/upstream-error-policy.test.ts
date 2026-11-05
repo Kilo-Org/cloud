@@ -54,6 +54,29 @@ describe('applyUpstreamErrorPolicy', () => {
     expect(await response.json()).toEqual({ error: 'upstream 402' });
   });
 
+  it('preserves a connected customer’s billing refusal without reporting a Kilo payment outage', async () => {
+    const response = new Response(
+      JSON.stringify({
+        type: 'error',
+        error: {
+          type: 'billing_error',
+          details: { error_code: 'linked_organization_spend_limit_reached' },
+        },
+      }),
+      { status: 402 }
+    );
+    const replacement = await applyUpstreamErrorPolicy({
+      ...baseParams(response),
+      providerId: 'claude-billing',
+      isUserByok: false,
+    });
+    expect(replacement).toBeUndefined();
+    expect(captureMock).toHaveBeenCalledWith(expect.objectContaining({ trackInSentry: false }));
+    expect((await response.json()).error.details.error_code).toBe(
+      'linked_organization_spend_limit_reached'
+    );
+  });
+
   it('passes a BYOK 402 through and reports it without Sentry', async () => {
     const response = upstream(402);
     const replacement = await applyUpstreamErrorPolicy({

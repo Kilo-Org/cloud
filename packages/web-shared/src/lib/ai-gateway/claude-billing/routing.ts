@@ -2,7 +2,6 @@ import 'server-only';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type {
   GatewayChatApiKind,
   Provider,
@@ -13,12 +12,9 @@ import {
   CLAUDE_BILLING_BETA,
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { getClaudeBillingConnection, type ClaudeBillingOwner } from './store';
-import {
-  getClaudeOperatorToken,
-  getClaudeServedModelIds,
-  isClaudeOperatorConfigured,
-} from './operator';
+import type { ClaudeBillingOwner } from './store';
+import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
+import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
 /** The provider type of a request served on a customer's Claude organization. */
 export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
@@ -41,7 +37,7 @@ export type ClaudeBillingRoutingInput = {
 export type ClaudeBillingRoutingResult =
   | { kind: 'provider'; provider: Provider; userByok: null; skipBalanceCheck: true }
   /** The owner has a connection that cannot bill. Never serve it another way. */
-  | { kind: 'unavailable'; message: string };
+  | { kind: 'unavailable'; message: string; retryable?: boolean };
 
 /**
  * The owner whose connection serves the request. An organization request uses
@@ -68,16 +64,6 @@ export async function resolveClaudeBillingModel(requestedModel: string): Promise
   const model = (await resolveOpenRouterModelAlias(requestedModel.trim())).trim();
   if (!ANTHROPIC_MODEL_PREFIX.test(model) || !isClaudeModel(model)) return null;
   return model.replace(ANTHROPIC_MODEL_PREFIX, '').replace(/(\d)\.(\d)/g, '$1-$2');
-}
-
-/**
- * True when the operator's organization can serve `model`. An unknown list (no
- * successful Models API fetch yet) does not block: Anthropic answers an unknown
- * model with its own error, and refusing here would move the request to Kilo.
- */
-async function isServable(model: string): Promise<boolean> {
-  const served = await getClaudeServedModelIds();
-  return served.size === 0 || served.has(model);
 }
 
 /**
@@ -132,27 +118,35 @@ export function buildClaudeBillingProvider(
 export async function checkClaudeBilling(
   input: ClaudeBillingRoutingInput
 ): Promise<ClaudeBillingRoutingResult | null> {
-  if (!servesApiKind(input.request.kind)) return null;
   const owner = ownerOf(input);
   if (!owner) return null;
 
   const upstreamModel = await resolveClaudeBillingModel(input.requestedModel);
   if (!upstreamModel) return null;
 
-  const connection = await getClaudeBillingConnection(owner, readDb);
+  let connection: ClaudeBillingPayerState | null;
+  try {
+    connection = await getAuthoritativeClaudeBillingState(owner);
+  } catch {
+    return {
+      kind: 'unavailable',
+      message: 'We could not check your Claude connection. Try again.',
+      retryable: true,
+    };
+  }
   if (!connection || connection.status === ClaudeBillingConnectionStatus.Removed) return null;
   if (connection.status === ClaudeBillingConnectionStatus.BillingUnavailable) {
     return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
   if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
-  if (!isClaudeOperatorConfigured()) {
-    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
-  }
-  if (!(await isServable(upstreamModel))) {
+  if (!servesApiKind(input.request.kind)) {
     return {
       kind: 'unavailable',
-      message: 'This Claude model is unavailable on your connected Claude organization.',
+      message: 'Use the Messages or Chat Completions API with your Claude connection.',
     };
+  }
+  if (!isClaudeOperatorConfigured()) {
+    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
 
   const accessToken = await getClaudeOperatorToken();

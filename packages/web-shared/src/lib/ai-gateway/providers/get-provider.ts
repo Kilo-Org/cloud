@@ -126,7 +126,7 @@ export type GetProviderResult =
    * The owner's Claude billing connection cannot bill. Serving the request any
    * other way would spend a different payer's allowance without telling them.
    */
-  | { kind: 'claude-billing-unavailable'; message: string }
+  | { kind: 'claude-billing-unavailable'; message: string; retryable?: boolean }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' }
   | DirectByokCatalogOnlyResult;
@@ -451,7 +451,11 @@ async function selectProvider(
   });
   if (claudeBilling?.kind === 'unavailable') {
     decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'unavailable' });
-    return { kind: 'claude-billing-unavailable', message: claudeBilling.message };
+    return {
+      kind: 'claude-billing-unavailable',
+      message: claudeBilling.message,
+      retryable: claudeBilling.retryable,
+    };
   }
   if (claudeBilling) {
     decision.step({ step: 'claude-billing', outcome: 'selected' });

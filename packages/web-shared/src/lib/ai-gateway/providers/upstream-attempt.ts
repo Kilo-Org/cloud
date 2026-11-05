@@ -7,6 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { invalidateClaudeOperatorToken } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import {
   claudeBillingRefusalCodeFor,
   isClaudeBillingConnectionDead,
@@ -102,7 +103,8 @@ export async function sendUpstreamAttempt({
     isNonTrialEnterprise,
     dataRegion
   );
-  if (costLimit) {
+  // This bound limits Kilo debits. The connected Claude organization pays its own bill.
+  if (costLimit && providerContext.provider.type !== CLAUDE_BILLING_PROVIDER_ID) {
     const decision = await enforceRequestCostLimit(
       costLimit.maximumMicrodollars,
       requestedModel,
@@ -175,6 +177,7 @@ async function recordClaudeBillingRefusalResponse(
   response: Response,
   provider: Provider
 ): Promise<void> {
+  if (response.status === 401) invalidateClaudeOperatorToken();
   const userProfileId = provider.claudeBillingUserProfileId;
   const connectedAt = provider.claudeBillingConnectedAt;
   if (!userProfileId || !connectedAt) return;

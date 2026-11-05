@@ -85,7 +85,11 @@ describe('bounded spending provider enforcement', () => {
     });
   });
 
-  function attempt(providerId: string, userByok: BYOKResult[] | null) {
+  function attempt(
+    providerId: string,
+    userByok: BYOKResult[] | null,
+    availableBalanceMicrodollars = 2_000_000
+  ) {
     jest.mocked(upstreamRequest).mockResolvedValue({
       type: 'success',
       response: jsonResponse(200, { ok: true }),
@@ -112,9 +116,22 @@ describe('bounded spending provider enforcement', () => {
       isNonTrialEnterprise: false,
       search: '',
       method: 'POST',
-      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars: 2_000_000 },
+      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars },
     });
   }
+
+  it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
+    jest
+      .mocked(applyProviderSpecificLogic)
+      .mockImplementationOnce(async (_provider, _model, request) => {
+        Object.assign(request.body, {
+          billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+        });
+      });
+    const result = await attempt('claude-billing', null, 0);
+    expect(result.type).toBe('success');
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 
   it('refuses a managed Vercel route the quoted ceiling cannot cover', async () => {
     const result = await attempt('vercel', null);

@@ -73,6 +73,8 @@ export async function markClaudeBillingUnavailable(
     .set({
       status: ClaudeBillingConnectionStatus.BillingUnavailable,
       last_refusal_code: refusalCode,
+      // Request bookkeeping must not invalidate an approval already in flight.
+      updated_at: claude_billing_connections.updated_at,
       last_refusal_at: new Date().toISOString(),
     })
     .where(
@@ -92,7 +94,11 @@ export async function recordClaudeBillingRefusal(
 ): Promise<void> {
   await db
     .update(claude_billing_connections)
-    .set({ last_refusal_code: refusalCode, last_refusal_at: new Date().toISOString() })
+    .set({
+      last_refusal_code: refusalCode,
+      last_refusal_at: new Date().toISOString(),
+      updated_at: claude_billing_connections.updated_at,
+    })
     .where(
       and(
         eq(claude_billing_connections.user_profile_id, userProfileId),
@@ -109,7 +115,11 @@ export async function clearClaudeBillingRefusal(
 ): Promise<void> {
   await db
     .update(claude_billing_connections)
-    .set({ last_refusal_code: null, last_refusal_at: null })
+    .set({
+      last_refusal_code: null,
+      last_refusal_at: null,
+      updated_at: claude_billing_connections.updated_at,
+    })
     .where(
       and(
         eq(claude_billing_connections.user_profile_id, userProfileId),

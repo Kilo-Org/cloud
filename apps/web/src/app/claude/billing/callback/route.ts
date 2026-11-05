@@ -10,7 +10,7 @@ import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { consumeClaudeBillingPending } from '@/lib/claude-billing/pending';
-import { claudeBillingReturnPath } from '@/lib/claude-billing/return-path';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
   ClaudeBillingExchangeError,
   exchangeClaudeBillingCode,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   if (!pending || !session || pending.kiloUserId !== session.id) {
     return outcomeRedirect('/byok', 'failed');
   }
-  const returnPath = claudeBillingReturnPath(pending.returnPath);
+  const returnPath = validateReturnPath(pending.returnPath) ?? '/byok';
 
   // auth.claude.com returns the state with every outcome, including a refusal.
   if (params.get('state') !== pending.state) return outcomeRedirect(returnPath, 'failed');

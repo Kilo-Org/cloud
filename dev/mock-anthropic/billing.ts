@@ -119,8 +119,11 @@ export function createBillingStub(
         send(response, 400, { error: 'invalid_request' });
       } else {
         response.writeHead(200, { 'content-type': 'text/html' });
+        const organization = (
+          profiles.get(par.profileId)?.organization ?? `org-${uri.slice(-12)}`
+        ).replace(/[&<>"']/g, character => `&#${character.charCodeAt(0)};`);
         response.end(
-          `<!doctype html><h1>Connect your Claude organization</h1><p>Approve billing Claude requests from Kilo to your API organization.</p><form method="post" action="/oauth/billing/decision"><input name="request_uri" type="hidden" value="${uri}"><label>Claude organization <input name="organization" value="org-${uri.slice(-12)}"></label><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>`
+          `<!doctype html><h1>Connect your Claude organization</h1><p>Approve billing Claude requests from Kilo to your API organization.</p><form method="post" action="/oauth/billing/decision"><input name="request_uri" type="hidden" value="${uri}"><label>Claude organization <input name="organization" value="${organization}"></label><button name="decision" value="approve">Approve</button><button name="decision" value="decline">Decline</button></form>`
         );
       }
       return true;
@@ -140,7 +143,12 @@ export function createBillingStub(
       const conflict = [...profiles.values()].some(
         profile => profile.id !== par.profileId && profile.organization === organization
       );
-      if (form.get('decision') !== 'approve') target.searchParams.set('error', 'access_denied');
+      const existingOrganization = profiles.get(par.profileId)?.organization;
+      if (
+        form.get('decision') !== 'approve' ||
+        (existingOrganization && existingOrganization !== organization)
+      )
+        target.searchParams.set('error', 'access_denied');
       else if (conflict) target.searchParams.set('error', 'user_profile_already_linked');
       else {
         const code = randomUUID();
@@ -178,7 +186,7 @@ export function createBillingStub(
         const conflict = [...profiles.values()].some(
           other => other.id !== profile.id && other.organization === approval.organization
         );
-        if (conflict) {
+        if (conflict || (profile.organization && profile.organization !== approval.organization)) {
           send(response, 400, { error: 'user_profile_already_linked' });
           return true;
         }

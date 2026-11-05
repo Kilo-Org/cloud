@@ -188,7 +188,9 @@ export async function resolveProviderAndPolicy(
   if (providerResult.kind === 'claude-billing-unavailable') {
     // The owner's Claude billing connection cannot bill. Never serve it on
     // another payer's allowance without telling them.
-    return reject(claudeBillingUnavailableResponse(providerResult.message));
+    return reject(
+      claudeBillingUnavailableResponse(providerResult.message, providerResult.retryable)
+    );
   }
   if (providerResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.

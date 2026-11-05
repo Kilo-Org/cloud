@@ -1,7 +1,6 @@
 jest.mock('./store', () => ({ getClaudeBillingConnection: jest.fn() }));
 jest.mock('./operator', () => ({
   getClaudeOperatorToken: jest.fn(),
-  getClaudeServedModelIds: jest.fn(),
   isClaudeOperatorConfigured: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -13,11 +12,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getClaudeBillingConnection } from './store';
-import {
-  getClaudeOperatorToken,
-  getClaudeServedModelIds,
-  isClaudeOperatorConfigured,
-} from './operator';
+import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import { checkClaudeBilling } from './routing';
 
 const row: ClaudeBillingConnectionRow = {
@@ -38,10 +33,6 @@ const row: ClaudeBillingConnectionRow = {
 beforeEach(() => {
   jest.mocked(getClaudeBillingConnection).mockReset().mockResolvedValue(row);
   jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
-  jest
-    .mocked(getClaudeServedModelIds)
-    .mockReset()
-    .mockResolvedValue(new Set(['claude-sonnet-4-6']));
   jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
 });
 
@@ -116,9 +107,35 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
-  it('never falls back when the connected organization cannot serve the model', async () => {
-    jest.mocked(getClaudeServedModelIds).mockResolvedValue(new Set(['claude-other']));
-    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+  it('keeps a failed payer lookup retryable without selecting another payer', async () => {
+    jest
+      .mocked(getClaudeBillingConnection)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    expect(await checkClaudeBilling(input())).toMatchObject({
+      kind: 'unavailable',
+      retryable: true,
+    });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('accepts an undated Anthropic alias instead of rejecting it against a canonical model list', async () => {
+    const args = input();
+    args.requestedModel = 'anthropic/claude-haiku-4.5';
+    args.request.body.model = args.requestedModel;
+    const result = await checkClaudeBilling(args);
+    if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: args.requestedModel,
+      request: args.request,
+      extraHeaders: {},
+      originalHeaders: {} as never,
+      userByok: null,
+      kilo_user_id: 'user',
+      organization_id: null,
+      session_id: null,
+    });
+    expect(args.request.body.model).toBe('claude-haiku-4-5');
   });
 
   it('fails locally without fetching an operator token after a terminal refusal', async () => {
@@ -126,6 +143,19 @@ describe('Claude customer-billed routing', () => {
       .mocked(getClaudeBillingConnection)
       .mockResolvedValue({ ...row, status: 'billing_unavailable' });
     expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('does not switch payer for an unsupported API shape', async () => {
+    expect(
+      await checkClaudeBilling({
+        ...input(),
+        request: {
+          kind: 'responses',
+          body: { model: 'anthropic/claude-sonnet-4.6', input: 'hello' },
+        },
+      })
+    ).toMatchObject({ kind: 'unavailable' });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 

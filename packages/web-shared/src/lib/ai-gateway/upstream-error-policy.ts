@@ -2,6 +2,7 @@ import {
   captureProxyError,
   temporarilyUnavailableResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
 
 type UpstreamErrorPolicyParams = {
   response: Response;
@@ -28,7 +29,8 @@ export async function applyUpstreamErrorPolicy(
   const { response, providerId, isUserByok, ...context } = params;
   if (response.status < 400) return undefined;
 
-  const isPlatformPaymentRequired = response.status === 402 && !isUserByok;
+  const isPlatformPaymentRequired =
+    response.status === 402 && !isUserByok && providerId !== CLAUDE_BILLING_PROVIDER_ID;
   await captureProxyError({
     ...context,
     response,

@@ -12,16 +12,6 @@ import {
   CLAUDE_OPERATOR_WORKSPACE_ID,
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { signClaudeFederationJwt } from '@kilocode/web-shared/lib/auth/claude/federation-jwt';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-
-/**
- * Kilo's operator service account on the Claude API.
- *
- * It authenticates with Workload Identity Federation: each exchange presents a
- * fresh Kilo-signed JWT, and the SDK trades it for a short-lived access token.
- * Only this service account may send requests that bill a connected customer,
- * and it also creates the customer profiles.
- */
 
 /**
  * Anthropic mints a token that lives at most twice the identity JWT's remaining
@@ -50,52 +40,39 @@ function operatorTokenProvider(): AccessTokenProvider {
     serviceAccountId: CLAUDE_OPERATOR_SERVICE_ACCOUNT_ID,
     ...(CLAUDE_OPERATOR_WORKSPACE_ID ? { workspaceId: CLAUDE_OPERATOR_WORKSPACE_ID } : {}),
     baseURL: CLAUDE_API_BASE_URL,
-    fetch: globalThis.fetch,
+    fetch: (input, init) =>
+      globalThis.fetch(input, { ...init, signal: AbortSignal.timeout(15_000) }),
   });
 }
 
 let tokenCache: TokenCache | null = null;
 
-/** The operator's current access token, refreshed before it expires. */
 export async function getClaudeOperatorToken(): Promise<string> {
   tokenCache ??= new TokenCache(operatorTokenProvider());
   return await tokenCache.getToken();
 }
 
-/** Drops the cached token after the Claude API rejected it as unauthenticated. */
 export function invalidateClaudeOperatorToken(): void {
   tokenCache?.invalidate();
 }
 
 let client: Anthropic | null = null;
 
-/** An SDK client that authenticates as the operator service account. */
 export function getClaudeOperatorClient(): Anthropic {
-  client ??= new Anthropic({ baseURL: CLAUDE_API_BASE_URL, credentials: operatorTokenProvider() });
+  client ??= new Anthropic({
+    baseURL: CLAUDE_API_BASE_URL,
+    apiKey: null,
+    authToken: null,
+    credentials: operatorTokenProvider(),
+    timeout: 15_000,
+    // Profile creation is not idempotent: a lost reply must not create a second profile automatically.
+    maxRetries: 0,
+  });
   return client;
 }
 
-/** Creates one customer profile. Anthropic creates a new profile on every call. */
+// Each create call makes a new profile; callers must serialize first-time creation.
 export async function createClaudeUserProfile(): Promise<string> {
   const profile = await getClaudeOperatorClient().beta.userProfiles.create({});
   return profile.id;
 }
-
-const SERVED_MODELS_TTL_MS = 10 * 60 * 1000;
-
-/**
- * The model IDs the operator's organization can serve. An empty set means no
- * successful fetch yet, which callers treat as "do not filter".
- */
-export const getClaudeServedModelIds = createCachedFetch<ReadonlySet<string>>(
-  async () => {
-    const ids = new Set<string>();
-    for await (const model of getClaudeOperatorClient().models.list({ limit: 1000 })) {
-      ids.add(model.id);
-    }
-    return ids;
-  },
-  SERVED_MODELS_TTL_MS,
-  new Set(),
-  { name: 'claudeServedModels' }
-);

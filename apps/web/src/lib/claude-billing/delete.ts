@@ -9,40 +9,47 @@ import {
   isClaudeOperatorConfigured,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { CLAUDE_API_BASE_URL } from '@kilocode/web-shared/lib/auth/claude/config';
+import { classifyHttpStatus } from '@/lib/user/deletion-queue/deletion-http';
 
-/**
- * Deletes the deleted person's own Anthropic user profile.
- *
- * The installed Anthropic SDK has no delete for user profiles, so this request
- * is sent directly and its response validated. The order matters for account
- * erasure: the local row keeps the profile ID until the remote delete succeeds,
- * so `softDeleteUser` can be retried after an outage. Anthropic answers 404 for
- * an unknown or already-deleted profile, which also covers a delete whose reply
- * was lost.
- */
 const deleteResponseSchema = z.object({ type: z.literal('user_profile_deleted') });
+
+export class ClaudeProfileDeletionError extends Error {
+  constructor(readonly retryable: boolean) {
+    super('Claude profile cleanup could not complete');
+  }
+}
 
 export async function deletePersonalClaudeProfile(userId: string): Promise<void> {
   const row = await getClaudeBillingConnection({ kind: 'personal', kiloUserId: userId });
-  if (!row || !isClaudeOperatorConfigured()) return;
+  if (!row) return;
+  if (!isClaudeOperatorConfigured()) throw new ClaudeProfileDeletionError(false);
 
-  await db
-    .update(claude_billing_connections)
-    .set({ status: 'billing_unavailable' })
-    .where(eq(claude_billing_connections.id, row.id));
-
+  // The installed SDK has no profile-delete method. Keep the local identifier
+  // until deletion succeeds; 404 also covers a delete whose reply was lost.
   const response = await fetch(
     `${CLAUDE_API_BASE_URL}/v1/user_profiles/${encodeURIComponent(row.user_profile_id)}`,
     {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${await getClaudeOperatorToken()}` },
+      headers: {
+        Authorization: `Bearer ${await getClaudeOperatorToken()}`,
+        'anthropic-beta': 'oauth-2025-04-20',
+        'anthropic-version': '2023-06-01',
+      },
       redirect: 'manual',
       signal: AbortSignal.timeout(15_000),
     }
   );
-  if (response.status === 404) return;
-  if (!response.ok) {
-    throw new Error(`Anthropic user profile delete failed with HTTP ${response.status}`);
+  if (response.status !== 404) {
+    if (!response.ok) {
+      const outcome = classifyHttpStatus(response.status);
+      throw new ClaudeProfileDeletionError(
+        outcome.kind === 'retry' || outcome.kind === 'rate_limited'
+      );
+    }
+    deleteResponseSchema.parse(await response.json());
   }
-  deleteResponseSchema.parse(await response.json());
+  await db
+    .update(claude_billing_connections)
+    .set({ status: 'billing_unavailable' })
+    .where(eq(claude_billing_connections.id, row.id));
 }

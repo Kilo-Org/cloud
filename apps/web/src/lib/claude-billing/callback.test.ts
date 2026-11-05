@@ -24,6 +24,13 @@ import { consumeClaudeBillingPending } from './pending';
 import { canManageClaudeBillingOrganization, canUseClaudeBilling } from './access';
 import { exchangeClaudeBillingCode, ClaudeBillingExchangeError } from './protocol';
 import { GET } from '@/app/claude/billing/callback/route';
+import { GET as connect } from '@/app/claude/billing/connect/route';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import {
+  clearClaudeBillingRefusal,
+  markClaudeBillingUnavailable,
+  recordClaudeBillingRefusal,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 
 beforeEach(() => {
   jest.mocked(canUseClaudeBilling).mockReset().mockResolvedValue(true);
@@ -149,5 +156,62 @@ describe('Claude billing callback', () => {
     expect(await state(row.id)).toMatchObject({ status: 'removed', connection_id: null });
     const keys = await db.select().from(byok_api_keys).where(eq(byok_api_keys.created_by, user.id));
     expect(keys.map(key => key.provider_id)).toEqual(['anthropic']);
+  });
+
+  it('keeps normalized return paths on Kilo at both ends of the connection flow', async () => {
+    await seed();
+    const pending = await consumeClaudeBillingPending();
+    if (!pending) throw new Error('Missing pending fixture');
+    jest
+      .mocked(consumeClaudeBillingPending)
+      .mockResolvedValue({ ...pending, returnPath: '/..//external.invalid/path' });
+    const end = new URL((await callback('state=wrong')).headers.get('location') ?? '');
+    expect(end.origin).toBe(new URL(APP_URL).origin);
+    expect(end.pathname).toBe('/byok');
+    jest.mocked(canUseClaudeBilling).mockResolvedValue(false);
+    const start = new URL(
+      (
+        await connect(
+          new NextRequest(
+            'http://localhost/claude/billing/connect?return=%2F..%2F%2Fexternal.invalid%2Fpath'
+          )
+        )
+      ).headers.get('location') ?? ''
+    );
+    expect(start.origin).toBe(new URL(APP_URL).origin);
+    expect(start.pathname).toBe('/byok');
+  });
+
+  it('completes a reconnect while ordinary requests update refusal bookkeeping', async () => {
+    const { row } = await seed();
+    const connectedAt = '2026-01-01T00:00:00Z';
+    const [connected] = await db
+      .update(claude_billing_connections)
+      .set({ status: 'connected', connected_at: connectedAt })
+      .where(eq(claude_billing_connections.id, row.id))
+      .returning();
+    if (!connected) throw new Error('Missing connected fixture');
+    const pending = await consumeClaudeBillingPending();
+    if (!pending) throw new Error('Missing pending fixture');
+    jest
+      .mocked(consumeClaudeBillingPending)
+      .mockResolvedValue({ ...pending, connectionVersion: connected.updated_at });
+    await clearClaudeBillingRefusal(row.user_profile_id, connectedAt);
+    await recordClaudeBillingRefusal(
+      row.user_profile_id,
+      'linked_organization_spend_limit_reached',
+      connectedAt
+    );
+    await markClaudeBillingUnavailable(
+      row.user_profile_id,
+      'user_profile_not_billable',
+      connectedAt
+    );
+    expect((await callback()).headers.get('location')).toContain('claude_billing=connected');
+    expect(await state(row.id)).toMatchObject({
+      status: 'connected',
+      connection_id: 'ocon_new',
+      last_refusal_code: null,
+    });
   });
 });

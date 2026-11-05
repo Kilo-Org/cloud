@@ -559,7 +559,7 @@ describe('AttachmentPreviewStrip — composer chip alignment', () => {
     // The alignment lives on the strip's content container; the surface keeps
     // its own size classes and no horizontal padding.
     expect(surfaces[0]?.props.className).toBe(
-      'overflow-hidden rounded-md border border-border bg-card h-12 w-48'
+      'overflow-hidden rounded-md border border-border bg-card h-[46px] w-48'
     );
     expect(surfaces[0]?.props.className).not.toContain('pl-');
 
@@ -1272,13 +1272,13 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     renderer.unmount();
   });
 
-  it('reaches the 44 dp tap target from the document chip body with its slop', async () => {
+  it('gives the document chip body a 44 dp frame, because the surface clips slop', async () => {
     const renderer = await mount([makeAttachment({})]);
-    const body = chipBody(renderer.root);
-    const slop = body.props.hitSlop as { top: number; bottom: number };
+    const surface = chipSurfaces(renderer.root)[0];
 
-    // 40 dp of body inside the chip's border, plus the vertical slop.
-    expect(40 + slop.top + slop.bottom).toBeGreaterThanOrEqual(44);
+    // 46 px of surface minus the 1 dp border on each side is the body's 44 dp.
+    expect(surface?.props.className).toContain('h-[46px]');
+    expect(chipBody(renderer.root).props.hitSlop).toBeUndefined();
 
     renderer.unmount();
   });

@@ -38,7 +38,9 @@ const DOCUMENT_EXTENSION_BY_MIME = {
 type DocumentMime = keyof typeof DOCUMENT_EXTENSION_BY_MIME;
 
 function isDocumentMime(mime: string): mime is DocumentMime {
-  return mime in DOCUMENT_EXTENSION_BY_MIME;
+  // An own-property check, because `in` also matches inherited names such as
+  // `constructor`, which are not document MIME types.
+  return Object.hasOwn(DOCUMENT_EXTENSION_BY_MIME, mime);
 }
 
 /** Part or chip ids whose download or preview is running. A repeated tap joins

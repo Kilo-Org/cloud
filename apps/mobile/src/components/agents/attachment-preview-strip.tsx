@@ -73,10 +73,12 @@ function removeHitSlop() {
   return { top: slop, bottom: slop, left: slop, right: slop };
 }
 
-/** The document chip's body measures 40 dp inside its border at native rem 14,
- *  so two points of vertical slop reach the 44 dp tap target without moving the
- *  chip or stealing its neighbours' taps. */
-const CHIP_BODY_HIT_SLOP = { top: 2, bottom: 2 } as const;
+/**
+ * The document chip is 46 px tall so its body — the whole tap target — is the
+ * 44 dp minimum after the 1 dp border on each side. The chip surface clips its
+ *  children, so slop on the body could not grow that target past the surface.
+ */
+const DOCUMENT_CHIP_SIZE_CLASS = 'h-[46px] w-48';
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -444,7 +446,7 @@ const AttachmentChip = memo(function AttachmentChip({
           <View
             className={cn(
               'overflow-hidden rounded-md border border-border bg-card',
-              isImage ? 'h-16 w-20' : 'h-12 w-48',
+              isImage ? 'h-16 w-20' : DOCUMENT_CHIP_SIZE_CLASS,
               description.showRetry && 'border-destructive',
               isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
@@ -470,7 +472,6 @@ const AttachmentChip = memo(function AttachmentChip({
               <Pressable
                 ref={bodyRef}
                 className="h-full w-full active:opacity-70"
-                hitSlop={CHIP_BODY_HIT_SLOP}
                 accessible
                 onPress={handleOpen}
                 accessibilityLabel={description.accessibilityLabel}

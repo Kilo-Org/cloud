@@ -193,6 +193,54 @@ test('every workflow install job restores a pnpm dependency cache', () => {
   assert.deepEqual(uncached, [], 'an install job must restore a pnpm cache before it installs');
 });
 
+// The apt-get behind `playwright install --with-deps` runs to the job timeout
+// whenever the runner fleet's apt egress degrades, and the runner images
+// already ship the Chromium system libraries. A browser build that the
+// version-keyed cache does not satisfy is downloaded, never apt-installed.
+// chromatic.yml is disabled in the repository's Actions settings, so its jobs
+// run nowhere; it is left as it is until the workflow is re-enabled.
+const disabledWorkflows = new Set(['chromatic.yml']);
+
+test('every Chromium install skips apt and restores the browser cache first', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const cacheKey =
+    '${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}';
+  const installs = [];
+  for (const file of readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()) {
+    if (disabledWorkflows.has(file)) continue;
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
+      steps.forEach((step, index) => {
+        if (!/\bplaywright\b.*\binstall\b/.test(step.run ?? '')) return;
+        installs.push(`${file}:${jobName}`);
+        assert.doesNotMatch(
+          step.run,
+          /--with-deps/,
+          `${file}:${jobName} must install Chromium without apt`
+        );
+        const cacheIndex = steps.findIndex(
+          candidate =>
+            String(candidate.uses).startsWith('actions/cache@') &&
+            candidate.with?.path === '~/.cache/ms-playwright'
+        );
+        assert.ok(
+          cacheIndex >= 0 && cacheIndex < index,
+          `${file}:${jobName} must restore the browser cache before it installs`
+        );
+        assert.equal(steps[cacheIndex].with.key, cacheKey, `${file}:${jobName} cache key`);
+      });
+    }
+  }
+  assert.deepEqual(
+    installs,
+    ['ci.yml:mobile-diagram-host', 'extension-ci.yml:e2e-chrome', 'setup-smoke.yml:setup-smoke'],
+    'every Chromium install in a live workflow is covered'
+  );
+});
+
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],

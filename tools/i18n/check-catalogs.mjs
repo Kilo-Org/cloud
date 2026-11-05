@@ -370,6 +370,44 @@ function checkPullRequestTerm(values, label) {
   }
 }
 
+/**
+ * Armenian closes a sentence with `։` (U+0589) and holds one sentence's
+ * clauses together with `՝` (U+055D). A translator who leaves the ASCII `.` or
+ * `:` at a sentence boundary mixes two conventions on one screen. Only the
+ * marks that close a sentence are read: an ellipsis, a host or file name, a
+ * decimal, a `{{token}}` and a Latin abbreviation keep theirs.
+ */
+const ARMENIAN_SENTENCE_TERMINATORS = new Set(['hy']);
+const ARMENIAN_UPPERCASE_AFTER_MARK = /^\s*[\u0531-\u0556]/;
+const LATIN_AFTER_DOT = /[A-Za-z0-9]/;
+
+/** Reject a sentence in the Armenian catalog that ends with an ASCII mark. */
+function checkArmenianSentenceTerminator(tag, values, label) {
+  if (!ARMENIAN_SENTENCE_TERMINATORS.has(tag)) {
+    return;
+  }
+  for (const [key, value] of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      const mark = value[index];
+      if (mark !== '.' && mark !== ':') {
+        continue;
+      }
+      // A run of dots is an ellipsis, a wait state rather than a sentence end.
+      if (value[index - 1] === '.' || value[index + 1] === '.') {
+        continue;
+      }
+      if (mark === '.' && LATIN_AFTER_DOT.test(value[index + 1] ?? '')) {
+        continue;
+      }
+      const rest = value.slice(index + 1);
+      if (rest.trim() !== '' && !ARMENIAN_UPPERCASE_AFTER_MARK.test(rest)) {
+        continue;
+      }
+      fail(`${label}: "${key}" ends a sentence with the ASCII "${mark}"; Armenian writes «։»`);
+    }
+  }
+}
+
 /** The `{{token}}` set of one string, as a sorted, counted signature. */
 function placeholders(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)]
@@ -796,6 +834,7 @@ for (const catalog of CATALOGS) {
     localeValues.set(tag, translated);
     checkAgentEditorCopy(translated, english, label);
     checkPullRequestTerm(translated, label);
+    checkArmenianSentenceTerminator(tag, translated, label);
     const ownValues = new Set(translated.values());
 
     // A locale-driven plural family: the English base interpolates {{count}}

@@ -99,7 +99,10 @@ describe('scanRequest', () => {
       detectResponse({ summary: { injection_attack: 0, pii: 0 }, result_message: null })
     );
 
-    await scanRequest(makeScan(), dependencies);
+    await scanRequest(
+      makeScan({ microdollarUsageId: '00000000-0000-4000-8000-000000000003' }),
+      dependencies
+    );
 
     const [[url, init]] = fetchCalls(dependencies);
     expect(url).toBe(ENKRYPT_DETECT_URL);
@@ -478,20 +481,21 @@ describe('scanRequest', () => {
     });
   });
 
-  it('retries one transient failure and records usage for both calls', async () => {
+  it('preserves the inference association on both usage records after a transient failure', async () => {
+    const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
     const responses = [
       detectResponse({ summary: {} }, { status: 502 }),
       detectResponse({ summary: { injection_attack: 0 } }, { credits: '2' }),
     ];
     const dependencies = deps(async () => responses.shift() ?? Response.error());
 
-    const result = await scanRequest(makeScan(), dependencies);
+    const result = await scanRequest(makeScan({ microdollarUsageId }), dependencies);
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(2);
     expect(result.verdict).toEqual({ action: 'allow' });
     expect(result.usageRecords).toEqual([
-      expect.objectContaining({ decision: 'error', creditsCost: null }),
-      expect.objectContaining({ decision: 'allowed', creditsCost: 2 }),
+      expect.objectContaining({ microdollarUsageId, decision: 'error', creditsCost: null }),
+      expect.objectContaining({ microdollarUsageId, decision: 'allowed', creditsCost: 2 }),
     ]);
   });
 

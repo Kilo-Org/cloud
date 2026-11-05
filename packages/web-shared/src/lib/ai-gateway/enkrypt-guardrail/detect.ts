@@ -58,6 +58,7 @@ export type EnkryptScanCoverage = {
 
 export type EnkryptGuardrailScan = {
   sessionId: string | null;
+  microdollarUsageId?: string;
   organizationId: string;
   kiloUserId: string;
   apiKind: EnkryptGuardrailApiKind;
@@ -376,6 +377,7 @@ export async function scanRequest(
     organizationId: scan.organizationId,
     kiloUserId: scan.kiloUserId,
     sessionId: scan.sessionId,
+    microdollarUsageId: scan.microdollarUsageId,
     apiKind: scan.apiKind,
     decision: attemptDecision(each, config),
     creditsCost: each.creditsCost,

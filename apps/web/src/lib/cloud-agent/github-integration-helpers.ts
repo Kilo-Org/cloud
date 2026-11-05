@@ -2,7 +2,6 @@ import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   getIntegrationsByOrganization,
-  getIntegrationForOrganization,
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
   updateRepositoriesForIntegration,
@@ -209,70 +208,6 @@ export async function getGitHubInstallationIdForUser(userId: string): Promise<st
     : undefined;
 }
 
-/**
- * Fetch GitHub repositories for an organization
- * Returns cached repositories by default, fetches fresh from GitHub when forceRefresh is true
- */
-export async function fetchGitHubRepositoriesForOrganization(
-  organizationId: string,
-  forceRefresh: boolean = false
-): Promise<GitHubRepositoriesResult> {
-  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
-
-  if (!integration) {
-    const unavailableIntegration = await getIntegrationForOrganization(
-      organizationId,
-      PLATFORM.GITHUB
-    );
-    if (unavailableIntegration) {
-      return unavailableIntegrationResponse(
-        unavailableReasonForIntegration(unavailableIntegration)
-      );
-    }
-    return missingIntegrationResponse('No GitHub integration found for this organization');
-  }
-
-  if (!integration.platform_installation_id) {
-    return unavailableIntegrationResponse('not_configured');
-  }
-
-  try {
-    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // Answer from the cached snapshot unless the caller forces a sync or the
-    // integration has never synced: a synced empty snapshot is the
-    // connected-empty state, not a reason to re-query GitHub on every read.
-    if (
-      shouldSyncProviderRepositories({
-        forceRefresh,
-        cachedRepositories,
-        repositoriesSyncedAt: integration.repositories_synced_at,
-      })
-    ) {
-      const repositories = await fetchGitHubRepositories(
-        integration.platform_installation_id,
-        integration.github_app_type || 'standard',
-        integration.id
-      );
-      await updateRepositoriesForIntegration(integration.id, repositories);
-      return {
-        integrationInstalled: true,
-        repositories: mapRepositories(repositories),
-        syncedAt: new Date().toISOString(),
-      };
-    }
-    return {
-      integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories ?? []),
-      syncedAt: integration.repositories_synced_at,
-    };
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to fetch GitHub repositories',
-    });
-  }
-}
-
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
   forceRefresh: boolean = false,
@@ -454,28 +389,6 @@ export async function validateGitHubRepoAccessForUser(
 ): Promise<boolean> {
   try {
     const result = await fetchGitHubRepositoriesForUser(userId, false);
-
-    if (!result.integrationInstalled || !result.repositories.length) {
-      return false;
-    }
-
-    return result.repositories.some(
-      repo => repo.fullName.toLowerCase() === githubRepo.toLowerCase()
-    );
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to validate repository access',
-    });
-  }
-}
-
-export async function validateGitHubRepoAccessForOrganization(
-  organizationId: string,
-  githubRepo: string
-): Promise<boolean> {
-  try {
-    const result = await fetchGitHubRepositoriesForOrganization(organizationId, false);
 
     if (!result.integrationInstalled || !result.repositories.length) {
       return false;

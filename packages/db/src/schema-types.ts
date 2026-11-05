@@ -923,6 +923,7 @@ export const AdminActionAuditAction = z.enum([
   'request_logging_opt_in.create',
   'request_logging_opt_in.delete',
   'api_request_log.download',
+  'provider_metadata.download',
   'organization.member.invite',
   'organization.member.role.update',
   'organization.member.remove',

@@ -443,7 +443,7 @@ function SpendAlertsForm({
         />
       </View>
 
-      {/* One 44dp row on the same 12dp inset as the KvRow card above: the
+      {/* One 44dp row on the same 10.5dp inset as the KvRow card above: the
           switch's own box sets the height, so the card adds no vertical
           padding of its own. The switch's end inset lives in CardSwitch, so
           every switch on the screen ends level with the label's start. */}
@@ -581,13 +581,13 @@ function SpendAlertsForm({
 /**
  * The shared `Switch`, pulled out to sit level with the row's label.
  *
- * The card ends its content 12dp from the edge (`px-3`), but the text ink the
- * label paints starts about 10dp in, and the native switch node paints its
- * track ending about 4dp before the node's end edge, so an unpulled switch's
- * painted end lands about 16dp from the card edge — visibly deeper than the
- * label. Pulling the node out by 4dp puts the painted end about 11–12dp from
- * the edge, level with the label's start, and keeps about 8dp of the node's
- * hit area inside the card.
+ * The card ends its content at `px-3` = 10.5dp (the native rem here is 14dp),
+ * and the label's ink starts about 10dp in. An unpulled switch's painted end
+ * (the thumb at its travel limit, about 3dp past the track's own end) lands
+ * about 14dp from the card edge, visibly deeper than the label. Pulling the
+ * node out by 4dp (`-me-1`) puts the painted thumb end about 10–11dp from the
+ * edge, level with the label's start, and keeps about 6dp of the node's hit
+ * area inside the card.
  *
  * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
  * the writing direction, where a hand-picked `-mr-1` would land on the label's
@@ -641,9 +641,9 @@ function RuleCard({
 
   return (
     <View className="gap-3">
-      {/* Same 12dp scale as the cards around it: px-3 matches the KvRow card
+      {/* Same 10.5dp scale as the cards around it: px-3 matches the KvRow card
           above, and py-3 is that card's row padding, so the title and subtitle
-          keep 12dp from the card's edges. The switch's own box is taller than a
+          keep 10.5dp from the card's edges. The switch's own box is taller than a
           single line and taller than the two-line block, so it sets nothing
           here. */}
       <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">

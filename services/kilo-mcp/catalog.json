@@ -36835,6 +36835,18 @@
             "vercel-large"
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "profileId": {
           "anyOf": [
             {
@@ -36919,6 +36931,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "profileid",
       "bodyschema",
       "prompttemplate",
@@ -36929,7 +36942,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -37205,6 +37218,18 @@
             }
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "promptTemplate": {
           "type": "string",
           "minLength": 1,
@@ -37294,6 +37319,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "prompttemplate",
       "profileid",
       "bodyschema",
@@ -37304,7 +37330,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

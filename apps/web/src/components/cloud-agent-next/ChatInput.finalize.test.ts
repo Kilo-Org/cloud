@@ -348,7 +348,12 @@ describe('ChatInput finalize failure', () => {
     const onStop = jest.fn();
     const dom = installLinkedomDom();
     const root = createRoot(dom.container);
-    const render = (canInterrupt: boolean, disabled: boolean, withHandler = true) => {
+    const render = (
+      canInterrupt: boolean,
+      disabled: boolean,
+      options: { withHandler?: boolean; isStreaming?: boolean; isPreparing?: boolean } = {}
+    ) => {
+      const { withHandler = true, isStreaming = true, isPreparing = false } = options;
       act(() => {
         root.render(
           createElement(ChatInput, {
@@ -356,30 +361,66 @@ describe('ChatInput finalize failure', () => {
             onStop: withHandler ? onStop : undefined,
             canInterrupt,
             disabled,
-            isStreaming: true,
+            isStreaming,
+            isPreparing,
             attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
           })
         );
       });
     };
-    const stopButton = () => {
+    const queryStopButton = () =>
+      dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Stop response"], button[aria-label="Stop workspace preparation"]'
+      );
+    const stopButton = (label = 'Stop response') => {
       const button = dom.container.querySelector<HTMLButtonElement>(
-        'button[aria-label="Stop response"]'
+        `button[aria-label="${label}"]`
       );
       if (!button) throw new Error('Stop button missing');
       return button;
     };
 
     try {
+      // Preparation is not a streaming turn, but Stop still applies during it.
+      render(true, true, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(false);
+      expect(stopButton('Stop workspace preparation').getAttribute('title')).toBe(
+        'Stop preparation and all chats in this workspace'
+      );
+      act(() => stopButton('Stop workspace preparation').click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      // The same interrupt and handler gates apply while preparing.
+      render(false, true, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(true);
+      act(() => stopButton('Stop workspace preparation').click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(true, true, { withHandler: false, isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(true);
+
+      // Streaming keeps its existing label even if preparation is also reported.
+      render(true, true, { isStreaming: true, isPreparing: true });
+      expect(stopButton('Stop response').hasAttribute('disabled')).toBe(false);
+
+      // Idle shows no Stop, and clearing preparation after Stop hides it again.
+      render(true, false, { isStreaming: false, isPreparing: false });
+      expect(queryStopButton()).toBeNull();
+      render(true, false, { isStreaming: false, isPreparing: true });
+      expect(stopButton('Stop workspace preparation').hasAttribute('disabled')).toBe(false);
+      render(true, false, { isStreaming: false, isPreparing: false });
+      expect(queryStopButton()).toBeNull();
+
       render(true, true);
       expect(stopButton().hasAttribute('disabled')).toBe(false);
+      expect(stopButton().hasAttribute('title')).toBe(false);
       act(() => stopButton().click());
-      expect(onStop).toHaveBeenCalledTimes(1);
+      expect(onStop).toHaveBeenCalledTimes(2);
 
       render(false, true);
       expect(stopButton().hasAttribute('disabled')).toBe(true);
       act(() => stopButton().click());
-      expect(onStop).toHaveBeenCalledTimes(1);
+      expect(onStop).toHaveBeenCalledTimes(2);
 
       render(false, false);
       expect(stopButton().hasAttribute('disabled')).toBe(true);
@@ -387,7 +428,7 @@ describe('ChatInput finalize failure', () => {
       render(true, true);
       expect(stopButton().hasAttribute('disabled')).toBe(false);
 
-      render(true, false, false);
+      render(true, false, { withHandler: false });
       expect(stopButton().hasAttribute('disabled')).toBe(true);
     } finally {
       act(() => root.unmount());

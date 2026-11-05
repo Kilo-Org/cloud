@@ -381,7 +381,7 @@ async function prepareWarmRoute(
   const prepareFrame = await wrapper.next();
   wrapper.send({ type: 'session.ready', sessionId: input.spec.sessionId });
   await waitFor(async () => {
-    expect(await stub.status({ sessionId: input.spec.sessionId })).toEqual({
+    expect(await stub.status({ sessionId: input.spec.sessionId })).toMatchObject({
       sessionId: input.spec.sessionId,
       view: { state: 'ready', attemptId: expect.any(String) },
     });
@@ -2184,7 +2184,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     await stub.release({ sessionId: SESSION });
 
     expect(await readRouteRow(stub, SESSION)).toBeNull();
-    expect(await stub.status({ sessionId: SESSION })).toEqual({
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({
       sessionId: SESSION,
       view: { state: 'unknown' },
     });
@@ -2197,6 +2197,24 @@ describe('SandboxControlV2 credentials (B3)', () => {
       })
     ).toBeNull();
     expect(await wrapper.next()).toEqual({ type: 'session.release', sessionId: SESSION });
+  });
+
+  it('rebuilds the Vercel policy when a workspace Stop retires the last route', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+    const policyBefore = provider.policyCalls.length;
+
+    await stub.cancelWorkspace({ sessionId: SESSION, requestedAt: Date.now() });
+
+    expect(provider.policyCalls.length).toBeGreaterThan(policyBefore);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    expect((await stub.status({ sessionId: SESSION })).view.state).toBe('unknown');
   });
 
   it('re-issues Vercel grants with the runtime-proxy members and applies policy before credentials', async () => {
@@ -2300,7 +2318,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(result).toBe('sent');
     expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', sessionId: SESSION });
     expect(wrapper.receivedFrames()).toBe(framesBefore + 1);
-    expect(await stub.status({ sessionId: SESSION })).toEqual({
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
     });
@@ -2350,7 +2368,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // fails its queued messages with the real reason instead of waiting for the
     // queued backstop.
     expect(result).toBe('not_ready');
-    expect(await stub.status({ sessionId: SESSION })).toEqual({
+    expect(await stub.status({ sessionId: SESSION })).toMatchObject({
       sessionId: SESSION,
       view: {
         state: 'failed',

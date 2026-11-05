@@ -3,8 +3,12 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
-import { AlertCircle, Check, ChevronDown, Terminal } from '@/components/ui/icons';
-import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import { AlertCircle, Check, ChevronDown, Square, Terminal } from '@/components/ui/icons';
+import {
+  isPreparationCancellation,
+  type PreparationAttempt,
+  type PreparationStepSnapshot,
+} from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -33,7 +37,9 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   useEffect(() => {
     setExpanded(attempt.status !== 'completed' || incomplete !== undefined);
   }, [attempt.id, attempt.status, incomplete]);
-  const title = incomplete ?? attemptTitle(attempt.status, t);
+  const stopped = attempt.status === 'failed' && isPreparationCancellation(attempt.safeError);
+  const title =
+    incomplete ?? (stopped ? t('agentChat.session.stopped') : attemptTitle(attempt.status, t));
   return (
     <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
       <Pressable
@@ -50,7 +56,11 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         ) : (
           <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
-        <AttemptIcon status={attempt.status} incomplete={incomplete !== undefined} />
+        <AttemptIcon
+          status={attempt.status}
+          incomplete={incomplete !== undefined}
+          stopped={stopped}
+        />
         <Text
           className={incomplete ? 'text-sm font-medium text-destructive' : 'text-sm font-medium'}
         >
@@ -76,13 +86,18 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
 function AttemptIcon({
   status,
   incomplete,
+  stopped = false,
 }: {
   status: PreparationAttempt['status'];
   incomplete: boolean;
+  stopped?: boolean;
 }) {
   const colors = useThemeColors();
   if (incomplete) {
     return <AlertCircle size={16} color={colors.destructive} />;
+  }
+  if (stopped) {
+    return <Square size={16} color={colors.mutedForeground} />;
   }
   if (status === 'running') {
     return <ActivityIndicator size="small" color={colors.mutedForeground} />;

@@ -220,6 +220,22 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     }
   });
 
+  it('still cancels preparation after the status check exhausts its transport deadline', async () => {
+    const { stub, peer, sessionId } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(prompt('m1'));
+    const status = held<Awaited<ReturnType<FakeSandboxPeer['status']>>>();
+    const snapshot = await peer.status({ sessionId });
+    peer.status = async () => status.promise;
+    try {
+      await bounded(stub.stop());
+      expect(peer.cancelWorkspaceCalls).toHaveLength(1);
+      expect((await rows(stub))[0]?.state).toBe('cancelled');
+    } finally {
+      status.resolve(snapshot);
+    }
+  });
+
   it('bounds hung deliver, its recovery pass and abort; Stop is durable and late callbacks cannot revive it', async () => {
     const { stub, peer, sessionId } = await setup();
     peer.prepareView = peer.view('ready');
@@ -288,7 +304,13 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await stub.send(prompt('m1'));
       const pending = held<ReturnType<FakeSandboxPeer['view']>>();
       if (operation === 'status') {
-        peer.status = async input => ({ sessionId: input.sessionId, view: await pending.promise });
+        peer.status = async input => ({
+          sessionId: input.sessionId,
+          view: await pending.promise,
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
+        });
       } else {
         peer.prepareView = { state: 'unknown' };
         peer.prepare = async () => pending.promise;
@@ -313,7 +335,13 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const pending = held<ControlPlaneDeliverResult>();
     peer.status = async input => {
       await new Promise(resolve => setTimeout(resolve, 1_200));
-      return { sessionId: input.sessionId, view: peer.view('ready') };
+      return {
+        sessionId: input.sessionId,
+        view: peer.view('ready'),
+        workspacePreparing: false,
+        workspaceStopEpoch: 0,
+        workspaceStopAt: 0,
+      };
     };
     peer.deliver = async payload => {
       peer.deliverCalls.push(payload);
@@ -603,7 +631,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       await runInDurableObject(stub, instance => instance.alarm());
       expect(peer.prepareCalls).toHaveLength(prepares);
       expect(peer.deliverCalls).toHaveLength(0);
-      expect(peer.statusCalls).toHaveLength(0);
+      // Stop asks the sandbox for the authoritative workspace phase; the other
+      // settle paths do not need it.
+      expect(peer.statusCalls).toHaveLength(action === 'stop' ? 1 : 0);
       expect([reports.length, callbacks.length]).toEqual(counts);
     }
   );

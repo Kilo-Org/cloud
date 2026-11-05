@@ -1,5 +1,5 @@
 import { type TFunction } from 'i18next';
-import { type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
+import { isPreparationCancellation, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -158,6 +158,9 @@ export function preparationDetailText(detail: string, t: TFunction): string {
  * failure title.
  */
 export function preparationErrorText(error: string, t: TFunction): string {
+  if (isPreparationCancellation(error)) {
+    return t('agentChat.session.stopped');
+  }
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
 }
 

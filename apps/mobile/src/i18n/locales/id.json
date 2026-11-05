@@ -3809,7 +3809,6 @@
     "saved": "Setelan peringatan pengeluaran disimpan",
     "loadError": "Tidak dapat memuat peringatan pengeluaran.",
     "saveError": "Tidak dapat menyimpan peringatan pengeluaran.",
-    "empty": "Peringatan pengeluaran nonaktif. Aktifkan untuk memberi tahu kontak penagihan cakupan ini.",
     "sendAlerts": "Kirim peringatan pengeluaran",
     "noSpend": "Belum ada pengeluaran",
     "spend24h": "Pengeluaran dalam 24 jam terakhir",

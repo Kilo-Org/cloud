@@ -3809,7 +3809,6 @@
     "saved": "Tetapan amaran perbelanjaan disimpan",
     "loadError": "Tidak dapat memuatkan amaran perbelanjaan.",
     "saveError": "Tidak dapat menyimpan amaran perbelanjaan.",
-    "empty": "Amaran perbelanjaan dimatikan. Hidupkannya untuk memberitahu kenalan pengebilan skop ini.",
     "sendAlerts": "Hantar amaran",
     "noSpend": "Belum ada perbelanjaan",
     "spend24h": "Perbelanjaan dalam 24 jam terakhir",

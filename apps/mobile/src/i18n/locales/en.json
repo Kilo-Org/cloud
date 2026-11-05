@@ -3876,7 +3876,6 @@
     "saved": "Spend alert settings saved",
     "loadError": "Couldn't load spend alerts.",
     "saveError": "Couldn't save spend alerts.",
-    "empty": "Spend alerts are off. Turn them on to alert this scope's billing contacts.",
     "sendAlerts": "Send alerts",
     "noSpend": "None yet",
     "spend24h": "Spend in the last 24 hours",

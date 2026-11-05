@@ -3809,7 +3809,6 @@
     "saved": "Inställningarna för utgiftsvarningar har sparats",
     "loadError": "Utgiftsvarningarna kunde inte läsas in.",
     "saveError": "Utgiftsvarningarna kunde inte sparas.",
-    "empty": "Utgiftsvarningar är av. Slå på dem för att varna detta områdes faktureringskontakter.",
     "sendAlerts": "Skicka varningar",
     "noSpend": "Inga utgifter ännu",
     "spend24h": "Utgifter de senaste 24 timmarna",

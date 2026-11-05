@@ -3809,7 +3809,6 @@
     "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
     "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
     "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
-    "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
     "sendAlerts": "Warnungen senden",
     "noSpend": "Noch keine Ausgaben",
     "spend24h": "Ausgaben der letzten 24 Stunden",

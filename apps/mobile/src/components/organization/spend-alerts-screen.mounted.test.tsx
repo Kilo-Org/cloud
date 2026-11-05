@@ -613,18 +613,16 @@ describe('SpendAlertsScreen with an alert kind switched off', () => {
   });
 });
 
-describe('SpendAlertsScreen empty state', () => {
-  it('shows the off copy with the master switch as the only call to action', async () => {
+describe('SpendAlertsScreen off state', () => {
+  it('shows the master switch as the only call to action while alerts are off', async () => {
     const { renderer } = await mountLoaded({ enabled: false });
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(1);
 
     toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), true);
 
-    expect(texts(renderer)).not.toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(2);
     expect(byType(renderer, 'Button')).toHaveLength(1);
   });
@@ -634,7 +632,6 @@ describe('SpendAlertsScreen empty state', () => {
 
     toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(0);
 
     const saveButton = buttonByVariant(renderer);
@@ -664,7 +661,6 @@ describe('SpendAlertsScreen empty state', () => {
       queryClient.setQueryData(['spendAlerts', 'get', {}], settingsFixture({ enabled: false }));
     });
 
-    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBe(
       i18n.t('spendAlerts.saved')
     );

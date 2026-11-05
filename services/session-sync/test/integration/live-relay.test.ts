@@ -78,6 +78,20 @@ function whenClosed(ws: WebSocket): Promise<CloseEvent> {
   return promise;
 }
 
+/** Consume and release RPC capabilities even when an assertion only needs the status. */
+async function rpcResponse(pending: Promise<Response>): Promise<Response> {
+  const response = await pending;
+  try {
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
+      headers: new Headers(response.headers),
+    });
+  } finally {
+    const dispose: unknown = Symbol.dispose in response ? response[Symbol.dispose] : undefined;
+    if (typeof dispose === 'function') dispose.call(response);
+  }
+}
+
 function setSocketExpiry(instance: unknown, state: DurableObjectState, exp: number): void {
   const relay = instance as { saveAttachment: (ws: WebSocket, attachment: unknown) => void };
   for (const ws of state.getWebSockets()) {
@@ -291,10 +305,12 @@ it('queues HTTP and socket commands together, delivers in order, dedupes, and re
   const token = await fixture.ticket('controller');
   expect(
     await (
-      await fixture.stub.command({
-        ticket: token,
-        command: fixture.command('one', { opaque: 'first' }),
-      })
+      await rpcResponse(
+        fixture.stub.command({
+          ticket: token,
+          command: fixture.command('one', { opaque: 'first' }),
+        })
+      )
     ).json()
   ).toEqual({ commandID: 'one', status: 'queued' });
   controller.ws.send(JSON.stringify(fixture.command('two', { opaque: 'second' })));
@@ -304,10 +320,12 @@ it('queues HTTP and socket commands together, delivers in order, dedupes, and re
   });
   expect(
     await (
-      await fixture.stub.command({
-        ticket: token,
-        command: fixture.command('one', { changed: true }),
-      })
+      await rpcResponse(
+        fixture.stub.command({
+          ticket: token,
+          command: fixture.command('one', { changed: true }),
+        })
+      )
     ).json()
   ).toMatchObject({ status: 'queued' });
   const runner = await fixture.connect('runner');
@@ -333,7 +351,9 @@ it('queues HTTP and socket commands together, delivers in order, dedupes, and re
     status: 'delivered',
   });
   expect(
-    await (await fixture.stub.commandStatus({ ticket: token, commandID: 'one' })).json()
+    await (
+      await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'one' }))
+    ).json()
   ).toEqual({ commandID: 'one', status: 'delivered' });
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const row = drizzle(state.storage)
@@ -348,7 +368,7 @@ it('queues HTTP and socket commands together, delivers in order, dedupes, and re
 it('redelivers unacknowledged queueable commands when the runner reconnects', async () => {
   const fixture = await setup();
   const token = await fixture.ticket('controller');
-  await fixture.stub.command({ ticket: token, command: fixture.command('retry') });
+  await rpcResponse(fixture.stub.command({ ticket: token, command: fixture.command('retry') }));
   const controller = await fixture.connect('controller');
   const runner = await fixture.connect('runner');
   expect((await runner.next('send_message')).body).toMatchObject({ commandID: 'retry' });
@@ -364,19 +384,23 @@ it('rejects offline liveOnly commands and clears delivered payloads without repl
   const token = await fixture.ticket('controller');
   expect(
     (
-      await fixture.stub.command({
-        ticket: token,
-        command: fixture.command('offline', null, { liveOnly: true }),
-      })
+      await rpcResponse(
+        fixture.stub.command({
+          ticket: token,
+          command: fixture.command('offline', null, { liveOnly: true }),
+        })
+      )
     ).status
   ).toBe(409);
   const controller = await fixture.connect('controller');
   const runner = await fixture.connect('runner');
   await controller.next('runner_status');
-  await fixture.stub.command({
-    ticket: token,
-    command: fixture.command('approval', { approvalID: 'a' }, { liveOnly: true }),
-  });
+  await rpcResponse(
+    fixture.stub.command({
+      ticket: token,
+      command: fixture.command('approval', { approvalID: 'a' }, { liveOnly: true }),
+    })
+  );
   expect((await runner.next('send_message')).body).toMatchObject({
     commandID: 'approval',
     liveOnly: true,
@@ -402,7 +426,9 @@ it('rejects offline liveOnly commands and clears delivered payloads without repl
     });
   });
   expect(
-    await (await fixture.stub.commandStatus({ ticket: token, commandID: 'approval' })).json()
+    await (
+      await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'approval' }))
+    ).json()
   ).toMatchObject({ status: 'delivered' });
 });
 
@@ -412,19 +438,23 @@ it('validates TTL, expires opaque payloads on alarms, and retains only bounded s
   for (const ttlMs of [0, -1, LIVE_LIMITS.mailboxMaxMs + 1]) {
     expect(
       (
-        await fixture.stub.command({
-          ticket: token,
-          command: fixture.command(`bad-${ttlMs}`, null, { ttlMs }),
-        })
+        await rpcResponse(
+          fixture.stub.command({
+            ticket: token,
+            command: fixture.command(`bad-${ttlMs}`, null, { ttlMs }),
+          })
+        )
       ).status
     ).toBe(400);
   }
   const before = Date.now();
-  await fixture.stub.command({ ticket: token, command: fixture.command('default') });
-  await fixture.stub.command({
-    ticket: token,
-    command: fixture.command('max', null, { ttlMs: LIVE_LIMITS.mailboxMaxMs }),
-  });
+  await rpcResponse(fixture.stub.command({ ticket: token, command: fixture.command('default') }));
+  await rpcResponse(
+    fixture.stub.command({
+      ticket: token,
+      command: fixture.command('max', null, { ttlMs: LIVE_LIMITS.mailboxMaxMs }),
+    })
+  );
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const db = drizzle(state.storage);
     const row = db
@@ -440,7 +470,9 @@ it('validates TTL, expires opaque payloads on alarms, and retains only bounded s
   });
   await runDurableObjectAlarm(fixture.stub);
   expect(
-    await (await fixture.stub.commandStatus({ ticket: token, commandID: 'default' })).json()
+    await (
+      await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'default' }))
+    ).json()
   ).toMatchObject({ status: 'expired' });
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const db = drizzle(state.storage);
@@ -453,9 +485,9 @@ it('validates TTL, expires opaque payloads on alarms, and retains only bounded s
       .run();
   });
   await runDurableObjectAlarm(fixture.stub);
-  expect((await fixture.stub.commandStatus({ ticket: token, commandID: 'default' })).status).toBe(
-    404
-  );
+  expect(
+    (await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'default' }))).status
+  ).toBe(404);
 });
 
 it('enforces mailbox item and byte limits without dropping existing commands', async () => {
@@ -478,7 +510,11 @@ it('enforces mailbox item and byte limits without dropping existing commands', a
     for (const row of rows) db.insert(relayCommands).values(row).run();
   });
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('overflow') })).status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('overflow') })
+      )
+    ).status
   ).toBe(503);
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const db = drizzle(state.storage);
@@ -499,8 +535,11 @@ it('enforces mailbox item and byte limits without dropping existing commands', a
       .run();
   });
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('overflow-bytes') }))
-      .status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('overflow-bytes') })
+      )
+    ).status
   ).toBe(503);
 });
 
@@ -527,7 +566,8 @@ it('evicts old finished receipts before admitting new commands, never queued pay
     }
   });
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('new') })).status
+    (await rpcResponse(fixture.stub.command({ ticket: token, command: fixture.command('new') })))
+      .status
   ).toBe(200);
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const rows = drizzle(state.storage).select().from(relayCommands).all();
@@ -556,7 +596,11 @@ it('enforces shared per-user role limits across sockets, reconnects, and HTTP', 
       .run();
   });
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('limited') })).status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('limited') })
+      )
+    ).status
   ).toBe(429);
   controller.ws.send(JSON.stringify(fixture.command('also-limited')));
   expect((await controller.next('error')).body).toEqual({ code: 'rate_limit_exceeded' });
@@ -606,10 +650,12 @@ it('prevents viewers publishing commands and controllers acknowledging their own
   expect((await viewer.next('error')).body).toEqual({ code: 'forbidden' });
   expect(
     (
-      await fixture.stub.command({
-        ticket: await fixture.ticket('viewer'),
-        command: fixture.command('http-forbidden'),
-      })
+      await rpcResponse(
+        fixture.stub.command({
+          ticket: await fixture.ticket('viewer'),
+          command: fixture.command('http-forbidden'),
+        })
+      )
     ).status
   ).toBe(403);
   controller.ws.send(JSON.stringify({ type: 'ack', commandID: 'forbidden' }));
@@ -748,10 +794,12 @@ it('defaults missing event/command bodies to null and returns delivered on live 
   await subscribe(viewer);
   runner.ws.send(JSON.stringify({ channel: 'events', type: 'bodyless' }));
   expect((await viewer.next('bodyless')).body).toBeNull();
-  const response = await fixture.stub.command({
-    ticket: await fixture.ticket('controller'),
-    command: { channel: 'commands', type: 'interrupt', commandID: 'bodyless-command' },
-  });
+  const response = await rpcResponse(
+    fixture.stub.command({
+      ticket: await fixture.ticket('controller'),
+      command: { channel: 'commands', type: 'interrupt', commandID: 'bodyless-command' },
+    })
+  );
   expect(await response.json()).toEqual({ commandID: 'bodyless-command', status: 'delivered' });
   const command = await runner.next('interrupt');
   expect(command.body).toMatchObject({ payload: null, expiresAt: expect.any(String) });
@@ -813,10 +861,15 @@ it('gives status polling an independent durable rate budget', async () => {
       .run();
   });
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('send-budget') })).status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('send-budget') })
+      )
+    ).status
   ).toBe(200);
   expect(
-    (await fixture.stub.commandStatus({ ticket: token, commandID: 'send-budget' })).status
+    (await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'send-budget' })))
+      .status
   ).toBe(429);
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const db = drizzle(state.storage);
@@ -830,10 +883,15 @@ it('gives status polling an independent durable rate budget', async () => {
       .run();
   });
   expect(
-    (await fixture.stub.commandStatus({ ticket: token, commandID: 'send-budget' })).status
+    (await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'send-budget' })))
+      .status
   ).toBe(200);
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('limited-send') })).status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('limited-send') })
+      )
+    ).status
   ).toBe(429);
 });
 
@@ -843,7 +901,9 @@ it('retains delivered status when an unacknowledged handed-off payload reaches T
   const token = await fixture.ticket('controller');
   expect(
     await (
-      await fixture.stub.command({ ticket: token, command: fixture.command('late-ack') })
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('late-ack') })
+      )
     ).json()
   ).toMatchObject({ status: 'delivered' });
   await runner.next('send_message');
@@ -863,7 +923,9 @@ it('retains delivered status when an unacknowledged handed-off payload reaches T
   });
   await runDurableObjectAlarm(fixture.stub);
   expect(
-    await (await fixture.stub.commandStatus({ ticket: token, commandID: 'late-ack' })).json()
+    await (
+      await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'late-ack' }))
+    ).json()
   ).toEqual({ commandID: 'late-ack', status: 'delivered' });
   await runInDurableObject(fixture.stub, (_instance, state) => {
     expect(
@@ -913,7 +975,7 @@ it('permanently purges payloads, sockets, rate budgets, and persisted watch clea
   const viewerToken = await fixture.ticket('viewer');
   const runner = await fixture.connect('runner');
   const viewer = await fixture.connect('viewer');
-  await fixture.stub.command({ ticket: token, command: fixture.command('purged') });
+  await rpcResponse(fixture.stub.command({ ticket: token, command: fixture.command('purged') }));
   await runner.next('send_message');
   const runnerClosed = whenClosed(runner.ws);
   const viewerClosed = whenClosed(viewer.ws);
@@ -938,12 +1000,15 @@ it('permanently purges payloads, sockets, rate budgets, and persisted watch clea
     ).status
   ).toBe(401);
   expect(
-    (await fixture.stub.command({ ticket: token, command: fixture.command('cannot-repopulate') }))
-      .status
+    (
+      await rpcResponse(
+        fixture.stub.command({ ticket: token, command: fixture.command('cannot-repopulate') })
+      )
+    ).status
   ).toBe(403);
-  expect((await fixture.stub.commandStatus({ ticket: token, commandID: 'purged' })).status).toBe(
-    403
-  );
+  expect(
+    (await rpcResponse(fixture.stub.commandStatus({ ticket: token, commandID: 'purged' }))).status
+  ).toBe(403);
 });
 
 it('fences fetch, command, and status calls already awaiting ticket verification when purged', async () => {
@@ -1050,10 +1115,12 @@ it('replaces a runner without a false offline flap and still discards liveOnly p
   const viewer = await fixture.connect('viewer');
   const original = await fixture.connect('runner');
   expect((await viewer.next('runner_status')).body).toEqual({ runnerConnected: true });
-  await fixture.stub.command({
-    ticket: await fixture.ticket('controller'),
-    command: fixture.command('replace-live', null, { liveOnly: true }),
-  });
+  await rpcResponse(
+    fixture.stub.command({
+      ticket: await fixture.ticket('controller'),
+      command: fixture.command('replace-live', null, { liveOnly: true }),
+    })
+  );
   await original.next('send_message');
   const replaced = whenClosed(original.ws);
   await fixture.connect('runner');

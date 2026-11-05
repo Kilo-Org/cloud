@@ -66,7 +66,8 @@ function tierAtInputLength(
   return selected;
 }
 
-function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRates {
+/** The worse of two prices, so a bound built from both covers either route. */
+export function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRates {
   return {
     inputRate: Math.max(a.inputRate, b.inputRate),
     outputRate: Math.max(a.outputRate, b.outputRate),
@@ -74,7 +75,11 @@ function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRate
   };
 }
 
-function pickerRequestPrice(
+/**
+ * The rates a stored or catalog model is billed at, with the custom pricing tier
+ * that applies at `inputTokenCeiling`, as billing selects it.
+ */
+export function pickerRequestPrice(
   modelId: string,
   models: Record<string, StoredModel>,
   catalog: OpenRouterModel[],
@@ -164,7 +169,11 @@ export function textPricingRates(pricing: EndpointPricing | undefined): TextPric
   return rates;
 }
 
-function requestTextBytes(value: unknown): number {
+/**
+ * An upper bound on the tokens a JSON request can carry: every token covers at
+ * least one UTF-8 byte, so the serialized size bounds the token count.
+ */
+export function requestTextBytes(value: unknown): number {
   if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
   if (Array.isArray(value)) {
     return (value as unknown[]).reduce<number>((sum, item) => sum + requestTextBytes(item), 0);

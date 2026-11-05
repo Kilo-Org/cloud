@@ -6,6 +6,7 @@ import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
@@ -23,6 +24,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { name: 'primary' },
   readDb: { name: 'replica' },
 }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { eval: jest.fn(async () => 1) },
+}));
 
 const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedGetBalance = jest.mocked(getBalanceAndOrgSettings);
@@ -39,6 +43,8 @@ function params(overrides: Partial<Parameters<typeof checkDirectProviderAccess>[
     provider: 'inception',
     isFreeUsage: false,
     hasByok: false,
+    usageId: 'usage-1',
+    maximumCostMicrodollars: null,
     ...overrides,
   };
 }
@@ -68,7 +74,7 @@ describe('checkDirectProviderAccess', () => {
       kiloUserId: 'user-1',
       modelId: 'vendor/model',
     });
-    expect(result).toEqual({ access: { balance: 10, plan: 'teams', payer } });
+    expect(result).toEqual({ access: { balance: 10, plan: 'teams', payer, releaseSpend: null } });
   });
 
   it('omits usage funding for free models', async () => {
@@ -95,7 +101,18 @@ describe('checkDirectProviderAccess', () => {
   ])('allows insufficient balance for %s', async (_label, overrides) => {
     mockedGetBalance.mockResolvedValue({ balance: 0, settings: undefined });
     const result = await checkDirectProviderAccess(params(overrides));
-    expect(result).toEqual({ access: { balance: 0, plan: undefined, payer: undefined } });
+    expect(result).toEqual({
+      access: { balance: 0, plan: undefined, payer: undefined, releaseSpend: null },
+    });
+  });
+
+  it('holds a bound request against the payer and refuses one the balance cannot cover', async () => {
+    const admitted = await checkDirectProviderAccess(params({ maximumCostMicrodollars: 1_500 }));
+    expect(admitted.access?.releaseSpend).toEqual(expect.any(Function));
+
+    jest.mocked(redisClient.eval).mockResolvedValue(0);
+    const refused = await checkDirectProviderAccess(params({ maximumCostMicrodollars: 1_500 }));
+    expect(refused.rejection?.status).toBe(402);
   });
 
   it('skips the model decision without an organization', async () => {

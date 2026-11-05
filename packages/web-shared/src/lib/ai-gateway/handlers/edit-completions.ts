@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -25,6 +26,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import { textRequestSpendBound } from '@kilocode/web-shared/lib/ai-gateway/request-spend-bound';
 import {
   gatewayUsageContextBase,
   resolveGatewayCaller,
@@ -142,6 +144,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+  const usageId = randomUUID();
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(rawClientIp(request)),
@@ -167,6 +170,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     requested_model: requestBody.model,
     is_free: isFreeModel(requestBody.model),
     promptInfo,
+    usageId,
     max_tokens: requestBody.max_tokens ?? null,
     isStreaming: false,
     user_byok: !!userByokEntry,
@@ -190,9 +194,15 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     provider: editProvider,
     isFreeUsage: usageContext.is_free,
     hasByok: !!userByokEntry,
+    usageId,
+    maximumCostMicrodollars: await textRequestSpendBound({
+      model: requestBody.model,
+      body: requestBody,
+      explicitOutputTokens: requestBody.max_tokens ?? null,
+    }),
   });
   if (accessResult.rejection) return accessResult.rejection;
-  const { balance, plan, payer } = accessResult.access;
+  const { balance, plan, payer, releaseSpend } = accessResult.access;
 
   // Data-use contract for this route: edit goes straight to Inception, which the gateway's
   // provider data policy classifies as not training on prompts and not retaining them
@@ -203,6 +213,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
 
   if (!apiKey) {
+    await releaseSpend?.();
     return NextResponse.json(
       {
         error: 'This model requires a BYOK API key. Please configure your API key in settings.',
@@ -220,7 +231,10 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   });
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
-  if (bouncerRejection) return bouncerRejection;
+  if (bouncerRejection) {
+    await releaseSpend?.();
+    return bouncerRejection;
+  }
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',
@@ -234,14 +248,20 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const bodyForUpstream = { ...requestBody, model: upstreamModel };
 
-  const proxyRes = await fetch(INCEPTION_EDIT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(bodyForUpstream),
-  });
+  let proxyRes: Response;
+  try {
+    proxyRes = await fetch(INCEPTION_EDIT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(bodyForUpstream),
+    });
+  } catch (error) {
+    await releaseSpend?.();
+    throw error;
+  }
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
@@ -265,6 +285,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   );
 
   if (!proxyRes.body) {
+    await releaseSpend?.();
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -286,7 +307,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
-  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan, releaseSpend ?? undefined);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

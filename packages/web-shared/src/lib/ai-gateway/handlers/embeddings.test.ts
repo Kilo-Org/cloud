@@ -49,6 +49,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
 }));
+// Admission pricing has its own tests; these cover the route's transport.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-spend-bound', () => ({
+  textRequestSpendBound: async () => null,
+  embeddingRequestSpendBound: async () => null,
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);

@@ -68,6 +68,27 @@ The queue launch and retirement rollback are documented in
 Source defaults do not establish deployed selection; production SFO and FRA
 selection follow the deployed source and have no runtime cohort switch.
 
+## Gateway spend admission
+
+A paid request holds its priced maximum cost against its payer before the
+upstream call, so the payer's total in-flight cost stays inside the balance their
+admission read. The hold lives in the shared Redis (`lib/redis.ts`), never in the
+primary: `spend-reservation.ts` keys it by the request's usage id and takes it
+atomically against the payer counter.
+
+- The usage write consumes the hold where the debit commits
+  (`saveUsageRelatedDataLocally`), so a hold covers exactly the request's
+  uncommitted window. Every path that ends before billing releases it, and a
+  hold that outlives its request expires.
+- A payer whose holds plus this request exceed their balance is refused with the
+  route's existing credits response. A request the catalog cannot bound holds
+  nothing and keeps the positive-balance admission; the gap is reported to
+  Sentry instead of turning a catalog hole into a refusal.
+- Prices come from `request-spend-bound.ts`. It reads the raw provider catalog
+  through `providers/raw-model-catalog.ts` and the stored model metadata and
+  custom pricing through `readDb`, and caches all of them in process. Keep that
+  path free of an uncached provider call.
+
 ## Data collection versus ZDR
 
 `provider.data_collection: 'deny'` only excludes providers that store prompts

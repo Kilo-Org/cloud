@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -25,6 +26,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import { textRequestSpendBound } from '@kilocode/web-shared/lib/ai-gateway/request-spend-bound';
 import {
   gatewayUsageContextBase,
   resolveGatewayCaller,
@@ -144,6 +146,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+  const usageId = randomUUID();
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(rawClientIp(request)),
@@ -173,6 +176,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     requested_model: requestBody.model,
     is_free: isFreeModel(requestBody.model),
     promptInfo,
+    usageId,
     max_tokens: requestBody.max_tokens ?? null,
     isStreaming: requestBody.stream === true,
     user_byok: !!userByokEntry,
@@ -196,9 +200,15 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     provider: fimProvider,
     isFreeUsage: usageContext.is_free,
     hasByok: !!userByokEntry,
+    usageId,
+    maximumCostMicrodollars: await textRequestSpendBound({
+      model: requestBody.model,
+      body: requestBody,
+      explicitOutputTokens: requestBody.max_tokens ?? null,
+    }),
   });
   if (accessResult.rejection) return accessResult.rejection;
-  const { balance, plan, payer } = accessResult.access;
+  const { balance, plan, payer, releaseSpend } = accessResult.access;
 
   // Data-use contract for this route: FIM goes straight to the provider, and the supported
   // providers are classified by the gateway's provider data policy as not training on prompts
@@ -210,6 +220,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
 
   if (!apiKey) {
+    await releaseSpend?.();
     return NextResponse.json(
       {
         error: 'This model requires a BYOK API key. Please configure your API key in settings.',
@@ -227,7 +238,10 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   });
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
-  if (bouncerRejection) return bouncerRejection;
+  if (bouncerRejection) {
+    await releaseSpend?.();
+    return bouncerRejection;
+  }
 
   sentryRootSpan()?.setAttribute(
     'fim.time_to_request_start_ms',
@@ -247,14 +261,20 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   // Make upstream request to the resolved provider
-  const proxyRes = await fetch(upstreamUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(bodyForUpstream),
-  });
+  let proxyRes: Response;
+  try {
+    proxyRes = await fetch(upstreamUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(bodyForUpstream),
+    });
+  } catch (error) {
+    await releaseSpend?.();
+    throw error;
+  }
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
@@ -278,6 +298,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   );
 
   if (!proxyRes.body) {
+    await releaseSpend?.();
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -300,7 +321,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const clonedResponse = proxyRes.clone(); // reading from body is side-effectful
 
   // Account for usage using FIM-specific parser
-  countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
+  countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan, releaseSpend ?? undefined);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

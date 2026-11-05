@@ -2,6 +2,7 @@ import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
+import { releaseSpendHold } from './spend-reservation';
 import { after } from 'next/server';
 import {
   USAGE_QUEUE_SFO_CONFIG,
@@ -540,6 +541,10 @@ export async function saveUsageRelatedDataLocally(
         bouncer_usage_event
       );
       if (!inserted) return null;
+      // The debit is committed, so the request stops holding its spend. A usage
+      // row written without a hold, and a redelivery of one, find nothing to
+      // release.
+      await releaseSpendHold(coreUsageFields.id);
       if (posthog_distinct_id && !inserted.wasRedelivery) {
         if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
         await sendFirstMicrodollarUsageEventIfNeeded(

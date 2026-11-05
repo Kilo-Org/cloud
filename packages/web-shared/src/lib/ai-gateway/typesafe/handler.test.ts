@@ -33,6 +33,7 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   logMicrodollarUsageAndReportToBouncer,
   mapToUsageStats,
@@ -55,6 +56,9 @@ import { handleSystemOneRequest } from './handler';
 jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { eval: jest.fn(async () => 1) },
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: jest.fn(),
@@ -272,6 +276,9 @@ describe('handleSystemOneRequest', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
+    // The spend store admits every request in this suite; its own behaviour is
+    // covered by its unit tests.
+    jest.mocked(redisClient.eval).mockResolvedValue(1 as never);
     setAuth();
     mockVerdict(null);
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });

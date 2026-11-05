@@ -57,6 +57,11 @@ jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),
 }));
+// Admission pricing has its own tests; these cover the route's transport.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-spend-bound', () => ({
+  textRequestSpendBound: async () => null,
+  embeddingRequestSpendBound: async () => null,
+}));
 
 // Run `after()` work inline so we can assert on the usage write the same tick.
 jest.mock('next/server', () => ({

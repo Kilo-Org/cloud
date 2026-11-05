@@ -1,4 +1,5 @@
 import type { NextRequest, NextResponse } from 'next/server';
+import { captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -28,6 +29,17 @@ import {
   modelNotAllowedResponse,
   paidModelAuthRequiredResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { reservePaidSpend } from '@kilocode/web-shared/lib/ai-gateway/spend-reservation';
+
+/** A paid request that may run, and how to give back the spend it holds. */
+export type SpendAdmission =
+  | {
+      kind: 'admitted';
+      /** Null when nothing was held, either because the request is unbounded or the store was down. */
+      release: (() => Promise<void>) | null;
+    }
+  /** The payer's available balance cannot cover the request's maximum cost. */
+  | { kind: 'insufficient' };
 
 type GatewayAuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 
@@ -113,6 +125,57 @@ export function paidUsageRejection(params: {
       organizationId,
       balanceLimitedByUserAllowance: account.balanceLimitedByUserAllowance,
     });
+}
+
+/**
+ * Holds a request's maximum cost against the payer before the upstream call, so
+ * the payer's in-flight cost stays inside the balance this request read.
+ *
+ * A request the catalog cannot bound holds nothing and keeps the
+ * positive-balance admission it had. A reservation store that does not answer
+ * also holds nothing: an unavailable store must not refuse a request the balance
+ * check admitted.
+ */
+export async function admitGatewaySpend(params: {
+  user: Pick<User, 'id'>;
+  organizationId: string | undefined;
+  /** The usage id the request's debit will carry, which keys the hold. */
+  usageId: string;
+  account: Pick<BalanceAndOrgSettings, 'balance'>;
+  maximumCostMicrodollars: number | null;
+  model: string;
+}): Promise<SpendAdmission> {
+  const { user, organizationId, usageId, account, maximumCostMicrodollars } = params;
+  if (maximumCostMicrodollars === null) {
+    reportUnboundedRequest(params.model);
+    return { kind: 'admitted', release: null };
+  }
+  const reservation = await reservePaidSpend({
+    usageId,
+    payer: { organizationId, userId: user.id },
+    amountMicrodollars: maximumCostMicrodollars,
+    availableMicrodollars: Math.floor(account.balance * 1_000_000),
+  });
+  if (reservation.kind === 'insufficient') return { kind: 'insufficient' };
+  return {
+    kind: 'admitted',
+    release: reservation.kind === 'reserved' ? reservation.release : null,
+  };
+}
+
+/** One report a model a minute raises the alarm without flooding when the catalog has a gap. */
+const UNBOUNDED_REPORT_INTERVAL_MS = 60_000;
+const lastUnboundedReportAt = new Map<string, number>();
+
+function reportUnboundedRequest(model: string): void {
+  const now = Date.now();
+  if (now - (lastUnboundedReportAt.get(model) ?? 0) < UNBOUNDED_REPORT_INTERVAL_MS) return;
+  lastUnboundedReportAt.set(model, now);
+  captureMessage('Gateway request has no maximum cost bound', {
+    level: 'warning',
+    tags: { source: 'gateway_spend_admission' },
+    extra: { model },
+  });
 }
 
 /**

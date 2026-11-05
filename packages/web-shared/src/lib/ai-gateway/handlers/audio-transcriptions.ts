@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -35,6 +36,7 @@ import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsag
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
+  admitGatewaySpend,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
@@ -221,6 +223,7 @@ export async function handleAudioTranscriptionsRequest(
     );
   }
 
+  const usageId = randomUUID();
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: 'audio_transcriptions',
@@ -228,6 +231,7 @@ export async function handleAudioTranscriptionsRequest(
     requested_model: requestedModelLowerCased,
     is_free: isFreeModel(requestedModelLowerCased),
     promptInfo,
+    usageId,
     isStreaming: false,
     user_byok: !!userByok,
     has_tools: false,
@@ -280,6 +284,18 @@ export async function handleAudioTranscriptionsRequest(
   });
   if (preferences.kind === 'rejected') return preferences.response;
   const organizationProvider = preferences.provider;
+
+  // A transcription prices from the provider's own usage record and its request
+  // states no duration, so admission cannot bound it. It keeps the balance check
+  // above and reports the unbounded request instead of refusing it.
+  await admitGatewaySpend({
+    user,
+    organizationId,
+    usageId,
+    account,
+    maximumCostMicrodollars: null,
+    model: requestedModelLowerCased,
+  });
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.

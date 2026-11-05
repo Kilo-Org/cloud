@@ -64,6 +64,11 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
     getdel: jest.fn().mockResolvedValue(null),
   },
 }));
+// Admission pricing has its own tests; these cover the route's transport.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-spend-bound', () => ({
+  textRequestSpendBound: async () => null,
+  embeddingRequestSpendBound: async () => null,
+}));
 jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),

@@ -12,7 +12,13 @@ import {
   type OrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { paidUsageRejection } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import {
+  admitGatewaySpend,
+  paidUsageRejection,
+  type SpendAdmission,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { textRequestSpendBound } from '@kilocode/web-shared/lib/ai-gateway/request-spend-bound';
+import { getMaxTokens } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
@@ -28,6 +34,7 @@ import {
   allowedInferenceProviders,
   apiKindNotSupportedResponse,
   chatGptReconnectResponse,
+  creditsBlockedResponse,
   dataCollectionRequiredResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
@@ -64,6 +71,8 @@ type ProviderPolicyInput = {
   request: ValidatedGatewayRequest;
   /** The resolved model id, lowercased. */
   model: string;
+  /** The usage id this request will bill under, which keys its spend hold. */
+  usageId: string;
   /** The request's own provider object, before privacy and organization policy replaced it. */
   requestProvider: OpenRouterProviderConfig | undefined;
   customLlm: CustomLlm | null;
@@ -85,6 +94,7 @@ type ProviderPolicyResult =
       providerResult: GetProviderProviderResult;
       isNonTrialEnterprise: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
+      spendAdmission: SpendAdmission | null;
     }
   | { ok: false; response: NextResponseType<unknown> };
 
@@ -324,10 +334,46 @@ export async function resolveProviderAndPolicy(
     }
   }
 
+  // The balance check above reads a snapshot. Hold the request's maximum cost
+  // against the payer last, after every policy rejection, so the hold covers the
+  // upstream call and nothing else.
+  let spendAdmission: SpendAdmission | null = null;
+  if (!isAnonymous) {
+    const spendExempt =
+      providerResult.isFree || !!providerResult.userByok || !!providerResult.skipBalanceCheck;
+    if (!spendExempt) {
+      const account = await input.balanceAndSettingsPromise;
+      spendAdmission = await admitGatewaySpend({
+        user,
+        organizationId: input.organizationId,
+        usageId: input.usageId,
+        account,
+        maximumCostMicrodollars: await textRequestSpendBound({
+          model,
+          body: request.body,
+          explicitOutputTokens: getMaxTokens(request),
+          choices: request.kind === 'chat_completions' ? (request.body.n ?? 1) : 1,
+        }),
+        model,
+      });
+      if (spendAdmission.kind === 'insufficient') {
+        return reject(
+          await creditsBlockedResponse({
+            user,
+            balance: account.balance,
+            organizationId: input.organizationId,
+            balanceLimitedByUserAllowance: account.balanceLimitedByUserAllowance,
+          })
+        );
+      }
+    }
+  }
+
   return {
     ok: true,
     providerResult,
     isNonTrialEnterprise,
     dataRegion: organizationGatewaySettings.dataRegion,
+    spendAdmission,
   };
 }

@@ -34,6 +34,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     query: { microdollar_usage: { findFirst: jest.fn() } },
   },
 }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { eval: jest.fn(async () => 0) },
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   USAGE_QUEUE_SFO_CONFIG: { enabled: false },
   USAGE_QUEUE_FRA_CONFIG: { enabled: false },

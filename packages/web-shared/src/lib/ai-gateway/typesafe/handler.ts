@@ -12,6 +12,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
+  admitGatewaySpend,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
@@ -186,6 +187,27 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const providerPolicy =
     preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
+  // The bound above prices this request alone. Hold it against the payer so a
+  // concurrent System One request cannot spend the same balance snapshot, and
+  // take it after every policy rejection so it covers the upstream call only.
+  const usageId = randomUUID();
+  const spendAdmission = await admitGatewaySpend({
+    user,
+    organizationId,
+    usageId,
+    account,
+    maximumCostMicrodollars: estimatedMaxCostMicrodollars,
+    model: resolvedModel,
+  });
+  if (spendAdmission.kind === 'insufficient') {
+    return errorResponse(
+      'This request can cost more than the available balance covers. Add credits or send a smaller request.',
+      'insufficient_credits',
+      402
+    );
+  }
+  const releaseSpend = spendAdmission.release;
+
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 
@@ -232,7 +254,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
-  if (bouncerRejection) return bouncerRejection;
+  if (bouncerRejection) {
+    await releaseSpend?.();
+    return bouncerRejection;
+  }
 
   const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
     ...usageBase.context,
@@ -241,6 +266,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     requested_model: requestedModel,
     is_free: isFree,
     promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+    usageId,
     isStreaming: false,
     status_code: statusCode,
     user_byok: false,
@@ -377,6 +403,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   // Nothing has reached the provider yet, so this request owes no usage row.
   if (request.signal.aborted) {
+    await releaseSpend?.();
     return errorResponse(
       'The client disconnected before the response was sent, so the request was cancelled.',
       'client_disconnect',

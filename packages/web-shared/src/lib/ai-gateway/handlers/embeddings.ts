@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -15,6 +16,7 @@ import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   countAndStoreEmbeddingUsage,
+  creditsBlockedResponse,
   extractEmbeddingPromptInfo,
   invalidRequestResponse,
   malformedJsonResponse,
@@ -30,12 +32,15 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  admitGatewaySpend,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
+  type SpendAdmission,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { embeddingRequestSpendBound } from '@kilocode/web-shared/lib/ai-gateway/request-spend-bound';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -185,6 +190,7 @@ export async function handleEmbeddingsRequest(
 
   // Build usage context
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
+  const usageId = randomUUID();
 
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
@@ -193,6 +199,7 @@ export async function handleEmbeddingsRequest(
     requested_model: requestedModelLowerCased,
     is_free: isFree,
     promptInfo,
+    usageId,
     isStreaming: false,
     user_byok: !!userByok,
     has_tools: false,
@@ -215,6 +222,7 @@ export async function handleEmbeddingsRequest(
   let accountPayer: BalancePayer | undefined;
 
   // Skip balance/org checks for anonymous users — they can only use free models
+  let spendAdmission: SpendAdmission | null = null;
   if (!isAnonymousContext(user)) {
     const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
     const { balance, settings, plan, payer } = account;
@@ -223,11 +231,12 @@ export async function handleEmbeddingsRequest(
     accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
+    const exempt = usageContext.is_free || !!userByok;
     const creditsBlocked = paidUsageRejection({
       user,
       organizationId,
       account,
-      exempt: usageContext.is_free || !!userByok,
+      exempt,
     });
     if (creditsBlocked) return await creditsBlocked();
 
@@ -238,7 +247,31 @@ export async function handleEmbeddingsRequest(
     });
     if (preferences.kind === 'rejected') return preferences.response;
     if (preferences.provider) requestBodyParsed.provider = preferences.provider;
+
+    // Last, so the hold covers the upstream call and nothing else.
+    if (!exempt) {
+      spendAdmission = await admitGatewaySpend({
+        user,
+        organizationId,
+        usageId,
+        account,
+        maximumCostMicrodollars: await embeddingRequestSpendBound({
+          model: requestedModelLowerCased,
+          body: requestBodyParsed,
+        }),
+        model: requestedModelLowerCased,
+      });
+      if (spendAdmission.kind === 'insufficient') {
+        return await creditsBlockedResponse({
+          user,
+          balance: account.balance,
+          organizationId,
+          balanceLimitedByUserAllowance: account.balanceLimitedByUserAllowance,
+        });
+      }
+    }
   }
+  const releaseSpend = spendAdmission?.release ?? null;
 
   sentryRootSpan()?.setAttribute(
     'embedding.time_to_request_start_ms',
@@ -247,6 +280,7 @@ export async function handleEmbeddingsRequest(
 
   const dimensionError = validateEmbeddingDimensions(requestBodyParsed, requestedModelLowerCased);
   if (dimensionError) {
+    await releaseSpend?.();
     return NextResponse.json(
       {
         error: {
@@ -317,13 +351,22 @@ export async function handleEmbeddingsRequest(
 
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
-  if (bouncerRejection) return bouncerRejection;
+  if (bouncerRejection) {
+    await releaseSpend?.();
+    return bouncerRejection;
+  }
 
-  const response = await embeddingProxyRequest({
-    body: upstreamBody,
-    provider: effectiveProvider,
-    signal: request.signal,
-  });
+  let response: Response;
+  try {
+    response = await embeddingProxyRequest({
+      body: upstreamBody,
+      provider: effectiveProvider,
+      signal: request.signal,
+    });
+  } catch (error) {
+    await releaseSpend?.();
+    throw error;
+  }
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
@@ -358,10 +401,18 @@ export async function handleEmbeddingsRequest(
     organizationId,
     model: requestedModelLowerCased,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    await releaseSpend?.();
+    return upstreamErrorResponse;
+  }
 
   const clonedResponse = response.clone();
-  countAndStoreEmbeddingUsage(clonedResponse, usageContext, embeddingRequestSpan);
+  countAndStoreEmbeddingUsage(
+    clonedResponse,
+    usageContext,
+    embeddingRequestSpan,
+    releaseSpend ?? undefined
+  );
 
   return wrapInSafeNextResponse(response);
 }

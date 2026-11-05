@@ -381,6 +381,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     countryCode,
+    usageId,
     boundedSpending: requestCostLimit !== null,
     providerMetadataCapture,
     effectivePrivacy,
@@ -388,7 +389,14 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { providerResult, isNonTrialEnterprise, dataRegion, spendAdmission } = providerPolicy;
+  // The request holds its maximum cost until the usage write consumes it. Any
+  // exit before the accounting starts owes that hold back.
+  const releaseSpend = spendAdmission?.kind === 'admitted' ? spendAdmission.release : null;
+  const rejectReleasingSpend = async (response: NextResponseType<unknown>) => {
+    await releaseSpend?.();
+    return response;
+  };
 
   console.debug(`Routing request to ${providerResult.provider.type}`, {
     byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
@@ -441,7 +449,7 @@ export async function handleLlmProxyRequest(
   // rejects; every other outcome sends the request.
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
-  if (bouncerRejection) return bouncerRejection;
+  if (bouncerRejection) return await rejectReleasingSpend(bouncerRejection);
   const requestLogging = {
     user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
@@ -456,7 +464,7 @@ export async function handleLlmProxyRequest(
   );
   if (guardrailRejection) {
     // The disconnect was already logged; nobody reads this rejection.
-    if (request.signal.aborted) return guardrailRejection;
+    if (request.signal.aborted) return await rejectReleasingSpend(guardrailRejection);
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
@@ -464,7 +472,7 @@ export async function handleLlmProxyRequest(
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
-    return guardrailRejection;
+    return await rejectReleasingSpend(guardrailRejection);
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
@@ -492,9 +500,11 @@ export async function handleLlmProxyRequest(
         : undefined,
   });
   if (attempt.type === 'invalid-openrouter-model') {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+    return await rejectReleasingSpend(
+      modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased)
+    );
   }
-  if (attempt.type === 'error') return attempt.response;
+  if (attempt.type === 'error') return await rejectReleasingSpend(attempt.response);
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
@@ -508,6 +518,7 @@ export async function handleLlmProxyRequest(
     usageContext,
     upstreamSpan: openrouterRequestSpan,
     requestStartedAt,
+    releaseUnusedSpend: releaseSpend ?? undefined,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
     logging: requestLogging,
     enkryptOutputScan:

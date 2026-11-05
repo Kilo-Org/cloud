@@ -41,6 +41,8 @@ type RespondInput = {
   usageContext: MicrodollarUsageContext;
   upstreamSpan: Span;
   requestStartedAt: number;
+  /** Gives back held spend when this response produces no usage to bill. */
+  releaseUnusedSpend?: () => Promise<void>;
   briefingSettlementToken: string | null;
   logging: RequestLoggingParams;
   /** Null when the organization has no output guardrail. */
@@ -99,14 +101,19 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     gatewayModel: model,
     byokProviderIds: userByokProviderIds,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    // No usage is billed for this response, so the held spend goes back now.
+    await input.releaseUnusedSpend?.();
+    return upstreamErrorResponse;
+  }
 
   // Reading the body is side-effectful, so accounting reads a clone.
   const accounting = accountForMicrodollarUsage(
     response.clone(),
     usageContext,
     input.upstreamSpan,
-    provider
+    provider,
+    ...(input.releaseUnusedSpend ? [input.releaseUnusedSpend] : [])
   );
   const settlementToken = input.briefingSettlementToken;
   const sessionId = usageContext.session_id;

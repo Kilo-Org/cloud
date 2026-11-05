@@ -7,15 +7,24 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  admitGatewaySpend,
   gatewayUsageContextBase,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { reservePaidSpend } from '@kilocode/web-shared/lib/ai-gateway/spend-reservation';
+import { captureMessage } from '@sentry/nextjs';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/spend-reservation', () => ({
+  reservePaidSpend: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
 }));
 
 const user = { id: 'user-1', google_user_email: 'user@example.com', microdollars_used: 5 } as User;
@@ -156,6 +165,127 @@ describe('paidUsageRejection', () => {
       error: { balance: 0 },
       error_type: ProxyErrorType.usage_limit_exceeded,
     });
+  });
+});
+
+describe('admitGatewaySpend', () => {
+  beforeEach(() => {
+    jest.mocked(reservePaidSpend).mockReset();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it('holds the request maximum cost against the payer balance', async () => {
+    const release = jest.fn(async () => {});
+    jest.mocked(reservePaidSpend).mockResolvedValue({
+      kind: 'reserved',
+      amountMicrodollars: 2_500,
+      release,
+    });
+
+    await expect(
+      admitGatewaySpend({
+        user,
+        organizationId: 'org-1',
+        usageId: 'usage-1',
+        account: { balance: 0.004 },
+        maximumCostMicrodollars: 2_500,
+        model: 'openai/gpt-4o',
+      })
+    ).resolves.toEqual({ kind: 'admitted', release });
+    expect(reservePaidSpend).toHaveBeenCalledWith({
+      usageId: 'usage-1',
+      payer: { organizationId: 'org-1', userId: 'user-1' },
+      amountMicrodollars: 2_500,
+      availableMicrodollars: 4_000,
+    });
+  });
+
+  it('refuses the request when the payer cannot cover it alongside the held spend', async () => {
+    jest.mocked(reservePaidSpend).mockResolvedValue({ kind: 'insufficient' });
+
+    await expect(
+      admitGatewaySpend({
+        user,
+        organizationId: undefined,
+        usageId: 'usage-2',
+        account: { balance: 0.004 },
+        maximumCostMicrodollars: 2_500,
+        model: 'openai/gpt-4o',
+      })
+    ).resolves.toEqual({ kind: 'insufficient' });
+  });
+
+  it('keeps the request admitted without a hold when the store is unavailable', async () => {
+    jest.mocked(reservePaidSpend).mockResolvedValue({ kind: 'unavailable' });
+
+    await expect(
+      admitGatewaySpend({
+        user,
+        organizationId: undefined,
+        usageId: 'usage-3',
+        account: { balance: 0.004 },
+        maximumCostMicrodollars: 2_500,
+        model: 'openai/gpt-4o',
+      })
+    ).resolves.toEqual({ kind: 'admitted', release: null });
+  });
+
+  it('holds nothing for a request no catalog can bound, and reports it', async () => {
+    await expect(
+      admitGatewaySpend({
+        user,
+        organizationId: undefined,
+        usageId: 'usage-4',
+        account: { balance: 0.004 },
+        maximumCostMicrodollars: null,
+        model: 'vendor/unpriced',
+      })
+    ).resolves.toEqual({ kind: 'admitted', release: null });
+    expect(reservePaidSpend).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('admits one of two concurrent requests when either alone fits the balance', async () => {
+    // The store contract: a hold is taken only while the holds already taken
+    // plus this amount fit the balance the request was admitted on.
+    let held = 0;
+    jest
+      .mocked(reservePaidSpend)
+      .mockImplementation(async ({ amountMicrodollars, availableMicrodollars }) => {
+        if (held + amountMicrodollars > availableMicrodollars) return { kind: 'insufficient' };
+        held += amountMicrodollars;
+        return {
+          kind: 'reserved',
+          amountMicrodollars,
+          release: async () => {
+            held -= amountMicrodollars;
+          },
+        };
+      });
+    const account = { balance: 0.004 };
+
+    const [first, second] = await Promise.all([
+      admitGatewaySpend({
+        user,
+        organizationId: undefined,
+        usageId: 'usage-5',
+        account,
+        maximumCostMicrodollars: 2_500,
+        model: 'openai/gpt-4o',
+      }),
+      admitGatewaySpend({
+        user,
+        organizationId: undefined,
+        usageId: 'usage-6',
+        account,
+        maximumCostMicrodollars: 2_500,
+        model: 'openai/gpt-4o',
+      }),
+    ]);
+
+    expect([first.kind, second.kind].sort()).toEqual(['admitted', 'insufficient']);
+    if (first.kind === 'admitted') await first.release?.();
+    expect(held).toBe(0);
   });
 });
 

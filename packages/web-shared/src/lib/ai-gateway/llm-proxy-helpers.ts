@@ -721,11 +721,39 @@ export function wrapInSafeNextResponse(response: Response) {
   });
 }
 
+/**
+ * Registers a request's accounting for the rest of its lifetime, and gives back
+ * the spend admission held for it when the response produced nothing to bill. A
+ * billed request leaves its hold to the usage write, which consumes it where the
+ * debit commits.
+ */
+function afterUsageAccounting(
+  accounting: Promise<{ usageId: string } | null | undefined>,
+  releaseUnusedSpend?: () => Promise<void>
+): void {
+  after(accounting);
+  if (!releaseUnusedSpend) return;
+  after(
+    accounting
+      .then(
+        result => (result ? undefined : releaseUnusedSpend()),
+        () => releaseUnusedSpend()
+      )
+      .catch(() => {})
+  );
+}
+
+/**
+ * `releaseUnusedSpend` gives back the spend admission held for this request when
+ * the response produced no usage to bill. A billed request leaves its hold to the
+ * usage write, which consumes it where the debit commits.
+ */
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
   openrouterRequestSpan: Span | undefined,
-  servingProvider: Provider
+  servingProvider: Provider,
+  releaseUnusedSpend?: () => Promise<void>
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
@@ -735,7 +763,7 @@ export function accountForMicrodollarUsage(
     openrouterRequestSpan,
     servingProvider
   );
-  after(accounting);
+  afterUsageAccounting(accounting, releaseUnusedSpend);
   return accounting;
 }
 
@@ -1218,7 +1246,8 @@ async function parseMistralFimUsageFromStream(
 export function countAndStoreFimUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  releaseUnusedSpend?: () => Promise<void>
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
@@ -1251,7 +1280,7 @@ export function countAndStoreFimUsage(
             return null;
           });
 
-  after(
+  afterUsageAccounting(
     usageStatsPromise.then(usageStats => {
       if (!usageStats) {
         if (statusCode < 400) {
@@ -1273,7 +1302,8 @@ export function countAndStoreFimUsage(
 
       // Persist billing, then report the same request to bouncer's usage ledger.
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
+    }),
+    releaseUnusedSpend
   );
 }
 
@@ -1371,7 +1401,8 @@ export function parseEditUsageFromResponse(
 export function countAndStoreEditUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  releaseUnusedSpend?: () => Promise<void>
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
@@ -1393,7 +1424,7 @@ export function countAndStoreEditUsage(
           return null;
         });
 
-  after(
+  afterUsageAccounting(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
@@ -1415,7 +1446,8 @@ export function countAndStoreEditUsage(
       }
 
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
+    }),
+    releaseUnusedSpend
   );
 }
 
@@ -1602,7 +1634,8 @@ export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo
 export function countAndStoreEmbeddingUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  releaseUnusedSpend?: () => Promise<void>
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
@@ -1614,7 +1647,7 @@ export function countAndStoreEmbeddingUsage(
         .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
         .catch(() => null);
 
-  after(
+  afterUsageAccounting(
     usageStatsPromise.then(usageStats => {
       requestSpan?.end();
       if (!usageStats) {
@@ -1636,7 +1669,8 @@ export function countAndStoreEmbeddingUsage(
       }
 
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
+    }),
+    releaseUnusedSpend
   );
 }
 

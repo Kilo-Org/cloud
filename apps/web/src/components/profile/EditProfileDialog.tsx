@@ -1,8 +1,6 @@
 'use client';
 
-// Default `React` is required by Jest's SWC classic JSX transform; production
-// uses the automatic JSX runtime from tsconfig.
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -25,6 +23,9 @@ type EditProfileDialogProps = {
   githubUrl: string | null;
   githubLinkedViaOAuth: boolean;
 };
+
+const URL_ERROR_MESSAGE = 'URL must start with http:// or https://';
+export const SAVE_LABEL = 'Save';
 
 function isValidHttpUrlOrEmpty(value: string): boolean {
   if (value.trim() === '') return true;
@@ -50,6 +51,7 @@ export function EditProfileDialog({
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const [githubValue, setGithubValue] = useState(githubUrl ?? '');
   const [githubError, setGithubError] = useState<string | null>(null);
+  const [validationAttempt, setValidationAttempt] = useState(0);
 
   // Reset form state when dialog opens
   useEffect(() => {
@@ -74,36 +76,39 @@ export function EditProfileDialog({
 
   function handleSave() {
     const trimmedLinkedin = linkedinValue.trim();
+    const trimmedGithub = githubValue.trim();
 
     let hasError = false;
 
     if (trimmedLinkedin !== '' && !isValidHttpUrlOrEmpty(trimmedLinkedin)) {
-      setLinkedinError('URL must start with http:// or https://');
+      setLinkedinError(URL_ERROR_MESSAGE);
       hasError = true;
     } else {
       setLinkedinError(null);
     }
 
     if (!githubLinkedViaOAuth) {
-      const trimmedGithub = githubValue.trim();
       if (trimmedGithub !== '' && !isValidHttpUrlOrEmpty(trimmedGithub)) {
-        setGithubError('URL must start with http:// or https://');
+        setGithubError(URL_ERROR_MESSAGE);
         hasError = true;
       } else {
         setGithubError(null);
       }
+    }
 
-      if (hasError) return;
+    if (hasError) {
+      setValidationAttempt(attempt => attempt + 1);
+      return;
+    }
 
+    if (githubLinkedViaOAuth) {
+      updateProfileMutation.mutate({
+        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
+      });
+    } else {
       updateProfileMutation.mutate({
         linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
         github_url: trimmedGithub === '' ? null : trimmedGithub,
-      });
-    } else {
-      if (hasError) return;
-
-      updateProfileMutation.mutate({
-        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
       });
     }
   }
@@ -128,11 +133,13 @@ export function EditProfileDialog({
               aria-invalid={linkedinError !== null}
               aria-describedby={linkedinError ? 'linkedin-url-error' : undefined}
             />
-            {linkedinError && (
-              <p id="linkedin-url-error" role="alert" className="text-destructive text-sm">
-                {linkedinError}
-              </p>
-            )}
+            <p id="linkedin-url-error" className="text-destructive text-sm">
+              {linkedinError && (
+                <span key={validationAttempt} role="alert">
+                  {linkedinError}
+                </span>
+              )}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="github-url">GitHub Profile URL</Label>
@@ -156,11 +163,13 @@ export function EditProfileDialog({
                   aria-invalid={githubError !== null}
                   aria-describedby={githubError ? 'github-url-error' : undefined}
                 />
-                {githubError && (
-                  <p id="github-url-error" role="alert" className="text-destructive text-sm">
-                    {githubError}
-                  </p>
-                )}
+                <p id="github-url-error" className="text-destructive text-sm">
+                  {githubError && (
+                    <span key={validationAttempt} role="alert">
+                      {githubError}
+                    </span>
+                  )}
+                </p>
               </>
             )}
           </div>
@@ -179,7 +188,7 @@ export function EditProfileDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={updateProfileMutation.isPending}>
-            {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
+            {updateProfileMutation.isPending ? 'Saving...' : SAVE_LABEL}
           </Button>
         </DialogFooter>
       </DialogContent>

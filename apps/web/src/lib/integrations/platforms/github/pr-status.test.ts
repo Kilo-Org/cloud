@@ -4,11 +4,6 @@ const mockPullsGet = jest.fn();
 const mockListForRef = jest.fn();
 const mockListCommitStatusesForRef = jest.fn();
 const mockGraphQlRequest = jest.fn();
-const mockDelay = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('node:timers/promises', () => ({
-  setTimeout: (...args: unknown[]) => mockDelay(...args),
-}));
 
 jest.mock('./adapter', () => ({
   generateGitHubInstallationToken: (...args: unknown[]) => mockGenerateToken(...args),
@@ -26,60 +21,68 @@ jest.mock('@octokit/rest', () => ({
   }),
 }));
 
-import { fetchPullRequestStatus } from './pr-status';
+import { fetchPullRequestObservations, type FetchPullRequestObservationsInput } from './pr-status';
+import {
+  createEmptyPrObservations,
+  getPrObservationSummary,
+  normalizePrObservationEvent,
+  reducePrObservation,
+  type PrObservations,
+} from './pr-observations';
 
 const HEAD_SHA = '1111111111111111111111111111111111111111';
 const BASE_SHA = '2222222222222222222222222222222222222222';
+const OLD_SHA = '3333333333333333333333333333333333333333';
+const AT = '2026-10-21T12:00:00Z';
+const LATER = '2026-10-21T12:01:00Z';
 
-const input = {
+const input: FetchPullRequestObservationsInput = {
   installationId: '123',
   integrationId: 'integration-1',
-  appType: 'standard' as const,
+  appType: 'standard',
   owner: 'acme',
   repo: 'widgets',
   number: 7,
+  pullRequest: {
+    number: 7,
+    htmlUrl: 'https://github.com/acme/widgets/pull/7',
+    state: 'open',
+    title: 'Add feature',
+    headSha: HEAD_SHA,
+    updatedAt: AT,
+    baseSha: BASE_SHA,
+    baseRef: 'main',
+    mergeable: true,
+    mergeableState: 'clean',
+  },
+  existing: null,
 };
 
-type PullOverrides = {
-  number: number;
-  html_url: string;
-  title: string;
-  state: string;
-  draft: boolean;
-  merged: boolean;
-  mergeable: boolean | null;
-  mergeable_state: string | null;
-  headSha: string;
-  headRef: string;
-  headRepo: string | null;
-  baseSha: string;
-  baseRepo: string;
+type CheckRunOverrides = {
+  id?: number;
+  appId?: number;
+  name?: string;
+  status?: string;
+  conclusion?: string | null;
+  runAttempt?: number;
 };
 
-function pullResponse(overrides: Partial<PullOverrides> = {}) {
+function checkRun(overrides: CheckRunOverrides = {}) {
   return {
-    data: {
-      number: overrides.number ?? 7,
-      html_url: overrides.html_url ?? 'https://github.com/acme/widgets/pull/7',
-      title: overrides.title ?? 'Add feature',
-      state: overrides.state ?? 'open',
-      draft: overrides.draft ?? false,
-      merged: overrides.merged ?? false,
-      mergeable: overrides.mergeable === undefined ? true : overrides.mergeable,
-      mergeable_state:
-        overrides.mergeable_state === undefined ? 'clean' : overrides.mergeable_state,
-      head: {
-        sha: overrides.headSha ?? HEAD_SHA,
-        ref: overrides.headRef ?? 'feature',
-        repo:
-          overrides.headRepo === null ? null : { full_name: overrides.headRepo ?? 'acme/widgets' },
-      },
-      base: {
-        sha: overrides.baseSha ?? BASE_SHA,
-        ref: 'main',
-        repo: { full_name: overrides.baseRepo ?? 'acme/widgets' },
-      },
-    },
+    id: overrides.id ?? 1,
+    app: { id: overrides.appId ?? 1 },
+    name: overrides.name ?? `run-${overrides.id ?? 1}`,
+    head_sha: HEAD_SHA,
+    run_attempt: overrides.runAttempt ?? 1,
+    status: overrides.status ?? 'completed',
+    conclusion:
+      overrides.conclusion === undefined
+        ? overrides.status
+          ? null
+          : 'success'
+        : overrides.conclusion,
+    started_at: AT,
+    completed_at: LATER,
   };
 }
 
@@ -91,24 +94,22 @@ function checkRunPage(items: unknown[], link?: string) {
   return { data: { check_runs: items }, headers: link ? { link } : {} };
 }
 
+function threadNode(id: string, isResolved: boolean, fullDatabaseId: string | number | null) {
+  return { id, isResolved, comments: { nodes: [{ fullDatabaseId }] } };
+}
+
 function graphQlPage(
   options: {
     reviewDecision?: string | null;
-    resolved?: number;
-    unresolved?: number;
-    nodes?: Array<{ isResolved: boolean }>;
+    nodes?: Array<ReturnType<typeof threadNode>>;
     hasNextPage?: boolean;
     endCursor?: string | null;
   } = {}
 ) {
-  const nodes = options.nodes ?? [
-    ...Array.from({ length: options.resolved ?? 0 }, () => ({ isResolved: true })),
-    ...Array.from({ length: options.unresolved ?? 0 }, () => ({ isResolved: false })),
-  ];
   return {
     reviewDecision: options.reviewDecision ?? null,
     reviewThreads: {
-      nodes,
+      nodes: options.nodes ?? [],
       pageInfo: {
         hasNextPage: options.hasNextPage ?? false,
         endCursor: options.endCursor ?? null,
@@ -125,22 +126,25 @@ function updatedAt(day: number) {
   return `2026-01-${String(day).padStart(2, '0')}T00:00:00Z`;
 }
 
+function existingWith(overrides: Partial<PrObservations>): unknown {
+  return { ...createEmptyPrObservations(), headSha: HEAD_SHA, ...overrides };
+}
+
 beforeEach(() => {
   mockGenerateToken.mockReset().mockResolvedValue({
     token: 'installation-token',
     expires_at: null,
   });
   mockOctokitConstructor.mockReset();
-  mockPullsGet.mockReset().mockResolvedValue(pullResponse());
+  mockPullsGet.mockReset();
   mockListForRef.mockReset().mockResolvedValue(checkRunPage([]));
   mockListCommitStatusesForRef.mockReset().mockResolvedValue(restPage([]));
   mockGraphQlRequest.mockReset().mockResolvedValue(graphQlResponse(graphQlPage()));
-  mockDelay.mockClear();
 });
 
-describe('fetchPullRequestStatus', () => {
+describe('fetchPullRequestObservations', () => {
   it('generates the agent installation token with the exact app and integration association', async () => {
-    await fetchPullRequestStatus({ ...input, appType: 'lite' });
+    await fetchPullRequestObservations({ ...input, appType: 'lite' });
 
     expect(mockGenerateToken).toHaveBeenCalledWith('123', 'lite', 'integration-1', 'agent');
     expect(mockOctokitConstructor).toHaveBeenCalledWith({
@@ -149,159 +153,157 @@ describe('fetchPullRequestStatus', () => {
     });
   });
 
-  it('retries mergeability computation within a bound before returning a snapshot', async () => {
-    mockPullsGet
-      .mockResolvedValueOnce(pullResponse({ mergeable: null }))
-      .mockResolvedValueOnce(pullResponse({ mergeable: false, mergeable_state: 'dirty' }));
-    expect((await fetchPullRequestStatus(input)).mergeable).toBe(false);
-    expect(mockPullsGet).toHaveBeenCalledTimes(2);
-    expect(mockDelay).toHaveBeenCalledWith(1_000);
+  it('never reads the pull request itself or retries mergeability', async () => {
+    await fetchPullRequestObservations(input);
+
+    expect(mockPullsGet).not.toHaveBeenCalled();
   });
 
-  it('keeps mergeability unknown after two bounded retries rather than waiting indefinitely', async () => {
-    mockPullsGet.mockResolvedValue(pullResponse({ mergeable: null, mergeable_state: 'unknown' }));
-    expect((await fetchPullRequestStatus(input)).mergeable).toBeNull();
-    expect(mockPullsGet).toHaveBeenCalledTimes(3);
-    expect(mockDelay).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not retry mergeability for a closed draft PR', async () => {
-    mockPullsGet.mockResolvedValue(pullResponse({ state: 'closed', draft: true, mergeable: null }));
-    expect((await fetchPullRequestStatus(input)).state).toBe('closed');
-    expect(mockPullsGet).toHaveBeenCalledTimes(1);
-    expect(mockDelay).not.toHaveBeenCalled();
-  });
-
-  it('returns pull metadata and counts successful, failed, pending, and unresolved data', async () => {
+  it('hydrates keyed check and thread observations with review decision and mergeability', async () => {
     mockListForRef.mockResolvedValue(
       checkRunPage([
-        { status: 'completed', conclusion: 'success' },
-        { status: 'completed', conclusion: 'failure' },
-        { status: 'in_progress', conclusion: null },
+        checkRun({ id: 1, name: 'build', conclusion: 'success' }),
+        checkRun({ id: 2, name: 'test', conclusion: 'failure' }),
+        checkRun({ id: 3, name: 'e2e', status: 'in_progress', conclusion: null }),
+        checkRun({ id: 4, name: 'docs', conclusion: 'neutral' }),
       ])
     );
     mockListCommitStatusesForRef.mockResolvedValue(
       restPage([
-        { id: 1, context: 'deploy', state: 'success', updated_at: updatedAt(1) },
-        { id: 2, context: 'lint', state: 'failure', updated_at: updatedAt(1) },
-        { id: 3, context: 'e2e', state: 'pending', updated_at: updatedAt(1) },
+        { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(1) },
+        { id: 11, context: 'lint', state: 'pending', updated_at: updatedAt(1) },
+        { id: 12, context: 'scan', state: 'failure', updated_at: updatedAt(1) },
       ])
     );
     mockGraphQlRequest.mockResolvedValue(
       graphQlResponse(
-        graphQlPage({ resolved: 1, unresolved: 1, reviewDecision: 'CHANGES_REQUESTED' })
+        graphQlPage({
+          reviewDecision: 'CHANGES_REQUESTED',
+          nodes: [
+            threadNode('PRRT_resolved', true, '9007199254740993'),
+            threadNode('PRRT_unresolved', false, '9007199254740994'),
+          ],
+        })
       )
     );
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations(input);
 
-    expect(status).toMatchObject({
-      url: 'https://github.com/acme/widgets/pull/7',
-      number: 7,
-      state: 'open',
-      title: 'Add feature',
+    expect(result.reviewDecision).toBe('changes_requested');
+    expect(result.reviewDecisionFetched).toBe(true);
+    expect(result.observations).toMatchObject({
       headSha: HEAD_SHA,
-      baseSha: BASE_SHA,
-      headRef: 'feature',
-      baseRepoFullName: 'acme/widgets',
-      headRepoFullName: 'acme/widgets',
-      reviewDecision: 'changes_requested',
-      mergeable: true,
-      mergeableState: 'clean',
-      unresolvedThreads: 1,
+      checksObserved: true,
+      checksComplete: true,
+      checksTruncated: false,
+      threadsObserved: true,
+      threadsComplete: true,
       threadsTruncated: false,
       unavailable: [],
     });
-    expect(status.checks).toEqual({
-      total: 6,
-      passed: 2,
-      failed: 2,
-      pending: 2,
-      skipped: 0,
-      unknown: 0,
+    expect(result.observations.checks).toHaveLength(7);
+    expect(result.observations.checks.map(entry => entry.outcome)).toEqual([
+      'passed',
+      'failed',
+      'pending',
+      'skipped',
+      'passed',
+      'pending',
+      'failed',
+    ]);
+    expect(result.observations.threads).toEqual([
+      { rootId: '9007199254740993', threadId: 'PRRT_resolved', state: 'resolved' },
+      { rootId: '9007199254740994', threadId: 'PRRT_unresolved', state: 'unresolved' },
+    ]);
+    expect(result.observations.threads).toHaveLength(2);
+    expect(result.observations.mergeability).toMatchObject({
+      headSha: HEAD_SHA,
+      baseSha: BASE_SHA,
+      baseRef: 'main',
+      mergeable: true,
+      state: 'clean',
+    });
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      checks: {
+        total: 7,
+        failed: 2,
+        passed: 2,
+        pending: 2,
+        skipped: 1,
+        unknown: 0,
+        complete: true,
+      },
+      unresolvedThreads: 1,
+      threadsComplete: true,
       truncated: false,
     });
-    expect(Number.isNaN(Date.parse(status.fetchedAt))).toBe(false);
-    expect(mockListForRef).toHaveBeenCalledWith(
-      expect.objectContaining({ ref: HEAD_SHA, filter: 'latest', per_page: 100, page: 1 })
-    );
-    expect(mockListCommitStatusesForRef).toHaveBeenCalledWith(
-      expect.objectContaining({ ref: HEAD_SHA, per_page: 100, page: 1 })
-    );
+
+    for (const call of mockListForRef.mock.calls) {
+      expect(call[0]).toMatchObject({ ref: HEAD_SHA, filter: 'latest', per_page: 100 });
+    }
+    for (const call of mockListCommitStatusesForRef.mock.calls) {
+      expect(call[0]).toMatchObject({ ref: HEAD_SHA, per_page: 100 });
+    }
+    const [method, request] = mockGraphQlRequest.mock.calls[0] as [
+      string,
+      { query: string; variables: Record<string, unknown> },
+    ];
+    expect(method).toBe('POST /graphql');
+    expect(request.query).toContain('isResolved');
+    expect(request.query).toContain('comments(first: 1)');
+    expect(request.query).toContain('fullDatabaseId');
+    expect(request.query).not.toContain('databaseId');
+    expect(request.variables).toMatchObject({ owner: 'acme', name: 'widgets', number: 7 });
   });
 
-  it('returns a zeroed checks summary when both check sources succeed with no data', async () => {
-    const status = await fetchPullRequestStatus(input);
+  it('summarizes a successful empty inventory as observed and complete', async () => {
+    mockGraphQlRequest.mockResolvedValue(
+      graphQlResponse(graphQlPage({ reviewDecision: 'APPROVED' }))
+    );
 
-    expect(status.checks).toEqual({
-      total: 0,
-      passed: 0,
-      failed: 0,
-      pending: 0,
-      skipped: 0,
-      unknown: 0,
-      truncated: false,
+    const result = await fetchPullRequestObservations(input);
+
+    expect(result.reviewDecision).toBe('approved');
+    expect(result.reviewDecisionFetched).toBe(true);
+    expect(result.observations).toMatchObject({
+      checksObserved: true,
+      checksComplete: true,
+      threadsObserved: true,
+      threadsComplete: true,
+      unavailable: [],
     });
-    expect(status.unresolvedThreads).toBe(0);
-    expect(status.unavailable).toEqual([]);
-  });
-
-  it('classifies completed, skipped, failing, pending, and unrecognized check runs', async () => {
-    mockListForRef.mockResolvedValue(
-      checkRunPage([
-        { status: 'completed', conclusion: 'success' },
-        { status: 'completed', conclusion: 'neutral' },
-        { status: 'completed', conclusion: 'skipped' },
-        { status: 'completed', conclusion: 'failure' },
-        { status: 'completed', conclusion: 'cancelled' },
-        { status: 'completed', conclusion: 'timed_out' },
-        { status: 'completed', conclusion: 'action_required' },
-        { status: 'completed', conclusion: 'stale' },
-        { status: 'completed', conclusion: 'startup_failure' },
-        { status: 'completed', conclusion: 'mystery' },
-        { status: 'completed', conclusion: null },
-        { status: 'in_progress', conclusion: null },
-        { status: 'queued', conclusion: null },
-      ])
-    );
-
-    const status = await fetchPullRequestStatus(input);
-
-    expect(status.checks).toEqual({
-      total: 13,
-      passed: 1,
-      failed: 6,
-      pending: 2,
-      skipped: 2,
-      unknown: 2,
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      checks: {
+        total: 0,
+        failed: 0,
+        passed: 0,
+        pending: 0,
+        skipped: 0,
+        unknown: 0,
+        complete: true,
+      },
+      unresolvedThreads: 0,
+      threadsComplete: true,
       truncated: false,
     });
   });
 
-  it('keeps only the latest legacy status per context by id and timestamp', async () => {
-    mockListCommitStatusesForRef.mockResolvedValue(
-      restPage([
-        { id: 10, context: 'ci/lint', state: 'failure', updated_at: updatedAt(1) },
-        { id: 12, context: 'ci/lint', state: 'success', updated_at: updatedAt(2) },
-        { id: 20, context: 'ci/build', state: 'success', updated_at: updatedAt(1) },
-        { id: 20, context: 'ci/build', state: 'failure', updated_at: updatedAt(3) },
-      ])
-    );
+  it('keeps a successful null review decision fetched so the router can replace it', async () => {
+    const result = await fetchPullRequestObservations(input);
 
-    const status = await fetchPullRequestStatus(input);
-
-    expect(status.checks).toEqual({
-      total: 2,
-      passed: 1,
-      failed: 1,
-      pending: 0,
-      skipped: 0,
-      unknown: 0,
-      truncated: false,
-    });
+    expect(result.reviewDecision).toBeNull();
+    expect(result.reviewDecisionFetched).toBe(true);
   });
 
-  it('treats GraphQL errors returned with HTTP 200 as an unavailable review leg', async () => {
+  it('treats GraphQL errors as an unavailable review leg and preserves prior threads', async () => {
+    const existing = existingWith({
+      threads: [
+        { rootId: '200', threadId: 'PRRT_200', state: 'resolved' },
+        { rootId: '201', threadId: 'PRRT_201', state: 'unresolved' },
+      ],
+      threadsObserved: true,
+      threadsComplete: true,
+    });
     mockGraphQlRequest.mockResolvedValue({
       data: {
         data: null,
@@ -309,16 +311,30 @@ describe('fetchPullRequestStatus', () => {
       },
     });
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations({ ...input, existing });
 
-    expect(status.unavailable).toEqual(['reviews']);
-    expect(status.reviewDecision).toBeNull();
-    expect(status.unresolvedThreads).toBeNull();
-    expect(status.threadsTruncated).toBe(false);
-    expect(status.checks).not.toBeNull();
+    expect(result.reviewDecision).toBeNull();
+    expect(result.reviewDecisionFetched).toBe(false);
+    expect(result.observations.unavailable).toEqual(['reviews']);
+    expect(result.observations.threads).toEqual([
+      { rootId: '200', threadId: 'PRRT_200', state: 'resolved' },
+      { rootId: '201', threadId: 'PRRT_201', state: 'unresolved' },
+    ]);
+    expect(result.observations).toMatchObject({
+      threadsObserved: true,
+      threadsComplete: true,
+      checksObserved: true,
+      checksComplete: true,
+    });
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      unresolvedThreads: 1,
+      threadsComplete: false,
+      truncated: true,
+      unavailable: ['reviews'],
+    });
   });
 
-  it('treats a review payload without thread nodes as unavailable rather than zero unresolved', async () => {
+  it('treats a review payload without thread nodes or a cursor as unavailable', async () => {
     mockGraphQlRequest.mockResolvedValue({
       data: {
         data: {
@@ -334,214 +350,436 @@ describe('fetchPullRequestStatus', () => {
       },
     });
 
-    const status = await fetchPullRequestStatus(input);
+    const missingNodes = await fetchPullRequestObservations(input);
+    expect(missingNodes.observations.unavailable).toEqual(['reviews']);
+    expect(missingNodes.reviewDecisionFetched).toBe(false);
 
-    expect(status.unavailable).toEqual(['reviews']);
-    expect(status.reviewDecision).toBeNull();
-    expect(status.unresolvedThreads).toBeNull();
+    mockGraphQlRequest.mockResolvedValue(
+      graphQlResponse(graphQlPage({ hasNextPage: true, endCursor: null }))
+    );
+    const missingCursor = await fetchPullRequestObservations(input);
+    expect(missingCursor.observations.unavailable).toEqual(['reviews']);
   });
 
-  it('preserves successful status data when the check-run leg fails', async () => {
+  it('preserves the failed check-source inventory while replacing a successful status source', async () => {
+    const existing = existingWith({
+      checks: [
+        {
+          key: 'check:1:stale',
+          id: '5',
+          attempt: 1,
+          at: AT,
+          phase: 2,
+          failed: false,
+          outcome: 'passed',
+        },
+        {
+          key: 'status:deploy',
+          id: '9',
+          attempt: 1,
+          at: AT,
+          phase: 2,
+          failed: false,
+          outcome: 'passed',
+        },
+      ],
+      checksTruncated: true,
+      checksObserved: true,
+      checksComplete: true,
+    });
     mockListForRef.mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403 }));
     mockListCommitStatusesForRef.mockResolvedValue(
-      restPage([{ id: 1, context: 'deploy', state: 'success', updated_at: updatedAt(1) }])
-    );
-    mockGraphQlRequest.mockResolvedValue(
-      graphQlResponse(graphQlPage({ reviewDecision: 'APPROVED' }))
+      restPage([
+        { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(2) },
+        { id: 9, context: 'deploy', state: 'failure', updated_at: updatedAt(1) },
+      ])
     );
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations({ ...input, existing });
 
-    expect(status.checks).toEqual({
-      total: 1,
-      passed: 1,
-      failed: 0,
-      pending: 0,
-      skipped: 0,
-      unknown: 0,
-      truncated: true,
+    expect(result.observations.unavailable).toEqual(['checks']);
+    expect(result.observations).toMatchObject({
+      checksObserved: false,
+      checksComplete: false,
+      checksTruncated: true,
     });
-    expect(status.unavailable).toEqual(['checks']);
-    expect(status.reviewDecision).toBe('approved');
+    expect(result.observations.checks).toEqual([
+      {
+        key: 'check:1:stale',
+        id: '5',
+        attempt: 1,
+        at: AT,
+        phase: 2,
+        failed: false,
+        outcome: 'passed',
+      },
+      {
+        key: 'status:deploy',
+        id: '10',
+        attempt: 1,
+        at: updatedAt(2),
+        phase: 2,
+        failed: false,
+        outcome: 'passed',
+      },
+    ]);
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      checks: { total: 2, failed: 0, passed: 2, complete: false },
+      truncated: true,
+      unavailable: ['checks'],
+    });
   });
 
-  it('preserves successful check data when the legacy status leg fails', async () => {
+  it('preserves the failed status-source inventory while replacing a successful check source', async () => {
+    const existing = existingWith({
+      checks: [
+        {
+          key: 'check:1:stale',
+          id: '5',
+          attempt: 1,
+          at: AT,
+          phase: 2,
+          failed: false,
+          outcome: 'passed',
+        },
+        {
+          key: 'status:deploy',
+          id: '9',
+          attempt: 1,
+          at: AT,
+          phase: 2,
+          failed: false,
+          outcome: 'passed',
+        },
+      ],
+    });
     mockListForRef.mockResolvedValue(
-      checkRunPage([{ status: 'completed', conclusion: 'success' }])
+      checkRunPage([checkRun({ id: 10, name: 'fresh', conclusion: 'failure' })])
     );
     mockListCommitStatusesForRef.mockRejectedValue(new Error('Resource not accessible'));
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations({ ...input, existing });
 
-    expect(status.checks).toEqual({
-      total: 1,
-      passed: 1,
-      failed: 0,
-      pending: 0,
-      skipped: 0,
-      unknown: 0,
-      truncated: true,
+    expect(result.observations.unavailable).toEqual(['statuses']);
+    expect(result.observations.checks.map(entry => entry.key)).toEqual([
+      'status:deploy',
+      'check:1:fresh',
+    ]);
+    expect(result.observations.checks.find(entry => entry.key === 'check:1:fresh')).toMatchObject({
+      id: '10',
+      outcome: 'failed',
     });
-    expect(status.unavailable).toEqual(['statuses']);
   });
 
-  it('returns null checks only when both check sources fail', async () => {
-    mockListForRef.mockRejectedValue(new Error('Forbidden'));
-    mockListCommitStatusesForRef.mockRejectedValue(new Error('Forbidden'));
-
-    const status = await fetchPullRequestStatus(input);
-
-    expect(status.checks).toBeNull();
-    expect(status.unavailable).toEqual(['checks', 'statuses']);
-    expect(status.reviewDecision).toBeNull();
-  });
-
-  it('paginates check runs using the page-length fallback and pins every read to the initial head', async () => {
-    mockListForRef
-      .mockResolvedValueOnce(
-        checkRunPage(
-          Array.from({ length: 100 }, () => ({
-            status: 'completed',
-            conclusion: 'success',
-          }))
-        )
-      )
-      .mockResolvedValueOnce(checkRunPage([{ status: 'completed', conclusion: 'failure' }]));
-
-    const status = await fetchPullRequestStatus(input);
-
-    expect(status.checks).toEqual({
-      total: 101,
-      passed: 100,
-      failed: 1,
-      pending: 0,
-      skipped: 0,
-      unknown: 0,
-      truncated: false,
+  it('clears previous-head checks, completion flags, and mergeability', async () => {
+    const existing = existingWith({
+      headSha: OLD_SHA,
+      checks: [
+        {
+          key: 'check:1:old',
+          id: '1',
+          attempt: 1,
+          at: AT,
+          phase: 2,
+          failed: true,
+          outcome: 'failed',
+        },
+      ],
+      checksObserved: true,
+      checksComplete: true,
+      mergeability: {
+        headSha: OLD_SHA,
+        baseSha: BASE_SHA,
+        baseRef: 'main',
+        mergeable: true,
+        state: 'clean',
+        observedAt: AT,
+      },
     });
-    expect(mockListForRef).toHaveBeenCalledTimes(2);
-    for (const call of mockListForRef.mock.calls) {
-      expect(call[0]).toMatchObject({ ref: HEAD_SHA });
-    }
+    const noMetadata = {
+      ...input,
+      existing,
+      pullRequest: {
+        number: input.pullRequest.number,
+        htmlUrl: input.pullRequest.htmlUrl,
+        state: input.pullRequest.state,
+        title: input.pullRequest.title,
+        headSha: HEAD_SHA,
+        updatedAt: input.pullRequest.updatedAt,
+      },
+    };
+
+    const result = await fetchPullRequestObservations(noMetadata);
+
+    expect(result.observations.checks).toEqual([]);
+    expect(result.observations.checksObserved).toBe(true);
+    expect(result.observations.checksComplete).toBe(true);
+    expect(result.observations.mergeability).toBeUndefined();
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)?.checks).toMatchObject({
+      total: 0,
+      complete: true,
+    });
   });
 
-  it('follows a next link even when the page is shorter than the page size', async () => {
-    mockListForRef
-      .mockResolvedValueOnce(
-        checkRunPage(
-          [{ status: 'completed', conclusion: 'success' }],
-          '<https://api.github.com/repos/acme/widgets/commits/head/check-runs?page=2>; rel="next"'
-        )
-      )
-      .mockResolvedValueOnce(checkRunPage([{ status: 'completed', conclusion: 'failure' }]));
+  it('seeds mergeability only from valid pull request metadata', async () => {
+    const valid = await fetchPullRequestObservations(input);
+    expect(valid.observations.mergeability).toMatchObject({
+      headSha: HEAD_SHA,
+      baseSha: BASE_SHA,
+      baseRef: 'main',
+      mergeable: true,
+      state: 'clean',
+    });
 
-    const status = await fetchPullRequestStatus(input);
-
-    expect(status.checks).toMatchObject({ total: 2, passed: 1, failed: 1, truncated: false });
-    expect(mockListForRef).toHaveBeenCalledTimes(2);
+    const invalid = await fetchPullRequestObservations({
+      ...input,
+      pullRequest: { ...input.pullRequest, baseSha: 'not-a-sha' },
+    });
+    expect(invalid.observations.mergeability).toBeUndefined();
   });
 
-  it('marks checks truncated at the five-page cap', async () => {
-    mockListForRef.mockImplementation(async () =>
-      checkRunPage(
-        Array.from({ length: 100 }, () => ({
+  it('updates hydrated keyed inventory from a webhook rerun without duplicating it', async () => {
+    mockListForRef.mockResolvedValue(
+      checkRunPage([checkRun({ id: 5, name: 'build', conclusion: 'success' })])
+    );
+
+    const fetched = await fetchPullRequestObservations(input);
+    const rerun = normalizePrObservationEvent('check_run', {
+      installation: { id: '123' },
+      repository: { id: '99', full_name: 'acme/widgets' },
+      check_run: {
+        id: 6,
+        app: { id: 1 },
+        name: 'build',
+        head_sha: HEAD_SHA,
+        run_attempt: 1,
+        status: 'completed',
+        conclusion: 'failure',
+        started_at: AT,
+        completed_at: LATER,
+      },
+    });
+    if (!rerun) throw new Error('Expected a normalized rerun');
+
+    const updated = reducePrObservation(fetched.observations, HEAD_SHA, rerun);
+    expect(updated?.checks).toHaveLength(1);
+    expect(updated?.checks[0]).toMatchObject({ id: '6', outcome: 'failed' });
+    expect(reducePrObservation(updated, HEAD_SHA, rerun)).toEqual(updated);
+  });
+
+  it('skips malformed or wrong-head check runs instead of forging identities', async () => {
+    mockListForRef.mockResolvedValue(
+      checkRunPage([
+        {
+          id: 1,
+          app: null,
+          name: 'build',
+          head_sha: HEAD_SHA,
+          run_attempt: 1,
           status: 'completed',
           conclusion: 'success',
-        })),
-        '<https://api.github.com/repos/acme/widgets/commits/head/check-runs?page=next>; rel="next"'
+          started_at: AT,
+          completed_at: LATER,
+        },
+        {
+          id: 2,
+          app: { id: 1 },
+          name: '',
+          head_sha: HEAD_SHA,
+          run_attempt: 1,
+          status: 'completed',
+          conclusion: 'success',
+          started_at: AT,
+          completed_at: LATER,
+        },
+        {
+          id: 3,
+          app: { id: 1 },
+          name: 'wrong-head',
+          head_sha: OLD_SHA,
+          run_attempt: 1,
+          status: 'completed',
+          conclusion: 'success',
+          started_at: AT,
+          completed_at: LATER,
+        },
+        checkRun({ id: 4, name: 'valid', conclusion: 'success' }),
+      ])
+    );
+
+    const result = await fetchPullRequestObservations(input);
+
+    expect(result.observations.checks).toEqual([
+      expect.objectContaining({ key: 'check:1:valid', id: '4', outcome: 'passed' }),
+    ]);
+    expect(result.observations.checks.map(entry => entry.key)).not.toContain('check:0:unknown');
+    expect(result.observations).toMatchObject({
+      checksObserved: true,
+      checksComplete: false,
+      checksTruncated: true,
+      unavailable: [],
+    });
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      checks: { total: 1, passed: 1, complete: false },
+      truncated: true,
+    });
+  });
+
+  it('skips malformed legacy statuses instead of forging context or state', async () => {
+    mockListCommitStatusesForRef.mockResolvedValue(
+      restPage([
+        { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(1) },
+        { id: 11, context: '', state: 'success', updated_at: updatedAt(1) },
+        { id: 12, context: 'scan', state: 'mystery', updated_at: updatedAt(1) },
+        { id: 13, context: 'lint', state: 'success', updated_at: 'not-a-date' },
+      ])
+    );
+
+    const result = await fetchPullRequestObservations(input);
+
+    expect(result.observations.checks).toEqual([
+      expect.objectContaining({ key: 'status:deploy', id: '10', outcome: 'passed' }),
+    ]);
+    expect(result.observations.checks.map(entry => entry.key)).not.toContain('status:unknown');
+    expect(result.observations).toMatchObject({
+      checksObserved: true,
+      checksComplete: false,
+      checksTruncated: true,
+      unavailable: [],
+    });
+  });
+
+  it('bounds check pagination at five pages and the state cap at 200 with explicit flags', async () => {
+    const nextLink =
+      '<https://api.github.com/repos/acme/widgets/commits/head/check-runs?page=next>; rel="next"';
+    mockListForRef.mockImplementation(async (params: { page: number }) =>
+      checkRunPage(
+        Array.from({ length: 100 }, (_, index) =>
+          checkRun({
+            id: (params.page - 1) * 100 + index + 1,
+            name: `run-${params.page}-${index}`,
+          })
+        ),
+        nextLink
       )
     );
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations(input);
 
     expect(mockListForRef).toHaveBeenCalledTimes(5);
-    expect(status.checks).toMatchObject({ total: 500, passed: 500, truncated: true });
+    expect(result.observations.checks).toHaveLength(200);
+    expect(result.observations).toMatchObject({
+      checksObserved: true,
+      checksComplete: false,
+      checksTruncated: true,
+    });
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      checks: { total: 200, complete: false },
+      truncated: true,
+    });
   });
 
-  it('paginates legacy statuses and pins every read to the initial head', async () => {
+  it('paginates legacy statuses and keeps only the latest status per context', async () => {
     mockListCommitStatusesForRef
       .mockResolvedValueOnce(
         restPage(
-          Array.from({ length: 100 }, (_, index) => ({
-            id: index + 1,
-            context: `ci/context-${index}`,
-            state: 'success',
-            updated_at: updatedAt(1),
-          }))
+          [
+            { id: 10, context: 'ci/lint', state: 'failure', updated_at: updatedAt(1) },
+            { id: 12, context: 'ci/lint', state: 'success', updated_at: updatedAt(2) },
+          ],
+          '<https://api.github.com/repos/acme/widgets/commits/head/statuses?page=2>; rel="next"'
         )
       )
       .mockResolvedValueOnce(
-        restPage([{ id: 101, context: 'ci/extra', state: 'failure', updated_at: updatedAt(2) }])
+        restPage([{ id: 11, context: 'ci/build', state: 'pending', updated_at: updatedAt(1) }])
       );
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations(input);
 
-    expect(status.checks).toMatchObject({ total: 101, passed: 100, failed: 1, truncated: false });
     expect(mockListCommitStatusesForRef).toHaveBeenCalledTimes(2);
+    expect(result.observations.checks.map(entry => entry.key).sort()).toEqual([
+      'status:ci/build',
+      'status:ci/lint',
+    ]);
+    expect(result.observations.checks.find(entry => entry.key === 'status:ci/lint')).toMatchObject({
+      id: '12',
+      outcome: 'passed',
+    });
+    expect(result.observations.checks.find(entry => entry.key === 'status:ci/build')).toMatchObject(
+      {
+        outcome: 'pending',
+      }
+    );
     for (const call of mockListCommitStatusesForRef.mock.calls) {
       expect(call[0]).toMatchObject({ ref: HEAD_SHA });
     }
   });
 
-  it('counts unresolved threads across review-thread pages', async () => {
-    mockGraphQlRequest
-      .mockResolvedValueOnce(
-        graphQlResponse(
-          graphQlPage({
-            reviewDecision: 'APPROVED',
-            nodes: Array.from({ length: 100 }, () => ({ isResolved: false })),
-            hasNextPage: true,
-            endCursor: 'thread-cursor-1',
-          })
-        )
+  it('keeps a fetched thread uncertain after an unordered contradictory resolution event (does not guess)', async () => {
+    const fullDatabaseId = '9007199254740993';
+    mockGraphQlRequest.mockResolvedValue(
+      graphQlResponse(
+        graphQlPage({
+          nodes: [threadNode('PRRT_thread_900', true, fullDatabaseId)],
+        })
       )
-      .mockResolvedValueOnce(graphQlResponse(graphQlPage({ nodes: [{ isResolved: false }] })));
+    );
 
-    const status = await fetchPullRequestStatus(input);
+    const fetched = await fetchPullRequestObservations(input);
+    expect(fetched.observations.threads).toEqual([
+      { rootId: fullDatabaseId, threadId: 'PRRT_thread_900', state: 'resolved' },
+    ]);
 
-    expect(status.unresolvedThreads).toBe(101);
-    expect(status.threadsTruncated).toBe(false);
-    expect(status.reviewDecision).toBe('approved');
-    expect(mockGraphQlRequest).toHaveBeenCalledTimes(2);
-    expect(mockGraphQlRequest.mock.calls[1]?.[1]).toMatchObject({
-      variables: { after: 'thread-cursor-1' },
+    const event = normalizePrObservationEvent('pull_request_review_thread', {
+      installation: { id: '123' },
+      repository: { id: '99', full_name: 'acme/widgets' },
+      action: 'unresolved',
+      pull_request: { number: 7 },
+      thread: {
+        node_id: 'PRRT_thread_900',
+        comments: [{ id: fullDatabaseId }],
+      },
+    });
+    if (!event) throw new Error('Expected a normalized thread event');
+
+    const updated = reducePrObservation(fetched.observations, HEAD_SHA, event);
+    expect(updated?.threads).toEqual([
+      { rootId: fullDatabaseId, threadId: 'PRRT_thread_900', state: 'unknown' },
+    ]);
+    expect(updated?.threadsTruncated).toBe(true);
+    expect(getPrObservationSummary(updated, HEAD_SHA)).toMatchObject({
+      unresolvedThreads: null,
+      threadsComplete: false,
+      truncated: true,
     });
   });
 
-  it('marks review threads truncated at the five-page cap', async () => {
-    for (let page = 1; page <= 5; page += 1) {
-      mockGraphQlRequest.mockResolvedValueOnce(
-        graphQlResponse(
-          graphQlPage({
-            nodes: Array.from({ length: 100 }, () => ({ isResolved: false })),
-            hasNextPage: true,
-            endCursor: `thread-cursor-${page}`,
-          })
-        )
-      );
-    }
+  it('caps review-thread pagination at the state limit without requesting another page', async () => {
+    const page = (pageNumber: number) =>
+      graphQlPage({
+        nodes: Array.from({ length: 100 }, (_, index) =>
+          threadNode(`PRRT_${pageNumber}_${index}`, false, pageNumber * 1000 + index)
+        ),
+        hasNextPage: true,
+        endCursor: `cursor-${pageNumber}`,
+      });
+    mockGraphQlRequest
+      .mockResolvedValueOnce(graphQlResponse(page(1)))
+      .mockResolvedValueOnce(graphQlResponse(page(2)));
 
-    const status = await fetchPullRequestStatus(input);
+    const result = await fetchPullRequestObservations(input);
 
-    expect(mockGraphQlRequest).toHaveBeenCalledTimes(5);
-    expect(status.unresolvedThreads).toBe(500);
-    expect(status.threadsTruncated).toBe(true);
-  });
-
-  it('maps draft and merged pull requests to distinct states', async () => {
-    mockPullsGet.mockResolvedValueOnce(pullResponse({ draft: true }));
-    await expect(fetchPullRequestStatus(input)).resolves.toMatchObject({ state: 'draft' });
-
-    mockPullsGet.mockResolvedValueOnce(pullResponse({ state: 'closed', merged: true }));
-    await expect(fetchPullRequestStatus(input)).resolves.toMatchObject({ state: 'merged' });
-  });
-
-  it('propagates a core pull request read failure before starting the CI legs', async () => {
-    mockPullsGet.mockRejectedValue(new Error('Not Found'));
-
-    await expect(fetchPullRequestStatus(input)).rejects.toThrow('Not Found');
-    expect(mockListForRef).not.toHaveBeenCalled();
-    expect(mockListCommitStatusesForRef).not.toHaveBeenCalled();
-    expect(mockGraphQlRequest).not.toHaveBeenCalled();
+    expect(mockGraphQlRequest).toHaveBeenCalledTimes(2);
+    expect(result.observations.threads).toHaveLength(200);
+    expect(result.observations).toMatchObject({
+      threadsObserved: true,
+      threadsComplete: false,
+      threadsTruncated: true,
+    });
+    expect(getPrObservationSummary(result.observations, HEAD_SHA)).toMatchObject({
+      unresolvedThreads: 200,
+      threadsComplete: false,
+      truncated: true,
+    });
   });
 });

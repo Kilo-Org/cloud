@@ -1,66 +1,70 @@
 import 'server-only';
 
 import { Octokit } from '@octokit/rest';
-import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
-import { generateGitHubInstallationToken, type GitHubAppType } from './adapter';
+import {
+  generateGitHubInstallationToken,
+  type AssociatedPullRequest,
+  type GitHubAppType,
+} from './adapter';
+import {
+  createEmptyPrObservations,
+  normalizePrObservationEvent,
+  PR_OBSERVATION_LIMIT,
+  prMergeabilitySchema,
+  prObservationsSchema,
+  reducePrObservation,
+  type PrObservationEvent,
+  type PrObservations,
+} from './pr-observations';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 
-const checkStateSchema = z.object({
-  total: z.number().int().nonnegative(),
-  passed: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-  pending: z.number().int().nonnegative(),
-  skipped: z.number().int().nonnegative(),
-  unknown: z.number().int().nonnegative(),
-  truncated: z.boolean(),
-});
+export type PullRequestObservationMetadata = AssociatedPullRequest & {
+  baseSha?: string;
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
+};
 
-export const prStatusSchema = z.object({
-  url: z.string().url(),
-  number: z.number().int().positive(),
-  state: z.enum(['open', 'closed', 'merged', 'draft']),
-  title: z.string(),
-  headSha: z.string().min(1),
-  baseSha: z.string().min(1),
-  headRef: z.string(),
-  baseRef: z.string(),
-  baseRepoFullName: z.string().min(1),
-  headRepoFullName: z.string().nullable(),
-  reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
-  mergeable: z.boolean().nullable(),
-  mergeableState: z.string().nullable(),
-  checks: checkStateSchema.nullable(),
-  unresolvedThreads: z.number().int().nonnegative().nullable(),
-  threadsTruncated: z.boolean(),
-  unavailable: z.array(z.enum(['checks', 'statuses', 'reviews'])),
-  fetchedAt: z.iso.datetime({ offset: true }),
-});
-
-export type PrStatus = z.infer<typeof prStatusSchema>;
-
-export type FetchPullRequestStatusInput = {
+export type FetchPullRequestObservationsInput = {
   installationId: string;
   integrationId: string;
   appType: GitHubAppType;
   owner: string;
   repo: string;
   number: number;
+  pullRequest: PullRequestObservationMetadata;
+  existing: unknown;
+};
+
+export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null;
+
+export type FetchPullRequestObservationsResult = {
+  observations: PrObservations;
+  reviewDecision: ReviewDecision;
+  reviewDecisionFetched: boolean;
 };
 
 type CheckRunLike = {
-  status: string;
-  conclusion: string | null;
+  id?: number | string | null;
+  app?: { id?: number | string | null } | null;
+  name?: string | null;
+  head_sha?: string | null;
+  run_attempt?: number | null;
+  status?: string | null;
+  conclusion?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
 };
 
 type CommitStatusLike = {
-  id: number;
-  context: string;
-  state: string;
-  updated_at: string;
+  id?: number | string | null;
+  context?: string | null;
+  state?: string | null;
+  updated_at?: string | null;
 };
 
 type CheckPage<T> = {
@@ -68,10 +72,20 @@ type CheckPage<T> = {
   truncated: boolean;
 };
 
+type ReviewThreadRecord = {
+  rootId: string | null;
+  threadId: string;
+  state: 'unresolved' | 'resolved';
+};
+
 type ReviewThreadPage = {
   reviewDecision: string | null;
   reviewThreads: {
-    nodes: Array<{ isResolved: boolean }>;
+    nodes: Array<{
+      id: string;
+      isResolved: boolean;
+      comments: { nodes: Array<{ fullDatabaseId: string | null }> };
+    }>;
     pageInfo: {
       hasNextPage: boolean;
       endCursor: string | null;
@@ -79,10 +93,21 @@ type ReviewThreadPage = {
   };
 };
 
+const id = z
+  .union([z.string().max(20).regex(/^\d+$/), z.number().int().nonnegative()])
+  .transform(String);
 const reviewThreadPageSchema: z.ZodType<ReviewThreadPage> = z.object({
   reviewDecision: z.string().nullable(),
   reviewThreads: z.object({
-    nodes: z.array(z.object({ isResolved: z.boolean() })),
+    nodes: z.array(
+      z.object({
+        id: z.string().min(1).max(512),
+        isResolved: z.boolean(),
+        comments: z.object({
+          nodes: z.array(z.object({ fullDatabaseId: id.nullable() })),
+        }),
+      })
+    ),
     pageInfo: z.object({
       hasNextPage: z.boolean(),
       endCursor: z.string().nullable(),
@@ -104,13 +129,19 @@ const graphQlResponseSchema = z.object({
 });
 
 const REVIEW_THREADS_QUERY = /* GraphQL */ `
-  query PrStatusReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
+  query PrObservationReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         reviewDecision
         reviewThreads(first: 100, after: $after) {
           nodes {
+            id
             isResolved
+            comments(first: 1) {
+              nodes {
+                fullDatabaseId
+              }
+            }
           }
           pageInfo {
             hasNextPage
@@ -122,87 +153,14 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
   }
 `;
 
-const FAILED_CONCLUSIONS = new Set([
-  'failure',
-  'cancelled',
-  'timed_out',
-  'action_required',
-  'stale',
-  'startup_failure',
-]);
-
-function emptyCheckState(): NonNullable<PrStatus['checks']> {
-  return {
-    total: 0,
-    passed: 0,
-    failed: 0,
-    pending: 0,
-    skipped: 0,
-    unknown: 0,
-    truncated: false,
-  };
-}
-
-function addCheckRun(state: NonNullable<PrStatus['checks']>, run: CheckRunLike): void {
-  state.total += 1;
-  if (run.status !== 'completed') {
-    state.pending += 1;
-    return;
-  }
-  if (run.conclusion === 'success') {
-    state.passed += 1;
-  } else if (run.conclusion === 'neutral' || run.conclusion === 'skipped') {
-    state.skipped += 1;
-  } else if (run.conclusion !== null && FAILED_CONCLUSIONS.has(run.conclusion)) {
-    state.failed += 1;
-  } else {
-    state.unknown += 1;
-  }
-}
-
-function addCommitStatus(state: NonNullable<PrStatus['checks']>, status: CommitStatusLike): void {
-  state.total += 1;
-  if (status.state === 'success') {
-    state.passed += 1;
-  } else if (status.state === 'failure' || status.state === 'error') {
-    state.failed += 1;
-  } else if (status.state === 'pending') {
-    state.pending += 1;
-  } else {
-    state.unknown += 1;
-  }
-}
-
-function isLaterStatus(candidate: CommitStatusLike, current: CommitStatusLike): boolean {
-  if (candidate.id !== current.id) {
-    return candidate.id > current.id;
-  }
-  return Date.parse(candidate.updated_at) > Date.parse(current.updated_at);
-}
-
-function latestStatusPerContext(statuses: CommitStatusLike[]): CommitStatusLike[] {
-  const byContext = new Map<string, CommitStatusLike>();
-  for (const status of statuses) {
-    const current = byContext.get(status.context);
-    if (!current || isLaterStatus(status, current)) {
-      byContext.set(status.context, status);
-    }
-  }
-  return [...byContext.values()];
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
 function linkHasNext(headers: unknown): boolean | null {
-  if (!isRecord(headers)) {
-    return null;
-  }
+  if (!isRecord(headers)) return null;
   const link = headers.link;
-  if (typeof link !== 'string') {
-    return null;
-  }
+  if (typeof link !== 'string') return null;
   return /rel="?next"?/i.test(link);
 }
 
@@ -214,17 +172,13 @@ async function collectRestPages<T>(
     const response = await fetchPage(page);
     items.push(...response.data);
     const hasNext = linkHasNext(response.headers) ?? response.data.length >= PAGE_SIZE;
-    if (!hasNext) {
-      return { items, truncated: false };
-    }
-    if (page === MAX_PAGES) {
-      return { items, truncated: true };
-    }
+    if (!hasNext) return { items, truncated: false };
+    if (page === MAX_PAGES) return { items, truncated: true };
   }
   return { items, truncated: true };
 }
 
-function normalizeReviewDecision(value: string | null): PrStatus['reviewDecision'] {
+function normalizeReviewDecision(value: string | null): ReviewDecision {
   if (value === 'APPROVED') return 'approved';
   if (value === 'CHANGES_REQUESTED') return 'changes_requested';
   if (value === 'REVIEW_REQUIRED') return 'review_required';
@@ -265,46 +219,115 @@ async function fetchReviewPage(
 async function readReviews(
   octokit: Octokit,
   params: { owner: string; repo: string; number: number }
-): Promise<{
-  reviewDecision: PrStatus['reviewDecision'];
-  unresolvedThreads: number;
-  truncated: boolean;
-}> {
-  let page = await fetchReviewPage(octokit, params, null);
-  const reviewDecision = normalizeReviewDecision(page.reviewDecision);
-  let unresolvedThreads = 0;
+): Promise<{ reviewDecision: ReviewDecision; threads: ReviewThreadRecord[]; truncated: boolean }> {
   let after: string | null = null;
+  let reviewDecision: ReviewDecision = null;
+  const threads: ReviewThreadRecord[] = [];
 
   for (let pageIndex = 1; pageIndex <= MAX_PAGES; pageIndex += 1) {
-    if (pageIndex > 1) {
-      page = await fetchReviewPage(octokit, params, after);
+    const page = await fetchReviewPage(octokit, params, after);
+    if (pageIndex === 1) reviewDecision = normalizeReviewDecision(page.reviewDecision);
+    for (const node of page.reviewThreads.nodes) {
+      if (threads.length >= PR_OBSERVATION_LIMIT) {
+        return { reviewDecision, threads, truncated: true };
+      }
+      threads.push({
+        rootId: node.comments.nodes[0]?.fullDatabaseId ?? null,
+        threadId: node.id,
+        state: node.isResolved ? 'resolved' : 'unresolved',
+      });
     }
-    unresolvedThreads += page.reviewThreads.nodes.filter(node => !node.isResolved).length;
     if (!page.reviewThreads.pageInfo.hasNextPage) {
-      return { reviewDecision, unresolvedThreads, truncated: false };
+      return { reviewDecision, threads, truncated: false };
+    }
+    if (threads.length >= PR_OBSERVATION_LIMIT) {
+      return { reviewDecision, threads, truncated: true };
     }
     const endCursor = page.reviewThreads.pageInfo.endCursor;
-    if (!endCursor) {
-      throw new Error('GitHub did not return a review thread cursor');
-    }
-    if (pageIndex === MAX_PAGES) {
-      return { reviewDecision, unresolvedThreads, truncated: true };
-    }
+    if (!endCursor) throw new Error('GitHub did not return a review thread cursor');
+    if (pageIndex === MAX_PAGES) return { reviewDecision, threads, truncated: true };
     after = endCursor;
   }
-  return { reviewDecision, unresolvedThreads, truncated: true };
+  return { reviewDecision, threads, truncated: true };
 }
 
-function pullState(pull: { state: string; draft?: boolean; merged: boolean }): PrStatus['state'] {
-  if (pull.merged) return 'merged';
-  if (pull.state === 'closed') return 'closed';
-  if (pull.draft) return 'draft';
-  return 'open';
+type CheckEvent = Extract<PrObservationEvent, { kind: 'check' }>;
+
+function checkRunEvent(
+  input: FetchPullRequestObservationsInput,
+  run: CheckRunLike
+): CheckEvent | null {
+  const event = normalizePrObservationEvent('check_run', {
+    installation: { id: '0' },
+    repository: { id: '0', full_name: `${input.owner}/${input.repo}` },
+    check_run: {
+      id: run.id,
+      app: run.app,
+      name: run.name,
+      head_sha: run.head_sha,
+      run_attempt: run.run_attempt,
+      status: run.status,
+      conclusion: run.conclusion,
+      started_at: run.started_at,
+      completed_at: run.completed_at,
+    },
+  });
+  return event?.kind === 'check' ? event : null;
 }
 
-export async function fetchPullRequestStatus(
-  input: FetchPullRequestStatusInput
-): Promise<PrStatus> {
+function commitStatusEvent(
+  input: FetchPullRequestObservationsInput,
+  headSha: string,
+  status: CommitStatusLike
+): CheckEvent | null {
+  const event = normalizePrObservationEvent('status', {
+    installation: { id: '0' },
+    repository: { id: '0', full_name: `${input.owner}/${input.repo}` },
+    id: status.id,
+    sha: headSha,
+    context: status.context,
+    state: status.state,
+    updated_at: status.updated_at,
+  });
+  return event?.kind === 'check' ? event : null;
+}
+
+function threadEvent(
+  input: FetchPullRequestObservationsInput,
+  thread: ReviewThreadRecord
+): PrObservationEvent {
+  return {
+    installationId: '0',
+    repositoryId: '0',
+    repository: `${input.owner}/${input.repo}`,
+    kind: 'thread',
+    prNumber: input.number,
+    rootId: thread.rootId,
+    threadId: thread.threadId,
+    state: thread.state,
+    fromComment: false,
+  };
+}
+
+function seedMergeability(
+  pullRequest: PullRequestObservationMetadata,
+  headSha: string
+): PrObservations['mergeability'] {
+  if (!pullRequest.baseSha || !pullRequest.baseRef) return undefined;
+  const parsed = prMergeabilitySchema.safeParse({
+    headSha,
+    baseSha: pullRequest.baseSha,
+    baseRef: pullRequest.baseRef,
+    mergeable: pullRequest.mergeable ?? null,
+    state: pullRequest.mergeableState ?? null,
+    observedAt: new Date().toISOString(),
+  });
+  return parsed.success ? parsed.data : undefined;
+}
+
+export async function fetchPullRequestObservations(
+  input: FetchPullRequestObservationsInput
+): Promise<FetchPullRequestObservationsResult> {
   const token = await generateGitHubInstallationToken(
     input.installationId,
     input.appType,
@@ -317,19 +340,32 @@ export async function fetchPullRequestStatus(
   });
 
   const { owner, repo, number } = input;
-  let { data: pull } = await octokit.pulls.get({ owner, repo, pull_number: number });
-  // GitHub computes mergeability asynchronously after a head or base change.
-  for (
-    let attempt = 0;
-    attempt < 2 && pull.state === 'open' && pull.mergeable === null;
-    attempt++
-  ) {
-    await delay(1_000);
-    ({ data: pull } = await octokit.pulls.get({ owner, repo, pull_number: number }));
-  }
-  const headSha = pull.head.sha;
+  const headSha = input.pullRequest.headSha.toLowerCase();
 
-  const [checksResult, statusesResult, reviewsResult] = await Promise.allSettled([
+  const parsedExisting = prObservationsSchema.safeParse(input.existing);
+  const state: PrObservations = parsedExisting.success
+    ? {
+        ...parsedExisting.data,
+        checks: [...parsedExisting.data.checks],
+        threads: [...parsedExisting.data.threads],
+      }
+    : {
+        ...createEmptyPrObservations(),
+        threadsUnknown: input.existing != null,
+        checksTruncated: input.existing != null,
+        threadsTruncated: input.existing != null,
+      };
+
+  if (state.headSha !== headSha) {
+    state.headSha = headSha;
+    state.checks = [];
+    state.checksTruncated = false;
+    state.checksObserved = false;
+    state.checksComplete = false;
+    state.mergeability = undefined;
+  }
+
+  const [checkRunsResult, statusesResult, reviewsResult] = await Promise.allSettled([
     collectRestPages<CheckRunLike>(async page => {
       const response = await octokit.checks.listForRef({
         owner,
@@ -354,51 +390,74 @@ export async function fetchPullRequestStatus(
     readReviews(octokit, { owner, repo, number }),
   ]);
 
-  const checksPage = checksResult.status === 'fulfilled' ? checksResult.value : null;
+  const checkRunsPage = checkRunsResult.status === 'fulfilled' ? checkRunsResult.value : null;
   const statusesPage = statusesResult.status === 'fulfilled' ? statusesResult.value : null;
   const reviews = reviewsResult.status === 'fulfilled' ? reviewsResult.value : null;
-  const unavailable: PrStatus['unavailable'] = [];
 
-  if (!checksPage) unavailable.push('checks');
+  const unavailable: Array<'checks' | 'statuses' | 'reviews'> = [];
+  if (!checkRunsPage) unavailable.push('checks');
   if (!statusesPage) unavailable.push('statuses');
   if (!reviews) unavailable.push('reviews');
+  state.unavailable = unavailable;
 
-  let checks: PrStatus['checks'] = null;
-  if (checksPage || statusesPage) {
-    const state = emptyCheckState();
-    if (checksPage) {
-      for (const run of checksPage.items) addCheckRun(state, run);
+  let working: PrObservations = {
+    ...state,
+    checks: state.checks.filter(
+      check =>
+        (!checkRunsPage && check.key.startsWith('check:')) ||
+        (!statusesPage && check.key.startsWith('status:'))
+    ),
+    checksTruncated:
+      !checkRunsPage || !statusesPage
+        ? state.checksTruncated ||
+          (checkRunsPage?.truncated ?? false) ||
+          (statusesPage?.truncated ?? false)
+        : (checkRunsPage?.truncated ?? false) || (statusesPage?.truncated ?? false),
+  };
+
+  let invalidSourceItems = false;
+  if (checkRunsPage) {
+    for (const run of checkRunsPage.items) {
+      const event = checkRunEvent(input, run);
+      if (!event || event.sha !== headSha) {
+        invalidSourceItems = true;
+        continue;
+      }
+      working = reducePrObservation(working, headSha, event) ?? working;
     }
-    if (statusesPage) {
-      for (const status of latestStatusPerContext(statusesPage.items))
-        addCommitStatus(state, status);
+  }
+  if (statusesPage) {
+    for (const status of statusesPage.items) {
+      const event = commitStatusEvent(input, headSha, status);
+      if (!event || event.sha !== headSha) {
+        invalidSourceItems = true;
+        continue;
+      }
+      working = reducePrObservation(working, headSha, event) ?? working;
     }
-    state.truncated =
-      (checksPage?.truncated ?? false) ||
-      (statusesPage?.truncated ?? false) ||
-      !checksPage ||
-      !statusesPage;
-    checks = state;
+  }
+  working.checksTruncated ||= invalidSourceItems;
+  working.checksObserved = Boolean(checkRunsPage && statusesPage);
+  working.checksComplete = working.checksObserved && !working.checksTruncated;
+
+  if (reviews) {
+    working.threads = [];
+    working.threadsObserved = true;
+    working.threadsUnknown = false;
+    working.threadsTruncated = reviews.truncated;
+    working.threadsComplete = false;
+    for (const thread of reviews.threads) {
+      working = reducePrObservation(working, headSha, threadEvent(input, thread)) ?? working;
+    }
+    working.threadsComplete = !working.threadsUnknown && !working.threadsTruncated;
   }
 
-  return prStatusSchema.parse({
-    url: pull.html_url,
-    number: pull.number,
-    state: pullState(pull),
-    title: pull.title,
-    headSha,
-    baseSha: pull.base.sha,
-    headRef: pull.head.ref,
-    baseRef: pull.base.ref,
-    baseRepoFullName: pull.base.repo?.full_name ?? `${owner}/${repo}`,
-    headRepoFullName: pull.head.repo?.full_name ?? null,
+  const mergeability = seedMergeability(input.pullRequest, headSha);
+  if (mergeability) working.mergeability = mergeability;
+
+  return {
+    observations: prObservationsSchema.parse(working),
     reviewDecision: reviews?.reviewDecision ?? null,
-    mergeable: pull.mergeable ?? null,
-    mergeableState: pull.mergeable_state ?? null,
-    checks,
-    unresolvedThreads: reviews?.unresolvedThreads ?? null,
-    threadsTruncated: reviews?.truncated ?? false,
-    unavailable,
-    fetchedAt: new Date().toISOString(),
-  });
+    reviewDecisionFetched: reviewsResult.status === 'fulfilled',
+  };
 }

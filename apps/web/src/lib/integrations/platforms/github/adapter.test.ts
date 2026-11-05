@@ -178,6 +178,26 @@ describe('fetchPullRequestByNumber', () => {
     expect(mockPaginate).not.toHaveBeenCalled();
   });
 
+  it.each([true, false, null])(
+    'includes mergeability %s from the existing PR GET',
+    async mergeable => {
+      mockPullsGet.mockResolvedValue({
+        data: githubPrPayload({
+          base: { sha: 'b'.repeat(40), ref: 'main', repo: { full_name: 'kilo/repo' } },
+          mergeable,
+          mergeable_state: mergeable === false ? 'dirty' : 'unknown',
+        }),
+      });
+      expect(await fetchPullRequestByNumber(fetchParams)).toMatchObject({
+        baseSha: 'b'.repeat(40),
+        baseRef: 'main',
+        mergeable,
+        mergeableState: mergeable === false ? 'dirty' : 'unknown',
+      });
+      expect(mockPullsGet).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('reports an empty head repo when the head repository is gone (deleted fork)', async () => {
     mockPullsGet.mockResolvedValue({
       data: githubPrPayload({

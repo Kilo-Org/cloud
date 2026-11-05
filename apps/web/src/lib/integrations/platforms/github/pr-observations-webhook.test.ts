@@ -74,6 +74,11 @@ describe('passive PR webhook observer', () => {
     expect(getPrObservationSummary(value.pr_observations, head)?.checks).toEqual({
       total: 1,
       failed: 1,
+      passed: 0,
+      pending: 0,
+      skipped: 0,
+      unknown: 0,
+      complete: false,
     });
     const query = new PgDialect().sqlToQuery(condition);
     expect(query.params).toEqual(

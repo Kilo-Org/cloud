@@ -13,11 +13,13 @@ import {
  * everything off.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<OrganizationGuardrailsPolicy | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: request.method,
+  });
   if (!success) {
     return nextResponse;
   }

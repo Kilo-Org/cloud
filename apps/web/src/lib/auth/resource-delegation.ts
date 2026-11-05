@@ -34,6 +34,10 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import {
+  recordKiloAdminElevationForRequest,
+  serviceTarget,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -358,6 +362,16 @@ export async function isModernResourceDelegationRequest(requestHeaders: Headers)
   return verified.claims.tokenPurpose !== undefined;
 }
 
+function mintsWorkerAdminToken(
+  resource: ControlResource,
+  authority: ResourceDelegationAuthority,
+  options?: CreateControlTokenOptions
+): boolean {
+  return (
+    resource !== 'cloud-agent-next' && options?.extra?.isAdmin === true && authority.user.is_admin
+  );
+}
+
 async function createModernControlToken(
   authority: ResourceDelegationAuthority,
   resource: ControlResource,
@@ -373,6 +387,15 @@ async function createModernControlToken(
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
   const memberships =
     resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
+  if (mintsWorkerAdminToken(resource, authority, options)) {
+    await recordKiloAdminElevationForRequest({
+      user: authority.user,
+      tokenSource: options?.tokenSource ?? authority.tokenSource,
+      reason: 'delegated_resource_token_mint',
+      target: serviceTarget(resource),
+      headersList: options?.headers,
+    });
+  }
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,
@@ -480,6 +503,15 @@ export async function createControlTokenForRequest(
     const expiresIn =
       options?.legacyExpiresIn ??
       (resource === 'cloud-agent-next' ? TOKEN_EXPIRY.default : ONE_HOUR_SECONDS);
+    if (mintsWorkerAdminToken(resource, authority, options)) {
+      await recordKiloAdminElevationForRequest({
+        user: authority.user,
+        tokenSource: options?.tokenSource,
+        reason: 'delegated_resource_token_mint',
+        target: serviceTarget(resource),
+        headersList: options?.headers,
+      });
+    }
     const token = generateApiToken(
       authority.user,
       {

@@ -1,4 +1,8 @@
 import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import {
+  workspaceSnapshotIdentity,
+  type WorkspaceSnapshotIdentity,
+} from '../sandbox/workspace-snapshot.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -326,6 +330,16 @@ export const controlPlaneSessionRegistrationSchema = z
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
 
+function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
+  return registration === null
+    ? null
+    : workspaceSnapshotIdentity(
+        registration.sandboxId,
+        registration.spec.directory,
+        registration.credentials
+      );
+}
+
 const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 
 const cloudAgentChildSessionRegistrationSchema = z
@@ -439,7 +453,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
-  getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  getStatusSnapshot(identity?: WorkspaceSnapshotIdentity | null): Promise<SandboxStatusSnapshot>;
   /** Passive billing projection for the workspace that owns this sandbox. */
   getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
   fetch(request: Request): Promise<Response>;
@@ -2053,7 +2067,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
     if (peer === null) return unavailableStatusSnapshot();
     try {
-      return await peer.getStatusSnapshot();
+      return await peer.getStatusSnapshot(statusWorkspaceIdentity(this.registration));
     } catch {
       return unavailableStatusSnapshot();
     }
@@ -2070,7 +2084,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
     if (peer === null) return { sandbox: unavailableStatusSnapshot(), billing: null };
     const [sandbox, billing] = await Promise.all([
-      peer.getStatusSnapshot().catch(() => unavailableStatusSnapshot()),
+      peer
+        .getStatusSnapshot(statusWorkspaceIdentity(this.registration))
+        .catch(() => unavailableStatusSnapshot()),
       peer.getWorkspaceBillingProjection().catch(() => null),
     ]);
     return { sandbox, billing };
@@ -2567,6 +2583,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const url = new URL('https://sandbox.internal/status-stream');
       url.searchParams.set('sessionId', this.sessionId);
       url.searchParams.set('ownerId', this.metadata.identity.userId);
+      const identity = statusWorkspaceIdentity(this.registration);
+      if (identity !== null) {
+        url.searchParams.set('workspaceId', identity.workspaceId);
+        url.searchParams.set('directory', identity.directory);
+        if (identity.orgId !== undefined) url.searchParams.set('orgId', identity.orgId);
+      }
       try {
         return await withDORetry(
           () => {

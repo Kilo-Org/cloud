@@ -8,16 +8,24 @@ import {
 import {
   admin_action_audit_logs,
   organization_audit_logs,
-  organization_memberships,
+  organization_group_policy_settings,
   organization_invitations,
+  organization_membership_removals,
+  organization_memberships,
   organizations,
   external_side_effect_outbox,
   type User,
   type Organization,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type * as OrganizationAuditLogsModule from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import {
+  bumpOrganizationGroupPolicyRevision,
+  lockOrganizationGroupPolicy,
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
@@ -40,6 +48,13 @@ jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => {
       actual.updateUserRoleInOrganization as typeof updateUserRoleInOrganization
     ),
   };
+});
+
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => {
+  const actual = jest.requireActual<typeof OrganizationAuditLogsModule>(
+    '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+  );
+  return { ...actual, createAuditLog: jest.fn(actual.createAuditLog) };
 });
 
 // Mock the email service to prevent actual API calls during tests
@@ -760,38 +775,542 @@ describe('organizations members trpc router', () => {
       }
     });
 
-    it('removes unselected child organization memberships regardless of role', async () => {
-      const childOwner = await insertTestUser({
-        google_user_email: `${crypto.randomUUID()}@elevated-child-owner.example.com`,
-        google_user_name: 'Elevated Child Owner',
-        is_admin: false,
-      });
-      const child = await createChildOrganization('Elevated Child Members', childOwner.id);
+    it.each(['owner', 'admin', 'billing_manager'] as const)(
+      'rejects a billing manager omitting a child %s membership without partial changes',
+      async role => {
+        const childOwner = await insertTestUser({ is_admin: false });
+        const elevatedChild = await createChildOrganization('Elevated Child', childOwner.id);
+        const existingChild = await createChildOrganization('Existing Member Child', childOwner.id);
+        const newChild = await createChildOrganization('New Member Child', childOwner.id);
+        const childIds = [elevatedChild.id, existingChild.id, newChild.id];
+        await addUserToOrganization(elevatedChild.id, memberUser.id, role);
+        await addUserToOrganization(existingChild.id, memberUser.id, 'member');
+        jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+        const caller = await createCallerForUser(billingManagerUser.id);
+
+        try {
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              organizationId: testOrganization.id,
+              memberId: memberUser.id,
+              childOrganizationIds: [newChild.id],
+            })
+          ).rejects.toMatchObject({
+            code: 'FORBIDDEN',
+            message: 'Elevated child team memberships must be managed in the child team',
+          });
+
+          const rows = await db
+            .select({
+              organizationId: organization_memberships.organization_id,
+              role: organization_memberships.role,
+            })
+            .from(organization_memberships)
+            .where(
+              and(
+                eq(organization_memberships.kilo_user_id, memberUser.id),
+                inArray(organization_memberships.organization_id, childIds)
+              )
+            );
+          expect(rows).toEqual(
+            expect.arrayContaining([
+              { organizationId: elevatedChild.id, role },
+              { organizationId: existingChild.id, role: 'member' },
+            ])
+          );
+          expect(rows).toHaveLength(2);
+          const audits = await db
+            .select()
+            .from(organization_audit_logs)
+            .where(inArray(organization_audit_logs.organization_id, childIds));
+          expect(audits).toEqual([]);
+          expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+        } finally {
+          await cleanupChildOrganizations(childIds);
+        }
+      }
+    );
+
+    it.each([
+      ['parent owner', () => regularUser.id],
+      ['Kilo admin', () => adminUser.id],
+    ])('rejects an omitted elevated membership for a %s', async (_label, getActorId) => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Protected Child', childOwner.id);
       await addUserToOrganization(child.id, memberUser.id, 'owner');
+      const caller = await createCallerForUser(getActorId());
       jest.mocked(invalidateOrganizationSessionAccess).mockClear();
-      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [],
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, memberUser.id)
+          ),
+        });
+        expect(membership?.role).toBe('owner');
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+        if (getActorId() === adminUser.id) {
+          const audits = await db
+            .select()
+            .from(admin_action_audit_logs)
+            .where(
+              and(
+                eq(admin_action_audit_logs.actor_id, adminUser.id),
+                eq(admin_action_audit_logs.target_id, testOrganization.id),
+                eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+              )
+            );
+          expect(audits).toEqual([]);
+        }
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('removes a member while retaining a selected elevated child membership', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const elevatedChild = await createChildOrganization('Selected Elevated Child', childOwner.id);
+      const memberChild = await createChildOrganization('Removable Member Child', childOwner.id);
+      const newChild = await createChildOrganization('Added Member Child', childOwner.id);
+      const childIds = [elevatedChild.id, memberChild.id, newChild.id];
+      await addUserToOrganization(elevatedChild.id, memberUser.id, 'admin');
+      await addUserToOrganization(memberChild.id, memberUser.id, 'member');
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      const caller = await createCallerForUser(billingManagerUser.id);
 
       try {
         const result = await caller.organizations.members.setChildMemberships({
           organizationId: testOrganization.id,
           memberId: memberUser.id,
-          childOrganizationIds: [],
+          childOrganizationIds: [elevatedChild.id, newChild.id],
         });
 
-        expect(result).toEqual({ success: true, added: [], removed: [child.id] });
-        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(memberUser.id, child.id);
-        const [membership] = await db
-          .select({ role: organization_memberships.role })
+        expect(result).toEqual({ success: true, added: [newChild.id], removed: [memberChild.id] });
+        const rows = await db
+          .select({
+            organizationId: organization_memberships.organization_id,
+            role: organization_memberships.role,
+          })
           .from(organization_memberships)
           .where(
             and(
-              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, memberUser.id),
+              inArray(organization_memberships.organization_id, childIds)
+            )
+          );
+        expect(rows).toEqual(
+          expect.arrayContaining([
+            { organizationId: elevatedChild.id, role: 'admin' },
+            { organizationId: newChild.id, role: 'member' },
+          ])
+        );
+        expect(rows).toHaveLength(2);
+        const audits = await db
+          .select({
+            organizationId: organization_audit_logs.organization_id,
+            action: organization_audit_logs.action,
+          })
+          .from(organization_audit_logs)
+          .where(inArray(organization_audit_logs.organization_id, childIds));
+        expect(audits).toEqual(
+          expect.arrayContaining([
+            { organizationId: newChild.id, action: 'organization.member.admin_add' },
+            { organizationId: memberChild.id, action: 'organization.member.remove' },
+          ])
+        );
+        expect(audits).toHaveLength(2);
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledTimes(1);
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+          memberUser.id,
+          memberChild.id
+        );
+      } finally {
+        await cleanupChildOrganizations(childIds);
+      }
+    });
+
+    it('refuses removal when a concurrent child role promotion commits first', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const existingChild = await createChildOrganization(
+        'Concurrent Promotion Child',
+        childOwner.id
+      );
+      const newChild = await createChildOrganization('Concurrent Addition Child', childOwner.id);
+      const childIds = [existingChild.id, newChild.id];
+      await addUserToOrganization(existingChild.id, memberUser.id, 'member');
+      const caller = await createCallerForUser(billingManagerUser.id);
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      const promoted = Promise.withResolvers<number>();
+      const allowCommit = Promise.withResolvers<void>();
+      const promotion = db.transaction(async tx => {
+        await tx
+          .update(organization_memberships)
+          .set({ role: 'admin' })
+          .where(
+            and(
+              eq(organization_memberships.organization_id, existingChild.id),
               eq(organization_memberships.kilo_user_id, memberUser.id)
             )
           );
-        expect(membership).toBeUndefined();
+        const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+        const pid = result.rows[0]?.pid;
+        if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+        promoted.resolve(pid);
+        await allowCommit.promise;
+      });
+      const holderPid = await promoted.promise;
+      const attempt = caller.organizations.members
+        .setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [newChild.id],
+        })
+        .then(
+          value => ({ value }),
+          (error: unknown) => ({ error })
+        );
+
+      try {
+        let blocked = false;
+        for (let i = 0; i < 2000 && !blocked; i += 1) {
+          const waiting = await db.execute(sql`
+            SELECT 1 FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND wait_event_type = 'Lock'
+              AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          `);
+          blocked = waiting.rows.length > 0;
+          if (!blocked) await new Promise<void>(resolve => setImmediate(resolve));
+        }
+        expect(blocked).toBe(true);
+        allowCommit.resolve();
+        await promotion;
+        expect(await attempt).toMatchObject({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Elevated child team memberships must be managed in the child team',
+          },
+        });
+        const rows = await db
+          .select({
+            organizationId: organization_memberships.organization_id,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.kilo_user_id, memberUser.id),
+              inArray(organization_memberships.organization_id, childIds)
+            )
+          );
+        expect(rows).toEqual([{ organizationId: existingChild.id, role: 'admin' }]);
+        const audits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(inArray(organization_audit_logs.organization_id, childIds));
+        expect(audits).toEqual([]);
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
       } finally {
+        allowCommit.resolve();
+        await promotion;
+        await attempt;
+        await cleanupChildOrganizations(childIds);
+      }
+    }, 20_000);
+
+    it('completes concurrent additions without reversing policy and membership locks', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Concurrent Membership Addition', childOwner.id);
+      const caller = await createCallerForUser(billingManagerUser.id);
+      const inserted = Promise.withResolvers<number>();
+      const allowPolicyUpdate = Promise.withResolvers<void>();
+      const competingAddition = db.transaction(async tx => {
+        await tx.insert(organization_memberships).values({
+          organization_id: child.id,
+          kilo_user_id: memberUser.id,
+          role: 'admin',
+        });
+        const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+        const pid = result.rows[0]?.pid;
+        if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+        inserted.resolve(pid);
+        await allowPolicyUpdate.promise;
+        await bumpOrganizationGroupPolicyRevision(tx, child.id, childOwner.id);
+      });
+      const holderPid = await inserted.promise;
+      const attempt = caller.organizations.members
+        .setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [child.id],
+        })
+        .then(
+          value => ({ value }),
+          (error: unknown) => ({ error })
+        );
+
+      try {
+        let blocked = false;
+        for (let i = 0; i < 2000 && !blocked; i += 1) {
+          const waiting = await db.execute(sql`
+            SELECT 1 FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND wait_event_type = 'Lock'
+              AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          `);
+          blocked = waiting.rows.length > 0;
+          if (!blocked) await new Promise<void>(resolve => setImmediate(resolve));
+        }
+        expect(blocked).toBe(true);
+        allowPolicyUpdate.resolve();
+        await expect(competingAddition).resolves.toBeUndefined();
+        expect(await attempt).toEqual({
+          value: { success: true, added: [], removed: [] },
+        });
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, memberUser.id)
+          ),
+        });
+        expect(membership?.role).toBe('admin');
+      } finally {
+        allowPolicyUpdate.resolve();
+        await competingAddition;
+        await attempt;
         await cleanupChildOrganizations([child.id]);
+      }
+    }, 20_000);
+
+    it('serializes overlapping replacements for different members in child ID order', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const firstChild = await createChildOrganization('Concurrent Swap First', childOwner.id);
+      const secondChild = await createChildOrganization('Concurrent Swap Second', childOwner.id);
+      const [firstId, secondId] = [firstChild.id, secondChild.id].sort();
+      await addUserToOrganization(firstId, memberUser.id, 'member');
+      await addUserToOrganization(secondId, orgAdminUser.id, 'member');
+      const caller = await createCallerForUser(billingManagerUser.id);
+      const policyLockHeld = Promise.withResolvers<number>();
+      const releasePolicyLock = Promise.withResolvers<void>();
+      const policyLock = db.transaction(async tx => {
+        await lockOrganizationGroupPolicy(tx, firstId);
+        const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+        const pid = result.rows[0]?.pid;
+        if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+        policyLockHeld.resolve(pid);
+        await releasePolicyLock.promise;
+      });
+      const holderPid = await policyLockHeld.promise;
+      const attempts = [
+        caller.organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [secondId],
+        }),
+        caller.organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: orgAdminUser.id,
+          childOrganizationIds: [firstId],
+        }),
+      ];
+      const results = Promise.allSettled(attempts);
+
+      try {
+        let waiters = 0;
+        for (let i = 0; i < 2000 && waiters < 2; i += 1) {
+          const waiting = await db.execute<{ count: number }>(sql`
+            SELECT count(*)::int AS count FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND wait_event_type = 'Lock'
+              AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          `);
+          waiters = waiting.rows[0]?.count ?? 0;
+          if (waiters < 2) await new Promise<void>(resolve => setImmediate(resolve));
+        }
+        expect(waiters).toBe(2);
+        releasePolicyLock.resolve();
+        await policyLock;
+        expect(await results).toEqual([
+          { status: 'fulfilled', value: { success: true, added: [secondId], removed: [firstId] } },
+          { status: 'fulfilled', value: { success: true, added: [firstId], removed: [secondId] } },
+        ]);
+        const memberships = await db
+          .select({
+            organizationId: organization_memberships.organization_id,
+            userId: organization_memberships.kilo_user_id,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              inArray(organization_memberships.organization_id, [firstId, secondId]),
+              inArray(organization_memberships.kilo_user_id, [memberUser.id, orgAdminUser.id])
+            )
+          );
+        expect(memberships).toEqual(
+          expect.arrayContaining([
+            { organizationId: secondId, userId: memberUser.id, role: 'member' },
+            { organizationId: firstId, userId: orgAdminUser.id, role: 'member' },
+          ])
+        );
+        expect(memberships).toHaveLength(2);
+      } finally {
+        releasePolicyLock.resolve();
+        await policyLock;
+        await results;
+        await cleanupChildOrganizations([firstId, secondId]);
+      }
+    }, 20_000);
+
+    it('serializes an opposite swap and a concurrent child invitation without deadlock', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const firstChild = await createChildOrganization('Invite Swap First', childOwner.id);
+      const secondChild = await createChildOrganization('Invite Swap Second', childOwner.id);
+      const [firstId, secondId] = [firstChild.id, secondChild.id].sort();
+      await addUserToOrganization(secondId, memberUser.id, 'member');
+      await db
+        .delete(organization_group_policy_settings)
+        .where(eq(organization_group_policy_settings.organization_id, secondId));
+      const caller = await createCallerForUser(billingManagerUser.id);
+      const organizationLockHeld = Promise.withResolvers<number>();
+      const allowInvitation = Promise.withResolvers<void>();
+      const invitation = db.transaction(async tx => {
+        await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, secondId))
+          .for('update');
+        const result = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+        const pid = result.rows[0]?.pid;
+        if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+        organizationLockHeld.resolve(pid);
+        await allowInvitation.promise;
+        await tx
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, testOrganization.id),
+              eq(organization_memberships.kilo_user_id, memberUser.id)
+            )
+          )
+          .for('share');
+        await tx.insert(organization_invitations).values({
+          organization_id: secondId,
+          email: `${crypto.randomUUID()}@child-invitation-lock.example.com`,
+          role: 'member',
+          invited_by: childOwner.id,
+          token: crypto.randomUUID(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+      });
+      const holderPid = await organizationLockHeld.promise;
+      const attempt = caller.organizations.members
+        .setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [firstId],
+        })
+        .then(
+          value => ({ value }),
+          (error: unknown) => ({ error })
+        );
+
+      try {
+        let blocked = false;
+        for (let i = 0; i < 2000 && !blocked; i += 1) {
+          const waiting = await db.execute<{ query: string }>(sql`
+            SELECT query FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND wait_event_type = 'Lock'
+              AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          `);
+          blocked = waiting.rows.some(row =>
+            /insert into "organization_group_policy_settings"/i.test(row.query)
+          );
+          if (!blocked) await new Promise<void>(resolve => setImmediate(resolve));
+        }
+        expect(blocked).toBe(true);
+        allowInvitation.resolve();
+        await expect(invitation).resolves.toBeUndefined();
+        expect(await attempt).toEqual({
+          value: { success: true, added: [firstId], removed: [secondId] },
+        });
+      } finally {
+        allowInvitation.resolve();
+        await invitation;
+        await attempt;
+        await db
+          .delete(organization_invitations)
+          .where(eq(organization_invitations.organization_id, secondId));
+        await cleanupChildOrganizations([firstId, secondId]);
+      }
+    }, 20_000);
+
+    it('rolls back membership and audit changes when a later addition fails', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const firstChild = await createChildOrganization('Rollback First Child', childOwner.id);
+      const secondChild = await createChildOrganization('Rollback Second Child', childOwner.id);
+      const [existingChildId, newChildId] = [firstChild.id, secondChild.id].sort();
+      const childIds = [existingChildId, newChildId];
+      await addUserToOrganization(existingChildId, memberUser.id, 'member');
+      const caller = await createCallerForUser(billingManagerUser.id);
+      const createAudit = jest.mocked(createAuditLog);
+      const actual = jest.requireActual<typeof OrganizationAuditLogsModule>(
+        '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+      );
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      createAudit.mockClear();
+      createAudit.mockImplementationOnce(actual.createAuditLog);
+      createAudit.mockRejectedValueOnce(new Error('Audit write failed'));
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [newChildId],
+          })
+        ).rejects.toThrow('Audit write failed');
+        expect(createAudit).toHaveBeenCalledTimes(2);
+
+        const rows = await db
+          .select({
+            organizationId: organization_memberships.organization_id,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.kilo_user_id, memberUser.id),
+              inArray(organization_memberships.organization_id, childIds)
+            )
+          );
+        expect(rows).toEqual([{ organizationId: existingChildId, role: 'member' }]);
+        const audits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(inArray(organization_audit_logs.organization_id, childIds));
+        expect(audits).toEqual([]);
+        const removals = await db
+          .select()
+          .from(organization_membership_removals)
+          .where(inArray(organization_membership_removals.organization_id, childIds));
+        expect(removals).toEqual([]);
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+      } finally {
+        createAudit.mockReset();
+        createAudit.mockImplementation(actual.createAuditLog);
+        await cleanupChildOrganizations(childIds);
       }
     });
   });

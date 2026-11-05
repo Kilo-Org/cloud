@@ -307,7 +307,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       const directRole = user.is_admin
         ? 'owner'
         : await getDirectOrganizationRole(organizationId, user.id);
-      if (directRole !== 'owner' && directRole !== 'billing_manager') {
+      if (!ORGANIZATION_BILLING_ROLES.some(role => role === directRole)) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message: 'You do not have the required organizational role to access this feature',
@@ -446,7 +446,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         await recordElevatedOrganizationAdminAction(ctx, {
           organizationId,
           // Mirrors the direct-membership check above.
-          requiredRoles: ['owner', 'billing_manager'],
+          requiredRoles: ORGANIZATION_BILLING_ROLES,
           membershipScope: 'direct',
           action: 'organization.child_memberships.set',
           message: 'Changed child organization memberships',

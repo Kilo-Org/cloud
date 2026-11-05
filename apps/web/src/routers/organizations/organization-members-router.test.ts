@@ -662,6 +662,13 @@ describe('organizations members trpc router', () => {
         expect(rows.map(row => row.organizationId)).toEqual(
           expect.arrayContaining([childA.id, childB.id])
         );
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [childB.id],
+          })
+        ).resolves.toEqual({ success: true, added: [], removed: [childA.id] });
       } finally {
         await cleanupChildOrganizations([childA.id, childB.id]);
       }
@@ -684,12 +691,125 @@ describe('organizations members trpc router', () => {
         });
 
         expect(result).toEqual({ success: true, added: [child.id], removed: [] });
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [],
+          })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
       } finally {
         await cleanupChildOrganizations([child.id]);
       }
     });
 
-    it('rejects parent members assigning child memberships', async () => {
+    it('allows parent admins to add and remove ordinary child memberships', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      const child = await createChildOrganization('Admin Child Members', childOwner.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
+      const input = { organizationId: testOrganization.id, memberId: target.id };
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [child.id],
+          })
+        ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(membership?.role).toBe('member');
+
+        await expect(
+          caller.organizations.members.setChildMemberships({ ...input, childOrganizationIds: [] })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
+
+        const remainingMembership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(remainingMembership).toBeUndefined();
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(target.id, child.id);
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('records only bypassed Kilo admin child-membership writes', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'admin');
+      const child = await createChildOrganization('Kilo Admin Child Members', childOwner.id);
+      const input = {
+        organizationId: testOrganization.id,
+        memberId: target.id,
+        childOrganizationIds: [child.id],
+      };
+
+      try {
+        const directAdminCaller = await createCallerForUser(kiloAdmin.id);
+        await expect(
+          directAdminCaller.organizations.members.setChildMemberships(input)
+        ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+
+        const directAudits = await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.actor_id, kiloAdmin.id),
+              eq(admin_action_audit_logs.target_id, testOrganization.id),
+              eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+            )
+          );
+        expect(directAudits).toEqual([]);
+
+        const elevatedCaller = await createCallerForUser(adminUser.id);
+        await expect(
+          elevatedCaller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [],
+          })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
+
+        const elevatedAudits = await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.actor_id, adminUser.id),
+              eq(admin_action_audit_logs.target_id, testOrganization.id),
+              eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+            )
+          );
+        expect(elevatedAudits).toEqual([
+          expect.objectContaining({
+            metadata: {
+              memberKiloUserId: target.id,
+              addedOrganizationIds: [],
+              removedOrganizationIds: [child.id],
+              heldRoles: [],
+            },
+          }),
+        ]);
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('rejects parent members assigning or removing child memberships', async () => {
       const childOwner = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@member-child-owner.example.com`,
         google_user_name: 'Member Child Owner',
@@ -705,9 +825,172 @@ describe('organizations members trpc router', () => {
             memberId: memberUser.id,
             childOrganizationIds: [child.id],
           })
-        ).rejects.toThrow(
-          'You do not have the required organizational role to access this feature'
-        );
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        });
+        const deniedAssignment = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, memberUser.id)
+          ),
+        });
+        expect(deniedAssignment).toBeUndefined();
+
+        await addUserToOrganization(child.id, billingManagerUser.id, 'member');
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: billingManagerUser.id,
+            childOrganizationIds: [],
+          })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        });
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, billingManagerUser.id)
+          ),
+        });
+        expect(membership?.role).toBe('member');
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('rejects outsiders assigning or removing child memberships', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      const child = await createChildOrganization('Outsider Child Members', childOwner.id);
+      const caller = await createCallerForUser(nonMemberUser.id);
+      const input = { organizationId: testOrganization.id, memberId: target.id };
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+        const deniedAssignment = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(deniedAssignment).toBeUndefined();
+
+        await addUserToOrganization(child.id, target.id, 'member');
+        await expect(
+          caller.organizations.members.setChildMemberships({ ...input, childOrganizationIds: [] })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(membership?.role).toBe('member');
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it.each(['owner', 'admin', 'billing_manager'] as const)(
+      'rejects an inherited parent %s without a direct privileged membership',
+      async role => {
+        const grandparentOwner = await insertTestUser({ is_admin: false });
+        const actor = await insertTestUser({ is_admin: false });
+        const grandparent = await createOrganization('Grandparent Members', grandparentOwner.id);
+        const childOwner = await insertTestUser({ is_admin: false });
+        const target = await insertTestUser({ is_admin: false });
+        await addUserToOrganization(grandparent.id, actor.id, role);
+        await addUserToOrganization(testOrganization.id, target.id, 'member');
+        const child = await createChildOrganization('Inherited Actor Child Members', childOwner.id);
+        const caller = await createCallerForUser(actor.id);
+
+        try {
+          await db
+            .update(organizations)
+            .set({ parent_organization_id: grandparent.id })
+            .where(eq(organizations.id, testOrganization.id));
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              organizationId: testOrganization.id,
+              memberId: target.id,
+              childOrganizationIds: [child.id],
+            })
+          ).rejects.toMatchObject({
+            code: 'UNAUTHORIZED',
+            message: 'You do not have the required organizational role to access this feature',
+          });
+
+          await addUserToOrganization(testOrganization.id, actor.id, 'member');
+          await expect(
+            caller.organizations.members.setChildMemberships({
+              organizationId: testOrganization.id,
+              memberId: target.id,
+              childOrganizationIds: [child.id],
+            })
+          ).rejects.toMatchObject({
+            code: 'UNAUTHORIZED',
+            message: 'You do not have the required organizational role to access this feature',
+          });
+
+          const membership = await db.query.organization_memberships.findFirst({
+            where: and(
+              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, target.id)
+            ),
+          });
+          expect(membership).toBeUndefined();
+        } finally {
+          await cleanupChildOrganizations([child.id]);
+          await db
+            .update(organizations)
+            .set({ parent_organization_id: null })
+            .where(eq(organizations.id, testOrganization.id));
+          await db.delete(organizations).where(eq(organizations.id, grandparent.id));
+        }
+      }
+    );
+
+    it('rejects parent admins assigning service accounts', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const bot = await insertTestUser({ is_bot: true });
+      await addUserToOrganization(testOrganization.id, bot.id, 'member');
+      const child = await createChildOrganization('Bot Child Members', childOwner.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: bot.id,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+          message: 'User is not a member of the parent organization',
+        });
+
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, bot.id)
+          ),
+        });
+        expect(membership).toBeUndefined();
       } finally {
         await cleanupChildOrganizations([child.id]);
       }
@@ -720,7 +1003,7 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
       const child = await createChildOrganization('Non Parent Child Members', childOwner.id);
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
 
       try {
         await expect(
@@ -745,7 +1028,7 @@ describe('organizations members trpc router', () => {
         'Unrelated Members Org',
         unrelatedOwner.id
       );
-      const caller = await createCallerForUser(regularUser.id);
+      const caller = await createCallerForUser(orgAdminUser.id);
 
       try {
         await expect(

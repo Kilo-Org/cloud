@@ -14,17 +14,20 @@ export type BlacklistStats = {
   totalBlockedUsers: number;
 };
 
-// The host part of the account email, lowercased. Blacklist entries match this
-// host on label boundaries, the same way sign-in matches them, so an entry below
-// the registrable domain still reports the accounts it stops.
-const emailHostSql = sql<
-  string | null
->`lower(split_part(${kilocode_users.google_user_email}, '@', 2))`;
+const atSignCountSql = sql`length(${kilocode_users.google_user_email}) - length(replace(${kilocode_users.google_user_email}, '@', ''))`;
+
+// The host part of the account email, lowercased. This is the text after the
+// last '@', and the whole address when it holds none, because that is the host
+// isEmailBlacklistedByDomain reads from a sign-in email. Blacklist entries
+// match this host on label boundaries, so an entry below the registrable domain
+// still reports the accounts it stops.
+const emailHostSql = sql<string>`lower(split_part(${kilocode_users.google_user_email}, '@', ${atSignCountSql} + 1))`;
 
 /**
  * Reads one grouped count of users per email host. A report builds its
  * per-entry totals from this single statement, whatever the configured list
- * size.
+ * size: the grouped rows are bounded by the distinct hosts in the table, not by
+ * the list.
  *
  * Pass `readDb` for read-only reports. The caller owns the choice of pool.
  */

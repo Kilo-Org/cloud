@@ -69,6 +69,28 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     });
   });
 
+  it('reads the host after the last @, and keeps an address that holds none', async () => {
+    await insertHostUsers('mailinator.com', 2);
+    // Sign-in reads the text after the last '@' as the host.
+    await insertTestUser({ google_user_email: 'first@second@mailinator.com' });
+    // An address without '@' is its own host, matched on a dotted suffix.
+    await insertTestUser({ google_user_email: 'deep.spam.org' });
+
+    mockedGetBlacklistedDomains.mockResolvedValue(['mailinator.com', 'spam.org']);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      domains: [
+        { domain: 'mailinator.com', blockedCount: 3 },
+        { domain: 'spam.org', blockedCount: 1 },
+      ],
+      totalDomains: 2,
+      totalBlockedUsers: 4,
+    });
+  });
+
   it('keeps one query and a bounded row count for a large blacklist', async () => {
     await insertHostUsers('bulk7.test', 5);
     const blacklistedDomains = Array.from({ length: 300 }, (_, i) => `bulk${i}.test`);

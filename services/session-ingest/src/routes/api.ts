@@ -14,6 +14,7 @@ import {
   sessionDiffReadSchema,
   sessionIdSchema,
   sessionShareOptionsSchema,
+  storedSessionIdSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
@@ -600,10 +601,15 @@ api.get('/session/:sessionId/diff', async c => {
  * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
  * page size of 50; the existing max of 100 is honored for callers that
  * request more.
+ *
+ * The id takes `storedSessionIdSchema`: a session created before the
+ * canonical `ses_…` shape was issued keeps the id it was created with, and
+ * this read is what shows its stored transcript. The access check below, not
+ * the id shape, decides who may read it.
  */
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
-  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  const parsed = storedSessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }

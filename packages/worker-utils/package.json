@@ -21,6 +21,8 @@
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
+    "./worker-admin-capability": "./src/worker-admin-capability.ts",
+    "./worker-admin-actions": "./src/worker-admin-actions.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",

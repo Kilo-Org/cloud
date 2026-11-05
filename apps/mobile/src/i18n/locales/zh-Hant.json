@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "原生遠端示範",
+    "sessionsEmpty": "尚無原生工作階段",
+    "hosts": "線上主機",
+    "hostsEmpty": "沒有線上主機",
+    "directory": "工作目錄",
+    "createSession": "新增原生工作階段",
+    "queueIfOffline": "主機離線時將提示排入佇列",
+    "prompt": "提示或 /command",
+    "localClear": "清除本機檢視",
+    "abort": "中止回合",
+    "failed": "原生遠端操作失敗",
+    "creationUnknown": "建立結果不明。請先重新整理工作階段再重試。",
+    "commandFailed": "執行器命令失敗",
+    "invalidReply": "執行器回覆無效",
+    "unsafeCommand": "請使用 /compact、/new、/skill、/models、/agents 或 /clear（僅清除本機檢視）。",
+    "status": "連線：{{connection}} · 執行器：{{runner}}",
+    "presenceStatus": "主機：{{connection}}",
+    "commandStatus": "命令傳送狀態：{{status}}",
+    "delivered": "已送達",
+    "expired": "已過期"
+  },
   "common": {
     "cancel": "取消",
     "done": "完成",

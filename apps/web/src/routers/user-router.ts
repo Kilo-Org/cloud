@@ -593,6 +593,16 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
   };
 }
 
+// Passkey enrollment and management change which authenticators can sign in
+// as this account, so they are bound to a browser session. A bearer token must
+// not be able to add or remove a sign-in factor.
+const passkeyManagementProcedure = baseProcedure.use(({ ctx, next }) => {
+  if (ctx.credential !== 'session') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Browser session required' });
+  }
+  return next();
+});
+
 export const userRouter = createTRPCRouter({
   getPaidCreditPolicy: baseProcedure.query(() =>
     getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
@@ -652,7 +662,7 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
-  renamePasskey: baseProcedure
+  renamePasskey: passkeyManagementProcedure
     .input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(64) }))
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
@@ -667,7 +677,7 @@ export const userRouter = createTRPCRouter({
       return successResult();
     }),
 
-  deletePasskey: baseProcedure
+  deletePasskey: passkeyManagementProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);

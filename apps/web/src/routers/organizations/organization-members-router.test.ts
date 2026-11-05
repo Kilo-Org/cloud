@@ -22,6 +22,11 @@ import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
 
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
 }));
@@ -265,6 +270,24 @@ describe('organizations members trpc router', () => {
         action: 'organization.member.remove',
         metadata: { previousRole: 'admin', heldRoles: ['admin'] },
       });
+    });
+
+    it('enforce applies the real role and rejects admin self-removal', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Enforced Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      enableSupportAccess(true);
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.remove({
+            organizationId: organization.id,
+            memberId: kiloAdmin.id,
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        enableSupportAccess(false);
+      }
     });
 
     it('does not record writes by members acting within their own role', async () => {
@@ -636,6 +659,46 @@ describe('organizations members trpc router', () => {
         await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
       }
     }
+
+    it('enforce denies an admin with no parent membership', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Child Members', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      enableSupportAccess(true);
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        enableSupportAccess(false);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('enforce uses a real billing-manager role for an admin', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Billing Child', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'billing_manager');
+      enableSupportAccess(true);
+      try {
+        const result = await (
+          await createCallerForUser(kiloAdmin.id)
+        ).organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [child.id],
+        });
+        expect(result.added).toEqual([child.id]);
+      } finally {
+        enableSupportAccess(false);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
 
     it('allows parent owners to assign parent members to child organizations', async () => {
       const childOwner = await insertTestUser({

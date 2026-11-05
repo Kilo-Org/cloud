@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // NOTE: Base config is for PRODUCTION environment
-  // Use --env dev for development deployments
+  // Use --env staging for the staging deployment
   "name": "cloudflare-scim-sync",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
@@ -32,8 +32,16 @@
   "triggers": {
     "crons": ["*/5 * * * *"],
   },
+  // `vars`, `secrets_store_secrets` and `durable_objects` are not inherited by
+  // a named environment, so `env.staging` below restates each one in full.
+  // Everything above this line is inherited and must stay environment-neutral.
   "vars": {
     "ENVIRONMENT": "production",
+    // Origin of the Kilo app whose `/api/internal/scim/*` endpoints own the
+    // writes. This Worker holds no database binding: directory state is
+    // applied over REST so the app keeps the advisory locks, the depth check,
+    // the soft-delete side effects and the removal tombstone in one place.
+    "BACKEND_API_URL": "https://app.kilo.ai",
     // Seconds between polls. Read on every alarm, so a change takes effect on
     // the first tick after deploy. Clamped in code to 10..3600: a sub-second
     // interval would keep the Durable Object from hibernating and bill
@@ -46,6 +54,9 @@
     // can be copied forward.
     "WORKOS_EVENT_CURSOR": "",
   },
+  // One key pair per WorkOS environment. The Events API is scoped to whichever
+  // WorkOS environment issued the key, so these names are what decide which
+  // directory stream a deployment consumes — not `ENVIRONMENT`.
   "secrets_store_secrets": [
     {
       "binding": "WORKOS_API_KEY",
@@ -56,17 +67,6 @@
       "binding": "WORKOS_CLIENT_ID",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "WORKOS_CLIENT_ID",
-    },
-  ],
-  // Shared PostgreSQL, same instance and Hyperdrive config as every other
-  // service in this repo. Workers cannot hold long-lived connections, so
-  // Hyperdrive owns the regional pool and `getWorkerDb` opens a `max: 1` pool
-  // per call against the string it hands out.
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "624ec80650dd414199349f4e217ddb10",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
   "durable_objects": {
@@ -86,15 +86,26 @@
     },
   ],
   // ============================================
-  // DEVELOPMENT ENVIRONMENT
-  // Deploy with: wrangler deploy --env dev
+  // STAGING ENVIRONMENT
+  // Deploy with: wrangler deploy --env staging
+  //
+  // Named `staging` because that is the only non-production value
+  // `deploy-workers.yml` passes, and it skips any Worker whose config lacks an
+  // `env` of exactly that name. So this environment is what makes the Worker
+  // part of the staging rollout; any other name deploys by hand only.
+  //
+  // It polls the WorkOS *Staging* directory stream and applies to the staging
+  // Kilo app. Pointing it at the production WorkOS keys would make two
+  // deployments consume one stream, and once the write path lands they would
+  // both apply the same events: the cursor is configuration, not a lease.
   // ============================================
   "env": {
-    "dev": {
-      "name": "cloudflare-scim-sync-dev",
+    "staging": {
+      "name": "cloudflare-scim-sync-staging",
       "workers_dev": false,
       "vars": {
-        "ENVIRONMENT": "development",
+        "ENVIRONMENT": "staging",
+        "BACKEND_API_URL": "https://staging-app.kilo.ai",
         "SCIM_POLL_INTERVAL_SECONDS": "60",
         "WORKOS_EVENT_CURSOR": "",
       },
@@ -102,19 +113,12 @@
         {
           "binding": "WORKOS_API_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "WORKOS_API_KEY",
+          "secret_name": "WORKOS_API_KEY_STAGING",
         },
         {
           "binding": "WORKOS_CLIENT_ID",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "WORKOS_CLIENT_ID",
-        },
-      ],
-      "hyperdrive": [
-        {
-          "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
-          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+          "secret_name": "WORKOS_CLIENT_ID_STAGING",
         },
       ],
       "durable_objects": {

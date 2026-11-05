@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
@@ -144,6 +145,7 @@ export function NewSessionPrompt({
   initialPrompt,
   frameHeight,
   cardTop = 0,
+  lineCount = NEW_SESSION_PROMPT_DEFAULT_LINES,
   onStartSession,
   isCloneEntry = false,
   autoFocusOnMount = true,
@@ -195,22 +197,21 @@ export function NewSessionPrompt({
   // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
   // the frame leaves for the input.
   const [cardChromeHeight, setCardChromeHeight] = useState(0);
-  // The input is one size whatever the draft holds: the 3-line floor, lowered
-  // only where the frame cannot hold it (the keyboard up on a short window). A
-  // draft taller than the field scrolls inside it. Sizing the field to its text
-  // made every row below it move once the stored draft loaded, seconds after
-  // the screen opened, so the composer is content-independent instead.
+  // The input is one size whatever the draft holds: the preferred floor, or the
+  // one-line floor a short window takes so the repository picker under the card
+  // stays visible, lowered further only where the frame cannot hold it (the
+  // keyboard up on a short window). A draft taller than the field scrolls
+  // inside it. Sizing the field to its text made every row below it move once
+  // the stored draft loaded, seconds after the screen opened, so the composer
+  // is content-independent instead.
   const promptHeight = resolveNewSessionPromptMinHeight({
     frameHeight: frameHeight ?? 0,
     cardTop,
     cardChromeHeight,
-    // The shared helper keeps the preferred 3-line floor in one place.
-    preferredMinHeight: resolveNewSessionPromptHeight(
-      promptLineHeight,
-      NEW_SESSION_PROMPT_DEFAULT_LINES
-    ),
+    // The shared helper keeps the preferred floor in one place.
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, lineCount),
     lineHeight: promptLineHeight,
-    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+    preferredLines: lineCount,
   });
 
   // The draft's own laid-out height, reported by the input on every content
@@ -249,6 +250,10 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     textAlignVertical: 'top',
   } satisfies TextStyle;
+  // The one-line floor is shorter than the touch target. The slop makes the
+  // field's whole height reachable without taking room from the sections under
+  // the card, which the short window has none of.
+  const promptHitSlopDp = Math.max(0, (TOUCH_TARGET_DP - promptHeight) / 2);
 
   // Publish the counter only when the value the card renders changes: the
   // count stays hidden until the draft nears the limit, and republishing the
@@ -505,6 +510,11 @@ export function NewSessionPrompt({
             ]}
             onChangeText={handlePromptChange}
             onSelectionChange={handlePromptSelectionChange}
+            hitSlop={
+              promptHitSlopDp > 0
+                ? { top: promptHitSlopDp, right: 0, bottom: promptHitSlopDp, left: 0 }
+                : undefined
+            }
             onContentSizeChange={event => {
               const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
               setContentHeight(current => (current === next ? current : next));

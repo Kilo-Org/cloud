@@ -34,6 +34,7 @@ import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/git
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
   CodeReviewCouncilConfigSchema,
@@ -663,14 +664,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       try {
         const platform = input.platform ?? 'github';
         const isBitbucket = platform === PLATFORM.BITBUCKET;
-        const isGitLab = platform === PLATFORM.GITLAB;
 
         // GitLab code review has no 'all' repository mode: the webhook handler
-        // reviews only selected or manually added projects. Store the clamp here
-        // too (the PATCH path applies it post-merge) so a full save can never
-        // leave a row whose reported mode disagrees with the trigger filter.
-        const repositorySelectionMode: 'all' | 'selected' =
-          isBitbucket || isGitLab ? 'selected' : input.repositorySelectionMode || 'all';
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = isBitbucket
+          ? 'selected'
+          : repositoryModeForPlatform(platform, input.repositorySelectionMode);
 
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         const previousRepoIds =

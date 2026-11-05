@@ -130,6 +130,40 @@ describe('organization review agent router: toggleReviewAgent', () => {
     const logs = await settingsChangeAuditLogs(organization.id);
     expect(logs).toEqual([{ message: 'Enabled AI Code Review Agent for github' }]);
   });
+
+  it('stores the selected repository mode when a GitLab agent is enabled for the first time', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'gitlab',
+      isEnabled: true,
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'gitlab');
+    expect(stored?.is_enabled).toBe(true);
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+      })
+    );
+  });
+
+  it('keeps the all repository mode when a GitHub agent is enabled for the first time', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+    expect(stored?.config).toEqual(expect.objectContaining({ repository_selection_mode: 'all' }));
+  });
 });
 
 describe('organization review agent router: council config', () => {

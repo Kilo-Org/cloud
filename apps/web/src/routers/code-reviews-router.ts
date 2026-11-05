@@ -39,6 +39,7 @@ import {
   type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -343,11 +344,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const platform = input.platform ?? 'github';
 
         // GitLab code review has no 'all' repository mode: the webhook handler
-        // reviews only selected or manually added projects. Store the clamp here
-        // too (the PATCH paths apply it post-merge) so a full save can never
-        // leave a row whose reported mode disagrees with the trigger filter.
-        const repositorySelectionMode: 'all' | 'selected' =
-          platform === PLATFORM.GITLAB ? 'selected' : input.repositorySelectionMode || 'all';
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = repositoryModeForPlatform(
+          platform,
+          input.repositorySelectionMode
+        );
 
         // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);

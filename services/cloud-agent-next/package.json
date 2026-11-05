@@ -7,7 +7,7 @@
   "author": "",
   "type": "module",
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
+    "preinstall": "node ../../scripts/check-pnpm.mjs",
     "predeploy": "pnpm run build:wrapper",
     "deploy": "wrangler deploy",
     "predev": "pnpm run build:wrapper",

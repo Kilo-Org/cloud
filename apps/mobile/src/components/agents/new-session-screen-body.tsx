@@ -639,11 +639,11 @@ export function NewSessionScreenBody() {
   // marks the row the form actually shows. A target the live list no longer
   // represents keeps its value here; the spawn path reports that case.
   useEffect(() => {
-    if (instancesData === undefined) {
+    if (instancesData === undefined || runOnInstance === null) {
       return;
     }
     const live = followLiveRunOn(runOnInstance, instanceList);
-    if (live?.connectionId !== (runOnInstance?.connectionId ?? null)) {
+    if (live !== null && live.connectionId !== runOnInstance.connectionId) {
       setRunOnInstance(live);
     }
   }, [instanceList, instancesData, runOnInstance]);

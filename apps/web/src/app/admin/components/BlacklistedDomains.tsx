@@ -129,7 +129,8 @@ function EditTab() {
             <AlertTriangle className="h-4 w-4 shrink-0" />
             The stored list has {data.dropped_domains.toLocaleString()} more entries than the{' '}
             {domainCount.toLocaleString()} shown here. Those entries are not shown or enforced, and
-            saving keeps the list above.
+            saving writes exactly this list, so it permanently discards them, even when only the
+            signup TLDs change.
           </p>
         )}
         <Textarea

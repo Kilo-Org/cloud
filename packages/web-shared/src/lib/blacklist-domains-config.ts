@@ -69,6 +69,9 @@ const envFallbackDomains = getEnvFallbackDomains();
 const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
 let snapshot: BlacklistDomainsConfigSnapshot | null = null;
+// The last over-cap config this process reported, so the log fires once per loaded config
+// instead of once per cache refresh.
+let reportedDroppedDomains: string | null = null;
 
 /**
  * Reads the operator-maintained config from Redis. Throws when the read or the stored payload
@@ -82,7 +85,9 @@ async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
       snapshot,
       Date.now()
     );
-    if (snapshot.droppedDomains > 0) {
+    const droppedKey = `${snapshot.config?.updated_at ?? ''}:${snapshot.droppedDomains}`;
+    if (snapshot.droppedDomains > 0 && droppedKey !== reportedDroppedDomains) {
+      reportedDroppedDomains = droppedKey;
       errorExceptInTest('[blacklist-domains] Stored domain list is longer than the cap:', {
         droppedDomains: snapshot.droppedDomains,
       });

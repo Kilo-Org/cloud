@@ -60,13 +60,13 @@ const expoFileSystemMock = vi.hoisted(() => {
       write: vi.fn().mockResolvedValue(undefined),
       writeSync: vi.fn(),
       text: fileText,
-      canPreview: vi.fn(async () => previewBehavior.canPreview),
-      preview: vi.fn(async () => {
-        if (previewBehavior.previewError !== null) {
-          throw previewBehavior.previewError;
-        }
-      }),
-      copy: vi.fn(async () => undefined),
+      canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
+      preview: vi.fn(() =>
+        previewBehavior.previewError !== null
+          ? Promise.reject(previewBehavior.previewError)
+          : Promise.resolve()
+      ),
+      copy: vi.fn(() => Promise.resolve()),
       delete: vi.fn(),
       filename,
     };
@@ -369,9 +369,9 @@ describe('FilePartRenderer mounted', () => {
         write: vi.fn(() => write.promise),
         writeSync: vi.fn(),
         text: expoFileSystemMock.fileText,
-        canPreview: vi.fn(async () => true),
-        preview: vi.fn(async () => undefined),
-        copy: vi.fn(async () => undefined),
+        canPreview: vi.fn(() => Promise.resolve(true)),
+        preview: vi.fn(() => Promise.resolve()),
+        copy: vi.fn(() => Promise.resolve()),
         extension: '.png',
         delete: vi.fn(),
         filename,

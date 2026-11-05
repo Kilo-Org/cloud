@@ -44,13 +44,13 @@ const expoFileSystemMock = vi.hoisted(() => {
         return dot === -1 ? '' : uri.slice(dot);
       },
       text: fileText,
-      canPreview: vi.fn(async () => previewBehavior.canPreview),
-      preview: vi.fn(async () => {
-        if (previewBehavior.previewError !== null) {
-          throw previewBehavior.previewError;
-        }
-      }),
-      copy: vi.fn(async () => undefined),
+      canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
+      preview: vi.fn(() =>
+        previewBehavior.previewError !== null
+          ? Promise.reject(previewBehavior.previewError)
+          : Promise.resolve()
+      ),
+      copy: vi.fn(() => Promise.resolve()),
       delete: vi.fn(),
     };
     instances.push(instance as unknown as (typeof instances)[number]);

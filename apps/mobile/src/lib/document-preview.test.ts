@@ -1,4 +1,7 @@
+/* eslint-disable max-lines -- cohesive suite: the materialization, viewer, and account-fence cases share one mock harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type * as ShareRemoteFileModule from '@/lib/share-remote-file';
 
 import {
   getDocumentPreviewTarget,
@@ -50,19 +53,17 @@ const fileSystem = vi.hoisted(() => {
         const dot = uri.lastIndexOf('.');
         return dot === -1 ? '' : uri.slice(dot);
       },
-      canPreview: vi.fn(async () => {
+      canPreview: vi.fn(() => {
         if (behavior.canPreviewError !== null) {
-          throw behavior.canPreviewError;
+          return Promise.reject(behavior.canPreviewError);
         }
-        return behavior.canPreview;
+        return Promise.resolve(behavior.canPreview);
       }),
-      preview: vi.fn(async () => {
-        if (behavior.previewError !== null) {
-          throw behavior.previewError;
-        }
-      }),
-      write: vi.fn(async () => undefined),
-      copy: vi.fn(async () => undefined),
+      preview: vi.fn(() =>
+        behavior.previewError !== null ? Promise.reject(behavior.previewError) : Promise.resolve()
+      ),
+      write: vi.fn(() => Promise.resolve()),
+      copy: vi.fn(() => Promise.resolve()),
       delete: vi.fn(),
     };
     instances.push(instance as unknown as (typeof instances)[number]);
@@ -92,7 +93,7 @@ vi.mock('expo-sharing', () => ({
 const downloadRemoteFile = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/share-remote-file', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/share-remote-file')>();
+  const actual = await importOriginal<typeof ShareRemoteFileModule>();
   return {
     ...actual,
     downloadRemoteFile,
@@ -360,9 +361,7 @@ describe('previewRemoteDocument', () => {
         canPreview: vi.fn(),
         preview: vi.fn(),
         write: vi.fn(),
-        copy: vi.fn(async () => {
-          throw new Error('copy-failed');
-        }),
+        copy: vi.fn(() => Promise.reject(new Error('copy-failed'))),
         delete: vi.fn(),
       };
     });
@@ -408,9 +407,9 @@ describe('previewRemoteDocument', () => {
 
   it('drops the copy and skips the viewer when the account changes during the download', async () => {
     const copy = ownedCopy('file:///cache/session-file-parts/part-10-report.pdf');
-    downloadRemoteFile.mockImplementation(async () => {
+    downloadRemoteFile.mockImplementation(() => {
       authEpoch.value += 1;
-      return copy;
+      return Promise.resolve(copy);
     });
 
     const outcome = await previewRemoteDocument({
@@ -435,9 +434,9 @@ describe('previewRemoteDocument', () => {
         uri: copy.uri,
         exists: true,
         extension: '.pdf',
-        canPreview: vi.fn(async () => {
+        canPreview: vi.fn(() => {
           authEpoch.value += 1;
-          return true;
+          return Promise.resolve(true);
         }),
         preview: vi.fn(),
         write: vi.fn(),

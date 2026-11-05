@@ -25,7 +25,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
-import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { normalizeCreditActivityOrgParam, reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -116,20 +116,10 @@ const CreditRow = memo(function CreditRow({
   );
 });
 
-function firstSearchParam(value: string | string[] | undefined): string | undefined {
-  if (!Array.isArray(value) && value !== undefined && value.length > 0) {
-    return value;
-  }
-  if (Array.isArray(value) && value[0] !== undefined && value[0].length > 0) {
-    return value[0];
-  }
-  return undefined;
-}
-
 export function OrganizationCreditActivityScreen() {
   const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
-  const orgParam = firstSearchParam(orgParamRaw);
+  const orgParam = normalizeCreditActivityOrgParam(orgParamRaw);
 
   const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
   // When `org` is present, resolve role/membership against the param only — never

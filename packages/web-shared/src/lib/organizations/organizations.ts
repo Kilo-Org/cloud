@@ -29,7 +29,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, isNull, gt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -449,7 +449,10 @@ export async function updateUserRoleInOrganization(
 
     // If no membership was updated, check for pending invitations
     const [user] = await tx
-      .select({ email: kilocode_users.google_user_email })
+      .select({
+        email: kilocode_users.google_user_email,
+        normalizedEmail: kilocode_users.normalized_email,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, userId));
 
@@ -457,23 +460,31 @@ export async function updateUserRoleInOrganization(
       return { success: false, updated: 'none' };
     }
 
-    const invitationUpdateResult = await tx
-      .update(organization_invitations)
-      .set({ role })
+    const pendingInvitations = await tx
+      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .from(organization_invitations)
       .where(
         and(
           eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, user.email),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
       );
 
-    if (invitationUpdateResult.rowCount && invitationUpdateResult.rowCount > 0) {
-      return successResult({ updated: 'invitation' as const });
+    const invitationIds = pendingInvitations
+      .filter(invitation => invitationAddressesAccount(invitation.email, user))
+      .map(invitation => invitation.id);
+
+    if (invitationIds.length === 0) {
+      return { success: false, updated: 'none' };
     }
 
-    return { success: false, updated: 'none' };
+    await tx
+      .update(organization_invitations)
+      .set({ role })
+      .where(inArray(organization_invitations.id, invitationIds));
+
+    return successResult({ updated: 'invitation' as const });
   };
 
   return txn ? run(txn) : db.transaction(run);
@@ -484,6 +495,44 @@ export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
 
 export const CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER =
   'Only parent organization members can join a child organization.';
+
+/**
+ * The one relation that decides which account an invitation address belongs to:
+ * both addresses must have the same `normalizeEmail` form, so the dedupe,
+ * existing-member check, role change and acceptance treat a `+` alias, Gmail
+ * dots and casing as one person. The stored address itself keeps the spelling
+ * the inviter typed.
+ */
+function isSameInvitationAddress(invitationEmail: string, address: string): boolean {
+  return normalizeEmail(invitationEmail) === normalizeEmail(address);
+}
+
+/**
+ * `isSameInvitationAddress` for a stored account row. A row's stored normalized
+ * form is one more spelling of the same account, so an address change after
+ * signup does not make an invitation unclaimable.
+ */
+function invitationAddressesAccount(
+  invitationEmail: string,
+  account: { email: string; normalizedEmail: string | null }
+): boolean {
+  return (
+    isSameInvitationAddress(invitationEmail, account.email) ||
+    account.normalizedEmail === normalizeEmail(invitationEmail)
+  );
+}
+
+/**
+ * The account row for `invitationAddressesAccount` above, as a query predicate.
+ * A row without a stored normalized form falls back to a case-insensitive exact
+ * match.
+ */
+function userMatchesEmailAddress(email: string) {
+  return or(
+    eq(kilocode_users.normalized_email, normalizeEmail(email)),
+    sql`lower(${kilocode_users.google_user_email}) = ${email.trim().toLowerCase()}`
+  );
+}
 
 async function parentOrganizationMemberIdForEmail(
   tx: DrizzleTransaction,
@@ -498,10 +547,7 @@ async function parentOrganizationMemberIdForEmail(
       and(
         eq(organization_memberships.organization_id, parentOrganizationId),
         eq(kilocode_users.is_bot, false),
-        or(
-          sql`lower(${kilocode_users.google_user_email}) = ${email.trim().toLowerCase()}`,
-          eq(kilocode_users.normalized_email, normalizeEmail(email))
-        )
+        userMatchesEmailAddress(email)
       )
     )
     .limit(1)
@@ -562,20 +608,18 @@ export async function inviteUserToOrganization(
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    const existingInvitation = await tx
-      .select()
+    const pendingInvitations = await tx
+      .select({ email: organization_invitations.email })
       .from(organization_invitations)
       .where(
         and(
           eq(organization_invitations.organization_id, organizationId),
-          eq(organization_invitations.email, email),
           isNull(organization_invitations.accepted_at),
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
-      )
-      .limit(1);
+      );
 
-    if (existingInvitation.length > 0) {
+    if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
       throw new Error('User already has a pending invitation');
     }
 
@@ -586,7 +630,7 @@ export async function inviteUserToOrganization(
       .where(
         and(
           eq(organization_memberships.organization_id, organizationId),
-          eq(kilocode_users.google_user_email, email)
+          userMatchesEmailAddress(email)
         )
       )
       .limit(1);
@@ -762,8 +806,7 @@ export async function acceptOrganizationInvite(
 
       joinedDistinctId = acceptingUser.email;
 
-      const acceptedEmail = acceptingUser.normalizedEmail ?? normalizeEmail(acceptingUser.email);
-      if (acceptedEmail !== normalizeEmail(invitation.email)) {
+      if (!invitationAddressesAccount(invitation.email, acceptingUser)) {
         return failureResult('Invitation is for a different email address');
       }
 

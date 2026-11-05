@@ -116,11 +116,13 @@ done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not
 
 # Whether "$dir" has a deployable change since BASE_SHA.
 #
-# `git diff -z` writes a NUL-separated status, then the path, then a second path
-# for a rename or a copy, which is the previous name. A record is skipped only
-# when its paths are Markdown and the directory is not one the Worker reads at
-# runtime. A deletion always deploys, because a runtime asset can leave the tree
-# that way, and so does a rename that involves any other path.
+# `git diff -z -M` writes a NUL-separated status, then the path, then a second
+# path for a rename or a copy, which is the previous name. A record is skipped
+# only when its paths are Markdown and the directory is not one the Worker reads
+# at runtime. A deletion always deploys, because a runtime asset can leave the
+# tree that way, and so does a rename or copy that involves any other path.
+# A rename between two Markdown paths is a documentation move and is skipped;
+# it removes no runtime path, and its old path is Markdown too.
 #
 # The diff runs first, on its own, so its exit status is visible: a fatal
 # `git diff` deploys, exactly as `! git diff --quiet` did before. A failed
@@ -135,7 +137,7 @@ dir_changed() {
   if [[ "$runtime" == true ]]; then return 0; fi
 
   local changes
-  if ! changes=$(git diff -z --name-status "$BASE_SHA" HEAD -- "$dir/"); then
+  if ! changes=$(git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/"); then
     echo "Cannot diff $dir against $BASE_SHA; deploying it" >&2
     return 0
   fi
@@ -156,7 +158,7 @@ dir_changed() {
       continue
     fi
     return 0
-  done < <(git diff -z --name-status "$BASE_SHA" HEAD -- "$dir/")
+  done < <(git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/")
 
   return 1
 }

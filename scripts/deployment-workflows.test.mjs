@@ -877,9 +877,8 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
       commit(reason);
       const output = join(directory, '.git', 'detect-output');
       writeFileSync(output, '');
-      const script = detection.run
-        .replaceAll('${{ inputs.base_sha }}', before)
-        .replaceAll('${{ inputs.target_environment }}', 'production');
+      // Inputs reach the step through `env`, which the test asserts once.
+      const script = detection.run;
       const result = spawnSync('bash', ['-e', '-c', script], {
         cwd: directory,
         encoding: 'utf8',
@@ -1030,30 +1029,16 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
       commit(reason);
       const output = join(directory, '.git', 'detect-output');
       writeFileSync(output, '');
-      const result = spawnSync(
-        'bash',
-        [
-          '-e',
-          '-c',
-          detection.run
-            .replaceAll('${{ inputs.base_sha }}', before)
-            .replaceAll('${{ inputs.target_environment }}', 'production')
-            .replace(
-              'bash scripts/deploy-changed-workers.sh',
-              'bash scripts/deploy-changed-workers.sh'
-            ),
-        ],
-        {
-          cwd: directory,
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            GITHUB_OUTPUT: output,
-            BASE_SHA: before,
-            TARGET_ENVIRONMENT: 'production',
-          },
-        }
-      );
+      const result = spawnSync('bash', ['-e', '-c', detection.run], {
+        cwd: directory,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          BASE_SHA: before,
+          TARGET_ENVIRONMENT: 'production',
+        },
+      });
       assert.equal(result.status, 0, `${reason}: ${result.stderr}`);
       const outputs = readFileSync(output, 'utf8');
       lastOrdered = outputs.match(/^deploy-cloud-agent-after-session-ingest=(.*)$/m)[1];
@@ -1142,26 +1127,16 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
     assert.equal(lastOrdered, 'false', 'the ordered cloud-agent-next output stays false');
 
     // A missing base must deploy, never report "no change".
-    const unknownBase = spawnSync(
-      'bash',
-      [
-        '-e',
-        '-c',
-        detection.run
-          .replaceAll('${{ inputs.base_sha }}', '0'.repeat(40))
-          .replaceAll('${{ inputs.target_environment }}', 'production'),
-      ],
-      {
-        cwd: directory,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_OUTPUT: join(directory, '.git', 'detect-unknown'),
-          BASE_SHA: '0'.repeat(40),
-          TARGET_ENVIRONMENT: 'production',
-        },
-      }
-    );
+    const unknownBase = spawnSync('bash', ['-e', '-c', detection.run], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: join(directory, '.git', 'detect-unknown'),
+        BASE_SHA: '0'.repeat(40),
+        TARGET_ENVIRONMENT: 'production',
+      },
+    });
     assert.equal(unknownBase.status, 0, unknownBase.stderr);
     assert.deepEqual(
       JSON.parse(

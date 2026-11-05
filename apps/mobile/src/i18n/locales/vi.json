@@ -3809,7 +3809,6 @@
     "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
     "loadError": "Không thể tải cảnh báo chi tiêu.",
     "saveError": "Không thể lưu cảnh báo chi tiêu.",
-    "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
     "sendAlerts": "Gửi cảnh báo chi tiêu",
     "noSpend": "Chưa có chi tiêu",
     "spend24h": "Chi tiêu trong 24 giờ qua",

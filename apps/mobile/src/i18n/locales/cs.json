@@ -3921,7 +3921,6 @@
     "saved": "Nastavení upozornění na útratu bylo uloženo",
     "loadError": "Upozornění na útratu se nepodařilo načíst.",
     "saveError": "Upozornění na útratu se nepodařilo uložit.",
-    "empty": "Upozornění na útratu jsou vypnutá. Zapni je, abys upozornil fakturační kontakty tohoto rozsahu.",
     "sendAlerts": "Posílat upozornění",
     "noSpend": "Zatím žádná útrata",
     "spend24h": "Útrata za posledních 24 hodin",

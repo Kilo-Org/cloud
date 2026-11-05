@@ -3809,7 +3809,6 @@
     "saved": "A költésfigyelmeztetési beállítások elmentve",
     "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
     "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
-    "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
     "sendAlerts": "Értesítések küldése",
     "noSpend": "Nincs költés",
     "spend24h": "Költés az elmúlt 24 órában",

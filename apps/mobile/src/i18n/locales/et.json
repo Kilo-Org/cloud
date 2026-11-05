@@ -3809,7 +3809,6 @@
     "saved": "Kulutushoiatuste seaded on salvestatud",
     "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
     "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
-    "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle konto või organisatsiooni faktureerimiskontakte.",
     "sendAlerts": "Saada hoiatused",
     "noSpend": "Kulutusi veel pole",
     "spend24h": "Viimase 24 tunni kulutus",

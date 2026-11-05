@@ -3921,7 +3921,6 @@
     "saved": "Zapisano ustawienia alertów o wydatkach",
     "loadError": "Nie udało się wczytać alertów o wydatkach.",
     "saveError": "Nie udało się zapisać alertów o wydatkach.",
-    "empty": "Alerty o wydatkach są wyłączone. Włącz je, aby ostrzegać kontakty rozliczeniowe tego zakresu.",
     "sendAlerts": "Wyślij alerty",
     "noSpend": "Brak wydatków",
     "spend24h": "Wydatki z ostatnich 24 godzin",

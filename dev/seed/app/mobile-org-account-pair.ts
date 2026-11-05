@@ -103,7 +103,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .values({ organization_id: MEMBER_ORGANIZATION_ID, kilo_user_id: userId, role: 'member' })
     .onConflictDoNothing();
 
-  console.log('This fixture represents: one person who owns one organization and belongs to another.');
+  console.log(
+    'This fixture represents: one person who owns one organization and belongs to another.'
+  );
   console.log('Suggested next step: sign in with the seeded email on the mobile dev client,');
   console.log('open the owned organization hub link, open Invoices from it, switch the');
   console.log('account to the member organization from the new-session account row, then');

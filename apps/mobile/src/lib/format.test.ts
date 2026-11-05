@@ -6,6 +6,8 @@ import {
   firstGrapheme,
   foldDecimalDigits,
   formatCalendarDate,
+  formatClockTime,
+  formatDate,
   formatFileSize,
   formatList,
   formatMoney,
@@ -33,6 +35,15 @@ describe('formatMoney', () => {
 });
 
 describe('localized format helpers', () => {
+  it('drops the leading zero a locale pads its hour with', () => {
+    const twoForty = new Date(2026, 0, 1, 2, 40);
+    expect(formatDate(twoForty, 'yo', { hour: 'numeric', minute: '2-digit' })).toBe('02:40');
+    expect(formatClockTime(twoForty, 'yo')).toBe('2:40');
+    expect(formatClockTime(twoForty, 'en')).toBe(
+      formatDate(twoForty, 'en', { hour: 'numeric', minute: '2-digit' })
+    );
+  });
+
   it('formats a list and preserves one grapheme', () => {
     expect(formatList(['A', 'B'], 'de')).toBe('A und B');
     expect(formatFileSize(1024, 'de')).toContain('1 kB');

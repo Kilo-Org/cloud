@@ -1,8 +1,7 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
-import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
+import { CURRENCY_ZERO_THRESHOLD, formatClockTime, formatCurrency } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -181,7 +180,7 @@ function clockTime(timestamp: string | null | undefined): string | null {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(date);
+  return formatClockTime(date, i18n.language);
 }
 
 /**

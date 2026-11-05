@@ -162,13 +162,11 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
       // Envelope IDs do not identify permission requests. V2's event schema
       // omits the request ID; the pending list owns that identity.
       const permissionDirectory = directory ?? options.source.directory;
-      const pending = z
-        .array(kilo2PermissionSchema)
-        .parse(
-          await api.data(`/api/permission/request?${kilo2LocationQuery(permissionDirectory)}`, {
-            signal,
-          })
-        );
+      const pending = z.array(kilo2PermissionSchema).parse(
+        await api.data(`/api/permission/request?${kilo2LocationQuery(permissionDirectory)}`, {
+          signal,
+        })
+      );
       const pendingIds = new Set(pending.map(request => request.id));
       for (const [requestId, requestDirectory] of emittedPermissions)
         if (requestDirectory === permissionDirectory && !pendingIds.has(requestId))

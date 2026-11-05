@@ -2,7 +2,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from '@/components/ui/icons';
-import { memo, type ReactNode, useCallback, useEffect } from 'react';
+import { memo, type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -25,7 +25,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
-import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
+import { normalizeCreditActivityOrgParam, reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -116,20 +116,10 @@ const CreditRow = memo(function CreditRow({
   );
 });
 
-function firstSearchParam(value: string | string[] | undefined): string | undefined {
-  if (!Array.isArray(value) && value !== undefined && value.length > 0) {
-    return value;
-  }
-  if (Array.isArray(value) && value[0] !== undefined && value[0].length > 0) {
-    return value[0];
-  }
-  return undefined;
-}
-
 export function OrganizationCreditActivityScreen() {
   const { t } = useTranslation();
   const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
-  const orgParam = firstSearchParam(orgParamRaw);
+  const orgParam = normalizeCreditActivityOrgParam(orgParamRaw);
 
   const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
   // When `org` is present, resolve role/membership against the param only — never
@@ -145,11 +135,20 @@ export function OrganizationCreditActivityScreen() {
     orgs: orgsLoading ? undefined : (orgs ?? []),
   });
 
+  // The linked organization becomes the selection once per mounted screen, the
+  // same way the organization hub applies a deep-linked id. The selection's
+  // writer is memoized on the current selection, so an effect keyed on it would
+  // otherwise re-write the param after the reader switches accounts on another
+  // screen, silently reverting that switch.
+  const appliedOverrideRef = useRef<string | null>(null);
   useEffect(() => {
     // Wait for SecureStore hydration so the deep-link selection always wins over stored org.
-    if (isLoaded && reconcile.shouldPersistOverride && reconcile.effectiveOrganizationId != null) {
-      setOrganizationId(reconcile.effectiveOrganizationId);
+    const target = reconcile.shouldPersistOverride ? reconcile.effectiveOrganizationId : null;
+    if (!isLoaded || target == null || appliedOverrideRef.current === target) {
+      return;
     }
+    appliedOverrideRef.current = target;
+    setOrganizationId(target);
   }, [
     isLoaded,
     reconcile.shouldPersistOverride,

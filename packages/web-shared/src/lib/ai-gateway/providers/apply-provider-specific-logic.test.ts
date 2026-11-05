@@ -1027,6 +1027,72 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
   });
 });
 
+describe('applyProviderSpecificLogic whitespace-only messages', () => {
+  const model = 'anthropic/claude-opus-5.5';
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+    { name: 'a direct provider', provider: { ...makeProvider(null), type: 'custom' as const } },
+  ])('removes a whitespace-only assistant turn on $name', async ({ provider }) => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const toolUse = { type: 'tool_use' as const, id: 'toolu_1', name: 'read', input: {} };
+    const toolResult = { type: 'tool_result' as const, tool_use_id: 'toolu_1', content: 'ok' };
+    const request = makeMessagesRequest(model);
+    request.body.thinking = { type: 'adaptive' };
+    request.body.messages = [
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    expect(request.body.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ]);
+    jest.restoreAllMocks();
+  });
+});
+
 describe('applyProviderSpecificLogic paid server features', () => {
   const fields = {
     plugins: [{ id: 'web' }],

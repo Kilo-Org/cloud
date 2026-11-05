@@ -27,6 +27,12 @@ export const session = sqliteTable('session', {
   deleted_at: integer('deleted_at'),
 });
 
+/** Session-local principal grants; only the creator receives an owner grant today. */
+export const sessionRoles = sqliteTable('session_roles', {
+  principal_id: text('principal_id').primaryKey(),
+  role: text('role', { enum: ['owner', 'viewer', 'editor'] }).notNull(),
+});
+
 /** Current portable entities. A row holds an inline JSON value or a blob reference. */
 export const entities = sqliteTable(
   'entities',

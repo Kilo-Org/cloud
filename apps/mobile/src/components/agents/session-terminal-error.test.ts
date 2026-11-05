@@ -6,6 +6,7 @@ import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
+import { SESSION_HISTORY_FAILURES } from './session-history-failures';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
@@ -189,6 +190,28 @@ describe('resolveSessionTerminalError', () => {
       retryWith: 'session',
       detail: 'boom',
     });
+  });
+
+  it.each([
+    SESSION_HISTORY_FAILURES.too_large.message,
+    SESSION_HISTORY_FAILURES.invalid_data.message,
+  ])('offers no Retry for a stored transcript that cannot be read: %s', message => {
+    // The stored page is oversize or unreadable, so the same read answers the
+    // same way every time: the reader gets the permanent not-available state
+    // instead of a Retry that cannot succeed.
+    expect(
+      resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+    ).toMatchObject({ retryable: false, detail: message });
+  });
+
+  it('still offers Retry for a transient transcript read failure', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: SESSION_HISTORY_FAILURES.retryable_failure.message,
+        statusIndicator: null,
+        messageCount: 0,
+      })
+    ).toMatchObject({ retryable: true });
   });
 
   it('never shows the English transport message to the reader', () => {

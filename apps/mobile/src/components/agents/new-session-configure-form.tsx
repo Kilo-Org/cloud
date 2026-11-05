@@ -1,7 +1,13 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+  type LayoutChangeEvent,
+  ScrollView,
+  type ScrollViewInstance,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -10,13 +16,15 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
+import { resolveNewSessionPromptLineCount } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -180,6 +188,17 @@ export function NewSessionConfigureForm({
   // connected yet — the target is the computer either way.
   const isRemote = runOnInstance !== null || pendingComputer === true;
   const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
+  // The composer keeps its three-line floor wherever the form's first screenful
+  // still holds the repository picker under it, and takes one line where it
+  // cannot. The window decides, not the measured frame, so the card cannot
+  // reflow after the first layout; with the keyboard up the frame owns the fit.
+  const windowSize = useWindowDimensions();
+  const keyboardVisible = useKeyboardState(state => state.isVisible);
+  const promptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight: windowSize.height,
+    keyboardVisible,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -244,6 +263,7 @@ export function NewSessionConfigureForm({
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
           cardTop={composerTop}
+          lineCount={promptLineCount}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
           autoFocusOnMount={autoFocusPrompt}
@@ -256,9 +276,7 @@ export function NewSessionConfigureForm({
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? (
-          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
-        ) : null}
+        {planRefusal !== null ? <NewSessionPlanRefusal message={planRefusal} /> : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

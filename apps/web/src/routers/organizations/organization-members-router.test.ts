@@ -840,8 +840,21 @@ describe('organizations members trpc router', () => {
       await addUserToOrganization(child.id, memberUser.id, 'owner');
       const caller = await createCallerForUser(getActorId());
       jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      const readActorAudits = () =>
+        db
+          .select({ id: admin_action_audit_logs.id })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.actor_id, getActorId()),
+              eq(admin_action_audit_logs.target_id, testOrganization.id),
+              eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+            )
+          )
+          .orderBy(admin_action_audit_logs.id);
 
       try {
+        const auditsBefore = await readActorAudits();
         await expect(
           caller.organizations.members.setChildMemberships({
             organizationId: testOrganization.id,
@@ -858,19 +871,7 @@ describe('organizations members trpc router', () => {
         });
         expect(membership?.role).toBe('owner');
         expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
-        if (getActorId() === adminUser.id) {
-          const audits = await db
-            .select()
-            .from(admin_action_audit_logs)
-            .where(
-              and(
-                eq(admin_action_audit_logs.actor_id, adminUser.id),
-                eq(admin_action_audit_logs.target_id, testOrganization.id),
-                eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
-              )
-            );
-          expect(audits).toEqual([]);
-        }
+        expect(await readActorAudits()).toEqual(auditsBefore);
       } finally {
         await cleanupChildOrganizations([child.id]);
       }

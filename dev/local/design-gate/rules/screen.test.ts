@@ -189,10 +189,18 @@ test('touch-overlap: runs of one wrapped paragraph share the text owner, separat
   );
 
   // Two inline links are their own tap owners even inside one text, so their
-  // overlap is still measured, and either is measured against a control
-  // outside it. The links' rects intersect without one holding the other.
+  // own overlap is still measured. Their rects intersect without one holding
+  // the other.
   const [linksFinding] = run('touch-overlap', [
-    ...wrapped(1).map((node, index) => (index === 2 ? { ...node, role: 'link' } : node)),
+    { parent: 0, tag: 'Paragraph', rect: [0, 120, 384, 72], text: 'first second third' },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 144, 384, 48],
+      pressable: true,
+      role: 'link',
+      text: 'third',
+    },
     {
       parent: 1,
       tag: 'View',

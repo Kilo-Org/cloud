@@ -123,7 +123,7 @@ export class SessionRelayDO extends DurableObject<Env> {
       const prior = sockets.find(([, state]) => state.ticket.role === 'runner');
       if (prior && prior[1].ticket.userID !== ticket.userID)
         return error(409, 'runner_connected', 'A runner is already connected');
-      if (prior) this.close(prior[0], prior[1], 4009, 'Runner replaced by reconnect');
+      if (prior) this.close(prior[0], prior[1], 4009, 'Runner replaced by reconnect', true);
     }
     if (
       ticket.role !== 'runner' &&
@@ -435,14 +435,20 @@ export class SessionRelayDO extends DurableObject<Env> {
     }
   }
 
-  private close(ws: WebSocket, state: Attachment, code: number, reason: string): void {
+  private close(
+    ws: WebSocket,
+    state: Attachment,
+    code: number,
+    reason: string,
+    replaced = false
+  ): void {
     state.closed = true;
     this.saveAttachment(ws, state);
     // A peer that sent no Close code is reported as 1005, which cannot go on the wire.
     ws.close(code === 1005 || code === 1006 || code === 1015 ? 1000 : code, reason.slice(0, 100));
     if (state.ticket.role === 'runner') {
       this.expireLiveOnly();
-      if (code !== 4009)
+      if (!replaced)
         this.broadcastControl('runner_status', { runnerConnected: Boolean(this.runner()) });
     } else if (!this.purged) this.ctx.waitUntil(this.notifyWatch(state.ticket));
   }

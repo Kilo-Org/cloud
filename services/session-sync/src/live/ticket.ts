@@ -28,9 +28,7 @@ const ticketSchema = z
     ticket => principalSchema.safeParse({ userID: ticket.userID, tenant: ticket.tenant }).success
   )
   .refine(ticket =>
-    ticket.aud === 'session-relay'
-      ? ticket.sessionID !== undefined
-      : ticket.sessionID === undefined && ticket.role !== 'controller'
+    ticket.aud === 'session-relay' ? ticket.sessionID !== undefined : ticket.sessionID === undefined
   );
 
 export type LiveTicket = z.infer<typeof ticketSchema>;

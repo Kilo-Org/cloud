@@ -125,9 +125,11 @@ live.post('/presence/ticket', async c => {
   if (auth instanceof Response) return auth;
   const input = await body(c, 1024);
   if (input instanceof Response) return input;
-  const parsed = z.strictObject({ role: z.enum(['viewer', 'runner']) }).safeParse(input);
+  const parsed = z
+    .strictObject({ role: z.enum(['viewer', 'runner', 'controller']) })
+    .safeParse(input);
   if (!parsed.success)
-    return error('invalid_request', 'A presence viewer or runner role is required');
+    return error('invalid_request', 'A presence viewer, runner, or controller role is required');
   return json(await mintTicket(c.req.raw, c.env, auth, 'session-presence', parsed.data.role));
 });
 
@@ -136,6 +138,47 @@ live.get('/presence', async c => {
   const ticket = token ? await verifyTicket(token, c.env, 'session-presence') : undefined;
   if (!ticket) return error('invalid_ticket', 'A valid presence ticket is required', 401);
   return getPresenceStub(c.env, ticket.userID).fetch(c.req.raw);
+});
+
+live.post('/presence/instances/:instanceID/commands', async c => {
+  const auth = await principal(c);
+  if (auth instanceof Response) return auth;
+  const instanceID = z.string().min(1).max(128).safeParse(c.req.param('instanceID'));
+  if (!instanceID.success) return error('invalid_request', 'Invalid instance ID');
+  const input = await body(c, LIVE_LIMITS.messageBytes);
+  if (input instanceof Response) return input;
+  const parsed = z
+    .strictObject({
+      channel: z.literal('commands').optional(),
+      instanceID: z.string().optional(),
+      commandID: z.string().min(1).max(256),
+      type: z.string().min(1).max(256),
+      body: z.unknown().optional(),
+    })
+    .safeParse(input);
+  if (
+    !parsed.success ||
+    (parsed.data.instanceID !== undefined && parsed.data.instanceID !== instanceID.data)
+  ) {
+    return error('invalid_request', 'Invalid instance command');
+  }
+  const ticket = await mintTicket(c.req.raw, c.env, auth, 'session-presence', 'controller');
+  try {
+    return await getPresenceStub(c.env, auth.userID).command({
+      ticket: ticket.ticket,
+      command: { ...parsed.data, channel: 'commands', instanceID: instanceID.data },
+    });
+  } catch {
+    return json(
+      {
+        commandID: parsed.data.commandID,
+        instanceID: instanceID.data,
+        status: 'unknown',
+        outcome: 'unknown',
+      },
+      202
+    );
+  }
 });
 
 const cursorSchema = z.strictObject({

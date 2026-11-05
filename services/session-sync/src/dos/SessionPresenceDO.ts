@@ -1,11 +1,15 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq } from 'drizzle-orm';
+import { asc, count, eq, lt, lte, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 
 import migrations from '../../drizzle-presence/migrations';
-import { presenceAdvertisements } from '../db/presence-sqlite-schema';
+import {
+  presenceAdvertisements,
+  presenceCommandRates,
+  presenceCommandRoutes,
+} from '../db/presence-sqlite-schema';
 import type { Env } from '../env';
 import {
   LIVE_LIMITS,
@@ -16,8 +20,14 @@ import {
   socketTicket,
   socketProtocol,
 } from '../live/protocol';
-import { verifyTicket } from '../live/ticket';
-import { sessionIDSchema, tenantSchema, userIDSchema, type Tenant } from '../protocol';
+import { verifyTicket, type LiveTicket } from '../live/ticket';
+import {
+  isBoundedJson,
+  sessionIDSchema,
+  tenantSchema,
+  userIDSchema,
+  type Tenant,
+} from '../protocol';
 
 const WATCH_LEASE_MS = 5 * 60_000;
 const WATCH_LIMIT = 128;
@@ -25,6 +35,8 @@ const INSTANCE_LIMIT = 32;
 const PROVISIONAL_RUNNER_LIMIT = 8;
 const ATTACHMENT_BYTES = 1_536;
 const ADVERTISEMENT_BYTES = 8_192;
+const COMMAND_TIMEOUT_MS = 10_000;
+const COMMAND_ROUTE_LIMIT = 1_000;
 const encoder = new TextEncoder();
 const text = z.string().max(256);
 
@@ -53,7 +65,7 @@ const ticketSchema = z.strictObject({
   env: z.string(),
   tenant: tenantSchema,
   userID: userIDSchema,
-  role: z.enum(['runner', 'viewer']),
+  role: z.enum(['runner', 'viewer', 'controller']),
   exp: z.number().int(),
   iat: z.number().int(),
 });
@@ -76,6 +88,30 @@ const watchSchema = z.strictObject({
 });
 type Watch = z.infer<typeof watchSchema>;
 const watchInputSchema = watchSchema.omit({ expiresAt: true }).extend({ watching: z.boolean() });
+const commandSchema = z.strictObject({
+  channel: z.literal('commands'),
+  type: z.string().min(1).max(256),
+  commandID: z.string().min(1).max(256),
+  instanceID: z.string().min(1).max(128),
+  body: z.unknown().default(null).refine(isBoundedJson),
+});
+type CommandFailure = {
+  ok: false;
+  status: number;
+  code: string;
+  message: string;
+  retryAfter?: number;
+};
+type CommandResult =
+  | CommandFailure
+  | {
+      ok: true;
+      commandID: string;
+      instanceID: string;
+      expiresAt: number;
+    };
+type CommandRoute = typeof presenceCommandRoutes.$inferSelect;
+type HTTPWaiter = { resolve: (response: Response) => void; cancel: () => void };
 const frameSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('reauth'), ticket: z.string().min(1).max(8_192) }),
   z.strictObject({ type: z.literal('subscribe') }),
@@ -83,6 +119,11 @@ const frameSchema = z.discriminatedUnion('type', [
     type: z.literal('heartbeat'),
     instanceID: z.string().min(1).max(128),
     advertisement: advertisementSchema,
+  }),
+  z.strictObject({
+    type: z.literal('reply'),
+    commandID: z.string().min(1).max(256),
+    body: z.unknown().default(null).refine(isBoundedJson),
   }),
 ]);
 
@@ -105,6 +146,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
   private db;
   private attachments = new Map<WebSocket, Attachment>();
   private advertisements = new Map<string, { value: InstanceAdvertisement; encoded: string }>();
+  private httpWaiters = new Map<string, HTTPWaiter>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -142,6 +184,15 @@ export class SessionPresenceDO extends DurableObject<Env> {
       const saved = await ctx.storage.get<unknown>('watches');
       if (saved !== undefined) this.watches = z.array(watchSchema).max(WATCH_LIMIT).parse(saved);
       this.alarmAt = await ctx.storage.getAlarm();
+      this.expireCommands(Date.now());
+      for (const route of this.db.select().from(presenceCommandRoutes).all()) {
+        if (
+          !active.has(route.runner_connection_id) ||
+          route.controller_connection_id === null ||
+          !active.has(route.controller_connection_id)
+        )
+          this.finishUnknown(route);
+      }
     });
   }
 
@@ -153,7 +204,6 @@ export class SessionPresenceDO extends DurableObject<Env> {
     const ticket = token ? await verifyTicket(token, this.env, 'session-presence') : undefined;
     if (
       !ticket ||
-      ticket.role === 'controller' ||
       ticket.sessionID !== undefined ||
       !this.ctx.id.equals(this.env.SESSION_PRESENCE_DO.idFromName(presenceName(ticket.userID)))
     ) {
@@ -162,10 +212,10 @@ export class SessionPresenceDO extends DurableObject<Env> {
     await this.sweep();
     const connections = this.connections();
     const limit = ticket.role === 'runner' ? PROVISIONAL_RUNNER_LIMIT : LIVE_LIMITS.viewers;
-    const competing = connections.filter(
-      ([, state]) =>
-        state.ticket.role === ticket.role &&
-        (ticket.role !== 'runner' || state.instanceID === undefined)
+    const competing = connections.filter(([, state]) =>
+      ticket.role === 'runner'
+        ? state.ticket.role === 'runner' && state.instanceID === undefined
+        : state.ticket.role !== 'runner'
     );
     if (competing.length >= limit) {
       return Response.json(
@@ -232,6 +282,12 @@ export class SessionPresenceDO extends DurableObject<Env> {
       this.broadcast();
       return;
     }
+    let value: unknown;
+    try {
+      value = typeof message === 'string' ? JSON.parse(message) : undefined;
+    } catch {
+      value = undefined;
+    }
     if (now - state.rateAt >= 60_000) {
       state.rateAt = now;
       state.rateCount = 0;
@@ -243,11 +299,35 @@ export class SessionPresenceDO extends DurableObject<Env> {
       this.broadcast();
       return;
     }
-    let value: unknown;
-    try {
-      value = typeof message === 'string' ? JSON.parse(message) : undefined;
-    } catch {
-      value = undefined;
+    const commandFrame =
+      typeof value === 'object' &&
+      value !== null &&
+      'channel' in value &&
+      value.channel === 'commands';
+    if (commandFrame && state.ticket.role === 'controller') {
+      const result = this.acceptCommand(state.ticket, value, state.connectionID);
+      if (result.ok) {
+        this.emit(ws, state, 'command_status', {
+          commandID: result.commandID,
+          instanceID: result.instanceID,
+          status: 'delivered',
+        });
+      } else {
+        this.emit(ws, state, 'error', {
+          code: result.code,
+          message: result.message,
+          ...(result.retryAfter === undefined ? {} : { retryAfterMs: result.retryAfter * 1000 }),
+        });
+      }
+      await this.schedule();
+      return;
+    }
+    if (commandFrame) {
+      this.emit(ws, state, 'error', {
+        code: 'forbidden',
+        message: 'A controller ticket is required',
+      });
+      return;
     }
     const parsed = frameSchema.safeParse(value);
     if (!parsed.success) {
@@ -283,9 +363,12 @@ export class SessionPresenceDO extends DurableObject<Env> {
         ).toISOString(),
       });
       await this.schedule();
-    } else if (frame.type === 'subscribe' && state.ticket.role === 'viewer') {
+    } else if (frame.type === 'subscribe' && state.ticket.role !== 'runner') {
       state.subscribed = true;
       this.emit(ws, state, 'instances', { instances: this.instances(state.ticket.tenant) });
+    } else if (frame.type === 'reply' && state.ticket.role === 'runner') {
+      this.acceptReply(ws, state, frame.commandID, frame.body);
+      await this.schedule();
     } else if (frame.type === 'heartbeat' && state.ticket.role === 'runner') {
       if (state.instanceID !== undefined && state.instanceID !== frame.instanceID) {
         this.emit(ws, state, 'error', {
@@ -385,6 +468,323 @@ export class SessionPresenceDO extends DurableObject<Env> {
       bytes,
       latencyMs: Date.now() - now,
     });
+  }
+
+  async command(input: { ticket: string; command: unknown }): Promise<Response> {
+    const ticket = await verifyTicket(input.ticket, this.env, 'session-presence');
+    if (
+      !ticket ||
+      ticket.role !== 'controller' ||
+      ticket.sessionID !== undefined ||
+      !this.ctx.id.equals(this.env.SESSION_PRESENCE_DO.idFromName(presenceName(ticket.userID)))
+    ) {
+      return Response.json(
+        { error: { code: 'forbidden', message: 'A controller ticket is required' } },
+        { status: 403 }
+      );
+    }
+    await this.sweep();
+    const result = this.acceptCommand(ticket, input.command, null);
+    if (!result.ok) {
+      await this.schedule();
+      return Response.json(
+        { error: { code: result.code, message: result.message } },
+        {
+          status: result.status,
+          headers:
+            result.retryAfter === undefined
+              ? undefined
+              : { 'retry-after': String(result.retryAfter) },
+        }
+      );
+    }
+    const pending = Promise.withResolvers<Response>();
+    const timer = setTimeout(
+      () => {
+        this.db
+          .delete(presenceCommandRoutes)
+          .where(eq(presenceCommandRoutes.command_id, result.commandID))
+          .run();
+        this.httpWaiters.delete(result.commandID);
+        pending.resolve(
+          Response.json(
+            {
+              commandID: result.commandID,
+              instanceID: result.instanceID,
+              status: 'unknown',
+            },
+            { status: 202 }
+          )
+        );
+      },
+      Math.max(0, result.expiresAt - Date.now())
+    );
+    this.httpWaiters.set(result.commandID, {
+      resolve: pending.resolve,
+      cancel: () => clearTimeout(timer),
+    });
+    await this.schedule();
+    return pending.promise;
+  }
+
+  private acceptCommand(
+    ticket: LiveTicket,
+    input: unknown,
+    controllerConnectionID: string | null
+  ): CommandResult {
+    if (ticket.role !== 'controller' || ticket.exp * 1000 <= Date.now()) {
+      return {
+        ok: false,
+        status: 403,
+        code: 'forbidden',
+        message: 'A controller ticket is required',
+      };
+    }
+    const now = Date.now();
+    this.expireCommands(now);
+    const window = Math.floor(now / 60_000);
+    const key = JSON.stringify([ticket.userID, ticket.tenant.type, ticket.tenant.id]);
+    const prior = this.db
+      .select()
+      .from(presenceCommandRates)
+      .where(eq(presenceCommandRates.key, key))
+      .get();
+    const used = prior?.window === window ? prior.count : 0;
+    if (used >= LIVE_LIMITS.rates.controller) {
+      return {
+        ok: false,
+        status: 429,
+        code: 'rate_limit_exceeded',
+        message: 'Presence command rate limit exceeded',
+        retryAfter: Math.max(1, Math.ceil(((window + 1) * 60_000 - now) / 1000)),
+      };
+    }
+    this.db
+      .insert(presenceCommandRates)
+      .values({ key, window, count: used + 1 })
+      .onConflictDoUpdate({ target: presenceCommandRates.key, set: { window, count: used + 1 } })
+      .run();
+    const parsed = commandSchema.safeParse(input);
+    if (!parsed.success)
+      return {
+        ok: false,
+        status: 400,
+        code: 'invalid_request',
+        message: 'Invalid instance command',
+      };
+    const command = parsed.data;
+    const body = {
+      commandID: command.commandID,
+      instanceID: command.instanceID,
+      payload: command.body,
+    };
+    if (
+      byteLength(command) > LIVE_LIMITS.messageBytes ||
+      byteLength({
+        v: 1,
+        channel: 'commands',
+        seq: Number.MAX_SAFE_INTEGER,
+        from: ticket.userID,
+        at: now,
+        type: command.type,
+        body,
+      }) > LIVE_LIMITS.messageBytes
+    ) {
+      return {
+        ok: false,
+        status: 413,
+        code: 'message_too_large',
+        message: 'Instance command exceeds the message limit',
+      };
+    }
+    const runner = this.connections().find(
+      ([, state]) =>
+        state.ticket.role === 'runner' &&
+        state.instanceID === command.instanceID &&
+        sameTenant(state.ticket.tenant, ticket.tenant) &&
+        this.advertisements.has(state.connectionID) &&
+        this.online(state, now)
+    );
+    if (!runner)
+      return {
+        ok: false,
+        status: 409,
+        code: 'instance_offline',
+        message: 'The instance is not online',
+      };
+    if (
+      this.db
+        .select()
+        .from(presenceCommandRoutes)
+        .where(eq(presenceCommandRoutes.command_id, command.commandID))
+        .get()
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'command_conflict',
+        message: 'The command ID is already pending',
+      };
+    }
+    const outstanding = this.db.select({ count: count() }).from(presenceCommandRoutes).get();
+    if ((outstanding?.count ?? 0) >= COMMAND_ROUTE_LIMIT) {
+      return {
+        ok: false,
+        status: 503,
+        code: 'service_overloaded',
+        message: 'Presence command routing is full',
+      };
+    }
+    const expiresAt = now + COMMAND_TIMEOUT_MS;
+    if (!this.emit(runner[0], runner[1], command.type, body, 'commands', ticket.userID)) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'instance_offline',
+        message: 'The instance is not online',
+      };
+    }
+    this.db
+      .insert(presenceCommandRoutes)
+      .values({
+        command_id: command.commandID,
+        controller_connection_id: controllerConnectionID,
+        runner_connection_id: runner[1].connectionID,
+        tenant_type: ticket.tenant.type,
+        tenant_id: ticket.tenant.id,
+        instance_id: command.instanceID,
+        expires_at: expiresAt,
+      })
+      .run();
+    liveMetric(this.env, {
+      route: 'presence_command',
+      role: ticket.role,
+      bytes: byteLength(command),
+      fanout: 1,
+    });
+    return { ok: true, commandID: command.commandID, instanceID: command.instanceID, expiresAt };
+  }
+
+  private acceptReply(ws: WebSocket, state: Attachment, commandID: string, payload: unknown): void {
+    const now = Date.now();
+    this.expireCommands(now);
+    const route = this.db
+      .select()
+      .from(presenceCommandRoutes)
+      .where(eq(presenceCommandRoutes.command_id, commandID))
+      .get();
+    if (
+      !route ||
+      route.runner_connection_id !== state.connectionID ||
+      route.instance_id !== state.instanceID ||
+      route.tenant_type !== state.ticket.tenant.type ||
+      route.tenant_id !== state.ticket.tenant.id ||
+      !this.online(state, now)
+    ) {
+      this.emit(ws, state, 'error', {
+        code: 'command_not_found',
+        message: 'No pending command for this runner',
+      });
+      return;
+    }
+    const body = { commandID, instanceID: route.instance_id, payload };
+    if (
+      byteLength({
+        v: 1,
+        channel: 'control',
+        seq: Number.MAX_SAFE_INTEGER,
+        from: state.ticket.userID,
+        at: now,
+        type: 'reply',
+        body,
+      }) > LIVE_LIMITS.messageBytes
+    ) {
+      this.emit(ws, state, 'error', {
+        code: 'message_too_large',
+        message: 'Instance reply exceeds the message limit',
+      });
+      return;
+    }
+    this.db
+      .delete(presenceCommandRoutes)
+      .where(eq(presenceCommandRoutes.command_id, commandID))
+      .run();
+    const waiter = this.httpWaiters.get(commandID);
+    if (waiter) {
+      this.httpWaiters.delete(commandID);
+      waiter.cancel();
+      waiter.resolve(
+        Response.json({
+          commandID,
+          instanceID: route.instance_id,
+          status: 'replied',
+          body: payload,
+        })
+      );
+    } else if (route.controller_connection_id !== null) {
+      const controller = this.connections().find(
+        ([, saved]) =>
+          saved.connectionID === route.controller_connection_id &&
+          saved.ticket.role === 'controller' &&
+          saved.ticket.exp * 1000 > now &&
+          saved.ticket.tenant.type === route.tenant_type &&
+          saved.ticket.tenant.id === route.tenant_id
+      );
+      if (controller)
+        this.emit(controller[0], controller[1], 'reply', body, 'control', state.ticket.userID);
+    }
+  }
+
+  private finishUnknown(route: CommandRoute): void {
+    const removed = this.db
+      .delete(presenceCommandRoutes)
+      .where(eq(presenceCommandRoutes.command_id, route.command_id))
+      .returning()
+      .get();
+    if (!removed) return;
+    const waiter = this.httpWaiters.get(route.command_id);
+    if (waiter) {
+      this.httpWaiters.delete(route.command_id);
+      waiter.cancel();
+      waiter.resolve(
+        Response.json(
+          {
+            commandID: route.command_id,
+            instanceID: route.instance_id,
+            status: 'unknown',
+          },
+          { status: 202 }
+        )
+      );
+    } else if (route.controller_connection_id !== null) {
+      const controller = this.connections().find(
+        ([, saved]) =>
+          saved.connectionID === route.controller_connection_id &&
+          saved.ticket.role === 'controller' &&
+          saved.ticket.exp * 1000 > Date.now() &&
+          saved.ticket.tenant.type === route.tenant_type &&
+          saved.ticket.tenant.id === route.tenant_id
+      );
+      if (controller)
+        this.emit(controller[0], controller[1], 'command_status', {
+          commandID: route.command_id,
+          instanceID: route.instance_id,
+          status: 'unknown',
+        });
+    }
+  }
+
+  private expireCommands(now: number): void {
+    for (const route of this.db
+      .select()
+      .from(presenceCommandRoutes)
+      .where(lte(presenceCommandRoutes.expires_at, now))
+      .all())
+      this.finishUnknown(route);
+    this.db
+      .delete(presenceCommandRates)
+      .where(lt(presenceCommandRates.window, Math.floor(now / 60_000)))
+      .run();
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
@@ -489,22 +889,31 @@ export class SessionPresenceDO extends DurableObject<Env> {
     return result;
   }
 
-  private emit(ws: WebSocket, state: Attachment, type: string, body: unknown): void {
+  private emit(
+    ws: WebSocket,
+    state: Attachment,
+    type: string,
+    body: unknown,
+    channel: 'commands' | 'control' = 'control',
+    from = 'server'
+  ): boolean {
     state.seq++;
     this.saveAttachment(ws, state);
     if (
       !send(ws, {
         v: 1,
-        channel: 'control',
+        channel,
         seq: state.seq,
-        from: 'server',
+        from,
         at: Date.now(),
         type,
         body,
       })
     ) {
       this.close(ws, state, 1011, 'Transport unavailable');
+      return false;
     }
+    return true;
   }
 
   private close(ws: WebSocket, state: Attachment, code: number, reason: string): void {
@@ -516,6 +925,17 @@ export class SessionPresenceDO extends DurableObject<Env> {
       .where(eq(presenceAdvertisements.connection_id, state.connectionID))
       .run();
     this.advertisements.delete(state.connectionID);
+    for (const route of this.db
+      .select()
+      .from(presenceCommandRoutes)
+      .where(
+        or(
+          eq(presenceCommandRoutes.runner_connection_id, state.connectionID),
+          eq(presenceCommandRoutes.controller_connection_id, state.connectionID)
+        )
+      )
+      .all())
+      this.finishUnknown(route);
     try {
       const replyCode = code === 1005 || code === 1006 || code === 1015 ? 1000 : code;
       ws.close(replyCode, reason);
@@ -529,7 +949,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
     const snapshots = new Map<string, Instance[]>();
     for (const [ws, state] of this.connections()) {
       if (
-        state.ticket.role === 'viewer' &&
+        state.ticket.role !== 'runner' &&
         state.subscribed &&
         state.ticket.exp * 1000 > Date.now()
       ) {
@@ -548,6 +968,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
 
   private async sweep(): Promise<void> {
     const now = Date.now();
+    this.expireCommands(now);
     let changed = false;
     for (const [ws, state] of this.connections()) {
       const expired = state.ticket.exp * 1000 <= now;
@@ -595,6 +1016,20 @@ export class SessionPresenceDO extends DurableObject<Env> {
         due = Math.min(due, state.lastHeartbeatAt + LIVE_LIMITS.staleMs);
     }
     for (const watch of this.watches) due = Math.min(due, watch.expiresAt);
+    const command = this.db
+      .select()
+      .from(presenceCommandRoutes)
+      .orderBy(asc(presenceCommandRoutes.expires_at))
+      .limit(1)
+      .get();
+    if (command) due = Math.min(due, command.expires_at);
+    const rate = this.db
+      .select()
+      .from(presenceCommandRates)
+      .orderBy(asc(presenceCommandRates.window))
+      .limit(1)
+      .get();
+    if (rate) due = Math.min(due, (rate.window + 1) * 60_000);
     if (due === Infinity) {
       if (this.alarmAt !== null) {
         this.alarmAt = null;

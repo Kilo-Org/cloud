@@ -56,6 +56,9 @@ export function requestRoute(request: Request): string {
   if (path === '/v1/presence' || path === '/v1/presence/ticket') {
     return `${request.method} ${path}`;
   }
+  if (/^\/v1\/presence\/instances\/[^/]+\/commands$/.test(path)) {
+    return `${request.method} /v1/presence/instances/:instanceID/commands`;
+  }
   const live = /^\/v1\/sessions\/[^/]+\/(live|live-ticket|commands)(\/[^/]+)?$/.exec(path);
   if (live) return `${request.method} /v1/sessions/:id/${live[1]}${live[2] ? '/:commandID' : ''}`;
   if (/^\/internal\/users\/[^/]+\/erase$/.test(path)) {

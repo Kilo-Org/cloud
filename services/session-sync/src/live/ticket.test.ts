@@ -143,21 +143,26 @@ describe('live tickets', () => {
     expect((await verified(minted.ticket)).exp).toBe(deadline);
   });
 
-  it.each<LiveRole>(['runner', 'viewer'])('mints a user-scoped presence %s ticket', async role => {
-    const minted = await mintTicket(
-      request(await grant()),
-      env,
-      principal,
-      'session-presence',
-      role
-    );
-    expect(await verifyTicket(minted.ticket, env, 'session-presence')).toMatchObject({
-      userID: USER,
-      role,
-      aud: 'session-presence',
-    });
-    expect(await verifyTicket(minted.ticket, env, 'session-relay')).toBeUndefined();
-  });
+  it.each<LiveRole>(['runner', 'viewer', 'controller'])(
+    'mints a user-scoped presence %s ticket',
+    async role => {
+      const minted = await mintTicket(
+        request(await grant()),
+        env,
+        principal,
+        'session-presence',
+        role
+      );
+      const claims = await verifyTicket(minted.ticket, env, 'session-presence');
+      expect(claims).toMatchObject({
+        userID: USER,
+        role,
+        aud: 'session-presence',
+      });
+      expect(claims).not.toHaveProperty('sessionID');
+      expect(await verifyTicket(minted.ticket, env, 'session-relay')).toBeUndefined();
+    }
+  );
 
   it('preserves organization tenant binding', async () => {
     const member: Principal = { userID: USER, tenant: { type: 'organization', id: ORG } };
@@ -232,7 +237,7 @@ describe('live tickets', () => {
   });
 
   it.each([
-    ['controller presence', 'session-presence', 'controller', undefined],
+    ['session-scoped controller presence', 'session-presence', 'controller', SESSION],
     ['session-scoped presence', 'session-presence', 'runner', SESSION],
     ['relay without session', 'session-relay', 'viewer', undefined],
   ] as const)('rejects invalid mint scope: %s', async (_name, audience, role, sessionID) => {
@@ -283,7 +288,7 @@ describe('live tickets', () => {
     ['a malformed session', { sessionID: 'invalid' }],
     ['an unknown claim', { admin: true }],
     ['another version', { version: 2 }],
-    ['controller presence', { aud: 'session-presence', sessionID: undefined, role: 'controller' }],
+    ['session-scoped controller presence', { aud: 'session-presence', role: 'controller' }],
     ['session-scoped presence', { aud: 'session-presence' }],
   ])('rejects signed tickets with %s', async (_name, overrides) => {
     const token = await sign(ticketClaims(overrides));

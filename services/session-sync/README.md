@@ -435,8 +435,9 @@ in Logpush-visible URLs. Never log authorization or subprotocol headers.
 | GET | `/v1/sessions/:id/live` | WebSocket upgrade, session-relay ticket |
 | POST | `/v1/sessions/:id/commands` | Same command frame as the controller socket |
 | GET | `/v1/sessions/:id/commands/:commandID` | Command delivery status, never payload |
-| POST | `/v1/presence/ticket` | `{role:"runner"|"viewer"}` → `{ticket,expiresAt}` |
+| POST | `/v1/presence/ticket` | `{role:"runner"|"viewer"|"controller"}` → `{ticket,expiresAt}` |
 | GET | `/v1/presence` | WebSocket upgrade, session-presence ticket |
+| POST | `/v1/presence/instances/:instanceID/commands` | Opaque live-only instance command, awaiting reply up to ten seconds |
 | GET | `/v1/sessions?limit=50&cursor=…` | Creator-index page `{version:1,items,cursor}` |
 
 Minting session tickets first checks the SyncDO ACL. Tickets are audience,
@@ -518,10 +519,39 @@ only matching, advertised runner sessions. First viewer/controller attach starts
 watching; last leave stops it. Watch leases survive hibernation, are refreshed
 while watched, and expire if the relay disappears. Reconnecting runners receive
 the current watch state. Presence caps are 32 advertised instances, eight separate
-provisional runner sockets (permitting reconnect-at-cap), 100 viewers, 128 watched
+provisional runner sockets (permitting reconnect-at-cap), 100 combined viewers/controllers, 128 watched
 sessions, bounded advertisements, and snapshots within the 64 KiB frame budget.
 New instance admission beyond 32 closes 1013; the ninth provisional connection
 receives 503 and Retry-After. Watch admission failures produce an explicit viewer error.
+
+### Headless instance commands
+
+Presence controllers can subscribe to instance snapshots and send
+`{channel:"commands",type,body?,commandID,instanceID}` without registering a session.
+An online runner in the same user/tenant/instance receives the opaque command
+envelope with body `{commandID,instanceID,payload}`; the controller gets
+`command_status {commandID,instanceID,status:"delivered"}`. Offline or wrong-tenant
+instances reject with `instance_offline` (HTTP 409). No mailbox or command payload
+is stored. Runner-owned types include `create_session`, `list_directories`,
+`list_models`, and `list_agents`; session commands remain on SessionRelayDO.
+
+Runner reply `{type:"reply",commandID,body?}` routes only to the originating
+controller as control `reply {commandID,instanceID,payload}`. Routing metadata
+survives hibernation and binds the exact runner connection and tenant; pending
+duplicate IDs reject `command_conflict`. Missing command/reply bodies default
+to null. A 120-command/min controller budget is shared by HTTP and sockets;
+frames/envelopes are bounded at 64 KiB, outstanding metadata at 1,000 routes,
+and routes expire after ten seconds.
+
+HTTP uses `POST /v1/presence/instances/:instanceID/commands` with a sync grant and
+`{type,body?,commandID}`. Optional socket frame channel and matching instanceID
+are accepted. The same handler returns 200
+`{commandID,instanceID,status:"replied",body}` if the runner replies within ten
+seconds, or 202 `{commandID,instanceID,status:"unknown"}` otherwise. An ambiguous
+RPC transport failure also returns 202, adding `outcome:"unknown"` instead of
+claiming execution failed. Timeout/transport loss does not prove non-execution.
+Late runner `command_not_found` replies are informational: routing has expired
+or the controller left; do not retry the reply. Live request/reply needs no fake/control session.
 
 Session discovery pages the user's personal creator index across all tenants,
 newest registration first with stable cursor ties, and merges matching presence
@@ -544,10 +574,12 @@ are excluded. HTTP request points retain the schema documented above.
 On an isolated work VM, install workspace dependencies and run
 `node scripts/live-e2e.mjs` from this service directory. It launches real
 `wrangler dev --local` with `wrangler.test.jsonc`, synthetic signing keys and
-temporary storage. A scripted presence runner/viewer and session runner/viewer/
-controller exercise watch signals, offline queue/replay/ack, live events,
-cursor replay, HTTP commands, reauthorization, and discovery over real
-WebSockets. No production secret, account, PostgreSQL connection, or Cloudflare
+temporary storage. A scripted presence runner/viewer/controller creates the first
+real session through an instance command before any session exists, and exercises
+HTTP instance request/reply. Session runner/viewer/controller sockets then exercise
+watch signals, offline queue/replay/ack, live events, cursor replay, HTTP commands,
+runner takeover, reauthorization, and discovery over real WebSockets.
+No production secret, account, PostgreSQL connection, or Cloudflare
 deployment is needed. Durable Object regression suites additionally cover
 expiry, resets, caps, rate/size bounds, and stale heartbeat alarms.
 

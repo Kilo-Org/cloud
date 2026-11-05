@@ -35,13 +35,14 @@ async function grant(expiresIn = 300) {
     .setExpirationTime(now + expiresIn)
     .sign(new TextEncoder().encode(secret));
 }
-async function request(path, method = 'GET', value) {
+async function request(path, method = 'GET', value, expectedStatus) {
   const response = await fetch(`${origin}/v1${path}`, {
     method,
     headers: { authorization: `Bearer ${await grant()}`, 'content-type': 'application/json' },
     body: value === undefined ? undefined : JSON.stringify(value),
   });
   const json = await response.json();
+  if (expectedStatus !== undefined) check(response.status, expectedStatus);
   assert(response.ok, `${method} ${path}: ${response.status} ${JSON.stringify(json)}`);
   return json;
 }
@@ -137,8 +138,6 @@ try {
       reject(new Error(`Wrangler exited ${code}: ${output}`));
     });
   });
-  const registered = await request(`/sessions/${sessionID}`, 'PUT', { version: 1, sourceID });
-  check(registered.creatorID, userID);
   const presenceRunner = await socket('runner', true);
   const presenceViewer = await socket('viewer', true);
   const instanceID = crypto.randomUUID();
@@ -149,7 +148,7 @@ try {
     kind: 'cli',
     startedAt: Date.now(),
     gitBranch: 'test',
-    capabilities: ['send_message'],
+    capabilities: ['send_message', 'create_session', 'list_directories'],
     sessions: [sessionID],
   };
   presenceRunner.send({ type: 'heartbeat', instanceID, advertisement });
@@ -161,6 +160,52 @@ try {
     instances.body.instances.some(instance => instance.online),
     true
   );
+  const presenceController = await socket('controller', true);
+  const createID = crypto.randomUUID();
+  presenceController.send({
+    channel: 'commands',
+    type: 'create_session',
+    commandID: createID,
+    instanceID,
+    body: { projectName: 'relay-proof' },
+  });
+  const create = await presenceRunner.next('create_session');
+  check(create.body.commandID, createID);
+  const registered = await request(`/sessions/${sessionID}`, 'PUT', { version: 1, sourceID });
+  check(registered.creatorID, userID);
+  presenceRunner.send({ type: 'reply', commandID: createID, body: { sessionID, created: true } });
+  const created = await presenceController.next(
+    'reply',
+    frame => frame.body.commandID === createID
+  );
+  check(created.body.payload, { sessionID, created: true });
+  const directoryID = crypto.randomUUID();
+  const directoriesResponse = request(`/presence/instances/${instanceID}/commands`, 'POST', {
+    type: 'list_directories',
+    commandID: directoryID,
+    body: { path: '.' },
+  });
+  const directories = await presenceRunner.next('list_directories');
+  check(directories.body.commandID, directoryID);
+  presenceRunner.send({ type: 'reply', commandID: directoryID, body: { directories: ['.'] } });
+  check(await directoriesResponse, {
+    commandID: directoryID,
+    instanceID,
+    status: 'replied',
+    body: { directories: ['.'] },
+  });
+  const unansweredID = crypto.randomUUID();
+  const unanswered = request(
+    `/presence/instances/${instanceID}/commands`,
+    'POST',
+    {
+      type: 'list_models',
+      commandID: unansweredID,
+    },
+    202
+  );
+  await presenceRunner.next('list_models');
+  check(await unanswered, { commandID: unansweredID, instanceID, status: 'unknown' });
   const viewer = await socket('viewer');
   const hello = await viewer.next('hello');
   check(hello.body.reconnectAfterMs >= 1000 && hello.body.reconnectAfterMs <= 60_000, true);

@@ -8,13 +8,16 @@ import migrations from '../../drizzle/migrations';
 import type { Env } from '../env';
 import { DataRateLimit } from '../data-rate-limit';
 import { toHex } from '../hex';
+import { isOverloaded, overloaded } from '../overload';
 import {
   LIMITS,
+  batchJsonWithinBudget,
   batchRequestSchema,
   blobRefSchema,
   cursorSchema,
   fail,
   hashSchema,
+  isBoundedJson,
   ok,
   principalSchema,
   registerRequestSchema,
@@ -63,14 +66,44 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): Result<T> {
 
 /** Parses and validates the exact batch body that the digest covers. */
 function parseBatch(body: string) {
-  if (utf8Bytes(body) > LIMITS.batchBytes) {
-    return fail('request_too_large', `The body exceeds ${LIMITS.batchBytes} bytes`);
+  if (!batchJsonWithinBudget(body)) {
+    return fail('json_budget_exceeded', 'The batch exceeds the JSON depth or node budget', {
+      depth: LIMITS.jsonBatchDepth,
+      nodes: LIMITS.jsonBatchNodes,
+    });
   }
   let value: unknown;
   try {
     value = JSON.parse(body);
   } catch {
     return fail('invalid_request', 'The body is not valid JSON');
+  }
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    'changes' in value &&
+    Array.isArray(value.changes)
+  ) {
+    const changes: unknown[] = value.changes;
+    for (const change of changes) {
+      const budget = { nodes: 0, exceeded: false };
+      if (
+        change !== null &&
+        typeof change === 'object' &&
+        'value' in change &&
+        !isBoundedJson(change.value, 0, budget) &&
+        budget.exceeded
+      ) {
+        return fail(
+          'json_budget_exceeded',
+          'An inline value exceeds the JSON depth or node budget',
+          {
+            depth: LIMITS.jsonDepth,
+            nodes: LIMITS.jsonValueNodes,
+          }
+        );
+      }
+    }
   }
   return parse(batchRequestSchema, value);
 }
@@ -84,6 +117,8 @@ function parseBatch(body: string) {
 export class SessionSyncDO extends DurableObject<Env> {
   private db: session.Db;
   private quotaGate: Promise<void> = Promise.resolve();
+  private pendingBatchBytes = 0;
+  private pendingBatches = 0;
   private purgeRetryAt = 0;
   private leaseReconcilePending = false;
   private pendingRegistration:
@@ -131,6 +166,7 @@ export class SessionSyncDO extends DurableObject<Env> {
     try {
       return await fn();
     } catch (error) {
+      if (isOverloaded(error)) return overloaded();
       console.error('session-sync tenant admission failed', {
         error: error instanceof Error ? error.name : typeof error,
       });
@@ -342,23 +378,45 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(batchInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, body } = parsed.value;
-    const admitted = await this.dataRateLimit.admit(
-      this.env.USER_DATA_BLOCK_LIMITER,
-      principal.userID
-    );
-    if (!admitted.ok) return admitted;
-    const batch = parseBatch(body);
-    if (!batch.ok) return batch;
-    // Hash before the transaction: every check and write below runs synchronously.
-    const digest = await sha256Hex(body);
-    const applied = await this.leased(principal, sessionID, () =>
-      batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now())
-    );
-    if (applied.ok) await this.scheduleSweep();
-    return applied;
+    if (body.length > LIMITS.batchBytes || utf8Bytes(body) > LIMITS.batchBytes) {
+      return fail('request_too_large', `The body exceeds ${LIMITS.batchBytes} bytes`);
+    }
+    // Reserve conservative UTF-16 storage before the first await, including the
+    // active write. Count also caps tiny/empty calls and their pending promises.
+    const retainedBytes = body.length * 2;
+    if (
+      this.pendingBatchBytes + retainedBytes > LIMITS.batchQueueBytes ||
+      this.pendingBatches >= LIMITS.batchQueueRequests
+    ) {
+      return fail('rate_limited', 'The session batch queue is full', {
+        retryAt: Date.now() + 1000,
+      });
+    }
+    this.pendingBatchBytes += retainedBytes;
+    this.pendingBatches++;
+    try {
+      const admitted = await this.dataRateLimit.admit(
+        this.env.USER_DATA_BLOCK_LIMITER,
+        principal.userID
+      );
+      if (!admitted.ok) return admitted;
+      // Hash before the transaction: checks and writes below run synchronously.
+      const digest = await sha256Hex(body);
+      const applied = await this.leased(principal, sessionID, () => {
+        // Queued writes never retain parsed trees across tenant RPC I/O.
+        const batch = parseBatch(body);
+        if (!batch.ok) throw new session.SyncFailure(batch.error);
+        return batches.apply(this.db, principal, sessionID, batch.value, digest, Date.now());
+      });
+      if (applied.ok) await this.scheduleSweep();
+      return applied;
+    } finally {
+      this.pendingBatchBytes -= retainedBytes;
+      this.pendingBatches--;
+    }
   }
 
-  async readEntities(input: unknown): Promise<Result<string>> {
+  async readEntities(input: unknown): Promise<Result<ReadableStream<Uint8Array>>> {
     const parsed = parse(pageInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, ...query } = parsed.value;
@@ -367,7 +425,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       principal.userID
     );
     if (!admitted.ok) return admitted;
-    return this.tx(() => JSON.stringify(page.read(this.db, principal, sessionID, query)));
+    return this.tx(() => page.read(this.db, principal, sessionID, query));
   }
 
   async beginBlob(input: unknown): Promise<Result<blob.Begin>> {

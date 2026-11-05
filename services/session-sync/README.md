@@ -50,6 +50,17 @@ All JSON requests use protocol version `1`.
 Errors have an explicit machine-readable code and an appropriate HTTP status.
 An unavailable authentication dependency produces a retryable service error, not an invalid-credential response.
 
+| Retryable error | HTTP | Client action |
+|---|---|---|
+| `service_overloaded` | 503 | Honor `Retry-After: 3` and epoch-ms `error.retryAt`, then add jitter before retrying. |
+| `tenant_unavailable` | 503 | Honor the tenant retry deadline; admission remains fail-closed. |
+| `rate_limited` | 429 | Honor the rate-limit retry deadline before another request. |
+
+The Worker classifies the platform's `overloaded` flag and documented object-queue
+or account-stub-lookup overload messages at the RPC boundary. Overloaded calls
+are not retried immediately, including when another retryability flag is present.
+The CLI retains the typed error and uses its existing jittered backoff.
+
 | Operation | Route | Meaning |
 |---|---|---|
 | Exchange credential | `POST /v1/auth/exchange` | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant. |
@@ -85,11 +96,31 @@ Source positions can be sparse after local coalescing.
 The service checks that `after` matches the committed source position.
 
 Each change has a kind and an entity ID.
-The portable kinds are `session`, `message`, `inbox`, `instruction-entry`,
+The portable kinds are `session`, `message`, `message-part`, `inbox`, `instruction-entry`,
 `instruction-state`, `instruction-blob`, and `asset`.
 An upsert carries an inline JSON value or a verified blob reference.
 A removal carries its semantic cause; maintenance is not a deletion intent.
 Inbox delivery uses the `consumed` removal cause, not cancellation.
+Native part replacement/removal uses `part-removed` for `message-part` and its `asset`
+entities only; a transcript revert retains the `revert` cause.
+
+Assistant messages use an envelope, not an ever-growing content array:
+`message` value `{seq, message, parts: {count, through}}`, with the native assistant's
+`content` omitted from `message`. Each `message-part` has ID `<messageID>/<ordinal>`
+and value `{messageID, ordinal, position, part}`, or `{messageID, ordinal, position,
+deferred: true}` while its native body is incomplete. Ordinals are unique nonnegative
+integers (gaps are allowed), ordered **numerically**, not by the page's lexical ID ordering.
+`through` is the envelope's captured source position; each part's `position` is
+captured before the envelope. There is no O(parts) manifest on the envelope.
+A reader assembles only a revision-consistent snapshot whose page `position` is
+at least `parts.through`, with exactly `count` parts with unique ordinals, no
+deferred parts, and no part newer than that frontier. Otherwise it is incomplete,
+not a truncated complete message. Large immutable single parts remain private blobs.
+These are producer/reader semantics; the service stores opaque bounded JSON.
+
+This is a clean pre-release protocol cutover: the default-on native client has
+not been released and both production DO namespaces were verified empty before
+this change. No legacy envelope migration or dual-writing compatibility path is needed.
 
 Batch IDs identify immutable payloads.
 Retrying an acknowledged batch returns its receipt without applying it again.
@@ -100,7 +131,7 @@ The receipt includes the SHA-256 digest of the exact UTF-8 request body.
 Retry the stored bytes rather than serializing the packet again.
 Session inspection exposes `lastReceipt` so a producer can recover a lost acknowledgement or detect a conflicting restored database.
 
-Page reads report the revision they observe.
+Page reads report both the revision and committed source position they observe.
 A reader can require that revision on subsequent pages.
 If it changes, return a conflict rather than claiming a consistent snapshot.
 Pinned snapshots and resumable live subscriptions extend this contract when clients need them.
@@ -142,6 +173,14 @@ The initial storage policy is explicit:
 | Batch body | 512 KiB |
 | Changes per batch | 64 |
 | Inline entity body | 64 KiB |
+| JSON nodes per inline value (keys plus values/containers) | 8,192 |
+| JSON container depth per inline value | 64 |
+| JSON nodes in the entire batch, including metadata | 32,768 |
+| JSON container depth in the entire batch | 67 |
+| Active and queued batch text per session object (conservative UTF-16 bytes) | 4 MiB |
+| Active and queued batch calls per session object | 8 |
+| Entities per page | 100 (default 50) |
+| Inline value bytes per page | 2 MiB |
 | Blob body | 8 MiB |
 | Stored and reserved blob bytes per session | 256 MiB |
 | Blob entries per session | 10,000 |
@@ -163,6 +202,72 @@ An old receipt leaving the bounded tail never makes its packet eligible to apply
 
 Entity pages seek on the composite `(kind, id)` key. They select identities and sizes first,
 then load only values within the 2 MiB inline-byte budget, plus a bounded identity lookahead.
+The DO returns a byte-oriented RPC stream that copies stored canonical JSON text
+directly into the HTTP response; it does not parse, revalidate, or stringify inline
+values on reads. Snapshot rows are loaded inside the transaction, so a later write
+cannot change a response already being streamed.
+
+A lexical pass caps whole-batch nodes and nesting **before** `JSON.parse`, including
+unknown fields and duplicate keys. Escaped strings do not count as containers.
+Each object key and every value (including containers and primitives) costs one
+node; keys do not add depth. A root container has depth one, so 64 nested arrays
+around a primitive are admissible. The batch envelope adds three container levels.
+After parsing, the service separately enforces the inline-value node/depth budget.
+Budget failures are explicit `json_budget_exceeded` (413); invalid syntax remains
+`invalid_request` (400). Producers externalize values exceeding inline complexity
+and split batches exceeding total complexity, even when their byte size is small.
+
+Parsing occurs only inside the serialized write transaction; a queued write does
+not retain a parsed tree while tenant admission awaits I/O. Before its first await,
+a batch reserves `body.length * 2` bytes and one call slot, including active work.
+The 4 MiB / eight-call admission cap returns retryable `rate_limited` with `retryAt`
+when full, and releases reservations in `finally` on success, typed rejection, or
+an exception. These are deterministic request/write-queue bounds, not a claim
+that arbitrary concurrent reads, runtime internals, or an entire production
+isolate have a measured absolute memory ceiling.
+
+### Boundary measurement
+
+From this directory, `node scripts/measure-bounds.mjs` runs the focused
+`test/integration/large-entity.test.ts` in the real Workers test pool, using only
+the local bindings in `wrangler.test.jsonc`. It never deploys or reads production.
+The harness uses the workerd inspector's 100 μs CPU profiler and polls
+`Runtime.getHeapUsage` every 5 ms, with a garbage-collected baseline before each
+scenario. CPU includes pool test/RPC overhead and excludes idle samples.
+Used heap and V8 reserved heap are reported separately, plus incremental used
+heap above that scenario's baseline. Polling is an observed high-water mark,
+**not an exact instantaneous peak**, process RSS, or Cloudflare billing CPU.
+The pool's test-loader/import heap is not representative of a standalone DO.
+
+Fixtures cover an exact 512 KiB batch with exact 64 KiB inline strings, 64 changes,
+64-deep values, exactly 32,768 total batch nodes with an 8,192-node value, an exact
+2 MiB page, 100-item pages, typed over-budget rejection before parsing, and both
+queue-admission limits. The harness asserts incremental sampled used heap below
+32 MiB; the practical sampled-CPU review target is 100 ms, not a flaky timing test.
+
+Measured 2026-11-05 on the disposable Linux work VM (workerd via Workers pool
+0.16.13, Vitest 4.1.12): **7 tests passed**, 17 profiled scenarios, 7.23 s total.
+Heap columns are MiB; CPU is sampled active milliseconds.
+
+| Boundary | CPU ms | Peak used heap | Peak V8 reserved heap | Incremental used heap |
+|---|---:|---:|---:|---:|
+| 512 KiB batch / 64 KiB inline values | 44.119 | 58.34 | 64.25 | 2.97 |
+| 64 changes | 34.840 | 55.07 | 59.49 | 0.17 |
+| 64 inline container levels | 10.854 | 55.40 | 57.99 | 0.45 |
+| 32,768 batch nodes / 8,192 value nodes | 23.310 | 56.12 | 60.24 | 0.99 |
+| Exact 2 MiB page | 42.346 | 63.04 | 69.24 | 7.91 |
+| 100-item page | 30.692 | 56.44 | 58.99 | 1.49 |
+| Full 4 MiB write queue: reject next call | 6.682 | 55.56 | 57.99 | 0.08 |
+| Full eight-call queue: reject next call | 6.256 | 55.05 | 57.49 | 0.06 |
+
+Over-budget JSON and 10,000-level pre-parse depth attacks took at most 9.136 ms
+sampled CPU and 0.47 MiB incremental used heap. The largest incremental heap
+was the 2 MiB page (42.346 ms / 7.91 MiB incremental used heap); this includes the
+test client's response buffering, JSON parsing, and schema validation, not just
+the DO's streaming path. All samples stayed below the practical review targets.
+These observations support the deterministic bounds; they do not prove an
+absolute production CPU/memory ceiling or count unsampled allocation spikes.
+
 
 ### Tenant admission
 

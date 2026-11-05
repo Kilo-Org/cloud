@@ -2552,6 +2552,7 @@
       "assistantStopped": "Cavabın yaradılması dayandırıldı.",
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
       "assistantProviderError": "Təminatçı xəta qaytardı.",
+      "assistantProviderRefused": "Təminatçı bu sorğunu rədd etdi və təkrar cəhd mümkün deyil.",
       "assistantOutputLimit": "Cavab modelin çıxış həddinə çatdı.",
       "assistantStructuredOutput": "Cavab tələb olunan formatla uyğun gəlmədi.",
       "assistantFailed": "Cavabı yaratmaq mümkün olmadı."

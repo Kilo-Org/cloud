@@ -2558,6 +2558,7 @@
       "assistantStopped": "ምላሹ ቆሟል።",
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
       "assistantProviderError": "አቅራቢው ስህተት መልሷል።",
+      "assistantProviderRefused": "አቅራቢው ይህን ጥያቄ ውድቅ አድርጓል፤ እንደገና ማሞከርም አይቻልም።",
       "assistantOutputLimit": "ምላሹ የሞዴሉን የውጤት ገደብ ደርሷል።",
       "assistantStructuredOutput": "ምላሹ ከተጠየቀው ቅርጸት ጋር አልተመሳሰለም።",
       "assistantFailed": "ምላሹ አልተሳካም።"

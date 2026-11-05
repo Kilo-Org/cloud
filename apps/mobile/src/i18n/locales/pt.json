@@ -2604,6 +2604,7 @@
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O fornecedor devolveu um erro.",
+      "assistantProviderRefused": "O fornecedor rejeitou este pedido e não é possível repeti-lo.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "A resposta falhou."

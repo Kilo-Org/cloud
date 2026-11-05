@@ -2552,6 +2552,7 @@
       "assistantStopped": "Jibu lilisimamishwa.",
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
       "assistantProviderError": "Mtoa huduma alirudisha kosa.",
+      "assistantProviderRefused": "Mtoa huduma alikataa ombi hili na haliwezi kujaribiwa tena.",
       "assistantOutputLimit": "Jibu lilifikisha kikomo cha matokeo ya modeli.",
       "assistantStructuredOutput": "Jibu halikulingana na muundo unaohitajika.",
       "assistantFailed": "Imeshindikana kutoa jibu."

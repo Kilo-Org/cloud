@@ -2113,6 +2113,7 @@
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
+      "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."

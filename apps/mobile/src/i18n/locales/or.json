@@ -2552,6 +2552,7 @@
       "assistantStopped": "ଉତ୍ତର ଲେଖିବା ବନ୍ଦ ହୋଇଗଲା।",
       "assistantContextOverflow": "ବାର୍ତ୍ତାଳାପ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ଲମ୍ବା ହୋଇଗଲାଣି।",
       "assistantProviderError": "ସେବା ପ୍ରଦାନକାରୀ ଏକ ତ୍ରୁଟି ଫେରାଇଲେ।",
+      "assistantProviderRefused": "ସେବା ପ୍ରଦାନକାରୀ ଏହି ଅନୁରୋଧକୁ ଅସ୍ୱୀକାର କଲେ ଏବଂ ଏହା ପୁନଃଚେଷ୍ଟା କରାଯାଇପାରିବ ନାହିଁ।",
       "assistantOutputLimit": "ଉତ୍ତର ମଡେଲ୍ର ଆଉଟପୁଟ୍ ସୀମାରେ ପହଞ୍ଚିଲା।",
       "assistantStructuredOutput": "ଉତ୍ତର ଆବଶ୍ୟକ ଫର୍ମାଟ୍ ସହିତ ମେଳ ହେଲା ନାହିଁ।",
       "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।"

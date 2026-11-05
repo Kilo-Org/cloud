@@ -2552,6 +2552,7 @@
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
       "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
+      "assistantProviderRefused": "چمتو کوونکي دا غوښتنه رد کړه او بیا هڅه نشي کېدای.",
       "assistantOutputLimit": "ځواب د ماډل د وتلو حد ته ورسېد.",
       "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."

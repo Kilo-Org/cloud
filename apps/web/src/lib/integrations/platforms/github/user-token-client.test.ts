@@ -1,8 +1,70 @@
 import {
+  GitHubUserAccessTokenResponseSchema,
   getGitHubUserAccessToken,
   evictGitHubUserAccessTokenCache,
   __resetGitHubUserAccessTokenClientForTests,
 } from './user-token-client';
+
+describe('provided credential contract', () => {
+  const provided = () => ({
+    connected: true,
+    token: 'ghp_synthetic',
+    expiresAtEpochMs: null,
+    githubLogin: 'octocat',
+    authorizationId: 'auth-1',
+    credentialVersion: 1,
+    credentialSource: 'provided_token',
+    refreshSupported: false,
+  });
+
+  it('accepts legacy App responses and both source-aware response shapes', () => {
+    const { credentialSource: _source, refreshSupported: _refresh, ...legacy } = provided();
+    expect(
+      GitHubUserAccessTokenResponseSchema.safeParse({
+        ...legacy,
+        expiresAtEpochMs: Date.now() + 3600000,
+      }).success
+    ).toBe(true);
+    expect(GitHubUserAccessTokenResponseSchema.safeParse(provided()).success).toBe(true);
+    expect(
+      GitHubUserAccessTokenResponseSchema.safeParse({
+        ...provided(),
+        credentialSource: 'github_app',
+        refreshSupported: true,
+        expiresAtEpochMs: Date.now() + 3600000,
+      }).success
+    ).toBe(true);
+    expect(GitHubUserAccessTokenResponseSchema.safeParse(legacy).success).toBe(false);
+    expect(
+      GitHubUserAccessTokenResponseSchema.safeParse({ ...provided(), refreshSupported: true })
+        .success
+    ).toBe(false);
+  });
+
+  it.each([null, 30000])(
+    'bounds provided cache lifetime independently of App refresh headroom: %s',
+    async expiry => {
+      jest.useFakeTimers();
+      try {
+        fetchMock.mockImplementation(async () =>
+          Response.json({
+            ...provided(),
+            expiresAtEpochMs: expiry === null ? null : Date.now() + expiry,
+          })
+        );
+        await getGitHubUserAccessToken('u1', { op: 'fetch' });
+        jest.advanceTimersByTime((expiry ?? 60000) - 1);
+        await getGitHubUserAccessToken('u1', { op: 'fetch' });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        jest.advanceTimersByTime(1);
+        await getGitHubUserAccessToken('u1', { op: 'fetch' });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
+});
 
 const mockConfig = {
   apiUrl: 'https://git-token-service.example.com',

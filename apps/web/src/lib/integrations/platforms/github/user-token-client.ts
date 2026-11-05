@@ -46,12 +46,24 @@ const GitHubUserAccessTokenConnectedSchema = z
   .object({
     connected: z.literal(true),
     token: z.string().min(1),
-    expiresAtEpochMs: z.number().int().positive(),
+    expiresAtEpochMs: z.number().int().positive().nullable(),
+    credentialSource: z.enum(['github_app', 'provided_token']).optional(),
+    refreshSupported: z.boolean().optional(),
     githubLogin: z.string().min(1),
     authorizationId: z.string().min(1),
     credentialVersion: z.number().int().nonnegative(),
   })
-  .strict();
+  .strict()
+  .refine(value => {
+    if (value.credentialSource === undefined && value.refreshSupported === undefined) {
+      return value.expiresAtEpochMs !== null;
+    }
+    return value.credentialSource === 'provided_token'
+      ? value.refreshSupported === false
+      : value.credentialSource === 'github_app' &&
+          value.refreshSupported === true &&
+          value.expiresAtEpochMs !== null;
+  });
 
 const GitHubUserAccessTokenDisconnectedSchema = z
   .object({
@@ -76,7 +88,7 @@ export type GitHubUserAccessTokenResult =
 const CACHE_REFRESH_HEADROOM_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-type CachedCredential = GitHubUserAccessTokenConnected;
+type CachedCredential = { credential: GitHubUserAccessTokenConnected; validUntil: number };
 
 const cache = new Map<string, CachedCredential>();
 const queue = new Map<string, Promise<unknown>>();
@@ -104,22 +116,26 @@ async function enqueueForUser<T>(userId: string, op: () => Promise<T>): Promise<
   }
 }
 
-function readCache(userId: string): CachedCredential | undefined {
+function readCache(userId: string): GitHubUserAccessTokenConnected | undefined {
   const entry = cache.get(userId);
   if (!entry) return undefined;
-  if (entry.expiresAtEpochMs - Date.now() <= CACHE_REFRESH_HEADROOM_MS) {
+  if (entry.validUntil <= Date.now()) {
     cache.delete(userId);
     return undefined;
   }
-  return entry;
+  return entry.credential;
 }
 
-function cacheForUser(userId: string, credential: CachedCredential | null): void {
+function cacheForUser(userId: string, credential: GitHubUserAccessTokenConnected | null): void {
   if (credential === null) {
     cache.delete(userId);
     return;
   }
-  cache.set(userId, credential);
+  const validUntil =
+    credential.credentialSource === 'provided_token'
+      ? Math.min(Date.now() + 60_000, credential.expiresAtEpochMs ?? Infinity)
+      : (credential.expiresAtEpochMs ?? 0) - CACHE_REFRESH_HEADROOM_MS;
+  cache.set(userId, { credential, validUntil });
 }
 
 async function callTokenService(

@@ -11024,12 +11024,48 @@
     "path": "githubApps.disconnectUserAuthorization",
     "kind": "mutation",
     "summary": "Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authorizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialVersion": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "authorizationId",
+        "credentialVersion"
+      ],
+      "additionalProperties": false
+    },
     "tags": [
       "githubapps",
-      "disconnectuserauthorization"
+      "disconnectuserauthorization",
+      "authorizationid",
+      "credentialversion"
     ],
-    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization"
+    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization authorizationid credentialversion authorizationId credentialVersion"
   },
   "githubApps.getAppType": {
     "path": "githubApps.getAppType",

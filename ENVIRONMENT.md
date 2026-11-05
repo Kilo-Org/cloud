@@ -212,6 +212,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GITHUB_TOKEN` - Generic GitHub token for API calls used as fallback when `GIT_TOKEN` or `GITHUB_CLI_PAT` is absent; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GH_TOKEN` - Short alias used by GitHub CLI processes. `[SECRET]`
+- `GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED` - Enables App source/refresh metadata in git-token-service responses after tolerant web readers deploy. Defaults to disabled; provided-token responses always carry this metadata. `[SERVER]`
 - `GIT_TOKEN` - Dynamic git credential token (often a GitHub App installation token) scoped for git clone/push; propagated from Town DO to containers in `services/gastown/src/dos/town/container-dispatch.ts` and `services/gastown/container/src/agent-runner.ts`. `[SECRET]`
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_ID` - Google Workspace OAuth client ID; used in tests and integration code. [PUBLIC]
 - `GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET` - Google Workspace OAuth client secret. `[SECRET]`

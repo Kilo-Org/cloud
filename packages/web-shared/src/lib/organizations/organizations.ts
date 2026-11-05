@@ -29,10 +29,14 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, inArray, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
-import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  getDeliveredEmailAddress,
+  getLowerDomainFromEmail,
+  normalizeEmail,
+} from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
@@ -533,9 +537,11 @@ function invitationAddressesAccount(
 }
 
 /**
- * The account-matching relation for member rows, applied when the rows are read.
- * A row without a stored normalized form still matches through its address, so
- * `invitationAddressesAccount` covers aliases for every row here.
+ * The account-matching relation for member rows. The query returns the rows that
+ * can match — the stored normalized form, a case variant of the address, and the
+ * rows that carry no stored normalized form — and the relation itself decides.
+ * Rows without a stored normalized form are the only ones the database cannot
+ * narrow, and they are the legacy ones.
  */
 async function organizationMembersMatchingEmail(
   tx: DrizzleTransaction,
@@ -552,7 +558,16 @@ async function organizationMembersMatchingEmail(
     })
     .from(organization_memberships)
     .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(eq(organization_memberships.organization_id, organizationId));
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        or(
+          eq(kilocode_users.normalized_email, normalizeEmail(email)),
+          isNull(kilocode_users.normalized_email),
+          sql`lower(${kilocode_users.google_user_email}) = ${getDeliveredEmailAddress(email)}`
+        )
+      )
+    );
 
   return candidates.filter(candidate => invitationAddressesAccount(email, candidate));
 }

@@ -16,12 +16,9 @@ jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBlacklistedDomains = jest.mocked(getBlacklistedDomains);
 
-async function insertDomainUsers(emailDomain: string, count: number): Promise<void> {
+async function insertHostUsers(emailHost: string, count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
-    await insertTestUser({
-      google_user_email: `user${i}@${emailDomain}`,
-      email_domain: emailDomain,
-    });
+    await insertTestUser({ google_user_email: `user${i}@${emailHost}` });
   }
 }
 
@@ -40,14 +37,19 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
   });
 
   it('reports per-domain blocked counts from one grouped query', async () => {
-    await insertDomainUsers('mailinator.com', 3);
-    await insertDomainUsers('sub.mailinator.com', 1);
-    await insertDomainUsers('spam.org', 1);
-    await insertDomainUsers('notmailinator.com', 2);
-    // Rows that predate the email_domain backfill are not part of the report.
+    await insertHostUsers('mailinator.com', 3);
+    await insertHostUsers('sub.mailinator.com', 1);
+    await insertHostUsers('spam.org', 2);
+    await insertHostUsers('notmailinator.com', 2);
+    // The count reads the email itself, so a row without the stored domain still counts.
     await insertTestUser({ google_user_email: 'legacy@mailinator.com', email_domain: null });
 
-    mockedGetBlacklistedDomains.mockResolvedValue(['mailinator.com', 'spam.org', 'unused.io']);
+    mockedGetBlacklistedDomains.mockResolvedValue([
+      'mailinator.com',
+      'sub.mailinator.com',
+      'spam.org',
+      'unused.io',
+    ]);
     const selectSpy = jest.spyOn(readDb, 'select');
 
     const response = await GET();
@@ -57,17 +59,18 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     expect(selectSpy).toHaveBeenCalledTimes(1);
     await expect(response.json()).resolves.toEqual({
       domains: [
-        { domain: 'mailinator.com', blockedCount: 4 },
-        { domain: 'spam.org', blockedCount: 1 },
+        { domain: 'mailinator.com', blockedCount: 5 },
+        { domain: 'spam.org', blockedCount: 2 },
+        { domain: 'sub.mailinator.com', blockedCount: 1 },
         { domain: 'unused.io', blockedCount: 0 },
       ],
-      totalDomains: 3,
-      totalBlockedUsers: 5,
+      totalDomains: 4,
+      totalBlockedUsers: 8,
     });
   });
 
   it('keeps one query and a bounded row count for a large blacklist', async () => {
-    await insertDomainUsers('bulk7.test', 5);
+    await insertHostUsers('bulk7.test', 5);
     const blacklistedDomains = Array.from({ length: 300 }, (_, i) => `bulk${i}.test`);
     mockedGetBlacklistedDomains.mockResolvedValue(blacklistedDomains);
     const selectSpy = jest.spyOn(readDb, 'select');

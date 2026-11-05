@@ -207,6 +207,25 @@ export type BlacklistDomainsConfigSnapshot = {
 };
 
 /**
+ * Parses one stored blocklist config. A stored list longer than the cap keeps
+ * its first MAX_BLACKLIST_DOMAINS entries instead of failing to parse, so a
+ * config written before the cap existed still enforces a bounded list.
+ */
+export function parseBlacklistDomainsConfig(value: unknown): BlacklistDomainsConfig {
+  if (value !== null && typeof value === 'object' && 'domains' in value) {
+    const { domains } = value;
+    if (Array.isArray(domains) && domains.length > MAX_BLACKLIST_DOMAINS) {
+      return BlacklistDomainsConfigSchema.parse({
+        ...value,
+        domains: domains.slice(0, MAX_BLACKLIST_DOMAINS),
+      });
+    }
+  }
+
+  return BlacklistDomainsConfigSchema.parse(value);
+}
+
+/**
  * Re-reads the admin blocklist config, downloading it only when it may have changed. An imported
  * domain list is megabytes and every process refreshes it each minute, so an unchanged config
  * costs one read of the small updated_at key instead. Returns `previous` itself when it is still
@@ -229,7 +248,7 @@ export async function refreshBlacklistDomainsConfig(
 
   const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
   return {
-    config: raw ? BlacklistDomainsConfigSchema.parse(JSON.parse(raw)) : null,
+    config: raw ? parseBlacklistDomainsConfig(JSON.parse(raw)) : null,
     fullReadAt: now,
   };
 }

@@ -5,7 +5,7 @@ import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domain
 import {
   BLACKLIST_STATS_ROW_LIMIT,
   computeBlacklistStats,
-  countUsersByEmailDomain,
+  countUsersByEmailHost,
 } from '@/lib/abuse/blacklist-domain-stats';
 
 export async function GET() {
@@ -17,10 +17,10 @@ export async function GET() {
   try {
     const blacklistedDomains = await getBlacklistedDomains();
     // The report is assembled from one grouped aggregate on the read replica.
-    const emailDomainCounts = await countUsersByEmailDomain(readDb);
+    const emailHostCounts = await countUsersByEmailHost(readDb);
 
     return NextResponse.json(
-      computeBlacklistStats(blacklistedDomains, emailDomainCounts, BLACKLIST_STATS_ROW_LIMIT)
+      computeBlacklistStats(blacklistedDomains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT)
     );
   } catch (error) {
     console.error('Error fetching blacklisted domains:', error);

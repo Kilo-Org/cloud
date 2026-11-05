@@ -7,7 +7,7 @@ import {
   getBlockedSignupTlds,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
+import { parseBlacklistDomainsConfig } from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
@@ -22,7 +22,7 @@ import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklis
 import {
   BLACKLIST_STATS_ROW_LIMIT,
   computeBlacklistStats,
-  countUsersByEmailDomain,
+  countUsersByEmailHost,
 } from '@/lib/abuse/blacklist-domain-stats';
 
 const SuspiciousDomainsInputSchema = z
@@ -34,7 +34,7 @@ const SuspiciousDomainsInputSchema = z
 async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
   if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+  return parseBlacklistDomainsConfig(JSON.parse(raw));
 }
 
 async function readConfig(): Promise<BlacklistDomainsConfig> {
@@ -126,9 +126,9 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   stats: adminProcedure.query(async () => {
     const domains = await getBlacklistedDomains();
 
-    const emailDomainCounts = await countUsersByEmailDomain(db);
+    const emailHostCounts = await countUsersByEmailHost(db);
 
-    return computeBlacklistStats(domains, emailDomainCounts, BLACKLIST_STATS_ROW_LIMIT);
+    return computeBlacklistStats(domains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT);
   }),
 
   suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {

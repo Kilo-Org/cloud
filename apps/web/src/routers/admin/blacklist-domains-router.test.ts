@@ -88,13 +88,13 @@ describe('isDomainOnBlacklist', () => {
 });
 
 describe('computeBlacklistStats', () => {
-  it('sums per-email_domain counts for each blacklist entry by exact match', () => {
+  it('sums per-host counts for each blacklist entry by exact match', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com', 'spam.org'],
       [
-        { email_domain: 'mailinator.com', count: 12 },
-        { email_domain: 'spam.org', count: 5 },
-        { email_domain: 'legit.com', count: 99 },
+        { email_host: 'mailinator.com', count: 12 },
+        { email_host: 'spam.org', count: 5 },
+        { email_host: 'legit.com', count: 99 },
       ]
     );
 
@@ -110,10 +110,10 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
       [
-        { email_domain: 'mailinator.com', count: 4 },
-        { email_domain: 'evil.mailinator.com', count: 3 },
-        { email_domain: 'a.b.mailinator.com', count: 2 },
-        { email_domain: 'notmailinator.com', count: 100 },
+        { email_host: 'mailinator.com', count: 4 },
+        { email_host: 'evil.mailinator.com', count: 3 },
+        { email_host: 'a.b.mailinator.com', count: 2 },
+        { email_host: 'notmailinator.com', count: 100 },
       ]
     );
 
@@ -125,9 +125,9 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['first.com', 'second.com', 'third.com'],
       [
-        { email_domain: 'first.com', count: 1 },
-        { email_domain: 'second.com', count: 10 },
-        { email_domain: 'third.com', count: 5 },
+        { email_host: 'first.com', count: 1 },
+        { email_host: 'second.com', count: 10 },
+        { email_host: 'third.com', count: 5 },
       ]
     );
 
@@ -138,9 +138,9 @@ describe('computeBlacklistStats', () => {
     const stats = computeBlacklistStats(
       ['first.com', 'second.com', 'third.com'],
       [
-        { email_domain: 'first.com', count: 1 },
-        { email_domain: 'second.com', count: 10 },
-        { email_domain: 'third.com', count: 5 },
+        { email_host: 'first.com', count: 1 },
+        { email_host: 'second.com', count: 10 },
+        { email_host: 'third.com', count: 5 },
       ],
       2
     );
@@ -153,12 +153,12 @@ describe('computeBlacklistStats', () => {
     expect(stats.totalBlockedUsers).toBe(16);
   });
 
-  it('ignores rows with null email_domain', () => {
+  it('ignores rows with a null host', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
       [
-        { email_domain: null, count: 999 },
-        { email_domain: 'mailinator.com', count: 3 },
+        { email_host: null, count: 999 },
+        { email_host: 'mailinator.com', count: 3 },
       ]
     );
 
@@ -166,7 +166,7 @@ describe('computeBlacklistStats', () => {
   });
 
   it('returns zero-count entries for blacklist entries with no matching users', () => {
-    const stats = computeBlacklistStats(['unused.com'], [{ email_domain: 'other.com', count: 10 }]);
+    const stats = computeBlacklistStats(['unused.com'], [{ email_host: 'other.com', count: 10 }]);
 
     expect(stats.domains).toEqual([{ domain: 'unused.com', blockedCount: 0 }]);
     expect(stats.totalBlockedUsers).toBe(0);
@@ -175,7 +175,7 @@ describe('computeBlacklistStats', () => {
   it('counts one group once for each matching entry, including nested entries', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com', 'sub.mailinator.com'],
-      [{ email_domain: 'sub.mailinator.com', count: 3 }]
+      [{ email_host: 'sub.mailinator.com', count: 3 }]
     );
 
     expect(stats.domains).toEqual([
@@ -188,14 +188,14 @@ describe('computeBlacklistStats', () => {
   it('does not match a group whose label boundary differs from the entry', () => {
     const stats = computeBlacklistStats(
       ['mailinator.com'],
-      [{ email_domain: 'notmailinator.com', count: 50 }]
+      [{ email_host: 'notmailinator.com', count: 50 }]
     );
 
     expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 0 }]);
   });
 
   it('returns empty stats for an empty blacklist', () => {
-    const stats = computeBlacklistStats([], [{ email_domain: 'anything.com', count: 5 }]);
+    const stats = computeBlacklistStats([], [{ email_host: 'anything.com', count: 5 }]);
 
     expect(stats.domains).toEqual([]);
     expect(stats.totalDomains).toBe(0);

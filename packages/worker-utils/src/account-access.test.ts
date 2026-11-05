@@ -10,6 +10,7 @@ import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
+  parseBlacklistDomainsConfig,
   refreshBlacklistDomainsConfig,
   requestOrganizationId,
   type BlacklistDomainsConfig,
@@ -252,5 +253,26 @@ describe('BlacklistDomainsConfigSchema domain bound', () => {
     );
 
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('parseBlacklistDomainsConfig', () => {
+  const domains = (count: number) =>
+    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
+
+  it('keeps the first capped entries of a stored list over the cap', () => {
+    const parsed = parseBlacklistDomainsConfig(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
+    );
+
+    expect(parsed.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(parsed.domains[0]).toBe('bulk-0.example');
+    expect(parsed.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
+  });
+
+  it('keeps every entry of a stored list within the cap', () => {
+    const stored = blocklistConfig({ domains: ['spam.example', 'junk.example'] });
+
+    expect(parseBlacklistDomainsConfig(stored).domains).toEqual(['spam.example', 'junk.example']);
   });
 });

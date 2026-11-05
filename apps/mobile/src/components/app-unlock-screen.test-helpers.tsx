@@ -304,7 +304,10 @@ vi.mock('@/lib/form-sheet', () => ({
     sheetShouldOverflowTopInset: true,
   }),
 }));
-vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
+vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
+  useRouteForegroundRefresh: vi.fn(),
+  useAppWideForegroundRefresh: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),
 }));

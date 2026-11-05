@@ -28,7 +28,7 @@ import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
 import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
-import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useAppWideForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
@@ -98,7 +98,7 @@ function ForegroundReconciliationMount() {
  */
 function AppWideFreshnessMount() {
   const trpc = useTRPC();
-  useRouteForegroundRefresh([
+  useAppWideForegroundRefresh([
     trpc.user.getMe.queryKey(),
     trpc.organizations.list.queryKey(),
     // Kilo-chat keys are FLAT (['kilo-chat', 'conversations', …]), so the

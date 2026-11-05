@@ -56,15 +56,18 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   };
 });
 
-// One object for the whole test file, like the navigators hand a route: the
-// recovery registry keys on this identity, so a fresh object per call would hide
-// what the screen boundary reads back.
-const navigation = { isFocused: () => focusState.isFocused, getParent: () => undefined };
+// One object per test, like the navigators hand a route: the recovery registry
+// keys on this identity and only grows, so a shared object would leak a scope
+// into a later test that expects none.
+type NavigationStub = { isFocused: () => boolean; getParent: () => undefined };
+const navigation: { current: NavigationStub } = {
+  current: { isFocused: () => focusState.isFocused, getParent: () => undefined },
+};
 
 vi.mock('expo-router', () => ({
   // `isFocused()` is a live call, so a test can blur the route without
   // rerendering the probe - the frozen-tab case.
-  useNavigation: () => navigation,
+  useNavigation: () => navigation.current,
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
   },
@@ -78,6 +81,12 @@ function Probe({ queryKeys }: { queryKeys: readonly (readonly unknown[])[] }) {
   renderCount.value += 1;
   useRouteForegroundRefresh(queryKeys);
   return createElement('ProbeText', null, 'probe');
+}
+
+/** The app-wide freshness mount shape: keys refreshed, but no recovery scope. */
+function AppWideProbe({ queryKeys }: { queryKeys: readonly (readonly unknown[])[] }) {
+  useRouteForegroundRefresh(queryKeys, { recoveryScope: false });
+  return createElement('AppWideProbeText', null, 'app-wide');
 }
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
@@ -125,6 +134,24 @@ async function renderProbeWithProvider(
   return renderer;
 }
 
+async function renderAppWideProbe(
+  queryKeys: readonly (readonly unknown[])[]
+): Promise<TestRenderer.ReactTestRenderer> {
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
+  await act(async () => {
+    await Promise.resolve();
+    rendererRef.current = TestRenderer.create(createElement(AppWideProbe, { queryKeys }));
+  });
+  const renderer = rendererRef.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  mountedRenderers.push(renderer);
+  return renderer;
+}
+
 function backgroundThenActive(): void {
   act(() => {
     appState.emit('background');
@@ -137,6 +164,7 @@ function backgroundThenActive(): void {
 describe('useRouteForegroundRefresh mounted', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    navigation.current = { isFocused: () => focusState.isFocused, getParent: () => undefined };
     focusState.isFocused = true;
     focusEffect.effect = undefined;
     renderCount.value = 0;
@@ -204,7 +232,15 @@ describe('useRouteForegroundRefresh mounted', () => {
 
     // The screen boundary reads this back to refetch before it remounts a route
     // that threw, so it must be there even for a screen that never commits.
-    expect(getRouteRecoveryScope(navigation)).toEqual(KEYS);
+    expect(getRouteRecoveryScope(navigation.current)).toEqual(KEYS);
+  });
+
+  it('keeps an app-wide freshness mount out of the recovery scope', async () => {
+    await renderAppWideProbe(KEYS);
+
+    // These keys are the whole app's freshness, not one route's payloads: a
+    // screen that declared nothing must remount instead of refetching them.
+    expect(getRouteRecoveryScope(navigation.current)).toEqual([]);
   });
 
   it('invalidates the keys on a later focus regain', async () => {

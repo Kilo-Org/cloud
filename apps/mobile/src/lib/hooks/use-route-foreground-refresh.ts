@@ -17,10 +17,19 @@ import { setRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
  * Keys are tRPC path-prefix arrays (e.g. `[['securityAgent']]`), which match
  * every procedure and scope variant under the prefix; only mounted observers
  * refetch.
+ *
+ * The keys double as the route's render-recovery scope unless the caller is a
+ * mount whose keys are app-wide rather than the render payloads of one route
+ * (`recoveryScope: false`): the recovery fallback must not refetch the whole
+ * app's freshness for a screen that reads none of it.
  */
-export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[])[]): void {
+export function useRouteForegroundRefresh(
+  queryKeys: readonly (readonly unknown[])[],
+  options: { recoveryScope?: boolean } = {}
+): void {
   const queryClient = useQueryClient();
   const navigation = useNavigation();
+  const recoveryScope = options.recoveryScope ?? true;
 
   // Keep the latest keys in a ref so the focus effect callback stays stable:
   // the owner passes an inline array literal, which is a fresh reference every
@@ -36,7 +45,9 @@ export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[
   // would then never commit the effect. The write is an idempotent entry in a
   // WeakMap keyed by this route's navigation object, derived only from the
   // hook's arguments, and the boundary reads it back for the same object.
-  setRouteRecoveryScope(navigation, queryKeys);
+  if (recoveryScope) {
+    setRouteRecoveryScope(navigation, queryKeys);
+  }
 
   const firstFocusRef = useRef(true);
 
@@ -69,4 +80,14 @@ export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[
       }
     }, [queryClient])
   );
+}
+
+/**
+ * App-wide freshness: the same foreground refresh, without a render-recovery
+ * scope. These keys are the whole app's freshness rather than one route's
+ * render payloads, so a route screen that declared no reads of its own remounts
+ * instead of refetching them.
+ */
+export function useAppWideForegroundRefresh(queryKeys: readonly (readonly unknown[])[]): void {
+  useRouteForegroundRefresh(queryKeys, { recoveryScope: false });
 }

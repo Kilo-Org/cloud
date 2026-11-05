@@ -40,8 +40,10 @@ keeps its local Durable Object storage. The test then checks earlier message IDs
 inside the replacement native database.
 
 Recovery requires native replay data recorded by this adapter. Existing v1 history
-needs a separate migration. A restore fails when history is incomplete or exceeds
-1,000 messages or 32 MiB. Standard Cloud event-size limits also apply. This local
+needs a separate migration; until then, a v1 session opens without earlier messages.
+A restore does not fail on incomplete history. It skips omitted rows, keeps the
+newest messages within 1,000 messages and 32 MiB, and logs the gap. Standard Cloud
+event-size limits also apply. This local
 proof does not qualify production providers, billing, or deployment.
 The native adapter returns empty todo and suggestion lists. This v2 server does
 not expose matching read endpoints.

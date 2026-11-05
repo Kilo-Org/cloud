@@ -699,7 +699,7 @@ describe('idle workspace disk checkpoint', () => {
     await waitFor(async () => {
       const attempts = await sibling.session.getPreparationAttempts();
       expect(attempts.flatMap(attempt => attempt.steps).map(step => step.latestDetail)).toContain(
-        'Restoring the workspace tail snapshot (captured 24 Oct 2026, 21:32:19 UTC)'
+        'Restoring the workspace snapshot (captured 24 Oct 2026, 21:32:19 UTC)'
       );
     });
     expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({

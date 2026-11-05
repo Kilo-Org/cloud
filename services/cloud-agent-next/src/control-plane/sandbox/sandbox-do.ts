@@ -4781,7 +4781,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log('selected', candidate.sessionId, candidate.owner.workspaceId);
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
-        detail: `Restoring the workspace tail snapshot (captured ${environmentSnapshotName(descriptor.capturedAt)})`,
+        detail: `Restoring the workspace snapshot (captured ${environmentSnapshotName(descriptor.capturedAt)})`,
       });
       return { snapshotId: descriptor.snapshotId, baseImage: descriptor.baseImage };
     });

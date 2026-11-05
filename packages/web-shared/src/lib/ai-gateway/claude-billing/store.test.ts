@@ -15,15 +15,13 @@ describe('Claude billing refusal transitions', () => {
   it('records spend limits without disabling the connection and clears them after success', async () => {
     const user = await insertTestUser();
     const connectedAt = '2026-01-01T00:00:00Z';
-    await db
-      .insert(claude_billing_connections)
-      .values({
-        kilo_user_id: user.id,
-        user_profile_id: `uprof_${user.id}`,
-        created_by: user.id,
-        status: 'connected',
-        connected_at: connectedAt,
-      });
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: `uprof_${user.id}`,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: connectedAt,
+    });
     await recordClaudeBillingRefusal(
       `uprof_${user.id}`,
       'linked_organization_spend_limit_reached',
@@ -44,15 +42,13 @@ describe('Claude billing refusal transitions', () => {
   it('does not let an old refusal disable a newly reconnected owner', async () => {
     const user = await insertTestUser();
     const profileId = `uprof_${user.id}`;
-    await db
-      .insert(claude_billing_connections)
-      .values({
-        kilo_user_id: user.id,
-        user_profile_id: profileId,
-        created_by: user.id,
-        status: 'connected',
-        connected_at: '2026-02-01T00:00:00Z',
-      });
+    await db.insert(claude_billing_connections).values({
+      kilo_user_id: user.id,
+      user_profile_id: profileId,
+      created_by: user.id,
+      status: 'connected',
+      connected_at: '2026-02-01T00:00:00Z',
+    });
     await markClaudeBillingUnavailable(
       profileId,
       'user_profile_not_billable',

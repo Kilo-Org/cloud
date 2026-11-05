@@ -72,7 +72,7 @@ type IssuedCode = {
 };
 
 const codes = new Map<string, IssuedCode>();
-const usedJtis = new Set<string>();
+const usedJtis = new Map<string, number>();
 const recordedRequests: Array<{ method: string; path: string; body: unknown; at: string }> = [];
 
 function base64url(input: Buffer | string): string {
@@ -123,7 +123,7 @@ function checkClientAssertion(clientId: string, assertion: unknown): string | nu
   }
   if (typeof claims.jti !== 'string') return 'assertion has no jti';
   if (usedJtis.has(claims.jti)) return 'assertion jti reused';
-  usedJtis.add(claims.jti);
+  usedJtis.set(claims.jti, claims.exp);
   return null;
 }
 
@@ -262,7 +262,14 @@ function handleToken(body: Record<string, unknown>, response: ServerResponse): v
 
 const handleBilling = createBillingStub(checkClientAssertion);
 
-const server = createServer(async (request, response) => {
+async function handleRequest(request: IncomingMessage, response: ServerResponse) {
+  const now = Date.now();
+  for (const [code, issued] of codes) {
+    if (issued.expiresAt <= now) codes.delete(code);
+  }
+  for (const [jti, expiresAt] of usedJtis) {
+    if (expiresAt * 1000 <= now) usedJtis.delete(jti);
+  }
   const url = new URL(request.url ?? '/', BASE_URL);
   const raw = request.method === 'POST' ? await readBody(request) : '';
   const isJson = request.headers['content-type']?.startsWith('application/json') ?? false;
@@ -344,6 +351,13 @@ const server = createServer(async (request, response) => {
     return;
   }
   send(response, 404, { error: 'not_found', path: url.pathname });
+}
+
+const server = createServer((request, response) => {
+  void handleRequest(request, response).catch(() => {
+    if (response.headersSent) response.destroy();
+    else send(response, 400, { error: 'invalid_request' });
+  });
 });
 
 server.listen(PORT, HOST, () => {

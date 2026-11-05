@@ -476,13 +476,8 @@ describe('getGitHubUserAccessToken', () => {
     // Queue a reportRejected (must be serialized). While it is in flight,
     // a cache hit for fetch must return immediately without going through
     // the queue.
-    let resolveReport: ((value: Response) => void) | null = null;
-    fetchMock.mockImplementationOnce(
-      () =>
-        new Promise<Response>(resolve => {
-          resolveReport = resolve;
-        })
-    );
+    const reportGate = Promise.withResolvers<Response>();
+    fetchMock.mockImplementationOnce(() => reportGate.promise);
     const reportPromise = getGitHubUserAccessToken('kilo-user-1', {
       op: 'reportRejected',
       authorizationId: 'auth-1',
@@ -495,17 +490,22 @@ describe('getGitHubUserAccessToken', () => {
       cacheHitSettled = true;
       return result;
     });
-    await new Promise<void>(resolve => setImmediate(resolve));
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve));
 
-    expect(resolveReport).not.toBeNull();
-    expect(cacheHitSettled).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(cacheHitSettled).toBe(true);
 
-    const hit = await hitPromise;
-    if (hit.status !== 'connected') throw new Error('expected connected');
-    expect(hit.credential.token).toBe('ghs_cached');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+      const hit = await hitPromise;
+      if (hit.status !== 'connected') throw new Error('expected connected');
+      expect(hit.credential.token).toBe('ghs_cached');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      // Release the queued report even when an assertion above fails, so the
+      // next test cannot inherit a permanently pending queue entry.
+      reportGate.resolve(makeDisconnectedResponse('revoked'));
+    }
 
-    resolveReport!(makeDisconnectedResponse('revoked'));
     await reportPromise;
   });
 

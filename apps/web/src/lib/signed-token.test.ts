@@ -115,7 +115,10 @@ describe('verifySignedToken', () => {
     });
 
     expect(
-      verifySignedTokenDetailed(`${encodedPayload}.${signature.slice(0, -2)}AA`, options)
+      verifySignedTokenDetailed(
+        `${encodedPayload}.${signature.slice(0, -1)}${signature.endsWith('A') ? 'B' : 'A'}`,
+        options
+      )
     ).toEqual({ status: 'invalid', reason: 'signature_invalid' });
 
     expect(

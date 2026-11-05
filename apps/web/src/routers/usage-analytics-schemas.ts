@@ -89,7 +89,8 @@ const FiltersShape = {
 
 /**
  * The window is half-open: `startDate` is inclusive and `endDate` is exclusive.
- * Equal boundaries therefore stay valid and describe a zero-width window.
+ * Equal boundaries stay valid; the query window may still span the containing
+ * day or month bucket.
  */
 export const UsageAnalyticsFiltersSchema = z
   .object(FiltersShape)

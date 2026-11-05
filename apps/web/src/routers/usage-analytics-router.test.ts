@@ -303,11 +303,17 @@ describe('usage analytics date window', () => {
   it('accepts equal start and end timestamps', async () => {
     const instant = {
       ...dateWindowFilters,
-      endDate: dateWindowFilters.startDate,
+      startDate: '2026-06-04T12:00:00.000Z',
+      endDate: '2026-06-04T12:00:00.000Z',
     };
 
     expect(UsageAnalyticsFiltersSchema.safeParse(instant).success).toBe(true);
     await expect(caller().getSummary(instant)).resolves.toMatchObject({ requestCount: 0 });
+
+    // The daily tier rounds the pair out to the UTC day that contains it.
+    const bindings = mockExecuteSnowflakeStatement.mock.calls[0][0].bindings ?? [];
+    const values = bindings.map(binding => binding.value);
+    expect(values).toEqual(expect.arrayContaining(['2026-06-04', '2026-06-05']));
   });
 
   it('derives the aggregation tier from the window boundaries', () => {

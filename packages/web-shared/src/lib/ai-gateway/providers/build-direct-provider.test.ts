@@ -16,7 +16,8 @@ const API_KEY_AUTH: DirectUpstreamAuth = {
 
 async function transformRequest(
   request: GatewayRequest,
-  options: Partial<Omit<CustomLlmApiConfig, 'base_url'>> = {}
+  options: Partial<Omit<CustomLlmApiConfig, 'base_url'>> = {},
+  kiloUserId = 'user-1'
 ) {
   const provider = buildDirectProvider(
     'custom',
@@ -37,7 +38,7 @@ async function transformRequest(
     originalHeaders: EmptyFraudDetectionHeaders,
     extraHeaders,
     userByok: null,
-    kilo_user_id: 'user-1',
+    kilo_user_id: kiloUserId,
     organization_id: null,
     session_id: null,
   });
@@ -185,11 +186,43 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       kind: 'responses',
       body: { model: 'public-model', input: 'hello', prompt_cache_key: 'task-cache-key' },
     },
-  ])('includes the prefixed prompt cache key for $kind when enabled', async request => {
+  ])('derives the header for the signed-in user for $kind when enabled', async request => {
     const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
 
-    expect(headers['Mt-User-Id']).toBe('kilo:task-cache-key');
+    expect(headers['Mt-User-Id']).toMatch(/^kilo:[A-Za-z0-9+/]{43}=$/);
+    expect(headers['Mt-User-Id']).not.toContain('task-cache-key');
     expect(request.body).toHaveProperty('prompt_cache_key', 'task-cache-key');
+  });
+
+  it('keeps the header stable for one user and follows the cache key', async () => {
+    const options = { prompt_cache_key_as_mt_user_id: true };
+    const withKey = (promptCacheKey: string) => {
+      const request = makeRequest();
+      request.body.prompt_cache_key = promptCacheKey;
+      return request;
+    };
+
+    const first = await transformRequest(withKey('task-cache-key'), options);
+    const again = await transformRequest(withKey('task-cache-key'), options);
+    const otherKey = await transformRequest(withKey('other-cache-key'), options);
+
+    expect(first['Mt-User-Id']).toBe(again['Mt-User-Id']);
+    expect(first['Mt-User-Id']).not.toBe(otherKey['Mt-User-Id']);
+  });
+
+  it('gives each user a distinct header', async () => {
+    const options = { prompt_cache_key_as_mt_user_id: true };
+    const withKey = () => {
+      const request = makeRequest();
+      request.body.prompt_cache_key = 'task-cache-key';
+      return request;
+    };
+
+    const firstUser = await transformRequest(withKey(), options, 'user-1');
+    const secondUser = await transformRequest(withKey(), options, 'user-2');
+
+    expect(firstUser['Mt-User-Id']).toMatch(/^kilo:/);
+    expect(firstUser['Mt-User-Id']).not.toBe(secondUser['Mt-User-Id']);
   });
 
   it.each([undefined, false])('does not add the header when the option is %s', enabled => {
@@ -222,7 +255,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       remove_from_body: ['prompt_cache_key'],
     });
 
-    expect(headers['Mt-User-Id']).toBe('kilo:task-cache-key');
+    expect(headers['Mt-User-Id']).toMatch(/^kilo:[A-Za-z0-9+/]{43}=$/);
     expect(request.body).not.toHaveProperty('prompt_cache_key');
   });
 
@@ -236,7 +269,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     });
 
     expect(Object.fromEntries(new Headers(headers))).toEqual({
-      'mt-user-id': 'kilo:task-cache-key',
+      'mt-user-id': expect.stringMatching(/^kilo:[A-Za-z0-9+/]{43}=$/),
       'x-custom': 'kept',
     });
   });

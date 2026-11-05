@@ -9,6 +9,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
@@ -77,7 +78,13 @@ export function buildDirectProvider(
             delete context.extraHeaders[key];
           }
         }
-        context.extraHeaders['Mt-User-Id'] = 'kilo:' + promptCacheKey;
+        context.extraHeaders['Mt-User-Id'] =
+          'kilo:' +
+          generateProviderSpecificSessionHash(
+            context.kilo_user_id,
+            promptCacheKey,
+            context.provider
+          );
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

@@ -43,7 +43,8 @@ function secureProxyProvider(disable_url_suffix: boolean, prompt_cache_key_as_mt
 async function sendThroughSecureProxy(
   disable_url_suffix: boolean,
   prompt_cache_key_as_mt_user_id = false,
-  prompt_cache_key = 'task-cache-key'
+  prompt_cache_key = 'task-cache-key',
+  kiloUserId = 'user-1'
 ) {
   const fetchMock = jest.fn(
     async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}')
@@ -63,7 +64,7 @@ async function sendThroughSecureProxy(
     originalHeaders: EmptyFraudDetectionHeaders,
     extraHeaders,
     userByok: null,
-    kilo_user_id: 'user-1',
+    kilo_user_id: kiloUserId,
     organization_id: null,
     session_id: null,
   });
@@ -125,11 +126,22 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1?trace=1');
   });
 
-  it('sends the prefixed Mt-User-Id only to the upstream when enabled', async () => {
+  it('sends the user-derived Mt-User-Id only to the upstream when enabled', async () => {
     const { headers, body } = await sendThroughSecureProxy(false, true);
+    const forwarded = body.kilo_secure_proxy.headers['mt-user-id'];
 
     expect(headers.has('Mt-User-Id')).toBe(false);
-    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('kilo:task-cache-key');
+    expect(forwarded).toMatch(/^kilo:[A-Za-z0-9+/]{43}=$/);
+    expect(forwarded).not.toContain('task-cache-key');
+  });
+
+  it('sends each user a distinct Mt-User-Id', async () => {
+    const first = await sendThroughSecureProxy(false, true);
+    const second = await sendThroughSecureProxy(false, true, 'task-cache-key', 'user-2');
+
+    expect(first.body.kilo_secure_proxy.headers['mt-user-id']).not.toBe(
+      second.body.kilo_secure_proxy.headers['mt-user-id']
+    );
   });
 
   it.each(['\u4e2d\u6587', 'key\r\nInjected: value', 'key\0'])(

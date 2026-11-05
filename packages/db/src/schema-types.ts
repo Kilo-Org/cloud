@@ -2810,6 +2810,7 @@ export const CustomLlmApiConfigSchema = z.object({
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
+  /** Send the signed-in user's derived cache bucket to the upstream in the `Mt-User-Id` header. */
   prompt_cache_key_as_mt_user_id: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),

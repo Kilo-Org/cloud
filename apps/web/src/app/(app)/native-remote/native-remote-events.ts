@@ -106,17 +106,17 @@ export function transcriptText(content: unknown): string {
 }
 
 export type CommandOutcome = { error?: string; commandID?: string };
-export type CommandRunner = (operation: () => Promise<string>) => Promise<boolean>;
+export type CommandRunner = (key: string, operation: () => Promise<string>) => Promise<boolean>;
 
 /**
- * Runs one command at a time. A repeated press while a command is in flight is
- * ignored, so a double click cannot submit the same action twice.
+ * Runs one command per key at a time. A repeated press on the same control while
+ * its command is in flight is ignored, and unrelated controls keep working.
  */
 export function commandRunner(settle: (outcome: CommandOutcome) => void): CommandRunner {
-  let running = false;
-  return async operation => {
-    if (running) return false;
-    running = true;
+  const running = new Set<string>();
+  return async (key, operation) => {
+    if (running.has(key)) return false;
+    running.add(key);
     settle({ error: '' });
     try {
       settle({ commandID: await operation() });
@@ -125,7 +125,7 @@ export function commandRunner(settle: (outcome: CommandOutcome) => void): Comman
       settle({ error: cause instanceof Error ? cause.message : 'Command failed' });
       return false;
     } finally {
-      running = false;
+      running.delete(key);
     }
   };
 }

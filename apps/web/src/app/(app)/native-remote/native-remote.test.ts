@@ -121,24 +121,33 @@ it('clears pending state when the inventory cannot be read', () => {
   expect(pendingRequests([asked]).permissions).toHaveLength(1);
   expect(pendingRequests([asked, malformed])).toEqual({ permissions: [], questions: [] });
 });
-it('runs one command at a time and reports its outcome', async () => {
+it('runs one command per control and leaves other controls free', async () => {
   const outcomes: CommandOutcome[] = [];
   const run = commandRunner(outcome => outcomes.push(outcome));
   let finish: (value: string) => void = () => {};
   const pending = run(
+    'prompt',
     () =>
       new Promise<string>(resolve => {
         finish = resolve;
       })
   );
-  await expect(run(() => Promise.resolve('second'))).resolves.toBe(false);
+  await expect(run('prompt', () => Promise.resolve('second'))).resolves.toBe(false);
   expect(outcomes).toEqual([{ error: '' }]);
+  await expect(run('abort', () => Promise.resolve('abort-id'))).resolves.toBe(true);
   finish('first');
   await expect(pending).resolves.toBe(true);
-  expect(outcomes).toEqual([{ error: '' }, { commandID: 'first' }]);
-  await expect(run(() => Promise.reject(new Error('No permission')))).resolves.toBe(false);
+  expect(outcomes).toEqual([
+    { error: '' },
+    { error: '' },
+    { commandID: 'abort-id' },
+    { commandID: 'first' },
+  ]);
+  await expect(run('prompt', () => Promise.reject(new Error('No permission')))).resolves.toBe(
+    false
+  );
   expect(outcomes.at(-1)).toEqual({ error: 'No permission' });
-  await expect(run(() => Promise.resolve('after'))).resolves.toBe(true);
+  await expect(run('prompt', () => Promise.resolve('after'))).resolves.toBe(true);
 });
 it('clears only the local view and sends no runner command', async () => {
   const connection = {

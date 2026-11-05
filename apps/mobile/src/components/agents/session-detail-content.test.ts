@@ -2170,6 +2170,32 @@ describe('session detail slow load', () => {
     );
   });
 
+  it('holds a writable session composer back until the mounted rows are painted', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    openSettledReport.value = false;
+    const view = await mountDetails([childMessage(ROOT_ID, 'writable row')]);
+    // The rows are mounted but the open gate still hides them behind its
+    // skeleton, so the bottom slot keeps the composer's reserve: an input over a
+    // loading body is the same two states at once the read-only side avoids.
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    const list = view.renderer.root.findByType(SessionMessageList);
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
+    });
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      1
+    );
+  });
+
   it('resolves an exhausted app-wide leg into the same retryable error', async () => {
     connectionHealth.isConnected = false;
     connectionHealth.reconnectExhausted = true;

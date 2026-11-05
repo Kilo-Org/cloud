@@ -20,10 +20,13 @@ import {
   kilocode_users,
   organization_memberships,
   organizations,
+  passkey_credentials,
+  session_step_up_proofs,
   support_access_grant_events,
   support_access_grants,
   type User,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -429,15 +432,19 @@ function setSupportEnabled(enabled: boolean) {
 
 describe('binary support organization access', () => {
   let events: AdminAccessEvent[];
+  const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
 
   beforeEach(() => {
     events = [];
     setAdminAccessSinkForTest(event => events.push(event));
     setSupportEnabled(false);
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
   });
 
   afterEach(async () => {
     setSupportEnabled(false);
+    if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+    else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
     setAdminAccessSinkForTest(null);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(support_access_grant_events);
@@ -494,6 +501,53 @@ describe('binary support organization access', () => {
       trpcPath: 'organizations.usageStats',
       trpcType: 'query',
     };
+  }
+
+  const writeSessionId = 'support-write-use-session';
+
+  async function enroll(userId: string) {
+    const [credential] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: userId,
+        credential_id: `support-write-${crypto.randomUUID()}`,
+        public_key: 'unused-public-key',
+      })
+      .returning();
+    return credential!.id;
+  }
+
+  async function insertStepUpProof(
+    userId: string,
+    credentialId: string,
+    verifiedAt = new Date(),
+    expiresAt = new Date(Date.now() + 15 * 60_000)
+  ) {
+    await db.insert(session_step_up_proofs).values({
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(writeSessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credentialId,
+      purpose: 'session',
+      verified_at: verifiedAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+    });
+  }
+
+  async function writeCtxWithStepUpForPath(user: User, trpcPath: string): Promise<TRPCContext> {
+    const credentialId = await enroll(user.id);
+    await insertStepUpProof(user.id, credentialId);
+    return {
+      user,
+      credential: 'session',
+      webSessionId: writeSessionId,
+      trpcPath,
+      trpcType: 'mutation',
+    };
+  }
+
+  async function writeCtxWithStepUp(user: User): Promise<TRPCContext> {
+    return writeCtxWithStepUpForPath(user, 'organizations.settings.updateDefaultModel');
   }
 
   function failGrantLookupQueries() {
@@ -601,13 +655,193 @@ describe('binary support organization access', () => {
       actionClass: 'support_write',
       approverKiloUserId: approver.id,
     });
-    const writeCtx: TRPCContext = {
-      user: admin,
-      trpcPath: 'organizations.settings.updateDefaultModel',
-      trpcType: 'mutation',
-    };
+    const writeCtx = await writeCtxWithStepUp(admin);
 
     await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+  });
+
+  test('ON write use rejects a bearer credential', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'human_bearer',
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
+  });
+
+  test('ON write use requires a fresh proof', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+    await enroll(admin.id);
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'session',
+          webSessionId: writeSessionId,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_REQUIRED' }),
+    });
+  });
+
+  test('ON write use rejects an expired proof as MFA_EXPIRED', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+    const credentialId = await enroll(admin.id);
+    await insertStepUpProof(
+      admin.id,
+      credentialId,
+      new Date(Date.now() - 2 * 60 * 60_000),
+      new Date(Date.now() - 60_000)
+    );
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'session',
+          webSessionId: writeSessionId,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ code: 'MFA_EXPIRED' }),
+    });
+  });
+
+  test('ON write use fails closed when step-up evaluation throws', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+    const originalSelect = db.select.bind(db);
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === passkey_credentials) {
+                throw new Error('step-up store unavailable');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      await expect(
+        ensureOrganizationAccess(
+          {
+            user: admin,
+            credential: 'session',
+            webSessionId: writeSessionId,
+            trpcPath: 'organizations.settings.updateDefaultModel',
+            trpcType: 'mutation',
+          },
+          organization.id
+        )
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: expect.objectContaining({ code: 'STEP_UP_UNAVAILABLE' }),
+      });
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  test('ON read grants still work with a bearer credential', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          credential: 'human_bearer',
+          trpcPath: 'organizations.usageStats',
+          trpcType: 'query',
+        },
+        organization.id
+      )
+    ).resolves.toBe('member');
+  });
+
+  test('ON denies GitHub install cancellation through support', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        await writeCtxWithStepUpForPath(admin, 'githubApps.cancelPendingInstallation'),
+        organization.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_not_allowlisted' }),
+    });
   });
 
   test('ON denies a read grant on a write procedure', async () => {
@@ -648,14 +882,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(
-        {
-          user: admin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        organization.id
-      )
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin), organization.id)
     ).resolves.toBe('admin');
   });
 
@@ -789,14 +1016,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(
-        {
-          user: superadmin,
-          trpcPath: 'organizations.settings.updateDefaultModel',
-          trpcType: 'mutation',
-        },
-        organization.id
-      )
+      ensureOrganizationAccess(await writeCtxWithStepUp(superadmin), organization.id)
     ).resolves.toBe('admin');
   });
 

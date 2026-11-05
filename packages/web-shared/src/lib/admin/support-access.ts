@@ -190,7 +190,6 @@ const ORGANIZATION_WRITES: readonly WriteEntry[] = [
   ['organizations.securityAgent.saveConfig', 'billing'],
   ['organizations.securityAgent.setEnabled', 'billing'],
   ['organizations.members.resendInvite', 'manage'],
-  ['githubApps.cancelPendingInstallation', 'manage'],
 ];
 
 export const SUPPORT_READ_ALLOWLIST: readonly SupportAllowEntry[] = [
@@ -243,6 +242,7 @@ export const SUPPORT_NEVER_KEYS: readonly string[] = [
   'organizations.members.update',
   'organizations.members.remove',
   'organizations.members.setChildMemberships',
+  'githubApps.cancelPendingInstallation',
   'organizations.cloudAgentNext.createWorktreeChat',
   'organizations.kiloclaw.createAgent',
   'organizations.kiloclaw.destroy',
@@ -320,7 +320,8 @@ export type SupportStepUpPort = {
       | 'support_read_request'
       | 'support_write_request'
       | 'support_approval'
-      | 'support_emergency_issue';
+      | 'support_emergency_issue'
+      | 'support_write_use';
     credential?: SupportStepUpCredential;
     webSessionId?: string | null;
     route?: string | null;

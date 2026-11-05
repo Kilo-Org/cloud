@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -464,6 +465,20 @@ export async function resolveOrganizationAccess(
 
   if (evaluation.access) {
     if (evaluation.access.actionClass === 'support_write') {
+      const entry = key
+        ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
+        : undefined;
+      if (entry?.stepUp === 'fresh') {
+        await supportStepUpPort.requireFresh({
+          userId: ctx.user.id,
+          action: 'support_write_use',
+          credential: ctx.credential,
+          webSessionId: ctx.webSessionId ?? null,
+          route: ctx.trpcPath ?? null,
+          method: ctx.trpcType ?? null,
+          surface,
+        });
+      }
       await recordSupportWriteUse({
         grantId: evaluation.access.grantId,
         actorKiloUserId: ctx.user.id,

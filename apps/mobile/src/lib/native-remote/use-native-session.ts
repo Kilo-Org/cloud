@@ -27,16 +27,24 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
   const [busy, setBusy] = useState(false);
   const [errorMessage, setError] = useState('');
   const [commandID, setCommandID] = useState('');
+  const [owner, setOwner] = useState({ client, sessionID, organizationID });
+  if (
+    owner.client !== client ||
+    owner.sessionID !== sessionID ||
+    owner.organizationID !== organizationID
+  ) {
+    setOwner({ client, sessionID, organizationID });
+    setState(undefined);
+    setBusy(false);
+    setError('');
+    setCommandID('');
+  }
   const connectionRef = useRef<NativeSessionConnection | null>(null);
   const scope = useRef({ client, sessionID, organizationID });
   scope.current = { client, sessionID, organizationID };
 
   useEffect(() => {
     let active = true;
-    setState(undefined);
-    setBusy(false);
-    setError('');
-    setCommandID('');
     const matches = () =>
       active &&
       scope.current.client === client &&

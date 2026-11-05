@@ -206,7 +206,7 @@ Implementation adds new schema and routing rather than reusing existing personal
 
 ## Addendum: Self-serve tier changes
 
-An owner or billing manager can upgrade a self-serve, monthly agreement to a higher tier. Downgrades and yearly agreements are refused. The change is recorded on the agreement as `next_term_version_id` and `next_term_effective_at`, and Stripe swaps only the pass price on the seat subscription at its next renewal through an owned subscription schedule (`kilo-pass-org-tier-change`). Nothing is charged at scheduling time, upgrades and downgrades alike, and the seat item, quantities, collection method, tax, and discount settings are carried over, so invoice-billed organizations keep their terms.
+An owner or billing manager can upgrade a self-serve, monthly agreement to a higher tier. Downgrades and yearly agreements are refused. The change is recorded on the agreement as `next_term_version_id` and `next_term_effective_at`, and Stripe swaps only the pass price on the seat subscription at its next renewal through an owned subscription schedule (`kilo-pass-org-tier-change`). Scheduling does not charge the organization; the upgraded pass price is billed at renewal. The seat item, quantities, collection method, tax, and discount settings are carried over, so invoice-billed organizations keep their terms.
 
 The agreement moves to the new standard term version only when the paid invoice for the period starting at the effective boundary bills the target tier's price. A renewal that bills another tier drops the pending change and keeps the current terms, and an older invoice paid late never rewrites them.
 

@@ -2654,6 +2654,16 @@ export async function handleUpdateSeatCount(
     paidSeatItem,
     passItem: organizationPassItem,
   });
+  let scheduleReleased = false;
+
+  const restoreTierChangeSchedule = async () => {
+    if (!organizationPassItem || typeof restoreOrganizationKiloPassTierChange !== 'function') {
+      return;
+    }
+    await restoreOrganizationKiloPassTierChange(subscriptionStripeId).catch(error => {
+      captureException(error, { tags: { source: 'kilo_pass_org_tier_change_restore' } });
+    });
+  };
 
   let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
     prorationDate,
@@ -2709,7 +2719,10 @@ export async function handleUpdateSeatCount(
   try {
     const locked = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
-      if (scheduleToRelease) await releaseCancellationSchedule(scheduleToRelease);
+      if (scheduleToRelease) {
+        await releaseCancellationSchedule(scheduleToRelease);
+        scheduleReleased = true;
+      }
       const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {
@@ -2741,6 +2754,7 @@ export async function handleUpdateSeatCount(
     updatedSubscription = locked.updatedSubscription;
     invoiceObj = locked.invoiceObj;
   } catch (error) {
+    if (scheduleReleased) await restoreTierChangeSchedule();
     if (pendingFeeItemId) {
       await discardStagedOrganizationKiloPassServiceFeeItem({
         invoiceItemId: pendingFeeItemId,
@@ -2750,15 +2764,9 @@ export async function handleUpdateSeatCount(
     return handleUpdateSeatCountRequiresActionError(error, subscriptionStripeId);
   }
 
-  if (
-    scheduleToRelease &&
-    organizationPassItem &&
-    typeof restoreOrganizationKiloPassTierChange === 'function'
-  ) {
+  if (scheduleToRelease && organizationPassItem) {
     // The seat update released a pending tier change schedule; put it back with the new quantities.
-    await restoreOrganizationKiloPassTierChange(subscriptionStripeId).catch(error => {
-      captureException(error, { tags: { source: 'kilo_pass_org_tier_change_restore' } });
-    });
+    await restoreTierChangeSchedule();
   }
 
   let paymentIntent: Stripe.PaymentIntent | null = null;

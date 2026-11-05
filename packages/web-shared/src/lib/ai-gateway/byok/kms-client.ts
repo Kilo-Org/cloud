@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
+import {
+  cacheByokDataKey,
+  evictCachedByokDataKey,
+  getCachedByokDataKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -13,13 +19,6 @@ const KMS_TOTAL_BUDGET_MS = 8000;
 /** A retry is worth issuing only with a slice of budget this large left: a shorter one can
  * only abort and would replace the specific error of the attempt before it with a timeout. */
 const KMS_MIN_ATTEMPT_BUDGET_MS = 500;
-
-export type ByokKmsContext = {
-  key_id: string;
-  owner_type: 'user' | 'organization';
-  owner_id: string;
-  provider_id: string;
-};
 
 type ByokKmsClientConfig = {
   url: string;
@@ -189,17 +188,35 @@ export async function decryptByokEnvelope(
     throw new Error('BYOK_KMS_SERVICE_URL is required to decrypt an envelope-encrypted BYOK key');
   }
 
-  const { data_key } = RetrievedDataKeySchema.parse(
-    await sendToKms(config, `${config.url}/decrypt`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...context,
-        wrapped_dek: envelope.wrapped_dek,
-        kms_key_id: envelope.kms_key_id,
-        kms_key_version: envelope.kms_key_version,
-      }),
-    })
-  );
-  return decryptApiKey(envelope.encrypted_data, data_key);
+  // The KMS request is always sent, in parallel with the cache read, so every decrypt reaches the
+  // service. A cache hit does not wait for it and ignores its result; a miss uses it.
+  const kmsRequest = sendToKms(config, `${config.url}/decrypt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ...context,
+      wrapped_dek: envelope.wrapped_dek,
+      kms_key_id: envelope.kms_key_id,
+      kms_key_version: envelope.kms_key_version,
+    }),
+  }).then(response => RetrievedDataKeySchema.parse(response));
+  // Marks a failure as handled while the cache read is pending; a miss still awaits it below.
+  kmsRequest.catch(() => {});
+
+  const cachedDataKey = await getCachedByokDataKey(envelope, context);
+  if (cachedDataKey) {
+    try {
+      return decryptApiKey(envelope.encrypted_data, cachedDataKey);
+    } catch {
+      // An entry that no longer opens the ciphertext is damaged; the KMS response decides.
+      void evictCachedByokDataKey(envelope, context);
+    }
+  }
+
+  const { data_key } = await kmsRequest;
+  const apiKey = decryptApiKey(envelope.encrypted_data, data_key);
+  // Cached only once it has opened the ciphertext. Not awaited, so a slow Redis never delays
+  // the request that already has its key.
+  void cacheByokDataKey(envelope, context, data_key);
+  return apiKey;
 }

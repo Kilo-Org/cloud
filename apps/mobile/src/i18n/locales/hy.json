@@ -3103,7 +3103,7 @@
   },
   "kiloPass": {
     "title": "Kilo Pass",
-    "unavailable": "Kilo Pass-ը հասանելի չէ։",
+    "unavailable": "Kilo Pass-ը չհաջողվեց բեռնել։",
     "couldNotLoad": "Չհաջողվեց բեռնել Kilo Pass-ը։ Կրկին փորձիր։",
     "retryLoading": "Կրկին փորձել բեռնել Kilo Pass-ը",
     "productsUnavailable": "App Store-ի ապրանքները հասանելի չեն։",
@@ -3114,7 +3114,7 @@
     "purchaseUnavailable": "Այս պահին հնարավոր չէ գնել Kilo Pass-ը։",
     "kiloPassManagement": "Kilo Pass-ի կառավարում",
     "kiloPassSetup": "Kilo Pass-ի կարգավորում",
-    "subscriptionHeaderDescription": "Ամսական բաժանորդագրություն, որը կրեդիտներ է ավելացնում ձեր Kilo մնացորդին՝ Kilo App-ում AI ծրագրավորման նիստեր վարելու համար։",
+    "subscriptionHeaderDescription": "Ամսական բաժանորդագրություն, որը կրեդիտներ է ավելացնում քո Kilo մնացորդին՝ Kilo App-ում AI ծրագրավորման նիստեր վարելու համար։",
     "manage": "Կառավարել",
     "managedOnWeb": "Այս Kilo Pass-ը կառավարվում է կայքում",
     "opensManagementOnWeb": "Կայքում բացում է Kilo Pass-ի կառավարման էջը։",
@@ -3124,10 +3124,10 @@
     "purchaseFailed": "Չհաջողվեց ավարտել գնումը։",
     "couldNotConnectToAppStore": "Չհաջողվեց միանալ App Store-ին։ Ստուգիր կապը և կրկին փորձիր։",
     "purchaseMissingSignedTransaction": "App Store-ի գնման տվյալներում բացակայում էր ստորագրված գործարքի JWS-ը։",
-    "couldNotConnectToPlay": "Չհաջողվեց միանալ Google Play-ին: Ստուգեք ձեր կապը և նորից փորձեք:",
-    "productsUnavailablePlay": "Google Play ապրանքները հասանելի չեն",
-    "purchaseDifferentAccountPlay": "Այս Google Play գնումը կապված չէ ձեր Kilo հաշվին: Մուտք գործեք գնման համար օգտագործված Google հաշիվ, ապա նորից փորձեք:",
-    "purchaseMissingPurchaseToken": "Google Play գնումը չէր ներառում purchase token:"
+    "couldNotConnectToPlay": "Չհաջողվեց միանալ Google Play-ին։ Ստուգիր կապը և կրկին փորձիր։",
+    "productsUnavailablePlay": "Google Play-ի ապրանքները հասանելի չեն։",
+    "purchaseDifferentAccountPlay": "Այս Google Play գնումը կապված չէ քո Kilo հաշվին։ Մուտք գործիր գնման համար օգտագործված Google հաշիվ, ապա կրկին փորձիր։",
+    "purchaseMissingPurchaseToken": "Google Play գնումը չէր ներառում purchase token։"
   },
   "consent": {
     "kilo": "Kilo",
@@ -3224,7 +3224,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "Վերադառնալ պրոֆիլին",
-      "loadErrorMessage": "Ստուգիր ինտերնետ կապը և կրկին փորձիր։",
+      "loadErrorMessage": "Ստուգեք ձեր ինտերնետ կապը և կրկին փորձեք։",
       "chooseAccount": "Ընտրել հաշիվ",
       "loadErrorTitle": "Չհաջողվեց բեռնել ձեր կազմակերպությունները։",
       "membershipLostNotice": "Դուք այլևս այս կազմակերպություն մուտք գործելու իրավունք չունեք։ Փոխարկվել է {{target}}։",
@@ -3263,7 +3263,7 @@
       "roleMember": "Դերը՝ անդամ։",
       "sendInvite": "Ուղարկել հրավեր",
       "title": "Հրավիրել անդամ",
-      "alreadyInvited": "Նրանք արդեն հրավիրված են կամ արդեն անդամ են։",
+      "alreadyInvited": "Այս անձն արդեն հրավիրված է կամ արդեն անդամ է։",
       "sendError": "Չհաջողվեց ուղարկել հրավերը։",
       "pendingInvitation": "Այս էլփոստն արդեն ունի սպասող հրավեր։",
       "alreadyMember": "Այս անձն արդեն այս կազմակերպության անդամ է։"
@@ -3599,11 +3599,11 @@
       "authBearer": "Bearer թոքեն",
       "authOAuth": "OAuth մուտք",
       "fieldToken": "Թոքեն",
-      "oauthHint": "Պահպանելուց հետո սերվերի վրա հպիր $t(modelChat.mcpOAuth.signIn)՝ դիտարկիչով մուտք գործելու համար։",
-      "serverNeedsSignIn": "Մուտք գործիր՝ այս սերվերն օգտագործելու համար",
+      "oauthHint": "Պահպանելուց հետո սերվերի վրա հպեք $t(modelChat.mcpOAuth.signIn)՝ դիտարկիչով մուտք գործելու համար։",
+      "serverNeedsSignIn": "Մուտք գործեք՝ այս սերվերն օգտագործելու համար",
       "signIn": "Մուտք գործել",
       "signInA11y": "Մուտք գործել այս սերվեր: {{name}}",
-      "signInFailed": "Չհաջողվեց մուտք գործել {{name}}։ Կրկին փորձիր։"
+      "signInFailed": "Չհաջողվեց մուտք գործել {{name}}։ Կրկին փորձեք։"
     },
     "backends": {
       "title": "Զրույցի սերվերային ծառայություններ",

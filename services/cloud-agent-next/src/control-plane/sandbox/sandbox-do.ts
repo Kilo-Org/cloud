@@ -302,6 +302,7 @@ import {
   recordRepositoryLaunch,
   type RepositoryPreparationFailure,
 } from './repository-launch.js';
+import { startCommandsForWrapper, WrapperStartCommandsUnsupportedError } from './start-commands.js';
 import {
   environmentLaunchCandidate,
   environmentStartDetail,
@@ -405,6 +406,7 @@ const wrapperSocketAttachmentSchema = z.object({
   workspaceSnapshots: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  startCommands: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
@@ -417,6 +419,7 @@ const WRAPPER_BILLING_CHECK_MS = 30_000;
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
   | 'wrapper_skills_sh_unsupported'
+  | 'wrapper_start_commands_unsupported'
   | 'frame_materialization_failed';
 
 class PrepareFrameMaterializationError extends Error {
@@ -438,9 +441,10 @@ function errorClassName(error: unknown): string {
 }
 
 function materializationStage(error: unknown): PrepareFrameMaterializationStage {
-  return error instanceof PrepareFrameMaterializationError
-    ? error.stage
-    : 'frame_materialization_failed';
+  if (error instanceof PrepareFrameMaterializationError) return error.stage;
+  if (error instanceof WrapperStartCommandsUnsupportedError)
+    return 'wrapper_start_commands_unsupported';
+  return 'frame_materialization_failed';
 }
 
 /**
@@ -2650,6 +2654,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.branchMode ? { branchMode: spec.branchMode } : {}),
       ...(spec.env ? { env: spec.env } : {}),
       ...(spec.setupCommands ? { setupCommands: spec.setupCommands } : {}),
+      ...(spec.startCommands ? { startCommands: spec.startCommands } : {}),
+      ...(spec.environmentSetupCommandCount === undefined
+        ? {}
+        : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
       ...(spec.runtimeIsolation ? { runtimeIsolation: spec.runtimeIsolation } : {}),
       ...(spec.git ? { git: spec.git } : {}),
     };
@@ -2786,6 +2794,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       directory?: string | undefined;
       env?: Record<string, string> | undefined;
       setupCommands?: string[] | undefined;
+      startCommands?: string[] | undefined;
+      environmentSetupCommandCount?: number | undefined;
       git?: SessionAttachPayload['git'];
       kilo: NonNullable<SessionAttachPayload['kilo']>;
       githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
@@ -2812,6 +2822,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         : { githubReviewTarget: payload.githubReviewTarget }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
+      ...(payload.startCommands === undefined ? {} : { startCommands: payload.startCommands }),
+      ...(payload.environmentSetupCommandCount === undefined
+        ? {}
+        : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
       // The roots hold no credential; the wrapper takes each root's alias by host.
       ...(spec.roots === undefined ? {} : { roots: spec.roots }),
@@ -3621,6 +3635,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.installsSkillsSh === true;
   }
 
+  private wrapperRunsStartCommands(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.startCommands === true;
+  }
+
   private wrapperAcceptsWorkspaceConfiguration(socket: WebSocket): boolean {
     return this.readAttachment(socket)?.workspaceConfiguration === true;
   }
@@ -3630,16 +3648,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * route waits out its preparation deadline.
    */
   private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
-    const wireSpec = runtimeSpecForContract(
-      route.spec,
-      readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
-    );
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
     ) {
       throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
     }
+    const attachment = this.readAttachment(socket);
+    const snapshotFrame = workspaceSnapshotFrame(this.db, route, attachment);
+    const wireSpec = startCommandsForWrapper(
+      {
+        ...runtimeSpecForContract(
+          route.spec,
+          readRuntimeContract(this.ctx.storage.kv, attachment?.allocationId ?? null)
+        ),
+        ...snapshotFrame,
+      },
+      this.wrapperRunsStartCommands(socket)
+    );
     const encryptedSecrets = route.credentialSource?.encryptedSecrets;
     try {
       const frameEnv = buildFrameEnv({
@@ -3664,7 +3690,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const frameSpec = controlPlaneRouteSpecSchema.parse({
         ...wireSpec,
-        ...workspaceSnapshotFrame(this.db, route, this.readAttachment(socket)),
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
         ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
         ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
@@ -5210,6 +5235,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(frame.startCommands ? { startCommands: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       logControlDiagnostic('workspace_snapshot_capability', {

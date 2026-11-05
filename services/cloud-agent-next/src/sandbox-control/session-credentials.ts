@@ -1031,6 +1031,10 @@ function preparedPayload(input: {
           }
         : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands.map(sanitize) } : {}),
+    ...(payload.startCommands ? { startCommands: payload.startCommands.map(sanitize) } : {}),
+    ...(payload.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
     kilo: {
       scopeId: grant.scopeId,
       token: kiloToken,

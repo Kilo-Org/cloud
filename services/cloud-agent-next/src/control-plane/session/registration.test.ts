@@ -1134,6 +1134,29 @@ describe('profile runtime delivery', () => {
     });
   });
 
+  it('delivers the environment setup command boundary through prepare', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          setupCommands: ['env-setup', 'inline-setup'],
+          environmentSetupCommandCount: 1,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec).toMatchObject({
+      setupCommands: ['env-setup', 'inline-setup'],
+      environmentSetupCommandCount: 1,
+    });
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.environmentSetupCommandCount
+    ).toBe(1);
+  });
+
   it('accepts an inherited worktree profile without per-session isolation', () => {
     const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
     expect(

@@ -827,9 +827,11 @@ jobs:
           path: ${{ github.workspace }}/apps/web/.next/cache
           # Key on the build inputs, not the commit: a cache entry is immutable,
           # so a key that carries github.sha writes a new entry on every run for
-          # one dependency graph. Every glob stays inside the app tree, so this
-          # never walks node_modules.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml', 'apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
+          # one dependency graph. The lockfile digest keeps its own segment, so
+          # the prefix restore-key below still matches this key when only a
+          # source file changed. The source globs stay inside the app tree, so
+          # none of them walks node_modules.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -875,7 +877,11 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ github.workspace }}/apps/ai-gateway/.next/cache
-          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          # Same input-keyed scheme as the web build cache: the lockfile digest
+          # is its own segment so the prefix restore-key below still matches.
+          # The job copies apps/web/.env and apps/web/.env.test into the app
+          # before building, so those files are build inputs here too.
+          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-
 

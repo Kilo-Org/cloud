@@ -2038,6 +2038,7 @@
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
+      "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."

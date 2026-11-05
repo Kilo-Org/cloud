@@ -2552,6 +2552,7 @@
       "assistantStopped": "وەڵامەکە وەستێنرا.",
       "assistantContextOverflow": "گفتوگۆکە بۆ ئەم مۆدێلە زۆر درێژە.",
       "assistantProviderError": "دابینکەرەکە هەڵەیەکی گەڕاندەوە.",
+      "assistantProviderRefused": "دابینکەرەکە ئەم داواکارییەی ڕەتکردەوە و ناتوانرێت دووبارە هەوڵی بۆ بدرێتەوە.",
       "assistantOutputLimit": "وەڵامەکە گەیشتووەتە سنووری دەرکردنی مۆدێلەکە.",
       "assistantStructuredOutput": "وەڵامەکە لەگەڵ ئەو فۆرماتەی کە پێویست بوو نەگونجاوە.",
       "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو."

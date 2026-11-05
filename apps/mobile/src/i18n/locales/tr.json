@@ -2013,6 +2013,7 @@
       "assistantStopped": "Yanıt durduruldu.",
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
+      "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."

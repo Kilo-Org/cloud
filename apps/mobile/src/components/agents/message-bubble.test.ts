@@ -272,12 +272,12 @@ function assistantMessageWithText(id: string): StoredMessage {
 function assistantMessageWithError(
   id: string,
   errorName: string,
-  options: { content?: boolean } = {}
+  options: { content?: boolean; isRetryable?: boolean } = {}
 ): StoredMessage {
   const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
   (message.info as { error?: { name: string; data: unknown } }).error = {
     name: errorName,
-    data: { message: 'raw', isRetryable: true },
+    data: { message: 'raw', isRetryable: options.isRetryable ?? true },
   };
   return message;
 }
@@ -431,6 +431,20 @@ describe('MessageBubble failure footer', () => {
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a gateway-marked final refusal in the detail line, without Retry', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-terminal', 'APIError', { isRetryable: false }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(true);
+    // The transient failure's line is what the terminal row used to repeat.
+    expect(findText(tree, t => t === 'The provider returned an error.')).toBe(false);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
   });
 

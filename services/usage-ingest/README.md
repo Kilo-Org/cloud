@@ -84,7 +84,18 @@ writer URLs, or exception details are included in these logs.
 Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
 `usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
 `usage_ingest_processing`) are always emitted; see
-[queue delivery diagnostics](diagnostics.md).
+[queue delivery diagnostics](diagnostics.md). The best-effort completion observation
+(`usage_ingest_enqueue_observed`) is described next.
+
+`usage_ingest_enqueue_observed` is registered on `ExecutionContext.waitUntil` before the
+single send is awaited, so it is intended to report the completion of that same send even
+when the caller has already disconnected. It records only the validated usage ID, the
+outcome and the monotonic send duration; it adds no send, retry, response or authentication
+change. This extends only the post-response observation lifetime: the HTTP status still
+comes from the awaited send, and no log proves the consumer committed a database row. A
+stall longer than Cloudflare's `waitUntil` allowance after the response or disconnect (30 s)
+can still end before the send settles, and a hard kill can lose the observation entirely; a
+missing observation is therefore not evidence that the send failed.
 
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
 of handling that message, independently of writer duration. Selected existing processing
@@ -165,8 +176,8 @@ After attempting queue publication, the gateway never falls back to a billing
 writer. Existing direct fallbacks for missing publisher configuration or failed
 lifetime registration remain safe because no publication was attempted. The
 Cloudflare HTTP publisher retries transient failures up to four total attempts,
-with up to ten seconds for the first confirmation and five seconds for each later
-one, inside a 25-second overall elapsed retry budget. Before retries it uses
+with up to twenty seconds for the first confirmation and five seconds for each later
+one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of

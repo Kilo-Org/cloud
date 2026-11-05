@@ -2011,6 +2011,7 @@
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é longa demais para o modelo.",
       "assistantProviderError": "O provedor retornou um erro.",
+      "assistantProviderRefused": "O provedor recusou esta solicitação e não é possível tentar novamente.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "Não foi possível gerar a resposta."

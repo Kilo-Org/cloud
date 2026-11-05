@@ -2552,6 +2552,7 @@
       "assistantStopped": "ప్రతిస్పందన ఆపివేయబడింది.",
       "assistantContextOverflow": "ఈ సంభాషణ మోడల్ నిర్వహించగల పరిమాణాన్ని మించిపోయింది.",
       "assistantProviderError": "ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది.",
+      "assistantProviderRefused": "ప్రొవైడర్ ఈ అభ్యర్థనను తిరస్కరించారు; దీన్ని మళ్లీ ప్రయత్నించలేము.",
       "assistantOutputLimit": "ప్రతిస్పందన మోడల్ అవుట్‌పుట్ పరిమితిని చేరుకుంది.",
       "assistantStructuredOutput": "ప్రతిస్పందన అవసరమైన ఫార్మాట్‌కు అనుగుణంగా లేదు.",
       "assistantFailed": "ప్రతిస్పందన విఫలమైంది."

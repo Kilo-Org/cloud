@@ -532,6 +532,21 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
     ).toBe('コンテキスト使用状況を利用できません、コスト 8 セント。');
   });
 
+  it('keeps the tap hint a separate sentence where no body mark closes the sentence', async () => {
+    // "th" ends no sentence with a terminator, so the hint's own leading space
+    // is the only thing that keeps the two sentences apart.
+    await i18n.changeLanguage('th');
+    const args = {
+      info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      totalCostMicrodollars: null,
+    } as const;
+    const body = getMetricsAccessibilityLabel({ ...args, interactive: false });
+    const hint = i18n.t('agentChat.contextUsage.tapToViewDetails');
+    expect(body.at(-1)).not.toMatch(/[\p{Sentence_Terminal}\u2026]/u);
+    expect(hint.startsWith(' ')).toBe(true);
+    expect(getMetricsAccessibilityLabel({ ...args, interactive: true })).toBe(`${body}${hint}`);
+  });
+
   it('never puts two sentence terminators side by side in any supported locale', async () => {
     expect(SUPPORTED_LANGUAGES.length).toBeGreaterThan(50);
     const usages = [

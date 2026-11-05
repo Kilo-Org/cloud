@@ -387,7 +387,7 @@ describe('MessageBubble failure footer', () => {
     ).toEqual([]);
 
     const executionFooter = footerOf(executionTree);
-    expect(String(executionFooter?.props.className)).toBe('gap-1 px-4 py-1');
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 py-1');
     expect(
       classNamesIn(executionFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')

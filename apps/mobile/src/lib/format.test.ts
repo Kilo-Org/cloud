@@ -8,6 +8,8 @@ import {
   formatCalendarDate,
   formatClockTime,
   formatDate,
+  formatDuration,
+  formatDurationIncludingZero,
   formatFileSize,
   formatList,
   formatMoney,
@@ -110,6 +112,24 @@ describe('localized format helpers', () => {
 
   it('formats a calendar date without a time-zone shift', () => {
     expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
+  });
+});
+
+describe('formatDurationIncludingZero', () => {
+  it('writes the zero duration that formatDuration drops', () => {
+    expect(formatDuration(0, 'en')).toBe('');
+    expect(formatDurationIncludingZero(0, 'en')).toBe('0 sec');
+  });
+
+  it('keeps the plain duration once a second has elapsed', () => {
+    expect(formatDurationIncludingZero(1, 'en')).toBe('1 sec');
+    expect(formatDurationIncludingZero(59, 'en')).toBe('59 sec');
+    expect(formatDurationIncludingZero(60, 'en')).toBe('1 min');
+    expect(formatDurationIncludingZero(3725, 'en')).toBe('1 hr, 2 min, 5 sec');
+  });
+
+  it.each(SUPPORTED_LANGUAGES)('names the zero in its own digits in %s', tag => {
+    expect(formatDurationIncludingZero(0, tag)).toContain(formatNumber(0, tag));
   });
 });
 

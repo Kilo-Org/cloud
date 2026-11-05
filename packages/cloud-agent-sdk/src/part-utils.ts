@@ -252,7 +252,7 @@ export function normalizeToolPartState(part: Part): Part | null {
  * the live-stream path (`messagePartUpdatedDataSchema` uses `.passthrough()`)
  * and the history-load path (mirrored in `kiloSdkPartSchema` step-finish
  * variant). Absent from the externally generated `StepFinishPart` type
- * (`apps/web/src/types/opencode.gen.ts` cannot be regenerated in-repo), so
+ * (`packages/app-shared/src/opencode.gen.ts` cannot be regenerated in-repo), so
  * read the field through {@link getStepFinishRoutedModel}.
  */
 export type RoutedModelRef = { providerID: string; modelID: string };

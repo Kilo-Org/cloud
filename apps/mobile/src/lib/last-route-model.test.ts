@@ -195,6 +195,7 @@ describe('shouldRepairRestoredRoute', () => {
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/(tabs)/(3_profile)/profiles/p1/variables',
         restoredRoute: '/agent-chat/ses_gone',
+        launchOpenedAppRoute: false,
       })
     ).toBe(true);
   });
@@ -204,6 +205,7 @@ describe('shouldRepairRestoredRoute', () => {
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/agent-chat/ses_1',
         restoredRoute: '/agent-chat/ses_1',
+        launchOpenedAppRoute: false,
       })
     ).toBe(false);
   });
@@ -215,6 +217,7 @@ describe('shouldRepairRestoredRoute', () => {
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/(tabs)/(3_profile)',
         restoredRoute: '/(app)/(tabs)/(0_home)',
+        launchOpenedAppRoute: false,
       })
     ).toBe(true);
   });
@@ -224,6 +227,7 @@ describe('shouldRepairRestoredRoute', () => {
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/(tabs)/(3_profile)',
         restoredRoute: '/(app)/(tabs)/(3_profile)',
+        launchOpenedAppRoute: false,
       })
     ).toBe(false);
   });
@@ -233,13 +237,31 @@ describe('shouldRepairRestoredRoute', () => {
       shouldRepairRestoredRoute({
         recordedHref: '/(app)/agent-chat/ses_1?via=push',
         restoredRoute: '/agent-chat/ses_2',
+        launchOpenedAppRoute: false,
       })
     ).toBe(true);
   });
 
   it('does not repair without a record', () => {
     expect(
-      shouldRepairRestoredRoute({ recordedHref: null, restoredRoute: '/agent-chat/ses_gone' })
+      shouldRepairRestoredRoute({
+        recordedHref: null,
+        restoredRoute: '/agent-chat/ses_gone',
+        launchOpenedAppRoute: false,
+      })
+    ).toBe(false);
+  });
+
+  it("never repairs a launch that opened one of the app's own routes", () => {
+    // The OS hands the same base Intent to a killed task and to a fresh link
+    // tap, so the launch link is the only evidence of what this process was
+    // started for: the pending consumer opens it, not the recorded route.
+    expect(
+      shouldRepairRestoredRoute({
+        recordedHref: '/(app)/(tabs)/(0_home)',
+        restoredRoute: '/(app)/(tabs)/(3_profile)/organization/invoices',
+        launchOpenedAppRoute: true,
+      })
     ).toBe(false);
   });
 });

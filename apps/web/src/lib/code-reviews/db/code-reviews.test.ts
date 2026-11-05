@@ -28,6 +28,7 @@ import {
   ensureCurrentCodeReviewAttemptFromReview,
   findActiveReviewsForPR,
   findExistingReview,
+  findReviewCoveringHeads,
   getCodeReviewAttemptForReview,
   getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
@@ -433,6 +434,53 @@ describe('review identity', () => {
     );
 
     expect(matchingReview?.id).toBe(reviewId);
+  });
+
+  it('covers heads only for reviews that finished or are in flight in the same scope', async () => {
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName: `${REPO}-covering-heads`,
+      prNumber: 25,
+      prUrl: `https://github.com/${REPO}-covering-heads/pull/25`,
+      prTitle: 'covering heads',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/covering-heads',
+      headSha: 'covering-heads-content-sha',
+      platform: 'github' as const,
+    };
+    const reviewId = await createCodeReview(params);
+    createdReviewIds.push(reviewId);
+
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName: params.repoFullName,
+      prNumber: params.prNumber,
+      platformIntegrationId: firstIntegrationId,
+    };
+
+    // A head it holds covers it only while the review can still stand for the content.
+    expect(
+      await findReviewCoveringHeads(scope, ['other-head-sha', 'covering-heads-content-sha'])
+    ).toEqual({
+      checkRunId: null,
+      headSha: 'covering-heads-content-sha',
+      id: reviewId,
+      status: 'pending',
+    });
+
+    await updateCodeReviewStatus(reviewId, 'cancelled');
+
+    expect(await findReviewCoveringHeads(scope, ['covering-heads-content-sha'])).toBeNull();
+    expect(
+      await findReviewCoveringHeads(
+        { ...scope, platformIntegrationId: alternateFirstUserIntegrationId },
+        ['covering-heads-content-sha']
+      )
+    ).toBeNull();
+    expect(await findReviewCoveringHeads(scope, [])).toBeNull();
   });
 
   it('scopes GitLab active review uniqueness to the integration; separate instances are independent', async () => {

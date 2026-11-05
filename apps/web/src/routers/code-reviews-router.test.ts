@@ -3914,7 +3914,6 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     // stored integration row regardless of their concrete values).
     expect(status.integration).toEqual(
       expect.objectContaining({
-        isValid: true,
         instanceUrl: 'https://gitlab.example.com',
       })
     );
@@ -4169,7 +4168,6 @@ describe('personalReviewAgent.getGitHubStatus connection rule', () => {
         accountLogin: 'octocat',
         repositorySelection: 'all',
         installedAt: '2026-01-01 00:00:00+00',
-        isValid: true,
       },
     });
   });
@@ -4233,7 +4231,6 @@ describe('personalReviewAgent.getGitHubStatus connection rule', () => {
         accountLogin: 'octocat-new',
         repositorySelection: 'all',
         installedAt: '2026-01-01 00:00:00+00',
-        isValid: true,
       },
     });
   });

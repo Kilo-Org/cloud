@@ -53,6 +53,7 @@ const SESSION_TIMERS = {
 
 type PromptCall = {
   sessionId: string;
+  agent?: string;
   messageId: string;
   prompt?: string;
   parts?: unknown[];
@@ -381,6 +382,76 @@ function eventFrames(frames: ControlPlaneWrapperFrame[]) {
 }
 
 describe('turn manager submission', () => {
+  it('passes a repository agent unchanged to the SDK without runtimeAgents', async () => {
+    const h = createHarness();
+    const spec = routeSpec({ createdOnPlatform: 'webhook' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    expect(h.client(spec).prompts).toMatchObject([
+      { agent: 'foreman', messageId: 'm1', sessionId: KILO_SESSION },
+    ]);
+  });
+
+  it('fails visibly and releases a turn when the SDK reports a missing agent', async () => {
+    const h = createHarness();
+    h.setDispatchObservation(false);
+    const spec = routeSpec({ createdOnPlatform: 'scheduled' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', {
+        sessionID: KILO_SESSION,
+        error: {
+          name: 'UnknownError',
+          data: { message: 'Agent not found: "foreman". Available agents: code, plan' },
+        },
+      })
+    );
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      {
+        status: 'failed',
+        reason: 'Agent "foreman" was not found in the repository or profile',
+        assistantReason: 'invalid_request',
+        lastMessageId: 'm1',
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+    expect(h.manager.activeTurnCount()).toBe(0);
+    expect(h.client(spec).prompts).toHaveLength(1);
+  });
+
+  it('does not fail an unobserved prompt for an unrelated missing-agent event', async () => {
+    const h = createHarness();
+    h.setDispatchObservation(false);
+    const spec = routeSpec({ createdOnPlatform: 'webhook' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      agent: { mode: 'foreman', model: 'test/model' },
+    });
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', {
+        sessionID: KILO_SESSION,
+        error: {
+          name: 'UnknownError',
+          data: { message: 'Agent not found: "previous-agent". Available agents: code' },
+        },
+      })
+    );
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(true);
+    h.manager.shutdown();
+  });
+
   it('bounds attachment delivery and fences late materialization without calling it native inactivity', async () => {
     const materialized = Promise.withResolvers<{ prompt: string }>();
     const h = createHarness({ materializeAttachments: () => materialized.promise });
@@ -2402,6 +2473,92 @@ describe('turn finalization', () => {
       commitHash: 'abc123',
       commitMessage: 'Fix bug',
     });
+  });
+
+  it('auto-commits each root of a multi-repository route and warns for the one that fails', async () => {
+    const calls: Array<{ workspacePath: string; upstreamBranch?: string }> = [];
+    const h = createHarness({
+      runAutoCommit: (async (opts: { workspacePath: string; upstreamBranch?: string }) => {
+        calls.push(opts);
+        if (opts.workspacePath === '/workspace/web') throw new Error('hook failed');
+        return { success: true };
+      }) as never,
+    });
+    h.registerRoute(
+      routeSpec({
+        directory: '/workspace',
+        roots: [
+          {
+            directory: '/workspace/web',
+            repoFullName: 'acme/web',
+            git: { url: 'https://github.com/acme/web.git', platform: 'github' },
+            branch: 'release',
+          },
+          {
+            directory: '/workspace/api',
+            repoFullName: 'acme/api',
+            git: { url: 'https://github.com/acme/api.git', platform: 'github' },
+            branch: 'kilo/work',
+            branchMode: 'working',
+          },
+        ],
+      })
+    );
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(calls.map(call => [call.workspacePath, call.upstreamBranch])).toEqual([
+      ['/workspace/web', 'release'],
+      ['/workspace/api', undefined],
+    ]);
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).toContain('Auto-commit failed (acme/web): hook failed');
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+
+  it('warns for a reported commit failure of a multi-repository root even when a later root succeeds', async () => {
+    const h = createHarness({
+      runAutoCommit: (async (opts: { workspacePath: string }) =>
+        opts.workspacePath === '/workspace/web'
+          ? { success: false, error: 'git commit failed' }
+          : { success: true }) as never,
+    });
+    h.registerRoute(
+      routeSpec({
+        directory: '/workspace',
+        roots: ['web', 'api'].map(leaf => ({
+          directory: `/workspace/${leaf}`,
+          repoFullName: `acme/${leaf}`,
+          git: { url: `https://github.com/acme/${leaf}.git`, platform: 'github' as const },
+          branch: 'kilo/work',
+          branchMode: 'working' as const,
+        })),
+      })
+    );
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).toContain('Auto-commit failed (acme/web): git commit failed');
+    expect(JSON.stringify(events)).not.toContain('Auto-commit failed (acme/api)');
+  });
+
+  it('does not add a warning for the reported commit failure of a V1 route', async () => {
+    const h = createHarness({
+      runAutoCommit: (async () => ({ success: false, error: 'git commit failed' })) as never,
+    });
+    h.registerRoute(routeSpec({}));
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).not.toContain('Auto-commit failed');
   });
 
   it('falls back to the user message ID, passes runtime env and named secret keys, and aborts auto-commit on abort', async () => {

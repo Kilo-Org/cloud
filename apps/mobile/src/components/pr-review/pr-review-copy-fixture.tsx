@@ -1,5 +1,5 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
-import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import {
   PrReviewOverviewCopyFixture,
@@ -31,10 +31,13 @@ import {
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { TRPCProvider } from '@/lib/trpc';
 
 // In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge,tabs}
-// through the app's native link scheme.
+// through the app's native link scheme; the overview surfaces are
+// dev/pr-review-copy-fixture/{overview,overview-blocked,overview-merged,merge-request,
+// merge-request-missing,merge-request-error}.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -43,7 +46,17 @@ import { TRPCProvider } from '@/lib/trpc';
 // searching fetches the final page through the usual pagination hook.
 const triple = { owner: 'sample', repo: 'review-copy', number: 1 };
 const headSha = '0123456789abcdef0123456789abcdef01234567';
-const OVERVIEW_SURFACES = ['overview', 'merge-request-missing', 'merge-request-error'] as const;
+const OVERVIEW_SURFACES = [
+  'overview',
+  'overview-blocked',
+  'overview-merged',
+  'merge-request',
+  'overview-no-checks',
+  'overview-multi-group',
+  'overview-auto-merge',
+  'merge-request-missing',
+  'merge-request-error',
+] as const;
 
 function isOverviewSurface(surface: string | undefined): surface is PrReviewOverviewFixtureSurface {
   return OVERVIEW_SURFACES.some(candidate => candidate === surface);
@@ -161,6 +174,24 @@ function createFixtureClient() {
   });
 }
 
+/**
+ * The standalone CHECKS surface: the section renders from a read its screen
+ * owns, so this surface owns one the way the overview does, and the card paints
+ * only once that read has answered — the only shape it has in the app.
+ */
+function ChecksSectionSurface() {
+  const queries = useProviderPrQueries(triple);
+  const read = useQuery(queries.checksOptions(headSha, true));
+  if (read.isLoading) {
+    return null;
+  }
+  return (
+    <ScrollView contentContainerClassName="gap-4 p-6">
+      <PrReviewChecksSection {...triple} checks={read} />
+    </ScrollView>
+  );
+}
+
 export function PrReviewCopyFixture() {
   const { surface } = useLocalSearchParams<{ surface?: string }>();
   const router = useRouter();
@@ -220,7 +251,7 @@ export function PrReviewCopyFixture() {
             conflicts: false,
             blockedReasons: [],
           }}
-          sheetTitle={t('prReview.merge.mergeTermTitle', { term: t(providerPrNounKey('gitlab')) })}
+          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).action}
           eyebrow="sample/review-copy!1"
           onRefetch={async () => {
             await queryClient.invalidateQueries();
@@ -251,7 +282,10 @@ export function PrReviewCopyFixture() {
       </PendingReviewProvider>
     );
   } else if (isOverviewSurface(surface)) {
-    content = <PrReviewOverviewCopyFixture surface={surface} />;
+    // Keyed by surface: each surface answers the same query keys, so a second
+    // surface opened on this route would otherwise read the first one's cached
+    // reads (staleTime: Infinity) and appear not to change the screen.
+    content = <PrReviewOverviewCopyFixture key={surface} surface={surface} />;
   } else if (surface === 'submit') {
     content = (
       <FeedbackPromptProvider>
@@ -264,11 +298,7 @@ export function PrReviewCopyFixture() {
       </FeedbackPromptProvider>
     );
   } else {
-    content = (
-      <ScrollView contentContainerClassName="gap-4 p-6">
-        <PrReviewChecksSection {...triple} headSha={headSha} />
-      </ScrollView>
-    );
+    content = <ChecksSectionSurface />;
   }
   return (
     <QueryClientProvider client={queryClient}>

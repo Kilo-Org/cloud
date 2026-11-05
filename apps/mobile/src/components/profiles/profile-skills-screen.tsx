@@ -4,10 +4,10 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -311,7 +311,11 @@ export function ProfileSkillsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.skillsTitle')} />
+      <ProfileSectionHeader
+        profileId={profileId}
+        organizationId={organizationId}
+        title={t('profiles.skillsTitle')}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { type ManageRepositoryAccess } from '@/lib/hooks/use-manage-repository-access';
 import { cn } from '@/lib/utils';
 
@@ -49,12 +50,14 @@ export function RepositorySyncFooter({
         <Button
           variant="link"
           size="sm"
-          // The compact box keeps its 44dp touch area through the button's own
-          // hit slop and the minimum width, so a short label in another language
-          // cannot shrink it below the target; the vertical margins cancel the
-          // height it would otherwise add, so this line sits the same 8dp under
-          // the count as the count sits under the explanation.
-          className="-my-[11px] min-w-[36px] px-0"
+          // The line's action keeps a 28dp box instead of `sm`'s 36dp frame: its
+          // layout height is cancelled so the line keeps the 7dp rhythm it has
+          // under the count, and a 36dp frame would then reach past that gap
+          // into the count itself. The 44dp reach comes from the box plus its
+          // slop, and the minimum width keeps a short label from shrinking the
+          // target in another language.
+          className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] px-0')}
+          hitSlop={LINE_ACTION_HIT_SLOP}
           loading={refreshing}
           disabled={refreshing}
           onPress={onRefresh}

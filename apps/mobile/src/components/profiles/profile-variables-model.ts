@@ -8,7 +8,11 @@
  * edit applies.
  */
 
-import { cleanVariableKey, VARIABLE_KEY_MAX_LENGTH } from '@/lib/agent-profile-forms';
+import {
+  cleanVariableKey,
+  isReservedVariableKey,
+  VARIABLE_KEY_MAX_LENGTH,
+} from '@/lib/agent-profile-forms';
 
 /** The fields of a variable the screen reads. Structural, so a test needs no tRPC type. */
 export type ProfileVarSource = Readonly<{
@@ -44,7 +48,7 @@ export function variableRows(vars: readonly ProfileVarSource[]): VariableRow[] {
   }));
 }
 
-export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'value-required';
+export type VariableInputError = 'empty' | 'too-long' | 'duplicate' | 'reserved' | 'value-required';
 
 /** Options the caller's surface adds to the shared key rules. */
 export type VariableInputRules = Readonly<{
@@ -55,16 +59,23 @@ export type VariableInputRules = Readonly<{
    * editor saves `KEY=` too.
    */
   requireValue?: boolean;
+  /**
+   * Refuse a key the sandbox runtime owns. A stored key keeps saving: the
+   * package applies the rule when a profile stores a key for the first time, so
+   * an edit of an older row must not be blocked here.
+   */
+  newKey?: boolean;
 }>;
 
 /**
- * Validate the edited variable before a save. Matches the server's
- * `VarSchema` key bound (`z.string().min(1).max(256)`) and, when `requireValue`
- * is set, refuses a blank value. `takenKeys` are the
+ * Validate the edited variable before a save. Measures the key the save will
+ * store, because the form adds a leading `_` to a digit-initial key, and the
+ * server bound applies to what it stores. When `requireValue` is set, a blank
+ * value is refused too. `takenKeys` are the
  * profile's stored keys: the server upserts on `(profile_id, key)` with the
  * cleaned key the form sends, so a new key that normalizes onto an existing one
- * would silently replace that variable. Returns an error code, or `null` when
- * valid.
+ * would silently replace that variable. `newKey` (on by default) also applies
+ * the reserved-name rule. Returns an error code, or `null` when valid.
  */
 export function validateVariableInput(
   input: Readonly<{ key: string; value: string }>,
@@ -75,11 +86,14 @@ export function validateVariableInput(
   if (key.length === 0) {
     return 'empty';
   }
-  if (key.length > VARIABLE_KEY_MAX_LENGTH) {
+  if (savedVariableKey(key).length > VARIABLE_KEY_MAX_LENGTH) {
     return 'too-long';
   }
   if (takenKeys.includes(cleanVariableKey(key))) {
     return 'duplicate';
+  }
+  if (rules.newKey !== false && isReservedVariableKey(savedVariableKey(key))) {
+    return 'reserved';
   }
   if (rules.requireValue === true && input.value.trim().length === 0) {
     return 'value-required';

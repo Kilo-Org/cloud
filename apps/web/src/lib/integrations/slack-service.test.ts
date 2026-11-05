@@ -5,6 +5,7 @@ const mockUpdateSet = jest.fn();
 const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
+const mockDeleteReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
+          orderBy: jest.fn(() => ({ limit: mockLimit })),
           limit: mockLimit,
         })),
       })),
@@ -212,13 +214,13 @@ describe('slack-service uninstallApp', () => {
 
 describe('slack-service deleteInstallationByTeamId', () => {
   beforeEach(() => {
-    mockLimit.mockReset();
     mockDeleteWhere.mockReset();
-    mockDeleteWhere.mockResolvedValue(undefined);
+    mockDeleteReturning.mockReset();
+    mockDeleteWhere.mockReturnValue({ returning: mockDeleteReturning });
   });
 
-  it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+  it('reports a deleted workspace when rows are removed', async () => {
+    mockDeleteReturning.mockResolvedValue([{ id: 'integration-1' }]);
 
     await expect(deleteInstallationByTeamId('T123')).resolves.toEqual({
       success: true,
@@ -328,6 +330,8 @@ describe('getMissingSlackScopes', () => {
 describe('upsertSlackInstallation', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    // A workspace lookup the test does not script finds no row.
+    mockLimit.mockResolvedValue([]);
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();
@@ -604,6 +608,8 @@ describe('upsertSlackInstallation organization workspace binding', () => {
 
   beforeEach(() => {
     mockLimit.mockReset();
+    // A workspace lookup the test does not script finds no row.
+    mockLimit.mockResolvedValue([]);
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();

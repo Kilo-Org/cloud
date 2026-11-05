@@ -180,9 +180,13 @@ function text() {
     .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
     .join('\n');
 }
-async function render(sessions = settled, contextOverride = context) {
+async function render(sessions = settled, contextOverride = context, briefing?: Props['briefing']) {
   await act(async () => {
-    const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
+    const tree = createElement(AgentSessionsSection, {
+      context: contextOverride,
+      sessions,
+      briefing,
+    });
     if (renderer) {
       renderer.update(tree);
     } else {
@@ -305,6 +309,56 @@ describe('Home live section', () => {
     // The header keeps See all's box but hides it.
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     expect(node('SectionHeader').props.actionHidden).toBe(true);
+  });
+
+  it('leaves the live card without a single pressable while the briefing holds the frame', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    expect(typeof newestButton().props.onPress).toBe('function');
+
+    // The briefing layer is drawn; the live card stays mounted underneath only
+    // to reserve the frame's height, so it renders no press target at all: a
+    // mounted Pressable is a touch area even without its onPress.
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] }, context, {
+      visible: true,
+      card: createElement('BriefingCard'),
+    });
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(text()).toContain('live-1');
+  });
+
+  it('does not reuse the previous session node when the card settles into the zero state', async () => {
+    await render({ ...settled, activeSessions: [session('live-1', 'running')] });
+    const live = newestButton();
+    expect(live.props.accessibilityLabel).toContain('live-1');
+
+    await render();
+    const zero = nodes('Pressable').find(
+      pressable =>
+        pressable.findAll(
+          child =>
+            Object.is(child.type, 'Text') && child.children.includes(i18n.t('home.noLiveSessions'))
+        ).length > 0
+    );
+    if (!zero) {
+      throw new Error('Missing the zero-state newest block');
+    }
+    // The zero state must be its own native view: React Native keeps a prop it
+    // stops receiving, so the reused Android view would go on announcing the
+    // previous session and its button role.
+    expect(zero).not.toBe(live);
+    expect(zero.props.accessibilityLabel).toBeUndefined();
+    expect(zero.props.accessibilityRole).toBeUndefined();
+    expect(
+      nodes('Pressable').some(pressable =>
+        String(pressable.props.accessibilityLabel ?? '').includes('live-1')
+      )
+    ).toBe(false);
+
+    // Returning to a session mounts a labelled control again.
+    await render({ ...settled, activeSessions: [session('live-2', 'busy')] });
+    const revived = newestButton();
+    expect(revived).not.toBe(zero);
+    expect(revived.props.accessibilityLabel).toContain('live-2');
   });
 
   it('moves the offline notice into the header and keeps the card in place', async () => {

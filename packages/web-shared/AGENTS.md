@@ -36,19 +36,37 @@ work, work after the upstream request starts, and exceptional paths may use it.
   acceptable for auth. Shared helpers keep their `fromDb = db` default for the
   web app; gateway callers must pass `readDb`, since omitting it selects the
   primary.
-- Defer writes with `after()`, or forward them to `fra1` like
+- Usage accounting has its own transport selection; do not infer it from the
+  general write guidance below. `usageAccountingTransport` selects queue or
+  direct transport per request for `logMicrodollarUsage` and
+  `logMicrodollarUsageAndReportToBouncer`. Selected usage publishes its
+  finalized record through the selected queue transport; in production that is
+  the authenticated Cloudflare ingress, whose consumer calls the existing
+  Frankfurt `/api/internal/usage/record` writer. HTTP 202 is queue acceptance,
+  not a committed row or debit; the writer persists idempotently by usage ID, so
+  redelivery does not create a second debit. Selection changes accounting
+  transport only, not inference routing or compute location.
+- Direct accounting remains for FRA deployments other than staging and
+  production `fra1`, for production FRA requests without a payer identity, and
+  for the existing SFO `recordUsageInPrimaryRegion` handoff, which falls back
+  to a local write when the handoff is unavailable. Selected queue usage falls
+  back to a direct write only in the two pre-publication cases where nothing was
+  sent:
+  missing/unparseable publisher configuration and failed lifetime registration.
+  It does not fall back after any publication attempt, including timeout or an
+  ambiguous failure, because the event may already be queued.
+- For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
 - Where correctness needs the primary on a rare path (read-after-write, a row
   lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
-## BYOK routing preview
-
-`previewByokRouting` in `src/lib/ai-gateway/providers/get-provider.ts` shows the BYOK settings
-page the route order of `getProvider`, from key metadata only. When changing `getProvider`'s step
-order or key decisions, update the preview in the same change and keep
-`get-provider.preview.test.ts` passing. The preview must never decrypt keys or call KMS.
+The queue launch and retirement rollback are documented in
+[`ENVIRONMENT.md`](../../ENVIRONMENT.md) and
+[`services/usage-ingest/README.md`](../../services/usage-ingest/README.md).
+Source defaults do not establish deployed selection; production SFO and FRA
+selection follow the deployed source and have no runtime cohort switch.
 
 ## Data collection versus ZDR
 

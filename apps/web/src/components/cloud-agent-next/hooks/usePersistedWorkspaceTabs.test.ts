@@ -307,6 +307,26 @@ describe('usePersistedWorkspaceTabs', () => {
       expect(chatProbe?.closedSessionIds).toEqual([]);
     });
 
+    it('resyncs a page restored from the back-forward cache', () => {
+      renderChats();
+      dom.storage.set(
+        STORAGE_KEY,
+        JSON.stringify({ closedSessionIds: ['ses-external'], sessionOrderByWorktree: {} })
+      );
+      const dispatchPageShow = (persisted: boolean) => {
+        const event = new window.Event('pageshow');
+        Object.assign(event, { persisted });
+        act(() => {
+          window.dispatchEvent(event);
+        });
+      };
+
+      dispatchPageShow(false);
+      expect(chatProbe?.closedSessionIds).toEqual([]);
+      dispatchPageShow(true);
+      expect(chatProbe?.closedSessionIds).toEqual(['ses-external']);
+    });
+
     it.each(['getItem', 'setItem'] as const)('keeps updates in memory when %s throws', method => {
       jest.spyOn(window.localStorage, method).mockImplementation(() => {
         throw new Error('unavailable');

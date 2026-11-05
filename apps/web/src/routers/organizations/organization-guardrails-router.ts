@@ -1,12 +1,22 @@
 import {
+  ENKRYPT_DETECTOR_IDS,
+  ENKRYPT_OUTPUT_DETECTOR_IDS,
   EnkryptInputDetectorsSchema,
   EnkryptInputGuardrailSettingsSchema,
+  EnkryptOutputDetectorsSchema,
+  EnkryptOutputGuardrailSettingsSchema,
+  type OrganizationSettings,
 } from '@kilocode/db/schema-types';
 import {
+  createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
   enabledEnkryptDetectorIds,
+  enabledEnkryptOutputDetectorIds,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import { readStoredEnkryptDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  readStoredEnkryptDetectors,
+  readStoredEnkryptOutputDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -20,50 +30,116 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { requireGuardrailsOrganization } from '@/lib/organizations/require-guardrails-organization';
 
+const OrganizationOutputGuardrailConfigSchema = z.object({
+  enabled: z.boolean(),
+  detectors: EnkryptOutputDetectorsSchema,
+});
+
 const OrganizationGuardrailsConfigSchema = z.object({
   enabled: z.boolean(),
   scan_tool_results: z.boolean(),
   detectors: EnkryptInputDetectorsSchema,
+  output: OrganizationOutputGuardrailConfigSchema,
+});
+
+/** `output` is optional so a page loaded before response checks existed can still save. */
+const OrganizationGuardrailsUpdateSchema = OrganizationGuardrailsConfigSchema.extend({
+  output: OrganizationOutputGuardrailConfigSchema.optional(),
 });
 
 export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrailsConfigSchema>;
 
 /**
- * `invalid_saved_detectors`: the saved detectors no longer validate, so the gateway rejects every
- * scanned request while the guardrail is enabled. `detectors` then holds Kilo Default as a
- * starting point for the admin to review and save.
+ * `invalid_saved_detectors`: the saved input detectors no longer validate, so the gateway rejects
+ * every scanned request while the guardrail is enabled. `detectors` then holds Kilo Default as a
+ * starting point for the admin to review and save. `invalid_saved_output_detectors` is the same for
+ * the response guardrail, which then withholds every response and starts from no detector.
  */
 const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
   invalid_saved_detectors: z.boolean(),
+  invalid_saved_output_detectors: z.boolean(),
 });
+
+type DescribedDetector = {
+  enabled: boolean;
+  action?: string;
+  entities?: string[];
+  banned_keywords?: string[];
+  topic?: string[];
+  format?: string;
+  rules?: unknown[];
+};
+
+function describeDetectors<Id extends string>(
+  ids: readonly Id[],
+  detectors: Record<Id, DescribedDetector>
+): string {
+  const summaries = ids.flatMap(id => {
+    const detector = detectors[id];
+    if (!detector.enabled) return [];
+    const details: string[] = [];
+    if (detector.action) details.push(detector.action);
+    if (detector.entities) details.push(detector.entities.join('/'));
+    if (detector.banned_keywords) details.push(`${detector.banned_keywords.length} keywords`);
+    if (detector.topic) details.push(`${detector.topic.length} topics`);
+    if (detector.format) {
+      details.push(
+        detector.format === 'rules' ? `${detector.rules?.length ?? 0} rules` : 'policy text'
+      );
+    }
+    return [details.length > 0 ? `${id} (${details.join(', ')})` : id];
+  });
+  return summaries.join(', ') || 'none';
+}
 
 /** Describes a saved configuration for the audit log without keywords, topics, or policy text. */
 export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): string {
-  const { detectors } = config;
-  const detectorSummaries = enabledEnkryptDetectorIds(detectors).map(id => {
-    const details: string[] = [];
-    const detector = detectors[id];
-    if ('action' in detector) details.push(detector.action);
-    if (id === 'pii') details.push(detectors.pii.entities.join('/'));
-    if (id === 'keyword_detector') {
-      details.push(`${detectors.keyword_detector.banned_keywords.length} keywords`);
-    }
-    if (id === 'topic_detector') details.push(`${detectors.topic_detector.topic.length} topics`);
-    if (id === 'policy_violation') {
-      details.push(
-        detectors.policy_violation.format === 'rules'
-          ? `${detectors.policy_violation.rules.length} rules`
-          : 'policy text'
-      );
-    }
-    return details.length > 0 ? `${id} (${details.join(', ')})` : id;
-  });
-  const scope = config.scan_tool_results ? 'every input' : 'new user input only';
+  const scope = config.scan_tool_results ? 'every input' : 'conversation without tool results';
   return [
     `Updated AI guardrails: ${config.enabled ? 'enabled' : 'disabled'}`,
     `checking ${scope}`,
-    `detectors: ${detectorSummaries.join(', ') || 'none'}`,
+    `detectors: ${describeDetectors(ENKRYPT_DETECTOR_IDS, config.detectors)}`,
+    `response checks: ${config.output.enabled ? 'enabled' : 'disabled'}`,
+    `response detectors: ${describeDetectors(ENKRYPT_OUTPUT_DETECTOR_IDS, config.output.detectors)}`,
   ].join('; ');
+}
+
+function savedInputGuardrail(organizationId: string, settings: OrganizationSettings) {
+  const saved = EnkryptInputGuardrailSettingsSchema.safeParse(settings.enkrypt?.input_guardrail);
+  if (!saved.success) {
+    return {
+      enabled: false,
+      scan_tool_results: false,
+      detectors: createKiloDefaultEnkryptInputDetectors(),
+      invalid_saved_detectors: false,
+    };
+  }
+  const stored = readStoredEnkryptDetectors(organizationId, saved.data.detectors);
+  return {
+    enabled: saved.data.enabled,
+    scan_tool_results: saved.data.scan_tool_results ?? true,
+    detectors:
+      stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors(),
+    invalid_saved_detectors: stored.status === 'invalid',
+  };
+}
+
+function savedOutputGuardrail(organizationId: string, settings: OrganizationSettings) {
+  const saved = EnkryptOutputGuardrailSettingsSchema.safeParse(settings.enkrypt?.output_guardrail);
+  if (!saved.success) {
+    return {
+      output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      invalid_saved_output_detectors: false,
+    };
+  }
+  const stored = readStoredEnkryptOutputDetectors(organizationId, saved.data.detectors);
+  return {
+    output: {
+      enabled: saved.data.enabled,
+      detectors: stored.status === 'found' ? stored.detectors : createEmptyEnkryptOutputDetectors(),
+    },
+    invalid_saved_output_detectors: stored.status === 'invalid',
+  };
 }
 
 export const organizationGuardrailsRouter = createTRPCRouter({
@@ -71,42 +147,47 @@ export const organizationGuardrailsRouter = createTRPCRouter({
     .output(OrganizationGuardrailsResponseSchema)
     .query(async ({ input }) => {
       const organization = await requireGuardrailsOrganization(input.organizationId);
-      const settings = EnkryptInputGuardrailSettingsSchema.safeParse(
-        organization.settings.enkrypt?.input_guardrail
-      );
-      if (!settings.success) {
-        return {
-          enabled: false,
-          scan_tool_results: false,
-          detectors: createKiloDefaultEnkryptInputDetectors(),
-          invalid_saved_detectors: false,
-        };
-      }
-      const stored = readStoredEnkryptDetectors(input.organizationId, settings.data.detectors);
       return {
-        enabled: settings.data.enabled,
-        scan_tool_results: settings.data.scan_tool_results ?? true,
-        detectors:
-          stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors(),
-        invalid_saved_detectors: stored.status === 'invalid',
+        ...savedInputGuardrail(input.organizationId, organization.settings),
+        ...savedOutputGuardrail(input.organizationId, organization.settings),
       };
     }),
 
   update: organizationAdminMutationProcedure
-    .input(OrganizationIdInputSchema.extend(OrganizationGuardrailsConfigSchema.shape))
+    .input(OrganizationIdInputSchema.extend(OrganizationGuardrailsUpdateSchema.shape))
     .output(OrganizationGuardrailsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, ...config } = input;
-      await requireGuardrailsOrganization(organizationId);
-      if (config.enabled && enabledEnkryptDetectorIds(config.detectors).length === 0) {
+      const { organizationId, output: requestedOutput, ...inputGuardrail } = input;
+      const { settings } = await requireGuardrailsOrganization(organizationId);
+      const { output, invalid_saved_output_detectors } = requestedOutput
+        ? { output: requestedOutput, invalid_saved_output_detectors: false }
+        : savedOutputGuardrail(organizationId, settings);
+      const config = { ...inputGuardrail, output };
+      if (
+        inputGuardrail.enabled &&
+        enabledEnkryptDetectorIds(inputGuardrail.detectors).length === 0
+      ) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Turn on at least one detector.' });
+      }
+      if (
+        requestedOutput?.enabled &&
+        enabledEnkryptOutputDetectorIds(requestedOutput.detectors).length === 0
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Turn on at least one response detector.',
+        });
       }
       await db.transaction(async tx => {
         await mutateOrganizationSettings(
           organizationId,
           organization => ({
             ...organization.settings,
-            enkrypt: { ...organization.settings.enkrypt, input_guardrail: config },
+            enkrypt: {
+              ...organization.settings.enkrypt,
+              input_guardrail: inputGuardrail,
+              ...(requestedOutput ? { output_guardrail: requestedOutput } : {}),
+            },
           }),
           tx
         );
@@ -120,6 +201,6 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           tx,
         });
       });
-      return { ...config, invalid_saved_detectors: false };
+      return { ...config, invalid_saved_detectors: false, invalid_saved_output_detectors };
     }),
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -186,6 +187,7 @@ export function PlatformOverviewScreen({
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',
+      acceptsVariant: true,
       onSelect: (modelSlug, variant) => {
         save.mutate({ modelSlug, thinkingEffort: variant || null });
       },

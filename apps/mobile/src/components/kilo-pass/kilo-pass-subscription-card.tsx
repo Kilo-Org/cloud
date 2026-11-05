@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
@@ -80,7 +81,7 @@ export function KiloPassSubscriptionCard({
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
     <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
-      <KiloPassIcon size={19} color={colors.primary} />
+      <KiloPassIcon size={19} color={colors[rowTint('honey').hueThemeKey]} />
     </View>
   );
   const cardBody = (text: ReactNode, trailing?: ReactNode, tile: ReactNode = iconTile) =>

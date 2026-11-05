@@ -285,6 +285,7 @@ describe('GitLabCredentialService', () => {
           ownedByUserId: 'user-1',
           ownedByOrganizationId: null,
           providerBaseUrl: 'https://gitlab.example.com',
+          providerSubjectId: '123',
         },
         credential: {
           id: 'project-credential-1',
@@ -298,6 +299,7 @@ describe('GitLabCredentialService', () => {
           provider_metadata: {
             providerCredentialId: '314',
             expiresOn: '2027-07-13',
+            authorizedAccountId: '123',
           },
           provider_scopes: null,
           provider_verified_at: null,
@@ -327,5 +329,110 @@ describe('GitLabCredentialService', () => {
       credentialVersion: 3,
       source: { type: 'project', projectId: '42' },
     });
+  });
+
+  it.each([
+    ['a second account', { authorizedAccountId: '456' }],
+    ['an unusable row', { unusableReason: 'account-changed' }],
+    ['no recorded account', {}],
+  ] as const)(
+    'serves only a project credential recorded for the connected account: %s',
+    async (_description, recordedMetadata) => {
+      const fixture = encryptedProjectTokenFixture();
+      const store: GitLabCredentialStore = {
+        findCredential: async () => ({
+          parent: {
+            integrationId: 'integration-1',
+            platform: 'gitlab',
+            integrationType: 'oauth',
+            integrationStatus: 'active',
+            ownedByUserId: 'user-1',
+            ownedByOrganizationId: null,
+            providerBaseUrl: 'https://gitlab.example.com',
+            providerSubjectId: '123',
+          },
+          credential: {
+            id: 'project-credential-1',
+            platform_integration_id: 'integration-1',
+            token_encrypted: fixture.tokenEncrypted,
+            expires_at: null,
+            provider_credential_type: 'project_access_token',
+            provider_resource_id: '42',
+            provider_base_url: 'https://gitlab.example.com',
+            authorized_by_user_id: null,
+            provider_metadata: {
+              providerCredentialId: '314',
+              expiresOn: '2027-07-13',
+              ...recordedMetadata,
+            },
+            provider_scopes: null,
+            provider_verified_at: null,
+            credential_version: 3,
+            last_validated_at: null,
+            last_used_at: null,
+            created_at: now,
+            updated_at: now,
+          },
+        }),
+        hasProjectCredentialCandidates: async () => false,
+        markUsed: async () => true,
+      };
+
+      await expect(
+        new GitLabCredentialService(store, fixture.crypto).getCredential(
+          { userId: 'user-1' },
+          { credential: 'project-exact', integrationId: 'integration-1', projectId: '42' }
+        )
+      ).resolves.toEqual({ status: 'reconnect_required' });
+    }
+  );
+
+  it('serves a project credential recorded for the connected account', async () => {
+    const fixture = encryptedProjectTokenFixture();
+    const store: GitLabCredentialStore = {
+      findCredential: async () => ({
+        parent: {
+          integrationId: 'integration-1',
+          platform: 'gitlab',
+          integrationType: 'oauth',
+          integrationStatus: 'active',
+          ownedByUserId: 'user-1',
+          ownedByOrganizationId: null,
+          providerBaseUrl: 'https://gitlab.example.com',
+          providerSubjectId: '123',
+        },
+        credential: {
+          id: 'project-credential-1',
+          platform_integration_id: 'integration-1',
+          token_encrypted: fixture.tokenEncrypted,
+          expires_at: null,
+          provider_credential_type: 'project_access_token',
+          provider_resource_id: '42',
+          provider_base_url: 'https://gitlab.example.com',
+          authorized_by_user_id: null,
+          provider_metadata: {
+            providerCredentialId: '314',
+            expiresOn: '2027-07-13',
+            authorizedAccountId: '123',
+          },
+          provider_scopes: null,
+          provider_verified_at: null,
+          credential_version: 3,
+          last_validated_at: null,
+          last_used_at: null,
+          created_at: now,
+          updated_at: now,
+        },
+      }),
+      hasProjectCredentialCandidates: async () => false,
+      markUsed: async () => true,
+    };
+
+    await expect(
+      new GitLabCredentialService(store, fixture.crypto).getCredential(
+        { userId: 'user-1' },
+        { credential: 'project-exact', integrationId: 'integration-1', projectId: '42' }
+      )
+    ).resolves.toMatchObject({ status: 'available', token: 'glpat-project-secret' });
   });
 });

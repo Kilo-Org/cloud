@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding } from './findings';
+import { enterTouchMode } from './input-mode';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
 import { checkMirror, checkScreen, checkShift, normalize } from './rules';
@@ -283,6 +284,11 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   }
   await ctx.probe.resetNavigation();
   const beforeDump = (await sampleUntilSettled(ctx.probe, ctx.clock)).dump;
+  // A device left in key mode by an earlier `adb shell input keyevent` paints
+  // Android's keyboard focus highlight over the first control of every screen it
+  // opens, which reads as a stuck pressed state in a screenshot. The tap lands on
+  // a point no control claims, so it only returns the device to touch mode.
+  enterTouchMode(ctx, beforeDump);
   const beforeTexts = screenTexts(beforeDump);
   const beforeRoute = beforeDump.env.route.split('?')[0];
   // A route name is not proof that the screen painted. Right after a language

@@ -58,10 +58,7 @@ export async function getModelVariants(
   model: string,
   allowFallback: boolean
 ): Promise<OpenCodeSettings['variants']> {
-  return toLegacyVariants(
-    await getModelReasoningOptions(model, allowFallback),
-    getAiSdkProvider(model, null)
-  );
+  return (await getGatewayOpenCodeSettings(model, allowFallback))?.variants;
 }
 
 export function getAiSdkProvider(

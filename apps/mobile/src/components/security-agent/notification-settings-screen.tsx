@@ -134,7 +134,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       ? slaNotificationWarningDays
       : (baseline?.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
-  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  // Same split as the SLA screen: the save payload falls back to the saved
+  // lead time, while the back guard reads the draft the user can see so an
+  // invalid-only edit is not silently classified as clean.
+  const draft = slaNotificationsEnabled ? { ...patch, slaNotificationWarningDays } : patch;
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, draft, valid) !== 'clean';
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
@@ -145,7 +149,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
     dirty,
     valid,
-    onSave: handleSave,
+    // These screens never ask a destructive question of their own: a save
+    // here always persists.
+    onSave: async () => {
+      await handleSave();
+      return 'saved';
+    },
   });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
@@ -199,7 +208,15 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        // The personal scope has no section heading between its two switches, so
+        // the break between the two groups carries their separation: it has to
+        // read as a group break, not as the 10dp step down to the severity label
+        // or the 7dp step inside its options, and not as the void a removed
+        // heading would leave. The organization scope keeps the standard gap,
+        // next to its headings. The permission note above the groups only
+        // renders for a scope that cannot manage, which the personal scope
+        // never is.
+        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
@@ -207,10 +224,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           </Text>
         )}
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.newFindingSection')}
-          </Text>
-          <View className="gap-2">
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.newFindingSection')}
+            </Text>
+          )}
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal
@@ -246,10 +265,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         </View>
 
         <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('securityAgent.notifications.slaSection')}
-          </Text>
-          <View className="gap-2">
+          {!personal && (
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('securityAgent.notifications.slaSection')}
+            </Text>
+          )}
+          <View className="gap-3">
             <ToggleRow
               title={
                 personal

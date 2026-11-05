@@ -27,7 +27,7 @@ import { FakeWrapper } from './helpers/fake-wrapper.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { waitFor } from './wait-for.js';
@@ -151,7 +151,7 @@ function configureHarness(
   installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
     NEXTAUTH_SECRET: workerSecret,
     WORKER_URL: 'https://worker.test',
-    SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
     RUNTIME_STARTUP_MODE: 'downloaded',
     NATIVE_RUNTIME_IMAGE: 'all-in-one',
     RUNTIME_RELEASE_DESCRIPTOR: descriptor,

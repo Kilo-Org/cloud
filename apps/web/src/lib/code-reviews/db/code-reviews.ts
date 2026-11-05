@@ -56,10 +56,10 @@ import {
   reconsiderableCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   isTerminalCodeReviewStatus,
+  NON_TERMINAL_CODE_REVIEW_STATUSES,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
-  NON_TERMINAL_CODE_REVIEW_STATUSES,
   nonTerminalCodeReviewStatusListSql,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
@@ -1698,6 +1698,61 @@ export function findExistingReviewInTransaction(
   headSha: string
 ): Promise<CloudAgentCodeReview | null> {
   return findExistingReviewWithDatabase(tx, scope, headSha);
+}
+
+/**
+ * A review that covers the content a merge-commit head carries: it sits on one of
+ * the heads that content spans and either finished or is still in flight.
+ */
+export type CoveringReview = Readonly<{
+  checkRunId: number | null;
+  headSha: string;
+  id: string;
+  status: CodeReviewStatus;
+}>;
+
+/**
+ * The newest review in the scope at any of these heads that covers the content:
+ * one that finished, or one still in flight. A cancelled or failed review covers
+ * nothing, and neither does an empty list.
+ */
+export async function findReviewCoveringHeads(
+  scope: ReviewScope,
+  headShas: readonly string[]
+): Promise<CoveringReview | null> {
+  if (headShas.length === 0) {
+    return null;
+  }
+  try {
+    const [review] = await db
+      .select({
+        checkRunId: cloud_agent_code_reviews.check_run_id,
+        headSha: cloud_agent_code_reviews.head_sha,
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          ...reviewScopeConditions(scope),
+          inArray(cloud_agent_code_reviews.head_sha, [...headShas]),
+          inArray(cloud_agent_code_reviews.status, [
+            'completed',
+            ...NON_TERMINAL_CODE_REVIEW_STATUSES,
+          ])
+        )
+      )
+      .orderBy(desc(cloud_agent_code_reviews.created_at))
+      .limit(1);
+
+    return review === undefined ? null : { ...review, status: review.status as CodeReviewStatus };
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'findReviewCoveringHeads' },
+      extra: { scope, headShas },
+    });
+    throw error;
+  }
 }
 
 export async function createCodeReviewIfAbsentInTransaction(

@@ -8,7 +8,12 @@ import { fetchSessionMetadata } from '../../session/metadata.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { interruptControlSession } from '../control-plane-session.js';
-import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
+import {
+  protectedProcedure,
+  publicProcedure,
+  internalApiProtectedProcedure,
+  cloudAgentManagedProcedure,
+} from '../auth.js';
 import {
   sessionIdSchema,
   MessageIdSchema,
@@ -241,7 +246,7 @@ export function createSessionManagementHandlers() {
      * The DO may signal a connected wrapper immediately and durably supervises
      * physical cleanup without letting this route issue provider teardown.
      */
-    interruptSession: protectedProcedure
+    interruptSession: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema.describe('Session ID to interrupt'),
@@ -365,7 +370,7 @@ export function createSessionManagementHandlers() {
      * - Excludes: githubToken, gitToken, envVars values, setupCommands, mcpServers configs
      * - Includes: counts of envVars, setupCommands, mcpServers for debugging
      */
-    getSession: protectedProcedure
+    getSession: cloudAgentManagedProcedure
       .input(GetSessionInput)
       .output(GetSessionOutput)
       .query(async ({ input, ctx }) => {
@@ -441,16 +446,9 @@ export function createSessionManagementHandlers() {
 
           const sandboxId =
             sessionMetadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              sessionMetadata.identity.orgId,
-              userId,
-              sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId,
-              {
-                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(sessionMetadata.identity.sessionId, {
+              createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
@@ -485,6 +483,9 @@ export function createSessionManagementHandlers() {
                   cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
                 }
               : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
+              : {}),
 
             githubRepo: repositoryFields.githubRepo,
             gitUrl: repositoryFields.gitUrl,
@@ -503,6 +504,9 @@ export function createSessionManagementHandlers() {
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
+              mode: agent.config.mode,
+              hidden: agent.config.hidden,
+              disable: agent.config.disable,
               model: agent.config.model ?? undefined,
               variant: agent.config.variant,
             })),
@@ -614,16 +618,9 @@ export function createSessionManagementHandlers() {
 
           const sandboxId: SandboxId =
             metadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              metadata.identity.orgId,
-              userId,
-              metadata.identity.sessionId,
-              metadata.identity.botId,
-              {
-                createdOnPlatform: metadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(metadata.identity.sessionId, {
+              createdOnPlatform: metadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
 
@@ -688,7 +685,7 @@ export function createSessionManagementHandlers() {
         });
       }),
 
-    getMessageResult: protectedProcedure
+    getMessageResult: cloudAgentManagedProcedure
       .input(GetMessageResultInput)
       .output(GetMessageResultOutput)
       .query(async ({ input, ctx }) => {

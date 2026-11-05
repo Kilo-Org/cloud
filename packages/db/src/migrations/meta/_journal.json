@@ -2262,6 +2262,83 @@
       "when": 1793405482598,
       "tag": "0322_github_connection_role_org_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 323,
+      "version": "7",
+      "when": 1793629222598,
+      "tag": "0323_enkrypt_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 324,
+      "version": "7",
+      "when": 1793632306051,
+      "tag": "0324_admin_api_request_log_export_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 325,
+      "version": "7",
+      "when": 1793639233734,
+      "tag": "0325_curved_pride",
+      "breakpoints": true
+    },
+    {
+      "idx": 326,
+      "version": "7",
+      "when": 1793652176221,
+      "tag": "0326_bent_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 327,
+      "version": "7",
+      "when": 1793654076574,
+      "tag": "0327_service_fee_rollback_refunds",
+      "breakpoints": true
+    },
+    {
+      "idx": 328,
+      "version": "7",
+      "when": 1793696097808,
+      "tag": "0328_drop_legacy_enkrypt_guardrail_charges",
+      "breakpoints": true
+    },
+    {
+      "idx": 329,
+      "version": "7",
+      "when": 1793702955328,
+      "tag": "0329_cloud_agent_pr_watches",
+      "breakpoints": true
+    },
+    {
+      "idx": 330,
+      "version": "7",
+      "when": 1793705066725,
+      "tag": "0330_windy_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 331,
+      "version": "7",
+      "when": 1793714439654,
+      "tag": "0331_usage_metadata_inference_region",
+      "breakpoints": true
+    },
+    {
+      "idx": 332,
+      "version": "7",
+      "when": 1793739202346,
+      "tag": "0332_fuzzy_nightcrawler",
+      "breakpoints": true
+    },
+    {
+      "idx": 333,
+      "version": "7",
+      "when": 1793799686440,
+      "tag": "0333_enkrypt_usage_guardrail",
+      "breakpoints": true
     }
   ]
 }

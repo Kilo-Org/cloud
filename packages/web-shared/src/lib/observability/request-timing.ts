@@ -12,8 +12,16 @@
  * rate is deployment configuration.
  */
 
-/** Same shape the min-version helper reads (`lib/trpc/min-version.ts`). */
-export type TimingHeaders = { get(name: string): string | null };
+import {
+  APP_CLIENT_HEADER,
+  APP_PLATFORM_HEADER,
+  APP_VERSION_HEADER,
+  KNOWN_PLATFORMS,
+  MOBILE_CLIENT,
+  isAppVersion,
+  isMobileClient,
+  type AppHeaderList,
+} from '@kilocode/web-shared/lib/app-headers';
 
 export type ClientDimensions = {
   client: string | null;
@@ -25,15 +33,16 @@ export type ClientDimensions = {
 const DEFAULT_SAMPLE_RATE = 0.01;
 
 /**
- * Client and platform values the first-party apps send. A non-empty value
- * outside the list is recorded as `'other'`.
+ * Client values the first-party apps send. A non-empty value outside the list
+ * is recorded as `'other'`.
  */
-const KNOWN_CLIENTS = ['mobile', 'web', 'extension'] as const;
-const KNOWN_PLATFORMS = ['ios', 'android'] as const;
+const KNOWN_CLIENTS = [MOBILE_CLIENT, 'web', 'extension'] as const;
 const OTHER = 'other';
 
-/** Same pattern the min-version helper enforces (`lib/trpc/min-version.ts`). */
-const VERSION_PATTERN = /^\d+(\.\d+)*$/;
+/**
+ * Timing-only bound on the logged version: a log line stays readable, where the
+ * minimum-version gate has no length limit of its own.
+ */
 const VERSION_MAX_LENGTH = 32;
 
 /** Accepted request-id shape: 1-64 characters from a bounded character set. */
@@ -49,23 +58,23 @@ function readAllowlisted(
 }
 
 /** Header names the app already sends on every request. */
-export function readClientDimensions(headersList?: TimingHeaders | null): ClientDimensions {
-  const version = headersList?.get('x-kilo-app-version') ?? null;
+export function readClientDimensions(headersList?: AppHeaderList | null): ClientDimensions {
+  const version = headersList?.get(APP_VERSION_HEADER) ?? null;
   const requestId = headersList?.get('x-kilo-request-id') ?? null;
   return {
-    client: readAllowlisted(headersList?.get('x-kilo-client'), KNOWN_CLIENTS),
-    platform: readAllowlisted(headersList?.get('x-kilo-app-platform'), KNOWN_PLATFORMS),
+    client: readAllowlisted(headersList?.get(APP_CLIENT_HEADER), KNOWN_CLIENTS),
+    platform: readAllowlisted(headersList?.get(APP_PLATFORM_HEADER), KNOWN_PLATFORMS),
     version:
-      version !== null && version.length <= VERSION_MAX_LENGTH && VERSION_PATTERN.test(version)
+      version !== null && version.length <= VERSION_MAX_LENGTH && isAppVersion(version)
         ? version
         : null,
     requestId: requestId !== null && REQUEST_ID_PATTERN.test(requestId) ? requestId : null,
   };
 }
 
-/** Mirrors the mobile test in `isMobileClient` (`lib/trpc/min-version.ts`). */
+/** The mobile-client test, on the already-extracted client dimension. */
 export function isMobileDimensions(client: string | null | undefined): boolean {
-  return client === 'mobile';
+  return isMobileClient(client);
 }
 
 /**

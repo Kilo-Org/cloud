@@ -1,9 +1,10 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Platform, Pressable, View } from 'react-native';
 
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text, TextClassContext } from '@/components/ui/text';
+import { COMPACT_BUTTON_HIT_SLOP, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -26,21 +27,37 @@ const buttonVariants = cva(
         // outline and paints no fill of its own.
         'outline-destructive':
           'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
-        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // A filled neutral action keeps its own fill rather than the surface
+        // token: `--secondary` is also the dark card an outlined control paints
+        // (above), so a filled action in that colour reads as the same control
+        // as the outlined one beside it, as it did in the discard-draft sheet
+        // and the permission card. `--secondary-fill` equals `--secondary` in
+        // light and takes a visible step above it in dark.
+        secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
-        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
+        // A soft accent action is low-emphasis, so it paints a tint of the
+        // accent rather than the full-strength surface user bubbles fill with.
+        // The tint is what keeps it behind a filled primary: in dark mode that
+        // primary already fills with #ffdd00, and a solid accent-soft button
+        // could not be told apart from it.
+        'accent-soft': 'bg-accent-soft-tint active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
-        // min-h (not fixed h) so the button grows to fit text scaled by large
-        // Dynamic Type instead of clipping the label; the min still guarantees
-        // the 48pt action / 44pt default/lg / 36pt-plus-hitSlop sm target.
+        // min-h (not fixed h) so a button with a label grows to fit text scaled
+        // by large Dynamic Type instead of clipping it; the min still guarantees
+        // the 48pt action / 44pt default/lg / 46pt-reach sm target, whose 36pt
+        // frame carries the rest as `COMPACT_BUTTON_HIT_SLOP`.
+        // `icon` has no label to scale, so it is exactly the shared icon target
+        // (`ICON_TARGET_BOX_CLASS`): the audit reads the node's own view rect, so
+        // a smaller frame plus `hitSlop` would still measure under Android's
+        // 48dp minimum. The glyph keeps its own size and the box centres it.
         // Use px because native rem defaults to 14pt, not 16pt.
         default: 'min-h-[44px] px-4 py-2',
         sm: 'min-h-[36px] rounded-md px-3 py-1.5',
         lg: 'min-h-[44px] rounded-md px-6 py-2',
         action: 'min-h-[48px] px-4 py-2',
-        icon: 'h-[44px] w-[44px]',
+        icon: ICON_TARGET_BOX_CLASS,
       },
     },
     defaultVariants: {
@@ -67,10 +84,6 @@ const buttonGapVariants = cva('', {
   },
 });
 
-// sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
-// without changing the compact visual size.
-const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
-
 // While `loading` is on, the spinner replaces the label instead of sitting
 // beside it. The label stays in the row at zero opacity, so a content-sized
 // button keeps exactly the width its label needs and nothing shifts when the
@@ -79,6 +92,9 @@ const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 // accessibility tree, because the button carries its own busy name.
 export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center';
 export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
+const BUTTON_BUSY_MARK_SIZE = 20;
+// Android's native arc can shrink to a dot; iOS uses a spoke spinner.
+const ANDROID_BUSY_TRACK_SIZE = 17;
 
 /**
  * The visible text of the button's children, for a label a loading button can
@@ -113,41 +129,48 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
   return text === '' ? undefined : text;
 }
 
-// Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
-// but is identical in both themes (global.css --accent-soft-foreground).
-function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
-  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
-    return colors.foreground;
-  }
-  if (variant === 'link') {
-    return colors.primary;
-  }
-  if (variant === 'accent-soft') {
-    return '#1A1A10';
-  }
-  if (variant === 'destructive') {
-    return colors.destructiveSolidForeground;
-  }
-  if (variant === 'outline-destructive') {
-    return colors.destructive;
-  }
-  // default
-  return colors.primaryForeground;
-}
+type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
+
+/**
+ * Each variant's ink in one place: the class its label paints and the theme
+ * token its busy mark follows. The mark has to read in the label's own colour —
+ * a busy button shows the mark where the label was, and a still capture of the
+ * platform indicator is otherwise a speck on the fill — so the two columns
+ * cannot be kept apart. Recording both here makes a variant added to
+ * `buttonVariants` without an ink pair, or an ink pair naming a token the
+ * palette does not define, a type error instead of a mark in the default
+ * variant's colour.
+ */
+const BUTTON_INK = {
+  default: { label: 'text-primary-foreground', mark: 'primaryForeground' },
+  destructive: {
+    label: 'text-destructive-solid-foreground',
+    mark: 'destructiveSolidForeground',
+  },
+  outline: { label: 'text-foreground', mark: 'foreground' },
+  'outline-destructive': { label: 'text-destructive', mark: 'destructive' },
+  secondary: { label: 'text-secondary-foreground', mark: 'secondaryForeground' },
+  ghost: { label: 'text-foreground', mark: 'foreground' },
+  link: { label: 'text-primary group-active:underline', mark: 'primary' },
+  'accent-soft': {
+    label: 'text-accent-soft-tint-foreground',
+    mark: 'accentSoftTintForeground',
+  },
+} as const satisfies Record<ButtonVariant, { label: string; mark: keyof ThemeColors }>;
+
+/**
+ * The label column of `BUTTON_INK`, keyed by the variant union. The table above
+ * is what makes it complete and what ties each label to its mark; `fromEntries`
+ * only rebuilds the same keys and widens them to `string`, so the record type
+ * restores the union cva reads its `variant` prop from.
+ */
+const buttonLabelClasses = Object.fromEntries(
+  Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
+) as Record<ButtonVariant, string>;
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      destructive: 'text-destructive-solid-foreground',
-      outline: 'text-foreground',
-      'outline-destructive': 'text-destructive',
-      secondary: 'text-secondary-foreground',
-      ghost: 'text-foreground',
-      link: 'text-primary group-active:underline',
-      'accent-soft': 'text-accent-soft-foreground',
-    },
+    variant: buttonLabelClasses,
     size: {
       default: '',
       sm: '',
@@ -165,7 +188,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
 type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
   React.RefAttributes<typeof Pressable> &
   VariantProps<typeof buttonVariants> & {
-    /** Disables the button and shows an ActivityIndicator alongside its content. */
+    /** Disables the button and replaces its label with a centered ActivityIndicator. */
     loading?: boolean;
     children?: React.ReactNode;
   };
@@ -217,9 +240,30 @@ function Button({
   // The children sit one level deeper in that layout, so their spacing moves
   // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
-  const busyIndicator = loading ? (
-    <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
-  ) : null;
+  const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
+  const busyMark = (
+    <View
+      className="items-center justify-center"
+      // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+      style={{ width: BUTTON_BUSY_MARK_SIZE, height: BUTTON_BUSY_MARK_SIZE }}
+    >
+      {Platform.OS === 'android' ? (
+        <View className="absolute inset-0 items-center justify-center">
+          <View
+            className="rounded-full border-2"
+            // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+            style={{
+              width: ANDROID_BUSY_TRACK_SIZE,
+              height: ANDROID_BUSY_TRACK_SIZE,
+              borderColor: busyInk,
+            }}
+          />
+        </View>
+      ) : null}
+      <ActivityIndicator accessible={false} size="small" color={busyInk} />
+    </View>
+  );
+  const busyIndicator = loading ? busyMark : null;
   // A bare string or number child has no host to draw on: Pressable is a View,
   // and a View draws no text, so the button collapses to its padding and the
   // label disappears while the accessibility tree still names it. Wrap scalars
@@ -266,7 +310,7 @@ function Button({
           // opting into the loading layout; `loading` still wins when it is set.
           busy: loading ?? accessibilityState?.busy,
         }}
-        hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
+        hitSlop={hitSlop ?? (size === 'sm' ? COMPACT_BUTTON_HIT_SLOP : undefined)}
         {...props}
       >
         {usesBusyLayout ? (
@@ -281,8 +325,15 @@ function Button({
           normalizedChildren
         )}
         {loading && size !== 'icon' ? (
-          <View className={BUTTON_BUSY_OVERLAY_CLASS}>
-            <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
+          // The button already carries the busy state and its name, so the
+          // mark inside it stays out of the accessibility tree instead of
+          // adding a second stop that reads only the wait.
+          <View
+            className={BUTTON_BUSY_OVERLAY_CLASS}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {busyMark}
           </View>
         ) : null}
         {size === 'icon' ? busyIndicator : null}

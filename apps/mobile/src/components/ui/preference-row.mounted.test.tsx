@@ -45,6 +45,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function renderRow(props: {
   value: boolean;
   disabled?: boolean;
+  busy?: boolean;
   onValueChange: (next: boolean) => void;
   resolveValue?: () => boolean;
   subtitle?: string;
@@ -237,6 +238,37 @@ describe('PreferenceRow', () => {
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 
+  it('draws its icon in the shared neutral tile, the column the neighbouring destination rows use', () => {
+    // A switch row standing above a `ConfigureRow` in one list (Voice input:
+    // gateway transcription over transcription model and language) must start
+    // its title at the same x as those rows, which render `IconTile`. A bare
+    // 18 px icon here left the first title 12 dp left of the others.
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const tiles = root.findAll(
+      node => typeof node.type === 'string' && String(node.props.className).includes('h-[30px]')
+    );
+
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]?.props.className).toContain('w-[30px]');
+    expect(tiles[0]?.props.className).toContain('bg-hair-soft');
+    expect(tiles[0]?.props.className).toContain('border-border');
+
+    const icon = tiles[0]?.find(node => Object.is(node.type, Icon));
+    expect(icon?.props.size).toBe(16);
+    expect(icon?.props.color).toBe(lightColors.secondaryForeground);
+  });
+
+  it('keeps the tile in place while the row is busy, so the title never moves', () => {
+    const root = renderRow({ value: false, busy: true, onValueChange: () => undefined });
+    const tiles = root.findAll(
+      node => typeof node.type === 'string' && String(node.props.className).includes('h-[30px]')
+    );
+
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]?.findAll(node => Object.is(node.type, 'ActivityIndicator'))).toHaveLength(1);
+    expect(tiles[0]?.findAll(node => Object.is(node.type, Icon))).toHaveLength(0);
+  });
+
   it('keeps the light off switch at 3:1 against the row it sits on', () => {
     // Left alone on this light row, the shared switch's `mutedSoft` track sits
     // at 2.1:1 over the `#F0EEE6` card, and Android's own default before it was
@@ -264,7 +296,9 @@ describe('PreferenceRow', () => {
 
     expect(toggle.props.thumbColor).toBe(darkColors.foreground);
     expect(trackColor.false).toBe(darkColors.mutedForeground);
-    expect(trackColor.true).toBe(darkColors.primary);
+    // The shared switch fills the dark on track with the muted olive, not the
+    // brand yellow its accent token carries.
+    expect(trackColor.true).toBe(darkColors.selection);
     expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
   });

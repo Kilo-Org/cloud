@@ -29,6 +29,7 @@ import {
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
+import { upsertByRequestId } from './pending-requests';
 import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
@@ -296,8 +297,8 @@ type FetchedSessionData = {
   routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
-  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
-  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  /** Installed custom agents, including picker visibility and model overrides. */
+  runtimeAgents?: SessionConfig['runtimeAgents'];
   associatedPr: AssociatedPrData | null;
   totalCostMicrodollars?: number | null;
   /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
@@ -921,17 +922,6 @@ function pendingDeliveryStatesEqual(
   return true;
 }
 
-function upsertPendingRequest<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 /** True when two request lists name the same requests in the same order. */
 function sameRequestIds(
   a: readonly { requestId: string }[],
@@ -949,6 +939,25 @@ function removePendingRequest<T extends { requestId: string }>(
   return list.some(entry => entry.requestId === requestId)
     ? list.filter(entry => entry.requestId !== requestId)
     : list;
+}
+
+/**
+ * Composer readiness from the session's cloud status. No reported status yet,
+ * a settled agent, or a failed cloud status all count as ready; an active
+ * cloud-agent session stays ready while the infrastructure prepares or
+ * finalizes, because the CLI queues those sends.
+ */
+function isCloudReady(
+  cloudStatus: CloudStatus | null,
+  sessionType: ActiveSessionType | null
+): boolean {
+  return (
+    cloudStatus === null ||
+    cloudStatus.type === 'ready' ||
+    cloudStatus.type === 'error' ||
+    (sessionType === 'cloud-agent' &&
+      (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'))
+  );
 }
 
 /**
@@ -992,6 +1001,14 @@ type OpenSessionCallbacks = Pick<
   | 'onMessageFailed'
   | 'onEvent'
 >;
+
+/**
+ * Every callback of one open, present rather than optional, so the fence below
+ * must list them all: an omission is a type error, not an unguarded callback.
+ */
+type OpenSessionHandlers = {
+  [K in keyof OpenSessionCallbacks]-?: NonNullable<OpenSessionCallbacks[K]>;
+};
 
 function createSessionManager(config: SessionManagerConfig): SessionManager {
   const { store } = config;
@@ -1542,6 +1559,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storedMessageMemo.clear();
       store.set(rootSessionIdAtom, null);
       store.set(chatUIAtom, { shouldAutoScroll: true });
+      // The composer's settings are session-scoped, so they leave with the
+      // session. A retry that keeps the transcript is still the same session
+      // and must keep them: the selection states what the next prompt sends.
+      store.set(sessionConfigAtom, null);
+      store.set(remoteModelOverrideAtom, null);
+      store.set(cloudAgentModelOverrideAtom, null);
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -1558,8 +1581,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     transcriptRows.reset();
     postInterruptUnlock = false;
     interruptAwaitingIdleSession = null;
-    store.set(remoteModelOverrideAtom, null);
-    store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -1573,7 +1594,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(setupLogAtom, []);
     store.set(preparationAttemptsAtom, []);
     store.set(commitsAtom, []);
-    store.set(sessionConfigAtom, null);
     store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
@@ -1609,6 +1629,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
     clearPendingInterrupt();
+  }
+
+  /**
+   * Retires every per-child hydration outcome for the active root storage. A
+   * session switch, `/clear` and destroy all drop the rows a child page was
+   * built from, so all three invalidate it the same way: bump the generation so
+   * an in-flight page fails its currency check and cannot replay pre-clear rows,
+   * clear the request registry so the next open starts a fresh fetch instead of
+   * joining the stale one, and empty both maps so every child sheet starts
+   * empty and hydrates again.
+   */
+  function resetChildSessionHydration(): void {
+    childSessionHydrationGeneration += 1;
+    childSessionHydrationRequests.clear();
+    store.set(childSessionHydrationStatesAtom, new Map());
+    store.set(childSessionErrorsAtom, new Map());
   }
 
   function setChildSessionHydrationState(
@@ -1881,13 +1917,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function updateCapabilityAtoms(session: CloudAgentSession): void {
-    const cloudStatus = store.get(cloudStatusAtom);
-    const cloudReady =
-      cloudStatus === null ||
-      cloudStatus.type === 'ready' ||
-      cloudStatus.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const liveCanSend = activeSessionType !== 'read-only' && session.canSend && cloudReady;
     if (postInterruptUnlock) {
       if (liveCanSend) {
@@ -1976,45 +2006,67 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  /**
+   * Drops the composer's pick when the catalog the owner reports does not
+   * offer it, and strips a variant that catalog no longer lists.
+   */
+  function validateRemoteModelOverride(state: RemoteModelState): void {
+    const override = store.get(remoteModelOverrideAtom);
+    if (!override) return;
+    const sourceMatchesProtocol =
+      (state.protocol === 'v1' && override.source === 'cli-catalog') ||
+      (state.protocol === 'legacy' && override.source === 'legacy-gateway');
+    const provider = state.catalog?.providers.find(
+      item => item.id === override.selection.model.providerID
+    );
+    const catalogModel = provider?.models.find(
+      item => item.id === override.selection.model.modelID
+    );
+    const modelMatchesProtocol =
+      state.protocol === 'v1'
+        ? catalogModel !== undefined
+        : state.protocol === 'legacy' && override.selection.model.providerID === 'kilo';
+    if (!sourceMatchesProtocol || !modelMatchesProtocol) {
+      store.set(remoteModelOverrideAtom, null);
+      return;
+    }
+    if (
+      override.source === 'cli-catalog' &&
+      override.selection.variant &&
+      catalogModel &&
+      !catalogModel.variants.includes(override.selection.variant)
+    ) {
+      store.set(remoteModelOverrideAtom, {
+        source: 'cli-catalog',
+        selection: { model: override.selection.model },
+      });
+    }
+  }
+
   function handleRemoteModelStateChange(state: RemoteModelState): void {
     const previousOwnerConnectionId = store.get(remoteModelStateAtom).ownerConnectionId;
     store.set(remoteModelStateAtom, state);
 
-    if (previousOwnerConnectionId !== state.ownerConnectionId) {
+    // An owner that replaces another did not produce what this manager holds
+    // from the one it replaced — the composer's pick, a model observed from a
+    // message it ran, or the session metadata it wrote — so all of it goes,
+    // and the new owner's catalog currentModel becomes the observation below.
+    // An owner attaching where none was known is not a replacement: a retried
+    // open keeps the transcript and publishes no owner until its CLI is
+    // rediscovered, so the pick that outlived the retry belongs to this same
+    // session.
+    if (
+      previousOwnerConnectionId !== null &&
+      previousOwnerConnectionId !== state.ownerConnectionId
+    ) {
       store.set(remoteModelOverrideAtom, null);
-      if (observedModelSource === 'catalog') {
-        observedModelSource = null;
-        store.set(observedModelAtom, null);
-      }
-    } else {
-      const override = store.get(remoteModelOverrideAtom);
-      const sourceMatchesProtocol =
-        (state.protocol === 'v1' && override?.source === 'cli-catalog') ||
-        (state.protocol === 'legacy' && override?.source === 'legacy-gateway');
-      const provider = state.catalog?.providers.find(
-        item => item.id === override?.selection.model.providerID
-      );
-      const catalogModel = provider?.models.find(
-        item => item.id === override?.selection.model.modelID
-      );
-      const modelMatchesProtocol =
-        state.protocol === 'v1'
-          ? catalogModel !== undefined
-          : state.protocol === 'legacy' && override?.selection.model.providerID === 'kilo';
-      if (override && (!sourceMatchesProtocol || !modelMatchesProtocol)) {
-        store.set(remoteModelOverrideAtom, null);
-      } else if (
-        override?.source === 'cli-catalog' &&
-        override.selection.variant &&
-        catalogModel &&
-        !catalogModel.variants.includes(override.selection.variant)
-      ) {
-        store.set(remoteModelOverrideAtom, {
-          source: 'cli-catalog',
-          selection: { model: override.selection.model },
-        });
-      }
+      observedModelSource = null;
+      store.set(observedModelAtom, null);
     }
+    // An owner that has not reported a protocol yet cannot judge the pick: it
+    // is still loading its catalog, and dropping the pick there would discard
+    // one this same session just kept.
+    if (state.protocol !== 'unknown') validateRemoteModelOverride(state);
     if (
       (observedModelSource === null || observedModelSource === 'catalog') &&
       state.catalog?.currentModel
@@ -2060,10 +2112,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
       store.set(setupLogAtom, session.state.getSetupLog());
-      transcriptRows.applyLive(
-        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : [],
-        session.state.getCommits()
-      );
+      transcriptRows.applyLive(session.state.getPreparationAttempts(), session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -2603,8 +2652,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function beginSessionOpen(kiloSessionId: KiloSessionId): number {
     for (const cleanup of metadataRecoveryCleanups) cleanup();
     metadataRecoveryCleanups = [];
-    childSessionHydrationGeneration += 1;
-    childSessionHydrationRequests.clear();
+    resetChildSessionHydration();
     switchGeneration += 1;
     const expectedGeneration = switchGeneration;
     activeSessionId = kiloSessionId;
@@ -2832,13 +2880,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   /**
    * The transport callbacks of one open. The session they belong to is built
    * from this object, so it is read through `getSession` at callback time.
+   * Bodies run only while this open is the current one: the fence added on
+   * return drops every callback of a superseded open, so a body may assume its
+   * open is still active.
    */
   function buildOpenSessionCallbacks(
     open: SessionOpen,
     getSession: () => CloudAgentSession
   ): OpenSessionCallbacks {
     const expectedGeneration = open.expectedGeneration;
-    return {
+    const handlers: OpenSessionHandlers = {
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message
@@ -2890,7 +2941,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onQuestionAsked: (requestId, questions) => {
         if (!questions) return;
-        const next = upsertPendingRequest(store.get(pendingQuestionsAtom), {
+        const next = upsertByRequestId(store.get(pendingQuestionsAtom), {
           requestId,
           questions,
         });
@@ -2904,7 +2955,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onPermissionAsked: (requestId, permission, patterns, metadata, always) => {
         if (!permission) return;
-        const next = upsertPendingRequest(store.get(pendingPermissionsAtom), {
+        const next = upsertByRequestId(store.get(pendingPermissionsAtom), {
           requestId,
           permission,
           patterns: patterns ?? [],
@@ -2942,21 +2993,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onRemoteModelStateChange: handleRemoteModelStateChange,
       onRemoteCommandStateChange: state => {
-        if (expectedGeneration !== switchGeneration) return;
         store.set(remoteCommandStateAtom, state);
       },
       onTransportCapabilityChange: () => {
-        if (expectedGeneration !== switchGeneration) return;
         const activeSession = getSession();
         if (currentSession === activeSession) updateCapabilityAtoms(activeSession);
       },
       onTransportCapabilitiesChange: capabilities => {
-        if (expectedGeneration !== switchGeneration) return;
         currentCapabilities = capabilities;
         recomputeSupportsAttachments(activeSessionType);
       },
       onReplayComplete: () => {
-        if (expectedGeneration !== switchGeneration) return;
         setRemoteHistoryReplaying(false);
         store.set(isLoadingAtom, false);
         store.set(isRefreshingCachedTranscriptAtom, false);
@@ -2998,9 +3045,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // An open that fails before the stream connects (for example, a refused
         // stream ticket) gets no replay to end its loading state, so the
         // failure ends it and shows why.
-        const failedOpen =
-          expectedGeneration === switchGeneration &&
-          (store.get(isLoadingAtom) || store.get(isRefreshingCachedTranscriptAtom));
+        const failedOpen = store.get(isLoadingAtom) || store.get(isRefreshingCachedTranscriptAtom);
         store.set(errorAtom, message);
         // The live transcript will not replace the cached rows now: the error
         // indicator owns the stale-rows state, so the refresh indicator stops.
@@ -3025,7 +3070,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
-        if (expectedGeneration !== switchGeneration) return;
         const session = getSession();
         const eventSessionId = chatEventSessionId(event);
         if (eventSessionId !== null) {
@@ -3152,6 +3196,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           }
         }
       },
+    };
+    return fenceOpenSessionCallbacks(expectedGeneration, handlers);
+  }
+
+  /**
+   * One place that fences an open's transport callbacks. Once another open
+   * begins (or the manager is destroyed) `switchGeneration` moves, and every
+   * callback of the retired open becomes inert: a late delivery cannot rewrite
+   * the active session's root-id filter, error state, capabilities, remote
+   * catalog, pending requests or child errors. Both the input and the result
+   * are typed with every key required, so a callback added to the transport
+   * contract fails to compile until it is listed here and therefore fenced.
+   */
+  function fenceOpenSessionCallbacks(
+    expectedGeneration: number,
+    handlers: OpenSessionHandlers
+  ): OpenSessionHandlers {
+    const fence =
+      <A extends unknown[], R>(handler: (...args: A) => R) =>
+      (...args: A): R | undefined => {
+        if (expectedGeneration !== switchGeneration) return undefined;
+        return handler(...args);
+      };
+    return {
+      onSessionCreated: fence(handlers.onSessionCreated),
+      onSessionUpdated: fence(handlers.onSessionUpdated),
+      onQuestionAsked: fence(handlers.onQuestionAsked),
+      onQuestionResolved: fence(handlers.onQuestionResolved),
+      onPermissionAsked: fence(handlers.onPermissionAsked),
+      onPermissionResolved: fence(handlers.onPermissionResolved),
+      onSuggestionAsked: fence(handlers.onSuggestionAsked),
+      onSuggestionResolved: fence(handlers.onSuggestionResolved),
+      onResolved: fence(handlers.onResolved),
+      onRemoteModelStateChange: fence(handlers.onRemoteModelStateChange),
+      onRemoteCommandStateChange: fence(handlers.onRemoteCommandStateChange),
+      onTransportCapabilityChange: fence(handlers.onTransportCapabilityChange),
+      onTransportCapabilitiesChange: fence(handlers.onTransportCapabilitiesChange),
+      onReplayComplete: fence(handlers.onReplayComplete),
+      onBranchChanged: fence(handlers.onBranchChanged),
+      onError: fence(handlers.onError),
+      onChildSessionError: fence(handlers.onChildSessionError),
+      onMessageFailed: fence(handlers.onMessageFailed),
+      onEvent: fence(handlers.onEvent),
     };
   }
 
@@ -3478,13 +3565,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * the CLI is still winding down are queued CLI-side.
    */
   function restoreAfterInterrupt(session: CloudAgentSession): void {
-    const cs = store.get(cloudStatusAtom);
-    const cloudReady =
-      cs === null ||
-      cs.type === 'ready' ||
-      cs.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cs.type === 'preparing' || cs.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const readOnly = activeSessionType === 'read-only';
     postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);
@@ -3574,6 +3655,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // service state.
     transcriptRows.reset();
     currentSession.storage.clear();
+    // Child hydration is keyed to the storage just emptied: a `ready` child,
+    // a stored hydration error, and a page still in flight all describe rows
+    // that are gone now. Retire them so every child sheet starts empty,
+    // hydrates again on its next open, and a pre-clear page cannot replay its
+    // rows back into the cleared transcript.
+    resetChildSessionHydration();
     currentSession.state.clearCommits();
     currentSession.state.clearPreparationAttempts();
     store.set(preparationAttemptsAtom, []);
@@ -3774,8 +3861,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     cacheActiveSessionPage();
     for (const cleanup of metadataRecoveryCleanups) cleanup();
     metadataRecoveryCleanups = [];
-    childSessionHydrationGeneration += 1;
-    childSessionHydrationRequests.clear();
+    resetChildSessionHydration();
     switchGeneration += 1;
     stateUnsub?.();
     stateUnsub = null;

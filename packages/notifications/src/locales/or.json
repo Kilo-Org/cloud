@@ -9,6 +9,7 @@
       "lowBalance": "ଆପଣଙ୍କ ବ୍ୟାଲାନ୍ସର ଧ୍ୟାନ ଦରକାର",
       "spendAlert": "ଆପଣଙ୍କ ଖର୍ଚ୍ଚର ଧ୍ୟାନ ଦରକାର",
       "securityFinding": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର",
+      "securityUpdate": "ଏକ ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଅପଡେଟ୍ ଅଛି",
       "activeAgentsGlanceable": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକରେ ଅପଡେଟ୍ ଅଛି"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର"
+      "body": "ଏକ ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଅପଡେଟ୍ ଅଛି"
     }
   },
   "instanceLifecycle": {

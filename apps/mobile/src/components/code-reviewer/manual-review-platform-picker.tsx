@@ -52,8 +52,7 @@ export function ManualReviewPlatformPicker({
             disabled={!connected}
             className={cn(
               'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-              index < MANUAL_REVIEW_PLATFORMS.length - 1 && 'border-b-[0.5px] border-hair-soft',
-              !connected && 'opacity-50'
+              index < MANUAL_REVIEW_PLATFORMS.length - 1 && 'border-b-[0.5px] border-hair-soft'
             )}
             onPress={() => {
               selectionHaptic();
@@ -78,8 +77,14 @@ export function ManualReviewPlatformPicker({
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              <Text className="text-sm font-medium">{platformLabel}</Text>
+              <Text className={cn('text-sm font-medium', !connected && 'text-muted-foreground')}>
+                {platformLabel}
+              </Text>
               {!connected && (
+                // The row dims only its label. This line is the only place
+                // that says why the option cannot be picked, so it keeps the
+                // muted token's own 4.5:1 on the `bg-secondary` card instead
+                // of inheriting a row-level opacity that halves it.
                 <Text variant="muted" className="text-xs">
                   {t('common.notConnected')}
                 </Text>

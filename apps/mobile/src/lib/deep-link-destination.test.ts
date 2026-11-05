@@ -10,7 +10,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { APP_ROUTE_ROOTS, opensAppRoutePath, opensDestination } from './deep-link-destination';
+import {
+  APP_ROUTE_ROOTS,
+  opensAppRoutePath,
+  opensDestination,
+  shellRouteHref,
+} from './deep-link-destination';
 
 const SESSION_ID = 'ses_0123456789abcdefghijklmnop';
 
@@ -65,6 +70,46 @@ describe('opensAppRoutePath', () => {
     '/(app)/agent-chat/ses_short',
   ])('refuses %s', path => {
     expect(opensAppRoutePath(path)).toBe(false);
+  });
+});
+
+describe('shellRouteHref', () => {
+  // A link into the signed-in shell is navigated through the pending deep-link
+  // slot, whose `withAnchor` navigation keeps each stack's layout anchor under
+  // the target. Everything else keeps the path it had.
+  it.each([
+    [
+      'kiloapp:///(app)/(tabs)/(3_profile)/organization/invoices',
+      '/(app)/(tabs)/(3_profile)/organization/invoices',
+    ],
+    [
+      'kiloapp:///(app)/(tabs)/(3_profile)/organization/credit-activity',
+      '/(app)/(tabs)/(3_profile)/organization/credit-activity',
+    ],
+    ['kiloapp:///(app)/(tabs)/(2_agents)', '/(app)/(tabs)/(2_agents)'],
+    ['/(app)/(tabs)/(3_profile)/preferences', '/(app)/(tabs)/(3_profile)/preferences'],
+    ['/(app)/agent-chat/new?mode=code', '/(app)/agent-chat/new?mode=code'],
+    ['kiloapp:///(app)/agent-chat/new', '/(app)/agent-chat/new'],
+  ])('takes %s into the pending slot as %s', (path, href) => {
+    expect(shellRouteHref(path)).toBe(href);
+  });
+
+  it.each([
+    // The shell gates own these: the consumer never runs on them.
+    'kiloapp:///(auth)/session-row-fixture',
+    '/(auth)/login',
+    'kiloapp:///force-update',
+    // A group-stripped search-family link belongs to the search slot.
+    'kiloapp://agent-chat/ses_0123456789abcdefghijklmnop',
+    'kiloapp://pr-review/Kilo-Org/cloud/6234',
+    // An id indexed before its family moved keeps the old route: still a tap.
+    'kiloapp:///(app)/(tabs)/(3_profile)/security-agent/finding-1',
+    // A session capture the route cannot open is not a screen.
+    'kiloapp:///(app)/agent-chat/not-a-session',
+    'https://app.kilo.ai/profile',
+    'not a url',
+  ])('leaves %s where it was', path => {
+    expect(shellRouteHref(path)).toBeNull();
   });
 });
 

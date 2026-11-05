@@ -291,6 +291,7 @@ test('registers user data export with worktree-aware ports and dependencies', ()
     'postgres',
     'redis',
     'stripe',
+    'cloudflare-scim-sync',
     'byok-kms',
     'cloudflare-git-token-service',
     'cloudflare-session-ingest',

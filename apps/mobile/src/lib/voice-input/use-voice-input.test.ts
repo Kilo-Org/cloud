@@ -7,11 +7,7 @@ import {
   type VoiceInputControllerSnapshot,
   type VoiceInputStartOptions,
 } from './voice-input-controller';
-import {
-  createVoiceInputActions,
-  shouldAbortVoiceInputForOwner,
-  showFeedback,
-} from './use-voice-input-actions';
+import { createVoiceInputActions, shouldAbortVoiceInputForOwner } from './use-voice-input-actions';
 import { __resetVoiceInputLanguageTagCacheForTests } from './voice-input-language';
 
 const hapticsMock = vi.hoisted(() => ({
@@ -52,10 +48,6 @@ const getSupportedLocalesMock = vi.hoisted(() =>
   })
 );
 
-const routerMock = vi.hoisted(() => ({
-  push: vi.fn(),
-}));
-
 const gatewayPreferenceMock = vi.hoisted(() => ({
   isGatewayTranscriptionEnabled: vi.fn<() => boolean>(() => false),
   readGatewayTranscriptionModel: vi.fn<() => { id: string; name: string } | null>(() => null),
@@ -74,10 +66,6 @@ vi.mock('expo-haptics', () => ({
 
 vi.mock('expo-localization', () => ({
   getLocales: localizationMock.getLocales,
-}));
-
-vi.mock('expo-router', () => ({
-  router: routerMock,
 }));
 
 vi.mock('./gateway/gateway-transcription-preference', () => gatewayPreferenceMock);
@@ -153,6 +141,7 @@ type ActionHarness = {
   disabled: ReturnType<typeof vi.fn>;
   draft: ReturnType<typeof vi.fn>;
   onDraftChange: ReturnType<typeof vi.fn>;
+  openTranscriptionModelPicker: ReturnType<typeof vi.fn>;
   owner: string;
 };
 
@@ -170,6 +159,7 @@ function buildActions(
   const onDraftChange = vi.fn<(nextDraft: string) => void>();
   const disabled = vi.fn<() => boolean>(() => overrides.disabled ?? false);
   const userId = vi.fn<() => string | undefined>(() => overrides.userId);
+  const openTranscriptionModelPicker = vi.fn<() => void>();
   const languageTag = overrides.languageTag;
 
   const actions = createVoiceInputActions({
@@ -180,9 +170,10 @@ function buildActions(
     getOnDraftChange: () => onDraftChange,
     getOwner: () => owner,
     getUserId: userId,
+    openTranscriptionModelPicker,
   });
 
-  return { actions, disabled, draft, onDraftChange, owner };
+  return { actions, disabled, draft, onDraftChange, openTranscriptionModelPicker, owner };
 }
 
 async function flushPendingTasks(): Promise<void> {
@@ -254,7 +245,9 @@ describe('useVoiceInput integration', () => {
 
     describe('toggle', () => {
       it('starts when idle, using the app language and passing draft/feedback callbacks', async () => {
-        const { actions, onDraftChange, owner } = buildActions({ draft: 'hello' });
+        const { actions, onDraftChange, openTranscriptionModelPicker, owner } = buildActions({
+          draft: 'hello',
+        });
         mockController.setSnapshot(idleSnapshot());
         localizationMock.getLocales.mockReturnValue([{ languageTag: 'nl-NL' }]);
 
@@ -269,7 +262,20 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.languageTag).toBe('en-US');
         expect(startOptions.owner).toBe(owner);
         expect(startOptions.onDraftChange).toBe(onDraftChange);
-        expect(startOptions.onFeedback).toBe(showFeedback);
+        // The engine's feedback is delivered through the owner's bound
+        // navigation, so an alert raised long after this render still knows
+        // which root owns it.
+        startOptions.onFeedback({
+          action: 'open-transcription-settings',
+          availability: 'available',
+          message: "This transcription model isn't available. Pick another one in Preferences.",
+          retryable: false,
+        });
+        const chooseModel = alertMock.alert.mock.calls.at(-1)?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        chooseModel?.find(button => button.text === 'Choose a model')?.onPress?.();
+        expect(openTranscriptionModelPicker).toHaveBeenCalledTimes(1);
       });
 
       it('uses the persisted language choice instead of resolving the app language', async () => {

@@ -69,21 +69,6 @@ catalogs:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
-  - '@cloudflare/sandbox@0.12.12'
-  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
-  # wrangler 4.134.0 is the first release with local development support for
-  # DO-managed Containers (named-image selection via ctx.container.images).
-  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
-  # are exempted with it. Approved early-access exception; remove all eight entries
-  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
-  - wrangler@4.135.0
-  - workerd@1.20260918.1
-  - miniflare@5.20260918.0-alpha
-  - '@cloudflare/workerd-darwin-64@1.20260918.1'
-  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
-  - '@cloudflare/workerd-linux-64@1.20260918.1'
-  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
-  - '@cloudflare/workerd-windows-64@1.20260918.1'
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -150,6 +135,8 @@ overrides:
   # An entry added or changed here names a reviewed version: an exact pin for the
   # version the lockfile carries, or a range that also states its upper bound, so
   # the entry moves only through a reviewed change to this file and the lockfile.
+  # A 'catalog:' entry takes that package's catalog pin, which sits in this same
+  # file, so it obeys the same rule.
   # esbuild below keeps a floor without an upper bound; see its own note.
   glob: 13.0.6
   google-auth-library: 10.6.2
@@ -163,14 +150,14 @@ overrides:
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
   form-data: 4.0.6
-  follow-redirects: 1.16.1
+  follow-redirects: 1.16.2
   ws@^7: 7.5.11
   ws@^8: 8.21.0
   tmp: 0.2.7
   dompurify: 3.4.17
   handlebars: 4.7.10
   brace-expansion: 5.0.12
-  node-forge: 1.4.0
+  node-forge: 1.4.2
   proxy-addr: 2.0.8
   compression: 1.8.2
   source-map-js: 1.2.2
@@ -190,7 +177,7 @@ overrides:
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
-  drizzle-orm: 0.45.2
+  drizzle-orm: 'catalog:'
   lodash-es: 4.18.1
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.1
@@ -199,7 +186,7 @@ overrides:
   # Nothing in the tree depends on serialize-javascript today; the spec stays for a
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
-  hono: 4.13.13
+  hono: 'catalog:'
   '@modelcontextprotocol/sdk@1.29.0': 1.32.1
   '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
@@ -236,7 +223,7 @@ overrides:
   lightningcss: 1.30.1
   axios: 1.20.0
   fast-uri: 3.1.8
-  joi: 17.13.8
+  joi: 17.13.9
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
   webpack-dev-middleware@^6: 7.4.6
@@ -336,7 +323,7 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@58.0.11: patches/expo-task-manager@58.0.11.patch
+  expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
   expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
@@ -359,10 +346,6 @@ patchedDependencies:
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
   react-native@0.88.0: patches/react-native@0.88.0.patch
-  # Android: read the live entry of the unique work chain, not the first one.
-  # A finished first entry made a cold start re-enqueue with REPLACE, which
-  # cancelled the glanceable refresh run in progress.
-  expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.
   react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch

@@ -7,8 +7,13 @@ import { toast } from 'sonner-native';
 
 import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
-import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+  ProviderPrScopeProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
+import { PrReviewOverviewSkeleton } from './pr-review-overview-skeleton';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
 const appState = vi.hoisted(() => ({
@@ -23,6 +28,8 @@ type MockStatusData = {
   connected: boolean;
   revoked?: boolean;
   reconnectRequired?: boolean;
+  /** The GitLab status read's connected instance, as the server reports it. */
+  integration?: { instanceUrl: string } | null;
 };
 
 type MockQueryResult = {
@@ -91,6 +98,17 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({ data: [{ organizationId: 'org-1' }] }),
 }));
+// The role split that decides whether an organization keeps the Connect CTA is
+// covered by pr-review-provider-connect-gate.mounted.test.tsx; this harness
+// pins a billing role so every arm still offers the launch it exercises.
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
+// The layout publishes the restored account selection and the gate reads the
+// same context; this harness is always past that restore.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),
@@ -118,10 +136,15 @@ vi.mock('@/components/pr-review/pr-review-context-line', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The gate's pending body is the detail screen's frame: the real skeleton over a
+// stubbed scroller keeps the assertion on the gate's own choice of body.
+vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Platform: platform,
+  useColorScheme: () => 'light',
   View: 'View',
 }));
 
@@ -315,12 +338,16 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     }
   );
 
-  it.each(providers)('%s shows loading, not Connect, for a paused status query', provider => {
-    queryResult.isPending = true;
-    const renderer = mount(provider);
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
-    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
-  });
+  it.each(providers)(
+    '%s shows the review skeleton, not a spinner, for a paused status query',
+    provider => {
+      queryResult.isPending = true;
+      const renderer = mount(provider);
+      expect(renderer.root.findAllByType(PrReviewOverviewSkeleton)).toHaveLength(1);
+      expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+    }
+  );
 
   it.each(providers)('%s offers a working Retry for status failures', async provider => {
     queryResult.isError = true;
@@ -385,15 +412,14 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
       const expectedTitle =
         provider === 'github' ? 'Reconnect GitHub' : 'GitLab connection expired';
       // The GitHub arm labels its recovery action with the same reconnect
-      // copy; the provider gate's action is the integration-page CTA, so it
-      // keeps that provider's Connect label.
-      const expectedAction = provider === 'github' ? 'Reconnect GitHub' : 'Connect GitLab';
+      // copy; the provider gate names the re-authorization the same way, so
+      // neither expired arm reads like a first-time connect.
+      const expectedAction = provider === 'github' ? 'Reconnect GitHub' : 'Reconnect GitLab';
       const renderer = mount(provider, null);
       const emptyState = renderer.root.findByType('EmptyState');
       expect(emptyState.props.title).toBe(expectedTitle);
-      // The recovery action is the same integration-page CTA as Connect, so
-      // its label is the provider's Connect label rather than the expired-state
-      // title above it.
+      // The recovery action names the reconnection, not the Connect label the
+      // gate uses when there is no connection yet.
       const labels = renderer.root
         .findAllByType('Text')
         .map(node => node.children.find(child => typeof child === 'string'));
@@ -508,5 +534,120 @@ describe('PR-review connect gate item line', () => {
     const renderer = mount('github');
     expect(itemLine(renderer)).toBeUndefined();
     expect(renderer.root.findAllByType('EmptyState')).toHaveLength(1);
+  });
+});
+
+describe('PR-review connect gate — GitLab instance mismatch', () => {
+  const SELF_MANAGED: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 18,
+    instanceHint: 'https://gitlab.example.com',
+  };
+  const MISMATCH_DESCRIPTION =
+    'Your GitLab connection is for gitlab.com, but this merge request is on ' +
+    'gitlab.example.com. Connect GitLab on that instance to review it.';
+
+  /** Mounts the gate inside the provider scope the route publishes. */
+  function mountInScope(ref: ProviderPrRef, organizationId: string | null = null) {
+    act(() => {
+      mounted = TestRenderer.create(
+        <ProviderPrScopeProvider value={{ ref, organizationId }}>
+          {gate('gitlab', organizationId, ref)}
+        </ProviderPrScopeProvider>
+      );
+    });
+    if (!mounted) {
+      throw new Error('gate did not mount');
+    }
+    return mounted;
+  }
+
+  function textValues(renderer: TestRenderer.ReactTestRenderer): (string | undefined)[] {
+    return renderer.root
+      .findAllByType('Text')
+      .map(node => node.children.find(child => typeof child === 'string'));
+  }
+
+  it('explains the wrong instance instead of a deleted merge request', () => {
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.com' },
+    };
+    const renderer = mountInScope(SELF_MANAGED);
+
+    expect(renderer.root.findByType('EmptyState').props.title).toBe(
+      'GitLab connection is for another instance'
+    );
+    expect(textValues(renderer)).toContain(MISMATCH_DESCRIPTION);
+    // The surface below the gate never mounts, so its "may have been deleted"
+    // state cannot be reached. The one action is the integration-page CTA.
+    expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(0);
+    expect(textValues(renderer)).toContain('Connect GitLab');
+    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    // The description already names the requested host.
+    expect(textValues(renderer)).not.toContain('https://gitlab.example.com');
+  });
+
+  it('renders the review when the connection serves the merge request instance', () => {
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.example.com' },
+    };
+    const renderer = mountInScope(SELF_MANAGED);
+    expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(1);
+    expect(renderer.root.findAllByType('EmptyState')).toHaveLength(0);
+  });
+
+  it('compares a gitlab.com link, which the context line never names', () => {
+    // The display hint drops the gitlab.com default, but the server still
+    // compares it: a self-managed connection cannot read a gitlab.com link.
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.example.com' },
+    };
+    const renderer = mountInScope({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 18,
+      instanceHint: 'https://gitlab.com',
+    });
+    expect(renderer.root.findByType('EmptyState').props.title).toBe(
+      'GitLab connection is for another instance'
+    );
+    expect(textValues(renderer)).toContain(
+      'Your GitLab connection is for gitlab.example.com, but this merge request is on ' +
+        'gitlab.com. Connect GitLab on that instance to review it.'
+    );
+    expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(0);
+  });
+
+  it('never compares a merge request whose link named no instance', () => {
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.com' },
+    };
+    const renderer = mountInScope({ platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 18 });
+    expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(1);
+  });
+
+  it('opens the organization integration page from the mismatch CTA', async () => {
+    platform.OS = 'android';
+    queryResult.data = {
+      connected: true,
+      reconnectRequired: false,
+      integration: { instanceUrl: 'https://gitlab.com' },
+    };
+    const pending = beginPendingLaunch();
+    const renderer = mountInScope(SELF_MANAGED, 'org-1');
+    await pressConnect(renderer);
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
+      'https://web.example/organizations/org-1/integrations/gitlab'
+    );
+    await settleLaunch(pending);
   });
 });

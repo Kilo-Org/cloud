@@ -7,7 +7,7 @@ import { act, type ElementType, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { TestRenderer } from '@/test/renderer';
+import { type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { McpServerRowView } from './mcp-server-row';
 import { type McpServerSource } from './profile-mcp-model';
 
@@ -101,6 +101,27 @@ describe('<McpServerRowView>', () => {
 
     const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
     expect(buttons).toEqual(['Edit MCP server docs-search', 'Delete MCP server docs-search']);
+  });
+
+  it('gives the name its own line and leaves the type and count to the line under it', () => {
+    const root = renderRow(row());
+
+    const nameLine = root.findAllByType(TEXT).find(node => node.props.children === server.name);
+    const body = nameLine?.parent ?? null;
+    if (nameLine === undefined || body === null) {
+      throw new Error('Missing the server name line');
+    }
+    const lines = body.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+
+    // Nothing paints beside the name, so a compact card cannot squeeze it to make
+    // room for the secondary type label and key count.
+    expect(lines.map(line => line.findAllByType(TEXT).map(node => node.props.children))).toEqual([
+      [server.name],
+      ['Remote', 2],
+      ['https://mcp.example.com/docs'],
+    ]);
   });
 
   it('carries the enabled state and disables the switch when the profile is read-only', () => {

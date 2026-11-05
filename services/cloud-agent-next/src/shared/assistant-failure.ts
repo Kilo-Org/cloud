@@ -131,6 +131,14 @@ export function isAssistantInterrupt(source: unknown): boolean {
   );
 }
 
+export function missingAgentSlug(source: unknown): string | undefined {
+  const message = assistantFailureText(source).replace(/^\[BYOK\] /, '');
+  return (
+    /^Agent not found: "([a-z][a-z0-9-]{0,49})"\./.exec(message)?.[1] ??
+    /^Agent "([a-z][a-z0-9-]{0,49})" was not found in the repository or profile$/.exec(message)?.[1]
+  );
+}
+
 export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
@@ -141,6 +149,14 @@ export function classifyAssistantFailure(
     /\[byok\]/i.test(message) || gatewayErrorType === 'byok_error'
       ? 'byok'
       : defaultProviderOwnership;
+  const missingAgent = missingAgentSlug(source);
+  if (missingAgent !== undefined) {
+    return {
+      reason: 'invalid_request',
+      safeMessage: `Agent "${missingAgent}" was not found in the repository or profile`,
+      providerOwnership,
+    };
+  }
   const messageReason = classifyAssistantFailureText(message);
   const specificMessageReason =
     messageReason !== 'unknown' &&

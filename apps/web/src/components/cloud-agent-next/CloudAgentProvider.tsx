@@ -32,6 +32,11 @@ const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
 const CloudAgentContext = createContext<WorktreeReviewSendApi | null>(null);
 
+/** Historical and child transcripts must not inherit live interaction handlers. */
+export function ReadOnlyCloudAgentBoundary({ children }: { children: ReactNode }) {
+  return <ManagerContext.Provider value={null}>{children}</ManagerContext.Provider>;
+}
+
 type CloudAgentProviderProps = {
   children: ReactNode;
   /** The signed-in user: the transcript cache is keyed per user. */
@@ -363,14 +368,6 @@ export function CloudAgentProvider({ children, userId, organizationId }: CloudAg
           networkMode: 'always',
         });
         return toFetchedSessionData(kiloSessionId, sessionResult);
-      },
-
-      onKiloSessionCreated: (kiloSessionId: KiloSessionId) => {
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.set('sessionId', kiloSessionId);
-          window.history.replaceState(window.history.state, '', url.toString());
-        }
       },
 
       onRemoteSessionOpened: ({ kiloSessionId }) => {

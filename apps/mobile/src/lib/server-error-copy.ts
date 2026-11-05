@@ -123,12 +123,22 @@ function copyKeyFor(message: string): string | undefined {
 }
 
 /**
+ * The catalog key for a server sentence the app explains, or `null` when it has
+ * none. Surfaces that persist a failure (or re-translate it after a language
+ * change) keep the key; everything that renders once reads
+ * `knownServerErrorMessage`.
+ */
+export function knownServerErrorCopyKey(error: unknown): string | null {
+  const message = readTrpcErrorField(error, 'message');
+  return message == null ? null : (copyKeyFor(message) ?? null);
+}
+
+/**
  * The localized copy for a server rejection the app knows how to explain, or
  * `null` when it carries no explanation of its own.
  */
 export function knownServerErrorMessage(error: unknown): string | null {
-  const message = readTrpcErrorField(error, 'message');
-  const key = message == null ? undefined : copyKeyFor(message);
+  const key = knownServerErrorCopyKey(error);
   return key == null ? null : i18n.t(key);
 }
 

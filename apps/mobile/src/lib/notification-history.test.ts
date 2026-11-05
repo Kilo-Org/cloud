@@ -66,12 +66,12 @@ describe('notificationHistoryCopy', () => {
         i18nKey: 'internal.securityLifecycle',
         i18nParams: null,
         title: 'Kilo',
-        body: 'A security finding needs attention',
+        body: 'A security check has an update',
       },
       'en'
     );
 
-    expect(copy).toEqual({ headline: 'A security finding needs attention', detail: null });
+    expect(copy).toEqual({ headline: 'A security check has an update', detail: null });
   });
 
   it('matches the app name of the row language, not the English one', () => {
@@ -80,13 +80,13 @@ describe('notificationHistoryCopy', () => {
         i18nKey: 'internal.securityLifecycle',
         i18nParams: null,
         title: 'I-Kilo',
-        body: 'Okutholakele kokuphepha kudinga ukunakwa',
+        body: 'Ukuhlola kokuphepha kunokubuyekezwa',
       },
       'zu'
     );
 
     expect(copy).toEqual({
-      headline: 'Okutholakele kokuphepha kudinga ukunakwa',
+      headline: 'Ukuhlola kokuphepha kunokubuyekezwa',
       detail: null,
     });
   });

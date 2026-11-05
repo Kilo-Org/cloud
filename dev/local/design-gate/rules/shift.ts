@@ -1,5 +1,5 @@
 import { finding, type Finding } from '../findings';
-import type { LayoutNode, LayoutTree, Rect } from '../tree';
+import { layoutRect, type LayoutNode, type LayoutTree, type Rect } from '../tree';
 import {
   ANIMATED_SHIFT_MIN_MS,
   REST_SAMPLES,
@@ -24,10 +24,6 @@ type Shift = {
   elapsed: number;
   animated: boolean;
 };
-
-function layoutRect(node: LayoutNode): Rect {
-  return node.probe.layoutRect ?? node.rect;
-}
 
 function largestShift(
   byKey: readonly ReadonlyMap<string, LayoutNode>[],

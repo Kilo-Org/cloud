@@ -5,6 +5,8 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 import { type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+
 import {
   collectControls,
   collectText,
@@ -84,6 +86,9 @@ async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
   persist._setSecureStoreForTests(secureStore);
   home._setHomeWidgetStoreForTests(secureStore);
   if (snapshot !== null) {
+    // A restart adopts the record and the Home-only data on the signed-in
+    // scope.
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
     persist.persistGlanceableSink.publish(snapshot);
     home.rememberHomeWidgetData({
       snapshot,

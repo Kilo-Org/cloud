@@ -250,17 +250,19 @@ describe('ProfileScreen deferred queries', () => {
     const { renderer, unmount } = await mountProfile();
 
     flushIdle();
+    // The resolved role is the settle signal: the row stays disabled until the
+    // organizations read hands the active context its membership.
     await waitFor(
       () =>
         findConfigureRows(renderer.root, i18n.t('profile.manageOrganization'))[0]?.props
-          .subtitle === 'Kilo'
+          .disabled === false
     );
 
     const [organizationRow] = findConfigureRows(
       renderer.root,
       i18n.t('profile.manageOrganization')
     );
-    expect(organizationRow?.props.subtitle).toBe('Kilo');
+    expect(organizationRow?.props.disabled).toBe(false);
     expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
 
     unmount();

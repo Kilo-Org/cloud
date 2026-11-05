@@ -9,6 +9,7 @@
       "lowBalance": "رصيدك يحتاج إلى انتباه",
       "spendAlert": "إنفاقك يحتاج إلى انتباه",
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
+      "securityUpdate": "فحص أمان به تحديث",
       "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "نتيجة أمان تحتاج إلى انتباه"
+      "body": "فحص أمان به تحديث"
     }
   },
   "instanceLifecycle": {

@@ -22,10 +22,13 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { FindingRow } from '@/components/security-agent/finding-row';
+import {
+  FindingListSkeletonRows,
+  FindingRowSkeleton,
+} from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
@@ -53,7 +56,7 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-lg" />;
+    return <FindingRowSkeleton index={0} />;
   }
   if (error) {
     return (
@@ -213,10 +216,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       ) : null}
 
       {body.status === 'loading' && (
-        <View className="flex-1 gap-3 px-6 pt-4">
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
+        <View style={listStyle}>
+          <View style={listContentContainerStyle}>
+            {/* The loaded list's `ListHeaderComponent` band, so the first card
+                lands where the first placeholder row stood. */}
+            <View className="pb-3" />
+            <FindingListSkeletonRows />
+          </View>
         </View>
       )}
 

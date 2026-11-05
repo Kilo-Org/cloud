@@ -23,6 +23,7 @@ import {
   getMergeabilityStatus,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
+import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   usePrReviewInboxBack,
@@ -38,6 +39,8 @@ import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
+const TABS_WITHOUT_A_REQUEST: readonly PrReviewTabId[] = ['files', 'discussion'];
+const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -218,7 +221,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
           ...(headSha
             ? [
                 queryClient.invalidateQueries({
-                  queryKey: queries.checksOptions(headSha).queryKey,
+                  queryKey: queries.checksOptions(headSha, true).queryKey,
                 }),
               ]
             : []),
@@ -230,14 +233,33 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   }, [queryClient, queries, pr.data?.headSha]);
 
   const isMergeRequest = queries.platform === 'gitlab';
-  // A first-load failure keeps the controls in place but disables actions and
-  // tabs that depend on a successfully loaded request.
-  const loadFailed = pr.isError && pr.data === undefined;
+  // The header actions follow the body, not the query: `PrReviewOverview`
+  // renders its error state for every failure except the two it keeps cached
+  // data for, so a terminal read (not-found, permission, reconnect) leaves the
+  // body showing "unavailable" even though an earlier read left `pr.data`
+  // behind. Deriving `loadFailed` from the same classification keeps the
+  // controls in step: a share, review or merge affordance that acts on the
+  // request is inert — disabled, and dimmed by `Button`'s disabled cue — while
+  // the body offers no request to act on, and before the first read answers.
+  const errorState = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
+  const keepsCachedData =
+    errorState?.kind === 'retryable' || errorState?.kind === 'service-unavailable';
+  const loadFailed = errorState !== null && (pr.data === undefined || !keepsCachedData);
+  const requestLoaded = !loadFailed && pr.data !== undefined;
+  // Files and Discussion read from the request, so a failed load leaves them
+  // with nothing to show. Overview owns that failure: it renders the
+  // unavailable state and its recovery, and it stays selectable, so a reader
+  // whose selected tab was Files keeps a way back to it.
+  const tabSelectorDisabledTabs = loadFailed ? TABS_WITHOUT_A_REQUEST : NO_DISABLED_TABS;
   // The review-submit sheet is a route sibling on every provider (s6), so
   // the affordance is offered wherever its scope can actually be queried:
   // a Bitbucket PR without a selected organization waits at the boundary
   // instead of opening a sheet that cannot load.
-  const canSubmitReview = queries.isReady;
+  const canSubmitReview = queries.isReady && requestLoaded;
+  // Share names the loaded request: a provider URL alone is not enough while
+  // the body is still loading or has failed, because the sheet would offer a
+  // link the screen cannot vouch for.
+  const canShare = requestLoaded && webUrl !== null;
   // The header Merge affordance mirrors the Overview merge section's gate so
   // the two never disagree: GitHub reads the mergeability off the overview DTO
   // (a merged/closed PR is terminal, a blocked one keeps the section's
@@ -318,7 +340,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               size="icon"
               variant="ghost"
               onPress={sharePullRequest}
-              disabled={loadFailed || !webUrl}
+              disabled={!canShare}
               accessibilityLabel={
                 isMergeRequest
                   ? t('prReview.terms.shareMergeRequest')
@@ -354,7 +376,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             activeTab={tab}
             onChange={setTab}
             discussionCount={pr.data?.commentCount}
-            disabled={loadFailed}
+            disabledTabs={tabSelectorDisabledTabs}
           />
         </View>
       ) : null}

@@ -50,7 +50,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
         <ConfigureRow
           icon={GitMerge}
           title={t('common.prReview')}
-          subtitle={t('profile.prReviewSubtitle')}
+          subtitle={t('common.prReviewSubtitle')}
           hue="gold"
           className="rounded-lg bg-secondary px-3"
           last

@@ -520,22 +520,25 @@ describe('ScreenHeader mounted', () => {
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
 
-  it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
+  it('keeps the title touch area out of the row gap beside it', () => {
+    // The heading's free side is the gap to the trailing slot, and a trailing
+    // control can carry a slop that reaches into that gap. A title slop there
+    // made the same strip two tap targets: measured on the session screen at
+    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
-  it('mirrors the title hit slop onto the free side in RTL', () => {
-    // RN does not mirror hitSlop under RTL: an unchanged physical right slop
-    // reaches across the visually mirrored back control and the title (the
-    // later sibling) wins those taps, so Back opens the title action instead.
+  it('keeps the title touch area identical in both directions', () => {
+    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
+    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 0, bottom: 13, left: 13 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
   it('gives the interactive title at least a 44-point reachable target', () => {
@@ -775,6 +778,56 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
+  it('reserves the title cap in a band beside the heading, not around the title', () => {
+    const renderer = renderHeader({
+      title: 'Harbor Analytics',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 2,
+      reserveTitleSpace: true,
+    });
+
+    const band = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className ?? '')
+          .split(' ')
+          .includes('w-0')
+    );
+    // The band holds one eyebrow line and the title's two-line cap, so the row
+    // keeps its height for a title that paints one line: the body below never
+    // moves when the name arrives and wraps.
+    expect(band.findAll(node => String(node.type) === 'Eyebrow')).toHaveLength(1);
+    const capBox = band.findAll(
+      node => typeof node.type === 'string' && String(node.props.className ?? '').includes('min-h')
+    );
+    expect(capBox.map(node => node.props.className)).toEqual(['min-h-14']);
+    // The band is clipped to no width, so it holds height only: it never takes
+    // space from the heading or paints beside the title.
+    expect(String(band.props.className)).toContain('w-0');
+
+    // The visible title keeps its own height, so the eyebrow sits right above
+    // it instead of above the empty line the cap reserves.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toBe('min-w-0 flex-1');
+    renderer.unmount();
+  });
+
+  it('reserves no band on a header whose title has a single fixed line', () => {
+    const renderer = renderHeader({
+      title: 'Personal',
+      eyebrow: 'RECENT REVIEWS',
+      titleNumberOfLines: 1,
+    });
+
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && String(node.props.className ?? '').startsWith('w-0')
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
     const renderer = renderHeader({
       title: 'Submit review',
@@ -882,6 +935,121 @@ describe('ScreenHeader mounted', () => {
   it('omits an absent eyebrow when no space is reserved', () => {
     const renderer = renderHeader({ title: '#6054' });
     expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('renders the subtitle under the title on one muted line', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      subtitle: 'Shared Agency Review Profile',
+    });
+
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    const texts = heading.findAllByType('Text');
+    expect(texts[0]?.children).toEqual(['Profile agents']);
+    const subtitle = texts[1];
+    expect(subtitle?.children).toEqual(['Shared Agency Review Profile']);
+    // Context under the title, never a second title: one line, tail ellipsis,
+    // and the muted body style with no uppercase or tracking of its own.
+    expect(subtitle?.props.variant).toBe('muted');
+    expect(subtitle?.props.numberOfLines).toBe(1);
+    expect(subtitle?.props.ellipsizeMode).toBe('tail');
+    expect(subtitle?.props.className).not.toContain('uppercase');
+    expect(subtitle?.props.className).not.toContain('tracking');
+    expect(subtitle?.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('keeps a reserved subtitle line hidden until its name arrives', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      centerTitle: true,
+    });
+
+    const placeholder = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(placeholder?.props.numberOfLines).toBe(1);
+    expect(placeholder?.children).toEqual(['\u00A0']);
+    expect(placeholder?.props.className).toContain('opacity-0');
+    expect(placeholder?.props.accessible).toBe(false);
+    expect(placeholder?.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          reserveSubtitle: true,
+          centerTitle: true,
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    const name = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    )[0];
+    expect(name?.children).toEqual(['Shared Agency Review Profile']);
+    expect(name?.props.className).not.toContain('opacity-0');
+    expect(name?.props.className).toContain('text-center');
+    renderer.unmount();
+  });
+
+  it('paints a placeholder on the reserved subtitle line while the name loads', () => {
+    const renderer = renderHeader({
+      title: 'Profile agents',
+      reserveSubtitle: true,
+      subtitlePlaceholder: createElement('PlaceholderBar'),
+    });
+
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(1);
+    // The placeholder is painted over the reserved line, which still holds the
+    // height the name will take, so the placeholder and the name lay out the same.
+    const reserved = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(reserved).toHaveLength(1);
+    expect(reserved[0]?.children).toEqual(['\u00A0']);
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: 'Profile agents',
+          subtitle: 'Shared Agency Review Profile',
+        })
+      );
+    });
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'PlaceholderBar'
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('omits the subtitle line when the caller reserves no space for it', () => {
+    const renderer = renderHeader({ title: 'Profile agents' });
+    const subtitles = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.variant === 'muted'
+    );
+    expect(subtitles).toHaveLength(0);
     renderer.unmount();
   });
 

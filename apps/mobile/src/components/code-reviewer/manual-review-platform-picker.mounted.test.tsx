@@ -110,4 +110,24 @@ describe('ManualReviewPlatformPicker accessible name', () => {
     expect(gitlab?.props.accessibilityLabel).toBe('GitLab');
     expect(gitlab?.props.accessibilityState).toMatchObject({ checked: true, disabled: false });
   });
+
+  it('dims the disabled label and never the reason it explains', () => {
+    // A row-level opacity multiplied the muted token, which took the reason to
+    // about 2:1 on the `bg-secondary` card. The dim is the label's own muted
+    // token now, so the reason keeps the token's 4.5:1 in both themes.
+    const [github, gitlab] = renderPicker({ platform: 'github', connected: ['github'] }).findAll(
+      node => Object.is(node.type, 'Pressable')
+    );
+
+    expect(gitlab?.props.className).not.toContain('opacity-50');
+    expect(github?.props.className).not.toContain('opacity-50');
+
+    const [label, reason] = gitlab?.findAll(node => Object.is(node.type, 'Text')) ?? [];
+    expect(label?.props.className).toContain('text-muted-foreground');
+    expect(reason?.props.className).toBe('text-xs');
+    expect(reason?.props.className).not.toContain('opacity');
+
+    const [connectedLabel] = github?.findAll(node => Object.is(node.type, 'Text')) ?? [];
+    expect(connectedLabel?.props.className).toBe('text-sm font-medium');
+  });
 });

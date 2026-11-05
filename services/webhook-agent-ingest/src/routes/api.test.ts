@@ -714,7 +714,7 @@ describe('standard pattern configuration', () => {
     expect(create.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
       [
         ['bodySchema', 'pattern'],
-        'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+        'Pattern must not combine quantifiers that exceed 64 combined repetitions',
       ],
     ]);
     expect(TriggerConfigUpdateInput.safeParse({ bodySchema }).success).toBe(false);

@@ -1,9 +1,10 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
+import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
-  ProviderId,
+  ProviderType,
   ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
@@ -32,7 +33,7 @@ export type RequestLoggingParams = {
 export type LogUnrewrittenResponseParams = {
   response: Response;
   model: string;
-  providerId: ProviderId;
+  providerId: ProviderType;
   logging: RequestLoggingParams;
   /** Merged into the row's `error`, e.g. to mark a response the gateway produced itself. */
   error: Record<string, string> | null;
@@ -41,10 +42,11 @@ export type LogUnrewrittenResponseParams = {
 export type RewriteModelResponseParams = {
   response: Response;
   model: string;
-  providerId: ProviderId;
+  providerId: ProviderType;
   kind: GatewayRequest['kind'];
   isFree: boolean;
   userByok: boolean;
+  customLlmPricing: CustomPricingTiers | null;
   logging: RequestLoggingParams;
   responseTransforms: ProviderResponseTransforms | null;
 };
@@ -53,10 +55,10 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-export function redactApiRequestLogRequest(request: GatewayRequest): unknown {
+export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
-    return request.body;
+    return { ...request.body };
   }
 
   const redactedByok = Object.fromEntries(
@@ -132,7 +134,7 @@ async function createRequestLogCapture(
         return;
       }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
-        request: JSON.stringify(redactApiRequestLogRequest(request)),
+        request: redactApiRequestLogRequest(request),
         response: responseText,
       });
       const r2UploadError = uploadError?.substring(0, 4000);
@@ -208,6 +210,7 @@ export async function rewriteModelResponse({
   kind,
   isFree,
   userByok,
+  customLlmPricing,
   logging,
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
@@ -218,6 +221,7 @@ export async function rewriteModelResponse({
     api_kind: kind,
     is_free: isFree,
     user_byok: userByok,
+    custom_llm_pricing: customLlmPricing,
     custom_pricing_config: await getCustomPricingConfig(),
   };
 

@@ -48,6 +48,7 @@ import { organizationsMembersRouter } from '@/routers/organizations/organization
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
+import { organizationRequestLogsRouter } from '@/routers/organizations/organization-request-logs-router';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -142,6 +143,7 @@ export const organizationsRouter = createTRPCRouter({
   subscription: organizationsSubscriptionRouter,
   settings: organizationsSettingsRouter,
   usageDetails: organizationsUsageDetailsRouter,
+  requestLogs: organizationRequestLogsRouter,
   sso: organizationSsoRouter,
   auditLogs: organizationAuditLogRouter,
   admin: organizationAdminRouter,

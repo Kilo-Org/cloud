@@ -39,7 +39,11 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
 }: LanguagePickerRowProps) {
   const { t } = useTranslation();
   const dividerClass = showDivider ? 'border-b-[0.5px] border-hair-soft' : undefined;
-  const textClass = `flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`;
+  // The check is the row's trailing element, so the gap belongs on the logical
+  // end edge — the same `pe-3` ChoiceRow gives its own default children. A
+  // physical `pl-3`/`pr-3` pair would land on the wrong side under RTL, where
+  // React Native swaps the two: the copy then touched the check.
+  const textClass = 'flex-1 pe-3';
   // iOS resolves `textAlign: 'auto'` from the paragraph's first strong
   // character, so an Arabic endonym right-aligns itself inside an LTR
   // interface while its Latin subtitle stays left — the two lines of one row
@@ -72,7 +76,9 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
         }}
       >
         <View className={textClass}>
-          <Text className={cn('text-sm font-medium', alignClass)}>
+          <Text
+            className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+          >
             {t('language.deviceLanguage')}
           </Text>
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
@@ -97,7 +103,11 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
             a Latin name under a right-aligned row must not jump to the left
             edge. Unicode bidi already renders each script correctly inside
             the line. */}
-        <Text className={cn('text-sm font-medium', alignClass)}>{item.row.endonym}</Text>
+        <Text
+          className={cn('text-sm font-medium', disabled && 'text-muted-foreground', alignClass)}
+        >
+          {item.row.endonym}
+        </Text>
         {item.row.englishName !== item.row.endonym ? (
           <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
             {item.row.englishName}

@@ -9,6 +9,7 @@
       "lowBalance": "Az egyenleged figyelmet igényel",
       "spendAlert": "A költésed figyelmet igényel",
       "securityFinding": "Egy biztonsági találat figyelmet igényel",
+      "securityUpdate": "Egy biztonsági ellenőrzés frissítést kapott",
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Egy biztonsági találat figyelmet igényel"
+      "body": "Egy biztonsági ellenőrzés frissítést kapott"
     }
   },
   "instanceLifecycle": {

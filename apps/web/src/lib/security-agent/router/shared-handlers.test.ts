@@ -18,6 +18,7 @@ import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { SECURITY_SYNC_PRECONDITION_CODES } from '@kilocode/app-shared/security-agent';
 import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import type { SecurityFindingWithRemediation } from '../db/security-remediation';
+import { parseSecurityAgentConfig } from '../core/constants';
 
 const commandId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const mockSubmitManualSecuritySync = jest.fn() as jest.MockedFunction<
@@ -90,6 +91,7 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
+const mockHasSecurityReviewPermissions = jest.fn<(...args: unknown[]) => boolean>(() => true);
 const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: string, integrationId: string) => Promise<unknown[]>>();
 const mockUpdateRepositoriesForIntegration =
@@ -118,7 +120,8 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
   settleOperation: mockSettleOperation,
 }));
 jest.mock('../github/permissions', () => ({
-  hasSecurityReviewPermissions: () => true,
+  hasSecurityReviewPermissions: (integration: unknown) =>
+    mockHasSecurityReviewPermissions(integration),
   getReauthorizeUrl: mockGetReauthorizeUrl,
 }));
 jest.mock('../github/dependabot-api', () => ({
@@ -193,6 +196,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // `jest.clearAllMocks` keeps a mock's implementation, but an earlier test may
+  // have narrowed this one to the missing-permission branch.
+  mockHasSecurityReviewPermissions.mockImplementation(() => true);
   mockGetSecurityAgentConfigWithStatus.mockResolvedValue(null);
   mockGetRemediationAttemptHistory.mockResolvedValue([]);
   mockEnqueueBacklogFindings.mockResolvedValue(0);
@@ -495,6 +501,20 @@ describe('getConfig', () => {
       autoAnalysisMinSeverity: 'high',
       autoRemediationMinSeverity: 'high',
       autoRemediationRequireApproval: true,
+    });
+  });
+
+  it('reports the remediation default when the stored config only sets the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 1,
+      storedConfig: { analysis_model_slug: 'analysis-model' },
+      config: parseSecurityAgentConfig({ analysis_model_slug: 'analysis-model' }),
+    });
+
+    await expect(createHandlers().getConfig({ ctx: context, input: {} })).resolves.toMatchObject({
+      analysisModelSlug: 'analysis-model',
+      remediationModelSlug: 'kilo-auto/balanced',
     });
   });
 });
@@ -881,6 +901,61 @@ describe('saveConfig', () => {
     );
   });
 
+  it('stores the remediation default when a save changes only the analysis model', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {},
+      config: parseSecurityAgentConfig({}),
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'analysis-model',
+          remediation_model_slug: 'kilo-auto/balanced',
+        }),
+      })
+    );
+  });
+
+  it('keeps a stored remediation model when a save omits it', async () => {
+    const stored = parseSecurityAgentConfig({
+      analysis_model_slug: 'analysis-model',
+      remediation_model_slug: 'stored-remediation-model',
+    });
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: true,
+      configRevision: 3,
+      storedConfig: {
+        analysis_model_slug: 'analysis-model',
+        remediation_model_slug: 'stored-remediation-model',
+      },
+      config: stored,
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, analysisModelSlug: 'next-analysis-model' },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          analysis_model_slug: 'next-analysis-model',
+          remediation_model_slug: 'stored-remediation-model',
+        }),
+      })
+    );
+  });
+
   it('enqueues the include-existing remediation backlog when approval is turned off', async () => {
     mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 2 });
     mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
@@ -1151,6 +1226,64 @@ describe('getAnalysis remediation timeline', () => {
       status: 'completed',
       remediationAttempts: [],
     });
+  });
+});
+
+describe('setEnabled precondition markers', () => {
+  it('marks the refusal that gates enabling without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    const error = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(TRPCError);
+    // The English sentence stays the web surface's copy; the code is what a
+    // device maps onto its own catalog copy.
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub App does not have vulnerability_alerts permission',
+    });
+    expect(causeUpstreamCode(error)).toBe(SECURITY_SYNC_PRECONDITION_CODES.missingPermission);
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+  });
+
+  it('lets a disable through without the Dependabot permission', async () => {
+    mockHasSecurityReviewPermissions.mockReturnValue(false);
+
+    await expect(
+      createHandlers().setEnabled.handler({ ctx: context, input: { isEnabled: false } })
+    ).resolves.toEqual({ success: true });
+  });
+
+  it('marks the refusal that gates enabling with no repository in scope', async () => {
+    const orgError = await createHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+
+    expect(orgError).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Select at least one repository before enabling Security Agent.',
+    });
+    expect(causeUpstreamCode(orgError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    // The personal router runs the same handler, so it marks the refusal too.
+    const personalError = await createPersonalHandlers()
+      .setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+      .catch((thrown: unknown) => thrown);
+    expect(causeUpstreamCode(personalError)).toBe(SECURITY_SYNC_PRECONDITION_CODES.noRepositories);
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 });
 

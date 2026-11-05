@@ -1,9 +1,9 @@
-import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseChildSessionCallbackPrompt } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { createMessageId } from '../session/message-id.js';
 import type { Env } from '../types.js';
-import { deliverParentSessionCallback, parentSessionCallbackPrompt } from './parent-session.js';
+import { deliverWorkspaceSessionCallback, parentSessionCallbackPrompt } from './parent-session.js';
 import { createCallbackQueueConsumer } from './queue-consumer.js';
 import type { CallbackJob } from './types.js';
 
@@ -20,6 +20,9 @@ const env = {} as Env;
 const userId = 'oauth/owner';
 const childId = 'workspace_child';
 const parentId = 'workspace_parent';
+const rootId = 'workspace_12345678-1234-4234-8234-123456789abc';
+const targetId = 'workspace_22345678-1234-4234-8234-123456789abc';
+const worktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
 let child: SessionMetadata;
 let parent: SessionMetadata;
 let job: CallbackJob;
@@ -41,7 +44,7 @@ beforeEach(() => {
     allowSubagentSessions: true,
   };
   job = {
-    target: { url: 'session:parent' },
+    target: { url: 'workspace:new-chat' },
     parentSession: { userId, messageId: createMessageId() },
     payload: {
       sessionId: childId,
@@ -65,14 +68,55 @@ beforeEach(() => {
   queuePrompt.mockReset().mockResolvedValue({ delivery: 'queued' });
 });
 
-describe('parent session callback delivery', () => {
+describe('child session callback envelope', () => {
+  it('emits the shared child callback envelope', () => {
+    expect(parseChildSessionCallbackPrompt(parentSessionCallbackPrompt(job.payload))).toMatchObject(
+      {
+        version: 1,
+        cloudAgentSessionId: childId,
+        kiloSessionId: 'ses_child',
+        messageId: job.payload.messageId,
+        status: 'completed',
+        result: 'Child result',
+      }
+    );
+  });
+});
+
+describe('workspace session callback delivery', () => {
+  beforeEach(() => {
+    child.parentCloudAgentSessionId = rootId;
+    parent = {
+      ...parent,
+      identity: { userId, sessionId: rootId },
+      workspace: { worktreeId },
+    };
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner === userId
+        ? sessionId === childId
+          ? child
+          : sessionId === rootId
+            ? parent
+            : sessionId === targetId
+              ? {
+                  ...parent,
+                  identity: { userId, sessionId: targetId },
+                  parentCloudAgentSessionId: undefined,
+                }
+              : null
+        : null
+    );
+    job.target = { url: `workspace:${targetId}` };
+  });
+
   it('preserves gate and structured failure results in the queued parent prompt', async () => {
     job.payload.gateResult = 'fail';
     job.payload.failure = { code: 'workspace_setup_failed', stage: 'pre_dispatch' };
     job.payload.failureStage = 'pre_dispatch';
-    expect(await deliverParentSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
     const [input] = queuePrompt.mock.calls[0];
     expect(JSON.parse(input.turn.prompt.split('\n')[2])).toMatchObject({
+      version: 1,
       status: 'completed',
       gateResult: 'fail',
       failure: job.payload.failure,
@@ -80,100 +124,61 @@ describe('parent session callback delivery', () => {
     });
   });
 
-  it.each(['completed', 'failed', 'interrupted'] as const)(
-    'queues %s with the persisted callback message ID and the parent authorization',
-    async status => {
-      job.payload.status = status;
-      job.payload.errorMessage = status === 'completed' ? undefined : 'Child stopped';
-      expect(await deliverParentSessionCallback(env, job, 1)).toEqual({ type: 'success' });
-      expect(assertAccess).toHaveBeenCalledWith({
-        env,
-        kiloUserId: userId,
-        cloudAgentSessionId: parentId,
-        expectedOrganizationId: null,
-        expectedKiloSessionId: 'ses_parent',
-      });
-      const [input, context] = queuePrompt.mock.calls[0];
-      expect(input.cloudAgentSessionId).toBe(parentId);
-      expect(input.turn.id).toBe(job.parentSession?.messageId);
-      expect(JSON.parse(input.turn.prompt.split('\n')[2])).toMatchObject({
-        cloudAgentSessionId: childId,
-        messageId: job.payload.messageId,
-        status,
-        result: 'Child result',
-      });
-      expect(context).toEqual({ env, userId });
-    }
-  );
+  it('queues the child result into the addressed chat in the same workspace', async () => {
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    const [input] = queuePrompt.mock.calls[0];
+    expect(input.cloudAgentSessionId).toBe(targetId);
+    expect(JSON.parse(input.turn.prompt.split('\n')[2])).toMatchObject({
+      cloudAgentSessionId: childId,
+      callbackSessionId: targetId,
+      result: 'Child result',
+    });
+    expect(assertAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId })
+    );
+  });
 
-  it.each(['missing lineage', 'self', 'owner', 'organization', 'disabled', 'missing parent'])(
-    'does not send with invalid parent routing: %s',
+  it('routes the queue job through the workspace session delivery path', async () => {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    await createCallbackQueueConsumer(env)({
+      messages: [{ body: job, attempts: 1, ack, retry }],
+    } as unknown as MessageBatch<CallbackJob>);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(queuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId }),
+      expect.anything(),
+      'workspace_session_callback'
+    );
+  });
+
+  it.each(['child target', 'other workspace', 'other owner'])(
+    'rejects a callback to %s',
     async condition => {
-      if (condition === 'missing lineage') delete child.parentCloudAgentSessionId;
-      if (condition === 'self') child.parentCloudAgentSessionId = childId;
-      if (condition === 'owner') parent.identity.userId = 'another-user';
-      if (condition === 'organization') parent.identity.orgId = 'another-org';
-      if (condition === 'disabled') parent.allowSubagentSessions = false;
-      if (condition === 'missing parent') child.parentCloudAgentSessionId = 'workspace_deleted';
-      expect(await deliverParentSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+      getMetadata.mockImplementation(async (_env, owner, sessionId) => {
+        if (owner !== userId) return null;
+        if (sessionId === childId) return child;
+        if (sessionId === rootId) return parent;
+        if (sessionId !== targetId) return null;
+        if (condition === 'other owner')
+          return { ...parent, identity: { userId: 'other', sessionId: targetId } };
+        return {
+          ...parent,
+          identity: { userId, sessionId: targetId },
+          parentCloudAgentSessionId: condition === 'child target' ? rootId : undefined,
+          workspace: {
+            worktreeId: condition === 'other workspace' ? 'worktree_other' : worktreeId,
+          },
+        };
+      });
+      expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
       expect(queuePrompt).not.toHaveBeenCalled();
     }
   );
+});
 
-  it('rejects callbacks without server-owned routing context', async () => {
-    delete job.parentSession;
-    expect(await deliverParentSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-    expect(getMetadata).not.toHaveBeenCalled();
-    expect(queuePrompt).not.toHaveBeenCalled();
-  });
-
-  it('checks current access before sending to a deleted session or removed organization member', async () => {
-    assertAccess.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
-    expect(await deliverParentSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-    expect(queuePrompt).not.toHaveBeenCalled();
-  });
-
-  it('does not renew or replace revoked parent authorization', async () => {
-    queuePrompt.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
-    expect(await deliverParentSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-  });
-
-  it('retries a full queue with the same message identity and stops after five attempts', async () => {
-    queuePrompt.mockRejectedValue(new TRPCError({ code: 'TOO_MANY_REQUESTS' }));
-    expect(await deliverParentSessionCallback(env, job, 1)).toEqual({
-      type: 'retry',
-      delaySeconds: 60,
-    });
-    expect(await deliverParentSessionCallback(env, job, 5)).toMatchObject({ type: 'failed' });
-    expect(queuePrompt.mock.calls.map(([input]) => input.turn.id)).toEqual([
-      job.parentSession?.messageId,
-      job.parentSession?.messageId,
-    ]);
-  });
-
-  it('preserves matching organization scope', async () => {
-    parent.identity.orgId = child.identity.orgId = 'org_owner';
-    expect(await deliverParentSessionCallback(env, job, 1)).toEqual({ type: 'success' });
-    expect(assertAccess.mock.calls[0][0].expectedOrganizationId).toBe('org_owner');
-  });
-
-  it('routes parent jobs through the queue consumer without HTTP delivery', async () => {
-    const ack = vi.fn();
-    const retry = vi.fn();
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
-    try {
-      await createCallbackQueueConsumer(env)({
-        messages: [{ body: job, attempts: 1, ack, retry }],
-      } as unknown as MessageBatch<CallbackJob>);
-      expect(ack).toHaveBeenCalledOnce();
-      expect(retry).not.toHaveBeenCalled();
-      expect(fetchMock).not.toHaveBeenCalled();
-      expect(queuePrompt).toHaveBeenCalledOnce();
-    } finally {
-      fetchMock.mockRestore();
-    }
-  });
-
+describe('callback fallbacks', () => {
   it('keeps HTTP callbacks on the existing HTTP delivery path', async () => {
     const ack = vi.fn();
     const retry = vi.fn();

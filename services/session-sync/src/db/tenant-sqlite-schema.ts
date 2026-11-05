@@ -10,3 +10,17 @@ export const usage = sqliteTable('usage', {
   sessions: integer('sessions').notNull(),
   bytes: integer('bytes').notNull(),
 });
+
+/** The personal tenant also indexes sessions its user creates in any tenant. */
+export const createdSessions = sqliteTable('created_sessions', {
+  target: text('target').primaryKey(),
+  tenant_type: text('tenant_type', { enum: ['user', 'organization'] }).notNull(),
+  tenant_id: text('tenant_id').notNull(),
+  session_id: text('session_id').notNull(),
+});
+
+/** Permanent admission fence; content cleanup is alarm-driven. */
+export const userErasure = sqliteTable('user_erasure', {
+  id: integer('id').primaryKey(),
+  user_id: text('user_id').notNull(),
+});

@@ -22,6 +22,8 @@ export const session = sqliteTable('session', {
   tenant_lease: integer('tenant_lease').notNull().default(0),
   created_at: integer('created_at').notNull(),
   updated_at: integer('updated_at').notNull(),
+  /** Registration anchors empty sessions; only accepted batches/blob commits refresh it. */
+  last_write_at: integer('last_write_at').notNull().default(0),
   deleted_at: integer('deleted_at'),
 });
 

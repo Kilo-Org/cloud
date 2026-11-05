@@ -2,7 +2,7 @@
 
 ## Scope
 
-This service synchronizes native v2 sessions from an opted-in Kilo CLI workspace.
+This service synchronizes native v2 sessions from a Kilo CLI workspace.
 The CLI remains the execution owner and continues when the service is unavailable.
 The existing session-ingest service remains unchanged during migration.
 
@@ -18,10 +18,10 @@ This document owns service semantics, admission, storage, and rollout gates.
 ## Decisions
 
 - Local execution never waits for a cloud round trip.
-- Workspace synchronization requires explicit opt-in.
+- Workspace synchronization uses the CLI's configured destination.
 - The service can decrypt stored content and enforces personal or organization access.
 - Native v2 supplies the live protocol; old sessions use a separate historical conversion path.
-- Retain the current transcript and portable state until deletion, subject to explicit quotas.
+- Retain current transcript and portable state until deletion or idle expiry, subject to explicit quotas.
 - Keep a bounded replay tail rather than permanent per-token revision history.
 - Fine-grained durable updates serve watched sessions; background synchronization uses coarser checkpoints.
 - Default continuation on an unreachable owner's session creates a fork.
@@ -148,6 +148,7 @@ The initial storage policy is explicit:
 | Inline entity bytes per session | 64 MiB |
 | Current entities per session | 100,000 |
 | Retained batch receipts | 256 |
+| Session idle retention | 90 days since the last accepted batch or blob commit |
 
 Verified uploads without a current entity reference enter `unreferenced` for 15 minutes.
 Replacing or removing the last reference sets its cleanup deadline to the batch commit time.
@@ -170,9 +171,8 @@ Its schema lives in `src/db/tenant-sqlite-schema.ts`. Generate changes with
 `pnpm drizzle-kit generate --config drizzle.tenant.config.ts`; commit the
 `drizzle-tenant` SQL, migration barrel, journal, and snapshot together.
 The constructor runs tracked migrations inside `blockConcurrencyWhile`, then seeds
-the usage row idempotently. The initial migration uses `IF NOT EXISTS` to preserve
-the same lease and usage rows from earlier raw-table local fixtures. Nothing has
-been deployed, so no deployed-data migration or data rewrite is needed.
+the usage row idempotently. Tracked migrations preserve existing lease and usage rows.
+The creator index adds no global coordinator or new Durable Object class.
 Default personal limits are 10,000 sessions and 100 GiB; organization limits are
 200,000 sessions and 2 TiB. Wrangler vars `USER_TENANT_SESSIONS`, `USER_TENANT_BYTES`,
 `ORGANIZATION_TENANT_SESSIONS`, and `ORGANIZATION_TENANT_BYTES` override these defaults.
@@ -194,6 +194,38 @@ as registration retries; an already-created session adopts that admission instea
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.
+
+### Account erasure and idle retention
+
+`POST /internal/users/:userID/erase` takes no body and authenticates
+`X-Internal-Secret` against the `INTERNAL_API_SECRET_PROD` Secrets Store binding,
+using the same convention as session-ingest. It returns `202` only after durably
+recording a permanent user admission fence and the cleanup work. Repeated requests
+are safe. User-facing sync grants cannot invoke this route.
+Non-production web stacks must explicitly configure `SESSION_SYNC_WORKER_URL` to
+their isolated service; account erasure has no production default outside production.
+
+Each user's personal tenant object indexes the tenant and session IDs of sessions
+they create, including organization sessions. Registration records the index before
+tenant admission, so a lost response cannot hide an admitted session from erasure.
+Account erasure pages that index from an alarm and uses the existing tombstone,
+R2 cleanup, and tenant quota release paths. Organization sessions created by other
+members are never erased. Failed cleanup reschedules itself; unfinished uploads
+retain their original fencing deadline before their private objects are purged.
+
+The durable web account-deletion task submits erasure before ingest teardown and
+anonymization. Its acceptance checkpoint prevents unnecessary requests during later
+ingest retries, while an unacknowledged request is retried at least once. Each user
+alarm handles only a bounded page and checkpoints individual successful sessions.
+
+An idle session expires 90 days after its latest successful batch or blob commit;
+registration anchors an empty session. Reads, repeated registration, and beginning
+or aborting an upload do not refresh that deadline. Retention shares the session's
+single alarm scheduler with blob sweeping and lease reconciliation, and uses the
+same permanent tombstone and quota-release path as explicit deletion. The service
+had no stored sessions before this retention-enabled cutover, so every session is
+created with its own retention alarm.
+
 
 ### Request admission
 
@@ -230,7 +262,9 @@ forward. A retry that encounters an expired, in-flight cleanup claim waits five 
 A tombstone survives entity cleanup.
 A deleted ID cannot be registered again.
 An operational restore must reapply deletion fences before exposing restored data.
-Document backup-retention behavior before production rollout.
+Durable Object SQLite point-in-time recovery retains platform backups for 30 days.
+R2 has no backup. Erasure removes live content; it does not shorten platform SQLite
+backup retention. Restoring SQLite requires reapplying deletion fences before access.
 
 ### Request metrics
 
@@ -351,9 +385,11 @@ Before rendering, an operator must obtain and review all of the following:
    Verify that its public development URL is disabled, it has no public custom
    domains, and it is not exposed by another Worker or public gateway. Only this
    service may access its synthetic session blobs.
-4. Two independently generated signing secrets, each at least 32 random bytes,
+4. Independently generated signing secrets, each at least 32 random bytes,
    recorded in the shared engineering vault and installed as Workers-scoped Secrets
-   Store entries `session-sync-staging-nextauth` and `session-sync-staging-grants`.
+   Store entries `session-sync-staging-nextauth` and `session-sync-staging-grants`,
+   plus a separate `session-sync-staging-internal` secret shared only with the isolated
+   web account-deletion caller.
    Record only the store ID and entry names in configuration. Never copy a
    production auth secret, share the two values, print values, or put them in the
    resource manifest. The first signs synthetic Kilo credentials; the second
@@ -423,7 +459,7 @@ version preview URLs, and uses its own workers.dev endpoint. It sets
 `ENVIRONMENT=staging`: synthetic Kilo credentials must carry `env: "staging"`,
 match the isolated database's user pepper, and use an eligible human/device
 credential policy. Production/development credentials must not exchange successfully.
-Both secrets use the service's existing Secrets Store `get()` support; absent
+All secrets use the service's existing Secrets Store `get()` support; absent
 bindings fail auth closed. No auth bypass or production secret binding is added.
 
 The dry run only bundles and validates configuration; it does **not** establish
@@ -443,8 +479,9 @@ References:
 Production is provisioned and deploys automatically at `https://session-sync.kiloapps.io`.
 The top level of `wrangler.jsonc` holds the production bindings; `pnpm dev` uses `env.local`.
 Production uses the private R2 bucket `session-sync`, the Hyperdrive configuration
-`session-sync-production`, and the Secrets Store entries `NEXTAUTH_SECRET_PROD` and
-`SESSION_SYNC_SECRET_PROD`. Shared secrets live in the shared engineering vault.
+`session-sync-production`, and the Secrets Store entries `NEXTAUTH_SECRET_PROD`,
+`SESSION_SYNC_SECRET_PROD`, and `INTERNAL_API_SECRET_PROD`. Shared secrets live in
+the shared engineering vault.
 The Hyperdrive configuration connects as `session_sync_reader`, a read-only role with
 column grants on only the account, device-session, and membership columns that exchange reads.
 Set `ENVIRONMENT=production` explicitly; exchange fails closed if it is absent or
@@ -460,5 +497,7 @@ prove remote cache settings. Cloudflare documents that writes do not invalidate
 cached reads and recommends a cache-disabled binding for authentication and permissions:
 [Hyperdrive query caching](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/).
 Verify account and organization authorization on an isolated stack before deployment.
-Complete account deletion, backup retention, quota policy, and rollout monitoring before public adoption.
-The CLI has no default destination; users opt in with an explicit `--url`.
+Account deletion and 90-day idle retention are implemented through durable alarm
+jobs. Tenant quotas and bounded cleanup are enforced. SQLite point-in-time recovery
+is retained by the platform for 30 days; R2 has no backup. Rollout monitoring remains
+an operational prerequisite. The CLI uses this production destination by default.

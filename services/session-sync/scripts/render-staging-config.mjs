@@ -108,6 +108,11 @@ try {
         store_id: manifest.secretsStoreID,
         secret_name: 'session-sync-staging-grants',
       },
+      {
+        binding: 'INTERNAL_API_SECRET_PROD',
+        store_id: manifest.secretsStoreID,
+        secret_name: 'session-sync-staging-internal',
+      },
     ],
   };
   mkdirSync(dirname(targetPath), { recursive: true });

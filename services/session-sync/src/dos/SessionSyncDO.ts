@@ -34,6 +34,7 @@ import * as page from './session-sync/page';
 import * as session from './session-sync/session';
 
 const PURGE_RETRY_MS = 60_000;
+export const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 class LeaseRequired extends Error {
   constructor(readonly bytes: number) {
     super('A larger tenant lease is required');
@@ -85,7 +86,9 @@ export class SessionSyncDO extends DurableObject<Env> {
   private quotaGate: Promise<void> = Promise.resolve();
   private purgeRetryAt = 0;
   private leaseReconcilePending = false;
-  private pendingRegistration: { tenant: Tenant; sessionID: string } | undefined;
+  private pendingRegistration:
+    | { tenant: Tenant; sessionID: string; creatorID?: string }
+    | undefined;
   private dataRateLimit = new DataRateLimit();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -194,9 +197,26 @@ export class SessionSyncDO extends DurableObject<Env> {
         if (!meta) {
           const abandoned = this.pendingRegistration;
           const released = await this.tenantCall(() =>
-            getTenantStub(this.env, abandoned.tenant).release({ ...abandoned, bytes: 0 })
+            getTenantStub(this.env, abandoned.tenant).release({
+              tenant: abandoned.tenant,
+              sessionID: abandoned.sessionID,
+              bytes: 0,
+            })
           );
           if (!released.ok) return released;
+          if (abandoned.creatorID) {
+            const forgotten = await this.tenantCall(() =>
+              getTenantStub(this.env, {
+                type: 'user',
+                id: abandoned.creatorID ?? '',
+              }).forgetCreatedSession({
+                tenant: abandoned.tenant,
+                sessionID: abandoned.sessionID,
+                bytes: 0,
+              })
+            );
+            if (!forgotten.ok) return forgotten;
+          }
         }
         // A successful registration may have adopted the reservation before
         // its intent was cleared. Never release an admission with a session row.
@@ -211,6 +231,10 @@ export class SessionSyncDO extends DurableObject<Env> {
           getTenantStub(this.env, tenant).release(input)
         );
         if (!released.ok) return released;
+        const forgotten = await this.tenantCall(() =>
+          getTenantStub(this.env, { type: 'user', id: meta.creator_id }).forgetCreatedSession(input)
+        );
+        if (!forgotten.ok) return forgotten;
         session.update(this.db, { tenant_lease: -1 });
         await this.clearLeaseReconcile();
       } else if (
@@ -242,11 +266,27 @@ export class SessionSyncDO extends DurableObject<Env> {
     const { principal, sessionID, request } = parsed.value;
     return this.serial(async () => {
       const existing = session.load(this.db);
-      if (existing) {
-        const registered = this.tx(() =>
-          session.register(this.db, principal, sessionID, request.sourceID, Date.now())
-        );
-        if (!registered.ok) return registered;
+      const prior = existing
+        ? this.tx(() =>
+            session.register(this.db, principal, sessionID, request.sourceID, Date.now())
+          )
+        : null;
+      if (prior && !prior.ok) return prior;
+      if (!existing) {
+        const pending = { tenant: principal.tenant, sessionID, creatorID: principal.userID };
+        await this.ctx.storage.put('pendingRegistration', pending);
+        this.pendingRegistration = pending;
+        await this.scheduleSweep();
+      }
+      const indexed = await this.tenantCall(() =>
+        getTenantStub(this.env, { type: 'user', id: principal.userID }).trackCreatedSession({
+          principal,
+          sessionID,
+        })
+      );
+      if (!indexed.ok) return indexed;
+      if (existing && prior?.ok) {
+        const registered = prior;
         const bytes = Math.max(
           existing.tenant_lease,
           Math.ceil((existing.blob_bytes + existing.inline_bytes) / LIMITS.tenantLeaseBytes) *
@@ -265,10 +305,6 @@ export class SessionSyncDO extends DurableObject<Env> {
         await this.clearLeaseReconcile();
         return registered;
       }
-      const pending = { tenant: principal.tenant, sessionID };
-      await this.ctx.storage.put('pendingRegistration', pending);
-      this.pendingRegistration = pending;
-      await this.scheduleSweep();
       const admitted = await this.tenantCall(() =>
         getTenantStub(this.env, principal.tenant).reserve({
           tenant: principal.tenant,
@@ -283,6 +319,7 @@ export class SessionSyncDO extends DurableObject<Env> {
       if (registered.ok) {
         await this.ctx.storage.delete('pendingRegistration');
         this.pendingRegistration = undefined;
+        await this.scheduleSweep();
       }
       return registered;
     });
@@ -452,8 +489,51 @@ export class SessionSyncDO extends DurableObject<Env> {
     return { ...ok(erased.value.state), r2Ms };
   }
 
+  /** Internal erasure must never delete another member's session in a shared tenant. */
+  async eraseForUser(input: unknown): Promise<Result<null>> {
+    const parsed = parse(stateInput, input);
+    if (!parsed.ok) return parsed;
+    const { principal, sessionID } = parsed.value;
+    const erased = await this.serial(async () => {
+      const meta = session.load(this.db);
+      if (!meta) {
+        return this.tenantCall(() =>
+          getTenantStub(this.env, principal.tenant).release({
+            tenant: principal.tenant,
+            sessionID,
+            bytes: 0,
+          })
+        );
+      }
+      if (meta.creator_id !== principal.userID) return ok(null);
+      const result = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
+      return result.ok ? ok(null) : result;
+    });
+    if (!erased.ok) return erased;
+    await this.scheduleSweep();
+    const reconciled = await this.reconcileLease();
+    if (!reconciled.ok) return reconciled;
+    await this.cleanup();
+    return ok(null);
+  }
+
   override async alarm(): Promise<void> {
     try {
+      await this.serial(async () => {
+        const meta = session.load(this.db);
+        if (meta && meta.deleted_at === null && Date.now() >= this.retentionDeadline(meta)) {
+          const tenant = { type: meta.tenant_type, id: meta.tenant_id };
+          const erased = this.tx(() =>
+            erase.tombstone(
+              this.db,
+              { userID: meta.creator_id, tenant },
+              meta.session_id,
+              Date.now()
+            )
+          );
+          if (!erased.ok) throw new Error(erased.error.message);
+        }
+      });
       await this.cleanup();
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
@@ -497,6 +577,10 @@ export class SessionSyncDO extends DurableObject<Env> {
     return r2Ms;
   }
 
+  private retentionDeadline(meta: session.Meta): number {
+    return (meta.last_write_at || meta.updated_at) + RETENTION_MS;
+  }
+
   private async scheduleSweep(): Promise<void> {
     const meta = session.load(this.db);
     const leaseDue =
@@ -508,9 +592,10 @@ export class SessionSyncDO extends DurableObject<Env> {
         ? Date.now() + PURGE_RETRY_MS
         : null;
     const blobDue = blob.nextSweep(this.db);
-    const due =
-      blobDue === null ? leaseDue : leaseDue === null ? blobDue : Math.min(blobDue, leaseDue);
-    if (due === null) return;
+    const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
+    const deadlines = [blobDue, leaseDue, retentionDue].filter(value => value !== null);
+    if (deadlines.length === 0) return;
+    const due = Math.min(...deadlines);
     const current = await this.ctx.storage.getAlarm();
     const scheduled = Math.max(Date.now() + 1, due, this.purgeRetryAt);
     if (current === null || current <= Date.now() || current > scheduled) {

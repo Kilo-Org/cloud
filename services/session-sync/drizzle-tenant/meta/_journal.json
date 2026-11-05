@@ -8,6 +8,13 @@
       "when": 1793822885416,
       "tag": "0000_furry_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793843048521,
+      "tag": "0001_superb_pandemic",
+      "breakpoints": true
     }
   ]
 }

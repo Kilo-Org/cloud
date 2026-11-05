@@ -155,6 +155,7 @@ export function register(
     tenant_lease: 0,
     created_at: now,
     updated_at: now,
+    last_write_at: now,
     deleted_at: null,
   };
   db.insert(session).values(row).run();

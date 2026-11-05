@@ -4,16 +4,19 @@
  *
  * A screen pushed from a tab's root has the root beneath it, so Back returns
  * to the root and a press on the already-selected tab pops back to it. A
- * screen delivered as a FRESH navigation destination — the relaunch restore
- * after the process died on a subpage — is the Stack's only route instead:
- * expo-router builds a fresh destination from the target alone and only adds a
- * Stack's anchor when it can READ that layout's `unstable_settings`. On a
- * release build `getLayoutAnchor` cannot load a layout the cold-start URL did
- * not already touch (`loadLayout` returns a promise, so the first read answers
- * `undefined`): the `(tabs)` anchor is loaded and the tab's own Stack anchor is
- * not. Back then leaves the tab for Home, and pressing the selected tab again
- * cannot reach the root, because the tab's press plan reads the Stack as
- * already at its root.
+ * screen delivered as a FRESH navigation destination — a link that replaces the
+ * focused route, or the restore a relaunch performs — can be the Stack's only
+ * route instead: expo-router builds a fresh destination from the target alone,
+ * and a Stack's anchor is only added when that layout's `unstable_settings` is
+ * readable at the moment the destination is built. A tab Stack whose
+ * destination was built without it has no screen beneath the subpage. Back
+ * then leaves the tab for Home, and pressing the selected tab again cannot
+ * reach the root, because the tab's press plan reads the Stack as already at
+ * its root.
+ *
+ * What matters here is the state, not how it was reached: a tab Stack that
+ * holds a subpage with no root beneath it is the defect, and every path that
+ * produces one is repaired by the same rule.
  *
  * These rules name the root such a Stack is missing, and the insertion that
  * puts it back beneath the screen the reader is on.

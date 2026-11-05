@@ -30,13 +30,12 @@ export type TabStackNavigation = Pick<
 /**
  * Put a tab's root beneath a tab screen that was restored without it.
  *
- * A fresh navigation destination — the relaunch restore after the app died on
- * a subpage — is built from the target alone whenever expo-router cannot read
- * the tab Stack's `unstable_settings` anchor, which a release build cannot do
- * for a layout the cold-start URL never loaded. The Stack is then the
- * subpage's only route: Back leaves the tab for Home, and a press on the
- * selected tab cannot reach the tab's root because the press plan reads the
- * Stack as already at its root.
+ * A fresh navigation destination — a link that replaces the focused route, or
+ * the restore a relaunch performs — can be built from the target alone, with
+ * the tab Stack's anchor never read. The Stack is then the subpage's only
+ * route: Back leaves the tab for Home, and a press on the selected tab cannot
+ * reach the tab's root because the press plan reads the Stack as already at
+ * its root.
  *
  * Inserting the root directly beneath the focused screen gives every leave a
  * destination inside the tab again, which is the state the root -> subpage

@@ -189,6 +189,7 @@
     "resendCode": "Retrimite codul",
     "termsPrefix": "Dacă continui, accepți ",
     "terms": "Termenii de utilizare",
+    "termsInSentence": "Termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
@@ -2597,6 +2598,7 @@
       "assistantStopped": "Generarea răspunsului a fost oprită.",
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
       "assistantProviderError": "Furnizorul a returnat o eroare.",
+      "assistantProviderRefused": "Furnizorul a refuzat această cerere și nu poate fi reîncercată.",
       "assistantOutputLimit": "Răspunsul a atins limita de ieșire a modelului.",
       "assistantStructuredOutput": "Răspunsul nu a corespuns formatului cerut.",
       "assistantFailed": "Generarea răspunsului a eșuat."

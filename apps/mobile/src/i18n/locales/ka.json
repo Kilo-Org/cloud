@@ -189,6 +189,7 @@
     "resendCode": "კოდის ხელახლა გაგზავნა",
     "termsPrefix": "გაგრძელებით ეთანხმები ჩვენს ",
     "terms": "პირობებს",
+    "termsInSentence": "პირობებს",
     "termsConnector": " და ",
     "termsSuffix": ".",
     "moreSignInOptions": "შესვლის სხვა გზები",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "პასუხის შექმნა შეწყდა.",
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
       "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
+      "assistantProviderRefused": "პროვაიდერმა უარყო ეს მოთხოვნა და მისი განმეორებითი ცდა შეუძლებელია.",
       "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
       "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."

@@ -8,6 +8,8 @@ const workspaceStampSchema = z
   .object({
     allocationId: z.string().min(1),
     commit: z.string(),
+    workspaceId: z.string().min(1).optional(),
+    directory: z.string().min(1).optional(),
     workspacePrepared: z.literal(false).optional(),
     // Lineage written by wrappers that captured session snapshots. Read only so
     // a stamp in an older snapshot still classifies; never written again.

@@ -189,6 +189,7 @@
     "resendCode": "Hantar semula kod",
     "termsPrefix": "Dengan meneruskan, anda bersetuju dengan ",
     "terms": "Terma",
+    "termsInSentence": "Terma",
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Pilihan log masuk lain",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
+      "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."

@@ -189,6 +189,7 @@
     "resendCode": "Отправить код повторно",
     "termsPrefix": "Продолжая, вы соглашаетесь с нашими ",
     "terms": "Условиями использования",
+    "termsInSentence": "Условиями использования",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Другие способы входа",
@@ -2062,6 +2063,7 @@
       "assistantStopped": "Генерация ответа остановлена.",
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
       "assistantProviderError": "Провайдер вернул ошибку.",
+      "assistantProviderRefused": "Провайдер отклонил этот запрос, повторная попытка невозможна.",
       "assistantOutputLimit": "Ответ достиг ограничения длины ответа модели.",
       "assistantStructuredOutput": "Ответ не соответствует требуемому формату.",
       "assistantFailed": "Не удалось сформировать ответ."

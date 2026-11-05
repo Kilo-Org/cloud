@@ -189,6 +189,7 @@
     "resendCode": "Seol an cód arís",
     "termsPrefix": "Trí leanúint ar aghaidh, aontaíonn tú lenár ",
     "terms": "Téarmaí",
+    "termsInSentence": "Téarmaí",
     "termsConnector": " agus ",
     "termsSuffix": ".",
     "moreSignInOptions": "Tuilleadh roghanna sínithe isteach",
@@ -2689,6 +2690,7 @@
       "assistantStopped": "Stopadh an freagra.",
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
       "assistantProviderError": "Chuir an soláthraí earráid ar ais.",
+      "assistantProviderRefused": "Dhiúltaigh an soláthraí don iarratas seo agus ní féidir é a ath-thriail.",
       "assistantOutputLimit": "Shroicheadh an teorainn aschuir den tsamhail.",
       "assistantStructuredOutput": "Ní raibh an freagra ag teacht leis an bhformáid riachtanach.",
       "assistantFailed": "Theip ar an bhfreagra."

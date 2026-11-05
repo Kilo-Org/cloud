@@ -189,6 +189,7 @@
     "resendCode": "Koodii irra deebi'ii ergi",
     "termsPrefix": "Itti fufuun, kanneen keenya armaan gadiitti walii galta: ",
     "terms": "Ulaagaalee",
+    "termsInSentence": "Ulaagaalee",
     "termsConnector": " fi ",
     "termsSuffix": ".",
     "moreSignInOptions": "Filannoowwan seensaa dabalataa",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
+      "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."

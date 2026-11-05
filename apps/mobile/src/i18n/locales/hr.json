@@ -189,6 +189,7 @@
     "resendCode": "Pošalji kôd ponovno",
     "termsPrefix": "Nastavkom prihvaćaš naše ",
     "terms": "Uvjete",
+    "termsInSentence": "Uvjete",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više načina prijave",
@@ -2597,6 +2598,7 @@
       "assistantStopped": "Generiranje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predug za model.",
       "assistantProviderError": "Pružatelj je vratio pogrešku.",
+      "assistantProviderRefused": "Pružatelj je odbio ovaj zahtjev i nije ga moguće ponovno pokušati.",
       "assistantOutputLimit": "Odgovor je dosegao ograničenje izlaza modela.",
       "assistantStructuredOutput": "Odgovor nije odgovarao potrebnom formatu.",
       "assistantFailed": "Generiranje odgovora nije uspjelo."

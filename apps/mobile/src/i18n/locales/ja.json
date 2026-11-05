@@ -189,6 +189,7 @@
     "resendCode": "コードを再送信",
     "termsPrefix": "続行すると、",
     "terms": "利用規約",
+    "termsInSentence": "利用規約",
     "termsConnector": "および",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
@@ -2012,6 +2013,7 @@
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
+      "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"

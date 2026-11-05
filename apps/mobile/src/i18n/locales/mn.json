@@ -189,6 +189,7 @@
     "resendCode": "Кодыг дахин илгээх",
     "termsPrefix": "Үргэлжлүүлснээр та манай дараах баримт бичгийг зөвшөөрнө: ",
     "terms": "Үйлчилгээний нөхцөл",
+    "termsInSentence": "Үйлчилгээний нөхцөл",
     "termsConnector": " болон ",
     "termsSuffix": ".",
     "moreSignInOptions": "Нэвтрэх бусад сонголтууд",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Хариулт үүсгэхийг зогсоосон.",
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
       "assistantProviderError": "Үйлчилгээ үзүүлэгч алдаа буцаалаа.",
+      "assistantProviderRefused": "Үйлчилгээ үзүүлэгч энэ хүсэлтийг татгалзсан тул дахин оролдох боломжгүй.",
       "assistantOutputLimit": "Хариулт загварын гаргах хэмжээний хязгаарт хүрлээ.",
       "assistantStructuredOutput": "Хариулт шаардлагатай форматад нийцсэнгүй.",
       "assistantFailed": "Хариулт үүсгэж чадсангүй."

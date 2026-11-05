@@ -189,6 +189,7 @@
     "resendCode": "Изпрати кода отново",
     "termsPrefix": "Като продължиш, приемаш нашите ",
     "terms": "Условия",
+    "termsInSentence": "Условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Генерирането на отговора беше спряно.",
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
       "assistantProviderError": "Доставчикът върна грешка.",
+      "assistantProviderRefused": "Доставчикът отказа тази заявка и тя не може да бъде повторена.",
       "assistantOutputLimit": "Отговорът достигна ограничението за изходни данни на модела.",
       "assistantStructuredOutput": "Отговорът не съответства на изисквания формат.",
       "assistantFailed": "Не успяхме да генерираме отговор."

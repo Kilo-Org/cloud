@@ -189,6 +189,7 @@
     "resendCode": "ส่งรหัสอีกครั้ง",
     "termsPrefix": "การดำเนินการต่อแสดงว่าคุณยอมรับ",
     "terms": "ข้อกำหนด",
+    "termsInSentence": "ข้อกำหนด",
     "termsConnector": "และ",
     "termsSuffix": ".",
     "moreSignInOptions": "ตัวเลือกการลงชื่อเข้าใช้เพิ่มเติม",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "หยุดสร้างคำตอบแล้ว",
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
       "assistantProviderError": "ผู้ให้บริการส่งกลับข้อผิดพลาด",
+      "assistantProviderRefused": "ผู้ให้บริการปฏิเสธคำขอนี้และไม่สามารถลองใหม่ได้",
       "assistantOutputLimit": "คำตอบเข้าถึงขีดจำกัดผลลัพธ์ของโมเดล",
       "assistantStructuredOutput": "คำตอบไม่ตรงกับรูปแบบที่กำหนด",
       "assistantFailed": "สร้างคำตอบไม่สำเร็จ"

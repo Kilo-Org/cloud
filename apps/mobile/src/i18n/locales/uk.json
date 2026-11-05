@@ -189,6 +189,7 @@
     "resendCode": "Надіслати код повторно",
     "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими ",
     "terms": "Умовами",
+    "termsInSentence": "Умовами",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Інші способи входу",
@@ -2062,6 +2063,7 @@
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
       "assistantProviderError": "Постачальник повернув помилку.",
+      "assistantProviderRefused": "Постачальник відхилив цей запит, і його не можна повторити.",
       "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
       "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."

@@ -38,8 +38,47 @@ jobs:
       VERCEL_VERSION: '59.5.0'
 
     steps:
+      # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
+      # off when the prefix holds a runnable copy of the pinned version. A miss, or
+      # a cache failure, costs the registry install and never blocks a deploy. An
+      # entry that fails the check below is not replaced under an unchanged key, so
+      # it costs that install in every job until the key changes.
+      - name: Restore Vercel CLI
+        id: vercel-cli-cache
+        continue-on-error: true
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ runner.temp }}/vercel-cli
+          # vercel@59.5.0 installs one @vercel/vc-native-<os>-<arch> optional
+          # dependency, so an entry from another architecture cannot be reused.
+          key: ${{ runner.os }}-${{ runner.arch }}-vercel-cli-${{ env.VERCEL_VERSION }}
+
       - name: Install Vercel CLI
-        run: npm install -g vercel@${{ env.VERCEL_VERSION }}
+        env:
+          VERCEL_CLI_PREFIX: ${{ runner.temp }}/vercel-cli
+          CACHE_HIT: ${{ steps.vercel-cli-cache.outputs.cache-hit }}
+        run: |
+          echo "$VERCEL_CLI_PREFIX/bin" >> "$GITHUB_PATH"
+
+          manifest="$VERCEL_CLI_PREFIX/lib/node_modules/vercel/package.json"
+          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
+
+          # A miss, a different version, or a tree the CLI cannot start from takes
+          # the registry path.
+          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$VERCEL_VERSION" ] \
+            && "$VERCEL_CLI_PREFIX/bin/vercel" --version >/dev/null 2>&1; then
+            echo "Restored vercel@$installed from the cache"
+          else
+            echo "Installing vercel@$VERCEL_VERSION"
+            rm -rf "$VERCEL_CLI_PREFIX"
+            npm install --global --prefix "$VERCEL_CLI_PREFIX" "vercel@$VERCEL_VERSION" --no-audit --no-fund
+            installed=$(node -p "require('$manifest').version")
+            if [ "$installed" != "$VERCEL_VERSION" ]; then
+              echo "::error::Resolved vercel@$installed but the pinned version is $VERCEL_VERSION"
+              exit 1
+            fi
+          fi
+          "$VERCEL_CLI_PREFIX/bin/vercel" --version
 
       - name: Promote Vercel deployment
         run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}

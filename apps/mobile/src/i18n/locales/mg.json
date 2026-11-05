@@ -189,6 +189,7 @@
     "resendCode": "Alefaso indray ny kaody",
     "termsPrefix": "Rehefa manohy ianao dia manaiky ny ",
     "terms": "Fepetra",
+    "termsInSentence": "Fepetra",
     "termsConnector": " sy ",
     "termsSuffix": ".",
     "moreSignInOptions": "Safidy fidirana fanampiny",
@@ -2557,6 +2558,7 @@
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
+      "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."

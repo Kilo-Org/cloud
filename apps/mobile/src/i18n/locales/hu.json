@@ -189,6 +189,7 @@
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a ",
     "terms": "Felhasználási feltételeket",
+    "termsInSentence": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
       "assistantProviderError": "A szolgáltató hibát adott vissza.",
+      "assistantProviderRefused": "A szolgáltató elutasította ezt a kérést, ezért nem lehet újrapróbálni.",
       "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
       "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."

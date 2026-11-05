@@ -20,6 +20,7 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   organizationId: z.guid(),
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
+  microdollarUsageId: z.uuid().optional(),
   apiKind: z.enum([
     'chat_completions',
     'messages',

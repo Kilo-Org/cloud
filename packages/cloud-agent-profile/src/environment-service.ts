@@ -322,6 +322,7 @@ export async function createEnvironment(
   const plainVars = validateEnvironmentPlainVars(input.plainVars);
   const secrets = validateEnvironmentSecrets(input.secrets);
   const commands = validateEnvironmentCommands(input.commands);
+  const startCommands = validateEnvironmentCommands(input.startCommands, 'Start');
   assertNoPlainSecretCollision(plainVars, Object.keys(secrets));
   validateEnvironmentVarCount(Object.keys(plainVars).length + Object.keys(secrets).length);
   const egress = resolveEnvironmentEgressPolicy(input);
@@ -339,6 +340,7 @@ export async function createEnvironment(
       name,
       ...repositoryColumns,
       commands,
+      start_commands: startCommands,
       sandbox_allocation: input.sandboxAllocation ?? null,
       egress_mode: egress?.egress_mode ?? null,
       egress_allowlist: egress?.egress_allowlist ?? null,
@@ -384,6 +386,10 @@ export async function updateEnvironment(
     input.plainVars === undefined ? undefined : validateEnvironmentPlainVars(input.plainVars);
   const commands =
     input.commands === undefined ? undefined : validateEnvironmentCommands(input.commands);
+  const startCommands =
+    input.startCommands === undefined
+      ? undefined
+      : validateEnvironmentCommands(input.startCommands, 'Start');
   const secretChanges = input.secrets;
   const egress = resolveEnvironmentEgressPolicy(input);
 
@@ -520,6 +526,14 @@ export async function updateEnvironment(
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
+  // Start commands never run in a build, so they never advance the revision.
+  if (startCommands !== undefined) {
+    await tx
+      .update(cloud_agent_environments)
+      .set({ start_commands: startCommands })
+      .where(eq(cloud_agent_environments.id, input.environmentId));
+  }
+
   if (repositoriesUpdate?.changed) {
     await tx
       .update(cloud_agent_environments)
@@ -623,6 +637,7 @@ export async function getEnvironment(
     ...identityResponseOf(environment),
     plainVars,
     commands: environment.commands,
+    startCommands: environment.start_commands,
     egressMode: environment.egress_mode,
     egressAllowlist: environment.egress_allowlist,
     secretKeys: secretKeys.map(row => row.key),
@@ -756,6 +771,7 @@ export async function loadEnvironmentForSession(
             envVars: plainVars,
             encryptedSecrets,
             setupCommands: environment.commands,
+            startCommands: environment.start_commands,
             ...(repositories ? { repositories: repositories.map(referenceRepositoryOf) } : {}),
           },
           reference: referenceOf(environment),

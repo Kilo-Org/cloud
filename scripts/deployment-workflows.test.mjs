@@ -819,6 +819,20 @@ test('production deploys cloud-agent-next after a changed session-ingest contrac
   const prepare = ordered.steps.findIndex(step => step.id === 'runtime');
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
+
+  // Only the deploy steps depend on session-ingest: the install and the runtime
+  // preparation must run while the sibling deployment is still in flight.
+  const setup = ordered.steps.findIndex(step => step.name === 'Setup Bun');
+  const install = ordered.steps.findIndex(
+    step => step.name === 'Install cloud-agent-next dependencies'
+  );
+  const gate = ordered.steps.indexOf(wait);
+  assert.ok(
+    setup >= 0 && setup < install && install < prepare && prepare < gate,
+    'the setup steps must precede the session-ingest gate'
+  );
+  assert.equal(gate + 1, deploy, 'the session-ingest gate must immediately precede the deploy');
+
   assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
   assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
 });

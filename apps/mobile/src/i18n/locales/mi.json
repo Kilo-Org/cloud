@@ -189,6 +189,7 @@
     "resendCode": "Tukuna anō te waehere",
     "termsPrefix": "Mēnā ka haere tonu koe, ka whakaae koe ki ā mātou ",
     "terms": "Ture",
+    "termsInSentence": "Ture",
     "termsConnector": " me ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ētahi atu kōwhiringa takiuru",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "I whakamutua te whakautu.",
       "assistantContextOverflow": "He roa rawa te kōrerorero mō te tauira.",
       "assistantProviderError": "I whakahoki te kaiwhakarato i tētahi hapa.",
+      "assistantProviderRefused": "I whakakāhoretia tēnei tono e te kaiwhakarato, ā, kāore e taea te whakamātau anō.",
       "assistantOutputLimit": "Tae rawa atu te whakautu ki te roa tōpū o ngā putanga a te tauira.",
       "assistantStructuredOutput": "Kāore te whakautu i te rite ki te hōputu e hiahiatia ana.",
       "assistantFailed": "I rahua te whakautu."

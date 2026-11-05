@@ -189,6 +189,7 @@
     "resendCode": "ارسال مجدد کد",
     "termsPrefix": "با ادامه، موافقت خود را با این موارد اعلام می‌کنید: ",
     "terms": "شرایط",
+    "termsInSentence": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "گزینه‌های بیشتر برای ورود",
@@ -2557,6 +2558,7 @@
       "assistantStopped": "پاسخ متوقف شد.",
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
+      "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."

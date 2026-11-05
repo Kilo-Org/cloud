@@ -189,6 +189,7 @@
     "resendCode": "Tún fi kóòdù ránṣẹ́",
     "termsPrefix": "Nípa títẹ̀síwájú, o fara mọ́ àwọn ìlànà wa wọ̀nyí: ",
     "terms": "Àwọn ìlànà",
+    "termsInSentence": "Àwọn ìlànà",
     "termsConnector": " àti ",
     "termsSuffix": ".",
     "moreSignInOptions": "Àwọn àṣàyàn ìwọlé sí i",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "A dá ìdáhùn náà dúró.",
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
       "assistantProviderError": "Olùpèsè náà da àṣìṣe padà.",
+      "assistantProviderRefused": "Olùpèsè náà kọ ìbéèrè náà, a kò sì lè tún gbìyànjú rẹ̀.",
       "assistantOutputLimit": "Ìdáhùn náà dé ààlà ìjade ti àwòṣe náà.",
       "assistantStructuredOutput": "Ìdáhùn náà kò bá àgbékalẹ̀ tí a fẹ́ mu.",
       "assistantFailed": "Ìdáhùn náà kùnà."

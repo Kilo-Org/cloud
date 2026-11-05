@@ -189,6 +189,7 @@
     "resendCode": "Bidali kodea berriro",
     "termsPrefix": "Jarraitzean, onartzen dituzu gure ",
     "terms": "Baldintzak",
+    "termsInSentence": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Erantzuna sortzea gelditu da.",
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
       "assistantProviderError": "Hornitzaileak errore bat itzuli du.",
+      "assistantProviderRefused": "Hornitzaileak eskaera hau baztertu du eta ezin da berriro saiatu.",
       "assistantOutputLimit": "Erantzunak modeloaren irteera-mugara iritsi da.",
       "assistantStructuredOutput": "Erantzunak ez zetorren bat eskatutako formatuarekin.",
       "assistantFailed": "Erantzunak huts egin du."

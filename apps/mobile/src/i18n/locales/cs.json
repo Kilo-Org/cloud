@@ -189,6 +189,7 @@
     "resendCode": "Odeslat kód znovu",
     "termsPrefix": "Pokračováním souhlasíte s našimi ",
     "terms": "Podmínkami",
+    "termsInSentence": "Podmínkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Další možnosti přihlášení",
@@ -2643,6 +2644,7 @@
       "assistantStopped": "Generování odpovědi bylo zastaveno.",
       "assistantContextOverflow": "Konverzace je pro model příliš dlouhá.",
       "assistantProviderError": "Poskytovatel vrátil chybu.",
+      "assistantProviderRefused": "Poskytovatel tento požadavek odmítl a nelze jej znovu odeslat.",
       "assistantOutputLimit": "Odpověď dosáhla limitu výstupu modelu.",
       "assistantStructuredOutput": "Odpověď neodpovídala požadovanému formátu.",
       "assistantFailed": "Odpověď se nepodařilo vytvořit."

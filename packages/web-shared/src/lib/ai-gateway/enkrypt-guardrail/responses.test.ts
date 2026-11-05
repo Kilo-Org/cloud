@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   enkryptGuardrailRejectionResponse,
+  enkryptOrganizationCreditsRequiredResponse,
   enkryptOutputGuardrailRejectionResponse,
 } from './responses';
 
@@ -239,5 +241,24 @@ describe('enkryptOutputGuardrailRejectionResponse', () => {
       },
       error_type: 'guardrail_unavailable',
     });
+  });
+});
+
+describe('enkryptOrganizationCreditsRequiredResponse', () => {
+  it('links the organization and omits the free-model advice', async () => {
+    const response = enkryptOrganizationCreditsRequiredResponse('org-1', -0.5);
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body).toEqual({
+      error: {
+        title: 'Organization Credits Required',
+        message: expect.stringContaining('including on free models and BYOK requests'),
+        balance: -0.5,
+        buyCreditsUrl: `${APP_URL}/organizations/org-1`,
+      },
+      error_type: 'usage_limit_exceeded',
+    });
+    expect(body.error.message).not.toMatch(/switch to a free model/i);
   });
 });

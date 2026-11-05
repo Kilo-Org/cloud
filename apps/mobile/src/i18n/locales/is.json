@@ -189,6 +189,7 @@
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú ",
     "terms": "Skilmála",
+    "termsInSentence": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Hætt var að mynda svarið.",
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
       "assistantProviderError": "Veitandinn skilaði villu.",
+      "assistantProviderRefused": "Veitandinn hafnaði þessari beiðni og ekki er hægt að reyna aftur.",
       "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
       "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."

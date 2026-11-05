@@ -189,6 +189,7 @@
     "resendCode": "Anfon y cod eto",
     "termsPrefix": "Drwy barhau, rydych yn cytuno i'n ",
     "terms": "Telerau",
+    "termsInSentence": "Telerau",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mwy o opsiynau mewngofnodi",
@@ -2735,6 +2736,7 @@
       "assistantStopped": "Ataliwyd yr ymateb.",
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
       "assistantProviderError": "Roedd gwall gan y darparwr.",
+      "assistantProviderRefused": "Gwrthododd y darparwr y cais ac ni ellir ei ailgynnig.",
       "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
       "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."

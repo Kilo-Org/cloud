@@ -189,6 +189,7 @@
     "resendCode": "Επαναποστολή κωδικού",
     "termsPrefix": "Συνεχίζοντας, αποδέχεσαι τους ",
     "terms": "όρους μας",
+    "termsInSentence": "όρους μας",
     "termsConnector": " και ",
     "termsSuffix": ".",
     "moreSignInOptions": "Περισσότερες επιλογές σύνδεσης",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Η δημιουργία της απάντησης διακόπηκε.",
       "assistantContextOverflow": "Η συνομιλία είναι πολύ μεγάλη για το μοντέλο.",
       "assistantProviderError": "Ο πάροχος επέστρεψε ένα σφάλμα.",
+      "assistantProviderRefused": "Ο πάροχος απέρριψε αυτό το αίτημα και δεν μπορεί να επαναληφθεί.",
       "assistantOutputLimit": "Η απάντηση έφτασε το όριο εξόδου του μοντέλου.",
       "assistantStructuredOutput": "Η απάντηση δεν είχε την απαιτούμενη μορφή.",
       "assistantFailed": "Η δημιουργία της απάντησης απέτυχε."

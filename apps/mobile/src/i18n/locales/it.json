@@ -189,6 +189,7 @@
     "resendCode": "Invia di nuovo il codice",
     "termsPrefix": "Continuando accetti i nostri ",
     "terms": "Termini",
+    "termsInSentence": "Termini",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Altre opzioni di accesso",
@@ -2004,6 +2005,7 @@
       "assistantStopped": "La risposta è stata interrotta.",
       "assistantContextOverflow": "La conversazione è troppo lunga per il modello.",
       "assistantProviderError": "Il fornitore ha restituito un errore.",
+      "assistantProviderRefused": "Il fornitore ha rifiutato questa richiesta e non è possibile riprovare.",
       "assistantOutputLimit": "La risposta ha raggiunto il limite di output del modello.",
       "assistantStructuredOutput": "La risposta non corrisponde al formato richiesto.",
       "assistantFailed": "Non è stato possibile generare la risposta."

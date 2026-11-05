@@ -189,6 +189,7 @@
     "resendCode": "Saada kood uuesti",
     "termsPrefix": "Jätkates kehtivad sulle meie ",
     "terms": "Kasutustingimused",
+    "termsInSentence": "Kasutustingimused",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",
@@ -2551,6 +2552,7 @@
       "assistantStopped": "Vastus peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
       "assistantProviderError": "Pakkuja tagastas vea.",
+      "assistantProviderRefused": "Pakkuja keeldus sellest päringust ja seda ei saa uuesti proovida.",
       "assistantOutputLimit": "Vastus jõudis mudeli väljundi piirini.",
       "assistantStructuredOutput": "Vastus ei vastanud nõutud vormingule.",
       "assistantFailed": "Vastuse koostamine ebaõnnestus."

@@ -180,6 +180,9 @@ jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useProfiles: () => ({}),
   useProfile: () => ({}),
 }));
+jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
+  useCloudAgentEnvironment: () => ({ data: undefined }),
+}));
 jest.mock('@/hooks/useSlashCommandSets', () => ({
   useSlashCommandSets: () => ({ availableCommands: [] }),
 }));

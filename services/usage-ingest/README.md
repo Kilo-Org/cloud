@@ -420,7 +420,10 @@ route, retry delay/budget and per-message dispositions.
 ## Deploy
 
 The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. Production's scheduled workflow can deploy
+production and staging deployments. Its `scripts/deploy-changed-workers.sh`
+selection redeploys a Worker when its own files, a workspace it depends on, or a
+root dependency path change. Markdown edits alone do not redeploy this Worker:
+it reads no Markdown at runtime. Production's scheduled workflow can deploy
 merged changes automatically; deployment authorization and all
 [production prerequisites](eu-queues.md#production-merge-gate)
 must be satisfied before merge. There is no guaranteed manual deployment window.

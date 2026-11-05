@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
@@ -518,7 +518,9 @@ test('staging and production Worker changes use independent deployment baselines
   );
   assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
-  assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
+  assert.equal(detect.run, 'bash scripts/deploy-changed-workers.sh');
+  assert.equal(detect.env.BASE_SHA, '${{ inputs.base_sha }}');
+  assert.equal(detect.env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
   assert.equal(
     production.jobs['deploy-kiloclaw'],
     undefined,
@@ -821,4 +823,278 @@ test('production deploys cloud-agent-next after a changed session-ingest contrac
   assert.ok(prepare >= 0 && prepare < deploy);
   assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
   assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
+});
+
+test('documentation-only Worker edits do not redeploy, runtime edits still do', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deploy-changed-workers-'));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const write = (path, content) => {
+    mkdirSync(dirname(join(directory, path)), { recursive: true });
+    writeFileSync(join(directory, path), content);
+  };
+  const commit = () => {
+    // A plain commit, never through the trimmed helper: that helper belongs to
+    // the outer checkout and would leave the fixture index alone.
+    execFileSync('git', ['add', '-A'], { cwd: directory });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'change'],
+      { cwd: directory }
+    );
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' }).trim();
+  };
+  try {
+    git('init', '-q');
+    for (const worker of ['usage-ingest', 'session-ingest']) {
+      write(`services/${worker}/wrangler.jsonc`, JSON.stringify({ name: worker }));
+      write(`services/${worker}/package.json`, JSON.stringify({ name: worker, private: true }));
+      write(`services/${worker}/src/index.ts`, 'export {};\n');
+      write(`services/${worker}/README.md`, '# Docs\n');
+    }
+    write('services/usage-ingest/docs/deep/runbook.md', '# Runbook\n');
+    write('packages/web-shared/package.json', '{"name":"web-shared","private":true}');
+    write('packages/web-shared/src/index.ts', 'export const value = 1;\n');
+    write('package.json', '{"name":"fixture","private":true}');
+    // The step runs inside the checkout. This fixture is the checkout, so it
+    // carries the script under its repository path.
+    write(
+      'scripts/deploy-changed-workers.sh',
+      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
+    );
+    write('pnpm-workspace.yaml', "packages:\n  - 'services/*'\n  - 'packages/*'\n");
+    commit('base');
+
+    const detection = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+    assert.ok(detection, 'detect-changes selects the Workers to deploy');
+    // One release: commit these edits, then run detection against the previous
+    // commit, the way a scheduled deploy diffs since the last release.
+    const release = (reason, ...edits) => {
+      const before = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: directory,
+        encoding: 'utf8',
+      }).trim();
+      for (const [path, content] of edits) write(path, content);
+      commit(reason);
+      const output = join(directory, '.git', 'detect-output');
+      writeFileSync(output, '');
+      const script = detection.run
+        .replaceAll('${{ inputs.base_sha }}', before)
+        .replaceAll('${{ inputs.target_environment }}', 'production');
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        cwd: directory,
+        encoding: 'utf8',
+        // The fixture carries the Workers; the classifier and script stay here.
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          BASE_SHA: before,
+          TARGET_ENVIRONMENT: 'production',
+        },
+      });
+      assert.equal(result.status, 0, `${reason}: ${result.stderr}`);
+      return JSON.parse(readFileSync(output, 'utf8').match(/^matrix=(.*)$/m)[1]);
+    };
+
+    assert.deepEqual(
+      release('README', ['services/usage-ingest/README.md', '# Docs\n\nUpdated.\n']),
+      [],
+      'a README edit alone does not redeploy'
+    );
+    assert.deepEqual(
+      release('nested Markdown', [
+        'services/usage-ingest/docs/deep/runbook.md',
+        '# Runbook\n\nEdited.\n',
+      ]),
+      [],
+      'a nested Markdown edit alone does not redeploy'
+    );
+    assert.deepEqual(
+      release('other README', ['services/session-ingest/README.md', '# Docs\n\nEdited.\n']),
+      [],
+      'another Worker README does not redeploy'
+    );
+    assert.deepEqual(
+      release('runtime', ['services/usage-ingest/src/index.ts', 'export const value = 1;\n']),
+      ['services/usage-ingest'],
+      'a runtime edit redeploys'
+    );
+    assert.deepEqual(
+      release(
+        'shared dependency',
+        ['services/usage-ingest/src/index.ts', 'export const value = 2;\n'],
+        ['packages/web-shared/src/index.ts', 'export const value = 2;\n']
+      ),
+      ['services/session-ingest', 'services/usage-ingest'],
+      'a shared dependency deploys every Worker'
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('detection keeps renames, deletions, config and runtime assets deploying', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deploy-changed-workers-'));
+  const run = (...args) => {
+    const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+    assert.equal(result.status, 0, `${args.join(' ')}: ${result.stderr}`);
+    return result;
+  };
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const write = (path, content) => {
+    mkdirSync(dirname(join(directory, path)), { recursive: true });
+    writeFileSync(join(directory, path), content);
+  };
+  const commit = message => {
+    execFileSync('git', ['add', '-A'], { cwd: directory });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message],
+      { cwd: directory }
+    );
+  };
+  try {
+    git('init', '-q');
+    for (const worker of ['usage-ingest', 'kilo-chat']) {
+      write(`services/${worker}/wrangler.jsonc`, JSON.stringify({ name: worker }));
+      write(`services/${worker}/package.json`, JSON.stringify({ name: worker, private: true }));
+      write(`services/${worker}/src/index.ts`, 'export {};\n');
+      write(`services/${worker}/README.md`, '# Docs\n');
+    }
+    write('services/kilo-chat/src/rules.ts', 'export const rules = 1;\n');
+    write('services/kilo-chat/PROMPT.md', '# Prompt\n');
+    write('services/kilo-chat/docs/old.md', '# Old\n');
+    write('package.json', '{"name":"fixture","private":true}');
+    // The step runs inside the checkout. This fixture is the checkout, so it
+    // carries the script under its repository path.
+    write(
+      'scripts/deploy-changed-workers.sh',
+      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
+    );
+    write('pnpm-workspace.yaml', "packages:\n  - 'services/*'\n  - 'packages/*'\n");
+    write('packages/web-shared/package.json', '{"name":"web-shared","private":true}');
+    write('packages/web-shared/src/index.ts', 'export const value = 0;\n');
+    write(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: false\n  excludeLinksFromLockfile: false\n"
+    );
+    commit('base');
+
+    const detection = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+    assert.ok(detection, 'detect-changes selects the Workers to deploy');
+    const release = (reason, edits) => {
+      const before = git('rev-parse', 'HEAD');
+      for (const edit of edits) edit();
+      commit(reason);
+      const output = join(directory, '.git', 'detect-output');
+      writeFileSync(output, '');
+      const result = spawnSync(
+        'bash',
+        [
+          '-e',
+          '-c',
+          detection.run
+            .replaceAll('${{ inputs.base_sha }}', before)
+            .replaceAll('${{ inputs.target_environment }}', 'production')
+            .replace(
+              'bash scripts/deploy-changed-workers.sh',
+              'bash scripts/deploy-changed-workers.sh'
+            ),
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: output,
+            BASE_SHA: before,
+            TARGET_ENVIRONMENT: 'production',
+          },
+        }
+      );
+      assert.equal(result.status, 0, `${reason}: ${result.stderr}`);
+      return JSON.parse(readFileSync(output, 'utf8').match(/^matrix=(.*)$/m)[1]);
+    };
+
+    assert.deepEqual(
+      release('Markdown renamed into a runtime path', [
+        () => run('mv', 'services/kilo-chat/PROMPT.md', 'services/kilo-chat/src/prompt.ts'),
+      ]),
+      ['services/kilo-chat'],
+      'a runtime path that gained a file deploys'
+    );
+    assert.deepEqual(
+      release('runtime renamed into a Markdown path', [
+        () => run('mv', 'services/kilo-chat/src/rules.ts', 'services/kilo-chat/RULES.md'),
+      ]),
+      ['services/kilo-chat'],
+      'a runtime path that lost a file deploys'
+    );
+    assert.deepEqual(
+      release('Markdown renamed to Markdown', [
+        () => run('mv', 'services/kilo-chat/docs/old.md', 'services/kilo-chat/docs/new.md'),
+      ]),
+      [],
+      'a Markdown rename alone does not redeploy'
+    );
+    assert.deepEqual(
+      release('Markdown deletion', [() => run('rm', '-q', 'services/kilo-chat/README.md')]),
+      ['services/kilo-chat'],
+      'a deletion keeps the previous deploy result'
+    );
+    assert.deepEqual(
+      release('wrangler config', [
+        () => write('services/kilo-chat/wrangler.jsonc', JSON.stringify({ name: 'chat' })),
+      ]),
+      ['services/kilo-chat'],
+      'a Wrangler config edit deploys'
+    );
+    assert.deepEqual(
+      release('secrets metadata', [
+        () => write('services/kilo-chat/.dev.vars.example', 'SECRET=\n'),
+      ]),
+      ['services/kilo-chat'],
+      'a secrets-metadata edit deploys'
+    );
+    assert.deepEqual(
+      release('Markdown-only edit', [
+        () => write('services/kilo-chat/guides/notes.md', '# Notes\n'),
+        () => write('services/kilo-chat/README.md', '# Docs\n\nUpdated.\n'),
+      ]),
+      [],
+      'Markdown-only edits do not deploy'
+    );
+    assert.deepEqual(
+      release('TypeScript and Markdown', [
+        () => write('services/kilo-chat/src/index.ts', 'export const value = 1;\n'),
+        () => write('services/kilo-chat/README.md', '# Docs\n\nCode release.\n'),
+      ]),
+      ['services/kilo-chat'],
+      'a runtime edit with a Markdown edit deploys'
+    );
+    assert.deepEqual(
+      release('root lockfile', [
+        () =>
+          write(
+            'pnpm-lock.yaml',
+            "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n"
+          ),
+      ]),
+      ['services/kilo-chat', 'services/usage-ingest'],
+      'a root dependency change deploys every Worker'
+    );
+    assert.deepEqual(
+      release('shared package', [
+        () => write('packages/web-shared/src/index.ts', 'export const value = 1;\n'),
+      ]),
+      ['services/kilo-chat', 'services/usage-ingest'],
+      'a package outside the workspace deploys every Worker'
+    );
+    assert.deepEqual(
+      release('root patch', [() => write('patches/fix.patch', '--- a\n+++ b\n')]),
+      ['services/kilo-chat', 'services/usage-ingest'],
+      'a root patch deploys every Worker'
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

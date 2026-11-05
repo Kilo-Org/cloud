@@ -185,6 +185,33 @@ account for a user who is leaving the directory. The accepted cost is that a
 removal arriving before its own addition leaves no tombstone to fence the late
 addition with — see `.specs/organization-sso.md`, Directory Sync rule 12.
 
+Removal also revokes the **parent** membership once the user holds no other
+directory group under it, reported as `revokedParentMembership`. An add writes
+two memberships — the group and its parent — because group membership is the
+identity provider saying the person belongs to the enterprise. Leaving one of
+several groups keeps the parent; leaving the last one does not, or a user
+deleted from the directory would keep the enterprise organization's seats and
+data. Only directory-bound siblings count, and only a directory-provisioned
+account is affected: a membership an administrator created is not directory
+sync's to revoke. See Directory Sync rule 4.
+
+`dsync.user.updated` is not a no-op. A changed name or address is applied to
+the bound account, and an address change runs the same two checks as a first
+bind — the organization must have captured the new domain, and no other account
+may hold the address. `normalized_email` and `email_domain` are rewritten
+alongside, because the dedup and the takeover gate read those rather than
+`google_user_email`.
+
+The `workos` auth provider row this route writes is keyed on the WorkOS
+directory user id, never on `data.idp_id`. `idp_id` is assigned by the
+customer's identity provider and is not unique across directories, and account
+resolution matches `(provider, provider_account_id)` *before* comparing
+addresses — so keying on it let a second directory's user resolve to the first
+person's account, silently taking their binding, before the domain gate or the
+rebind refusal could run. That row is also not the one an interactive sign-in
+matches, which is the WorkOS profile id (`prof_…`); a verified SSO callback
+matches by address and replaces it.
+
 ### Response classes
 
 Three classes, and they decide cursor movement:

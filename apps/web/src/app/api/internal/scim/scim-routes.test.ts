@@ -42,6 +42,7 @@ jest.mock('@/lib/scim/directory-sync', () => {
       parentOrganizationId: 'org-1',
       kiloUserId: 'user-1',
       removed: true,
+      revokedParentMembership: false,
     })),
   };
 });
@@ -200,6 +201,7 @@ describe('success', () => {
       parentOrganizationId: null,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     });
 
     const response = await deleteMembership(request(membershipBody));
@@ -210,6 +212,7 @@ describe('success', () => {
       parentOrganizationId: null,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     });
   });
 });

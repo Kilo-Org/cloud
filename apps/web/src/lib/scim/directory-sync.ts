@@ -1,10 +1,11 @@
 import {
   kilocode_users,
   organization_membership_removals,
+  organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   resolveEffectiveOrganizationSsoPolicy,
@@ -15,7 +16,7 @@ import {
   createOrganization,
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { and, eq, inArray, isNull, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
@@ -272,23 +273,44 @@ export async function upsertDirectorySubOrganization(
     return { id: existing.id, created: false };
   }
 
-  // One statement, so the row is either unbound or fully bound.
-  // `directory_group_id` is unique among live rows, so a crash before it lands
-  // leaves an unbound child that this lookup misses — the replay creates a
-  // second child rather than adopting it. That is visible as a duplicate
-  // sub-organization under the parent rather than silent data loss, and the
-  // group lookups keyed on `directory_group_id` stay deterministic.
-  const child = await createChildOrganization(input.name, parent.id);
+  // A retry adopts the child a previous attempt left behind instead of adding
+  // another. `createChildOrganization` commits the row in its own transaction
+  // and then provisions a Stripe customer outside it, so a failure after the
+  // commit leaves a live, unbound sub-organization that the
+  // `directory_group_id` lookup above cannot see. Each retry would otherwise
+  // add one more.
+  //
+  // `directory_idp_id` is the adoption key: it is the identity provider's own
+  // group id, which survives the disconnect/reconnect that mints a new
+  // `directory_group_id`, and it is written in the same statement as the name.
+  // The match is scoped to this parent and to rows with no
+  // `directory_group_id`, so it can only ever pick up a half-bound row from a
+  // failed attempt at this same group.
+  const orphanRows = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, parent.id),
+        eq(organizations.directory_idp_id, input.directoryIdpId),
+        isNull(organizations.directory_group_id),
+        liveOrganization
+      )
+    )
+    .limit(1);
+
+  const childId = orphanRows.at(0)?.id ?? (await createChildOrganization(input.name, parent.id)).id;
   await db
     .update(organizations)
     .set({
+      name: input.name,
       directory_id: input.directoryId,
       directory_group_id: directoryGroupId,
       directory_idp_id: input.directoryIdpId,
     })
-    .where(eq(organizations.id, child.id));
+    .where(eq(organizations.id, childId));
 
-  return { id: child.id, created: true };
+  return { id: childId, created: true };
 }
 
 /**
@@ -320,13 +342,18 @@ export async function upsertDirectoryUser(
   input: DirectoryUserUpsert
 ): Promise<DirectorySyncUpsertResult> {
   const byExternalId = await db
-    .select({ id: kilocode_users.id })
+    .select({
+      id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      name: kilocode_users.google_user_name,
+    })
     .from(kilocode_users)
     .where(eq(kilocode_users.external_id, externalId))
     .limit(1);
 
   const bound = byExternalId.at(0);
   if (bound) {
+    await applyDirectoryUserChanges(bound, externalId, input);
     return { id: bound.id, created: false };
   }
 
@@ -364,10 +391,27 @@ export async function upsertDirectoryUser(
       google_user_name: displayName === '' ? settlementEmail : displayName,
       google_user_image_url: '',
       hosted_domain: null,
-      // `workos` is the provider SSO sign-in records, so a later sign-in
-      // recognizes this account instead of creating a second one.
+      // Keyed on the WorkOS directory user id, never on `idp_id`.
+      //
+      // `createOrUpdateUser` resolves an account by `(provider,
+      // provider_account_id)` before it looks at the address, so the key has to
+      // be unique per person. `idp_id` is assigned by the customer's identity
+      // provider and is short and numeric in WorkOS's own examples, so two
+      // directories can deliver the same one: keying on it made a second
+      // directory user resolve to the first person's account and silently take
+      // their `external_id`, before the domain gate or the rebind refusal could
+      // run. The directory user id is WorkOS-scoped and is the identifier this
+      // route is already keyed on.
+      //
+      // It is not the id interactive SSO stores either — that is the WorkOS
+      // profile id (`prof_…`) from `account.providerAccountId`. Neither is, so
+      // this row cannot be the one a sign-in matches. It does not need to be:
+      // a verified SSO callback passes `autoLinkToExistingUser`, matches the
+      // account by address, and replaces this row with the `prof_…` one
+      // (`user/index.ts:571-574`, "WorkOS profile IDs can change when an
+      // organization's SSO connection is recreated").
       provider: 'workos',
-      provider_account_id: input.idpId,
+      provider_account_id: externalId,
     },
     undefined,
     // The directory asserted this identity, which is the proof that authorizes
@@ -394,6 +438,55 @@ export async function upsertDirectoryUser(
     .where(eq(kilocode_users.id, result.user.id));
 
   return { id: result.user.id, created: result.isNew };
+}
+
+/**
+ * Applies a `dsync.user.updated` to an already-bound account.
+ *
+ * Without this the route is a no-op that reports success: a renamed or
+ * re-addressed directory user keeps the attributes it was provisioned with,
+ * and a stale address desynchronizes the address-based matching that SSO
+ * sign-in and the takeover gate both rely on.
+ *
+ * An address change is a takeover in its own right — it moves the account onto
+ * a new mailbox — so it runs the same two checks as a first bind: the
+ * organization must have captured the new domain, and no other account may
+ * already hold the address. `normalized_email` and `email_domain` are written
+ * alongside, because `findUserByNormalizedEmail` and the signup dedup read
+ * them rather than `google_user_email`.
+ */
+async function applyDirectoryUserChanges(
+  bound: { id: string; email: string; name: string | null },
+  externalId: string,
+  input: DirectoryUserUpsert
+): Promise<void> {
+  const displayName = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
+  const changes: Partial<typeof kilocode_users.$inferInsert> = {};
+
+  if (displayName !== '' && displayName !== bound.name) {
+    changes.google_user_name = displayName;
+  }
+
+  // Case-insensitive: the stored spelling is authoritative, so a change that
+  // only differs in case is not a move to a different mailbox.
+  if (input.email.toLowerCase() !== bound.email.toLowerCase()) {
+    await assertDirectoryOwnsEmailDomain(input.directoryId, input.email);
+
+    const holder = await findUserByNormalizedEmail(input.email);
+    if (holder && holder.id !== bound.id) {
+      throw new DirectorySyncConflictError(
+        `Cannot move directory user ${externalId} to an address another Kilo account already holds`
+      );
+    }
+
+    changes.google_user_email = input.email;
+    changes.normalized_email = normalizeEmail(input.email);
+    changes.email_domain = getLowerDomainFromEmail(input.email);
+  }
+
+  if (Object.keys(changes).length === 0) return;
+
+  await db.update(kilocode_users).set(changes).where(eq(kilocode_users.id, bound.id));
 }
 
 /**
@@ -517,11 +610,20 @@ export async function addDirectoryMembership(
 }
 
 /**
- * Remove a directory user from the sub-organization its group maps to.
+ * Remove a directory user from the sub-organization its group maps to, and from
+ * its parent once no directory group under that parent remains.
  *
- * Only the sub-organization: the user may belong to sibling groups under the
- * same parent, so leaving one group must not revoke access to the directory's
- * organization.
+ * Leaving one of several groups keeps the parent membership: the user may
+ * belong to sibling groups, and the parent is what grants access to the
+ * enterprise at all. Leaving the *last* one does not. Group membership is the
+ * identity provider's statement that the user belongs to the enterprise, so
+ * once the identity provider makes no such statement the enterprise membership
+ * goes too — otherwise a user removed from every group, or deleted from the
+ * directory entirely, keeps access to the organization's seats and data.
+ *
+ * The parent revocation applies only to a directory-provisioned account, one
+ * carrying an `external_id`. A membership an administrator created, or one
+ * ordinary SSO sign-in provisioned, is not the directory's to revoke.
  *
  * Converges rather than conflicting. An unknown group or user means there is no
  * membership to revoke, which is the state the event asks for, so it reports
@@ -550,11 +652,12 @@ export async function removeDirectoryMembership(
       parentOrganizationId: null,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     };
   }
 
   const userRows = await db
-    .select({ id: kilocode_users.id })
+    .select({ id: kilocode_users.id, externalId: kilocode_users.external_id })
     .from(kilocode_users)
     .where(eq(kilocode_users.external_id, input.externalId))
     .limit(1);
@@ -566,6 +669,7 @@ export async function removeDirectoryMembership(
       parentOrganizationId: group.parent,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     };
   }
 
@@ -576,6 +680,9 @@ export async function removeDirectoryMembership(
   // a Kilo user" should look like.
   const { rowCount } = await removeUserFromOrganization(group.id, user.id);
 
+  const revokedParentMembership =
+    group.parent === null ? false : await revokeParentWhenLastGroupLeft(group.parent, user.id);
+
   return {
     organizationId: group.id,
     parentOrganizationId: group.parent,
@@ -583,7 +690,46 @@ export async function removeDirectoryMembership(
     // A replayed removal finds no membership and reports no change, which is
     // what makes the route idempotent.
     removed: (rowCount ?? 0) > 0,
+    revokedParentMembership,
   };
+}
+
+/**
+ * Removes the parent membership when the user holds no remaining directory
+ * group under it.
+ *
+ * Only directory groups count. A sub-organization the customer created under
+ * the same parent is not the identity provider's statement about enterprise
+ * membership, so a membership there does not keep the parent access alive.
+ *
+ * Idempotent: with the membership already gone `removeUserFromOrganization`
+ * reports no rows and this answers false.
+ */
+async function revokeParentWhenLastGroupLeft(
+  parentOrganizationId: string,
+  kiloUserId: string
+): Promise<boolean> {
+  const remaining = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      eq(organization_memberships.organization_id, organizations.id)
+    )
+    .where(
+      and(
+        eq(organizations.parent_organization_id, parentOrganizationId),
+        isNotNull(organizations.directory_group_id),
+        liveOrganization,
+        eq(organization_memberships.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+
+  if (remaining.length > 0) return false;
+
+  const { rowCount } = await removeUserFromOrganization(parentOrganizationId, kiloUserId);
+  return (rowCount ?? 0) > 0;
 }
 
 /**

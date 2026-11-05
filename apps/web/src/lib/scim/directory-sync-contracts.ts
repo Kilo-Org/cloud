@@ -71,8 +71,10 @@ export const DirectoryUserUpsertSchema = z.strictObject({
   email: z.string().email().max(320),
   firstName: z.string().max(255).nullish(),
   lastName: z.string().max(255).nullish(),
-  /** `data.idp_id` — recorded as the `workos` auth provider account id. */
-  idpId: workOSId,
+  // No `idp_id`. The `workos` auth provider row is keyed on the directory user
+  // id from the path, because `idp_id` is assigned by the customer's identity
+  // provider and is not unique across directories; keying on it let one
+  // directory user resolve to another person's account.
 });
 
 export type DirectoryUserUpsert = z.infer<typeof DirectoryUserUpsertSchema>;
@@ -133,6 +135,15 @@ export type DirectoryMembershipRemovalResult = {
   kiloUserId: string | null;
   /** False when there was nothing to remove, which is the converged case. */
   removed: boolean;
+  /**
+   * True when the parent organization membership was revoked as well, because
+   * this was the user's last directory group under it. Group membership is the
+   * identity provider's statement that the user belongs to the enterprise, so
+   * the enterprise membership does not outlive the last group — otherwise a
+   * user removed from every group, or deleted from the directory, keeps access
+   * to the organization's seats and data.
+   */
+  revokedParentMembership: boolean;
 };
 
 /** Soft delete: `deleted_at` is stamped, nothing is removed. */

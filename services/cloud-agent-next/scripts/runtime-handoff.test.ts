@@ -83,6 +83,86 @@ describe('retained exact-SHA handoff', () => {
     ).rejects.toThrow('stored-byte');
   });
 });
+describe('Kilo v2 release in the handoff', () => {
+  const kilo2Org = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+  async function withKilo2() {
+    const f = await fixture();
+    const kilo2 = await fixtureRuntime('B', 'B', { cliExecutable: 'package/bin/kilo2' });
+    const published = await publishRuntimeRelease(f.store, kilo2);
+    return { ...f, kilo2, kilo2Published: published };
+  }
+  const prepare = (f: Awaited<ReturnType<typeof fixture>>, kilo2?: { orgIds: string[] }) =>
+    prepareRuntimeDeployment({
+      config: {
+        r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
+        vars: {},
+        containers: [
+          {
+            class_name: 'SandboxContainers',
+            scheduling_policy: 'durable_object',
+            images: { app: { dockerfile: './Dockerfile.containers' } },
+          },
+        ],
+      },
+      startup: { mode: 'downloaded', image: 'runtime-free', ...(kilo2 ? { kilo2 } : {}) },
+      environment: 'production',
+      sourceSha: f.sourceSha,
+      bucket: 'runtime-test',
+      accountId: 'c'.repeat(32),
+      baseInputId: f.base.inputId,
+      store: f.store,
+      verifyBase: () => {},
+    });
+
+  it('records the v2 release and renders it only for a v2 catalog target', async () => {
+    const f = await withKilo2();
+    const handoff = await publishRuntimeHandoff({
+      ...f,
+      descriptor: f.packaged.descriptor,
+      kilo2Descriptor: f.kilo2.descriptor,
+    });
+    expect(handoff.kilo2DescriptorSha256).toBe(f.kilo2Published.descriptor.sha256);
+    const loaded = await loadRuntimeHandoff(f.store, f.sourceSha, f.base.inputId);
+    expect(loaded.kilo2Descriptor).toEqual(f.kilo2.descriptor);
+    const rendered = await prepare(f, { orgIds: [kilo2Org] });
+    expect(rendered?.vars).toMatchObject({
+      RUNTIME_RELEASE_DESCRIPTOR: f.published.descriptor.sha256,
+      RUNTIME_RELEASE_DESCRIPTOR_KILO2: f.kilo2Published.descriptor.sha256,
+      RUNTIME_KILO2_ORG_IDS: kilo2Org,
+    });
+    expect((await prepare(f))?.vars).not.toHaveProperty('RUNTIME_RELEASE_DESCRIPTOR_KILO2');
+  });
+  it('rejects a v2 target when the handoff has no v2 release', async () => {
+    const f = await fixture();
+    await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
+    await expect(prepare(f, { orgIds: [kilo2Org] })).rejects.toThrow('Kilo v2 runtime handoff');
+  });
+  it('rejects swapped or corrupt harness releases before writing the handoff', async () => {
+    const f = await withKilo2();
+    await expect(
+      publishRuntimeHandoff({
+        ...f,
+        descriptor: f.packaged.descriptor,
+        kilo2Descriptor: f.packaged.descriptor,
+      })
+    ).rejects.toThrow('Kilo v2 release');
+    await expect(publishRuntimeHandoff({ ...f, descriptor: f.kilo2.descriptor })).rejects.toThrow(
+      'Kilo v1 release'
+    );
+    await fs.writeFile(
+      path.join(f.root, runtimeArtifactReleaseKey(f.kilo2Published.descriptor.sha256)),
+      'corrupt'
+    );
+    await expect(
+      publishRuntimeHandoff({
+        ...f,
+        descriptor: f.packaged.descriptor,
+        kilo2Descriptor: f.kilo2.descriptor,
+      })
+    ).rejects.toThrow('descriptor');
+    expect(await f.store.getBytes(runtimeHandoffKey(f.sourceSha))).toBeNull();
+  });
+});
 describe('deployment preparation', () => {
   const config = () => ({
     r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],

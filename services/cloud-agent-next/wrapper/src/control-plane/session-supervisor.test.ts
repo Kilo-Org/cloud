@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { ActivitySnapshotMessage } from './harness-activity.js';
 import {
   createSessionSupervisor,
   type ExecutionFailure,
@@ -23,12 +24,16 @@ function fixture() {
     done: ReturnType<typeof Promise.withResolvers<void>>;
   }> = [];
   const recovery: string[] = [];
+  const confirmations: Promise<boolean>[] = [];
   const supervisor = createSessionSupervisor({
     nativeRuntimeId: 'runtime-1',
     directory: '/workspace',
     timers: { noProgressMs: 20 * MINUTE, turnHardCapMs: 120 * MINUTE },
     now: () => now,
-    onDeadline: (identity, reason, retry) => failures.push({ identity, reason, retry }),
+    onDeadline: (identity, reason, retry, stopped) => {
+      failures.push({ identity, reason, retry });
+      confirmations.push(stopped);
+    },
     interrupt: (identity, reason, signal) => {
       const done = Promise.withResolvers<void>();
       interruptions.push({ identity, reason, signal, done });
@@ -89,6 +94,7 @@ function fixture() {
     failures,
     interruptions,
     recovery,
+    confirmations,
     advance(ms: number) {
       now += ms;
     },
@@ -107,6 +113,38 @@ function observation(
 }
 
 describe('native session supervision', () => {
+  it('confirms cancellation only after the execution and descendants are retired', async () => {
+    const f = fixture();
+    f.open();
+    f.open('child', 'root');
+    f.advance(120 * MINUTE);
+    f.supervisor.tick();
+    let confirmed = false;
+    const result = f.confirmations[0].then(stopped => {
+      confirmed = true;
+      expect(f.supervisor.state('root')).toBeUndefined();
+      expect(f.supervisor.state('child')).toBeUndefined();
+      return stopped;
+    });
+    await Promise.resolve();
+    expect(confirmed).toBe(false);
+    await f.confirmed();
+    expect(await result).toBe(true);
+  });
+
+  it.each(['unconfirmed', 'disposed'] as const)(
+    'does not confirm cancellation when %s',
+    async reason => {
+      const f = fixture();
+      f.open();
+      f.advance(120 * MINUTE);
+      f.supervisor.tick();
+      if (reason === 'disposed') f.supervisor.dispose();
+      else f.interruptions[0].done.reject(new Error('abort failed'));
+      expect(await f.confirmations[0]).toBe(false);
+    }
+  );
+
   for (const runningTool of [false, true]) {
     it(`interrupts at 20 minutes with runningTool=${runningTool}, never a tick early`, async () => {
       const f = fixture();
@@ -213,9 +251,18 @@ describe('native session supervision', () => {
           retry: { message: 'Rate limit exceeded' },
           messages: [
             {
-              info: { id: 'assistant-root', role: 'assistant', time: { created: 1_000 } },
+              sessionId: 'root',
+              id: 'assistant-root',
+              role: 'assistant',
+              time: { created: 1_000 },
               parts: [
-                { id: 'text', messageID: 'assistant-root', type: 'text', text: 'partial output' },
+                {
+                  sessionId: 'root',
+                  messageId: 'assistant-root',
+                  id: 'text',
+                  kind: 'text',
+                  text: 'partial output',
+                },
               ],
             },
           ],
@@ -545,9 +592,12 @@ describe('native session supervision', () => {
         time: { created: 1, completed: 2 },
       },
     });
-    const completed = (id: string) => ({
-      info: { id, role: 'assistant', time: { created: 1, completed: 2 } },
-      parts: [{ id: `${id}-text`, messageID: id, type: 'text', text: 'old' }],
+    const completed = (id: string): ActivitySnapshotMessage => ({
+      sessionId: 'root',
+      id,
+      role: 'assistant',
+      time: { created: 1, completed: 2 },
+      parts: [{ sessionId: 'root', messageId: id, id: `${id}-text`, kind: 'text', text: 'old' }],
     });
     f.supervisor.reconcile(
       [{ ...observation(), messages: [completed('history')] }],
@@ -579,9 +629,18 @@ describe('native session supervision', () => {
       ...observation(),
       messages: [
         {
-          info: { id: 'recovered', role: 'assistant', time: { created: 10_000 } },
+          sessionId: 'root',
+          id: 'recovered',
+          role: 'assistant' as const,
+          time: { created: 10_000 },
           parts: [
-            { id: 'recovered-text', messageID: 'recovered', type: 'text', text: 'new output' },
+            {
+              sessionId: 'root',
+              messageId: 'recovered',
+              id: 'recovered-text',
+              kind: 'text' as const,
+              text: 'new output',
+            },
           ],
         },
       ],
@@ -634,14 +693,22 @@ describe('native session supervision', () => {
       ...observation('root', 'idle'),
       messages: [
         {
-          info: { id: 'assistant-root', role: 'assistant' },
+          sessionId: 'root',
+          id: 'assistant-root',
+          role: 'assistant',
           parts: [
             {
+              sessionId: 'root',
+              messageId: 'assistant-root',
               id: 'tool',
-              messageID: 'assistant-root',
-              type: 'tool',
-              tool: 'bash',
-              state: { status: 'running', metadata: { output: 'old' } },
+              kind: 'tool',
+              tool: {
+                callId: 'call',
+                name: 'bash',
+                status: 'running',
+                interactive: false,
+                output: 'old',
+              },
             },
           ],
         },

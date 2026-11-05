@@ -6,6 +6,11 @@ The publisher is `pnpm runtime:publish`. Local packaging and CI use the same com
 - Local Wrangler R2: `pnpm runtime:publish --local`.
 - CI: `pnpm runtime:publish --bucket "$RUNTIME_R2_BUCKET" --source-sha "$SOURCE_SHA"`.
 
+Without `--cli` or `--cli-version`, an invocation packages two releases with one control payload:
+the pinned Kilo v1 CLI and the pinned Kilo v2 CLI (`PINNED_CLIS` in `scripts/runtime-cli-artifact.ts`).
+The handoff records both descriptors. `--cli` or `--cli-version` selects one explicit release instead.
+Use `--cli-executable` with either flag to override that release's executable path.
+
 Every invocation rebuilds wrapper output. Payload hashes identify the output bytes. The publisher
 creates immutable objects, reads them back, and publishes the descriptor last. An exact-SHA handoff
 is published only after the runtime-free base and real CLI/wrapper compatibility check pass.

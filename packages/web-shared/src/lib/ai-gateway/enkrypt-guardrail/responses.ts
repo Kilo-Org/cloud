@@ -5,6 +5,7 @@ import type {
   EnkryptUnavailableReason,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 const UNAVAILABLE_MESSAGES: Record<
@@ -124,6 +125,29 @@ function streamErrorEvent(kind: GatewayChatApiKind, error: GuardrailError): stri
     error_type: error.errorType,
   };
   return `event: error\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+/**
+ * Uses the body shape of `usageLimitExceededResponse`, which Kilo clients render as a low-credit
+ * prompt, but without its advice to switch to a free model: free models are scanned too.
+ */
+export function enkryptOrganizationCreditsRequiredResponse(
+  organizationId: string,
+  balance: number
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: {
+        title: 'Organization Credits Required',
+        message:
+          'Your organization needs credits to run Enkrypt guardrails, including on free models and BYOK requests. Ask an organization owner to add credits.',
+        balance,
+        buyCreditsUrl: `${APP_URL}/organizations/${organizationId}`,
+      },
+      error_type: ProxyErrorType.usage_limit_exceeded,
+    },
+    { status: 402 }
+  );
 }
 
 /** Maps an input guardrail verdict to the gateway's rejection, or null to send the request upstream. */

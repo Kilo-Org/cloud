@@ -1,12 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
-import {
-  PINNED_CLI_SHA256,
-  PINNED_CLI_VERSION,
-  downloadVerified,
-  pinnedCliSourceKey,
-} from './runtime-cli-artifact.js';
+import { PINNED_CLIS, downloadVerified, pinnedCliSourceKey } from './runtime-cli-artifact.js';
 
 const tarball = new TextEncoder().encode('fixture tarball');
 const integrity = 'sha512-' + createHash('sha512').update(tarball).digest('base64');
@@ -95,20 +90,28 @@ describe('CLI tarball download', () => {
     expect(cache.putIfAbsent).not.toHaveBeenCalled();
   });
 
-  it('keys the pinned cache by version and digest', () => {
-    expect(pinnedCliSourceKey()).toBe(
-      `runtime-artifacts/v1/sources/cli-linux-x64-baseline-${PINNED_CLI_VERSION}-${PINNED_CLI_SHA256}.tgz`
-    );
-  });
+  it.each(Object.values(PINNED_CLIS))(
+    'keys the pinned cache for $version by version and digest',
+    pinned => {
+      expect(pinnedCliSourceKey(pinned)).toBe(
+        `runtime-artifacts/v1/sources/cli-linux-x64-baseline-${pinned.version}-${pinned.sha256}.tgz`
+      );
+    }
+  );
 
-  it('ignores a cached tarball that does not match the pinned digest and never caches unverified bytes', async () => {
-    const cache = memoryStore({ [pinnedCliSourceKey()]: new TextEncoder().encode('corrupt') });
-    const { request, calls } = registry([metadata, payload]);
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    await expect(downloadVerified(PINNED_CLI_VERSION, { cache, request })).rejects.toThrow(
-      'Pinned CLI content hash mismatch'
-    );
-    expect(calls).toHaveLength(2);
-    expect(cache.putIfAbsent).not.toHaveBeenCalled();
-  });
+  it.each(Object.values(PINNED_CLIS))(
+    'ignores a corrupt cached tarball for $version and never caches unverified bytes',
+    async pinned => {
+      const cache = memoryStore({
+        [pinnedCliSourceKey(pinned)]: new TextEncoder().encode('corrupt'),
+      });
+      const { request, calls } = registry([metadata, payload]);
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await expect(downloadVerified(pinned.version, { cache, request })).rejects.toThrow(
+        'Pinned CLI content hash mismatch'
+      );
+      expect(calls).toHaveLength(2);
+      expect(cache.putIfAbsent).not.toHaveBeenCalled();
+    }
+  );
 });

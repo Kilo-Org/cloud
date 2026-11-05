@@ -636,7 +636,7 @@ describe('enqueueUsage transient retries', () => {
         );
       }
     },
-    20_000
+    30_000
   );
 
   test('exhausts four real HTTP timeouts within the bounded attempt/backoff budget', async () => {
@@ -680,11 +680,145 @@ describe('enqueueUsage transient retries', () => {
         server.close(error => (error ? reject(error) : resolve()))
       );
     }
-  }, 30_000);
+  }, 60_000);
 });
 
 describe('bounded CF confirmation policy', () => {
-  test('accepts a first confirmation after eight seconds with one fetch and no retry', async () => {
+  /**
+   * Holds each response for a fixed time. `requestAborted` records a client abort while the
+   * fixture still owned the response, so a fetch that ignored its signal could not pass.
+   */
+  function createDelayedServer(responseDelayMs: number) {
+    const received: string[] = [];
+    const requestAborted: boolean[] = [];
+    const server = createServer((request, response) => {
+      let body = '';
+      request.on('data', chunk => {
+        body += chunk;
+      });
+      request.on('end', () => {
+        received.push(body);
+        const index = received.length - 1;
+        requestAborted[index] = false;
+        let finished = false;
+        request.socket.once('close', () => {
+          if (!finished) requestAborted[index] = true;
+        });
+        setTimeout(() => {
+          if (response.destroyed) return;
+          finished = true;
+          response.writeHead(202);
+          response.end();
+        }, responseDelayMs);
+      });
+    });
+    return { server, received, requestAborted };
+  }
+
+  async function withDelayedServer<T>(
+    responseDelayMs: number,
+    work: (fixture: ReturnType<typeof createDelayedServer>) => Promise<T>
+  ): Promise<T> {
+    const fixture = createDelayedServer(responseDelayMs);
+    try {
+      await new Promise<void>(resolve => fixture.server.listen(0, '127.0.0.1', resolve));
+      const address = fixture.server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+      mockFetch.mockImplementation(nativeFetch);
+      return await work(fixture);
+    } finally {
+      fixture.server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        fixture.server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+
+  test('accepts a 15-second first confirmation within the 20-second window with one fetch', async () => {
+    expect(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS).toBe(20_000);
+    expect(USAGE_ENQUEUE_RETRY_BUDGET_MS).toBe(40_000);
+    await withDelayedServer(15_000, async ({ received, requestAborted }) => {
+      const start = performance.now();
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'accepted',
+      });
+      const elapsed = performance.now() - start;
+      expect(elapsed).toBeGreaterThanOrEqual(15_000);
+      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+      expect(received).toEqual([JSON.stringify(payload)]);
+      expect(requestAborted).toEqual([false]);
+      // The one send is asserted above; `mockFetch` also counts calls made by earlier tests.
+      expect(warn).not.toHaveBeenCalled();
+    });
+  }, 40_000);
+
+  test('a first confirmation after the 10 s policy still accepts on the one send', async () => {
+    await withDelayedServer(12_000, async ({ received, requestAborted }) => {
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'accepted',
+      });
+      expect(received).toHaveLength(1);
+      expect(requestAborted).toEqual([false]);
+      // The one send is asserted above; `mockFetch` also counts calls made by earlier tests.
+      expect(warn).not.toHaveBeenCalled();
+    });
+  }, 40_000);
+
+  test('a first send that is lost after its 20 s window recovers only on the retry', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const bodies: { body: string; at: number }[] = [];
+    const start = performance.now();
+    const publisher = createServer((request, response) => {
+      let body = '';
+      request.on('data', chunk => {
+        body += chunk;
+      });
+      request.on('end', () => {
+        bodies.push({ body, at: performance.now() - start });
+        // The first send is lost: the fixture never answers it, so only the 20 s window ends it.
+        if (bodies.length > 1) {
+          response.writeHead(202);
+          response.end();
+        }
+      });
+    });
+    try {
+      await new Promise<void>(resolve => publisher.listen(0, '127.0.0.1', resolve));
+      const address = publisher.address();
+      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+      mockFetch.mockImplementation(nativeFetch);
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'accepted',
+      });
+      const elapsed = performance.now() - start;
+      // The old policy retried at 10 s. The lost send now waits for its full 20 s window, so the
+      // recovered second send starts no earlier than that.
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0].body).toBe(JSON.stringify(payload));
+      expect(bodies[1].body).toBe(JSON.stringify(payload));
+      expect(bodies[1].at).toBeGreaterThanOrEqual(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+      expect(elapsed).toBeGreaterThanOrEqual(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_RETRY_BUDGET_MS);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith('usage enqueue retrying', {
+        usageId: payload.core.id,
+        execution_region: 'unknown',
+        reason: 'timeout',
+        attempt: 1,
+        duplicate_possible: true,
+      });
+    } finally {
+      publisher.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        publisher.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }, 40_000);
+
+  test('a first confirmation after eight seconds still accepts with one fetch', async () => {
     let requests = 0;
     const publisher = createServer((request, response) => {
       requests++;
@@ -779,10 +913,10 @@ describe('bounded CF confirmation policy', () => {
     );
   });
 
-  test('confirmation timeouts plus near-maximum jitter stay within 25 seconds', async () => {
+  test('four full windows plus near-maximum jitter fit inside 40 seconds', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0.999);
-    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
       const controller = new AbortController();
       setTimeout(() => controller.abort(), ms);
       return controller.signal;
@@ -799,9 +933,16 @@ describe('bounded CF confirmation policy', () => {
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
     expect(mockFetch).toHaveBeenCalledTimes(4);
-    // 10 s + backoff + 5 s + backoff + 5 s + backoff leaves only a short fourth attempt.
-    expect(performance.now()).toBeGreaterThanOrEqual(20_000);
-    expect(performance.now()).toBeLessThanOrEqual(USAGE_ENQUEUE_RETRY_BUDGET_MS);
+    // 20 + 5 + 5 + 5 s of windows plus under 3.5 s of backoff stays under 38.5 s, so without a
+    // runtime delay the budget clips nothing and every attempt keeps its full window.
+    expect(timeouts.mock.calls).toEqual([
+      [USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+    ]);
+    expect(performance.now()).toBeGreaterThan(38_000);
+    expect(performance.now()).toBeLessThan(38_500);
     expect(warn).toHaveBeenLastCalledWith(
       'usage enqueue unavailable',
       expect.objectContaining({ duplicate_possible: true })
@@ -814,7 +955,7 @@ describe('bounded CF confirmation policy', () => {
     const timeouts = jest.spyOn(AbortSignal, 'timeout');
     mockFetch
       .mockImplementationOnce(async () => {
-        jest.advanceTimersByTime(23_000);
+        jest.advanceTimersByTime(38_000);
         return new Response(null, { status: 503 });
       })
       .mockResolvedValue(new Response(null, { status: 202 }));
@@ -825,7 +966,7 @@ describe('bounded CF confirmation policy', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  test('a never-answering first attempt still spends its full ten seconds before retrying', async () => {
+  test('a never-answering first attempt still spends its full twenty seconds before retrying', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0.5);
     const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
@@ -863,17 +1004,22 @@ describe('bounded CF confirmation policy', () => {
     });
   });
 
-  test('a fourth attempt shortened by the budget still classifies its timeout', async () => {
+  test('a stalled runtime clips a later attempt to the remaining budget', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0.999);
-    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
       const controller = new AbortController();
       setTimeout(() => controller.abort(), ms);
       return controller.signal;
     });
+    let attempt = 0;
     mockFetch.mockImplementation(
       (_url, init) =>
         new Promise((_resolve, reject) => {
+          attempt++;
+          // A runtime delay pushes the fourth attempt's start, so it is clipped to what remains.
+          if (attempt === 3) jest.advanceTimersByTime(10_000);
+          if (init?.signal?.aborted) return reject(new Error('synthetic timeout'));
           init?.signal?.addEventListener('abort', () => reject(new Error('synthetic timeout')), {
             once: true,
           });
@@ -882,14 +1028,54 @@ describe('bounded CF confirmation policy', () => {
     const result = enqueueUsage(payload, { retryTransientFailures: true });
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
-    expect(timeouts.mock.calls).toHaveLength(USAGE_ENQUEUE_MAX_ATTEMPTS);
-    const [first, ...later] = timeouts.mock.calls.map(([ms]) => ms);
-    expect(first).toBe(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
-    for (const clipped of later.slice(0, -1)) expect(clipped).toBe(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
-    expect(later.at(-1)).toBeLessThan(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
-    expect(later.at(-1)).toBeGreaterThan(0);
+    const timeoutMs = jest.mocked(AbortSignal.timeout).mock.calls.map(([ms]) => ms);
+    expect(timeoutMs[0]).toBe(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+    expect(timeoutMs[1]).toBe(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+    // The fourth attempt is clipped to the remaining budget instead of a full 5 s window.
+    expect(timeoutMs).toHaveLength(USAGE_ENQUEUE_MAX_ATTEMPTS);
     expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    const clipped = timeoutMs.slice(1);
+    expect(clipped.at(-1)).toBeLessThan(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+    expect(clipped.at(-1)).toBeGreaterThan(0);
     expect(performance.now()).toBeLessThanOrEqual(USAGE_ENQUEUE_RETRY_BUDGET_MS);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('a runtime stall spends the budget so no later attempt starts', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.999);
+    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+    mockFetch.mockImplementation((_url, init) => {
+      const attempt = mockFetch.mock.calls.length;
+      // A runtime stall during the second attempt spends the rest of the budget, so no later
+      // attempt can start and the first attempt keeps its full 20 s window.
+      if (attempt === 2) jest.advanceTimersByTime(32_000);
+      return new Promise((_resolve, reject) => {
+        // The abort may already have happened during the stall above.
+        if (init?.signal?.aborted) return reject(new Error('synthetic timeout'));
+        init?.signal?.addEventListener('abort', () => reject(new Error('synthetic timeout')), {
+          once: true,
+        });
+      });
+    });
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
+    const timeoutMs = jest.mocked(AbortSignal.timeout).mock.calls.map(([ms]) => ms);
+    expect(timeoutMs).toEqual([
+      USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
+      USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
+    ]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(warn).toHaveBeenLastCalledWith(
+      'usage enqueue unavailable',
+      expect.objectContaining({ reason: 'timeout', duplicate_possible: true })
+    );
   });
 
   test('fast failures keep the four-attempt cap without starting a fifth', async () => {
@@ -937,14 +1123,14 @@ describe('bounded CF confirmation policy', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0.5);
     const sleeps = jest.spyOn(globalThis, 'setTimeout');
     mockFetch.mockImplementation(async () => {
-      jest.advanceTimersByTime(24_900);
+      jest.advanceTimersByTime(39_900);
       return new Response(null, { status: 503 });
     });
     const result = enqueueUsage(payload, { retryTransientFailures: true });
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'unavailable', reason: 'http_503' });
     expect(sleeps.mock.calls.map(([, delay]) => delay)).toEqual([100]);
-    expect(performance.now()).toBe(25_000);
+    expect(performance.now()).toBe(40_000);
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenLastCalledWith(
       'usage enqueue unavailable',
@@ -955,7 +1141,7 @@ describe('bounded CF confirmation policy', () => {
   test('a stalled runtime exhausts the budget without masking the last network failure', async () => {
     jest.useFakeTimers();
     mockFetch.mockImplementation(async () => {
-      jest.advanceTimersByTime(25_000);
+      jest.advanceTimersByTime(40_000);
       throw new Error('synthetic network failure');
     });
     const result = await enqueueUsage(payload, { retryTransientFailures: true });

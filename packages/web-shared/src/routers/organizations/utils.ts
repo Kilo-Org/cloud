@@ -90,39 +90,40 @@ async function selectCallerRoleRows(
   organizationFilter: OrganizationIdFilter,
   fields: SelectedFields
 ): Promise<unknown[]> {
-  const directRows = await db
-    .select(fields)
-    .from(organization_memberships)
-    .innerJoin(
-      organizations,
-      activeOrganizationJoinCondition(organization_memberships.organization_id)
-    )
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, kiloUserId),
-        organizationFilter(organization_memberships.organization_id)
+  const [directRows, inheritedRows] = await Promise.all([
+    db
+      .select(fields)
+      .from(organization_memberships)
+      .innerJoin(
+        organizations,
+        activeOrganizationJoinCondition(organization_memberships.organization_id)
       )
-    );
-
-  const inheritedRows = await db
-    .select(fields)
-    .from(organizations)
-    .innerJoin(
-      parentOrganizations,
-      and(
-        eq(parentOrganizations.id, organizations.parent_organization_id),
-        isNull(parentOrganizations.deleted_at)
+      .where(
+        and(
+          eq(organization_memberships.kilo_user_id, kiloUserId),
+          organizationFilter(organization_memberships.organization_id)
+        )
+      ),
+    db
+      .select(fields)
+      .from(organizations)
+      .innerJoin(
+        parentOrganizations,
+        and(
+          eq(parentOrganizations.id, organizations.parent_organization_id),
+          isNull(parentOrganizations.deleted_at)
+        )
       )
-    )
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, organizations.parent_organization_id),
-        eq(organization_memberships.kilo_user_id, kiloUserId),
-        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+      .innerJoin(
+        organization_memberships,
+        and(
+          eq(organization_memberships.organization_id, organizations.parent_organization_id),
+          eq(organization_memberships.kilo_user_id, kiloUserId),
+          inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
+        )
       )
-    )
-    .where(and(organizationFilter(organizations.id), isNull(organizations.deleted_at)));
+      .where(and(organizationFilter(organizations.id), isNull(organizations.deleted_at))),
+  ]);
 
   return [...directRows, ...inheritedRows];
 }
@@ -140,6 +141,50 @@ function allowedRole(
   );
 }
 
+export function settle<T>(
+  promise: Promise<T>
+): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
+  return promise.then(
+    value => ({ ok: true as const, value }),
+    error => ({ ok: false as const, error })
+  );
+}
+
+export async function observeMembershipRole(
+  loader: () => Promise<{ role: OrganizationRole }[]>,
+  roles?: OrganizationRole[]
+): Promise<{
+  membershipRole: OrganizationRole | null;
+  wouldPassWithoutAdmin: boolean | null;
+}> {
+  try {
+    const rows = await loader();
+    return {
+      membershipRole: allowedRole(rows),
+      wouldPassWithoutAdmin: allowedRole(rows, roles) !== null,
+    };
+  } catch {
+    return { membershipRole: null, wouldPassWithoutAdmin: null };
+  }
+}
+
+async function observeBatchMembershipRoles(
+  loader: () => Promise<Map<string, OrganizationRole[]>>
+): Promise<Map<string, OrganizationRole[]> | null> {
+  try {
+    return await loader();
+  } catch {
+    return null;
+  }
+}
+
+export async function loadEffectiveMembershipRows(
+  userId: string,
+  organizationId: Organization['id']
+): Promise<CallerRoleRow[]> {
+  return selectCallerRoleRows(userId, column => eq(column, organizationId), callerRoleFields);
+}
+
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,
   organizationId: Organization['id'],
@@ -149,22 +194,38 @@ export async function ensureOrganizationAccess(
     // An admin elevation applies only to an organization that exists and is
     // live, matching getOrganizationById. A rejected request is not recorded
     // as an elevation.
-    const [organization] = await db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-      .limit(1);
-    if (!organization) {
+    const organizationResult = settle(
+      db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+        .limit(1)
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+      roles
+    );
+    const rowsResult = await organizationResult;
+    if (!rowsResult.ok) {
+      await recordKiloAdminElevation(ctx, {
+        reason: 'organization_access',
+        target: organizationTarget(organizationId),
+        ...observation,
+      });
+      throw rowsResult.error;
+    }
+    if (!rowsResult.value[0]) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Organization not found',
       });
     }
-    return await elevateViaKiloAdmin(ctx, {
+    await recordKiloAdminElevation(ctx, {
       reason: 'organization_access',
       target: organizationTarget(organizationId),
-      grant: 'owner',
+      ...observation,
     });
+    return 'owner';
   }
   const rows = await selectCallerRoleRows(
     ctx.user.id,
@@ -202,9 +263,20 @@ export async function ensureOrganizationAccess(
  * roles inherited from a parent org (owner/billing_manager). Orgs the caller has
  * no access to are simply absent from the returned map.
  */
+function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, OrganizationRole[]> {
+  const rolesByOrg = new Map<string, OrganizationRole[]>();
+  for (const row of rows) {
+    const list = rolesByOrg.get(row.organizationId) ?? [];
+    list.push(row.role);
+    rolesByOrg.set(row.organizationId, list);
+  }
+  return rolesByOrg;
+}
+
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
-  organizationIds: Organization['id'][]
+  organizationIds: Organization['id'][],
+  roles?: OrganizationRole[]
 ): Promise<Map<string, OrganizationRole>> {
   const uniqueIds = Array.from(new Set(organizationIds));
   const result = new Map<string, OrganizationRole>();
@@ -214,12 +286,22 @@ export async function getOrganizationsAccessRoles(
   if (ctx.user.is_admin) {
     // Only organizations that exist and are live are elevated, matching
     // getOrganizationById.
-    const liveIds = (
-      await db
+    const [liveOrgRows, rolesByOrg] = await Promise.all([
+      db
         .select({ id: organizations.id })
         .from(organizations)
-        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at)))
-    ).map(row => row.id);
+        .where(and(inArray(organizations.id, uniqueIds), isNull(organizations.deleted_at))),
+      observeBatchMembershipRoles(async () =>
+        groupRolesByOrganization(
+          await selectCallerRoleRows(
+            ctx.user.id,
+            column => inArray(column, uniqueIds),
+            callerRoleFields
+          )
+        )
+      ),
+    ]);
+    const liveIds = liveOrgRows.map(row => row.id);
     if (liveIds.length === 0) {
       return result;
     }
@@ -227,23 +309,25 @@ export async function getOrganizationsAccessRoles(
       reason: 'organization_access_batch',
       target: organizationsTarget(liveIds),
       grant: 'owner',
+      membershipRole: null,
+      wouldPassWithoutAdmin:
+        rolesByOrg === null
+          ? null
+          : liveIds.every(
+              id =>
+                allowedRole(
+                  (rolesByOrg.get(id) ?? []).map(role => ({ role })),
+                  roles
+                ) !== null
+            ),
     });
     for (const id of liveIds) result.set(id, grant);
     return result;
   }
 
-  const rows = await selectCallerRoleRows(
-    ctx.user.id,
-    column => inArray(column, uniqueIds),
-    callerRoleFields
+  const rolesByOrg = groupRolesByOrganization(
+    await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
-
-  const rolesByOrg = new Map<string, OrganizationRole[]>();
-  for (const row of rows) {
-    const list = rolesByOrg.get(row.organizationId) ?? [];
-    list.push(row.role);
-    rolesByOrg.set(row.organizationId, list);
-  }
   for (const [organizationId, roles] of rolesByOrg) {
     const best = rolePriority.find(role => roles.includes(role));
     if (best) result.set(organizationId, best);
@@ -260,7 +344,7 @@ export async function ensureOrganizationsAccess(
   organizationIds: Organization['id'][],
   roles?: OrganizationRole[]
 ): Promise<void> {
-  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds);
+  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
   const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
@@ -279,17 +363,24 @@ export async function ensureOrganizationAccessAndFetchOrg(
   roles?: OrganizationRole[]
 ): Promise<Organization> {
   if (ctx.user.is_admin) {
-    // Recorded before the fetch so an admin probing a non-existent organization
-    // is still attributed, rather than vanishing into the NOT_FOUND below.
+    const organizationResult = settle(
+      db
+        .select()
+        .from(organizations)
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(ctx.user.id, organizationId),
+      roles
+    );
     await recordKiloAdminElevation(ctx, {
       reason: 'organization_fetch',
       target: organizationTarget(organizationId),
+      ...observation,
     });
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
-
+    const rowsResult = await organizationResult;
+    if (!rowsResult.ok) throw rowsResult.error;
+    const [org] = rowsResult.value;
     if (!org) {
       throw new TRPCError({
         code: 'NOT_FOUND',

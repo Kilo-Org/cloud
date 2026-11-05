@@ -9,6 +9,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
@@ -57,7 +58,6 @@ export function buildDirectProvider(
     responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
       const body = context.request.body as Record<string, unknown>;
-      const promptCacheKey = body.prompt_cache_key;
       if (upstream.remove_from_body) {
         for (const key of upstream.remove_from_body) {
           delete body[key];
@@ -67,17 +67,14 @@ export function buildDirectProvider(
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
-      if (
-        upstream.prompt_cache_key_as_mt_user_id &&
-        typeof promptCacheKey === 'string' &&
-        /^[\t\x20-\x7e\x80-\xff]+$/.test(promptCacheKey)
-      ) {
+      if (upstream.user_hash_as_mt_user_id) {
         for (const key of Object.keys(context.extraHeaders)) {
           if (key.toLowerCase() === 'mt-user-id') {
             delete context.extraHeaders[key];
           }
         }
-        context.extraHeaders['Mt-User-Id'] = 'kilo:' + promptCacheKey;
+        context.extraHeaders['Mt-User-Id'] =
+          'kilo:' + generateProviderSpecificHash(context.kilo_user_id, context.provider);
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

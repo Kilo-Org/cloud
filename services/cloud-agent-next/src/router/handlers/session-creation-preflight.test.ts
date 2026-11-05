@@ -575,6 +575,7 @@ describe('session creation preflight', () => {
       mergeProfileConfigurationMock.mockResolvedValueOnce({
         envVars: { FROM_ENV: 'env' },
         setupCommands: ['env-command'],
+        environmentSetupCommandCount: 1,
       });
 
       const resolved = await preflightSessionCreation(
@@ -592,8 +593,30 @@ describe('session creation preflight', () => {
         expect.objectContaining({ environment: layer })
       );
       expect(resolved.profile?.resolved?.setupCommands).toEqual(['env-command']);
+      expect(resolved.profile?.resolved?.environmentSetupCommandCount).toBe(1);
       expect(resolved.environment).toEqual(environmentLoad({}, environmentId).reference);
       expect(resolved.environmentSandboxAllocation).toBe('cloudflare-containers-standard-4');
+    });
+
+    it('carries an explicit zero environment setup boundary', async () => {
+      const layer = { setupCommands: [] };
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'match',
+        environment: environmentLoad(layer, environmentId),
+      });
+      mergeProfileConfigurationMock.mockResolvedValueOnce({
+        setupCommands: ['inline-command'],
+        environmentSetupCommandCount: 0,
+      });
+
+      const resolved = await preflightSessionCreation(
+        request({ repository: githubRepository, options: webOptions }),
+        context,
+        'prepareSession'
+      );
+
+      expect(resolved.profile?.resolved?.setupCommands).toEqual(['inline-command']);
+      expect(resolved.profile?.resolved?.environmentSetupCommandCount).toBe(0);
     });
 
     it('omits the allocation when the environment has none', async () => {

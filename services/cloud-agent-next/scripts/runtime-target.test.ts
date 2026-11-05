@@ -117,6 +117,50 @@ it.each([{ ids: [] }, { ids: ['*'] }, { ids: ['not-an-org-id'] }])(
     ).toThrow();
   }
 );
+it('renders the published Kilo v2 release for its organization scope', () => {
+  const kilo2 = {
+    orgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56', '11111111-1111-4111-8111-111111111111'],
+  };
+  const output = renderRuntimeTarget({
+    config: baseline(),
+    environment: 'production',
+    startup: { ...startup, kilo2 },
+    release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+  });
+  expect(output.vars).toMatchObject({
+    RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
+    RUNTIME_KILO2_ORG_IDS: kilo2.orgIds.join(','),
+    RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
+  });
+  expect(
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup,
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars
+  ).not.toHaveProperty('RUNTIME_KILO2_ORG_IDS');
+  expect(() =>
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2 },
+      release,
+    })
+  ).toThrow('Kilo v2 runtime handoff');
+  for (const invalid of [{ orgIds: [] }, { orgIds: ['*'] }, { ...kilo2, descriptorSha256: 'f' }])
+    expect(() =>
+      selectRuntimeTarget({ default: { ...startup, kilo2: invalid }, targets: {} }, 'production')
+    ).toThrow();
+  expect(() =>
+    renderRuntimeTarget({
+      config: { ...baseline(), vars: { RUNTIME_KILO2_ORG_IDS: kilo2.orgIds[0] } },
+      environment: 'production',
+      startup,
+      release,
+    })
+  ).toThrow('configuration drift');
+});
 it('rejects manual cohort settings and secondary image drift', () => {
   const scopedVars = { ...baseline(), vars: { RUNTIME_INTERACTIVE_ORG_IDS: '*' } };
   expect(() =>

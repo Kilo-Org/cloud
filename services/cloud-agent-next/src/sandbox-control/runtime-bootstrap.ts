@@ -20,6 +20,7 @@ import {
   RUNTIME_FETCH_RETRY_DELAY_MS,
   RUNTIME_FETCH_STALL_MS,
   RUNTIME_HARD_MAX_EXPANDED_BYTES,
+  runtimeReleaseHarness,
 } from './runtime-release.js';
 import { STARTUP_FAILURES } from './startup-failure.js';
 
@@ -410,7 +411,7 @@ export function renderRuntimeBootstrap(input: {
     `if [ ! -f ${shellQuote(mainPath)} ]; then exit ${STARTUP_FAILURES.supervisor_missing.exitCode}; fi`,
     `${node} ${shellQuote(PROBE)} "$cli_path" ${shellQuote(descriptor.cliVersion)} ${shellQuote(String(input.deadlineAt))}`,
     'trap - 0',
-    `exec ${environment} KILO_RUNTIME_CLI_PATH="$cli_path" ${mainArgv}`,
+    `exec ${environment} KILO_RUNTIME_CLI_PATH="$cli_path" KILO_RUNTIME_HARNESS=${shellQuote(runtimeReleaseHarness(descriptor))} ${mainArgv}`,
   ].join('\n');
   return { argv: ['/bin/sh', '-c', script] };
 }

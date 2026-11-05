@@ -6,12 +6,21 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { SignInFlowProps, SignInFlowReturn } from './useSignInFlow';
 import type { SignInHint } from './useSignInHint';
 
-const mockSignIn = jest.fn<() => Promise<void>>();
+const mockSignIn =
+  jest.fn<
+    (
+      provider: string,
+      options?: Record<string, unknown>,
+      authorizationParams?: Record<string, string>
+    ) => Promise<void>
+  >();
 const mockSaveHint = jest.fn<(hint: SignInHint) => void>();
 const mockClearHint = jest.fn();
 const mockSendMagicLink =
   jest.fn<(email: string, callbackUrl?: string) => Promise<{ success: true }>>();
 let mockHint: SignInHint | null = null;
+const mockPrepareWatchwood = jest.fn<() => Promise<void>>();
+const mockSubmitWatchwood = jest.fn<() => Promise<void>>();
 
 jest.mock('next-auth/react', () => ({ signIn: mockSignIn }));
 jest.mock('@/hooks/useSignInHint', () => ({
@@ -23,6 +32,10 @@ jest.mock('@/hooks/useSignInHint', () => ({
   }),
 }));
 jest.mock('@/lib/auth/send-magic-link', () => ({ sendMagicLink: mockSendMagicLink }));
+jest.mock('@/lib/auth/watchwood.client', () => ({
+  prepareWatchwoodSignup: mockPrepareWatchwood,
+  submitWatchwoodSignup: mockSubmitWatchwood,
+}));
 
 const { useSignInFlow } = require('./useSignInFlow') as {
   useSignInFlow: (props: SignInFlowProps) => SignInFlowReturn;
@@ -155,6 +168,7 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
       onClick: () => flow.handleTurnstileError(1),
     }),
     createElement('button', { id: 'show-email', onClick: flow.handleShowEmailInput }),
+    createElement('button', { id: 'google', onClick: () => flow.handleOAuthClick('google') }),
     createElement('button', { id: 'select-email', onClick: () => flow.handleOAuthClick('email') }),
     createElement('button', {
       id: 'submit-email',
@@ -211,6 +225,10 @@ describe('useSignInFlow discovery cancellation', () => {
     mockClearHint.mockReset();
     mockSendMagicLink.mockReset();
     mockSendMagicLink.mockResolvedValue({ success: true });
+    mockPrepareWatchwood.mockReset();
+    mockPrepareWatchwood.mockResolvedValue(undefined);
+    mockSubmitWatchwood.mockReset();
+    mockSubmitWatchwood.mockResolvedValue(undefined);
     fetchMock.mockReset();
     globalThis.fetch = fetchMock;
   });
@@ -219,6 +237,117 @@ describe('useSignInFlow discovery cancellation', () => {
     mounted?.cleanup();
     mounted = undefined;
   });
+
+  it('does not submit Watchwood before successful Turnstile verification', async () => {
+    const verification = deferred<Response>();
+    fetchMock.mockReturnValue(verification.promise);
+    mounted = mountFlow();
+    act(() => button(mounted!.container, 'google').click());
+    await act(async () => {
+      button(mounted!.container, 'first').click();
+      await flushAsyncWork();
+    });
+    expect(mockSubmitWatchwood).not.toHaveBeenCalled();
+
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await act(async () => {
+        verification.resolve(response({ success: false }));
+        await flushAsyncWork();
+      });
+      expect(mockSubmitWatchwood).not.toHaveBeenCalled();
+      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mounted.container.querySelector('#turnstile-error')?.textContent).toBe('true');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it.each(['discovery', 'email', 'sso', 'oauth'] as const)(
+    'awaits Watchwood after Turnstile and before %s continues',
+    async nextAction => {
+      const submission = deferred<void>();
+      mockSubmitWatchwood.mockReturnValue(submission.promise);
+      fetchMock
+        .mockResolvedValueOnce(response({ success: true }))
+        .mockResolvedValueOnce(response({ kind: 'new', providers: ['google', 'email'] }));
+      mounted = mountFlow();
+      if (nextAction === 'discovery' || nextAction === 'email') {
+        act(() => button(mounted!.container, 'old-email').click());
+        act(() =>
+          button(
+            mounted!.container,
+            nextAction === 'email' ? 'select-email' : 'submit-email'
+          ).click()
+        );
+      } else {
+        act(() => button(mounted!.container, nextAction === 'sso' ? 'sso' : 'google').click());
+      }
+      await act(async () => {
+        button(mounted!.container, 'first').click();
+        await flushAsyncWork();
+      });
+
+      expect(mockSubmitWatchwood).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSendMagicLink).not.toHaveBeenCalled();
+      await act(async () => {
+        submission.resolve();
+        await flushAsyncWork();
+      });
+
+      if (nextAction === 'discovery') {
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(mounted.container.querySelector('#state')?.textContent).toBe('provider-select');
+      } else if (nextAction === 'email') {
+        expect(mockSendMagicLink).toHaveBeenCalledWith('old@example.com', expect.any(String));
+      } else if (nextAction === 'sso') {
+        expect(mockSignIn).toHaveBeenCalledWith(
+          'workos',
+          { callbackUrl: '/users/after-sign-in' },
+          { organization: 'org-stale' }
+        );
+      } else {
+        expect(mockSignIn).toHaveBeenCalledWith('google', { callbackUrl: '/users/after-sign-in' });
+      }
+      expect(mounted.container.querySelector('#error')?.textContent).toBe('');
+    }
+  );
+
+  it.each(['back', 'email-change', 'unmount'] as const)(
+    'ignores a completed Watchwood submission after %s invalidates its context',
+    async cancellation => {
+      const submission = deferred<void>();
+      mockSubmitWatchwood.mockReturnValue(submission.promise);
+      fetchMock.mockResolvedValue(response({ success: true }));
+      mounted = mountFlow();
+      act(() => button(mounted!.container, 'sso').click());
+      await act(async () => {
+        button(mounted!.container, 'first').click();
+        await flushAsyncWork();
+      });
+      expect(mockSubmitWatchwood).toHaveBeenCalledTimes(1);
+
+      if (cancellation === 'unmount') {
+        mounted.cleanup();
+        mounted = undefined;
+      } else {
+        act(() =>
+          button(mounted!.container, cancellation === 'back' ? 'back' : 'new-email').click()
+        );
+      }
+      await act(async () => {
+        submission.resolve();
+        await flushAsyncWork();
+      });
+
+      expect(mockSignIn).not.toHaveBeenCalled();
+      expect(mockSendMagicLink).not.toHaveBeenCalled();
+      expect(mockSaveHint).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('ignores a late automatic OAuth discovery result after Back cancels the flow', async () => {
     const discovery = deferred<Response>();

@@ -17,7 +17,7 @@ import {
   briefingScheduleProblems,
 } from '@/lib/agent-briefing-schedule';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { formatDate } from '@/lib/format';
+import { formatClockTime } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
 
@@ -135,9 +135,7 @@ export function ScheduleSettings({
                 setActiveTime(field.key);
               }}
             >
-              <Text>
-                {formatDate(pickerValue, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+              <Text>{formatClockTime(pickerValue, i18n.language)}</Text>
             </Button>
             {activeTime === field.key ? (
               <>

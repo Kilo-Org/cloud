@@ -53,6 +53,8 @@ export function validateRuntimeTarget(config: unknown, environment: string) {
       'NATIVE_RUNTIME_IMAGE',
       'RUNTIME_RELEASE_DESCRIPTOR',
       'RUNTIME_INTERACTIVE_ORG_IDS',
+      'RUNTIME_KILO2_ORG_IDS',
+      'RUNTIME_RELEASE_DESCRIPTOR_KILO2',
     ].some(key => vars[key] !== undefined)
   )
     throw new Error('Runtime configuration drift: startup settings belong in runtime-targets.json');
@@ -94,7 +96,13 @@ export function runtimeBucketBindings(
     : [...bindings, { binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: bucket }];
 }
 
-export type RuntimeTargetRelease = { descriptorSha256: string; baseImage: string; bucket: string };
+export type RuntimeTargetRelease = {
+  descriptorSha256: string;
+  /** The same source's Kilo v2 release, when its publisher packaged one. */
+  kilo2DescriptorSha256?: string;
+  baseImage: string;
+  bucket: string;
+};
 /** The target catalog owns both Worker vars and the native image selection. */
 export function renderRuntimeTarget(input: {
   config: unknown;
@@ -114,6 +122,15 @@ export function renderRuntimeTarget(input: {
       target.vars.RUNTIME_INTERACTIVE_ORG_IDS = startup.interactiveOrgIds.join(',');
     const release = input.release;
     if (!release) throw new Error('Downloaded target requires a verified runtime handoff');
+    if (startup.kilo2 !== undefined) {
+      if (release.kilo2DescriptorSha256 === undefined)
+        throw new Error('Kilo v2 target requires a verified Kilo v2 runtime handoff');
+      target.vars.RUNTIME_KILO2_ORG_IDS = startup.kilo2.orgIds.join(',');
+      target.vars.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .parse(release.kilo2DescriptorSha256);
+    }
     target.r2_buckets = runtimeBucketBindings(target.r2_buckets, release.bucket);
     target.vars.RUNTIME_RELEASE_DESCRIPTOR = z
       .string()

@@ -219,6 +219,10 @@ function applyProfileResolution(
       resolved: {
         envVars: resolved.envVars,
         setupCommands: resolved.setupCommands,
+        ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
+        ...(resolved.environmentSetupCommandCount === undefined
+          ? {}
+          : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
         encryptedSecrets: resolved.encryptedSecrets,
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,
@@ -233,10 +237,13 @@ function applyProfileResolution(
 function assertResolvedConfigurationWithinSessionLimits(
   resolved: SessionProfileBundle | undefined
 ): void {
+  // An older wrapper receives the start commands appended to setup, so the
+  // combined list must fit one setup list.
+  const setupAndStart = [...(resolved?.setupCommands ?? []), ...(resolved?.startCommands ?? [])];
   const parsed = SessionProfileBundleSchema.safeParse({
     envVars: resolved?.envVars,
     encryptedSecrets: resolved?.encryptedSecrets,
-    setupCommands: resolved?.setupCommands,
+    setupCommands: setupAndStart,
   });
   if (!parsed.success) {
     throw new TRPCError({

@@ -24,15 +24,12 @@ export function createTRPCRouteHandler<TCaller>(createCaller: (ctx: TRPCContext)
     handler: (caller: TCaller) => Promise<TResult>
   ): Promise<NextResponse<ErrorResponse | TResult>> {
     try {
-      // Create tRPC context and caller
-      const ctx = await createTRPCContext();
+      const ctx = await createTRPCContext({ req: request });
       const caller = createCaller(ctx);
 
-      // Execute the handler and return the result
       const result = await handler(caller);
       return NextResponse.json(result);
     } catch (error) {
-      // Handle tRPC errors specifically
       if (error instanceof TRPCError) {
         logTRPCError(error, {
           extra: {
@@ -48,7 +45,6 @@ export function createTRPCRouteHandler<TCaller>(createCaller: (ctx: TRPCContext)
       } else {
         captureException(error);
 
-        // Generic error response
         return NextResponse.json(
           {
             error: 'Internal Server Error',

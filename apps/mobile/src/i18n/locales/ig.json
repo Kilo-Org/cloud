@@ -2552,6 +2552,7 @@
       "assistantStopped": "Akwụsịrị nzaghachi ahụ.",
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
       "assistantProviderError": "Onye na-enye ọrụ zaghachiri na njehie.",
+      "assistantProviderRefused": "Onye na-enye ọrụ jụrụ arịrịọ a ma enweghị ike ịnwale ya ọzọ.",
       "assistantOutputLimit": "Nzaghachi ahụ ruru oke mmepụta nke ihe nlereanya ahụ.",
       "assistantStructuredOutput": "Nzaghachi ahụ adabaghị n'usoro a chọrọ.",
       "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."

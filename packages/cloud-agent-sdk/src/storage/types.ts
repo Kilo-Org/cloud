@@ -12,7 +12,7 @@ type SessionStorage = {
   getMessageInfo(messageId: string): MessageInfo | undefined;
 
   // Parts (sorted by ID within their message)
-  upsertPart(messageId: string, part: Part, eventTime?: number): void;
+  upsertPart(messageId: string, part: Part, eventTime?: number, authoritative?: boolean): void;
   /**
    * Append one streamed chunk to a text part, seeding the part when it is not
    * stored yet.

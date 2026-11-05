@@ -48,12 +48,12 @@ function classNameOf(el: React.ReactElement): string {
 }
 
 // The reserved bottom slot was a blank tinted block at the design review: its
-// bars carried the shared Skeleton's default `bg-muted`, and `--muted` equals
-// `--secondary` in BOTH themes (apps/mobile/src/global.css), so they painted the
-// footer's own fill. `bg-muted-soft` is the one gray that differs from it, the
-// same token the profile and pull-request cards reserve their space with. The
-// geometry the footer lands on is pinned too, so the reserved area keeps being
-// the footer's shape rather than an empty panel.
+// bars carried the shared Skeleton's default fill, and that fill matches the
+// footer's own `--secondary` in the light palette (apps/mobile/src/global.css),
+// so they painted that fill. `bg-muted-soft` is the one gray that differs from
+// it, the same token the profile and pull-request cards reserve their space
+// with. The geometry the footer lands on is pinned too, so the reserved area
+// keeps being the footer's shape rather than an empty panel.
 describe('SessionReadOnlyFooterPlaceholder', () => {
   it('reserves the footer shape in bars that stand off its own fill', () => {
     // eslint-disable-next-line new-cap

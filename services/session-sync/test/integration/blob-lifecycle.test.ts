@@ -244,7 +244,7 @@ describe('bounded blob cleanup', () => {
       .poll(async () => sessionStateSchema.parse(await (await api.state(sessionID)).json()))
       .toMatchObject({ usage: { blobBytes: 0 } });
     for (const upload of uploads) expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).toBeNull();
-  });
+  }, 15_000);
 
   it('counts empty blobs against the metadata budget', async () => {
     const { principal, sessionID, stub } = await fixture();

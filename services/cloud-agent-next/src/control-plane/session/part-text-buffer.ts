@@ -44,39 +44,37 @@ function storedEvent(buffered: Buffered) {
  * a row, and before a read of stored history; a timer flushes the rest. A
  * restart can lose the text since the last flush; the final full update
  * (`message.part.updated` or `conversation.message.updated`) carries it again.
+ * A row that fails to write is reported and dropped in the same way, so it
+ * cannot block other rows or grow without bound.
  */
 export function createPartTextBuffer(input: {
-  queries: SessionEventQueries;
+  queries: Pick<SessionEventQueries, 'upsert'>;
   onFlushError: (error: unknown) => void;
 }) {
   const rows = new Map<string, Buffered>();
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   function arm(): void {
-    timer ??= setTimeout(() => {
-      try {
-        flush();
-      } catch (error) {
-        // The text stays buffered; the next delta, event or read flushes it again.
-        timer = undefined;
-        input.onFlushError(error);
-      }
-    }, PART_TEXT_FLUSH_MS);
+    timer ??= setTimeout(flush, PART_TEXT_FLUSH_MS);
   }
 
   function flush(): void {
     clearTimeout(timer);
     timer = undefined;
     for (const [entityId, buffered] of rows) {
-      input.queries.upsert({
-        executionId: '',
-        sessionId: buffered.sessionId,
-        streamEventType: 'kilocode',
-        payload: JSON.stringify(slimPersistedKilocodeEvent(storedEvent(buffered))),
-        timestamp: buffered.timestamp,
-        entityId,
-      });
       rows.delete(entityId);
+      try {
+        input.queries.upsert({
+          executionId: '',
+          sessionId: buffered.sessionId,
+          streamEventType: 'kilocode',
+          payload: JSON.stringify(slimPersistedKilocodeEvent(storedEvent(buffered))),
+          timestamp: buffered.timestamp,
+          entityId,
+        });
+      } catch (error) {
+        input.onFlushError(error);
+      }
     }
   }
 

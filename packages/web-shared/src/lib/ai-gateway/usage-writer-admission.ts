@@ -10,7 +10,8 @@ type WriterPool = {
 };
 
 type QueueSource = 'queue' | 'queue_vercel';
-type WriterClass = 'queue' | 'non_llm';
+type AdmittedSource = QueueSource | 'ingress_direct';
+type WriterClass = 'queue' | 'non_llm' | 'direct';
 type RejectionReason = 'queue_limit' | 'pool_waiting' | 'pool_busy';
 type Admission =
   | { admitted: false; reason: RejectionReason }
@@ -31,8 +32,11 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
   // A ceiling inside `limit`, not a reservation: non-LLM usage writes may hold at most
   // this many shared slots, and LLM queue writes can still use all of `limit`.
   const nonLlmLimit = Math.max(1, Math.min(2, limit - 1));
+  // The same kind of ceiling for direct ingress writes, which take no FIFO place.
+  const directLimit = Math.max(1, limit - 3);
   let active = 0;
   let activeNonLlm = 0;
+  let activeDirect = 0;
   // Released slots pass directly to the oldest waiter, so `active` stays at `limit`
   // while anyone waits and new callers cannot overtake the queue.
   const waiters: Waiter[] = [];
@@ -45,14 +49,16 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
   const poolReason = (gauges: PoolGauges): RejectionReason | null =>
     gauges.waiting > 0 ? 'pool_waiting' : gauges.total - gauges.idle >= limit ? 'pool_busy' : null;
   const classFull = (writerClass: WriterClass) =>
-    writerClass === 'non_llm' && activeNonLlm >= nonLlmLimit;
+    (writerClass === 'non_llm' && activeNonLlm >= nonLlmLimit) ||
+    (writerClass === 'direct' && activeDirect >= directLimit);
   const nonLlmWaiting = () => waiters.filter(waiter => waiter.writerClass === 'non_llm').length;
   function take(writerClass: WriterClass) {
     if (writerClass === 'non_llm') activeNonLlm++;
+    if (writerClass === 'direct') activeDirect++;
   }
 
   function report(
-    source: QueueSource,
+    source: AdmittedSource,
     writerClass: WriterClass,
     usageId: string,
     reason: RejectionReason | null,
@@ -71,8 +77,10 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
             reason,
             active,
             active_non_llm: activeNonLlm,
+            active_direct: activeDirect,
             limit,
             non_llm_limit: nonLlmLimit,
+            direct_limit: directLimit,
             pool_max: poolMax,
             pool: gauges,
             sample_rate: sampleRate,
@@ -97,6 +105,7 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
         if (released) return;
         released = true;
         if (writerClass === 'non_llm') activeNonLlm--;
+        if (writerClass === 'direct') activeDirect--;
         passOrFreeSlot();
       },
     };
@@ -114,7 +123,7 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
   }
 
   function decideNow(
-    source: QueueSource,
+    source: AdmittedSource,
     writerClass: WriterClass,
     usageId: string,
     wait: SlotWait | null
@@ -143,10 +152,11 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
      * evidence of additional pressure there. Both pool reasons are rechecked at grant.
      * A `non_llm` caller also counts against its class ceiling, and its active plus
      * queued callers never exceed that ceiling, so it cannot crowd LLM writes out of
-     * the FIFO either.
+     * the FIFO either. A `direct` caller never waits: it is decided immediately, so
+     * it cannot hold a FIFO place or overtake a waiting queue caller.
      */
     acquire(
-      source: QueueSource,
+      source: AdmittedSource,
       usageId: string,
       {
         maxWaitMs,
@@ -161,7 +171,9 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
           return Promise.resolve({ admitted: false, reason: 'pool_waiting' });
         }
       }
-      const classRoom = writerClass === 'queue' || activeNonLlm + nonLlmWaiting() < nonLlmLimit;
+      const classRoom =
+        writerClass === 'queue' ||
+        (writerClass === 'non_llm' && activeNonLlm + nonLlmWaiting() < nonLlmLimit);
       const canWait =
         active >= limit && maxWaitMs > 0 && waiters.length < limit && classRoom && !signal?.aborted;
       if (!canWait) return Promise.resolve(decideNow(source, writerClass, usageId, IMMEDIATE));

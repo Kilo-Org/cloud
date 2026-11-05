@@ -2141,7 +2141,11 @@ describe('session detail slow load', () => {
     // fact is not set: the bottom slot must not offer a composer the session
     // may never get.
     act(() => {
-      view.store.set(view.manager.atoms.activeSessionType, null);
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
       view.store.set(view.manager.atoms.isReadOnly, false);
     });
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);

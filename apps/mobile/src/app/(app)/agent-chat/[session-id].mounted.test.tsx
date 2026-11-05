@@ -87,7 +87,11 @@ const queryState = vi.hoisted(() => ({
   // will not run. The route holds its skeleton only for the first.
   fetchStatus: 'fetching' as 'fetching' | 'paused' | 'idle',
   error: null as { data?: { code?: string } } | null,
-  data: null as { organization_id?: string | null; id?: string } | null,
+  data: null as {
+    organization_id?: string | null;
+    id?: string;
+    cloud_agent_session_id?: string | null;
+  } | null,
   // Epoch ms of the successful read, or 0 before one. The route's
   // rendered-session guard reads this to tell a fresh open's data from a
   // previous mount's cached row.

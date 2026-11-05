@@ -875,7 +875,7 @@
       "balance": "Մնացորդի մասին զգուշացումներ",
       "security": "Հայտնաբերված անվտանգության խնդիրներ",
       "spend": "Ծախսերի ծանուցումներ",
-      "followedSessions": "Հետևված սեսիաներ"
+      "followedSessions": "Հետևված նստաշրջաններ"
     },
     "category": {
       "chatMessagesSubtitle": "պատասխաններ ձեր զրույցներում",
@@ -2602,8 +2602,8 @@
       "stepSandboxBoot": "Ավազարկղի գործարկում",
       "stepSnapshotFallback": "Կրկնակի փորձ առանց սնապշոտի",
       "stepKiloServer": "Kilo-ի գործարկում",
-      "stepKiloSession": "Սեսիայի նախապատրաստում",
-      "stepRestoreIncomplete": "Սեսիայի վերականգնումն անավարտ է",
+      "stepKiloSession": "Նստաշրջանի նախապատրաստում",
+      "stepRestoreIncomplete": "Նստաշրջանի վերականգնումն անավարտ է",
       "stepReady": "Միջավայրը պատրաստ է",
       "stepFailed": "Միջավայրի կարգավորումը ձախողվեց",
       "stepUnknown": "Միջավայրի կարգավորում",
@@ -2613,21 +2613,21 @@
       "detailRunningSetupCommands": "Կարգավորման հրամանների գործարկում",
       "detailSavingRepository": "Ռեպոզիտորիայի պահպանում՝ ավելի արագ գործարկման համար",
       "detailStartingKiloRuntime": "Kilo runtime-ի գործարկում",
-      "detailPreparingKiloSession": "Kilo սեսիայի նախապատրաստում",
+      "detailPreparingKiloSession": "Kilo նստաշրջանի նախապատրաստում",
       "detailWaitingForPreviousSandbox": "Սպասում, մինչև նախորդ ավազարկղը դադարի",
       "detailRetryingSandboxCreation": "Ավազարկղի ստեղծման կրկնակի փորձ",
       "detailPreviousSnapshotFailed": "Նախորդ սնապշոտի գործարկումը ձախողվեց։ Կրկնակի փորձ առանց սնապշոտի։",
       "detailSnapshotStartupFailed": "Սնապշոտի գործարկումը ձախողվեց։ Կրկնակի փորձ առանց սնապշոտի։",
       "detailStartingSandboxWithoutSnapshot": "Ավազարկղի գործարկում առանց սնապշոտի",
       "detailSettingUpWorkspace": "Աշխատատարածքի կարգավորում",
-      "detailRestoringSession": "Սեսիայի վերականգնում",
+      "detailRestoringSession": "Նստաշրջանի վերականգնում",
       "detailWarmWorkspaceReused": "Ջերմ աշխատատարածքը վերաօգտագործվեց",
       "detailRetryingClone": "Կլոնավորման կրկնակի փորձ (փորձ {{attempt}}-ը {{total}}-ից)",
       "detailSetupCommandFailed": "Կարգավորման {{index}} հրամանը ձախողվեց",
       "detailSetupCommandTimedOut": "Կարգավորման {{index}} հրամանի ժամանակը սպառվեց",
       "detailColdRestore": "Սառը վերականգնում, սնապշոտը կիրառված է, վերականգնված ֆայլեր՝ {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% ավարտված է",
-      "detailRestoreIncompleteReport": "Սեսիայի վերականգնումն անավարտ է․ չվերականգնված ֆայլեր՝ {{skipped}} / {{total}} ({{reasons}})։",
+      "detailRestoreIncompleteReport": "Նստաշրջանի վերականգնումն անավարտ է․ չվերականգնված ֆայլեր՝ {{skipped}} / {{total}} ({{reasons}})։",
       "detailRestoreIncompleteMissing": "Բացակայում են՝ {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} և ևս {{omitted}}",
       "detailReasonPatchFailed": "patch-ը չկիրառվեց",
@@ -2640,7 +2640,7 @@
       "detailUnknown": "Դեռ նախապատրաստվում է",
       "errorPreparationTimeout": "Միջավայրի նախապատրաստման ժամանակը սպառվեց",
       "errorWorkspaceSetupFailed": "Աշխատատարածքի կարգավորումը ձախողվեց",
-      "errorCredentialUpgradeRequired": "Այս սեսիան չունի պահանջվող հավատարմագրի թարմացումը։ Շարունակելու համար սկսեք նոր սեսիա։",
+      "errorCredentialUpgradeRequired": "Այս նստաշրջանն չունի պահանջվող հավատարմագրի թարմացումը։ Շարունակելու համար սկսեք նոր նստաշրջան։",
       "errorAgentUnavailable": "Գործակալը անհասանելի դարձավ",
       "errorBillingBlocked": "Ավազարկղի վճարման համար լրացուցիչ կրեդիտներ են անհրաժեշտ",
       "errorBillingUnavailable": "Ավազարկղի վճարման կամ հզորության ստուգումը անհասանելի է։ Փորձեք կրկին շուտով։",
@@ -2912,7 +2912,7 @@
       "viewChanges": "Դիտել փոփոխությունները",
       "asOf": "{{time}}-ի դրությամբ",
       "tooLarge": "Փոփոխությունների ծավալը չափազանց մեծ է բջջային սարքում ցուցադրելու համար։",
-      "empty": "Այս սեսիայում դեռ ֆայլերի փոփոխություններ չկան։"
+      "empty": "Այս նստաշրջանում դեռ ֆայլերի փոփոխություններ չկան։"
     },
     "autoApprove": {
       "title": "Ավտոմատ հաստատում",
@@ -3235,7 +3235,7 @@
       "selectDescriptionWithOrganizations": "Դուք պատկանում եք մեկ կամ մի քանի կազմակերպությունների։ Ընտրեք այն հաշիվը, որը պետք է օգտագործի այս էկրանը։",
       "selectOrganization": "Ընտրել կազմակերպություն",
       "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Շարունակելու համար ձեր պրոֆիլում ընտրեք այլ կազմակերպություն։",
-      "unavailableSessionsDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Դրա սեսիաները հնարավոր չէ բեռնել։",
+      "unavailableSessionsDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Դրա նստաշրջանները հնարավոր չէ բեռնել։",
       "accessDeniedDescription": "Դուք այս կազմակերպություն մուտք գործելու իրավունք չունեք։"
     },
     "creditActivity": {
@@ -3830,7 +3830,7 @@
     "newProfile": "Նոր պրոֆիլ",
     "openHint": "Բացում է պրոֆիլը",
     "emptyTitle": "Դեռևս պրոֆիլներ չկան",
-    "emptyDescription": "Ստեղծեք պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները սեսիաներում կրկին օգտագործելու համար։",
+    "emptyDescription": "Ստեղծեք պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները նստաշրջաններում կրկին օգտագործելու համար։",
     "loadFailed": "Չհաջողվեց բեռնել պրոֆիլները",
     "counts": {
       "vars_one": "{{count}} փոփոխական",
@@ -4036,7 +4036,7 @@
       "unbindFailed": "Չհաջողվեց ապակապել պահոցը",
       "repoValue": "Պահոցը: {{name}}",
       "profileValue": "Պրոֆիլը: {{name}}",
-      "pickerEmptyDescriptionOrganization": "Ստեղծեք կազմակերպության պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները սեսիաներում կրկին օգտագործելու համար։",
+      "pickerEmptyDescriptionOrganization": "Ստեղծեք կազմակերպության պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները նստաշրջաններում կրկին օգտագործելու համար։",
       "pickerEmptyDescriptionOrganizationReadOnly": "Կազմակերպության սեփականատերը կամ ադմինիստրատորը կարող է ստեղծել կազմակերպության պրոֆիլ։"
     },
     "variablesDeleteFailed": "Չհաջողվեց ջնջել փոփոխականը",

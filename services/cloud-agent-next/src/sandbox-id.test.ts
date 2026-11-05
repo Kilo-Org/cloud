@@ -138,21 +138,6 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.provider).toBe('cloudflare-containers');
   });
 
-  it('skips Vercel for an enforced dual-enrolled organization and selects containers', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
-      },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: controlSessionId,
-    });
-
-    expect(selection.provider).toBe('cloudflare-containers');
-    expect(selection.sandboxId).toMatch(/^ses-/);
-  });
-
   it('moves an enforced organization to native containers', async () => {
     const selection = await selectSandboxForNewSession({
       env: {

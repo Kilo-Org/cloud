@@ -1777,6 +1777,28 @@ describe('worktree snapshot apply', () => {
         gzipSync(
           tarArchive([tarEntry('snapshot.json', manifestBytes({ capturedAt: 'not-a-time' }))])
         ),
+        gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ base: 'nope' }))])),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes({ deleted: ['same.txt', 'same.txt'] })),
+          ])
+        ),
+        gzipSync(
+          tarArchive([tarEntry('snapshot.json', manifestBytes({ deleted: ['../escape.txt'] }))])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry(
+              'snapshot.json',
+              manifestBytes({ omitted: [{ path: 'file.txt', reason: 'unknown' }] })
+            ),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes({ omitted: [{ path: 1, reason: 'symlink' }] })),
+          ])
+        ),
         Buffer.from('not a gzip stream'),
       ];
 

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
+import { z } from 'zod';
 import { createReadStream, createWriteStream } from 'node:fs';
 import {
   chmod,
@@ -57,25 +58,44 @@ const OMISSION_REASONS = [
   'unsafe_path',
   'inconsistent',
 ] as const;
-const OMISSION_REASON_SET: ReadonlySet<string> = new Set(OMISSION_REASONS);
 
-export type WorktreeSnapshotOmissionReason = (typeof OMISSION_REASONS)[number];
+const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
-export type WorktreeSnapshotOmission = {
-  path: string;
-  reason: WorktreeSnapshotOmissionReason;
-};
+const safeRelativePathSchema = z
+  .string()
+  .refine(isSafeRelativePath, { message: 'snapshot path is unsafe' });
+const displayPathSchema = z.string().refine(isDisplayPath, { message: 'snapshot path is invalid' });
+const omissionReasonSchema = z.enum(OMISSION_REASONS);
+const omissionSchema = z.object({
+  path: displayPathSchema,
+  reason: omissionReasonSchema,
+});
+const manifestSchema = z.object({
+  version: z.literal(WORKTREE_SNAPSHOT_VERSION),
+  worktreeId: z.string().min(1),
+  branch: z.string().nullable(),
+  base: z.string().regex(COMMIT_PATTERN),
+  capturedAt: z
+    .string()
+    .refine(value => CAPTURED_AT_PATTERN.test(value) && Number.isFinite(Date.parse(value)), {
+      message: 'snapshot capture time is invalid',
+    }),
+  deleted: z
+    .array(safeRelativePathSchema)
+    .max(MAX_WORKTREE_SNAPSHOT_FILES)
+    .refine(paths => new Set(paths).size === paths.length, {
+      message: 'snapshot deleted paths must be unique',
+    }),
+  omitted: z.array(omissionSchema).max(MAX_WORKTREE_SNAPSHOT_FILES),
+  partial: z.boolean(),
+});
 
-export type WorktreeSnapshotManifest = {
-  version: typeof WORKTREE_SNAPSHOT_VERSION;
-  worktreeId: string;
-  branch: string | null;
-  base: string;
-  capturedAt: string;
-  deleted: string[];
-  omitted: WorktreeSnapshotOmission[];
-  partial: boolean;
-};
+export type WorktreeSnapshotOmissionReason = z.infer<typeof omissionReasonSchema>;
+
+export type WorktreeSnapshotOmission = z.infer<typeof omissionSchema>;
+
+export type WorktreeSnapshotManifest = z.infer<typeof manifestSchema>;
 
 export type WorktreeSnapshotLimits = {
   files: number;
@@ -192,8 +212,6 @@ const GIT_PREFIX = [
   'core.quotepath=false',
 ];
 
-const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const GITLINK_MODE = '160000';
 const RECOVERY_PREFIX = 'recovery/';
 const RECOVERY_STAMP_PATTERN = /^[0-9A-Za-z._-]{1,256}$/;
@@ -1176,10 +1194,6 @@ function classifyArchiveMember(name: string): ArchiveMember {
   throw new InvalidWorktreeSnapshotError('snapshot archive contains an unexpected member');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function parseManifest(bytes: Buffer): WorktreeSnapshotManifest {
   let parsed: unknown;
   try {
@@ -1187,71 +1201,13 @@ function parseManifest(bytes: Buffer): WorktreeSnapshotManifest {
   } catch (error) {
     throw new InvalidWorktreeSnapshotError('snapshot manifest is not valid JSON', { cause: error });
   }
-  if (!isRecord(parsed)) throw new InvalidWorktreeSnapshotError('snapshot manifest is invalid');
-  if (parsed.version !== WORKTREE_SNAPSHOT_VERSION) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an unknown version');
+  const result = manifestSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new InvalidWorktreeSnapshotError('snapshot manifest is invalid', {
+      cause: result.error,
+    });
   }
-  if (typeof parsed.worktreeId !== 'string' || parsed.worktreeId.length === 0) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid worktree id');
-  }
-  if (parsed.branch !== null && typeof parsed.branch !== 'string') {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid branch');
-  }
-  if (typeof parsed.base !== 'string' || !COMMIT_PATTERN.test(parsed.base)) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid base commit');
-  }
-  if (
-    typeof parsed.capturedAt !== 'string' ||
-    !CAPTURED_AT_PATTERN.test(parsed.capturedAt) ||
-    !Number.isFinite(Date.parse(parsed.capturedAt))
-  ) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid capture time');
-  }
-  if (typeof parsed.partial !== 'boolean') {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid partial flag');
-  }
-  if (
-    !Array.isArray(parsed.deleted) ||
-    !Array.isArray(parsed.omitted) ||
-    parsed.deleted.length > MAX_WORKTREE_SNAPSHOT_FILES ||
-    parsed.omitted.length > MAX_WORKTREE_SNAPSHOT_FILES
-  ) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has invalid path lists');
-  }
-
-  const deleted = parsed.deleted.map(value => {
-    if (typeof value !== 'string' || !isSafeRelativePath(value)) {
-      throw new InvalidWorktreeSnapshotError('snapshot manifest has an unsafe deleted path');
-    }
-    return value;
-  });
-  if (new Set(deleted).size !== deleted.length) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has duplicate deleted paths');
-  }
-
-  const omitted = parsed.omitted.map(value => {
-    if (
-      !isRecord(value) ||
-      typeof value.path !== 'string' ||
-      !isDisplayPath(value.path) ||
-      typeof value.reason !== 'string' ||
-      !OMISSION_REASON_SET.has(value.reason)
-    ) {
-      throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid omission');
-    }
-    return { path: value.path, reason: value.reason as WorktreeSnapshotOmissionReason };
-  });
-
-  return {
-    version: WORKTREE_SNAPSHOT_VERSION,
-    worktreeId: parsed.worktreeId,
-    branch: parsed.branch,
-    base: parsed.base,
-    capturedAt: parsed.capturedAt,
-    deleted,
-    omitted,
-    partial: parsed.partial,
-  };
+  return result.data;
 }
 
 async function extractArchive(

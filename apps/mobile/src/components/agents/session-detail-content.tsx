@@ -330,6 +330,11 @@ export function SessionDetailContent({
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  // A failed row offers Retry only when this session can accept the re-send now.
+  // A read-only stored transcript has no transport send at all, and a remote
+  // session with no CLI owner cannot deliver; both used to fail inside the SDK
+  // and report transient connection trouble for a turn nobody re-sent.
+  const retryAvailable = !isReadOnly && canSend;
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
@@ -1334,6 +1339,13 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
+      // Read the live capability at tap time: a stale row could outlive the
+      // session's writability (a read-only transcript, or a remote session whose
+      // CLI owner went away) and the SDK would report the refusal as connection
+      // trouble for a prompt it never sent.
+      if (store.get(manager.atoms.isReadOnly) || !store.get(manager.atoms.canSend)) {
+        return;
+      }
       const target = resolveRetryTarget(message, messagesRef.current);
       if (target === null) {
         return;
@@ -1397,7 +1409,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId, store]
   );
 
   const handleCancelQueued = useCallback(
@@ -1584,6 +1596,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
@@ -1616,6 +1629,7 @@ export function SessionDetailContent({
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
+      retryAvailable,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,

@@ -2986,7 +2986,7 @@
     "viewProfile": "Դիտել պրոֆիլը",
     "signOutThisDevice": "Դուրս գալ այս սարքից",
     "signOutSessionLabel": "Դուրս գալ {{device}} սարքից, մուտք՝ {{signedIn}}",
-    "sessionSignedOut": "Նիստից դուրս եկաք։",
+    "sessionSignedOut": "Նստաշրջանից դուրս եկաք։",
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նստաշրջանից",
     "signOutThisSessionMessage": "{{device}} սարքը դուրս կգա հաշվից։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",

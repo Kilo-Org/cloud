@@ -1083,6 +1083,89 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it.each(['reload', 'reconnect'] as const)(
+      'keeps historical cancellation snapshots from interrupting a healthy session on %s',
+      connection => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        const cancelled = {
+          type: 'preparing' as const,
+          version: 2 as const,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'message-1',
+          revision: 2,
+          timestamp: 2_000,
+          step: 'failed' as const,
+          message: 'preparation_cancelled',
+          action: 'attempt_snapshot' as const,
+          attempt: {
+            id: 'attempt-1',
+            triggerMessageId: 'message-1',
+            status: 'failed' as const,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        };
+        const completed = {
+          ...cancelled,
+          attemptId: 'attempt-2',
+          triggerMessageId: 'message-2',
+          timestamp: 4_000,
+          step: 'ready' as const,
+          message: 'Environment prepared',
+          attempt: {
+            id: 'attempt-2',
+            triggerMessageId: 'message-2',
+            status: 'completed' as const,
+            startedAt: 3_000,
+            completedAt: 4_000,
+            revision: 2,
+          },
+        };
+        if (connection === 'reconnect') {
+          state.process(completed);
+          state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        }
+        state.process({
+          type: 'connected',
+          sessionStatus: { type: 'idle' },
+          cloudStatus: { type: 'ready' },
+        });
+        state.process(cancelled);
+        state.process(completed);
+        state.process({
+          ...cancelled,
+          action: 'step_snapshot',
+          stepId: 'phase:workspace_setup',
+          stepSnapshot: {
+            id: 'phase:workspace_setup',
+            key: 'workspace_setup',
+            kind: 'phase',
+            label: 'Workspace setup',
+            status: 'failed',
+            startedAt: 1_000,
+            completedAt: 2_000,
+            safeError: 'preparation_cancelled',
+            revision: 2,
+          },
+        });
+
+        expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+        expect(state.getStatus()).toEqual({ type: 'idle' });
+        expect(state.getPreparationAttempts()[0]).toMatchObject({
+          status: 'failed',
+          safeError: 'preparation_cancelled',
+          steps: [expect.objectContaining({ status: 'failed' })],
+        });
+        onError.mockClear();
+        state.process({ type: 'session.error', error: 'Current error' });
+        expect(onError).toHaveBeenCalledWith('Current error');
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'Current error' });
+      }
+    );
+
     it('keeps a workspace stop interrupted after the preparation failure arrives', () => {
       const state = createServiceState(makeConfig());
       state.process({

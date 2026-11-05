@@ -507,7 +507,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
           attempt.status === 'failed' &&
           isPreparationCancellation(attempt.safeError ?? event.message)
         ) {
-          settlePreparationCancellation();
+          if (event.action === 'attempt_failed' && attempt === preparationAttempts.at(-1)) {
+            settlePreparationCancellation();
+          }
         } else {
           cloudStatus =
             attempt.status === 'completed'

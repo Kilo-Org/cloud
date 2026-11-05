@@ -1136,6 +1136,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(await sandboxStub.status({ sessionId })).toEqual({
         sessionId,
         view: { state: 'failed', attemptId: expect.any(String), reason: 'workspace_setup_failed' },
+        workspacePreparing: false,
+        workspaceStopEpoch: 0,
+        workspaceStopAt: 0,
       });
     });
     // No prepare reaches the wrapper: the attempt failed before the frame.
@@ -1269,6 +1272,9 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
             attemptId: expect.any(String),
             reason: 'workspace_setup_failed',
           },
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
         });
       });
       return connected;
@@ -1322,6 +1328,9 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
             attemptId: expect.any(String),
             reason: 'workspace_setup_failed',
           },
+          workspacePreparing: false,
+          workspaceStopEpoch: 0,
+          workspaceStopAt: 0,
         });
       });
       return connected;

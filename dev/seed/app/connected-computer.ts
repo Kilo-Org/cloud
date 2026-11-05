@@ -42,7 +42,9 @@ function printUsage(): void {
   console.log('Only model/agent catalogs and synthetic directory listings are served.');
   console.log('All session creation, execution, and other commands are explicitly refused.');
   console.log(`Open ${DEEP_LINK}, select this computer, then choose a launch folder.`);
-  console.log('Directory results are synthetic; no filesystem browsing, remote execution, or inference occurs.');
+  console.log(
+    'Directory results are synthetic; no filesystem browsing, remote execution, or inference occurs.'
+  );
 }
 
 function localDatabase() {

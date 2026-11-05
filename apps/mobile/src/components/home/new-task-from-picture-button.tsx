@@ -98,12 +98,7 @@ export function NewTaskFromPictureButton({
           This button sits on the near-black page beside the filled primary, so
           there it takes the card surface instead: the same quiet step off the
           page the light scheme paints. */}
-      <Button
-        variant="secondary"
-        size="lg"
-        className="w-full dark:bg-card"
-        onPress={handlePress}
-      >
+      <Button variant="secondary" size="lg" className="w-full dark:bg-card" onPress={handlePress}>
         <Camera size={18} color={colors.secondaryForeground} />
         <Text className="shrink text-center font-semibold">{t('home.newTaskFromPicture')}</Text>
       </Button>

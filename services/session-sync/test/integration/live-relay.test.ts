@@ -548,6 +548,7 @@ it('evicts old finished receipts before admitting new commands, never queued pay
   const token = await fixture.ticket('controller');
   await runInDurableObject(fixture.stub, (_instance, state) => {
     const db = drizzle(state.storage);
+    const now = Date.now();
     for (let i = 0; i < LIVE_LIMITS.mailboxItems; i++) {
       db.insert(relayCommands)
         .values({
@@ -557,10 +558,10 @@ it('evicts old finished receipts before admitting new commands, never queued pay
           payload: i === 0 ? '{}' : null,
           bytes: i === 0 ? 2 : 0,
           live_only: false,
-          created_at: Date.now(),
-          expires_at: Date.now() + 60_000,
+          created_at: now,
+          expires_at: now + 60_000,
           status: i === 0 ? 'queued' : 'delivered',
-          finished_at: i === 0 ? null : Date.now() - i,
+          finished_at: i === 0 ? null : now - i,
         })
         .run();
     }

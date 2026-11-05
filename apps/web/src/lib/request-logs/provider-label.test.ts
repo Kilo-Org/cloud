@@ -21,9 +21,12 @@ describe('formatRequestLogProvider', () => {
     expect(formatRequestLogProvider('MEITUAN')).toBe('Meituan LongCat');
   });
 
-  test('title-cases an unknown inference provider', () => {
-    expect(formatRequestLogProvider('  acme labs  ')).toBe('Acme Labs');
-  });
+  test.each(['  acme labs  ', 'acme-labs', 'acme_labs', 'acme--__labs'])(
+    'title-cases the unknown inference provider %s with spaces',
+    inferenceProvider => {
+      expect(formatRequestLogProvider(inferenceProvider)).toBe('Acme Labs');
+    }
+  );
 
   test('does not treat Object.prototype names as known inference providers', () => {
     expect(formatRequestLogProvider('constructor')).toBe('Constructor');

@@ -18,6 +18,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   arceeai: 'Arcee AI',
   atlascloud: 'Atlas Cloud',
   bedrock: 'Amazon Bedrock',
+  boundless: 'Boundless',
   bytedance: 'ByteDance',
   dekallm: 'DekaLLM',
   deepinfra: 'DeepInfra',
@@ -41,6 +42,9 @@ const PROVIDER_NAMES: Record<string, string> = {
   openai: 'OpenAI',
   openinference: 'OpenInference',
   other: 'Other',
+  particle: 'Particle',
+  runinfra: 'RunInfra',
+  runware: 'Runware',
   sambanova: 'SambaNova',
   siliconflow: 'SiliconFlow',
   stealth: 'Stealth',
@@ -64,9 +68,10 @@ export function normalizePublicInferenceProvider(
   const normalizedKey = provider.toLowerCase().replace(/[^a-z0-9]/g, '');
   const key = PROVIDER_ALIASES[normalizedKey] ?? normalizedKey;
   const fallbackName = provider
+    .replace(/[-_]+/g, ' ')
     .trim()
     .toLowerCase()
-    .replace(/(^|[\s_-])\w/g, character => character.toUpperCase());
+    .replace(/(^|\s)\w/g, character => character.toUpperCase());
 
   return { key, name: PROVIDER_NAMES[key] ?? fallbackName };
 }

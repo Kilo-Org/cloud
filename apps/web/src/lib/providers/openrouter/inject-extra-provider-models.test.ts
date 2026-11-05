@@ -258,6 +258,9 @@ describe('injectVercelOnlyProviders', () => {
   test.each([
     ['meituan', 'Meituan LongCat'],
     ['deepinfra', 'DeepInfra'],
+    ['future-provider', 'Future Provider'],
+    ['future_provider', 'Future Provider'],
+    ['future--__provider', 'Future Provider'],
   ])('beautifies the synthesized provider %s', (providerId, displayName) => {
     const providerModelData = nvidiaProviderModelData();
     const vercelModels: Record<string, StoredModel> = {

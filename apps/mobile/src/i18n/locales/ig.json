@@ -2471,7 +2471,7 @@
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
       "matchesBadge_other": "ndakọrịta {{displayCount}}",
       "noOutput": "Enweghị mpụta.",
-      "translationFailed": "Ọsịsa agaghị"
+      "translationFailed": "Ntụgharị dara"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -2545,7 +2545,7 @@
       "cacheRead": "Ọgụgụ nchekwa nwa oge",
       "cacheWrite": "Ide na nchekwa nwa oge",
       "total": "Ngụkọta",
-      "reportAiResponseFailedRetryable": "Enweghị ike ịkọ nzaghachi a.",
+      "reportAiResponseFailedRetryable": "Ịkọ nzaghachi a dara.",
       "reportAiResponseFailedTerminal": "Enweghị ike ịkọ nzaghachi a."
     },
     "modelCost": {
@@ -2939,8 +2939,8 @@
     },
     "prBadge": {
       "open": "meghe arịrịọ ijikọ koodu",
-      "closed": "arịrịọ njikọta koodu emechiri",
-      "merged": "arịrịọ njikọta koodu ejikọtara",
+      "closed": "arịrịọ ijikọ koodu emechiri",
+      "merged": "arịrịọ ijikọ koodu ejikọtara",
       "draft": "arịrịọ ijikọ koodu nke mbido",
       "updating": "Na-emelite, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"

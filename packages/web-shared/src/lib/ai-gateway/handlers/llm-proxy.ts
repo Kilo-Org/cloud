@@ -13,6 +13,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import {
   findCustomLlm,
   isPublicCustomLlm,
@@ -28,6 +29,7 @@ import {
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
+  creditsBlockedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -64,7 +66,10 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
-import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  resolveEnkryptInputGuardrail,
+  resolveEnkryptOutputGuardrail,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
@@ -219,24 +224,52 @@ export async function handleLlmProxyRequest(
 
   const headers = readLlmProxyHeaders(request);
 
-  // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
-  // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
-  // never awaited.
+  const [guardrailCaller, guardrailAccount] = await Promise.all([
+    callerPromise,
+    balanceAndSettingsPromise,
+  ]);
+  const inputGuardrailConfig =
+    guardrailCaller.kind === 'signed-in' && guardrailCaller.organizationId
+      ? resolveEnkryptInputGuardrail(guardrailCaller.organizationId, guardrailAccount.settings)
+      : null;
+  if (
+    guardrailCaller.kind === 'signed-in' &&
+    guardrailCaller.organizationId &&
+    (inputGuardrailConfig ||
+      resolveEnkryptOutputGuardrail(guardrailCaller.organizationId, guardrailAccount.settings))
+  ) {
+    const { payer } = guardrailAccount;
+    const organizationBalance = payer
+      ? fromMicrodollars(payer.totalMicrodollarsAcquired - payer.microdollarsUsed)
+      : 0;
+    if (organizationBalance <= 0) {
+      return creditsBlockedResponse({
+        user: guardrailCaller.user,
+        organizationId: guardrailCaller.organizationId,
+        balance: organizationBalance,
+      });
+    }
+  }
+
   const enkryptGuardrail = startEnkryptInputGuardrail(
-    Promise.all([callerPromise, balanceAndSettingsPromise]).then(([caller, { settings }]) => {
-      if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-      const config = resolveEnkryptInputGuardrail(caller.organizationId, settings);
-      if (!config) return null;
+    Promise.resolve().then(() => {
+      if (
+        guardrailCaller.kind !== 'signed-in' ||
+        !guardrailCaller.organizationId ||
+        !inputGuardrailConfig
+      ) {
+        return null;
+      }
       return {
         sessionId: headers.sessionId,
-        organizationId: caller.organizationId,
-        kiloUserId: caller.user.id,
+        organizationId: guardrailCaller.organizationId,
+        kiloUserId: guardrailCaller.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId: headers.clientRequestId,
         segments: extractRequestSegments(requestBodyParsed, {
-          includeToolResults: config.scanToolResults,
+          includeToolResults: inputGuardrailConfig.scanToolResults,
         }),
-        config,
+        config: inputGuardrailConfig,
       };
     }),
     request.signal

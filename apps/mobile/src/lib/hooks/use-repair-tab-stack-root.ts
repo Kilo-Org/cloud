@@ -2,7 +2,7 @@ import { type NativeStackNavigationProp } from 'expo-router';
 import { type ParamListBase } from 'expo-router/react-navigation';
 import { useEffect } from 'react';
 
-import { tabStackRootRepair } from '@/lib/tab-stack-root-repair';
+import { TAB_STACK_ROOT_ROUTE_NAME, tabStackRootRepair } from '@/lib/tab-stack-root-repair';
 
 /**
  * The states this repair already acted on.
@@ -54,6 +54,12 @@ export function useRepairTabStackRoot(navigation: TabStackNavigation | undefined
     const repair = () => {
       const state = navigation.getState();
       if (repairedStates.has(state)) {
+        return;
+      }
+      // A Stack that does not register the root route rejects the reset, and
+      // remembering that state would stop the repair from ever trying again.
+      // Only a Stack that declares its root can take the insertion.
+      if (!state.routeNames.includes(TAB_STACK_ROOT_ROUTE_NAME)) {
         return;
       }
       const repaired = tabStackRootRepair(state);

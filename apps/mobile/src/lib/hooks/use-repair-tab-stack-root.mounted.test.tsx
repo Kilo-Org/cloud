@@ -6,7 +6,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { type TabStackNavigation, useRepairTabStackRoot } from './use-repair-tab-stack-root';
 
 type Route = { name: string; key: string; params?: object };
-type State = { index: number; routes: Route[] };
+/** A state the harness accepts; `routeNames` defaults to every route it holds. */
+type State = { index: number; routes: Route[]; routeNames?: string[] };
 
 /** The fake tab Stack the repair reads, dispatches into, and listens to. */
 type NavigationHarness = {
@@ -24,12 +25,17 @@ type NavigationHarness = {
  * listeners), and the listener the repair subscribes.
  */
 function createNavigation(initial: State): NavigationHarness {
-  let state = initial;
+  // A Stack always declares its route names; every state below is one of a
+  // Stack that declares the tab root, which is what a tab layout does.
+  let state: State = {
+    ...initial,
+    routeNames: initial.routeNames ?? ['index', ...initial.routes.map(r => r.name)],
+  };
   const listeners = new Set<() => void>();
   const resets: State[] = [];
 
   const commit = (next: State) => {
-    state = next;
+    state = { ...next, routeNames: next.routeNames ?? state.routeNames };
     for (const listener of listeners) {
       listener();
     }
@@ -90,7 +96,7 @@ describe('useRepairTabStackRoot', () => {
     expect(harness.resets).toHaveLength(1);
     // The inserted root is keyless: the reset action mints its key from the
     // state's own sequence, which is the chain the tab's screens derive from.
-    expect(harness.state()).toEqual({
+    expect(harness.state()).toMatchObject({
       index: 1,
       routes: [
         { key: '', name: 'index', params: {} },
@@ -143,15 +149,44 @@ describe('useRepairTabStackRoot', () => {
     // A link delivered later replaces the focused route with a fresh
     // destination, which leaves the subpage as the Stack's only route.
     act(() => {
-      harness.deliver({ index: 0, routes: [{ name: 'history', key: 'history' }] });
+      harness.deliver({
+        index: 0,
+        routeNames: ['index', 'history'],
+        routes: [{ name: 'history', key: 'history' }],
+      });
     });
 
-    expect(harness.state()).toEqual({
+    expect(harness.state()).toMatchObject({
       index: 1,
       routes: [
         { key: '', name: 'index', params: {} },
         { name: 'history', key: 'history' },
       ],
     });
+  });
+
+  it('does not spend the repair on a Stack that declares no root route', () => {
+    // The reset would be rejected for a route the Stack does not declare, and
+    // remembering that state would stop the repair from ever trying again.
+    const harness = createNavigation({ index: 0, routes: [{ name: 'history', key: 'history' }] });
+    harness.deliver({
+      index: 0,
+      routeNames: ['history'],
+      routes: [{ name: 'history', key: 'history' }],
+    });
+    mount(harness);
+
+    expect(harness.resets).toHaveLength(0);
+
+    // Once the Stack declares its root, the same screen is repaired.
+    act(() => {
+      harness.deliver({
+        index: 0,
+        routeNames: ['index', 'history'],
+        routes: [{ name: 'history', key: 'history' }],
+      });
+    });
+
+    expect(harness.resets).toHaveLength(1);
   });
 });

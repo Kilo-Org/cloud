@@ -64,7 +64,7 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
-import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
 import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   parseLlmProxyRequest,
@@ -218,27 +218,30 @@ export async function handleLlmProxyRequest(
   void organizationGroupPolicyPromise.catch(() => {});
 
   const headers = readLlmProxyHeaders(request);
+  const usageId = randomUUID();
 
-  // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
-  // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
-  // never awaited.
+  const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
+    ([caller, account]) => admitEnkryptGuardrail(caller, account)
+  );
+  if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
+
+  // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
+  // awaited just before the upstream call; log-only detectors are never awaited. Segments are
+  // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
-    Promise.all([callerPromise, balanceAndSettingsPromise]).then(([caller, { settings }]) => {
-      if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-      const config = resolveEnkryptInputGuardrail(caller.organizationId, settings);
-      if (!config) return null;
-      return {
-        sessionId: headers.sessionId,
-        organizationId: caller.organizationId,
-        kiloUserId: caller.user.id,
-        apiKind: requestBodyParsed.kind,
-        clientRequestId: headers.clientRequestId,
-        segments: extractRequestSegments(requestBodyParsed, {
-          includeToolResults: config.scanToolResults,
-        }),
-        config,
-      };
-    }),
+    Promise.resolve(enkryptAdmission.inputGuardrail).then(
+      inputGuardrail =>
+        inputGuardrail && {
+          ...inputGuardrail,
+          sessionId: headers.sessionId,
+          microdollarUsageId: usageId,
+          apiKind: requestBodyParsed.kind,
+          clientRequestId: headers.clientRequestId,
+          segments: extractRequestSegments(requestBodyParsed, {
+            includeToolResults: inputGuardrail.config.scanToolResults,
+          }),
+        }
+    ),
     request.signal
   );
 
@@ -368,7 +371,6 @@ export async function handleLlmProxyRequest(
   const autoModel = modelResolution.kind === 'routed' ? modelResolution.autoModel : null;
 
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
-  const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
   providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerPolicy = await resolveProviderAndPolicy({
@@ -448,6 +450,7 @@ export async function handleLlmProxyRequest(
     session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
+    enkrypt: enkryptGuardrail.requestLogs,
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
@@ -515,6 +518,7 @@ export async function handleLlmProxyRequest(
         ? resolveEnkryptOutputScan(
             {
               sessionId: usageContext.session_id,
+              microdollarUsageId: usageId,
               organizationId,
               kiloUserId: user.id,
               apiKind: requestBodyParsed.kind,

@@ -103,9 +103,9 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
   # @types/bun is DefinitelyTyped only: types, no runtime code, no install scripts.
-  # The wrapper and gastown dev types must equal the Bun the sandbox runs, which
-  # sandbox-image-versions.test.ts asserts. Bun 1.4.4 is the first release that
-  # rejects the compromised eMudhra chains, so the pair moves before the window.
+  # The wrapper and gastown dev types must equal the Bun the sandbox runs. Bun
+  # 1.4.4 is the first release that rejects the compromised eMudhra chains, so
+  # the pair moves before the window.
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
@@ -323,7 +323,7 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@58.0.11: patches/expo-task-manager@58.0.11.patch
+  expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
   expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
@@ -346,10 +346,6 @@ patchedDependencies:
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
   react-native@0.88.0: patches/react-native@0.88.0.patch
-  # Android: read the live entry of the unique work chain, not the first one.
-  # A finished first entry made a cold start re-enqueue with REPLACE, which
-  # cancelled the glanceable refresh run in progress.
-  expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.
   react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch

@@ -842,11 +842,13 @@ describe('processRemediationAttempt blocked-path settle', () => {
       transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
           update: vi.fn(() => ({
-            set: vi.fn(() => ({
-              where: vi.fn(() => ({
-                then: (resolve: (value: unknown) => void) => resolve([]),
-              })),
-            })),
+            set: vi.fn(() => {
+              const updateResult = {
+                then: (resolve: (value: unknown) => void) => resolve([{ id: attempt.id }]),
+                returning: vi.fn(() => Promise.resolve([{ id: attempt.id }])),
+              };
+              return { where: vi.fn(() => updateResult) };
+            }),
           })),
         };
         return cb(tx);
@@ -904,9 +906,13 @@ function ledgerCapturingDb(params: {
   }));
   const tx = {
     update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve()),
-      })),
+      set: vi.fn(() => {
+        const updateResult = {
+          then: (resolve: (value: unknown) => void) => resolve([{ id: ATTEMPT_ID }]),
+          returning: vi.fn(() => Promise.resolve([{ id: ATTEMPT_ID }])),
+        };
+        return { where: vi.fn(() => updateResult) };
+      }),
     })),
   };
   const transaction = vi.fn(async (cb: (t: typeof tx) => Promise<unknown>) => cb(tx));
@@ -1152,7 +1158,7 @@ describe('processRemediationAttempt pre-initiation cancellation settle', () => {
       dispatchId: 'dispatch-1',
     });
 
-    expect(result).toBe('launched');
+    expect(result).toBe('skipped');
     expect(settleOperation).toHaveBeenCalledWith(
       expect.anything(),
       settleCallMatcher('interrupted')

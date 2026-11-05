@@ -1,6 +1,5 @@
 import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { toast } from 'sonner-native';
 
@@ -57,6 +56,23 @@ type VoiceInputActionsConfig = {
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
   getUserId: () => string | undefined;
+  openTranscriptionModelPicker: () => void;
+};
+
+/**
+ * Navigation the feedback alert needs, supplied by the surface that owns the
+ * voice input.
+ *
+ * An alert outlives the render that raised it, so its action button must not
+ * reach for the module-level `router` from `expo-router`. That object is a
+ * shell that the navigation container rebinds when it mounts and unbinds to a
+ * throwing stub when it unmounts, so a press after an Activity recreation can
+ * throw while the bridge is between roots. A router taken from `useRouter()`
+ * instead belongs to the root that rendered this surface, so a press from a
+ * surface that is gone writes into that gone root and opens nothing.
+ */
+type VoiceInputFeedbackNavigation = {
+  openTranscriptionModelPicker: () => void;
 };
 
 function announceVoiceInputListening(): void {
@@ -114,7 +130,10 @@ export function subscribeVoiceInputFeedback(
   };
 }
 
-export function showFeedback(feedback: VoiceInputFeedback): void {
+export function showFeedback(
+  feedback: VoiceInputFeedback,
+  navigation: VoiceInputFeedbackNavigation
+): void {
   publishVoiceInputFeedback(feedback);
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
@@ -128,9 +147,7 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
           { text: i18n.t('common.cancel'), style: 'cancel' },
           {
             text: presentation.actionLabel,
-            onPress: () => {
-              router.push('/(app)/transcription-model-picker');
-            },
+            onPress: navigation.openTranscriptionModelPicker,
           },
         ],
         // Android back dismisses, which equals Cancel: nothing opens.
@@ -173,7 +190,12 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     getOnDraftChange,
     getOwner,
     getUserId,
+    openTranscriptionModelPicker,
   } = config;
+
+  // One navigation channel for every message this owner raises, so an alert's
+  // action button and the engine's own feedback reach the same root.
+  const feedbackNavigation: VoiceInputFeedbackNavigation = { openTranscriptionModelPicker };
 
   const abort = async (): Promise<boolean> => {
     const result = await controller.abort(getOwner());
@@ -221,7 +243,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       // The microphone stays in place while the recognizer is unavailable, so
       // the tap is the one place the reason can be given: say what is wrong
       // instead of raising a consent question a start could not honour.
-      showFeedback(classifyVoiceInputError('service-not-allowed'));
+      showFeedback(classifyVoiceInputError('service-not-allowed'), feedbackNavigation);
       return;
     }
 
@@ -241,7 +263,9 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
         baseDraft: getDraft(),
         languageTag,
         onDraftChange: getOnDraftChange(),
-        onFeedback: showFeedback,
+        onFeedback: feedback => {
+          showFeedback(feedback, feedbackNavigation);
+        },
         owner,
         requiresOnDeviceRecognition,
       };

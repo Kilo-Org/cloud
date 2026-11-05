@@ -93,6 +93,7 @@ const mockSession = {
   dismissSuggestion: jest.fn(),
   retryRemoteModels: jest.fn(),
   retryRemoteCommands: jest.fn(),
+  observeProjected: jest.fn(),
   createRemoteSession: jest.fn(),
   exitRemoteSession: jest.fn(() => Promise.resolve()),
   canSend: true,

@@ -179,7 +179,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
-- Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
+- Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 - A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
 - Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.
@@ -261,6 +261,10 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
 
 ## Chat tab
 

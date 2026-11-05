@@ -206,17 +206,20 @@ type NewSessionStartBlockedReasonInput = {
  * A repository reason is only ever emitted when re-evaluating the entry's own
  * gate with a synthetic selected/resolved repository makes Start ENABLED — i.e.
  * the missing repository is the blocker. If the gate is still disabled with
- * that synthetic selection, some other precondition (empty prompt,
- * uploading/failed attachment, loading profile, creating/submitting, empty or
- * unavailable model) owns the blocker, and the repository is not it. Provider
- * connect state and repository count stay separate, exactly like the
- * extension's `submitBlockedReason` separates `integrationInstalled` from
- * `repoCount`: a `connected-empty`, `error`, or `repos` group never reads as
- * "connect a provider".
+ * that synthetic selection, some other precondition (uploading or failed
+ * attachment, loading profile, creating/submitting, empty or unavailable model)
+ * owns the blocker, and the repository is not it. Provider connect state and
+ * repository count stay separate, exactly like the extension's
+ * `submitBlockedReason` separates `integrationInstalled` from `repoCount`: a
+ * `connected-empty`, `error`, or `repos` group never reads as "connect a
+ * provider".
  *
- * Once every other precondition is satisfied, an empty composer is named
- * instead, because a disabled Start with no explanation is a dead end: Cloud
- * Agent needs prompt text, and a remote CLI needs a prompt or a file.
+ * The empty composer never hides that blocker, because the form opens empty:
+ * with nothing typed and no repository selected the footer names the
+ * repository/provider step, with its action. Once a repository is selected, an
+ * empty composer is named instead, because a disabled Start with no
+ * explanation is a dead end: Cloud Agent needs prompt text, and a remote CLI
+ * needs a prompt or a file.
  */
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput
@@ -267,6 +270,12 @@ export function resolveNewSessionStartBlockedReason(
     input.entry === 'new-session'
       ? resolveNewSessionStartDisabled({
           ...input.gate,
+          // An empty composer is itself a blocker, so it must not decide this
+          // question: the form opens with it empty, and a repository the user
+          // still has to pick or connect is the blocker they can act on. Only
+          // the other preconditions (attachment state, model, create/submit,
+          // profile) own the blocker here.
+          hasPrompt: true,
           selectedRepo: SYNTHETIC_REPOSITORY_KEY,
           selectedRepositoryResolved: true,
         })

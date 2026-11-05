@@ -4027,6 +4027,11 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
         "keyIds": {
           "minItems": 1,
           "maxItems": 100,
@@ -4045,9 +4050,10 @@
     "tags": [
       "byok",
       "reorder",
+      "organizationid",
       "keyids"
     ],
-    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder keyids keyIds"
+    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder organizationid keyids organizationId keyIds"
   },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",
@@ -6516,6 +6522,48 @@
       "cloudagentsessionid"
     ],
     "searchBlob": "cloudAgentNext.getSession Retrieve the current status and details of a cloud agent session. cloudagentnext getsession cloudagentsessionid cloudAgentSessionId"
+  },
+  "cloudAgentNext.getSessionMessagesPage": {
+    "path": "cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
   },
   "cloudAgentNext.getWorktreeChanges": {
     "path": "cloudAgentNext.getWorktreeChanges",
@@ -9100,6 +9148,15 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
@@ -9152,12 +9209,13 @@
       "plainvars",
       "secrets",
       "commands",
+      "startcommands",
       "sandboxallocation",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -9496,6 +9554,15 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
@@ -9548,12 +9615,13 @@
       "plainvars",
       "secrets",
       "commands",
+      "startcommands",
       "sandboxallocation",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -17710,6 +17778,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getSession Get details of an organization cloud agent session by session ID. organizations cloudagentnext getsession organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
+  "organizations.cloudAgentNext.getSessionMessagesPage": {
+    "path": "organizations.cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+  },
   "organizations.cloudAgentNext.getWorktreeChanges": {
     "path": "organizations.cloudAgentNext.getWorktreeChanges",
     "kind": "query",
@@ -25112,6 +25230,20 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "modelPrefix": {
+          "type": "string",
+          "maxLength": 200
         }
       },
       "required": [
@@ -25122,9 +25254,12 @@
       "organizations",
       "requestlogs",
       "list",
-      "organizationid"
+      "organizationid",
+      "starttime",
+      "userid",
+      "modelprefix"
     ],
-    "searchBlob": "organizations.requestLogs.list List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first. organizations requestlogs list organizationid organizationId"
+    "searchBlob": "organizations.requestLogs.list List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first. organizations requestlogs list organizationid starttime userid modelprefix organizationId startTime userId modelPrefix"
   },
   "organizations.requestLogs.listEnkryptUsage": {
     "path": "organizations.requestLogs.listEnkryptUsage",

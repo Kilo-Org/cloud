@@ -25,6 +25,7 @@ import {
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
+import { manifestPath, readManifest, type Manifest, type ManifestEntry } from './manifest';
 import { currentComposeProject, syncInfraEnv } from './infra-env';
 import { syncEnvVars } from './env-sync';
 import { getWranglerRegistryPath } from './wrangler-registry';
@@ -1000,20 +1001,6 @@ type StatusEntry = {
   group: string;
 };
 
-type ManifestEntry = {
-  name: string;
-  port: number;
-  group: string;
-  type: string;
-};
-
-type Manifest = {
-  session: string;
-  portOffset: number;
-  wranglerRegistryPath: string;
-  services: ManifestEntry[];
-};
-
 function writeManifest(
   repoRoot: string,
   sessionName: string,
@@ -1030,25 +1017,7 @@ function writeManifest(
       return { name, port, group: svc.group, type: svc.type };
     }),
   };
-  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-}
-
-function readManifest(repoRoot: string): Manifest | undefined {
-  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
-  try {
-    const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-    if (
-      typeof raw?.session !== 'string' ||
-      typeof raw?.portOffset !== 'number' ||
-      !Array.isArray(raw?.services)
-    ) {
-      return undefined;
-    }
-    return raw;
-  } catch {
-    return undefined;
-  }
+  fs.writeFileSync(manifestPath(repoRoot), JSON.stringify(manifest, null, 2));
 }
 
 async function missingRunningServices(

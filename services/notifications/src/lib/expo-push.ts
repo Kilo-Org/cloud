@@ -1,7 +1,19 @@
 import Expo from 'expo-server-sdk';
-import type { ExpoPushMessage, ExpoPushReceipt } from 'expo-server-sdk';
+import type { ExpoPushMessage as ExpoServerPushMessage, ExpoPushReceipt } from 'expo-server-sdk';
 
-export type { ExpoPushMessage } from 'expo-server-sdk';
+export type { ExpoPushReceipt } from 'expo-server-sdk';
+
+/**
+ * The Expo push message plus the iOS thread field the Push API accepts.
+ *
+ * `expo-server-sdk@6.1.0` omits `threadId` from its `ExpoPushMessage` type, but
+ * `sendPushNotificationsAsync` posts the message array verbatim
+ * (`JSON.stringify(options.body)`), so the documented iOS field reaches Expo
+ * without an SDK upgrade. The Expo Push API documents `threadId` as
+ * iOS-only: notifications that share it are stacked into one group and none is
+ * replaced, and it maps to `aps.thread-id`. Android ignores it.
+ */
+export type ExpoPushMessage = ExpoServerPushMessage & { threadId?: string };
 
 export type TicketTokenPair = {
   ticketId: string;

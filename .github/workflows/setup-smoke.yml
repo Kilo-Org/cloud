@@ -108,8 +108,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
 
-      - name: Install Playwright browsers
-        run: pnpm --filter web exec playwright install --with-deps chromium
+      # No --with-deps: the runner image already ships the Chromium system
+      # libraries, and the apt-get behind --with-deps can hang until the job
+      # timeout when the fleet's apt egress degrades.
+      - name: Install Playwright Chromium
+        run: pnpm --filter web exec playwright install chromium
 
       - name: Start dev stack
         run: pnpm dev:start --no-attach

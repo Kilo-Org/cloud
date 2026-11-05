@@ -13,7 +13,8 @@ The independent phase sampling described in the service README under
 outcomes; it does not gate the diagnostics above.
 
 These records are emitted for 100% of valid publisher requests and deliveries in
-every environment, including production. That is more log volume than the
+every environment, including production, except `usage_ingest_enqueue_observed`,
+which is best effort because its promise is only kept alive by `waitUntil()`. That is more log volume than the
 previous production publisher path, which logged only sampled, slow, or failed
 sends. There is no runtime flag to reduce it; any reduction requires a code change
 or an explicit Workers Logs sampling configuration.
@@ -22,6 +23,8 @@ or an explicit Workers Logs sampling configuration.
 |---|---|
 | `usage_ingest_enqueue_start` | Validated `usage_id`, `publisher_entry_at_ms`, `before_send_at_ms`; emitted before the existing single send |
 | `usage_ingest_enqueue` | Validated `usage_id`, `accepted` / `unavailable` outcome, `after_send_at_ms`, monotonic `send_duration_ms`; accepted sends also repeat entry/before times and expose valid optional returned `queue_backlog_count`, `queue_backlog_bytes`, `queue_oldest_message_at_ms` |
+| `usage_ingest_enqueue_observed` | Validated `usage_id`, `accepted` (`info`) / `unavailable` (`warn`) outcome and monotonic `send_duration_ms` for the same single send, logged from a promise registered with `ExecutionContext.waitUntil` before that send is awaited; intended to survive a client abort or disconnect while the send is still pending |
+| `usage_ingest_enqueue_observation_unregistered` | `warn` with the validated `usage_id` only, when `ExecutionContext.waitUntil` throws while registering the observation; no exception text |
 | `usage_ingest_handler_entry` | `queue`, local invocation `batch_id`, actual `batch_size`, handler entry and per-message start epochs, queue message ID/timestamp, attempts, validated usage ID/event timestamp, optional batch backlog sample; emitted before that message's writer call |
 | `usage_ingest_processing` | Existing per-message writer duration/outcome/disposition plus `queue`, the same batch identity and handler entry |
 
@@ -42,6 +45,18 @@ shape is verified. No per-event `metrics()` call is added. Diagnostic formatting
 metadata and log-sink errors cannot convert an accepted send to a 503, republish,
 or change the processing outcome log's ACK/retry disposition. The shared writer's
 existing response validation and overload failure still determine disposition.
+
+The completion observation registers before the original send's first `await` and
+attaches both a fulfilment and a rejection handler, so it cannot leave an unhandled
+rejection, cannot observe a different or second send, and cannot replace the
+awaited send's response or failure. A `waitUntil` registration error does not
+break a send that has already started: it logs `usage_ingest_enqueue_observation_unregistered`
+and the send continues to determine the response. The observation only
+covers time after the response or disconnect while Cloudflare keeps the invocation
+alive, up to the shared 30 s `waitUntil` allowance; a hard kill, platform timeout,
+or a longer stall can drop it. It describes queue acceptance, not a committed
+ledger row, and no hosted disconnect, production deployment or lifecycle-bound
+measurement has been performed.
 
 ## Staging smoke gate (separate authorization and deployment)
 

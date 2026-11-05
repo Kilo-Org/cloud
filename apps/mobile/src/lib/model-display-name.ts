@@ -21,6 +21,21 @@ export function formatShortModelDisplayName(name: string): string {
 type NamedModel = { readonly id: string; readonly name: string };
 
 /**
+ * The name a raw model reference is shown as when the catalog does not carry
+ * it: its last path segment, without the `~` latest-alias marker and with
+ * hyphens as spaces.
+ *
+ * - `"deepseek/deepseek-v4.1-flash-1017"` → `"deepseek v4.1 flash 1017"`
+ * - `"~deepseek/deepseek-v4-flash-latest"` → `"deepseek v4 flash latest"`
+ * - `"custom-model-id"` → `"custom model id"`
+ */
+export function formatModelReferenceName(reference: string): string {
+  const segment = reference.slice(reference.lastIndexOf('/') + 1).replace(/^~/, '');
+  const words = segment.replaceAll(/-+/g, ' ').trim();
+  return words === '' ? reference : words;
+}
+
+/**
  * The name a model reference is shown as, resolved through the catalog the
  * matching picker reads (`useAvailableModels`).
  *
@@ -37,6 +52,5 @@ export function resolveCatalogModelName(model: string, catalog: readonly NamedMo
     return option.name;
   }
   const reference = formatShortModelDisplayName(model);
-  const segment = reference.slice(reference.lastIndexOf('/') + 1).replace(/^~/, '');
-  return segment.replaceAll(/-+/g, ' ').trim() || reference;
+  return formatModelReferenceName(reference) || reference;
 }

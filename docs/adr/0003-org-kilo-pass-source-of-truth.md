@@ -203,3 +203,11 @@ Transactional unlock makes bonus available immediately after base-threshold cons
 Period-bounded eligibility prevents one later spend event from satisfying multiple monthly thresholds and avoids maintaining a queue of old locked bonuses.
 
 Implementation adds new schema and routing rather than reusing existing personal Kilo Pass tables directly. Integration code must bridge org agreements to seat billing, credit grants, usage attribution, and admin UI.
+
+## Addendum: Self-serve tier changes
+
+An owner or billing manager can upgrade a self-serve, monthly agreement to a higher tier. Downgrades and yearly agreements are refused. The change is recorded on the agreement as `next_term_version_id` and `next_term_effective_at`, and Stripe swaps only the pass price on the seat subscription at its next renewal through an owned subscription schedule (`kilo-pass-org-tier-change`). Scheduling does not charge the organization; the upgraded pass price is billed at renewal. The seat item, quantities, collection method, tax, and discount settings are carried over, so invoice-billed organizations keep their terms.
+
+The agreement moves to the new standard term version only when the paid invoice for the period starting at the effective boundary bills the target tier's price. A renewal that bills another tier drops the pending change and keeps the current terms, and an older invoice paid late never rewrites them.
+
+Only self-serve agreements billed as a seat add-on can change tier. Manual, legacy, and enterprise-contract agreements have no Stripe item to reprice, so their tier stays a contractual change made by the account team. A change is also refused while cancellation is pending, while payment is under review, and before first payment. Cancelling the pass releases a pending change first, a seat quantity update releases and re-creates the schedule with the new quantities, and a seat update that cannot re-create it drops the pending change.

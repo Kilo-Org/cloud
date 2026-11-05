@@ -48,3 +48,14 @@ export type OrgKiloPassCondition = {
   onAction?: () => void;
   actionBusy?: boolean;
 };
+
+/** Plan change controls for an organization's Kilo Pass, shown on the detail view. */
+export type OrgKiloPassTierChange = {
+  currentTier: OrgKiloPassTier;
+  availableTerms: OrgKiloPassTerms[];
+  /** Why the tier cannot change now; absent when the change is allowed. */
+  blockedReason?: string;
+  pending?: { terms: OrgKiloPassTerms; effectiveAt: string };
+  onChangeTier: (tier: OrgKiloPassTier) => void;
+  onCancelPendingChange: () => void;
+};

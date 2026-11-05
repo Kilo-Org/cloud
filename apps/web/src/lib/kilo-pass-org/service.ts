@@ -138,6 +138,13 @@ export type OrganizationKiloPassService = {
       passCount: number;
       kind: 'parent' | 'child';
     }[];
+    pendingTierChange: {
+      tier: Tier;
+      terms: DisplayTerms;
+      effectiveAt: string;
+    } | null;
+    tierChangeBlockedReason: string | null;
+    availableTierTerms: DisplayTerms[];
   }>;
   getUsage(input: { organizationId: string }): Promise<{
     tier: Tier;
@@ -182,6 +189,14 @@ export type OrganizationKiloPassService = {
     runId: string;
     window: { startsAt: string; endsAt: string };
   }>;
+  scheduleTierChange(
+    input: { organizationId: string; actorUserId: string; tier: Tier },
+    scheduleProviderTierChange: OrganizationKiloPassProviderOperations['scheduleTierChange']
+  ): Promise<{ tier: Tier; effectiveAt: string }>;
+  cancelTierChange(
+    input: { organizationId: string; actorUserId: string },
+    releaseProviderTierChange: OrganizationKiloPassProviderOperations['releaseTierChange']
+  ): Promise<{ cancelled: true }>;
 };
 
 /** Stripe-facing operations are supplied by the application boundary. */
@@ -205,7 +220,104 @@ export type OrganizationKiloPassProviderOperations = {
     providerSeatAddOnItemId: string;
     organizationId: string;
   }): Promise<void>;
+  scheduleTierChange(input: {
+    providerSubscriptionId: string;
+    providerSeatAddOnItemId: string;
+    agreementId: string;
+    organizationId: string;
+    targetTier: KiloPassTier;
+    cadence: KiloPassCadence;
+  }): Promise<{ effectiveAt: Date }>;
+  releaseTierChange(input: {
+    providerSubscriptionId: string;
+    organizationId: string;
+  }): Promise<void>;
 };
+
+export type OrganizationKiloPassTierChangeBlockReason =
+  | 'manual_agreement'
+  | 'no_provider_subscription'
+  | 'not_active'
+  | 'cancellation_pending'
+  | 'ended'
+  | 'payment_review'
+  | 'yearly_cadence'
+  | 'downgrade'
+  | 'same_tier';
+
+export class OrganizationKiloPassTierChangeBlockedError extends Error {
+  readonly reason: OrganizationKiloPassTierChangeBlockReason;
+
+  constructor(reason: OrganizationKiloPassTierChangeBlockReason, message: string) {
+    super(message);
+    this.name = 'OrganizationKiloPassTierChangeBlockedError';
+    this.reason = reason;
+  }
+}
+
+const tierChangeBlockMessages: Record<
+  Exclude<OrganizationKiloPassTierChangeBlockReason, 'same_tier' | 'downgrade'>,
+  string
+> = {
+  yearly_cadence:
+    'Tier upgrades are available on monthly billing only. Annual Kilo Pass tiers cannot be changed here.',
+  manual_agreement:
+    'This Kilo Pass agreement is managed by your Kilo account team. Contact them to change tiers.',
+  no_provider_subscription:
+    'This Kilo Pass is not billed through your seat subscription, so its tier cannot be changed here.',
+  not_active: 'Tier changes are available once the first Kilo Pass payment has completed.',
+  cancellation_pending:
+    'Your Kilo Pass is set to cancel. Resume your subscription before changing tiers.',
+  ended: 'This Kilo Pass has ended. Start a new Kilo Pass to choose a different tier.',
+  payment_review: 'Tier changes are unavailable while a payment on this Kilo Pass is under review.',
+};
+
+/**
+ * Only self-serve agreements billed as an add-on on the organization's seat
+ * subscription can switch tier here. Manual and enterprise-contract
+ * agreements have no Stripe item to reprice, so their tier is a contractual
+ * change made by the account team.
+ */
+function tierChangeBlock(
+  agreement: typeof kilo_pass_org_agreements.$inferSelect
+): OrganizationKiloPassTierChangeBlockReason | null {
+  if (agreement.state === KiloPassOrgAgreementState.Ended) return 'ended';
+  if (
+    agreement.purchase_channel !== KiloPassOrgPurchaseChannel.SelfServe ||
+    agreement.processing_condition === KiloPassOrgProcessingCondition.Manual
+  ) {
+    return 'manual_agreement';
+  }
+  if (
+    !agreement.provider_subscription_id ||
+    !agreement.provider_seat_add_on_item_id ||
+    agreement.provider_seat_add_on_item_id.startsWith('pending:')
+  ) {
+    return agreement.state === KiloPassOrgAgreementState.PendingPayment
+      ? 'not_active'
+      : 'no_provider_subscription';
+  }
+  if (agreement.state === KiloPassOrgAgreementState.PendingPayment || !agreement.paid_until) {
+    return 'not_active';
+  }
+  if (agreement.cadence !== KiloPassCadence.Monthly) return 'yearly_cadence';
+  if (agreement.state === KiloPassOrgAgreementState.CancelAtPeriodEnd) {
+    return 'cancellation_pending';
+  }
+  if (agreement.processing_condition === KiloPassOrgProcessingCondition.SuspendedForReview) {
+    return 'payment_review';
+  }
+  return null;
+}
+
+function tierChangeBlockedReason(
+  agreement: typeof kilo_pass_org_agreements.$inferSelect
+): string | null {
+  const reason = tierChangeBlock(agreement);
+  return reason === null || reason === 'same_tier' || reason === 'downgrade'
+    ? null
+    : tierChangeBlockMessages[reason];
+}
 
 const iso = (value: string | Date | null) =>
   value === null ? null : new Date(value).toISOString();
@@ -837,12 +949,64 @@ async function reclaimBlockedProcessingRun(tx: DrizzleTransaction, runId: string
 }
 
 /** Provider adapters call this only from a recognized paid event. Paid-through never regresses. */
+const TIER_CHANGE_BOUNDARY_TOLERANCE_MS = 5 * 60 * 1000;
+
+/**
+ * A pending tier change applies only to the paid period that starts at its
+ * effective boundary and only when Stripe billed the target price. An older
+ * invoice paid late, or a renewal that kept the old price, never rewrites the
+ * agreement's terms silently: the latter drops the pending change instead.
+ */
+async function resolvePendingTierChange(
+  tx: DrizzleTransaction,
+  agreement: typeof kilo_pass_org_agreements.$inferSelect,
+  input: { paidFrom: Date; paidTier?: string }
+): Promise<{
+  update: Partial<typeof kilo_pass_org_agreements.$inferInsert>;
+}> {
+  if (
+    !agreement.next_term_version_id ||
+    !agreement.next_term_effective_at ||
+    !input.paidTier ||
+    input.paidFrom.getTime() <
+      asDate(agreement.next_term_effective_at).getTime() - TIER_CHANGE_BOUNDARY_TOLERANCE_MS
+  ) {
+    return { update: {} };
+  }
+  const [next] = await tx
+    .select()
+    .from(kilo_pass_org_term_versions)
+    .where(eq(kilo_pass_org_term_versions.id, agreement.next_term_version_id));
+  const applied = next !== undefined && next.tier === input.paidTier;
+  await recordAudit(tx, {
+    agreementId: agreement.id,
+    action: applied ? 'tier_change_applied' : 'tier_change_not_applied',
+    reason: applied ? 'renewal_billed_target_tier' : 'renewal_billed_other_tier',
+    before: { termVersionId: agreement.term_version_id },
+    after: {
+      termVersionId: applied ? next.id : agreement.term_version_id,
+      billedTier: input.paidTier,
+      effectiveAt: agreement.next_term_effective_at,
+    },
+    idempotencyKey: `tier-change-resolved:${agreement.id}:${agreement.next_term_version_id}:${agreement.next_term_effective_at}`,
+  });
+  return {
+    update: {
+      ...(applied ? { term_version_id: next.id } : {}),
+      next_term_version_id: null,
+      next_term_effective_at: null,
+    },
+  };
+}
+
 export async function activatePaidAgreement(input: {
   agreementId: string;
   recipientUserId: string;
   paidFrom: Date;
   paidUntil: Date;
   paidSeatCount: number;
+  /** Tier of the paid pass line; applies a pending tier change when the renewal bills it. */
+  paidTier?: string;
   /** The bridge service interval, or the full agreement month for regular issuance. */
   firstWindow: IssuanceWindow;
   isBridge: boolean;
@@ -890,9 +1054,11 @@ export async function activatePaidAgreement(input: {
     const replacesPendingCapacity =
       existing.next_purchased_pass_capacity !== null &&
       input.paidSeatCount > existing.next_purchased_pass_capacity;
+    const tierChange = await resolvePendingTierChange(tx, existing, input);
     await tx
       .update(kilo_pass_org_agreements)
       .set({
+        ...tierChange.update,
         state:
           existing.state === KiloPassOrgAgreementState.CancelAtPeriodEnd
             ? KiloPassOrgAgreementState.CancelAtPeriodEnd
@@ -1083,6 +1249,36 @@ export async function retryOrganizationPassRun(input: { agreementId: string; run
 }
 
 /** The provider item is created after the durable pending agreement. */
+export async function clearPendingTierChange(input: {
+  agreementId: string;
+  reason: string;
+  actorUserId?: string;
+}) {
+  await db.transaction(async tx => {
+    const [agreement] = await tx
+      .select()
+      .from(kilo_pass_org_agreements)
+      .where(eq(kilo_pass_org_agreements.id, input.agreementId))
+      .for('update');
+    if (!agreement?.next_term_version_id) return;
+    await tx
+      .update(kilo_pass_org_agreements)
+      .set({ next_term_version_id: null, next_term_effective_at: null })
+      .where(eq(kilo_pass_org_agreements.id, agreement.id));
+    await recordAudit(tx, {
+      agreementId: agreement.id,
+      actorUserId: input.actorUserId,
+      action: 'tier_change_cancelled',
+      reason: input.reason,
+      before: {
+        nextTermVersionId: agreement.next_term_version_id,
+        effectiveAt: agreement.next_term_effective_at,
+      },
+      after: { termVersionId: agreement.term_version_id },
+    });
+  });
+}
+
 export async function bindProviderSeatAddOnItem(input: {
   agreementId: string;
   providerSeatAddOnItemId: string;
@@ -1703,7 +1899,27 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
     }
     const currentWindowEnded = latestSnapshot ? asDate(latestSnapshot.end) <= now : false;
     const latestRun = await latestRunForAgreement(row.agreement.id);
+    const [pendingTerm] = row.agreement.next_term_version_id
+      ? await db
+          .select()
+          .from(kilo_pass_org_term_versions)
+          .where(eq(kilo_pass_org_term_versions.id, row.agreement.next_term_version_id))
+      : [];
     return {
+      pendingTierChange:
+        pendingTerm && row.agreement.next_term_effective_at
+          ? {
+              tier: pendingTerm.tier as Tier,
+              terms: displayTerms(pendingTerm),
+              effectiveAt: requiredIso(row.agreement.next_term_effective_at),
+            }
+          : null,
+      tierChangeBlockedReason: tierChangeBlockedReason(row.agreement),
+      availableTierTerms: standardDisplayTerms(
+        row.agreement.cadence === KiloPassCadence.Yearly ? 'yearly' : 'monthly'
+      ).filter(
+        terms => terms.pricePerPassUsd * 1_000_000 > row.term.billing_price_microdollars_per_pass
+      ),
       state: commercialState(row.agreement),
       commercialState: commercialState(row.agreement),
       processingCondition: processingCondition(row.agreement),
@@ -1913,6 +2129,8 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
         .set({
           state: KiloPassOrgAgreementState.CancelAtPeriodEnd,
           cancellation_effective_at: row.agreement.paid_until,
+          next_term_version_id: null,
+          next_term_effective_at: null,
         })
         .where(eq(kilo_pass_org_agreements.id, row.agreement.id));
       await recordAudit(tx, {
@@ -1962,6 +2180,110 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       });
     });
     return { state: 'active' };
+  },
+  async scheduleTierChange({ organizationId, actorUserId, tier }, scheduleProviderTierChange) {
+    await db.transaction(seedTerms);
+    const row = await nonEndedAgreement(organizationId);
+    if (!row) throw new Error('Kilo Pass organization agreement not found');
+    const { agreement } = row;
+    const block = tierChangeBlock(agreement);
+    if (block && block !== 'same_tier' && block !== 'downgrade') {
+      throw new OrganizationKiloPassTierChangeBlockedError(block, tierChangeBlockMessages[block]);
+    }
+    const providerSubscriptionId = agreement.provider_subscription_id;
+    const providerSeatAddOnItemId = agreement.provider_seat_add_on_item_id;
+    if (!providerSubscriptionId || !providerSeatAddOnItemId || !agreement.paid_until) {
+      throw new OrganizationKiloPassTierChangeBlockedError(
+        'no_provider_subscription',
+        tierChangeBlockMessages.no_provider_subscription
+      );
+    }
+    const cadence = agreement.cadence === KiloPassCadence.Yearly ? 'yearly' : 'monthly';
+    const [target] = await db
+      .select()
+      .from(kilo_pass_org_term_versions)
+      .where(eq(kilo_pass_org_term_versions.version_key, `standard-${tier}-${cadence}-v1`));
+    if (!target) throw new Error('standard organization Pass term unavailable');
+    if (row.term.id === target.id) {
+      throw new OrganizationKiloPassTierChangeBlockedError(
+        'same_tier',
+        agreement.next_term_version_id
+          ? 'Your Kilo Pass is already on this tier. Cancel the scheduled change to keep it.'
+          : 'Your Kilo Pass is already on this tier.'
+      );
+    }
+    if (target.billing_price_microdollars_per_pass < row.term.billing_price_microdollars_per_pass) {
+      throw new OrganizationKiloPassTierChangeBlockedError(
+        'downgrade',
+        'Only upgrades to a higher tier can be scheduled here.'
+      );
+    }
+    if (agreement.next_term_version_id === target.id && agreement.next_term_effective_at !== null) {
+      return { tier, effectiveAt: requiredIso(agreement.next_term_effective_at) };
+    }
+    // Record the intent before touching Stripe. A failed provider call reverts it, and a
+    // pending record without a schedule is dropped when the renewal bills another tier.
+    const setPending = (termVersionId: string | null, effectiveAt: string | null) =>
+      db
+        .update(kilo_pass_org_agreements)
+        .set({ next_term_version_id: termVersionId, next_term_effective_at: effectiveAt })
+        .where(eq(kilo_pass_org_agreements.id, agreement.id));
+    await setPending(target.id, agreement.paid_until);
+    let effectiveAt: Date;
+    try {
+      ({ effectiveAt } = await scheduleProviderTierChange({
+        providerSubscriptionId,
+        providerSeatAddOnItemId,
+        agreementId: agreement.id,
+        organizationId,
+        targetTier: dbTier[tier],
+        cadence: dbCadence[cadence],
+      }));
+    } catch (error) {
+      await setPending(agreement.next_term_version_id, agreement.next_term_effective_at);
+      throw error;
+    }
+    await db.transaction(async tx => {
+      await tx
+        .update(kilo_pass_org_agreements)
+        .set({ next_term_version_id: target.id, next_term_effective_at: effectiveAt.toISOString() })
+        .where(eq(kilo_pass_org_agreements.id, agreement.id));
+      await recordAudit(tx, {
+        agreementId: agreement.id,
+        actorUserId,
+        action: 'tier_change_scheduled',
+        reason: 'self_service',
+        before: {
+          termVersionId: row.term.id,
+          tier: row.term.tier,
+          nextTermVersionId: agreement.next_term_version_id,
+        },
+        after: {
+          nextTermVersionId: target.id,
+          tier,
+          effectiveAt: effectiveAt.toISOString(),
+        },
+      });
+    });
+    return { tier, effectiveAt: effectiveAt.toISOString() };
+  },
+  async cancelTierChange({ organizationId, actorUserId }, releaseProviderTierChange) {
+    const row = await nonEndedAgreement(organizationId);
+    if (!row) throw new Error('Kilo Pass organization agreement not found');
+    const { agreement } = row;
+    if (!agreement.next_term_version_id) throw new Error('NO_PENDING_TIER_CHANGE');
+    if (agreement.provider_subscription_id) {
+      await releaseProviderTierChange({
+        providerSubscriptionId: agreement.provider_subscription_id,
+        organizationId,
+      });
+    }
+    await clearPendingTierChange({
+      agreementId: agreement.id,
+      actorUserId,
+      reason: 'self_service',
+    });
+    return { cancelled: true };
   },
   async retryRun({ organizationId, runId, actorUserId }) {
     const row = await nonEndedAgreement(organizationId);

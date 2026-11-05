@@ -3481,6 +3481,11 @@ export const kilo_pass_org_agreements = pgTable(
     purchased_pass_capacity: integer().notNull(),
     next_purchased_pass_capacity: integer(),
     next_capacity_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
+    next_term_version_id: uuid().references(() => kilo_pass_org_term_versions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'cascade',
+    }),
+    next_term_effective_at: timestamp({ withTimezone: true, mode: 'string' }),
     paid_from: timestamp({ withTimezone: true, mode: 'string' }),
     paid_until: timestamp({ withTimezone: true, mode: 'string' }),
     issuance_anchor_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
@@ -3521,6 +3526,10 @@ export const kilo_pass_org_agreements = pgTable(
     check(
       'kilo_pass_org_agreements_next_capacity_check',
       sql`(${table.next_purchased_pass_capacity} IS NULL AND ${table.next_capacity_effective_at} IS NULL) OR (${table.next_purchased_pass_capacity} >= 0 AND ${table.next_capacity_effective_at} IS NOT NULL)`
+    ),
+    check(
+      'kilo_pass_org_agreements_next_term_check',
+      sql`(${table.next_term_version_id} IS NULL AND ${table.next_term_effective_at} IS NULL) OR (${table.next_term_version_id} IS NOT NULL AND ${table.next_term_effective_at} IS NOT NULL)`
     ),
     check(
       'kilo_pass_org_agreements_paid_interval_check',

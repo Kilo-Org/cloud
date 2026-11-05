@@ -18,11 +18,25 @@ const getUsage = jest.fn<OrganizationKiloPassService['getUsage']>();
 const createCheckout = jest.fn<OrganizationKiloPassService['createCheckout']>();
 const updateAllocation = jest.fn<OrganizationKiloPassService['updateAllocation']>();
 const cancel = jest.fn<OrganizationKiloPassService['cancel']>();
+const scheduleTierChange = jest.fn<OrganizationKiloPassService['scheduleTierChange']>();
+const cancelTierChange = jest.fn<OrganizationKiloPassService['cancelTierChange']>();
+
+class MockTierChangeBlockedError extends Error {
+  constructor(
+    readonly reason: string,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 jest.mock('@/lib/kilo-pass-org/stripe-adapter', () => ({
   createOrganizationKiloPassCheckout: jest.fn(),
   resumeOrganizationKiloPassCancellation: jest.fn(),
   scheduleOrganizationKiloPassCancellation: jest.fn(),
+  scheduleOrganizationKiloPassTierChange: jest.fn(),
+  releaseOrganizationKiloPassTierChange: jest.fn(),
+  OrganizationKiloPassTierChangeError: class extends Error {},
 }));
 
 jest.mock('@/lib/kilo-pass-org/service', () => ({
@@ -34,7 +48,10 @@ jest.mock('@/lib/kilo-pass-org/service', () => ({
     createCheckout,
     updateAllocation,
     cancel,
+    scheduleTierChange,
+    cancelTierChange,
   },
+  OrganizationKiloPassTierChangeBlockedError: MockTierChangeBlockedError,
 }));
 
 const NOW = '2026-07-23T12:00:00.000Z';
@@ -99,6 +116,8 @@ describe('organization Kilo Pass router', () => {
       createCheckout,
       updateAllocation,
       cancel,
+      scheduleTierChange,
+      cancelTierChange,
     ]) {
       mock.mockReset();
     }
@@ -166,6 +185,9 @@ describe('organization Kilo Pass router', () => {
         { organizationId: parent.id, organizationName: parent.name, passCount: 1, kind: 'parent' },
         { organizationId: child.id, organizationName: child.name, passCount: 1, kind: 'child' },
       ],
+      pendingTierChange: null,
+      tierChangeBlockedReason: null,
+      availableTierTerms: [],
     });
     getUsage.mockResolvedValue(null);
     createCheckout.mockResolvedValue({ kind: 'payment_action', clientSecret: 'pi_secret_1' });
@@ -279,6 +301,45 @@ describe('organization Kilo Pass router', () => {
       ).rejects.toMatchObject({ code, message: expect.stringContaining(message) });
     }
   );
+
+  it('passes a tier change through the Stripe-free boundary', async () => {
+    scheduleTierChange.mockResolvedValue({ tier: 'tier_49', effectiveAt: NOW });
+    const caller = await createCallerForUser(billingManager.id);
+    await expect(
+      caller.organizations.kiloPass.changeTier({ organizationId: parent.id, tier: 'tier_49' })
+    ).resolves.toEqual({ tier: 'tier_49', effectiveAt: NOW });
+    expect(scheduleTierChange).toHaveBeenCalledWith(
+      { organizationId: parent.id, actorUserId: billingManager.id, tier: 'tier_49' },
+      expect.any(Function)
+    );
+  });
+
+  it.each([
+    ['manual_agreement', 'PRECONDITION_FAILED'],
+    ['same_tier', 'BAD_REQUEST'],
+  ])('maps a blocked tier change (%s) to tRPC %s', async (reason, code) => {
+    scheduleTierChange.mockRejectedValue(new MockTierChangeBlockedError(reason, 'blocked'));
+    const caller = await createCallerForUser(owner.id);
+    await expect(
+      caller.organizations.kiloPass.changeTier({ organizationId: parent.id, tier: 'tier_49' })
+    ).rejects.toMatchObject({ code, message: 'blocked' });
+  });
+
+  it('denies tier changes to regular members and child owners', async () => {
+    const memberCaller = await createCallerForUser(member.id);
+    await expect(
+      memberCaller.organizations.kiloPass.changeTier({
+        organizationId: parent.id,
+        tier: 'tier_49',
+      })
+    ).rejects.toThrow('required organizational role');
+    const childCaller = await createCallerForUser(childOwner.id);
+    await expect(
+      childCaller.organizations.kiloPass.cancelTierChange({ organizationId: child.id })
+    ).rejects.toThrow('parent organization');
+    expect(scheduleTierChange).not.toHaveBeenCalled();
+    expect(cancelTierChange).not.toHaveBeenCalled();
+  });
 
   it('maps a stale plan service conflict to tRPC CONFLICT', async () => {
     updateAllocation.mockRejectedValue(new Error('STALE_PLAN_VERSION'));

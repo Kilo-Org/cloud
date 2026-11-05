@@ -15,7 +15,7 @@ import {
   KiloPassOrgAgreementState,
   KiloPassOrgProcessingCondition,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
@@ -1824,5 +1824,237 @@ describe('Kilo Pass organization agreement service', () => {
         [parent.id, 10_419_355],
       ])
     );
+  });
+
+  describe('organization tier change', () => {
+    async function activeAgreement(options: {
+      purchaseChannel?: 'manual';
+      cadence?: 'monthly' | 'yearly';
+    }) {
+      const owner = await insertTestUser();
+      const parent = await createOrganization(`kpo-tier-${crypto.randomUUID()}`, owner.id);
+      organizationIds.push(parent.id);
+      const pending = await createPendingAgreement({
+        parentOrganizationId: parent.id,
+        actorUserId: owner.id,
+        tier: 'tier_19',
+        cadence: options.cadence ?? 'monthly',
+        paidSeatCount: 2,
+        issuanceAnchorAt: window.start,
+        providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+        providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+        initialAllocations: [],
+      });
+      await activatePaidAgreement({
+        agreementId: pending.agreementId,
+        recipientUserId: owner.id,
+        paidFrom: window.start,
+        paidUntil: window.end,
+        paidSeatCount: 2,
+        firstWindow: window,
+        isBridge: false,
+      });
+      if (options.purchaseChannel) {
+        await db
+          .update(kilo_pass_org_agreements)
+          .set({ purchase_channel: options.purchaseChannel })
+          .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+      }
+      return { owner, parent, agreementId: pending.agreementId };
+    }
+
+    const readAgreement = async (agreementId: string) => {
+      const [agreement] = await db
+        .select()
+        .from(kilo_pass_org_agreements)
+        .where(eq(kilo_pass_org_agreements.id, agreementId));
+      return agreement!;
+    };
+
+    it('records a pending tier change without touching the current terms', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      const scheduleProvider = jest.fn(async () => ({ effectiveAt: window.end }));
+
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+          scheduleProvider
+        )
+      ).resolves.toEqual({ tier: 'tier_49', effectiveAt: window.end.toISOString() });
+
+      const agreement = await readAgreement(agreementId);
+      expect(agreement.next_term_version_id).not.toBeNull();
+      expect(new Date(agreement.next_term_effective_at!).toISOString()).toBe(
+        window.end.toISOString()
+      );
+      const detail = await organizationKiloPassService.getDetail({ organizationId: parent.id });
+      expect(detail.tier).toBe('tier_19');
+      expect(detail.pendingTierChange).toMatchObject({ tier: 'tier_49' });
+      expect(detail.tierChangeBlockedReason).toBeNull();
+    });
+
+    it('reverts the pending change when Stripe rejects the schedule', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_199' },
+          async () => {
+            throw new Error('stripe unavailable');
+          }
+        )
+      ).rejects.toThrow('stripe unavailable');
+      expect((await readAgreement(agreementId)).next_term_version_id).toBeNull();
+    });
+
+    it('rejects the current tier and agreements managed outside self-serve billing', async () => {
+      const selfServe = await activeAgreement({});
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: selfServe.parent.id, actorUserId: selfServe.owner.id, tier: 'tier_19' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'same_tier' });
+
+      const manual = await activeAgreement({ purchaseChannel: 'manual' });
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: manual.parent.id, actorUserId: manual.owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'manual_agreement' });
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('rejects downgrades and any change on a yearly agreement', async () => {
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      const yearly = await activeAgreement({ cadence: 'yearly' });
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: yearly.parent.id, actorUserId: yearly.owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'yearly_cadence' });
+      const detail = await organizationKiloPassService.getDetail({
+        organizationId: yearly.parent.id,
+      });
+      expect(detail.tierChangeBlockedReason).toContain('monthly billing only');
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('offers only higher tiers and rejects a downgrade', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      const detail = await organizationKiloPassService.getDetail({ organizationId: parent.id });
+      expect(detail.availableTierTerms.map(terms => terms.tier)).toEqual(['tier_49', 'tier_199']);
+
+      await db.execute(
+        sql`UPDATE kilo_pass_org_agreements SET term_version_id = (SELECT id FROM kilo_pass_org_term_versions WHERE version_key = 'standard-tier_199-monthly-v1') WHERE id = ${agreementId}`
+      );
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'downgrade' });
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('rejects a tier change while cancellation is pending', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      await db
+        .update(kilo_pass_org_agreements)
+        .set({ state: KiloPassOrgAgreementState.CancelAtPeriodEnd })
+        .where(eq(kilo_pass_org_agreements.id, agreementId));
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'cancellation_pending' });
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('applies the pending terms only when the renewal bills the target tier', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      await organizationKiloPassService.scheduleTierChange(
+        { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+        async () => ({ effectiveAt: window.end })
+      );
+      const renewal = {
+        agreementId,
+        recipientUserId: owner.id,
+        paidSeatCount: 2,
+        isBridge: false,
+      };
+      const nextWindow = {
+        start: window.end,
+        end: new Date('2026-09-01T00:00:00.000Z'),
+      };
+
+      await activatePaidAgreement({
+        ...renewal,
+        paidFrom: new Date('2026-07-15T00:00:00.000Z'),
+        paidUntil: window.end,
+        paidTier: 'tier_19',
+        firstWindow: window,
+      });
+      expect((await readAgreement(agreementId)).next_term_version_id).not.toBeNull();
+
+      await activatePaidAgreement({
+        ...renewal,
+        paidFrom: nextWindow.start,
+        paidUntil: nextWindow.end,
+        paidTier: 'tier_49',
+        firstWindow: nextWindow,
+      });
+      const agreement = await readAgreement(agreementId);
+      expect(agreement.next_term_version_id).toBeNull();
+      const detail = await organizationKiloPassService.getDetail({ organizationId: parent.id });
+      expect(detail.tier).toBe('tier_49');
+      const audits = await db
+        .select({ action: kilo_pass_org_audit_records.action })
+        .from(kilo_pass_org_audit_records)
+        .where(eq(kilo_pass_org_audit_records.agreement_id, agreementId));
+      expect(audits.map(audit => audit.action)).toContain('tier_change_applied');
+    });
+
+    it('drops the pending change when the renewal still bills the old tier', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      await organizationKiloPassService.scheduleTierChange(
+        { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+        async () => ({ effectiveAt: window.end })
+      );
+      const nextWindow = { start: window.end, end: new Date('2026-09-01T00:00:00.000Z') };
+      await activatePaidAgreement({
+        agreementId,
+        recipientUserId: owner.id,
+        paidSeatCount: 2,
+        isBridge: false,
+        paidFrom: nextWindow.start,
+        paidUntil: nextWindow.end,
+        paidTier: 'tier_19',
+        firstWindow: nextWindow,
+      });
+      expect((await readAgreement(agreementId)).next_term_version_id).toBeNull();
+      const detail = await organizationKiloPassService.getDetail({ organizationId: parent.id });
+      expect(detail.tier).toBe('tier_19');
+    });
+
+    it('releases the provider schedule and clears the pending change on cancel', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      await organizationKiloPassService.scheduleTierChange(
+        { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+        async () => ({ effectiveAt: window.end })
+      );
+      const release = jest.fn(async () => undefined);
+      await organizationKiloPassService.cancelTierChange(
+        { organizationId: parent.id, actorUserId: owner.id },
+        release
+      );
+      expect(release).toHaveBeenCalledTimes(1);
+      expect((await readAgreement(agreementId)).next_term_version_id).toBeNull();
+    });
   });
 });

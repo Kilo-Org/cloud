@@ -101,6 +101,7 @@ import {
   kilo_pass_subscriptions,
   kilo_pass_org_agreements,
   kilo_pass_org_audit_records,
+  kilo_pass_org_term_versions,
   organizations,
   kilocode_users,
   auto_top_up_configs,
@@ -5082,6 +5083,81 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
       expect(release).toHaveBeenCalledWith('sub_sched_cancel');
       expect(update).toHaveBeenCalled();
       expect(release.mock.invocationCallOrder[0]).toBeLessThan(update.mock.invocationCallOrder[0]!);
+    });
+
+    test('restores a pending tier change schedule when the seat update fails', async () => {
+      const tierChangeSchedule = cancellationSchedule(
+        [{ start: prorationDate, end: periodEnd, items: currentItems(5) }],
+        { origin: 'kilo-pass-org-tier-change' }
+      );
+      const period = {
+        start: new Date(prorationDate * 1000),
+        end: new Date(periodEnd * 1000),
+      };
+      const pending = await createPendingAgreement({
+        parentOrganizationId: organizationId,
+        actorUserId: actor.id,
+        tier: 'tier_19',
+        cadence: 'monthly',
+        paidSeatCount: 5,
+        issuanceAnchorAt: period.start,
+        providerSubscriptionId: subscriptionId,
+        providerSeatAddOnItemId: passItemId,
+        initialAllocations: [],
+      });
+      await activatePaidAgreement({
+        agreementId: pending.agreementId,
+        recipientUserId: actor.id,
+        paidFrom: period.start,
+        paidUntil: period.end,
+        paidSeatCount: 5,
+        firstWindow: period,
+        isBridge: false,
+      });
+      const [targetTerm] = await db
+        .select()
+        .from(kilo_pass_org_term_versions)
+        .where(eq(kilo_pass_org_term_versions.version_key, 'standard-tier_49-monthly-v1'));
+      expect(targetTerm).toBeDefined();
+      await db
+        .update(kilo_pass_org_agreements)
+        .set({
+          next_term_version_id: targetTerm!.id,
+          next_term_effective_at: period.end.toISOString(),
+        })
+        .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+
+      jest
+        .spyOn(client.subscriptions, 'retrieve')
+        .mockResolvedValueOnce(orgSubscription({ schedule: tierChangeSchedule }) as never)
+        .mockResolvedValue(orgSubscription() as never);
+      const release = jest
+        .spyOn(client.subscriptionSchedules, 'release')
+        .mockResolvedValue({ ...tierChangeSchedule, status: 'released' } as never);
+      const createSchedule = jest
+        .spyOn(client.subscriptionSchedules, 'create')
+        .mockResolvedValue({ id: 'sub_sched_restored', phases: [] } as never);
+      const updateSchedule = jest
+        .spyOn(client.subscriptionSchedules, 'update')
+        .mockResolvedValue({ id: 'sub_sched_restored' } as never);
+      jest.spyOn(client.subscriptions, 'update').mockRejectedValue(new Error('seat update failed'));
+
+      await expect(handleUpdateSeatCount(subscriptionId, 3, 5, { now })).rejects.toThrow(
+        'seat update failed'
+      );
+
+      expect(release).toHaveBeenCalledWith(tierChangeSchedule.id);
+      expect(createSchedule).toHaveBeenCalledWith({ from_subscription: subscriptionId });
+      expect(updateSchedule).toHaveBeenCalledWith(
+        'sub_sched_restored',
+        expect.objectContaining({
+          metadata: expect.objectContaining({ origin: 'kilo-pass-org-tier-change' }),
+        })
+      );
+      const persisted = await db.query.kilo_pass_org_agreements.findFirst({
+        where: eq(kilo_pass_org_agreements.id, pending.agreementId),
+      });
+      expect(persisted?.next_term_version_id).toBe(targetTerm!.id);
     });
 
     test('refuses to change seats under a schedule it cannot safely rewrite', async () => {

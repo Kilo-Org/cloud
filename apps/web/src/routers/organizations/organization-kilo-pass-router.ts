@@ -3,14 +3,21 @@ import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { organizationKiloPassService } from '@/lib/kilo-pass-org/service';
+import {
+  organizationKiloPassService,
+  OrganizationKiloPassTierChangeBlockedError,
+} from '@/lib/kilo-pass-org/service';
 import { listKiloPassOrganizationInvoices } from '@/lib/kilo-pass-org/billing-history';
 import {
   createOrganizationKiloPassCheckout,
   reconcileOrganizationKiloPassPayment,
+  OrganizationKiloPassTierChangeError,
+  releaseOrganizationKiloPassTierChange,
   resumeOrganizationKiloPassCancellation,
   scheduleOrganizationKiloPassCancellation,
+  scheduleOrganizationKiloPassTierChange,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import { SCHEDULE_REWRITE_UNSAFE } from '@/lib/kilo-pass-org/cancellation-schedule';
 import { OrganizationKiloPassCheckoutScheduleError } from '@/lib/kilo-pass-org/cancellation-schedule';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
@@ -155,7 +162,14 @@ const DetailOutputSchema = z.object({
       kind: z.enum(['parent', 'child']),
     })
   ),
+  pendingTierChange: z
+    .object({ tier: TierSchema, terms: TermsSchema, effectiveAt: TimestampSchema })
+    .nullable(),
+  tierChangeBlockedReason: z.string().nullable(),
+  availableTierTerms: z.array(TermsSchema),
 });
+const ChangeTierOutputSchema = z.object({ tier: TierSchema, effectiveAt: TimestampSchema });
+const CancelTierChangeOutputSchema = z.object({ cancelled: z.literal(true) });
 const CheckoutOutputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('payment_action'), clientSecret: z.string().min(1) }),
   z.object({ kind: z.literal('completed') }),
@@ -195,6 +209,39 @@ const organizationParentBillingProcedure = organizationBillingProcedure.use(
     return next();
   }
 );
+
+function rethrowTierChangeError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+  if (error instanceof OrganizationKiloPassTierChangeBlockedError) {
+    throw new TRPCError({
+      code:
+        error.reason === 'same_tier' || error.reason === 'downgrade'
+          ? 'BAD_REQUEST'
+          : 'PRECONDITION_FAILED',
+      message: error.message,
+    });
+  }
+  if (error instanceof OrganizationKiloPassTierChangeError) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message:
+        error.reason === 'cancellation_pending'
+          ? 'Your Kilo Pass is set to cancel. Resume your subscription before changing tiers.'
+          : 'Your seat subscription is not in a state that allows changing the Kilo Pass tier.',
+    });
+  }
+  if (error instanceof Error && error.message === SCHEDULE_REWRITE_UNSAFE) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message:
+        'Your seat subscription has another scheduled change. Cancel that change or wait for it to take effect before changing the Kilo Pass tier.',
+    });
+  }
+  if (error instanceof Error && error.message === 'NO_PENDING_TIER_CHANGE') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'No tier change is scheduled.' });
+  }
+  throw error;
+}
 
 function rethrowServiceError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -387,6 +434,33 @@ export const organizationKiloPassRouter = createTRPCRouter({
           });
         }
         throw error;
+      }
+    }),
+
+  changeTier: organizationParentBillingProcedure
+    .input(OrganizationIdInputSchema.extend({ tier: TierSchema }).strict())
+    .output(ChangeTierOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await organizationKiloPassService.scheduleTierChange(
+          { organizationId: input.organizationId, actorUserId: ctx.user.id, tier: input.tier },
+          scheduleOrganizationKiloPassTierChange
+        );
+      } catch (error) {
+        return rethrowTierChangeError(error);
+      }
+    }),
+
+  cancelTierChange: organizationParentBillingProcedure
+    .output(CancelTierChangeOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await organizationKiloPassService.cancelTierChange(
+          { organizationId: input.organizationId, actorUserId: ctx.user.id },
+          releaseOrganizationKiloPassTierChange
+        );
+      } catch (error) {
+        return rethrowTierChangeError(error);
       }
     }),
 

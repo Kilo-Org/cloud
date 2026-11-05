@@ -585,9 +585,9 @@ function SpendAlertsForm({
  * and the label's ink starts about 10dp in. An unpulled switch's painted end
  * (the thumb at its travel limit, about 3dp past the track's own end) lands
  * about 14dp from the card edge, visibly deeper than the label. Pulling the
- * node out by 4dp (`-me-1`) puts the painted thumb end about 10–11dp from the
- * edge, level with the label's start, and keeps about 6dp of the node's hit
- * area inside the card.
+ * node out by one spacing unit (`-me-1` = 3.5dp) puts the painted thumb end
+ * about 10–11dp from the edge, level with the label's start, and keeps about
+ * 7dp of the node's hit area inside the card.
  *
  * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
  * the writing direction, where a hand-picked `-mr-1` would land on the label's

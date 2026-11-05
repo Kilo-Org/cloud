@@ -37,9 +37,7 @@ async function applyIndexUpdate(update: SystemSearchIndexUpdate): Promise<void> 
  * lock already wiped them, so a publish that runs while it is up must not put
  * them back.
  */
-function applySessionCatalog(
-  sessions: readonly SessionCatalogEntry[]
-): Promise<boolean> {
+function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<boolean> {
   if (isAppLocked()) {
     return Promise.resolve(false);
   }

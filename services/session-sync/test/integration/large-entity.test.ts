@@ -1,5 +1,5 @@
 import { SELF, runInDurableObject } from 'cloudflare:test';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { getSessionSyncDOStub } from '../../src/dos/SessionSyncDO';
 import {
@@ -34,6 +34,7 @@ async function measure<T>(name: string, fn: () => Promise<T>): Promise<T> {
   // workerd processes forced-GC inspector commands at request safepoints.
   // Issue local no-auth requests until the actual profiler-ready signal arrives.
   let ready = false;
+  let outcome: { value: T } | { error: unknown };
   try {
     const starting = fetch(`${url}/start/${name}`, { signal: AbortSignal.timeout(10_000) })
       .then(
@@ -51,13 +52,70 @@ async function measure<T>(name: string, fn: () => Promise<T>): Promise<T> {
     if ('error' in start) throw start.error;
     expect(start.response.ok).toBe(true);
     await start.response.text();
-    return await fn();
-  } finally {
+    outcome = { value: await fn() };
+  } catch (error) {
+    outcome = { error };
+  }
+  try {
     const stopped = await fetch(`${url}/stop`, { signal: AbortSignal.timeout(10_000) });
     expect(stopped.ok).toBe(true);
     await stopped.text();
+  } catch (error) {
+    if ('error' in outcome)
+      throw new AggregateError([outcome.error, error], 'Measurement and cleanup failed');
+    throw error;
   }
+  if ('error' in outcome) throw outcome.error;
+  return outcome.value;
 }
+
+it('preserves measurement and cleanup failures independently', async () => {
+  const original = process.env.SESSION_SYNC_MEASURE_URL;
+  try {
+    process.env.SESSION_SYNC_MEASURE_URL = 'https://measurement.test';
+    for (const phase of ['start', 'body', 'none']) {
+      for (const cleanupFails of [false, true]) {
+        const primary = new Error('Synthetic measurement failure');
+        const cleanup = new Error('Synthetic cleanup failure');
+        const calls: string[] = [];
+        const mock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+          const url =
+            typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+          calls.push(url);
+          if (url.endsWith('/stop')) {
+            if (cleanupFails) throw cleanup;
+          } else if (phase === 'start') throw primary;
+          return new Response('ready');
+        });
+        try {
+          const result = await measure('errors', async () => {
+            if (phase === 'body') throw primary;
+            return 7;
+          }).then(
+            value => ({ value }),
+            (error: unknown) => ({ error })
+          );
+          expect(calls.some(url => url.endsWith('/stop'))).toBe(true);
+          if (phase === 'none' && !cleanupFails) {
+            expect(result).toEqual({ value: 7 });
+          } else {
+            if (!('error' in result)) throw new Error('Expected a measurement failure');
+            if (phase !== 'none' && cleanupFails) {
+              expect(result.error).toBeInstanceOf(AggregateError);
+              if (!(result.error instanceof AggregateError)) throw result.error;
+              expect(result.error.errors).toEqual([primary, cleanup]);
+            } else expect(result.error).toBe(phase === 'none' ? cleanup : primary);
+          }
+        } finally {
+          mock.mockRestore();
+        }
+      }
+    }
+  } finally {
+    if (original === undefined) delete process.env.SESSION_SYNC_MEASURE_URL;
+    else process.env.SESSION_SYNC_MEASURE_URL = original;
+  }
+});
 
 it('accepts message envelopes and independent parts without imposing lexical ordinal order', async () => {
   const { api, id, source } = await setup();

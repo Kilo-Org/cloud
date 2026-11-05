@@ -292,6 +292,30 @@ describe('baseGetSessionNextOutputSchema', () => {
       baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
     ).toEqual(runtimeAgents);
   });
+
+  it('preserves safe DO-native metadata fields used by session detail UIs', () => {
+    const metadata = {
+      title: 'DO title',
+      associatedPr: {
+        url: 'https://github.com/Kilo-Org/cloud/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Preserve metadata',
+        headSha: 'a'.repeat(40),
+        lastSyncedAt: '2026-10-19T21:00:00.000Z',
+        platform: 'github',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+      },
+      totalCostMicrodollars: 350_000,
+      createdOnPlatform: 'extension',
+      profileId: 'profile-1',
+    };
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...metadata })).toEqual({
+      ...baseSession,
+      ...metadata,
+    });
+  });
 });
 
 describe('baseWorktreeChangesNextSchema', () => {

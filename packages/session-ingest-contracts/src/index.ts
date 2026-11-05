@@ -13,3 +13,4 @@ export const DEFAULT_SESSION_TITLE_PATTERN =
 export function isDefaultSessionTitle(title: string | null | undefined): boolean {
   return title == null || DEFAULT_SESSION_TITLE_PATTERN.test(title);
 }
+export * from './kilo2-conversation';

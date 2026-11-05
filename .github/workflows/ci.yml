@@ -393,9 +393,55 @@ jobs:
       - name: Test SBOM workflow wiring
         run: node --test scripts/mobile-sbom-workflow.test.mjs
 
-  typecheck-groups:
+  # One producer for the tRPC declarations. Both matrices used to run the
+  # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
+  # compiled the same declaration program in two 4 vCPU jobs that started
+  # together, and both raced to save the one cache key. The cache stays here;
+  # every consumer downloads the built tree instead of building it again.
+  trpc-declarations:
     needs: changes
-    if: needs.changes.outputs.typecheck_groups != '[]'
+    # Only a consumer needs the artifact: every typecheck group downloads it,
+    # and the lint matrix only for its trpc entry. A lint-rest-only run must not
+    # wait for it.
+    if: needs.changes.outputs.typecheck_groups != '[]' || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Upload tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          # A hit that restored nothing must fail here, not in a consumer.
+          if-no-files-found: error
+
+  typecheck-groups:
+    needs: [changes, trpc-declarations]
+    # `always()` so a failed or skipped producer cannot quietly skip every
+    # group: the download below then fails and the required aggregator reports
+    # it, instead of passing on skipped rows. A failed `changes` job keeps them
+    # skipped, because its outputs carry no group list.
+    if: always() && needs.changes.result == 'success' && needs.changes.outputs.typecheck_groups != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -430,14 +476,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
-      - name: Restore or build tRPC declarations
-        if: matrix.group == 'trpc'
-        uses: ./.github/actions/trpc-declarations
+      - name: Download tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
-          KILO_TYPECHECK_TRPC_BUILT: ${{ matrix.group == 'trpc' && '1' || '' }}
+          # The producer job built or restored the declarations for every group.
+          KILO_TYPECHECK_TRPC_BUILT: '1'
         run: scripts/typecheck-all.sh --group ${{ matrix.group }}
 
   # Required check. Skipped groups (nothing affected) pass; a failed or
@@ -458,8 +507,11 @@ jobs:
           fi
 
   lint-groups:
-    needs: changes
-    if: needs.changes.outputs.lint_groups != '[]'
+    needs: [changes, trpc-declarations]
+    # `always()` so a skipped producer (a lint-rest-only run) or a failed one
+    # cannot skip every lint group; the trpc download below fails loudly. A
+    # failed `changes` job keeps them skipped.
+    if: always() && needs.changes.result == 'success' && needs.changes.outputs.lint_groups != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -487,9 +539,12 @@ jobs:
 
       # The extension sources lint against the built tRPC types. A full lint
       # also covers apps/mobile, which needs the harness SDK build too.
-      - name: Restore or build tRPC declarations
+      - name: Download tRPC declarations
         if: matrix.group == 'trpc'
-        uses: ./.github/actions/trpc-declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Restore or build the harness SDK
         if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')

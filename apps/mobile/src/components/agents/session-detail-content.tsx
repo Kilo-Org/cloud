@@ -2026,8 +2026,7 @@ export function SessionDetailContent({
     terminalError === null &&
     activeQuestion === null &&
     activePermission === null;
-  const isComposerVisible =
-    !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
+  const isComposerVisible = !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
   const isReadOnlyFooterPlaceholderVisible =

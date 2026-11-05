@@ -542,6 +542,51 @@ describe('worktree snapshot scheduler', () => {
     }
   });
 
+  it('retries a conditional upload conflict without deduplicating unaccepted content', async () => {
+    const archive = await temporaryArchive(Buffer.from('conditional upload'));
+    const fake = createFakeClock(10_000_000);
+    let captures = 0;
+    let puts = 0;
+    const { fetch } = createFetch(() => {
+      puts += 1;
+      return new Response(null, { status: puts === 1 ? 409 : 204 });
+    });
+    const snapshots = createSnapshots({
+      url: BASE_URL,
+      grant: grant(10_000, 9_000_000),
+      clock: fake.clock,
+      capture: async () => {
+        captures += 1;
+        return captureWith({
+          path: archive.path,
+          size: archive.size,
+          contentDigest: 'c'.repeat(64),
+        });
+      },
+      fetch,
+    });
+    try {
+      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => puts === 1);
+      await fake.advance(29_999);
+      expect(captures).toBe(1);
+      await fake.advance(1);
+      await waitFor(() => puts === 2);
+      expect(captures).toBe(2);
+
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => captures === 3);
+      await fake.settle();
+      expect(puts).toBe(2);
+    } finally {
+      snapshots.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
+  });
+
   it('holds the capture slot until a timed-out capture settles', async () => {
     const fake = createFakeClock(20_000_000);
     const starts: string[] = [];
@@ -872,6 +917,50 @@ describe('worktree snapshot grant renewal', () => {
     closedSnapshots.close();
     await closedClock.advance(2_000_000);
     expect(closed.calls).toHaveLength(0);
+  });
+
+  it('retries a scheduled renewal after a 503 and uploads with the renewed grant', async () => {
+    const now = 1_700_000_000_000;
+    const firstGrant = identityGrant(now / 1_000, now / 1_000 + 4_000);
+    const renewed = identityGrant(now / 1_000 + 2_030, now / 1_000 + 6_030);
+    const fake = createFakeClock(now);
+    let renewals = 0;
+    const { calls, fetch } = createFetch(call => {
+      if (call.init.method === 'POST') {
+        renewals += 1;
+        return renewals === 1
+          ? new Response(null, { status: 503 })
+          : Response.json({ grant: renewed });
+      }
+      return new Response(null, { status: 204 });
+    });
+    const archive = await temporaryArchive(Buffer.from('renew after outage'));
+    const snapshots = createSnapshots({
+      url: BASE_URL,
+      grant: firstGrant,
+      clock: fake.clock,
+      capture: async () =>
+        captureWith({ path: archive.path, size: archive.size, contentDigest: 'd'.repeat(64) }),
+      fetch,
+    });
+    try {
+      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      await fake.advance(2_000_000);
+      await waitFor(() => renewals === 1);
+      await fake.advance(29_999);
+      expect(renewals).toBe(1);
+      await fake.advance(1);
+      await waitFor(() => renewals === 2);
+
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => calls.some(call => call.init.method === 'PUT'));
+      const put = calls.find(call => call.init.method === 'PUT');
+      expect(put?.init.headers).toMatchObject({ authorization: `Bearer ${renewed}` });
+    } finally {
+      snapshots.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
   });
 
   it('tries other registered worktrees when renewal is forbidden for one', async () => {

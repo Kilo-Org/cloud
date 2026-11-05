@@ -7,6 +7,7 @@ import {
   mkdir,
   mkdtemp,
   open,
+  readdir,
   realpath,
   rm,
   rmdir,
@@ -141,6 +142,7 @@ type Clock = {
 };
 
 type CapturedFile = {
+  kind: 'file' | 'recovery';
   path: string;
   state: WorktreeFileState;
   mode: number;
@@ -157,6 +159,7 @@ type ExtractedFile = {
 type ExtractedSnapshot = {
   manifest: WorktreeSnapshotManifest;
   files: Map<string, ExtractedFile>;
+  recovery: Map<string, ExtractedFile>;
   temporaryDirectory: string;
 };
 
@@ -167,7 +170,10 @@ type GitResult = {
   truncated: boolean;
 };
 
-type ArchiveMember = { kind: 'manifest' } | { kind: 'file'; path: string };
+type ArchiveMember =
+  | { kind: 'manifest' }
+  | { kind: 'file'; path: string }
+  | { kind: 'recovery'; path: string };
 
 type CapturePaths = {
   tracked: string[];
@@ -188,6 +194,10 @@ const GIT_PREFIX = [
 const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const GITLINK_MODE = '160000';
+const RECOVERY_PREFIX = 'recovery/';
+const RECOVERY_STAMP_PATTERN = /^[0-9A-Za-z._-]{1,256}$/;
+const GIT_FILE_MODE = 0o100000;
+const GIT_FILE_TYPE_MASK = 0o170000;
 
 function compareStrings(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -271,6 +281,23 @@ function isSafeRelativePath(value: string): boolean {
 
 function isDisplayPath(value: string): boolean {
   return value.length > 0 && value.length <= 4096 && !value.includes('\0');
+}
+
+function isRecoveryStamp(value: string): boolean {
+  return RECOVERY_STAMP_PATTERN.test(value) && value !== '.' && value !== '..';
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+  );
+}
+
+function capturedFileMemberName(file: CapturedFile): string {
+  return file.kind === 'recovery' ? `${RECOVERY_PREFIX}${file.path}` : `files/${file.path}`;
 }
 
 async function isSubmodulePath(fullPath: string): Promise<boolean> {
@@ -416,8 +443,11 @@ async function writeArchive(
 
     for (const file of files) {
       clock.remaining();
-      digest.update(`\0file\0${file.path}\0${file.mode.toString(8)}\0${file.size.toString(10)}\0`);
-      for (const header of tarEntryHeader(`files/${file.path}`, file.mode, file.size)) {
+      const memberName = capturedFileMemberName(file);
+      digest.update(
+        `\0${file.kind}\0${file.path}\0${file.mode.toString(8)}\0${file.size.toString(10)}\0`
+      );
+      for (const header of tarEntryHeader(memberName, file.mode, file.size)) {
         yield header;
       }
 
@@ -566,6 +596,114 @@ function tarFileEntryBytes(name: string, mode: number, size: number): number {
   return headerBytes + size + tarPadding(size);
 }
 
+async function collectRecoveryDirectory(
+  stamp: string,
+  subDirectory: string,
+  absoluteDirectory: string,
+  paths: string[],
+  clock: Clock
+): Promise<void> {
+  const entries = await readdir(absoluteDirectory, { withFileTypes: true });
+  entries.sort((left, right) => compareStrings(left.name, right.name));
+  for (const entry of entries) {
+    clock.remaining();
+    const subPath = subDirectory === '' ? entry.name : `${subDirectory}/${entry.name}`;
+    if (!isSafeRelativePath(subPath) || entry.isSymbolicLink()) {
+      throw new Error('worktree snapshot recovery entry is unsafe');
+    }
+    const absolute = join(absoluteDirectory, entry.name);
+    if (entry.isDirectory()) {
+      await collectRecoveryDirectory(stamp, subPath, absolute, paths, clock);
+      continue;
+    }
+    if (!entry.isFile()) throw new Error('worktree snapshot recovery entry is unsafe');
+    paths.push(`${stamp}/${subPath}`);
+  }
+}
+
+async function collectRecoveryPaths(root: string, clock: Clock): Promise<string[]> {
+  const gitDirectory = join(root, '.git');
+  const gitEntry = await lstat(gitDirectory).catch((error: unknown) => {
+    if (isMissingPathError(error)) return undefined;
+    throw error;
+  });
+  if (!gitEntry?.isDirectory()) return [];
+  const recoveryRoot = join(gitDirectory, 'kilo-recovered');
+  const recoveryEntry = await lstat(recoveryRoot).catch((error: unknown) => {
+    if (isMissingPathError(error)) return undefined;
+    throw error;
+  });
+  if (!recoveryEntry) return [];
+  if (!recoveryEntry.isDirectory()) {
+    throw new Error('worktree snapshot recovery path is not a directory');
+  }
+
+  const paths: string[] = [];
+  const stamps = await readdir(recoveryRoot, { withFileTypes: true });
+  stamps.sort((left, right) => compareStrings(left.name, right.name));
+  for (const stamp of stamps) {
+    clock.remaining();
+    if (!isRecoveryStamp(stamp.name) || !stamp.isDirectory()) {
+      throw new Error('worktree snapshot recovery path is unsafe');
+    }
+    await collectRecoveryDirectory(stamp.name, '', join(recoveryRoot, stamp.name), paths, clock);
+  }
+  return paths;
+}
+
+async function captureRecoveryFiles(
+  root: string,
+  limits: WorktreeSnapshotLimits,
+  clock: Clock
+): Promise<{ files: CapturedFile[]; totalBytes: number; tarBytes: number }> {
+  const paths = await collectRecoveryPaths(root, clock);
+  if (paths.length === 0) return { files: [], totalBytes: 0, tarBytes: 0 };
+
+  const fileLimit = Math.min(limits.files, MAX_WORKTREE_SNAPSHOT_FILES);
+  if (paths.length > fileLimit) {
+    throw new Error('worktree snapshot recovery payload exceeded the file limit');
+  }
+  const fileBytesLimit = Math.min(limits.fileBytes, MAX_WORKTREE_SNAPSHOT_FILE_BYTES);
+  const totalBytesLimit = Math.min(limits.totalBytes, MAX_WORKTREE_SNAPSHOT_TOTAL_BYTES);
+  const files: CapturedFile[] = [];
+  let totalBytes = 0;
+  for (const path of paths) {
+    clock.remaining();
+    let state: WorktreeFileState;
+    try {
+      state = await inspectWorktreeFile(
+        root,
+        ['.git', 'kilo-recovered', ...path.split('/')].join('/')
+      );
+    } catch {
+      throw new Error('worktree snapshot recovery entry is unsafe');
+    }
+    const entry = state.stat;
+    if (!entry) throw new Error('worktree snapshot recovery entry is unsafe');
+    if (entry.size > fileBytesLimit) {
+      throw new Error('worktree snapshot recovery file exceeded the size limit');
+    }
+    if (totalBytes + entry.size > totalBytesLimit) {
+      throw new Error('worktree snapshot recovery payload exceeded the size limit');
+    }
+    const mode = (entry.mode & 0o111) === 0 ? 0o644 : 0o755;
+    files.push({ kind: 'recovery', path, state, mode, size: entry.size });
+    totalBytes += entry.size;
+  }
+
+  const tarBytes = files.reduce(
+    (total, file) => total + tarFileEntryBytes(`recovery/${file.path}`, file.mode, file.size),
+    0
+  );
+  const manifestLimit = Math.min(limits.manifestBytes, MAX_SNAPSHOT_MANIFEST_BYTES);
+  const uncompressedLimit = Math.min(limits.uncompressedBytes, MAX_DECOMPRESSED_BYTES);
+  const manifestReserve = tarFileEntryBytes('snapshot.json', 0o644, manifestLimit);
+  if (manifestReserve + tarBytes + TAR_BLOCK_BYTES * 2 > uncompressedLimit) {
+    throw new Error('worktree snapshot recovery payload exceeded the decompressed limit');
+  }
+  return { files, totalBytes, tarBytes };
+}
+
 function boundManifestSize(
   manifest: WorktreeSnapshotManifest,
   maxBytes: number,
@@ -604,12 +742,13 @@ async function captureFilesAndManifest(
   base: string,
   paths: CapturePaths,
   limits: WorktreeSnapshotLimits,
+  retained: { files: number; totalBytes: number; tarBytes: number },
   clock: Clock
 ): Promise<{ manifest: WorktreeSnapshotManifest; files: CapturedFile[] }> {
   const files: CapturedFile[] = [];
   const omitted: WorktreeSnapshotOmission[] = [];
   let partial = false;
-  let totalBytes = 0;
+  let totalBytes = retained.totalBytes;
   let budgetExhausted = false;
 
   function omit(path: string, reason: WorktreeSnapshotOmissionReason): void {
@@ -630,13 +769,14 @@ async function captureFilesAndManifest(
   const deleted: string[] = [];
   const deletedSet = new Set<string>();
   const fileLimit = Math.min(limits.files, MAX_WORKTREE_SNAPSHOT_FILES);
+  const remainingFileLimit = Math.max(0, fileLimit - retained.files);
   for (const path of paths.deleted) {
     if (candidatePaths.has(path) || deletedSet.has(path)) continue;
     if (!isSafeRelativePath(path)) {
       omit(path, 'unsafe_path');
       continue;
     }
-    if (deleted.length >= fileLimit) {
+    if (deleted.length >= remainingFileLimit) {
       omit(path, 'file_limit');
       continue;
     }
@@ -651,7 +791,7 @@ async function captureFilesAndManifest(
       omit(rawPath, 'unsafe_path');
       continue;
     }
-    if (files.length >= fileLimit) {
+    if (files.length >= remainingFileLimit) {
       omit(path, 'file_limit');
       continue;
     }
@@ -714,6 +854,7 @@ async function captureFilesAndManifest(
       continue;
     }
     files.push({
+      kind: 'file',
       path,
       state,
       mode: (entry.mode & 0o111) === 0 ? 0o644 : 0o755,
@@ -725,7 +866,7 @@ async function captureFilesAndManifest(
   const manifestLimit = Math.min(limits.manifestBytes, MAX_SNAPSHOT_MANIFEST_BYTES);
   const uncompressedLimit = Math.min(limits.uncompressedBytes, MAX_DECOMPRESSED_BYTES);
   const manifestReserve = tarFileEntryBytes('snapshot.json', 0o644, manifestLimit);
-  const fileBudget = uncompressedLimit - manifestReserve - TAR_BLOCK_BYTES * 2;
+  const fileBudget = uncompressedLimit - manifestReserve - retained.tarBytes - TAR_BLOCK_BYTES * 2;
   let fileEntryBytes = files.reduce(
     (total, file) => total + tarFileEntryBytes(`files/${file.path}`, file.mode, file.size),
     0
@@ -840,6 +981,7 @@ export async function captureWorktreeSnapshotWithLimits(
   }
 
   const paths = await collectCapturePaths(root, base, gitEnv, signal, clock);
+  const retained = await captureRecoveryFiles(root, limits, clock);
   const { manifest, files } = await captureFilesAndManifest(
     root,
     worktreeId,
@@ -847,6 +989,11 @@ export async function captureWorktreeSnapshotWithLimits(
     base,
     paths,
     limits,
+    {
+      files: retained.files.length,
+      totalBytes: retained.totalBytes,
+      tarBytes: retained.tarBytes,
+    },
     clock
   );
 
@@ -858,7 +1005,12 @@ export async function captureWorktreeSnapshotWithLimits(
   };
 
   try {
-    const contentDigest = await writeArchive(archivePath, manifest, files, clock);
+    const contentDigest = await writeArchive(
+      archivePath,
+      manifest,
+      [...retained.files, ...files],
+      clock
+    );
     const archive = await stat(archivePath);
     if (archive.size > limits.archiveBytes) {
       throw new Error('worktree snapshot archive exceeded the size limit');
@@ -1009,6 +1161,19 @@ function classifyArchiveMember(name: string): ArchiveMember {
     }
     return { kind: 'file', path };
   }
+  if (name.startsWith(RECOVERY_PREFIX)) {
+    const relative = name.slice(RECOVERY_PREFIX.length);
+    const separator = relative.indexOf('/');
+    if (separator <= 0) {
+      throw new InvalidWorktreeSnapshotError('snapshot archive contains an unsafe recovery path');
+    }
+    const stamp = relative.slice(0, separator);
+    const path = relative.slice(separator + 1);
+    if (!isRecoveryStamp(stamp) || !isSafeRelativePath(path)) {
+      throw new InvalidWorktreeSnapshotError('snapshot archive contains an unsafe recovery path');
+    }
+    return { kind: 'recovery', path: `${stamp}/${path}` };
+  }
   throw new InvalidWorktreeSnapshotError('snapshot archive contains an unexpected member');
 }
 
@@ -1111,6 +1276,7 @@ async function extractArchive(
   try {
     const reader = new ByteReader(input.pipe(gunzip));
     const files = new Map<string, ExtractedFile>();
+    const recovery = new Map<string, ExtractedFile>();
     let manifest: WorktreeSnapshotManifest | undefined;
     let longName: string | undefined;
     let ended = false;
@@ -1174,10 +1340,11 @@ async function extractArchive(
         continue;
       }
 
-      if (files.has(member.path)) {
+      const target = member.kind === 'recovery' ? recovery : files;
+      if (target.has(member.path)) {
         throw new InvalidWorktreeSnapshotError('snapshot archive has duplicate file entries');
       }
-      if (files.size >= MAX_WORKTREE_SNAPSHOT_FILES) {
+      if (files.size + recovery.size >= MAX_WORKTREE_SNAPSHOT_FILES) {
         throw new InvalidWorktreeSnapshotError('snapshot archive has too many file entries');
       }
       if (size > MAX_WORKTREE_SNAPSHOT_FILE_BYTES) {
@@ -1191,7 +1358,10 @@ async function extractArchive(
         throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported file mode');
       }
 
-      const destination = join(temporaryDirectory, ...member.path.split('/'));
+      const destination =
+        member.kind === 'recovery'
+          ? join(temporaryDirectory, 'recovery', ...member.path.split('/'))
+          : join(temporaryDirectory, 'files', ...member.path.split('/'));
       try {
         await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
       } catch (error) {
@@ -1230,7 +1400,7 @@ async function extractArchive(
         await handle.close();
       }
       await chmod(destination, mode);
-      files.set(member.path, { path: member.path, tempPath: destination, mode, size });
+      target.set(member.path, { path: member.path, tempPath: destination, mode, size });
       totalFileBytes += size;
     }
 
@@ -1246,7 +1416,7 @@ async function extractArchive(
       throw new InvalidWorktreeSnapshotError('snapshot archive belongs to another worktree');
     }
     complete = true;
-    return { manifest, files, temporaryDirectory };
+    return { manifest, files, recovery, temporaryDirectory };
   } finally {
     input.destroy();
     gunzip.destroy();
@@ -1348,6 +1518,89 @@ async function headPathExists(
     allow: [0, 1, 128],
   });
   return result.exitCode === 0;
+}
+
+async function headFileMode(
+  root: string,
+  head: string,
+  path: string,
+  env: NodeJS.ProcessEnv,
+  signal: AbortSignal,
+  clock: Clock
+): Promise<number | undefined> {
+  const result = await runGit(
+    root,
+    ['ls-tree', '-z', '--full-tree', head, '--', path],
+    env,
+    signal,
+    clock,
+    { allow: [0, 128] }
+  );
+  if (result.exitCode !== 0 || result.truncated) return undefined;
+  const [record] = result.stdout.split('\0');
+  const match = record === undefined ? null : /^([0-7]{6}) [a-z]+ [0-9a-f]+\t/.exec(record);
+  if (!match) return undefined;
+  return Number.parseInt(match[1], 8);
+}
+
+function snapshotModeMatchesHead(mode: number | undefined, snapshotMode: number): boolean {
+  if (mode === undefined || (mode & GIT_FILE_TYPE_MASK) !== GIT_FILE_MODE) return false;
+  return ((mode & 0o111) !== 0) === ((snapshotMode & 0o111) !== 0);
+}
+
+async function readExtractedFileBytes(file: ExtractedFile): Promise<Buffer> {
+  const handle = await open(file.tempPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const bytes = Buffer.alloc(file.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const result = await handle.read(bytes, offset, bytes.length - offset, offset);
+      if (result.bytesRead === 0) throw new Error('snapshot archive file is truncated');
+      offset += result.bytesRead;
+    }
+    return bytes;
+  } finally {
+    await handle.close();
+  }
+}
+
+async function workingFileMatchesSnapshot(
+  root: string,
+  file: ExtractedFile,
+  expected: Buffer
+): Promise<boolean> {
+  let state: WorktreeFileState;
+  try {
+    state = await inspectWorktreeFile(root, file.path);
+  } catch {
+    return false;
+  }
+  const entry = state.stat;
+  if (!entry?.isFile() || entry.size !== expected.length) return false;
+  if (((entry.mode & 0o111) !== 0) !== ((file.mode & 0o111) !== 0)) return false;
+
+  let handle: FileHandle | undefined;
+  try {
+    handle = await open(
+      state.path,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+    );
+    if (!sameFile(entry, await handle.stat())) return false;
+    const bytes = Buffer.alloc(expected.length);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const chunk = await readFileChunk(handle, offset, bytes.length - offset);
+      if (chunk.bytesRead === 0) return false;
+      chunk.bytes.copy(bytes, offset);
+      offset += chunk.bytesRead;
+    }
+    if (!sameFile(entry, await handle.stat())) return false;
+    return bytes.equals(expected);
+  } catch {
+    return false;
+  } finally {
+    if (handle) await handle.close();
+  }
 }
 
 async function walkSafeParents(
@@ -1564,7 +1817,7 @@ async function applyExtracted(
   signal: AbortSignal,
   clock: Clock
 ): Promise<AppliedWorktreeSnapshot> {
-  const { manifest, files } = extracted;
+  const { manifest, files, recovery } = extracted;
   const head = await resolveHead(root, env, signal, clock);
   const baseExists = await commitExists(root, manifest.base, env, signal, clock);
   const ancestor =
@@ -1576,6 +1829,22 @@ async function applyExtracted(
       : new Set<string>();
   const conflicts = new Set<string>();
   let applied = 0;
+
+  const orderedRecovery = [...recovery.values()].sort((left, right) =>
+    compareStrings(left.path, right.path)
+  );
+  for (const file of orderedRecovery) {
+    clock.remaining();
+    const relative = ['.git', 'kilo-recovered', ...file.path.split('/')].join('/');
+    try {
+      await replaceWithFile(root, relative, file.tempPath, file.mode);
+    } catch (error) {
+      if (error instanceof WorktreeTypeClashError) {
+        throw new Error('worktree snapshot recovery path is blocked');
+      }
+      throw error;
+    }
+  }
 
   const deletedPaths = [...manifest.deleted].sort(
     (left, right) => right.split('/').length - left.split('/').length || compareStrings(left, right)
@@ -1604,22 +1873,21 @@ async function applyExtracted(
     let conflict = allConflict;
     if (!allConflict && head && changed.has(file.path)) {
       const current = await headFileBytes(root, head, file.path, file.size + 1, env, signal, clock);
-      if (current) {
-        const snapshot = await open(file.tempPath, constants.O_RDONLY | constants.O_NOFOLLOW);
-        try {
-          const bytes = Buffer.alloc(file.size);
-          let offset = 0;
-          while (offset < bytes.length) {
-            const result = await snapshot.read(bytes, offset, bytes.length - offset, offset);
-            if (result.bytesRead === 0) throw new Error('snapshot archive file is truncated');
-            offset += result.bytesRead;
+      if (!current) {
+        conflict = true;
+      } else {
+        const snapshot = await readExtractedFileBytes(file);
+        if (!current.equals(snapshot)) {
+          conflict = true;
+        } else {
+          const headMode = await headFileMode(root, head, file.path, env, signal, clock);
+          if (!snapshotModeMatchesHead(headMode, file.mode)) {
+            conflict = true;
+          } else if (await workingFileMatchesSnapshot(root, file, snapshot)) {
+            continue;
           }
-          if (current.equals(bytes)) continue;
-        } finally {
-          await snapshot.close();
         }
       }
-      conflict = true;
     }
 
     if (conflict) {

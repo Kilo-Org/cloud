@@ -147,6 +147,17 @@ async function expectInvalid(promise: Promise<unknown>): Promise<void> {
   expect(error).toBeInstanceOf(InvalidWorktreeSnapshotError);
 }
 
+async function expectFailure(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
+  let error: unknown;
+  try {
+    await promise;
+  } catch (caught) {
+    error = caught;
+  }
+  expect(error).toBeInstanceOf(Error);
+  expect(String(error)).toMatch(pattern);
+}
+
 describe('worktree snapshot capture', () => {
   it('captures unstaged, staged, committed, untracked, binary, executable and deleted files', async () => {
     const fixture = await createFixture('snapshot-capture-');
@@ -897,6 +908,91 @@ describe('worktree snapshot capture', () => {
       await fixture.cleanup();
     }
   }, 120_000);
+
+  it('refuses unsafe or over-limit recovery payloads instead of dropping them', async () => {
+    const fixture = await createFixture('snapshot-recovery-unsafe-');
+    try {
+      const recovery = path.join(fixture.work, '.git', 'kilo-recovered', 'stamp');
+      await fs.mkdir(recovery, { recursive: true });
+      await fs.symlink('../../config', path.join(recovery, 'link'));
+      await expectFailure(capture(fixture.work), /recovery/);
+      await fs.unlink(path.join(recovery, 'link'));
+
+      await fs.writeFile(path.join(recovery, 'a.bin'), Buffer.alloc(40));
+      await fs.writeFile(path.join(recovery, 'b.bin'), Buffer.alloc(40));
+      await expectFailure(
+        captureWorktreeSnapshotWithLimits(
+          { directory: fixture.work, worktreeId: 'worktree_test', signal: signal() },
+          { ...LIMITS, fileBytes: 32 }
+        ),
+        /recovery/
+      );
+      await expectFailure(
+        captureWorktreeSnapshotWithLimits(
+          { directory: fixture.work, worktreeId: 'worktree_test', signal: signal() },
+          { ...LIMITS, totalBytes: 50 }
+        ),
+        /recovery/
+      );
+      await expectFailure(
+        captureWorktreeSnapshotWithLimits(
+          { directory: fixture.work, worktreeId: 'worktree_test', signal: signal() },
+          { ...LIMITS, files: 1 }
+        ),
+        /recovery/
+      );
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('keeps recovery payloads when ordinary files exhaust the total byte budget', async () => {
+    const fixture = await createFixture('snapshot-recovery-priority-');
+    try {
+      const recovery = path.join(fixture.work, '.git', 'kilo-recovered', 'stamp');
+      await fs.mkdir(recovery, { recursive: true });
+      await fs.writeFile(path.join(recovery, 'conflict.txt'), 'conflict10');
+      await fs.writeFile(path.join(fixture.work, 'new.txt'), 'newfile010');
+
+      const snapshot = await captureWorktreeSnapshotWithLimits(
+        { directory: fixture.work, worktreeId: 'worktree_test', signal: signal() },
+        { ...LIMITS, totalBytes: 15 }
+      );
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.omitted).toEqual([
+          { path: 'new.txt', reason: 'budget_exhausted' },
+        ]);
+        expect(snapshot.manifest.partial).toBe(true);
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 0, omitted: 1, conflicts: [], partial: true });
+        expect(
+          await fs.readFile(
+            path.join(target, '.git', 'kilo-recovered', 'stamp', 'conflict.txt'),
+            'utf8'
+          )
+        ).toBe('conflict10');
+        expect(
+          await fs.access(path.join(target, 'new.txt')).then(
+            () => true,
+            () => false
+          )
+        ).toBe(false);
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
 });
 
 describe('worktree snapshot apply', () => {
@@ -958,6 +1054,212 @@ describe('worktree snapshot apply', () => {
             () => false
           )
         ).toBe(false);
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('carries recovered conflict payloads into the next snapshot across a second recycle', async () => {
+    const fixture = await createFixture('snapshot-recovery-cycle-');
+    const upstream = await clone(fixture, 'upstream');
+    try {
+      await fs.writeFile(path.join(fixture.work, 'tracked.txt'), 'snapshot conflict bytes\n');
+      const first = await capture(fixture.work);
+      expect(first).not.toBeNull();
+      if (!first) throw new Error('expected snapshot');
+      try {
+        await fs.writeFile(path.join(upstream, 'tracked.txt'), 'advanced upstream bytes\n');
+        git(upstream, ['commit', '-am', 'advance']);
+        git(upstream, ['push', 'origin', 'main']);
+        const advanced = git(upstream, ['rev-parse', 'HEAD']);
+
+        const firstTarget = await clone(fixture, 'target-one');
+        const firstApply = await applyWorktreeSnapshot({
+          directory: firstTarget,
+          worktreeId: 'worktree_test',
+          archivePath: first.archivePath,
+          signal: signal(),
+        });
+        expect(firstApply).toEqual({
+          applied: 0,
+          omitted: 0,
+          conflicts: ['tracked.txt'],
+          partial: false,
+        });
+        const recovered = path.join(
+          firstTarget,
+          '.git',
+          'kilo-recovered',
+          sanitizedTimestamp(first.manifest.capturedAt),
+          'tracked.txt'
+        );
+        expect(await fs.readFile(recovered, 'utf8')).toBe('snapshot conflict bytes\n');
+        expect(await fs.readFile(path.join(firstTarget, 'tracked.txt'), 'utf8')).toBe(
+          'advanced upstream bytes\n'
+        );
+
+        await fs.writeFile(path.join(firstTarget, 'new-edit.txt'), 'new edit after recycle\n');
+        const second = await capture(firstTarget);
+        expect(second).not.toBeNull();
+        if (!second) throw new Error('expected second snapshot');
+        try {
+          expect(second.manifest.base).toBe(advanced);
+          expect(second.manifest.deleted).toEqual([]);
+          expect(second.manifest.omitted).toEqual([]);
+          expect(second.manifest.partial).toBe(false);
+
+          const secondTarget = await clone(fixture, 'target-two');
+          const secondApply = await applyWorktreeSnapshot({
+            directory: secondTarget,
+            worktreeId: 'worktree_test',
+            archivePath: second.archivePath,
+            signal: signal(),
+          });
+          expect(secondApply).toEqual({
+            applied: 1,
+            omitted: 0,
+            conflicts: [],
+            partial: false,
+          });
+          expect(await fs.readFile(path.join(secondTarget, 'new-edit.txt'), 'utf8')).toBe(
+            'new edit after recycle\n'
+          );
+          expect(
+            await fs.readFile(
+              path.join(
+                secondTarget,
+                '.git',
+                'kilo-recovered',
+                sanitizedTimestamp(first.manifest.capturedAt),
+                'tracked.txt'
+              ),
+              'utf8'
+            )
+          ).toBe('snapshot conflict bytes\n');
+          expect(await fs.readFile(path.join(secondTarget, 'tracked.txt'), 'utf8')).toBe(
+            'advanced upstream bytes\n'
+          );
+        } finally {
+          await second.cleanup();
+        }
+      } finally {
+        await first.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('restores saved bytes when preparation changes or removes a file whose HEAD content matches', async () => {
+    const fixture = await createFixture('snapshot-setup-replay-');
+    try {
+      await fs.writeFile(path.join(fixture.work, 'tracked.txt'), 'saved tracked bytes\n');
+      await fs.writeFile(path.join(fixture.work, 'base.txt'), 'saved base bytes\n');
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        git(fixture.work, ['add', '.']);
+        git(fixture.work, ['commit', '-m', 'push snapshot bytes']);
+        git(fixture.work, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        await fs.writeFile(path.join(target, 'tracked.txt'), 'setup replay bytes\n');
+        await fs.unlink(path.join(target, 'base.txt'));
+
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 2, omitted: 0, conflicts: [], partial: false });
+        expect(await fs.readFile(path.join(target, 'tracked.txt'), 'utf8')).toBe(
+          'saved tracked bytes\n'
+        );
+        expect(await fs.readFile(path.join(target, 'base.txt'), 'utf8')).toBe('saved base bytes\n');
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('restores executable mode and replaces a symlink when HEAD content already matches', async () => {
+    const fixture = await createFixture('snapshot-setup-modes-');
+    try {
+      await fs.writeFile(path.join(fixture.work, 'tool.sh'), '#!/bin/sh\necho saved\n');
+      chmodSync(path.join(fixture.work, 'tool.sh'), 0o755);
+      await fs.writeFile(path.join(fixture.work, 'data.txt'), 'saved data\n');
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        git(fixture.work, ['add', '.']);
+        git(fixture.work, ['commit', '-m', 'push snapshot bytes']);
+        git(fixture.work, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        await fs.chmod(path.join(target, 'tool.sh'), 0o644);
+        await fs.unlink(path.join(target, 'data.txt'));
+        await fs.symlink('tool.sh', path.join(target, 'data.txt'));
+
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 2, omitted: 0, conflicts: [], partial: false });
+        expect((await fs.stat(path.join(target, 'tool.sh'))).mode & 0o777).toBe(0o755);
+        const restored = await fs.lstat(path.join(target, 'data.txt'));
+        expect(restored.isFile()).toBe(true);
+        expect(restored.isSymbolicLink()).toBe(false);
+        expect(await fs.readFile(path.join(target, 'data.txt'), 'utf8')).toBe('saved data\n');
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('records a conflict when HEAD changes the executable mode of matching bytes', async () => {
+    const fixture = await createFixture('snapshot-head-mode-');
+    try {
+      await fs.writeFile(path.join(fixture.work, 'tool.sh'), '#!/bin/sh\necho saved\n');
+      chmodSync(path.join(fixture.work, 'tool.sh'), 0o755);
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        git(fixture.work, ['add', 'tool.sh']);
+        git(fixture.work, ['update-index', '--chmod=-x', 'tool.sh']);
+        git(fixture.work, ['commit', '-m', 'push non executable']);
+        git(fixture.work, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 0, omitted: 0, conflicts: ['tool.sh'], partial: false });
+        expect((await fs.stat(path.join(target, 'tool.sh'))).mode & 0o777).toBe(0o644);
+        const recovered = path.join(
+          target,
+          '.git',
+          'kilo-recovered',
+          sanitizedTimestamp(snapshot.manifest.capturedAt),
+          'tool.sh'
+        );
+        expect((await fs.stat(recovered)).mode & 0o777).toBe(0o755);
+        expect(await fs.readFile(recovered, 'utf8')).toBe('#!/bin/sh\necho saved\n');
       } finally {
         await snapshot.cleanup();
       }
@@ -1201,6 +1503,36 @@ describe('worktree snapshot apply', () => {
           tarArchive([
             tarEntry('snapshot.json', manifestBytes()),
             tarEntry('files/link', Buffer.alloc(0), '2'),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('recovery/../escape.txt', Buffer.from('escape')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('recovery/stamp/../escape.txt', Buffer.from('escape')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('recovery/stamp/.git/config', Buffer.from('escape')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('recovery/stamp/a\\b.txt', Buffer.from('escape')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('recovery/stamp/link', Buffer.alloc(0), '2'),
           ])
         ),
         gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ version: 2 }))])),

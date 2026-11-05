@@ -89,6 +89,7 @@ import {
   decideWorktreeSnapshotAuthorization,
   purgeWorktreeSnapshot,
   worktreeSnapshotAuthorizationInputSchema,
+  worktreeSnapshotObjectKey,
   worktreeSnapshotTombstoneInputSchema,
   worktreeSnapshotTombstoneKey,
   worktreeSnapshotWritesEnabled,
@@ -414,6 +415,7 @@ const wrapperSocketAttachmentSchema = z.object({
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
 const WRAPPER_BILLING_CHECK_MS = 30_000;
+const WORKTREE_SNAPSHOT_OBJECT_DELETE_TIMEOUT_MS = 5_000;
 
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
@@ -1205,6 +1207,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
 
     if (handoff.plan.action === 'replay') {
+      await this.enqueue(() => this.persistWorktreeSnapshotTombstone(parsed.worktreeId));
+      await this.deleteWorktreeSnapshotObject(parsed.worktreeId);
       return { deleted: true, sessionIds: handoff.plan.journal.sessionIds };
     }
 
@@ -1218,64 +1222,79 @@ export class SandboxControlV2 extends DurableObject<Env> {
         handoff.plan
       );
       // Phase 3 (serial queue): apply the confirmed result.
-      return this.enqueue(async () => {
-        if (!cleanup.ok) {
-          throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
+      const result = await this.enqueue(
+        async (): Promise<{ deleted: true; sessionIds: string[] }> => {
+          if (!cleanup.ok) {
+            throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
+          }
+          await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+          this.worktreeChanges.purge(parsed.worktreeId);
+          await this.persistWorktreeSnapshotTombstone(parsed.worktreeId);
+          const journal = await finishWorktreeDeletion(
+            this.ctx.storage,
+            parsed.worktreeId,
+            handoff.plan,
+            cleanup.sessionIds
+          );
+          return { deleted: true, sessionIds: journal.sessionIds };
         }
-        await this.revokeWorktreeRoutes(handoff.targetSessionIds);
-        this.worktreeChanges.purge(parsed.worktreeId);
-        await this.purgeWorktreeSnapshotStorage(parsed.worktreeId);
-        const journal = await finishWorktreeDeletion(
-          this.ctx.storage,
-          parsed.worktreeId,
-          handoff.plan,
-          cleanup.sessionIds
-        );
-        return { deleted: true, sessionIds: journal.sessionIds };
-      });
+      );
+      await this.deleteWorktreeSnapshotObject(parsed.worktreeId);
+      return result;
     }
 
     // Phase 2 (off-queue): the bounded provider stop or observation.
     const confirmed = await this.confirmWorktreeRemoval(handoff.plan);
 
     // Phase 3 (serial queue): apply the confirmed result.
-    return this.enqueue(async () => {
-      if (!confirmed) {
-        throw new WorktreeDeletionIncompleteError(
-          handoff.plan.action === 'stop'
-            ? 'Worktree provider stop is unconfirmed'
-            : 'Shared worktree runtime must reconnect before cleanup'
-        );
-      }
-      // Revoke the worktree's routes/grants even for a confirmed stop, so a
-      // failed route cannot keep the sandbox looking shared forever.
-      await this.revokeWorktreeRoutes(handoff.targetSessionIds);
-      this.worktreeChanges.purge(parsed.worktreeId);
-      await this.purgeWorktreeSnapshotStorage(parsed.worktreeId);
-      if (handoff.plan.action === 'stop') {
-        // Fence by allocation identity: a sibling prepare may have created a new
-        // allocation while the provider stop ran off-queue.
-        const current = await this.readAllocation();
-        if (current.allocationId === handoff.plan.allocationId) {
-          await this.applyEvent({ type: 'provider-gone', at: Date.now() });
+    const result = await this.enqueue(
+      async (): Promise<{ deleted: true; sessionIds: string[] }> => {
+        if (!confirmed) {
+          throw new WorktreeDeletionIncompleteError(
+            handoff.plan.action === 'stop'
+              ? 'Worktree provider stop is unconfirmed'
+              : 'Shared worktree runtime must reconnect before cleanup'
+          );
         }
+        // Revoke the worktree's routes/grants even for a confirmed stop, so a
+        // failed route cannot keep the sandbox looking shared forever.
+        await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+        this.worktreeChanges.purge(parsed.worktreeId);
+        await this.persistWorktreeSnapshotTombstone(parsed.worktreeId);
+        if (handoff.plan.action === 'stop') {
+          // Fence by allocation identity: a sibling prepare may have created a new
+          // allocation while the provider stop ran off-queue.
+          const current = await this.readAllocation();
+          if (current.allocationId === handoff.plan.allocationId) {
+            await this.applyEvent({ type: 'provider-gone', at: Date.now() });
+          }
+        }
+        const journal = await finishWorktreeDeletion(
+          this.ctx.storage,
+          parsed.worktreeId,
+          handoff.plan
+        );
+        return { deleted: true, sessionIds: journal.sessionIds };
       }
-      const journal = await finishWorktreeDeletion(
-        this.ctx.storage,
-        parsed.worktreeId,
-        handoff.plan
-      );
-      return { deleted: true, sessionIds: journal.sessionIds };
-    });
+    );
+    await this.deleteWorktreeSnapshotObject(parsed.worktreeId);
+    return result;
   }
 
-  private async purgeWorktreeSnapshotStorage(worktreeId: string): Promise<void> {
-    const purged = await purgeWorktreeSnapshot({
-      worktreeId,
-      storage: this.ctx.storage,
-      ...(this.env.WORKTREE_SNAPSHOTS_BUCKET ? { bucket: this.env.WORKTREE_SNAPSHOTS_BUCKET } : {}),
-    });
-    if (!purged) {
+  private async persistWorktreeSnapshotTombstone(worktreeId: string): Promise<void> {
+    await purgeWorktreeSnapshot({ worktreeId, storage: this.ctx.storage });
+  }
+
+  private async deleteWorktreeSnapshotObject(worktreeId: string): Promise<void> {
+    const bucket = this.env.WORKTREE_SNAPSHOTS_BUCKET;
+    if (!bucket) return;
+    try {
+      await withTimeout(
+        bucket.delete(worktreeSnapshotObjectKey(worktreeId)),
+        WORKTREE_SNAPSHOT_OBJECT_DELETE_TIMEOUT_MS,
+        'Worktree snapshot object delete timed out'
+      );
+    } catch {
       logControlDiagnostic('worktree_snapshot_delete_failed', { worktreeId }, 'warn');
     }
   }

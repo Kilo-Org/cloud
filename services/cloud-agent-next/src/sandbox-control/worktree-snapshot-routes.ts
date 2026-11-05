@@ -39,6 +39,8 @@ type SnapshotRouteIdentity = {
   worktreeId: string;
 };
 
+type AuthorizedSnapshotRoute = SnapshotRouteIdentity & { secret: string };
+
 function routeIdentity(c: Context<HonoContext>): SnapshotRouteIdentity | undefined {
   const identity = controlLogIdentitySchema.safeParse({
     sandboxId: c.req.param('sandboxId'),
@@ -80,13 +82,12 @@ async function isSnapshotTombstoned(
 
 async function authorizeRequest(
   c: Context<HonoContext>
-): Promise<SnapshotRouteIdentity | Response> {
+): Promise<AuthorizedSnapshotRoute | Response> {
   const target = routeIdentity(c);
   if (!target) return c.text('Invalid worktree snapshot identity', 400);
-  const grant = validateWorktreeSnapshotGrant(
-    c.req.header('Authorization') ?? null,
-    await resolveSecret(c.env.NEXTAUTH_SECRET)
-  );
+  const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  if (!secret) return c.text('Authentication unavailable', 503);
+  const grant = validateWorktreeSnapshotGrant(c.req.header('Authorization') ?? null, secret);
   if (!grant) return c.text('Unauthorized', 401);
   if (
     grant.sandboxId !== target.identity.sandboxId ||
@@ -102,7 +103,7 @@ async function authorizeRequest(
     return c.text('Sandbox unavailable', 503);
   }
   if (!authorized) return c.text('Forbidden', 403);
-  return target;
+  return { ...target, secret };
 }
 
 function digestFromObject(object: R2Object): string | undefined {
@@ -146,12 +147,31 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
     if (!bucket) return c.text('Worktree snapshot storage unavailable', 503);
 
     const key = worktreeSnapshotObjectKey(authorized.worktreeId);
-    let stored: R2Object;
+    let current: R2Object | null;
+    try {
+      current = await bucket.head(key);
+    } catch {
+      return c.text('Worktree snapshot storage unavailable', 503);
+    }
+    const precondition: R2Conditional = current
+      ? { etagMatches: current.etag }
+      : { etagDoesNotMatch: '*' };
+
+    let reauthorized: boolean;
+    try {
+      reauthorized = await authorizeSandbox(c, authorized.identity, authorized.worktreeId);
+    } catch {
+      return c.text('Sandbox unavailable', 503);
+    }
+    if (!reauthorized) return c.text('Forbidden', 403);
+
+    let stored: R2Object | null;
     try {
       stored = await bucket.put(key, body, {
         sha256: digest,
         httpMetadata: { contentType: OBJECT_CONTENT_TYPE },
         customMetadata: { sha256: digest },
+        onlyIf: precondition,
       });
     } catch (error) {
       if (error instanceof Error && /sha256|checksum|digest/i.test(error.message)) {
@@ -166,6 +186,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
         .warn('Worktree snapshot upload failed');
       return c.text('Worktree snapshot storage unavailable', 503);
     }
+    if (!stored) return c.text('Snapshot upload conflict', 409);
 
     if (stored.size > WORKTREE_SNAPSHOT_MAX_BYTES) {
       await discardIfCurrent(bucket, key, stored.etag).catch(() => {
@@ -235,8 +256,6 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
     if (!worktreeSnapshotWritesEnabled(c.env)) return c.text('Not found', 404);
     const authorized = await authorizeRequest(c);
     if (authorized instanceof Response) return authorized;
-    const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    if (!secret) return c.text('Authentication unavailable', 503);
-    return c.json({ grant: mintWorktreeSnapshotGrant(authorized.identity, secret) });
+    return c.json({ grant: mintWorktreeSnapshotGrant(authorized.identity, authorized.secret) });
   });
 }

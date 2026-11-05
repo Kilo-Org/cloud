@@ -2716,7 +2716,7 @@
       "questionAnnouncement": "Onye nnọchi anya chọrọ azịza gị. A kwụsịtụrụ ebe ide ozi ka ị zaa.",
       "permissionAnnouncement": "Onye nnọchi anya chọrọ ikike ịga n'ihu. A kwụsịtụrụ ebe ide ozi ka ị kpebie.",
       "positionHint": "(1 n'ime {{displayCount}})",
-      "movedPastPrompt": "Onye nnọchi anya agafeela ihe ị dere a. Kaadị a ga-emechi mgbe nnọkọ ga-aga n'ihu.",
+      "movedPastPrompt": "Onye nnọchi anya atụpụla arịrịọ a n'ihu. Kaadị a ga-emechi mgbe nnọkọ ga-aga n'ihu.",
       "waitingForAnswer": "Onye nnọchi anya na-eche azịza gị. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara ajụjụ a.",
       "waitingForPermission": "Onye nnọchi anya na-eche ikike. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara arịrịọ a."
     },
@@ -2802,7 +2802,7 @@
       "retryUploading": "Nwaa ibugote {{filename}} ọzọ",
       "removeAttachment": "Wepụ faịlụ mgbakwunye {{filename}}",
       "uploading": "Na-ebugote…",
-      "uploaded": "Ebugoro",
+      "uploaded": "Ebugotela",
       "uploadFailedRetry": "Enweghị ike ibugote. Pịa ka ị nwaa ọzọ.",
       "moveLeft": "Bugharịa {{filename}} n'aka ekpe",
       "moveRight": "Bugharịa {{filename}} n'aka nri"
@@ -2907,7 +2907,7 @@
       "provider": "Onye na-enye ọrụ",
       "totalCost": "Ngụkọta ọnụ ahịa",
       "usageReflectsLatest": "Ojiji a sitere na nzaghachi ikpeazụ onye inyeaka mechara.",
-      "usageUnavailable": "Ojiji nke context adịghị",
+      "usageUnavailable": "Ojiji nke ntụaka adịghị",
       "tokenUsage": "Ojiji tokin",
       "cacheRate": "Pasent sitere na nchekwa nwa oge",
       "modelsCount": "Ihe nlereanya ({{displayCount}})",
@@ -2917,7 +2917,7 @@
       "olderActivity": "Ọrụ ochie",
       "olderActivityDescription": "Ọnụ ahịa na-esiteghị na ndekọ e budatara",
       "ofWindowTokens": "n'ime tokin {{window}}",
-      "tokens": "iberibe ederede",
+      "tokens": "tokin",
       "tokensWithPercentage": "tokin ({{percentage}})",
       "stepsCount_one": "nzọụkwụ {{steps}}",
       "stepsCount": "nzọụkwụ {{steps}}",
@@ -2969,7 +2969,7 @@
       "retryableTitle": "Enweghị ike ịdepụta fọlda",
       "tapToListHint": "Pịa fọlda ka ị hụ ihe dị n'ime ya.",
       "unsupportedDescription": "CLI a enweghị ike ịdepụta fọlda. Pịa Emechaala iji debe fọlda mmalite. Malite nnọkọ ga-amalite ya n'ebe ahụ.",
-      "unsupportedTitle": "Enweghị ike ịdepụta fọlda"
+      "unsupportedTitle": "A naghị edepụta fọlda ebe a"
     },
     "toolRun": {
       "sheetTitle": "Oku ngwá ọrụ",

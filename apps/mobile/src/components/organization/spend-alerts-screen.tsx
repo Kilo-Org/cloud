@@ -283,10 +283,10 @@ function SpendAlertsForm({
 
   const spend24h = spend?.spend24hMicrodollars ?? 0;
   const spend7d = spend?.spend7dMicrodollars ?? 0;
-  const spendValue =
-    spend24h > 0 || spend7d > 0
-      ? formatMoney(fromMicrodollars(spend24h), i18n.language)
-      : t('spendAlerts.noSpend');
+  const hasSpend = spend24h > 0 || spend7d > 0;
+  const spendValue = hasSpend
+    ? formatMoney(fromMicrodollars(spend24h), i18n.language)
+    : t('spendAlerts.noSpend');
 
   const windowOptions: readonly { value: WindowOption; label: string }[] = [
     { value: '24', label: t(WINDOW_LABEL_KEYS['24']) },
@@ -429,13 +429,24 @@ function SpendAlertsForm({
 
       <View className="rounded-lg bg-secondary px-3">
         <KvRow label={scopeLabel} value={scopeName} selectable />
-        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last selectable />
+        {/* A selectable value is exempt from the row's one-line clamp (Android's
+            selection path re-applies selection and drops it), so only the amount
+            — the value someone copies — is selectable. The empty placeholder is
+            a sentence, so it paints in the sans face: monospace there reads as a
+            value and wraps the row on a compact phone. */}
+        <KvRow
+          label={t('spendAlerts.spend24h')}
+          value={spendValue}
+          valueFace={hasSpend ? 'mono' : 'text'}
+          selectable={hasSpend}
+          last
+        />
       </View>
 
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('notifications.channel.spend')}</Text>
+        <Text className="text-sm font-medium">{t('spendAlerts.sendAlerts')}</Text>
         <Switch
-          accessibilityLabel={t('notifications.channel.spend')}
+          accessibilityLabel={t('spendAlerts.sendAlerts')}
           value={enabled}
           onValueChange={value => {
             selectionHaptic();
@@ -548,10 +559,9 @@ function SpendAlertsForm({
         </>
       ) : (
         <>
-          <Text variant="muted" className="text-sm">
-            {t('spendAlerts.empty')}
-          </Text>
-          {/* A disable save lands with the stored value now false, so
+          {/* The switch row above is the whole off state: it already says alerts
+              are off, and the subtitle names who they reach. A disable save
+              lands with the stored value now false, so
               `masterDirty` clears on its own refetch. Keep the controls while a
               confirmation is live, or the saved line (and its reserved slot)
               would vanish the moment the save settles. An edit clears `saved`

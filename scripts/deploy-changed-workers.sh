@@ -116,17 +116,17 @@ done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not
 
 # Whether "$dir" has a deployable change since BASE_SHA.
 #
-# `git diff -z -M` writes a NUL-separated status, then the path, then a second
-# path for a rename or a copy, which is the previous name. A record is skipped
-# only when its paths are Markdown and the directory is not one the Worker reads
-# at runtime. A deletion always deploys, because a runtime asset can leave the
-# tree that way, and so does a rename or copy that involves any other path.
-# A rename between two Markdown paths is a documentation move and is skipped;
-# it removes no runtime path, and its old path is Markdown too.
+# `git diff -z -M --name-status` writes a NUL-separated status, then the path,
+# then a second path for a rename or a copy, which is the previous name. A
+# record is skipped only when its paths are Markdown and the directory is not one
+# the Worker reads at runtime. A deletion always deploys, because a runtime asset
+# can leave the tree that way, and so does a rename or copy that involves any
+# other path. A rename between two Markdown paths is a documentation move and is
+# skipped: it removes no runtime path, and its old path is Markdown too.
 #
-# The diff runs first, on its own, so its exit status is visible: a fatal
-# `git diff` deploys, exactly as `! git diff --quiet` did before. A failed
-# comparison must never be reported as "no change".
+# The diff lands in a file so its exit status is checked before anything reads
+# it. A fatal `git diff` deploys, exactly as `! git diff --quiet` did before: a
+# failed comparison must never be reported as "no change".
 dir_changed() {
   local dir="$1"
   local runtime=false
@@ -137,30 +137,34 @@ dir_changed() {
   if [[ "$runtime" == true ]]; then return 0; fi
 
   local changes
-  if ! changes=$(git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/"); then
+  changes="$(mktemp)"
+  if ! git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/" > "$changes"; then
+    rm -f "$changes"
     echo "Cannot diff $dir against $BASE_SHA; deploying it" >&2
     return 0
   fi
-  # Command substitution drops the trailing NUL, so an empty diff is no output.
-  if [[ -z "$changes" ]]; then return 1; fi
+  if [[ ! -s "$changes" ]]; then
+    rm -f "$changes"
+    return 1
+  fi
 
-  local status path markdown_paths=0
+  local status path markdown_paths=0 deploy=false
   while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-    if [[ "$status" == D* ]]; then return 0; fi
     markdown_paths=0
-    [[ "$path" == *.md ]] && markdown_paths=$((markdown_paths + 1))
     if [[ "$status" == R* || "$status" == C* ]]; then
       # A rename or a copy adds its old path first, then its new one.
+      local previous="$path"
       IFS= read -r -d '' path || path=""
-      [[ "$path" == *.md ]] && markdown_paths=$((markdown_paths + 1))
-      if [[ "$markdown_paths" == 2 ]]; then continue; fi
-    elif [[ "$markdown_paths" == 1 ]]; then
-      continue
+      if [[ "$previous" == *.md && "$path" == *.md ]]; then continue; fi
+      deploy=true
+      break
     fi
-    return 0
-  done < <(git diff -z -M --name-status "$BASE_SHA" HEAD -- "$dir/")
-
-  return 1
+    if [[ "$status" == D* ]]; then deploy=true; break; fi
+    [[ "$path" == *.md ]] || deploy=true
+    if [[ "$deploy" == true ]]; then break; fi
+  done < "$changes"
+  rm -f "$changes"
+  [[ "$deploy" == true ]]
 }
 
 AFFECTED_DIRS=""

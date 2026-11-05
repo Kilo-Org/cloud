@@ -833,6 +833,7 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     }
 
     renewing = true;
+    renewalTimer = clearTimer(renewalTimer);
     const abort = new AbortController();
     renewalAbort = abort;
     let status: number | undefined;

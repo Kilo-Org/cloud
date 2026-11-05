@@ -4861,7 +4861,12 @@ describe('worktree snapshot preparation lifecycle', () => {
       hasGit: true,
       worktreeSnapshots: snapshots.worktreeSnapshots,
     });
-    harness.setStamp({ allocationId: 'alloc-current', commit: 'c1', snapshotRecovery: true });
+    const persisted: WorkspaceStamp = {
+      allocationId: 'alloc-current',
+      commit: 'c1',
+      snapshotRecovery: true,
+    };
+    harness.setStamp(persisted);
     harness.setSessionExists(false);
     harness.setRestore(async () => restoreOk());
 
@@ -4869,7 +4874,7 @@ describe('worktree snapshot preparation lifecycle', () => {
 
     expect(snapshots.restoreCalls).toHaveLength(0);
     expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
-    expect(harness.stamp()).toMatchObject({ snapshotRecovery: true });
+    expect(harness.stamp()).toBe(persisted);
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(snapshots.registerCalls).toHaveLength(1);
   });

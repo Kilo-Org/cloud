@@ -466,6 +466,14 @@ async function writeArchive(
   return digest.digest('hex');
 }
 
+async function isNonDirectoryOnDisk(path: string): Promise<boolean> {
+  try {
+    return !(await lstat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 async function collectCapturePaths(
   root: string,
   base: string,
@@ -506,14 +514,16 @@ async function collectCapturePaths(
     if (!path || fields.length !== 5 || status?.length !== 1) {
       throw new Error('git diff returned an invalid record');
     }
-    if (oldMode === GITLINK_MODE || newMode === GITLINK_MODE) {
+    if (newMode === GITLINK_MODE || (oldMode === GITLINK_MODE && status === 'D')) {
       if (!seen.has(path)) {
         seen.add(path);
         submodules.push(path);
       }
       continue;
     }
-    if (status === 'D') {
+    // An ignored file removed from the index with `git rm --cached` is still on
+    // disk but absent from `ls-files --others`; capture it rather than delete it.
+    if (status === 'D' && !(await isNonDirectoryOnDisk(join(root, path)))) {
       if (!deletedSet.has(path)) {
         deletedSet.add(path);
         deleted.push(path);
@@ -522,7 +532,8 @@ async function collectCapturePaths(
     }
     if (seen.has(path)) continue;
     seen.add(path);
-    if (status === 'A' || status === 'M' || status === 'T' || status === 'U') tracked.push(path);
+    if (status === 'A' || status === 'D' || status === 'M' || status === 'T' || status === 'U')
+      tracked.push(path);
     else throw new Error(`git diff returned unsupported status ${status}`);
   }
 

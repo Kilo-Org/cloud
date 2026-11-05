@@ -1583,7 +1583,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (owner.released) return;
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
-      if (kiloConfig.scopeId.startsWith('worktree_')) {
+      if (spec.roots === undefined && kiloConfig.scopeId.startsWith('worktree_')) {
         deps.worktreeSnapshots?.register({
           directory,
           worktreeId: kiloConfig.scopeId,

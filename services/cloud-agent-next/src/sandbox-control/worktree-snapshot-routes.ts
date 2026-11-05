@@ -167,6 +167,19 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
       return c.text('Worktree snapshot storage unavailable', 503);
     }
 
+    if (stored.size > WORKTREE_SNAPSHOT_MAX_BYTES) {
+      await discardIfCurrent(bucket, key, stored.etag).catch(() => {
+        logger
+          .withFields({
+            event: 'worktree_snapshot_discard_failed',
+            sandboxId: authorized.identity.sandboxId,
+            worktreeId: authorized.worktreeId,
+          })
+          .warn('Worktree snapshot oversized upload discard failed');
+      });
+      return c.text('Body too large', 413);
+    }
+
     let tombstoned: boolean;
     try {
       tombstoned = await isSnapshotTombstoned(

@@ -328,6 +328,28 @@ describe('worktree snapshot PUT route', () => {
     expect(bucket.delete).toHaveBeenCalledWith(worktreeSnapshotObjectKey(worktreeId));
   });
 
+  it('discards a stored object larger than the cap despite a small declared length', async () => {
+    const { env, bucket, isWorktreeSnapshotTombstoned } = createEnv();
+    bucket.put.mockResolvedValueOnce({ etag: 'etag-1', size: 64 * 1024 * 1024 + 1 });
+    const bytes = new TextEncoder().encode('snapshot');
+    const response = await app().request(
+      path(),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': digest(bytes),
+        },
+        body: bytes,
+      },
+      requestEnv(env)
+    );
+    expect(response.status).toBe(413);
+    expect(bucket.delete).toHaveBeenCalledWith(worktreeSnapshotObjectKey(worktreeId));
+    expect(isWorktreeSnapshotTombstoned).not.toHaveBeenCalled();
+  });
+
   it('keeps the upload when only the allocation changes after authorization', async () => {
     const { env, bucket, authorizeWorktreeSnapshot, isWorktreeSnapshotTombstoned } = createEnv();
     authorizeWorktreeSnapshot.mockResolvedValueOnce(true).mockResolvedValueOnce(false);

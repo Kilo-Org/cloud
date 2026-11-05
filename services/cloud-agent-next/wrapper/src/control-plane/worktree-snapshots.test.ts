@@ -690,6 +690,45 @@ describe('worktree snapshot scheduler', () => {
     }
   });
 
+  it('retries a transiently failed 401 renewal before the half-life timer fires', async () => {
+    const archive = await temporaryArchive(Buffer.from('retry renewal upload'));
+    const fake = createFakeClock(22_000_000);
+    const renewed = identityGrant(22_001, 9_000_000);
+    let puts = 0;
+    let renewals = 0;
+    const { fetch } = createFetch(call => {
+      if (call.init.method === 'PUT') {
+        puts += 1;
+        return new Response(null, { status: puts === 1 ? 401 : 204 });
+      }
+      renewals += 1;
+      return renewals === 1
+        ? new Response(null, { status: 503 })
+        : Response.json({ grant: renewed });
+    });
+    const snapshots = createSnapshots({
+      url: BASE_URL,
+      grant: grant(22_000, 9_000_000),
+      clock: fake.clock,
+      capture: async () =>
+        captureWith({ path: archive.path, size: archive.size, contentDigest: 'a'.repeat(64) }),
+      fetch,
+    });
+    try {
+      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => renewals === 1);
+      await fake.advance(30_000);
+      await waitFor(() => renewals === 2);
+      await fake.advance(1_000);
+      await waitFor(() => puts === 2);
+    } finally {
+      snapshots.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the recapture when renewal succeeds while the failed capture cleans up', async () => {
     const archive = await temporaryArchive(Buffer.from('slow cleanup upload'));
     const fake = createFakeClock(22_000_000);

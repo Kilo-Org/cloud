@@ -14,7 +14,7 @@ import {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
-import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { createPreparationManager, type PrepareDeps, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 
 /**
@@ -99,6 +99,7 @@ function rootsHarness(
     fetchDelayMs?: (cwd: string | undefined) => number | undefined;
     timers?: ControlPlaneTimers;
     recoverWorktree?: (directory: string, files: string[]) => Promise<RootRecoveryResult>;
+    worktreeSnapshots?: PrepareDeps['worktreeSnapshots'];
   } = {}
 ) {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -187,6 +188,7 @@ function rootsHarness(
             )) as never,
         }
       : {}),
+    ...(options.worktreeSnapshots ? { worktreeSnapshots: options.worktreeSnapshots } : {}),
     seedRegistration: async () => undefined,
     sessionExists: async () => !options.recoverWorktree,
     sleep: async () => undefined,
@@ -267,6 +269,28 @@ describe('preparing a route with several git roots', () => {
       sessionId: spec.sessionId,
       workspace: 'cloned',
     });
+  });
+
+  it('neither restores nor registers a worktree snapshot for a worktree-scoped roots route', async () => {
+    const calls: string[] = [];
+    const harness = rootsHarness({
+      worktreeSnapshots: {
+        restore: async () => {
+          calls.push('restore');
+          return { found: false };
+        },
+        register: () => {
+          calls.push('register');
+        },
+        unregister: () => undefined,
+      },
+    });
+    const spec = rootSpec();
+
+    await harness.manager.prepare({ ...spec, kilo: { ...spec.kilo!, scopeId: 'worktree_roots' } });
+
+    expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    expect(calls).toEqual([]);
   });
 
   it('does not clone or set up again when every root has a matching stamp', async () => {

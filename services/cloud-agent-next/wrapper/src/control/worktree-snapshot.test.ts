@@ -280,6 +280,7 @@ describe('worktree snapshot capture', () => {
     try {
       await fs.writeFile(path.join(fixture.work, 'base.txt'), 'same content\n');
       const first = await capture(fixture.work);
+      const firstDigest = first?.contentDigest;
       await new Promise(resolve => setTimeout(resolve, 10));
       const second = await capture(fixture.work);
       expect(first).not.toBeNull();
@@ -311,6 +312,7 @@ describe('worktree snapshot capture', () => {
       if (!afterPush) throw new Error('expected snapshot');
       try {
         expect(afterPush.manifest.base).toBe(git(fixture.work, ['rev-parse', 'HEAD']));
+        expect(afterPush.contentDigest).not.toBe(firstDigest);
         expect(afterPush.manifest.deleted).toEqual([]);
         expect(afterPush.manifest.omitted).toEqual([]);
         expect(afterPush.manifest.partial).toBe(false);
@@ -730,6 +732,72 @@ describe('worktree snapshot capture', () => {
         expect(await fs.readFile(path.join(target, 'tracked.txt'), 'utf8')).toBe(
           'retained after rm cached\n'
         );
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('captures an ignored file kept on disk after git rm --cached instead of deleting it', async () => {
+    const fixture = await createFixture('snapshot-rm-cached-ignored-');
+    const target = await clone(fixture, 'target');
+    try {
+      await fs.writeFile(path.join(fixture.work, '.git', 'info', 'exclude'), 'tracked.txt\n');
+      git(fixture.work, ['rm', '--cached', 'tracked.txt']);
+      await fs.writeFile(path.join(fixture.work, 'tracked.txt'), 'ignored but retained\n');
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.deleted).not.toContain('tracked.txt');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result.conflicts).toEqual([]);
+        expect(await fs.readFile(path.join(target, 'tracked.txt'), 'utf8')).toBe(
+          'ignored but retained\n'
+        );
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('captures a regular file that replaces a gitlink', async () => {
+    const fixture = await createFixture('snapshot-gitlink-file-');
+    try {
+      const submoduleCommit = git(fixture.work, ['rev-parse', 'HEAD']);
+      git(fixture.work, [
+        'update-index',
+        '--add',
+        '--cacheinfo',
+        `160000,${submoduleCommit},vendor/lib`,
+      ]);
+      git(fixture.work, ['commit', '-m', 'gitlink']);
+      git(fixture.work, ['push', 'origin', 'main']);
+      git(fixture.work, ['rm', '--cached', 'vendor/lib']);
+      await fs.rm(path.join(fixture.work, 'vendor', 'lib'), { recursive: true, force: true });
+      await fs.mkdir(path.join(fixture.work, 'vendor'), { recursive: true });
+      await fs.writeFile(path.join(fixture.work, 'vendor', 'lib'), 'now a file\n');
+      git(fixture.work, ['add', 'vendor/lib']);
+
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.omitted).not.toContainEqual({
+          path: 'vendor/lib',
+          reason: 'submodule',
+        });
+        expect(snapshot.manifest.deleted).not.toContain('vendor/lib');
+        expect(snapshot.manifest.partial).toBe(false);
       } finally {
         await snapshot.cleanup();
       }

@@ -49,7 +49,6 @@ import { preflightAndQueuePromptMessage } from '../../session/queue-message.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import {
   assertSessionOperationIdentity,
-  assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
 import type { Env, TRPCContext } from '../../types.js';
@@ -679,10 +678,6 @@ async function createDestinationRuntimeAuthorization(
   }
 }
 
-async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<void> {
-  if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
-}
-
 /**
  * A source on a retired runtime, including a legacy shared sandbox, never loads
  * (`loadSourceMetadata`), so the sandbox needs no check here.
@@ -1070,9 +1065,6 @@ async function registerWorktreeSession(
           }
         }
         registrationAttempted = true;
-        if (preissuedRuntimeAuthorization === undefined) {
-          await assertNewDestinationRuntimeIsolation(ctx);
-        }
         const runtimeAuthorization =
           preissuedRuntimeAuthorization ??
           (await createDestinationRuntimeAuthorization(
@@ -1225,9 +1217,6 @@ async function executeWorktreeCreate(
   preissuedRuntimeAuthorization?: WorktreeRuntimeAuthorization
 ): Promise<OperationProgress> {
   const startedAt = Date.now();
-  if (preissuedRuntimeAuthorization === undefined) {
-    await assertNewDestinationRuntimeIsolation(ctx);
-  }
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: options.requestedCloudAgentSessionId ?? generateSessionId(),
     kiloSessionId: options.requestedKiloSessionId ?? generateKiloSessionId(),
@@ -1349,8 +1338,6 @@ async function reconcileWorktreeCreate(
       progress.cloudAgentSessionId,
       preissuedRuntimeAuthorization !== undefined
     );
-  } else if (preissuedRuntimeAuthorization === undefined) {
-    await assertNewDestinationRuntimeIsolation(ctx);
   }
 
   const ownership = await findOwnershipRow(

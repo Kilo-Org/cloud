@@ -17,7 +17,6 @@ import type {
 import type { BuildStore } from '../../src/environment-build/store.js';
 import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
 import { MAX_BUILD_LOG_BYTES } from '../../src/environment-build/policy.js';
-import { isEnvironmentSnapshotsEnabled } from '../../src/environment-build/enrollment.js';
 
 const OWNER = { type: 'organization' as const, id: '22222222-2222-4222-8222-222222222222' };
 const REPOSITORY = { platform: 'github' as const, repoFullName: 'acme/widgets' };
@@ -44,7 +43,6 @@ type Harness = {
   alarms: number[];
   gitUnavailable?: boolean;
   billingAdmission?: (allocation: BuilderAllocation) => Promise<void>;
-  snapshotOrgIds: string;
 };
 
 /** The profile package's reference, the shape `readEnvironmentReference` returns. */
@@ -92,7 +90,6 @@ async function setup(): Promise<Harness> {
     launchError: null,
     currentImage: 'registry.example/runtime-free:1',
     alarms: [],
-    snapshotOrgIds: OWNER.id,
   };
   const provider: BuilderProvider = {
     admitBilling: async allocation => {
@@ -182,13 +179,7 @@ async function setup(): Promise<Harness> {
         metadata: { origin: 'environment-build' },
       }),
       builderSandboxId: 'sbx-' + '0'.repeat(48),
-      unsupportedReason: owner =>
-        isEnvironmentSnapshotsEnabled(
-          { ENVIRONMENT_SNAPSHOT_ORG_IDS: harness.snapshotOrgIds },
-          owner
-        )
-          ? null
-          : 'Snapshots are not enabled for this account',
+      unsupportedReason: () => null,
       log: () => undefined,
     };
     host.coordinator = new EnvironmentBuildCoordinator(environmentId, deps);
@@ -756,80 +747,11 @@ describe('environment build lifecycle', () => {
 });
 
 describe('environment snapshot resolution', () => {
-  it.each(['organization', 'user'] as const)(
-    'uses account-neutral enrollment messaging for owner type %s',
-    async type => {
-      const environmentId = crypto.randomUUID();
-      const result = await namespace.getByName(environmentId).status({
-        environmentId,
-        owner: { type, id: crypto.randomUUID() },
-        configurationRevision: 1,
-      });
-      expect(result).toMatchObject({
-        supported: false,
-        unsupportedReason: 'Snapshots are not enabled for this account',
-      });
-    }
-  );
-
   const sessionReference = (harness: Harness, revision: number) => ({
     environmentId: harness.environmentId,
     owner: OWNER,
     configurationRevision: revision,
     repository: REPOSITORY,
-  });
-
-  it('denies manual and automatic builds for an organization outside the allowlist', async () => {
-    const harness = await setup();
-    harness.snapshotOrgIds = 'another-org';
-    expect(await manualBuild(harness)).toEqual({
-      status: 'rejected',
-      reason: 'unsupported_provider',
-    });
-    expect(
-      await harness.stub.resolveSnapshot({
-        reference: sessionReference(harness, 1),
-        actorUserId: 'user-1',
-      })
-    ).toEqual({
-      snapshot: null,
-      reason: 'unsupported',
-      admission: { status: 'skipped', reason: 'unsupported' },
-    });
-    expect(await status(harness)).toMatchObject({
-      supported: false,
-      activeBuild: null,
-      published: null,
-    });
-    expect(harness.launches).toHaveLength(0);
-  });
-
-  it('retains a published snapshot but refuses restore after organization access is removed', async () => {
-    const harness = await setup();
-    const { auth } = await readyBuild(harness);
-    await harness.stub.runnerResult(auth, {
-      outcome: 'ready',
-      commit: 'a'.repeat(40),
-      branch: 'main',
-      setupDurationMs: 1,
-    });
-    await drive(harness);
-    expect((await status(harness)).published).not.toBeNull();
-    harness.snapshotOrgIds = '';
-    expect(
-      await harness.stub.resolveSnapshot({
-        reference: sessionReference(harness, 1),
-        actorUserId: 'user-1',
-      })
-    ).toMatchObject({
-      snapshot: null,
-      reason: 'unsupported',
-      admission: { status: 'skipped', reason: 'unsupported' },
-    });
-    expect(await status(harness)).toMatchObject({
-      supported: false,
-      published: expect.any(Object),
-    });
   });
 
   it.each(['queued', 'preparing'] as const)(
@@ -854,31 +776,6 @@ describe('environment snapshot resolution', () => {
       });
     }
   );
-
-  it('does not launch a queued build after organization access is removed', async () => {
-    const harness = await setup();
-    await manualBuild(harness);
-    harness.snapshotOrgIds = '';
-    await drive(harness);
-    expect(harness.launches).toHaveLength(0);
-    expect(await status(harness)).toMatchObject({
-      activeBuild: null,
-      latestBuild: { state: 'obsolete', failureReason: 'snapshots_disabled' },
-    });
-  });
-
-  it('stops a running builder after organization access is removed', async () => {
-    const harness = await setup();
-    await readyBuild(harness);
-    harness.snapshotOrgIds = '';
-    await drive(harness);
-    expect(harness.stops).toHaveLength(1);
-    expect(harness.captures).toHaveLength(0);
-    expect(await status(harness)).toMatchObject({
-      activeBuild: null,
-      latestBuild: { state: 'obsolete' },
-    });
-  });
 
   it('admits one build however many sessions start without a snapshot', async () => {
     const harness = await setup();

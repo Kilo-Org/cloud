@@ -131,13 +131,11 @@ describe('isValidOpenRouterModelId', () => {
       isValidOpenRouterModelId,
       getCachedVercelInferenceProviderIdsForModel,
       resolveOpenRouterModelAlias,
-      resetOpenRouterModelIdWarningForTest,
     } = await import('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
     return {
       isValidOpenRouterModelId,
       getCachedVercelInferenceProviderIdsForModel,
       resolveOpenRouterModelAlias,
-      resetOpenRouterModelIdWarningForTest,
     };
   }
 
@@ -278,21 +276,6 @@ describe('isValidOpenRouterModelId', () => {
     } finally {
       jest.useRealTimers();
     }
-  });
-
-  it('warns again for a fresh empty snapshot after the latch is reset', async () => {
-    const { isValidOpenRouterModelId, resetOpenRouterModelIdWarningForTest } =
-      await loadValidator();
-    mockLimit.mockResolvedValue([]);
-
-    await expect(isValidOpenRouterModelId('vendor/one')).resolves.toBe(true);
-    await expect(isValidOpenRouterModelId('vendor/two')).resolves.toBe(true);
-    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(1);
-
-    resetOpenRouterModelIdWarningForTest();
-
-    await expect(isValidOpenRouterModelId('vendor/three')).resolves.toBe(true);
-    expect(mockWarnExceptInTest).toHaveBeenCalledTimes(2);
   });
 
   it('warns again only after metadata recovers and empties again', async () => {

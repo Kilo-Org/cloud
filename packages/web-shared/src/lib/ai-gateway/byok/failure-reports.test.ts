@@ -1,39 +1,38 @@
-import { beforeEach, describe, expect, test } from '@jest/globals';
-import {
-  BYOK_FAILURE_REPORT_WINDOW_MS,
-  claimFailureReport,
-  MAX_TRACKED_FAILURES,
-  resetFailureReportsForTest,
-} from './failure-reports';
+import { describe, expect, test } from '@jest/globals';
+import { BYOK_FAILURE_REPORT_WINDOW_MS, MAX_TRACKED_FAILURES } from './failure-reports';
 
-beforeEach(() => {
-  resetFailureReportsForTest();
-});
+/**
+ * The window lives in the module, so every case starts from an empty one by loading a fresh
+ * instance instead of resetting shared state.
+ */
+async function loadClaimFailureReport() {
+  jest.resetModules();
+  const { claimFailureReport } = await import('./failure-reports');
+  return claimFailureReport;
+}
 
 describe('claimFailureReport', () => {
-  test('claims a key once and suppresses it until the window passes', () => {
+  test('claims a key once and suppresses it until the window passes', async () => {
+    const claimFailureReport = await loadClaimFailureReport();
+
     expect(claimFailureReport('window-key', 0)).toBe(true);
     expect(claimFailureReport('window-key', BYOK_FAILURE_REPORT_WINDOW_MS - 1)).toBe(false);
     expect(claimFailureReport('window-key', BYOK_FAILURE_REPORT_WINDOW_MS)).toBe(true);
   });
 
-  test('claims each key independently', () => {
+  test('claims each key independently', async () => {
+    const claimFailureReport = await loadClaimFailureReport();
+
     expect(claimFailureReport('first-key', 5_000)).toBe(true);
     expect(claimFailureReport('second-key', 5_000)).toBe(true);
     expect(claimFailureReport('first-key', 5_001)).toBe(false);
+    expect(claimFailureReport('second-key', 5_001)).toBe(false);
   });
 
-  test('starts a fresh window after a reset', () => {
-    expect(claimFailureReport('reset-key', 0)).toBe(true);
-    expect(claimFailureReport('reset-key', 0)).toBe(false);
-
-    resetFailureReportsForTest();
-
-    expect(claimFailureReport('reset-key', 0)).toBe(true);
-  });
-
-  test('forgets the least recently reported key once the map is full', () => {
+  test('forgets the least recently reported key once the map is full', async () => {
+    const claimFailureReport = await loadClaimFailureReport();
     const overflow = 5;
+
     for (let index = 0; index < MAX_TRACKED_FAILURES + overflow; index += 1) {
       expect(claimFailureReport(`cap-key-${index}`, 10_000)).toBe(true);
     }
@@ -43,5 +42,15 @@ describe('claimFailureReport', () => {
     expect(claimFailureReport(`cap-key-${MAX_TRACKED_FAILURES + overflow - 1}`, 10_001)).toBe(
       false
     );
+  });
+
+  test('reports again after a restart, which starts an empty window', async () => {
+    const beforeRestart = await loadClaimFailureReport();
+    expect(beforeRestart('restart-key', 0)).toBe(true);
+    expect(beforeRestart('restart-key', 0)).toBe(false);
+
+    const afterRestart = await loadClaimFailureReport();
+
+    expect(afterRestart('restart-key', 0)).toBe(true);
   });
 });

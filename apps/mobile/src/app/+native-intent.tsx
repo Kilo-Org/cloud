@@ -5,6 +5,7 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
@@ -52,6 +53,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     // never a route, which the resolver would re-dispatch.
     if (handlePrReviewInstanceFixturePath(path)) {
       return null;
+    }
+    // Dev-only Run on sheet, opened with the bridge the composer writes
+    // (`dev/instance-picker-fixture/<state>` under the development scheme).
+    const instancePickerRoute = instancePickerFixtureRoute(path);
+    if (instancePickerRoute) {
+      return instancePickerRoute;
     }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).

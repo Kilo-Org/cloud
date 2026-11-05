@@ -63,22 +63,20 @@ test.each(
 test.each(
   [undefined, 'vercel'].flatMap(transport =>
     [
-      { region: 'sfo1', master: 'true', exposure: '1', selected: true },
-      { region: 'sfo1', master: 'true', exposure: '0', selected: false },
-      { region: 'sfo1', master: 'false', exposure: '1', selected: true },
-      { region: 'fra1', master: 'true', exposure: '1', selected: false },
+      { region: 'sfo1', master: 'true', selected: true },
+      { region: 'sfo1', master: 'false', selected: true },
+      { region: 'fra1', master: 'true', selected: false },
     ].map(config => ({ ...config, transport }))
   )
 )(
-  'production Cloudflare SFO selection survives transport=$transport, region=$region, master=$master, exposure=$exposure',
-  ({ transport, region, master, exposure, selected }) => {
+  'production SFO selection survives transport=$transport, region=$region, master=$master',
+  ({ transport, region, master, selected }) => {
     const original = { ...process.env };
     try {
       process.env.VERCEL_TARGET_ENV = 'production';
       process.env.VERCEL_ENV = 'production';
       process.env.VERCEL_REGION = region;
       process.env.USAGE_QUEUE_ONLY_ENABLED = master;
-      process.env.USAGE_QUEUE_SFO_EXPOSURE = exposure;
       process.env.BYOK_ENCRYPTION_KEY = 'synthetic-key';
       if (transport === undefined) delete process.env.USAGE_QUEUE_TRANSPORT;
       else process.env.USAGE_QUEUE_TRANSPORT = transport;

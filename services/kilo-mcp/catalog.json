@@ -4027,6 +4027,11 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
         "keyIds": {
           "minItems": 1,
           "maxItems": 100,
@@ -4045,9 +4050,10 @@
     "tags": [
       "byok",
       "reorder",
+      "organizationid",
       "keyids"
     ],
-    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder keyids keyIds"
+    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder organizationid keyids organizationId keyIds"
   },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",

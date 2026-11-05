@@ -547,7 +547,7 @@ function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
     side: 'assistant',
-    undelivered: false,
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,
@@ -562,7 +562,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
     side: 'user',
-    undelivered: true,
+    error: true,
     titleKey: 'agentChat.messageFailure.deliveryTitle',
     title: 'Message not sent',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
@@ -578,11 +578,11 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   const executionFailure: MessageFailure = {
     kind: 'delivery',
     side: 'assistant',
-    undelivered: false,
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
-    detailKey: null,
-    detail: null,
+    detailKey: 'agentChat.messageFailure.deliveryExecution',
+    detail: 'The agent could not run this message.',
     copyDetail: 'Message delivery failed',
     canRetry: true,
     canCopy: true,

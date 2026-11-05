@@ -147,7 +147,7 @@ describe.each([
 });
 
 describe('MessageBubble failed message treatment', () => {
-  it('marks a message the transport gave up on and leaves a stopped one and a failed response whole', async () => {
+  it('marks every error heading and leaves a message the person stopped unmarked', async () => {
     const { MessageBubble } = await import('./message-bubble');
     const retry = vi.fn<(message: StoredMessage) => void>();
     // eslint-disable-next-line new-cap
@@ -174,10 +174,11 @@ describe('MessageBubble failed message treatment', () => {
       deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
     });
 
-    // Only the give-up carries the marker beside its title; the bubble keeps the
-    // same fill and ink as a delivered one in every state.
+    // Every failure heading that reports an error carries the same marker; a
+    // message the person stopped reports a neutral status and carries none. The
+    // bubble keeps the same fill and ink as a delivered one in every state.
     expect(findElementByType(undelivered, 'AlertCircle')).not.toBeNull();
-    expect(findElementByType(execution, 'AlertCircle')).toBeNull();
+    expect(findElementByType(execution, 'AlertCircle')).not.toBeNull();
     expect(findElementByType(stopped, 'AlertCircle')).toBeNull();
     // Without a wired action the row states nothing, so no marker is drawn.
     expect(findElementByType(unexplained, 'AlertCircle')).toBeNull();

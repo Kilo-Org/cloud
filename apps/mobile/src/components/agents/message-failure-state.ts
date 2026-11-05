@@ -9,45 +9,51 @@ import { i18n } from '@/i18n';
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
 /**
- * The statement a delivery failure draws, keyed by its `reason`. A message the
- * person stopped says so and nothing more. A message the transport gave up on
- * says it was not sent, and a second line says how often it tried; that is the
- * only failure drawn on a failed bubble, because the message itself is what did
- * not arrive.
+ * The row a delivery failure draws, keyed by its `reason`. A message the person
+ * stopped states that it stopped and nothing more. A message the transport gave
+ * up on says it was not sent, and a second line says how many attempts it took;
+ * that is the only failure drawn on a failed bubble, because the message itself
+ * is what did not arrive.
  *
- * `execution` is the response failing, not the message: the row draws the
- * assistant-failure title instead (see `AGENT_EXECUTION_DELIVERY_REASON`), so
- * this line is never rendered. It stays in the record to keep the reason
- * coverage complete.
+ * `execution` is the response failing, not the message: the message reached the
+ * agent, so the row states the response's failure in the assistant column, and
+ * its second line names the run as the thing that failed.
+ *
+ * `error` marks a row that reports an error, so the row carries the destructive
+ * marker beside its title. A message the person stopped reports a neutral
+ * status rather than an error, so it carries none.
  */
-const DELIVERY_FAILURE_COPY = {
+const DELIVERY_FAILURE_ROW = {
   interrupted: {
+    side: 'user',
+    error: false,
     titleKey: 'agentChat.messageFailure.deliveryInterrupted',
     detailKey: null,
-    undelivered: false,
   },
   exhausted: {
+    side: 'user',
+    error: true,
     titleKey: 'agentChat.messageFailure.deliveryTitle',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
-    undelivered: true,
   },
   execution: {
-    titleKey: 'agentChat.messageFailure.deliveryExecution',
-    detailKey: null,
-    undelivered: false,
+    side: 'assistant',
+    error: true,
+    titleKey: 'agentChat.messageFailure.assistantTitle',
+    detailKey: 'agentChat.messageFailure.deliveryExecution',
   },
 } as const satisfies Record<
   DeliveryReason,
-  { titleKey: string; detailKey: string | null; undelivered: boolean }
+  { side: 'user' | 'assistant'; error: boolean; titleKey: string; detailKey: string | null }
 >;
 
 /**
  * The one delivery reason that is an agent run failing, not the transport: the
  * message was delivered and the agent could not run it. The row states it in
- * the assistant-failure copy ("Response failed") with no second line — the
- * session's own status line reports the same failure, so a delivery-flavoured
- * title here plus the footer's line read as the failure stated three times
- * (UX-DEFECT session-detail failed turn). Retry and Copy-to-composer keep
+ * the assistant-failure copy ("Response failed") in the assistant's column,
+ * with one line naming what failed; the session's status indicator for this
+ * reason is the delivery line, which that row already supersedes (see
+ * `statusIndicatorDuplicatesMessageFailure`). Retry and Copy-to-composer keep
  * working: the transport text stays reachable behind the copy action.
  */
 const AGENT_EXECUTION_DELIVERY_REASON = 'execution' satisfies DeliveryReason;
@@ -139,12 +145,13 @@ export type MessageFailure = {
    */
   side: 'user' | 'assistant';
   /**
-   * Whether the message itself never arrived. Only the transport giving up on a
-   * delivery says so, and only that failure draws the message as failed; a
-   * message the person stopped, and every failure of the response, leave the
-   * bubble whole.
+   * Whether the row reports an error, so it carries the destructive marker
+   * beside its title. Every failure does except a message the person stopped:
+   * stopping is a neutral status, not an error. The message bubble itself keeps
+   * the same fill and ink in every state, so the marker does not touch the ink
+   * its 15px copy reads at.
    */
-  undelivered: boolean;
+  error: boolean;
   /**
    * The catalog key behind `title`. The duplicate check compares keys, not the
    * resolved copy: `selectMessageFailure` runs inside a memo keyed on the
@@ -156,10 +163,9 @@ export type MessageFailure = {
   title: string;
   /**
    * The catalog key behind `detail`, or `null` when the title alone says it (an
-   * assistant failure with no classified reason, an agent-execution delivery
-   * failure whose response-failure title is the whole statement, or a message
-   * the person stopped). The footer then shows one statement plus the action
-   * rather than the same sentence twice.
+   * assistant failure with no classified reason, or a message the person
+   * stopped). The footer then shows one statement plus the action rather than
+   * the same sentence twice.
    */
   detailKey: string | null;
   /**
@@ -261,14 +267,15 @@ export function selectMessageFailure(input: {
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
+      const copy = DELIVERY_FAILURE_ROW.execution;
       return {
         kind: 'delivery',
-        side: 'assistant',
-        undelivered: false,
-        titleKey: 'agentChat.messageFailure.assistantTitle',
-        title: i18n.t('agentChat.messageFailure.assistantTitle'),
-        detailKey: null,
-        detail: null,
+        side: copy.side,
+        error: copy.error,
+        titleKey: copy.titleKey,
+        title: i18n.t(copy.titleKey),
+        detailKey: copy.detailKey,
+        detail: i18n.t(copy.detailKey),
         copyDetail: deliveryState.error,
         canRetry: retryAvailable,
         canCopy: true,
@@ -279,12 +286,12 @@ export function selectMessageFailure(input: {
     // takes the same branch instead of drawing an unlabelled row.
     const copy =
       deliveryState.reason === 'interrupted'
-        ? DELIVERY_FAILURE_COPY.interrupted
-        : DELIVERY_FAILURE_COPY.exhausted;
+        ? DELIVERY_FAILURE_ROW.interrupted
+        : DELIVERY_FAILURE_ROW.exhausted;
     return {
       kind: 'delivery',
-      side: 'user',
-      undelivered: copy.undelivered,
+      side: copy.side,
+      error: copy.error,
       titleKey: copy.titleKey,
       title: i18n.t(copy.titleKey),
       detailKey: copy.detailKey,
@@ -306,7 +313,7 @@ export function selectMessageFailure(input: {
     return {
       kind: 'assistant',
       side: 'assistant',
-      undelivered: false,
+      error: true,
       titleKey: 'agentChat.messageFailure.assistantTitle',
       title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detailKey,

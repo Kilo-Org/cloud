@@ -184,9 +184,12 @@ function MessageBubbleImpl({
     failure !== null && relevantHandlerWired ? (
       <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
         <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
-          {failure.undelivered ? (
-            // The marker is the state, not copy: the title beside it says what
-            // happened, so it carries no text of its own for a screen reader.
+          {failure.error ? (
+            // Every failure that reports an error carries the same marker; a
+            // message the person stopped reports a neutral status and carries
+            // none. The marker is the state, not copy: the title beside it says
+            // what happened, so it carries no text of its own for a screen
+            // reader.
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <AlertCircle size={14} color={colors.destructive} />
             </View>

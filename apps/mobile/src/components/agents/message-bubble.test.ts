@@ -363,6 +363,9 @@ describe('MessageBubble failure footer', () => {
         name.split(' ').includes('text-right')
       )
     ).toEqual([]);
+    // The failed response states its reason under the title, the same way the
+    // provider's own failures do.
+    expect(findText(executionTree, t => t === 'The agent could not run this message.')).toBe(true);
     // The failed response still offers both recovery actions.
     expect(
       findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Retry')

@@ -79,7 +79,16 @@ export async function fetchModelListJson(
       throw new Error(`Failed to fetch ${description}: response body is too large`);
     }
 
-    const body = await readBoundedBody(response, description, maxBytes);
+    let body: string;
+    try {
+      body = await readBoundedBody(response, description, maxBytes);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Failed to fetch ')) {
+        throw error;
+      }
+      const reason = error instanceof Error ? error.message : 'response body read failed';
+      throw new Error(`Failed to fetch ${description}: ${reason}`, { cause: error });
+    }
     try {
       return JSON.parse(body) as unknown;
     } catch (error) {

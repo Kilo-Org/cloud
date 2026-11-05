@@ -21,7 +21,10 @@ import {
 import { parseAwsBedrockModelsDevModels } from './bedrock-models';
 import { fetchModelListJson } from './fetch-model-list';
 import { parseGcpVertexModelsDevModels } from './vertex-models';
-import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import {
+  recordSkippedSyncProviders,
+  recordSyncCompleted,
+} from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
@@ -342,6 +345,9 @@ export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
     } else {
       direct_byok_model_counts[outcome.provider_id] = outcome.count;
     }
+  }
+  if (failed_provider_ids.length > 0) {
+    recordSkippedSyncProviders('direct_byok', failed_provider_ids);
   }
 
   // Nothing was skipped in favour of anything else, so the run itself failed.

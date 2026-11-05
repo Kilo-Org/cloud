@@ -200,6 +200,22 @@ describe('fetchModelListJson', () => {
     );
   });
 
+  test('reports a body stream that fails after the headers', async () => {
+    const server = await startServer((request, response) => {
+      response.on('error', () => undefined);
+      response.writeHead(200, {
+        'content-type': 'application/json',
+        'transfer-encoding': 'chunked',
+      });
+      response.write('{"data":["');
+      request.socket.destroy();
+    });
+
+    await expect(fetchModelListJson(`${server.url}/v1/models`, 'fixture models')).rejects.toThrow(
+      /^Failed to fetch fixture models: /
+    );
+  });
+
   test('stops waiting at the deadline', async () => {
     const server = await startServer(() => {
       // Never answers, so only the deadline ends the request.

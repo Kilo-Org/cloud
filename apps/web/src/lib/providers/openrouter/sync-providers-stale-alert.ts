@@ -252,6 +252,19 @@ export async function recordSyncCompleted(jobId: SyncJobId): Promise<string> {
   return completedAt;
 }
 
+export function recordSkippedSyncProviders(jobId: SyncJobId, providerIds: string[]): void {
+  const job = SYNC_JOBS[jobId];
+  captureException(
+    new Error(
+      `${job.logPrefix} providers whose list could not be refreshed: ${providerIds.join(', ')}`
+    ),
+    {
+      tags: { component: job.sentryComponent },
+      extra: { providers: providerIds },
+    }
+  );
+}
+
 export async function postStaleSyncAlert(input: {
   jobId: SyncJobId;
   lastCompletedAt: Date | null;

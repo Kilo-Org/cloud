@@ -16,6 +16,7 @@
     "ENVIRONMENT": "development",
     "NEXTAUTH_SECRET": "nextauth-test-secret-0123456789abcdef",
     "SESSION_SYNC_SECRET": "session-sync-test-secret-0123456789abcdef",
+    "INTERNAL_API_SECRET_PROD": "internal-test-secret-0123456789abcdef",
   },
   "ratelimits": [
     {

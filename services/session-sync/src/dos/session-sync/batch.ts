@@ -127,6 +127,7 @@ export function apply(
     entity_count: entityCount,
     inline_bytes: inlineBytes,
     updated_at: now,
+    last_write_at: now,
   });
 
   const receipt: ReceiptRow = {

@@ -37,6 +37,8 @@ async function loseTenantResponse(
         get: () => ({
           reserve: (input: unknown) => invoke('reserve', input),
           release: (input: unknown) => invoke('release', input),
+          trackCreatedSession: (input: unknown) => realTenant.trackCreatedSession(input),
+          forgetCreatedSession: (input: unknown) => realTenant.forgetCreatedSession(input),
         }),
       } as unknown as Env['SESSION_SYNC_TENANT_DO'],
     };
@@ -176,7 +178,12 @@ it('returns retryable tenant failures without resetting the session or losing re
       ...exposed.env,
       SESSION_SYNC_TENANT_DO: {
         idFromName: namespace.idFromName.bind(namespace),
-        get: () => ({ reserve: unavailable, release: unavailable }),
+        get: () => ({
+          reserve: unavailable,
+          release: unavailable,
+          trackCreatedSession: unavailable,
+          forgetCreatedSession: unavailable,
+        }),
       } as unknown as Env['SESSION_SYNC_TENANT_DO'],
     };
   });
@@ -361,6 +368,7 @@ it.each([false, true])(
         expect(await state.storage.get('pendingRegistration')).toEqual({
           tenant: principal.tenant,
           sessionID,
+          creatorID: principal.userID,
         });
         expect(await state.storage.getAlarm()).not.toBeNull();
         expect(drizzle(state.storage).select().from(session).get()).toBeUndefined();
@@ -450,10 +458,12 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     const sql = state.storage.sql;
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(1);
+    ).toBe(2);
     // Recreate the raw-table layout used by earlier, never-deployed local fixtures.
     sql.exec('DROP TABLE leases');
     sql.exec('DROP TABLE usage');
+    sql.exec('DROP TABLE created_sessions');
+    sql.exec('DROP TABLE user_erasure');
     sql.exec('DROP TABLE __drizzle_migrations');
     sql.exec('CREATE TABLE leases (session_id TEXT PRIMARY KEY, bytes INTEGER NOT NULL)');
     sql.exec(
@@ -475,7 +485,7 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     });
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(1);
+    ).toBe(2);
   });
   expect(await stub.reserve({ tenant, sessionID: newSessionID(), bytes: 256 })).toEqual({
     ok: true,

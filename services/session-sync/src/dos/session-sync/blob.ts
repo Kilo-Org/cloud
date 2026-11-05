@@ -136,6 +136,7 @@ export function commit(
     .set({ state: 'unreferenced', deadline: now + LIMITS.unreferencedMs })
     .where(and(eq(blobs.hash, ref.hash), eq(blobs.attempt, attempt)))
     .run();
+  update(db, { last_write_at: now });
   return { version: 1, hash: ref.hash, bytes: ref.bytes, created: true };
 }
 

@@ -7,6 +7,7 @@ import { authorize, exchange, type Principal } from './auth';
 import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
+import { internal } from './internal';
 import {
   ERROR_STATUS,
   LIMITS,
@@ -22,7 +23,7 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { jsonResponse, requestMetrics, textResponse, timed } from './metrics';
+import { jsonResponse, requestMetrics, requestRoute, textResponse, timed } from './metrics';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -127,6 +128,8 @@ function sessionParam(c: C): Result<string> {
 }
 
 export const app = new Hono<AppContext>();
+
+app.route('/internal', internal);
 
 app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
 
@@ -308,7 +311,7 @@ app.notFound(() => failure({ code: 'not_found', message: 'Route not found' }));
 
 app.onError((error, c) => {
   console.error('session-sync request failed', {
-    path: new URL(c.req.url).pathname,
+    path: requestRoute(c.req.raw),
     error: error.name,
   });
   return failure({ code: 'internal_error', message: 'Internal error' });

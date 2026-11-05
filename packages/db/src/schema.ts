@@ -97,6 +97,7 @@ import {
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
   BYOKManagementSource,
+  ClaudeBillingConnectionStatus,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
@@ -334,6 +335,7 @@ export const SCHEMA_CHECK_ENUMS = {
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
   BYOKManagementSource,
+  ClaudeBillingConnectionStatus,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
@@ -7425,6 +7427,70 @@ export const openai_chatgpt_connections = pgTable(
 );
 
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
+
+/**
+ * A Claude billing connection: one Kilo owner (a personal account or an
+ * organization) linked through its Anthropic user profile to a customer's
+ * Claude organization, so the Claude requests the owner makes bill that
+ * organization. No credential is stored: Kilo's operator service account sends
+ * the requests, and the user profile ID names who pays.
+ *
+ * Anthropic allows one user profile per customer organization for each OAuth
+ * app, so `user_profile_id` is unique and kept after a removal: a reconnect
+ * reuses it and gets the same connection back.
+ */
+export const claude_billing_connections = pgTable(
+  'claude_billing_connections',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    user_profile_id: text().notNull(),
+    /** Anthropic's `ocon_…` connection ID; null until an approval completes. */
+    connection_id: text(),
+    status: text()
+      .$type<ClaudeBillingConnectionStatus>()
+      .notNull()
+      .default(ClaudeBillingConnectionStatus.Pending),
+    /**
+     * The last refusal code Anthropic answered a customer-billed request with,
+     * such as `linked_organization_spend_limit_reached`. It explains the state
+     * to the owner and gates nothing; a reconnect clears it.
+     */
+    last_refusal_code: text(),
+    last_refusal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    connected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    created_by: text().notNull(),
+  },
+  table => [
+    unique('UQ_claude_billing_connections_user_profile_id').on(table.user_profile_id),
+    uniqueIndex('UQ_claude_billing_connections_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_claude_billing_connections_organization')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    enumCheck(
+      'claude_billing_connections_status_check',
+      table.status,
+      ClaudeBillingConnectionStatus
+    ),
+    check(
+      'claude_billing_connections_owner_check',
+      sql`(
+        (${table.kilo_user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
+        (${table.kilo_user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type ClaudeBillingConnectionRow = typeof claude_billing_connections.$inferSelect;
 
 // Security Reviews - Phase 1
 export const security_findings = pgTable(

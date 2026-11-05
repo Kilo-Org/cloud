@@ -1,0 +1,136 @@
+jest.mock('./store', () => ({ getClaudeBillingConnection: jest.fn() }));
+jest.mock('./operator', () => ({
+  getClaudeOperatorToken: jest.fn(),
+  getClaudeServedModelIds: jest.fn(),
+  isClaudeOperatorConfigured: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  resolveOpenRouterModelAlias: jest.fn(async (model: string) =>
+    model === '~anthropic/latest' ? 'anthropic/claude-sonnet-4.6' : model
+  ),
+}));
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { getClaudeBillingConnection } from './store';
+import {
+  getClaudeOperatorToken,
+  getClaudeServedModelIds,
+  isClaudeOperatorConfigured,
+} from './operator';
+import { checkClaudeBilling } from './routing';
+
+const row: ClaudeBillingConnectionRow = {
+  id: 'row',
+  kilo_user_id: 'user',
+  organization_id: null,
+  user_profile_id: 'uprof_test',
+  connection_id: 'ocon_test',
+  status: 'connected',
+  connected_at: '2026-01-01T00:00:00Z',
+  last_refusal_code: null,
+  last_refusal_at: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  created_by: 'user',
+};
+
+beforeEach(() => {
+  jest.mocked(getClaudeBillingConnection).mockReset().mockResolvedValue(row);
+  jest.mocked(getClaudeOperatorToken).mockReset().mockResolvedValue('operator-token');
+  jest
+    .mocked(getClaudeServedModelIds)
+    .mockReset()
+    .mockResolvedValue(new Set(['claude-sonnet-4-6']));
+  jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
+});
+
+function request(kind: 'messages' | 'chat_completions'): GatewayRequest {
+  return {
+    kind,
+    body: {
+      model: 'anthropic/claude-sonnet-4.6',
+      max_tokens: 20,
+      messages: [{ role: 'user', content: 'hello' }],
+    },
+  };
+}
+
+function input(kind: 'messages' | 'chat_completions' = 'messages') {
+  return {
+    request: request(kind),
+    requestedModel: '~anthropic/latest',
+    userId: 'user',
+    organizationId: undefined,
+  };
+}
+
+describe('Claude customer-billed routing', () => {
+  it.each(['messages', 'chat_completions'] as const)(
+    'bills the profile over %s without a Kilo charge',
+    async kind => {
+      const args = input(kind);
+      const result = await checkClaudeBilling(args);
+      if (result?.kind !== 'provider') throw new Error('Expected customer-billed provider');
+      expect(result.provider.apiUrl).toBe('https://api.anthropic.com/v1');
+      const headers: Record<string, string> = {};
+      await result.provider.transformRequest({
+        provider: result.provider,
+        model: args.requestedModel,
+        request: args.request,
+        extraHeaders: headers,
+        originalHeaders: {} as never,
+        userByok: null,
+        kilo_user_id: 'user',
+        organization_id: null,
+        session_id: null,
+      });
+      expect(args.request.body).toMatchObject({
+        model: 'claude-sonnet-4-6',
+        billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+      });
+      expect(headers['anthropic-user-profile-id']).toBe('uprof_test');
+      expect(headers['anthropic-beta']).toContain('user-profiles-billing-2026-10-01');
+      expect(result.skipBalanceCheck).toBe(true);
+    }
+  );
+
+  it('does not serve an organization request from a personal connection', async () => {
+    jest.mocked(getClaudeBillingConnection).mockResolvedValue(null);
+    expect(await checkClaudeBilling({ ...input(), organizationId: 'organization' })).toBeNull();
+    expect(getClaudeBillingConnection).toHaveBeenCalledWith(
+      { kind: 'organization', organizationId: 'organization' },
+      expect.anything()
+    );
+  });
+
+  it.each(['pending', 'removed'] as const)('keeps normal routing for %s owners', async status => {
+    jest.mocked(getClaudeBillingConnection).mockResolvedValue({ ...row, status });
+    expect(await checkClaudeBilling(input())).toBeNull();
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('never falls back when operator configuration is absent', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
+    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('never falls back when the connected organization cannot serve the model', async () => {
+    jest.mocked(getClaudeServedModelIds).mockResolvedValue(new Set(['claude-other']));
+    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+  });
+
+  it('fails locally without fetching an operator token after a terminal refusal', async () => {
+    jest
+      .mocked(getClaudeBillingConnection)
+      .mockResolvedValue({ ...row, status: 'billing_unavailable' });
+    expect(await checkClaudeBilling(input())).toMatchObject({ kind: 'unavailable' });
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps unrelated models on their existing route', async () => {
+    expect(await checkClaudeBilling({ ...input(), requestedModel: 'openai/gpt-model' })).toBeNull();
+    expect(getClaudeBillingConnection).not.toHaveBeenCalled();
+  });
+});

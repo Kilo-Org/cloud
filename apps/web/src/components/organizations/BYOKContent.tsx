@@ -15,6 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
+import { CLAUDE_BILLING_FLAG } from '@/lib/auth/claude/access';
+import { ClaudeBillingCard } from './byok/ClaudeBillingCard';
 
 export function BYOKContent({
   organizationId,
@@ -25,6 +27,7 @@ export function BYOKContent({
 }) {
   const { assumedRole } = useRoleTesting();
   const chatGptEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
+  const claudeBillingEnabled = useFeatureFlagEnabled(CLAUDE_BILLING_FLAG);
 
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
@@ -53,6 +56,9 @@ export function BYOKContent({
           title="Bring Your Own Key"
           showBackButton={false}
         />
+        {process.env.NODE_ENV === 'development' || claudeBillingEnabled === true ? (
+          <ClaudeBillingCard organizationId={organizationId} />
+        ) : null}
         {/*
           The ChatGPT connection is personal, so every member manages their own
           for this organization and sees only that card. The pasted-key manager

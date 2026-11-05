@@ -25,6 +25,7 @@ import {
 } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { createBillingStub } from './billing';
 
 const PORT = Number(process.env.MOCK_ANTHROPIC_PORT ?? 4791);
 const HOST = '127.0.0.1';
@@ -48,11 +49,16 @@ const federationPublicKey = createPublicKey(
   createPrivateKey(requireEnv('CLAUDE_FEDERATION_PRIVATE_KEY').replace(/\\n/g, '\n'))
 );
 const federationIssuer = requireEnv('CLAUDE_FEDERATION_ISSUER');
+const billingClientId = process.env.CLAUDE_BILLING_CLIENT_ID;
 
 /** Each OAuth app's client ID and the assertion audience its settings expect. */
 const clientAudiences = new Map<string, string>([
   [requireEnv('CLAUDE_SIGN_IN_CLIENT_ID'), requireEnv('CLAUDE_SIGN_IN_ASSERTION_AUDIENCE')],
 ]);
+if (billingClientId)
+  clientAudiences.set(billingClientId, requireEnv('CLAUDE_BILLING_ASSERTION_AUDIENCE'));
+if (process.env.CLAUDE_OPERATOR_TOKEN_AUDIENCE)
+  clientAudiences.set('operator', requireEnv('CLAUDE_OPERATOR_TOKEN_AUDIENCE'));
 
 type IssuedCode = {
   clientId: string;
@@ -254,6 +260,8 @@ function handleToken(body: Record<string, unknown>, response: ServerResponse): v
   });
 }
 
+const handleBilling = createBillingStub(checkClientAssertion);
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', BASE_URL);
   const raw = request.method === 'POST' ? await readBody(request) : '';
@@ -266,13 +274,30 @@ const server = createServer(async (request, response) => {
       // The recorded body never keeps an assertion or a code verifier.
       body: Object.fromEntries(
         Object.entries(jsonBody).filter(
-          ([key]) => !['client_assertion', 'code_verifier'].includes(key)
+          ([key]) => !['client_assertion', 'assertion', 'code_verifier', 'code'].includes(key)
         )
       ),
       at: new Date().toISOString(),
     });
   }
 
+  if (
+    await handleBilling(
+      request.method ?? 'GET',
+      url,
+      jsonBody,
+      raw,
+      request.headers.authorization,
+      typeof request.headers['anthropic-user-profile-id'] === 'string'
+        ? request.headers['anthropic-user-profile-id']
+        : undefined,
+      typeof request.headers['anthropic-beta'] === 'string'
+        ? request.headers['anthropic-beta']
+        : undefined,
+      response
+    )
+  )
+    return;
   if (request.method === 'GET' && url.pathname === '/users/.well-known/openid-configuration') {
     send(response, 200, {
       issuer: ISSUER,

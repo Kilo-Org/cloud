@@ -171,5 +171,15 @@ if [ ${#pnpm_filters[@]} -eq 0 ]; then
   exit 0
 fi
 
+# The wrapper workspace compiles this service's shared sources (its tsconfig
+# includes ../src/shared), and the package filters above follow package.json
+# dependencies only, in either direction from another workspace. CI's affected
+# run selects the wrapper through that include; select it here too whenever the
+# service lands in the selection.
+if pnpm ls -r --depth -1 "${pnpm_filters[@]}" --json 2>/dev/null |
+  node -e 'process.exit(JSON.parse(require("node:fs").readFileSync(0, "utf8")).some(p => p.name === "cloud-agent-next") ? 0 : 1)'; then
+  pnpm_filters+=(--filter '@kilocode/cloud-agent-wrapper')
+fi
+
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"
 pnpm -r "${pnpm_filters[@]}" "${workspace_typecheck_filters[@]}" run typecheck

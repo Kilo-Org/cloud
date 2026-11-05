@@ -45,7 +45,7 @@ export type NativeConnection = 'connecting' | 'connected' | 'disconnected';
 export type NativePresenceState = {
   connection: NativeConnection;
   instances: z.infer<typeof instanceSchema>[];
-  error?: string;
+  error?: string | undefined;
 };
 export type NativeSessionState = {
   connection: NativeConnection;
@@ -53,7 +53,7 @@ export type NativeSessionState = {
   messages: NativeMessage[];
   events: NativeEvent[];
   commands: Record<string, 'queued' | 'delivered' | 'expired'>;
-  error?: string;
+  error?: string | undefined;
 };
 export type NativeInstanceReply = {
   commandID: string;
@@ -119,7 +119,7 @@ const record = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 const reason = (error: unknown) =>
-  error instanceof Error ? error.message : 'Native connection failed';
+  error instanceof Error ? error['message'] : 'Native connection failed';
 
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
@@ -162,7 +162,7 @@ export class NativeSyncClient {
     });
     if (!response.ok) {
       const body = record(await response.json().catch(() => null));
-      const error = record(body.error);
+      const error = record(body['error']);
       const retry = response.headers.get('Retry-After');
       const retryAfterMs = retry
         ? /^\d+$/.test(retry)
@@ -170,7 +170,7 @@ export class NativeSyncClient {
           : Math.max(0, Date.parse(retry) - Date.now())
         : 0;
       throw new NativeSyncError(
-        typeof error.code === 'string' ? error.code : `HTTP ${response.status}`,
+        typeof error['code'] === 'string' ? error['code'] : `HTTP ${response.status}`,
         response.status,
         retryAfterMs
       );
@@ -186,7 +186,7 @@ export class NativeSyncClient {
         headers: { ...init?.headers, Authorization: `Bearer ${grant.token}` },
       })) as T;
     } catch (error) {
-      if (!(error instanceof NativeSyncError) || error.status !== 401) throw error;
+      if (!(error instanceof NativeSyncError) || error['status'] !== 401) throw error;
       this.grants.delete(organizationID ?? '');
       const renewed = await this.grant(organizationID);
       return (await this.json(path, {
@@ -235,10 +235,10 @@ export class NativeSyncClient {
     const scheduleRenewal = (body: Record<string, unknown>) => {
       clearTimeout(renewalTimer);
       const deadline =
-        typeof body.reauthAt === 'string'
-          ? Date.parse(body.reauthAt)
-          : typeof body.expiresAt === 'string'
-            ? Date.parse(body.expiresAt) - 30_000
+        typeof body['reauthAt'] === 'string'
+          ? Date.parse(body['reauthAt'])
+          : typeof body['expiresAt'] === 'string'
+            ? Date.parse(body['expiresAt']) - 30_000
             : NaN;
       if (!Number.isFinite(deadline)) return;
       const current = generation;
@@ -263,7 +263,7 @@ export class NativeSyncClient {
       clearTimeout(renewalTimer);
       onConnection('disconnected', error ? reason(error) : undefined);
       clearTimeout(reconnectTimer);
-      const retry = error instanceof NativeSyncError ? error.retryAfterMs : 0;
+      const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
       reconnectTimer = setTimeout(
         () => {
           void connect();
@@ -290,8 +290,8 @@ export class NativeSyncClient {
           if (current === generation) reconnect();
         };
         next.onmessage = event => {
-          if (typeof event.data !== 'string') return;
-          const data = event.data;
+          if (typeof event['data'] !== 'string') return;
+          const data = event['data'];
           frames = frames
             .then(async () => {
               if (stopped || current !== generation) return;
@@ -299,8 +299,8 @@ export class NativeSyncClient {
               if (frame.channel === 'control') {
                 const body = record(frame.body);
                 if (frame.type === 'hello') {
-                  if (typeof body.reconnectAfterMs === 'number')
-                    reconnectAfterMs = Math.min(60_000, Math.max(1000, body.reconnectAfterMs));
+                  if (typeof body['reconnectAfterMs'] === 'number')
+                    reconnectAfterMs = Math.min(60_000, Math.max(1000, body['reconnectAfterMs']));
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
@@ -368,25 +368,27 @@ export class NativeSyncClient {
         const body = record(frame.body);
         if (frame.type === 'hello') send({ type: 'subscribe' });
         if (frame.type === 'instances')
-          publish({ instances: z.array(instanceSchema).parse(body.instances) });
+          publish({ instances: z.array(instanceSchema).parse(body['instances']) });
         if (
           frame.type === 'reply' ||
-          (frame.type === 'command_status' && body.status === 'unknown')
+          (frame.type === 'command_status' && body['status'] === 'unknown')
         ) {
-          if (typeof body.commandID !== 'string') return;
-          const call = pending.get(body.commandID);
-          if (!call || body.instanceID !== call.instanceID) return;
+          if (typeof body['commandID'] !== 'string') return;
+          const call = pending.get(body['commandID']);
+          if (!call || body['instanceID'] !== call.instanceID) return;
           clearTimeout(call.timer);
-          pending.delete(body.commandID);
+          pending.delete(body['commandID']);
           call.resolve({
-            commandID: body.commandID,
+            commandID: body['commandID'],
             instanceID: call.instanceID,
             status: frame.type === 'reply' ? 'replied' : 'unknown',
-            body: body.payload,
+            body: body['payload'],
           });
         }
         if (frame.type === 'error')
-          publish({ error: typeof body.code === 'string' ? body.code : 'Presence command failed' });
+          publish({
+            error: typeof body['code'] === 'string' ? body['code'] : 'Presence command failed',
+          });
       },
       (connection, error) => {
         if (connection === 'disconnected') settleUnknown();
@@ -465,7 +467,7 @@ export class NativeSyncClient {
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
-            publish({ runnerConnected: body.runnerConnected === true });
+            publish({ runnerConnected: body['runnerConnected'] === true });
             if (lastSeq === undefined) {
               await snapshot();
               lastSeq = frame.seq;
@@ -474,45 +476,45 @@ export class NativeSyncClient {
           }
           if (frame.type === 'reset_required') {
             await snapshot();
-            lastSeq = typeof body.seq === 'number' ? body.seq : frame.seq;
+            lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
           }
           if (frame.type === 'runner_status') {
-            if (body.runnerConnected !== true) identity = undefined;
-            publish({ runnerConnected: body.runnerConnected === true });
+            if (body['runnerConnected'] !== true) identity = undefined;
+            publish({ runnerConnected: body['runnerConnected'] === true });
           }
-          if (frame.type === 'command_status' && typeof body.commandID === 'string') {
-            const parsed = commandStatusSchema.safeParse(body.status);
+          if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
+            const parsed = commandStatusSchema.safeParse(body['status']);
             if (parsed.success)
-              publish({ commands: { ...state.commands, [body.commandID]: parsed.data } });
+              publish({ commands: { ...state.commands, [body['commandID']]: parsed.data } });
           }
           if (frame.type === 'error')
             publish({
-              error: typeof body.code === 'string' ? body.code : 'Session command failed',
+              error: typeof body['code'] === 'string' ? body['code'] : 'Session command failed',
             });
           return;
         }
         if (frame.channel !== 'events' || (lastSeq !== undefined && frame.seq <= lastSeq)) return;
         lastSeq = frame.seq;
-        if (typeof body.incarnation === 'string')
+        if (typeof body['incarnation'] === 'string')
           identity = {
-            incarnation: body.incarnation,
-            ...(typeof body.runID === 'string' ? { runID: body.runID } : {}),
+            incarnation: body['incarnation'],
+            ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
           };
         if (frame.type === 'remote.state') remoteState = frame;
         const recent =
           frame.type === 'remote.state'
             ? []
-            : state.events.filter(event => event.type !== 'remote.state').slice(-498);
+            : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
         const events =
           frame.type === 'remote.state'
             ? [frame]
             : [...(remoteState ? [remoteState] : []), ...recent, frame];
         const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
         const beyondSnapshot =
-          typeof body.syncPosition !== 'number' ||
-          body.syncPosition > snapshotPosition ||
-          (ephemeral && body.syncPosition === snapshotPosition);
+          typeof body['syncPosition'] !== 'number' ||
+          body['syncPosition'] > snapshotPosition ||
+          (ephemeral && body['syncPosition'] === snapshotPosition);
         publish({
           events,
           messages: !beyondSnapshot
@@ -636,37 +638,37 @@ export class NativeSyncClient {
 
 /** Projects native public events, not the unrelated v1 transcript format. */
 export function applyNativeEvent(messages: NativeMessage[], frame: NativeEvent): NativeMessage[] {
-  const event = record(record(frame.body).data);
-  const data = record(event.data);
+  const event = record(record(frame.body)['data']);
+  const data = record(event['data']);
   const messageID =
-    typeof data.assistantMessageID === 'string'
-      ? data.assistantMessageID
-      : frame.type === 'session.message.content.updated' && typeof data.messageID === 'string'
-        ? data.messageID
+    typeof data['assistantMessageID'] === 'string'
+      ? data['assistantMessageID']
+      : frame.type === 'session.message.content.updated' && typeof data['messageID'] === 'string'
+        ? data['messageID']
         : undefined;
   if (frame.type === 'session.step.started' && messageID) {
     if (messages.some(message => message.id === messageID)) return messages;
     return [...messages, { id: messageID, role: 'assistant', content: [], seq: frame.seq }];
   }
   if (frame.type === 'session.inbox.enqueued') {
-    const item = record(data.item);
-    const payload = record(item.payload);
+    const item = record(data['item']);
+    const payload = record(item['payload']);
     const text =
-      item.type === 'user' && typeof payload.text === 'string' ? payload.text : undefined;
-    const inboxID = typeof data.inboxID === 'string' ? data.inboxID : undefined;
+      item['type'] === 'user' && typeof payload['text'] === 'string' ? payload['text'] : undefined;
+    const inboxID = typeof data['inboxID'] === 'string' ? data['inboxID'] : undefined;
     if (inboxID && text && !messages.some(entry => entry.id === inboxID))
       return [...messages, { id: inboxID, role: 'user', content: text, seq: frame.seq }];
   }
   if (!messageID) return messages;
   return messages.map(message => {
     if (message.id !== messageID) return message;
-    const parts = Array.isArray(message.content)
-      ? message.content.map(part => ({ ...record(part) }))
+    const parts = Array.isArray(message['content'])
+      ? message['content'].map(part => ({ ...record(part) }))
       : [];
     const partOrdinals = message.partOrdinals
       ? [...message.partOrdinals]
       : parts.map((_, index) => index);
-    const ordinal = typeof data.ordinal === 'number' ? data.ordinal : 0;
+    const ordinal = typeof data['ordinal'] === 'number' ? data['ordinal'] : 0;
     const kind = frame.type.startsWith('session.reasoning.') ? 'reasoning' : 'text';
     if (/^session\.(text|reasoning)\.(started|delta|ended)$/.test(frame.type)) {
       let index = partOrdinals.indexOf(ordinal);
@@ -681,8 +683,8 @@ export function applyNativeEvent(messages: NativeMessage[], frame: NativeEvent):
         text: frame.type.endsWith('.started')
           ? ''
           : frame.type.endsWith('.ended')
-            ? data.text
-            : `${typeof previous.text === 'string' ? previous.text : ''}${typeof data.delta === 'string' ? data.delta : ''}`,
+            ? data['text']
+            : `${typeof previous['text'] === 'string' ? previous['text'] : ''}${typeof data['delta'] === 'string' ? data['delta'] : ''}`,
       };
       const ordered = partOrdinals
         .map((ordinal, index) => ({ ordinal, part: parts[index] }))
@@ -694,40 +696,40 @@ export function applyNativeEvent(messages: NativeMessage[], frame: NativeEvent):
       };
     }
     if (frame.type.startsWith('session.tool.')) {
-      let index = parts.findIndex(part => part.id === data.id);
+      let index = parts.findIndex(part => part['id'] === data['id']);
       if (index < 0) {
         index = parts.length;
-        parts.push({ type: 'tool', id: data.id, name: data.name, state: {} });
+        parts.push({ type: 'tool', id: data['id'], name: data['name'], state: {} });
         partOrdinals.push((partOrdinals.at(-1) ?? -1) + 1);
       }
       const part = parts[index];
       if (!part) return message;
-      const state = record(part.state);
+      const state = record(part['state']);
       if (frame.type === 'session.tool.input.delta')
-        part.state = {
+        part['state'] = {
           ...state,
           status: 'streaming',
-          input: `${typeof state.input === 'string' ? state.input : ''}${typeof data.delta === 'string' ? data.delta : ''}`,
+          input: `${typeof state['input'] === 'string' ? state['input'] : ''}${typeof data['delta'] === 'string' ? data['delta'] : ''}`,
         };
       else if (frame.type === 'session.tool.input.ended')
-        part.state = { ...state, status: 'streaming', input: data.text };
+        part['state'] = { ...state, status: 'streaming', input: data['text'] };
       else if (frame.type === 'session.tool.called')
-        part.state = { status: 'running', input: data.input };
+        part['state'] = { status: 'running', input: data['input'] };
       else if (frame.type === 'session.tool.success')
-        part.state = {
+        part['state'] = {
           ...state,
           status: 'completed',
-          content: data.content,
-          metadata: data.metadata,
+          content: data['content'],
+          metadata: data['metadata'],
         };
       else if (frame.type === 'session.tool.failed')
-        part.state = { ...state, status: 'error', error: data.error };
+        part['state'] = { ...state, status: 'error', error: data['error'] };
       else if (frame.type === 'session.tool.progress')
-        part.state = { ...state, metadata: data.metadata };
+        part['state'] = { ...state, metadata: data['metadata'] };
       return { ...message, content: parts, partOrdinals };
     }
-    if (frame.type === 'session.message.content.updated' && Array.isArray(data.content))
-      return { ...message, content: data.content };
+    if (frame.type === 'session.message.content.updated' && Array.isArray(data['content']))
+      return { ...message, content: data['content'] };
     return message;
   });
 }

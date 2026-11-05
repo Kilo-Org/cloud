@@ -108,8 +108,8 @@ function reconstructMessages(entities: ResolvedEntity[], position: number): Nati
     // Keep malformed parts associated with their message, so they cannot turn a
     // partially readable envelope into an apparently complete transcript.
     const messageID =
-      record(item.value) && typeof item.value.messageID === 'string'
-        ? item.value.messageID
+      record(item.value) && typeof item.value['messageID'] === 'string'
+        ? item.value['messageID']
         : item.entity.id.slice(0, item.entity.id.lastIndexOf('/'));
     const group = parts.get(messageID);
     if (group) group.push(item);
@@ -125,11 +125,11 @@ function reconstructMessages(entities: ResolvedEntity[], position: number): Nati
     const output: NativeMessage = {
       id: message.id,
       role: message.type,
-      content: message.content ?? message.text ?? message,
+      content: message['content'] ?? message['text'] ?? message,
       seq: envelope.seq,
     };
-    if (envelope.parts !== undefined) {
-      const frontier = partsSchema.safeParse(envelope.parts);
+    if (envelope['parts'] !== undefined) {
+      const frontier = partsSchema.safeParse(envelope['parts']);
       const matching = parts.get(message.id) ?? [];
       const ordered: { ordinal: number; part: unknown }[] = [];
       const ordinals = new Set<number>();
@@ -158,13 +158,13 @@ function reconstructMessages(entities: ResolvedEntity[], position: number): Nati
       }
       if (complete) {
         ordered.sort((a, b) => a.ordinal - b.ordinal);
-        output.content = ordered.map(part => part.part);
-        output.partOrdinals = ordered.map(part => part.ordinal);
+        output.content = ordered.map(part => part['part']);
+        output.partOrdinals = ordered.map(part => part['ordinal']);
       } else {
         output.content = [];
         output.incomplete = true;
       }
-    } else if (message.type === 'assistant' && !Array.isArray(message.content)) {
+    } else if (message.type === 'assistant' && !Array.isArray(message['content'])) {
       output.content = [];
       output.incomplete = true;
     }
@@ -256,7 +256,7 @@ export async function fetchNativeSnapshot(
       if (
         attempt >= 2 ||
         !record(error) ||
-        (error.code !== 'revision_changed' && error.code !== 'blob_not_found')
+        (error['code'] !== 'revision_changed' && error['code'] !== 'blob_not_found')
       ) {
         throw error;
       }

@@ -1166,6 +1166,7 @@ export const GetSessionOutput = z.object({
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
+  environmentId: z.string().uuid().optional().describe('Environment used to create the workspace'),
   sandboxId: z
     .string()
     .optional()

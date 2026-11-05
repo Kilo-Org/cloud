@@ -103,6 +103,32 @@ describe('getSession runtime agents', () => {
     expect(result.parentCloudAgentSessionId).toBe(parentCloudAgentSessionId);
   });
 
+  it('returns only the environment ID from the stored environment reference', async () => {
+    const environmentId = '11111111-1111-4111-8111-111111111111';
+    const { caller } = setup({
+      ...storedMetadata,
+      environment: {
+        environmentId,
+        owner: { type: 'user', id: USER_ID },
+        configurationRevision: 3,
+        repository: { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+      },
+    });
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result.environmentId).toBe(environmentId);
+    expect(result).not.toHaveProperty('environment');
+  });
+
+  it('leaves the environment ID undefined for sessions without an environment', async () => {
+    const { caller } = setup();
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result.environmentId).toBeUndefined();
+  });
+
   it('omits the parent Cloud Agent session id when the metadata has none', async () => {
     const { caller } = setup();
 

@@ -4236,7 +4236,7 @@
     "scheduledContextHint": "Kwado ndekọ ọnọdụ n'oge a kara aka na nchịkọta AI akwụ ụgwọ maka ọnọdụ a naanị. A na-ezigara ụdị gị akụkụ ahọpụtara, nke e wepụrụ ozi nzuzo na ha, na eziokwu ahaziri ahazi. Nchịkọta na-eji asụsụ ngwa e chekwara. A na-echekwa asụsụ a naanị mgbe ị gbanwere ntọala akụkọ n'onwe gị; ọ naghị agbanwe na-akpaghị aka mgbe asụsụ ngwa gbanwere. Ụgwọ na-eji ego fọdụrụ n'ọnọdụ a. Ndekọ ọnọdụ na-enweghị ọrụ anaghị eji AI.",
     "snapshotSafeguards": "Oke oge na mmefu maka nchịkọta ọ bụla na-emetụta ndekọ ọnọdụ ọ bụla a haziri oge ya, ọ bụghị mmefu kwa ụbọchị.",
     "snapshotEstimateInputTooLarge": "Ndekọ ọnọdụ a nwere ihe akaebe karịrị nke ụdị AI ahọpụtara nwere ike ijikwa.",
-    "quietSnapshot": "Enweghị ọrụ nnọkọ ahọpụtara maka ndekọ ọnọdụ a. A rịọghị nchịkọta AI, naraghịkwa ụgwọ.",
+    "quietSnapshot": "Enweghị ọrụ nnọkọ ahọpụtara maka ndekọ ọnọdụ a. A rịọghị nchịkọta AI, a naraghịkwa ụgwọ.",
     "noEnabledContexts": "Enweghị ọnọdụ akwadoro maka akụkọ a haziri oge ha",
     "sourceBlocker": "Nnọkọ chọrọ nlebara anya",
     "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ"

@@ -709,9 +709,33 @@ Run focused formatting, type checks, and tests for
 
 ## Open Questions
 
-1. What is the account's Worker ingress limit? It decides whether the 50 MiB cap
-   can be raised.
-2. Vercel forwarding at 50 MiB: verify before Vercel BYOC launches.
+1. **Unreachable files and the quota.** Outside tail-snapshot coverage, files
+   from earlier sandboxes stay in R2 but not on disk, so neither the agent nor
+   the user can delete them. They still count toward the 500 MiB / 1,000-file
+   quota, which can eventually block new uploads for good. Options: a delete
+   action in the Artifacts view (smallest fix), counting only paths seen by the
+   current allocation, or evicting the oldest unseen entries.
+2. **Skipped-file visibility.** Files over the size cap, past the quota, or with
+   invalid paths only produce a diagnostic. Should the Artifacts view show
+   them as "not synced", and should the agent be told when a write will not be
+   kept?
+3. **Rollout cohort.** Which flag system gates the feature, and should the first
+   cohort match the workspace tail snapshot allowlist, so early users also get
+   the local folder back on replacement?
+4. **Retention and cost.** Artifacts live as long as the workspace, and
+   workspaces have no expiry. Is that acceptable, or should idle workspaces'
+   artifacts expire?
+5. **Exclusions.** Sync everything under `/artifacts`, or skip dotfiles and
+   common heavy directories (`node_modules`, `.git`, `.venv`) that would quickly
+   hit the quota if an agent puts a project there?
+6. **Environment snapshot output.** Files that setup commands write into
+   `/artifacts` during an environment build are baseline and never published.
+   Is that the intended behavior?
+7. **Renewal ownership.** Does the 12-hour turn work or this work build the
+   `transfer.grant` request pair?
+8. **Worker ingress limit.** What is the account's limit? It decides whether the
+   50 MiB cap can be raised.
+9. **Vercel at 50 MiB.** Verify forwarding before Vercel BYOC launches.
 
 ## Implementation Order
 

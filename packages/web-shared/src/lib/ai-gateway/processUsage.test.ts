@@ -23,6 +23,7 @@ import {
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { normalizeSystemPromptPrefix } from '@kilocode/web-shared/lib/ai-gateway/usage-dimensions';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -2633,7 +2634,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(core.requested_model).toBe('reqmodel');
 
     // metadata fields (from prompt extraction + upstream response)
-    expect(metadata.system_prompt_prefix).toBe('sysprefix');
+    expect(metadata.system_prompt_prefix).toBe(normalizeSystemPromptPrefix('sysprefix'));
     expect(metadata.user_prompt_prefix).toBe('usrprefix');
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
@@ -2701,5 +2702,144 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     );
 
     expect(metadata.api_kind).toBe('audio_transcriptions');
+  });
+});
+
+describe('toInsertableDbUsageRecord dimension normalization', () => {
+  const usageStats: MicrodollarUsageStats = {
+    messageId: 'msg-id',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model',
+    responseContent: '',
+    inference_provider: 'prov',
+    upstream_id: 'up',
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+    status_code: 200,
+  };
+
+  const context = (overrides: Partial<MicrodollarUsageContext>) =>
+    ({
+      api_kind: 'chat_completions',
+      kiloUserId: 'user-dimension-normalization',
+      prior_microdollar_usage: 0,
+      provider: 'openrouter',
+      fraudHeaders: getFraudDetectionHeaders(new Headers({ 'user-agent': 'test-agent' })),
+      isStreaming: false,
+      project_id: null,
+      requested_model: 'provider/requested-model',
+      is_free: false,
+      custom_llm_pricing: null,
+      promptInfo: {
+        system_prompt_prefix: 'You are Kilo Code, a helpful assistant.',
+        system_prompt_length: 41,
+        user_prompt_prefix: 'Please fix the failing test',
+      },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      status_code: null,
+      editor_name: 'vscode',
+      machine_id: 'machine',
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: 'session',
+      mode: null,
+      auto_model: null,
+      reasoning_setting: null,
+      inference_region: null,
+      ttfb_ms: null,
+      ...overrides,
+    }) satisfies MicrodollarUsageContext;
+
+  test('maps a versioned editor name onto its family', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(context({ editor_name: 'Visual Studio Code 1.114.0' }))
+    );
+
+    expect(metadata.editor_name).toBe('vscode');
+  });
+
+  test('maps an unknown editor name onto the other bucket', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(context({ editor_name: 'Neovim 0.10.2' }))
+    );
+
+    expect(metadata.editor_name).toBe('other');
+  });
+
+  test('maps a custom agent name onto the other bucket', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(context({ mode: 'my-custom-agent' }))
+    );
+
+    expect(metadata.mode).toBe('other');
+  });
+
+  test('keeps a built-in mode', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(context({ mode: 'BUILD' }))
+    );
+
+    expect(metadata.mode).toBe('build');
+  });
+
+  test('stores a fixed-size key derived from the system prompt', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(context({}))
+    );
+
+    expect(metadata.system_prompt_prefix).toBe(
+      normalizeSystemPromptPrefix('You are Kilo Code, a helpful assistant.')
+    );
+    expect(metadata.system_prompt_prefix).toMatch(/^sp-[0-9a-f]{4}$/);
+    expect(metadata.user_prompt_prefix).toBe('Please fix the failing test');
+    expect(metadata.system_prompt_length).toBe(41);
+  });
+
+  test('records no prompt key for an empty system prompt', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(
+        context({
+          promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+        })
+      )
+    );
+
+    expect(metadata.system_prompt_prefix).toBeNull();
+  });
+
+  test('keeps the dimensions null for organization usage', async () => {
+    const { metadata } = await toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(
+        context({
+          organizationId: 'org-1',
+          editor_name: 'Visual Studio Code 1.114.0',
+          mode: 'build',
+        })
+      )
+    );
+
+    expect(metadata.system_prompt_prefix).toBeNull();
+    expect(metadata.user_prompt_prefix).toBeNull();
+    expect(metadata.editor_name).toBe('vscode');
+    expect(metadata.mode).toBe('build');
   });
 });

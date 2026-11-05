@@ -2,6 +2,11 @@ import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
+import {
+  normalizeEditorName,
+  normalizeMode,
+  normalizeSystemPromptPrefix,
+} from './usage-dimensions';
 import { after } from 'next/server';
 import {
   enqueueUsage,
@@ -299,6 +304,12 @@ export async function toInsertableDbUsageRecord(
       provider,
     });
   }
+
+  // Dimension columns store values from the declared domains in
+  // usage-dimensions.ts, applied to the sanitized text.
+  metadata.editor_name = normalizeEditorName(metadata.editor_name);
+  metadata.mode = normalizeMode(metadata.mode);
+  metadata.system_prompt_prefix = normalizeSystemPromptPrefix(metadata.system_prompt_prefix);
 
   return { core, metadata };
 }

@@ -272,6 +272,7 @@ export type UsageMetaData = {
   http_x_vercel_ip_longitude: number | null;
   http_x_vercel_ja4_digest: string | null;
   user_prompt_prefix: string | null;
+  /** Fixed-size key from `normalizeSystemPromptPrefix`, one of a bounded value set. */
   system_prompt_prefix: string | null;
   system_prompt_length: number | null;
   http_user_agent: string | null;
@@ -287,12 +288,14 @@ export type UsageMetaData = {
   is_user_byok: boolean;
   streamed: boolean | null;
   cancelled: boolean | null;
+  /** Editor family from `normalizeEditorName`, one of `EDITOR_NAME_VALUES` or `other`. */
   editor_name: string | null;
   api_kind: GatewayApiKind | null;
   has_tools: boolean | null;
   machine_id: string | null;
   feature: string | null;
   session_id: string | null;
+  /** Mode from `normalizeMode`, one of `MODE_VALUES` or `other`. */
   mode: string | null;
   auto_model: string | null;
   reasoning_setting: string | null;

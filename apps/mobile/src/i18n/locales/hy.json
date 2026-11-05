@@ -320,7 +320,7 @@
     "fileNavigator": {
       "couldNotLoadFiles": "Չհաջողվեց բեռնել ֆայլերը։",
       "retryLoadingFiles": "Կրկին փորձել բեռնել ֆայլերը",
-      "filterPlaceholder": "Ֆայլի ուղի",
+      "filterPlaceholder": "Զտել ֆայլերն ըստ ուղու",
       "viewedCount": "դիտված է {{total}}-ից {{viewed}}-ը",
       "viewedOfListed": "ցուցակի {{total}} ֆայլից դիտված է {{viewed}}-ը",
       "loadingFiles": "Բեռնվում է՝ {{total}}-ից {{loaded}}-ը…",
@@ -338,7 +338,7 @@
       "markViewed": "Նշել {{path}} ֆայլը որպես դիտված",
       "unmarkViewed": "Հեռացնել {{path}} ֆայլի դիտված լինելու նշումը",
       "collapseFile": "Ծալել ֆայլը",
-      "expandFile": "Բացել ֆայլը",
+      "expandFile": "Ընդարձակել ֆայլը",
       "diffTooLarge": "Փոփոխությունների ծավալը չափազանց մեծ է ցուցադրելու համար։",
       "noPreview": "Այս ֆայլի նախադիտումը հասանելի չէ",
       "openOnGitHub": "Բացել GitHub-ում",
@@ -354,7 +354,7 @@
     },
     "hunkRows": {
       "hunkHeader": "Փոփոխությունների հատվածի վերնագիր՝ {{header}}",
-      "contextUnavailable": "Այս տարբերակի համատեքստը հասանելի չէ։",
+      "contextUnavailable": "Համատեքստը հասանելի չէ այս ref-ի համար",
       "retryLoadingContext": "Կրկին փորձել բեռնել համատեքստը",
       "failedToLoadContext": "Չհաջողվեց բեռնել համատեքստը — հպիր՝ կրկին փորձելու համար",
       "loadingContext": "Բեռնվում է համատեքստը…",
@@ -371,10 +371,10 @@
       "failedToLoadMoreFiles": "Չհաջողվեց բեռնել հավելյալ ֆայլերը — հպիր՝ կրկին փորձելու համար",
       "loadingAllFiles": "Բեռնվում են բոլոր ֆայլերը — {{loaded}}…",
       "loadingAllFilesOf": "Բեռնվում են բոլոր ֆայլերը — {{total}}-ից {{loaded}}-ը…",
-      "loadedOfTotalFiles": "բեռնված է {{total}} ֆայլից {{loaded}}-ը",
+      "loadedOfTotalFiles": "Բեռնված է {{total}} ֆայլից {{loaded}}-ը",
       "loadAllFiles": "Բեռնել բոլոր ֆայլերը",
       "loadAll": "Բեռնել բոլորը",
-      "fileLoadedCount_one": "բեռնված է {{displayCount}} ֆայլ",
+      "fileLoadedCount_one": "Բեռնված է {{displayCount}} ֆայլ",
       "fileLoadedCount": "Բեռնված է {{displayCount}} ֆայլ",
       "fileLoadedCount_other": "Բեռնված է {{displayCount}} ֆայլ",
       "fileLoadedOfTotalCount_one": "{{total}}-ից բեռնված է {{displayCount}} ֆայլ",
@@ -391,8 +391,8 @@
       "expandLinesOfContext_other": "Ցույց տալ համատեքստի {{displayCount}} տող",
       "expandMoreLines_one": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
       "expandMoreLines_other": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "բեռնված է {{total}} ֆայլից {{loaded}}-ը",
-      "loadedOfTotalFiles_other": "բեռնված է {{total}} ֆայլից {{loaded}}-ը"
+      "loadedOfTotalFiles_one": "Բեռնված է {{total}} ֆայլից {{loaded}}-ը",
+      "loadedOfTotalFiles_other": "Բեռնված է {{total}} ֆայլից {{loaded}}-ը"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ֆայլի վերջում նոր տողի նշան չկա։",
@@ -778,7 +778,7 @@
       "modified": "Փոփոխված",
       "renamed": "Վերանվանված",
       "copied": "Պատճենված",
-      "changed": "Փոփոխված"
+      "changed": "Փոխված"
     },
     "diff": {
       "selectedTapToChange": "Ընտրված է՝ {{label}}, հպիր՝ ընտրությունը փոխելու համար",

@@ -319,7 +319,10 @@ export async function resolveProviderAndPolicy(
     if (eligibleProviders.length === 0) {
       return reject(inferenceProvidersNotAllowedResponse(declaredProviders));
     }
-    if (eligibleProviders.length < declaredProviders.length) {
+    if (
+      providerResult.provider.type === 'vercel' ||
+      eligibleProviders.length < declaredProviders.length
+    ) {
       request.body.provider = { ...request.body.provider, only: eligibleProviders };
     }
   }

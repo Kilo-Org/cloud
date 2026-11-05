@@ -9,6 +9,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { getDomain } from 'tldts';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
@@ -48,8 +49,18 @@ export function buildDirectProvider(
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
 ): Provider {
+  let providerType: Provider['type'] = type;
+  if (type === 'custom-public') {
+    const domain = getDomain(new URL(upstream.base_url).hostname);
+    if (domain === 'openrouter.ai') {
+      providerType = 'openrouter';
+    } else if (domain === 'vercel.sh') {
+      providerType = 'vercel';
+    }
+  }
+
   return {
-    type,
+    type: providerType,
     ...resolveRouting(upstream, auth),
     apiUrlOverrides: {},
     disableUrlSuffix: upstream.disable_url_suffix ?? false,

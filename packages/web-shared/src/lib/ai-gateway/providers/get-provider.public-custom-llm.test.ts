@@ -156,6 +156,85 @@ describe('getProvider with public custom LLMs', () => {
     resetCustomLlmCacheForTest();
   });
 
+  describe.each([
+    ['openrouter', 'https://openrouter.ai/api/v1'],
+    ['vercel', 'https://ai-gateway.vercel.sh/v1'],
+  ] as const)('custom LLMs on %s', (type, apiUrl) => {
+    const publicModel = `acme/public-${type}-model`;
+    const privateModel = `acme/private-${type}-model`;
+    const internalId = `${type}/configured-upstream-model`;
+
+    beforeAll(async () => {
+      for (const model of [publicModel, `${publicModel}-free`]) {
+        await insertCustomLlmForTest(
+          model,
+          publicCustomLlmDefinition(['acme'], {
+            base_url: apiUrl,
+            internal_id: internalId,
+            extra_body: { temperature: 0.25 },
+            pricing,
+          }),
+          encryptedApiKey
+        );
+      }
+      await insertCustomLlmForTest(
+        privateModel,
+        customLlmDefinition({ base_url: apiUrl, organization_ids: [ORG_ID] }),
+        encryptedApiKey
+      );
+    });
+
+    afterAll(async () => {
+      for (const model of [publicModel, `${publicModel}-free`, privateModel]) {
+        await deleteCustomLlmForTest(model);
+      }
+    });
+
+    test.each([
+      ['', false],
+      ['-free', true],
+    ] as const)(
+      'retains public custom configuration and policy checks for id suffix "%s"',
+      async (suffix, isFree) => {
+        const model = `${publicModel}${suffix}`;
+        await expect(
+          getProvider(getProviderInput(providerInput(model, user, undefined)))
+        ).resolves.toMatchObject({
+          kind: 'provider',
+          provider: { type, apiUrl, apiKey: 'sk-upstream' },
+          bypassAccessCheck: false,
+          userByok: null,
+          isFree,
+        });
+
+        const body = await upstreamBody(model, user, undefined);
+
+        expect(body).toMatchObject({ model: internalId, temperature: 0.25 });
+        expect(body.plugins ?? []).toEqual(
+          type === 'openrouter' ? [{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }] : []
+        );
+        expect(body.tools).toEqual([
+          { type: 'function', function: { name: 'read_file', parameters: {} } },
+        ]);
+      }
+    );
+
+    test('keeps a private custom LLM custom and restricted to its grantees', async () => {
+      await expect(
+        getProvider(getProviderInput(providerInput(privateModel, user, ORG_ID)))
+      ).resolves.toMatchObject({
+        kind: 'provider',
+        provider: { type: 'custom', apiUrl, apiKey: 'sk-upstream' },
+        bypassAccessCheck: true,
+        userByok: null,
+        isFree: false,
+      });
+      await expect(
+        getProvider(getProviderInput(providerInput(privateModel, user, OTHER_ORG_ID)))
+      ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+    });
+  });
+
   test('routes a public custom LLM for an anonymous caller through policy checks', async () => {
     const result = await getProvider(
       getProviderInput(

@@ -17,6 +17,10 @@ jest.mock('./openrouter', () => ({
 jest.mock('./preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'),
+  isCustomLlm: jest.fn().mockResolvedValue(false),
+}));
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
@@ -27,6 +31,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   getOpenAiChatGptStoredConnection,
@@ -180,6 +185,7 @@ describe('upstream model catalog validation', () => {
   ]);
 
   beforeEach(() => {
+    jest.mocked(isCustomLlm).mockReset().mockResolvedValue(false);
     jest.mocked(isValidOpenRouterModelId).mockReset();
     jest
       .mocked(isValidOpenRouterModelId)
@@ -254,8 +260,28 @@ describe('upstream model catalog validation', () => {
         });
 
         expect(result).toEqual({ type: 'invalid-openrouter-model' });
+        expect(isCustomLlm).toHaveBeenCalledWith('qwen/not-in-catalog');
         expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/not-in-catalog']]);
         expect(upstreamRequest).not.toHaveBeenCalled();
+      });
+
+      it('sends an unknown custom alias using its configured upstream model', async () => {
+        const requestedModel = 'custom/public-alias';
+        const wireModel = 'provider/configured-model';
+        jest.mocked(isCustomLlm).mockImplementation(async model => model === requestedModel);
+
+        const result = await attempt({ providerId, requestedModel, wireModel, kind });
+
+        expect(result.type).toBe('success');
+        expect(isCustomLlm).toHaveBeenCalledWith(requestedModel);
+        expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+        expect(upstreamRequest).toHaveBeenCalledTimes(1);
+        expect(upstreamRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            chatApi: kind,
+            body: expect.objectContaining({ model: wireModel }),
+          })
+        );
       });
 
       it.each([false, true])('sends a valid catalog ID (BYOK: %s)', async byok => {

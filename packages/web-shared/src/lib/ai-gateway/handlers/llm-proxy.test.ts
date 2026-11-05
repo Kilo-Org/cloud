@@ -33,9 +33,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
+  getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   accountForMicrodollarUsage,
@@ -175,6 +179,16 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-orde
     ],
   })),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config');
+  return { ...actual, getCustomPricingConfig: jest.fn(actual.getCustomPricingConfig) };
+});
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
+  const actual = jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+  );
+  return { ...actual, mapModelIdToVercel: jest.fn(actual.mapModelIdToVercel) };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -4090,6 +4104,43 @@ describe('custom LLM requests', () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('routes a public Vercel custom alias with ignored providers and no catalog metadata', async () => {
+    const model = customLlm('acme/public-alias', true);
+    model.definition.base_url = 'https://ai-gateway.vercel.sh/v1';
+    model.definition.internal_id = 'moonshotai/kimi-k2.5';
+    model.definition.public = {
+      inference_providers: ['moonshotai'],
+      description: 'Public model',
+    };
+    mockCustomLlm(model);
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: buildDirectProvider('custom-public', ['chat_completions'], model.definition, {
+        type: 'api_key',
+        apiKey: 'test-key',
+        apiKeyHeader: null,
+      }),
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValueOnce(null);
+    jest.mocked(getCustomPricingConfig).mockResolvedValueOnce({ models: [] });
+    jest.mocked(mapModelIdToVercel).mockResolvedValueOnce(model.public_id);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(model.public_id), provider: { ignore: ['openai'] } }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(getCachedVercelInferenceProviderIdsForModel).toHaveBeenCalledWith(model.public_id);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({
+      model: 'moonshotai/kimi-k2.5',
+      providerOptions: { gateway: { only: ['moonshotai'] } },
+    });
   });
 
   it('rejects a public custom LLM when organization policy allows none of its providers', async () => {

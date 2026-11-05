@@ -124,6 +124,51 @@ describe('custom LLM endpoint configuration', () => {
   });
 });
 
+describe('buildDirectProvider provider type', () => {
+  it.each([
+    ['https://openrouter.ai/api/v1', 'openrouter'],
+    ['https://api.openrouter.ai:8443/v1', 'openrouter'],
+    ['https://OPENROUTER.AI./api/v1', 'openrouter'],
+    ['https://vercel.sh/v1', 'vercel'],
+    ['https://ai-gateway.vercel.sh/v1', 'vercel'],
+    ['https://region.ai-gateway.vercel.sh:8443/v1', 'vercel'],
+    ['https://AI-GATEWAY.VERCEL.SH./v1', 'vercel'],
+    ['https://llm.example.co.uk/v1', 'custom-public'],
+    ['https://notopenrouter.ai/v1', 'custom-public'],
+    ['https://notvercel.sh/v1', 'custom-public'],
+    ['https://openrouter.ai.example.com/v1', 'custom-public'],
+    ['https://ai-gateway.vercel.sh.example.com/v1', 'custom-public'],
+    ['https://openrouter.ai@example.com/v1', 'custom-public'],
+    ['https://example.com/v1?upstream=https://openrouter.ai', 'custom-public'],
+    ['http://127.0.0.1:4000/v1', 'custom-public'],
+  ])('classifies public endpoint %s as %s', (base_url, expected) => {
+    const provider = buildDirectProvider(
+      'custom-public',
+      ['chat_completions'],
+      { base_url },
+      API_KEY_AUTH
+    );
+
+    expect(provider.type).toBe(expected);
+    expect(provider.apiUrl).toBe(base_url);
+    expect(provider.apiKey).toBe(API_KEY_AUTH.apiKey);
+  });
+
+  it.each(['https://openrouter.ai/api/v1', 'https://ai-gateway.vercel.sh/v1'])(
+    'keeps private endpoint %s custom',
+    base_url => {
+      const provider = buildDirectProvider(
+        'custom',
+        ['chat_completions'],
+        { base_url },
+        API_KEY_AUTH
+      );
+
+      expect(provider.type).toBe('custom');
+    }
+  );
+});
+
 describe('buildDirectProvider model field', () => {
   it.each<GatewayRequest>([
     {

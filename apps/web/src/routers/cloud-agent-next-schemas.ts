@@ -849,6 +849,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+  environmentId: z.string().uuid().optional(),
 
   // Worktree ownership (present only for worktree sessions)
   worktreeId: z.string().nullable().optional(),

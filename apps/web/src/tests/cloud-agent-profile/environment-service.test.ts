@@ -1174,6 +1174,33 @@ describe('repository environment service', () => {
       expect((await getEnvironment(db, id, owner)).configurationRevision).toBe(1);
     });
 
+    test('saves start commands without advancing the revision and loads them for sessions', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      const owner = userOwner(user.id);
+
+      await expect(
+        updateEnv({ owner, environmentId: id, startCommands: ['docker compose up -d'] })
+      ).resolves.toBe(1);
+      const saved = await getEnvironment(db, id, owner);
+      expect(saved.startCommands).toEqual(['docker compose up -d']);
+      expect(saved.commands).toEqual(['install']);
+
+      const loaded = await loadEnvironmentForSession(db, {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/widgets' },
+      });
+      expect(loaded.status).toBe('match');
+      if (loaded.status !== 'match') return;
+      expect(loaded.environment.layer.setupCommands).toEqual(['install']);
+      expect(loaded.environment.layer.startCommands).toEqual(['docker compose up -d']);
+      expect(loaded.environment.reference.configurationRevision).toBe(1);
+
+      await expect(
+        updateEnv({ owner, environmentId: id, startCommands: ['x'.repeat(16_001)] })
+      ).rejects.toThrow('Start commands must be 1-16000 characters');
+    });
+
     test('advances for command, plaintext variable and secret changes', async () => {
       const user = await insertTestUser();
       const id = await createRevisionEnv(user.id);

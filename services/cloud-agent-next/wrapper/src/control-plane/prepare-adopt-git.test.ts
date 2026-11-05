@@ -1,3 +1,5 @@
+import { captureRootSnapshots } from './root-changes.js';
+import { collectWorktreeSnapshot } from '../control/worktree-changes.js';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -330,6 +332,85 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
+  describe('with start commands', () => {
+    const setupRun = (calls: unknown[][]) => calls.map(call => call[0]);
+
+    it('runs only the start commands in a workspace restored from the environment snapshot', async () => {
+      await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
+
+      expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
+      expect(restored.frames).toContainEqual(
+        expect.objectContaining({
+          type: 'session.progress',
+          step: 'setup',
+          detail: 'Setup already ran in the environment snapshot',
+        })
+      );
+    });
+
+    it.each([
+      { count: 1, setup: ['install', 'inline extra'], expected: ['inline extra', 'serve'] },
+      { count: 0, setup: ['inline extra'], expected: ['inline extra', 'serve'] },
+      {
+        count: undefined,
+        setup: ['install', 'inline extra'],
+        expected: ['install', 'inline extra', 'serve'],
+      },
+    ])(
+      'preserves session setup when the environment command count is $count',
+      async ({ count, setup, expected }) => {
+        await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
+        const restored = manager('alloc-restored');
+        await restored.prepared.prepare(
+          spec({
+            sessionId: 'ses_b',
+            setupCommands: [...setup],
+            environmentSetupCommandCount: count,
+            startCommands: ['serve'],
+          })
+        );
+
+        expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+        expect(setupRun(restored.runSetup.mock.calls)).toEqual([...expected]);
+      }
+    );
+
+    it('runs setup and start commands after a fresh clone', async () => {
+      const fresh = manager('alloc-image');
+      await fresh.prepared.prepare(
+        spec({
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
+
+      expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
+      expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);
+    });
+
+    it('runs neither for a workspace this allocation already prepared', async () => {
+      await manager('alloc-image').prepared.prepare(spec());
+      const sibling = manager('alloc-image');
+      await sibling.prepared.prepare(
+        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
+      );
+
+      expect(ready(sibling.frames)).toMatchObject({ workspace: 'same' });
+      expect(sibling.runSetup).not.toHaveBeenCalled();
+    });
+  });
+
   it('retains local workspace state', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
@@ -344,11 +425,25 @@ describe('adopting an environment snapshot against a real repository', () => {
   });
 });
 
-describe('restoring a private session disk snapshot', () => {
-  const provenance = { sourceAllocationId: 'alloc-source' };
+describe('restoring a private workspace disk snapshot', () => {
+  function workspaceSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRouteSpec {
+    const base = spec();
+    return {
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_00000000-0000-4000-8000-000000000001' },
+      ...overrides,
+    };
+  }
+  const provenance = () => ({
+    sourceAllocationId: 'alloc-source',
+    workspaceId: 'worktree_00000000-0000-4000-8000-000000000001' as const,
+    directory,
+  });
 
   it('preserves local git, files, home and history while refreshing credentials and config', async () => {
-    await manager('alloc-source').prepared.prepare(spec());
+    await manager('alloc-source').prepared.prepare(
+      workspaceSpec({ env: { CAPTURED_CONFIG: 'stale' } })
+    );
     git(directory, 'checkout', '-q', '-b', 'local-work');
     await fs.writeFile(path.join(directory, '.gitignore'), 'node_modules/\n');
     await fs.writeFile(path.join(directory, 'local-commit.txt'), 'unpushed commit\n');
@@ -370,9 +465,9 @@ describe('restoring a private session disk snapshot', () => {
     const refs = git(directory, 'show-ref', '--heads');
     const head = git(directory, 'rev-parse', 'HEAD');
     const restored = manager('alloc-restored');
-    const restoredSpec = spec({
+    const restoredSpec = workspaceSpec({
       branch: 'main',
-      sessionSnapshot: provenance,
+      workspaceSnapshot: provenance(),
       setupCommands: ['must not replay'],
       worktreeRecovery: { files: [{ path: 'README', status: 'modified', patch: 'older patch' }] },
       git: { url: 'https://github.com/acme/repo.git', token: 'current-git-token' },
@@ -396,6 +491,7 @@ describe('restoring a private session disk snapshot', () => {
     expect(await fs.stat(profileConfigPath(home)).catch(() => null)).toBeNull();
     expect(git(directory, 'remote', 'get-url', 'origin')).toBe('https://github.com/acme/repo.git');
     expect(restored.runtimeEnvs[0]?.CURRENT_CONFIG).toBe('refreshed');
+    expect(restored.runtimeEnvs[0]?.CAPTURED_CONFIG).toBeUndefined();
     expect(await fs.readFile(gitCredentialRecordPath(home), 'utf8')).toContain(
       'password=current-git-token\n'
     );
@@ -407,11 +503,96 @@ describe('restoring a private session disk snapshot', () => {
     ).toBe(false);
   });
 
+  it('runs only the start commands, because no process survives the restored snapshot', async () => {
+    await manager('alloc-source').prepared.prepare(workspaceSpec());
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(
+      workspaceSpec({
+        branch: 'main',
+        workspaceSnapshot: provenance(),
+        setupCommands: ['must not replay'],
+        startCommands: ['serve'],
+      })
+    );
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect((restored.runSetup.mock.calls as unknown[][]).map(call => call[0])).toEqual(['serve']);
+  });
+
+  it('restores every repository of a workspace without replaying checkout or setup', async () => {
+    const api = path.join(directory, 'api');
+    const web = path.join(directory, 'web');
+    const roots = [api, web].map((root, index) => ({
+      directory: root,
+      repoFullName: index === 0 ? 'acme/api' : 'acme/web',
+      git: { url: pathToFileURL(origin).toString(), platform: 'github' as const },
+      branch: 'main',
+    }));
+    const original = workspaceSpec({
+      roots,
+      setupCommands: ['initial workspace setup'],
+    });
+    await manager('alloc-source').prepared.prepare(original);
+    for (const [index, root] of [api, web].entries()) {
+      git(root, 'checkout', '-q', '-b', `local-${index}`);
+      await fs.writeFile(path.join(root, 'README'), `staged-${index}`);
+      git(root, 'add', 'README');
+      await fs.writeFile(path.join(root, 'README'), `dirty-${index}`);
+      await fs.writeFile(path.join(root, 'untracked'), `untracked-${index}`);
+    }
+    const statuses = [api, web].map(root => git(root, 'status', '--porcelain=v1'));
+    const registered: ControlPlaneRouteSpec[] = [];
+    const restored = manager('alloc-restored', {
+      onPreparedRoute: canonical => registered.push(canonical),
+    });
+    await restored.prepared.prepare({
+      ...original,
+      sessionId: 'new-multi-chat',
+      kiloSessionId: 'new-native',
+      workspaceSnapshot: provenance(),
+      setupCommands: ['must not replay'],
+      env: { CURRENT_CONFIG: 'refreshed' },
+    });
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    for (const [index, root] of [api, web].entries()) {
+      expect(git(root, 'status', '--porcelain=v1')).toBe(statuses[index]);
+      expect(git(root, 'branch', '--show-current')).toBe(`local-${index}`);
+      expect(git(root, 'show', ':README')).toBe(`staged-${index}`);
+      expect(await fs.readFile(path.join(root, 'README'), 'utf8')).toBe(`dirty-${index}`);
+    }
+    expect(registered[0]?.roots).toEqual(roots);
+    const prepared = restored.prepared.preparedRoute('new-multi-chat');
+    if (!prepared) throw new Error('Missing prepared workspace');
+    expect(prepared.roots.map(root => root.requestedBranch)).toEqual(['main', 'main']);
+    const grouped = await captureRootSnapshots({
+      roots: prepared.roots,
+      revision: 1,
+      capture: collectWorktreeSnapshot,
+    });
+    expect(grouped.repositories.map(root => root.capture.summary.comparison.baseRef)).toEqual([
+      'refs/remotes/origin/main',
+      'refs/remotes/origin/main',
+    ]);
+    expect(restored.runtimeEnvs[0]?.CURRENT_CONFIG).toBe('refreshed');
+    expect(restored.runSetup).not.toHaveBeenCalled();
+    expect(restored.restore).not.toHaveBeenCalled();
+    expect(restored.gitCalls.some(args => ['clone', 'fetch', 'checkout'].includes(args[0]!))).toBe(
+      false
+    );
+    expect(await readWorkspaceStamp(directory)).toMatchObject({
+      allocationId: 'alloc-restored',
+      workspaceId: provenance().workspaceId,
+      directory,
+    });
+  });
+
   it('fails a source allocation mismatch without touching recovered files or starting Kilo', async () => {
-    await manager('alloc-source').prepared.prepare(spec());
+    await manager('alloc-source').prepared.prepare(workspaceSpec());
     await fs.writeFile(path.join(directory, 'recovered.txt'), 'keep me');
     const restored = manager('alloc-restored');
-    await restored.prepared.prepare(spec({ sessionSnapshot: { sourceAllocationId: 'other' } }));
+    await restored.prepared.prepare(
+      workspaceSpec({ workspaceSnapshot: { ...provenance(), sourceAllocationId: 'other' } })
+    );
     expect(restored.frames.at(-1)).toMatchObject({
       type: 'session.failed',
       reason: 'workspace_setup_failed',
@@ -424,24 +605,24 @@ describe('restoring a private session disk snapshot', () => {
   });
 
   it('defers stamping until session resolution succeeds and falls back to history-only ingest', async () => {
-    await manager('alloc-source').prepared.prepare(spec());
+    await manager('alloc-source').prepared.prepare(workspaceSpec());
     const failed = manager('alloc-restored', {
       sessionExists: async () => false,
       restore: async () => ({ ok: false, error: 'unavailable', code: 503, step: 'download' }),
     });
-    await failed.prepared.prepare(spec({ sessionSnapshot: provenance }));
+    await failed.prepared.prepare(workspaceSpec({ workspaceSnapshot: provenance() }));
     expect(failed.frames.at(-1)).toMatchObject({ type: 'session.failed', step: 'kilo_session' });
     expect(await readWorkspaceStamp(directory)).toMatchObject({
       allocationId: 'alloc-source',
     });
     const restarted = manager('alloc-restored', { sessionExists: async () => false });
-    await restarted.prepared.prepare(spec({ sessionSnapshot: provenance }));
+    await restarted.prepared.prepare(workspaceSpec({ workspaceSnapshot: provenance() }));
     expect(ready(restarted.frames)).toBeDefined();
     expect(restarted.restore.mock.calls[0]?.[3]?.restoreFiles).toBe(false);
   });
 
   it.each([false, true])('restores a bare session with git init=%s', async initializeGit => {
-    const bareSpec = spec({ git: undefined });
+    const bareSpec = workspaceSpec({ git: undefined });
     await manager('alloc-source').prepared.prepare(bareSpec);
     if (initializeGit) git(directory, 'init', '-q', '-b', 'local-work');
     await fs.writeFile(path.join(directory, 'local.txt'), 'local commit\n');
@@ -452,7 +633,7 @@ describe('restoring a private session disk snapshot', () => {
     const head = initializeGit ? git(directory, 'rev-parse', 'HEAD') : '';
     const restored = manager('alloc-restored');
 
-    await restored.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
+    await restored.prepared.prepare({ ...bareSpec, workspaceSnapshot: provenance() });
 
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
     expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local commit\n');
@@ -462,7 +643,7 @@ describe('restoring a private session disk snapshot', () => {
       workspacePrepared: false,
     });
     const restarted = manager('alloc-restored');
-    await restarted.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
+    await restarted.prepared.prepare({ ...bareSpec, workspaceSnapshot: provenance() });
     expect(ready(restarted.frames)).toMatchObject({ workspace: 'same' });
     if (initializeGit) expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
     const normal = manager('alloc-restored');

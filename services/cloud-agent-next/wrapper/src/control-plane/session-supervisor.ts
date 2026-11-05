@@ -54,11 +54,13 @@ export type SessionSupervisorOptions = {
    * Called before native abort events can settle a Cloud message with another reason.
    * `retry` is set when a `no_progress` execution, or a descendant it stops, was stalled
    * in Kilo's model retry loop: the stall belongs to the model path, not the platform.
+   * `stopped` confirms cancellation and native retirement, or resolves false on failure/disposal.
    */
   onDeadline(
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ): void;
   /** The existing runtime owner performs bounded process recovery, including sibling failures. */
   onObservationFailure(reason: 'abort_unconfirmed' | 'activity_capacity'): void;
@@ -546,17 +548,27 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
           ? [execution, ...stoppedChildren.map(child => child.execution)].find(item => item.retry)
               ?.retry
           : undefined;
-      options.onDeadline(target, reason, retry);
+      const stopped = Promise.withResolvers<boolean>();
+      const cancelled = () => stopped.resolve(false);
+      stop.signal.addEventListener('abort', cancelled, { once: true });
+      options.onDeadline(target, reason, retry, stopped.promise);
       void options.interrupt(target, reason, stop.signal).then(
         () => {
-          if (disposed) return;
+          stop.signal.removeEventListener('abort', cancelled);
+          if (disposed || stop.signal.aborted) {
+            stopped.resolve(false);
+            return;
+          }
           if (record.execution === execution) finish(record);
           for (const child of stoppedChildren) {
             if (child.record.execution === child.execution) finish(child.record);
           }
           prune();
+          stopped.resolve(true);
         },
         () => {
+          stop.signal.removeEventListener('abort', cancelled);
+          stopped.resolve(false);
           if (!disposed && record.execution === execution)
             options.onObservationFailure('abort_unconfirmed');
         }

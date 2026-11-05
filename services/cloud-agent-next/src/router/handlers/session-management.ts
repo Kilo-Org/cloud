@@ -474,6 +474,7 @@ export function createSessionManagementHandlers() {
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
+            environmentId: sessionMetadata.environment?.environmentId,
             sandboxId,
 
             ...(worktreeId

@@ -10,7 +10,7 @@
 Production uses batch6/parallelism2/cap225; staging policy is unchanged at
 batch2/parallelism2/cap200. The production cap `225` is a bounded single-knob
 trial; batch, fill timeout, parallelism, retries and staging are unchanged.
-Complete the production merge gate below before merge, deployment or cohort exposure. Receipt mode at batch1/cap1 belongs
+Complete the production merge gate below before merge or deployment. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production
 workflow runs every 20 minutes and selects eligible CI-green main: it will create or
@@ -20,11 +20,13 @@ assume a separate manual deployment will provide a later approval gate.
 ## Production merge gate
 
 Independently verify the processing consumer and remove background shadow publication
-**before** deploying any gateway source that carries the retired SFO/FRA controls.
-Neither production SFO nor FRA selection has a runtime switch: an eligible production
-`sfo1` or `fra1` deployment queues every payer with an identity as soon as it runs, so
+**before** deploying any gateway source whose usage-accounting transport selects the
+queue.
+Production selection has no runtime switch: any production deployment whose function
+region runs the gateway queues every request as soon as it runs, so
 the default-on gateway deploy is the last step, not the first, and only withholding or
-reverting that source keeps it off. Before merging this queue change, obtain explicit
+reverting that source keeps it off. Adding a region to `apps/ai-gateway/vercel.mjs`, or
+adding another production caller of the usage-accounting path, enrols that traffic too. Before merging this queue change, obtain explicit
 production cutover authorization, pause all production queue publishers, and
 reconcile/drain source/DLQ, pending retries, in-flight work and accepted usage IDs.
 Verify those conditions before merge while normal production deployments remain

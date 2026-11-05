@@ -125,11 +125,11 @@ describe('upstreamRequest through the secure proxy', () => {
     expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1?trace=1');
   });
 
-  it('sends Mt-User-Id only to the upstream when enabled', async () => {
+  it('sends the prefixed Mt-User-Id only to the upstream when enabled', async () => {
     const { headers, body } = await sendThroughSecureProxy(false, true);
 
     expect(headers.has('Mt-User-Id')).toBe(false);
-    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('task-cache-key');
+    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('kilo:task-cache-key');
   });
 
   it.each(['\u4e2d\u6587', 'key\r\nInjected: value', 'key\0'])(

@@ -2984,10 +2984,14 @@ describe('adopting an environment snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
   });
 
-  it('runs the setup commands after an adopt and fails the route when one fails', async () => {
+  it('runs only the start commands after an adopt and fails the route when one fails', async () => {
     const harness = adoptHarness();
-    harness.setSetupResult(result(1, 'install failed'));
-    const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
+    harness.setSetupResult(result(1, 'serve failed'));
+    const spec = routeSpec({
+      git: { url: REPO },
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
+    });
 
     await harness.manager.prepare(spec);
 

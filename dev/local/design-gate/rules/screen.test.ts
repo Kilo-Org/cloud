@@ -170,6 +170,34 @@ test('touch-overlap: intersecting pressables, tolerance, containment', () => {
   );
 });
 
+test('touch-overlap: runs of one wrapped paragraph share the text owner, separate owners still collide', () => {
+  // agent-device reports every hittable accessibility node pressable, so a
+  // wrapped paragraph comes back as two sibling boxes that intersect where the
+  // line wraps. The text owns that tap, so the pair is skipped; the same two
+  // boxes as two separate targets are still a defect.
+  const wrapped = (secondParent: number): ProbeNode[] => [
+    { parent: 0, tag: 'Paragraph', rect: [0, 120, 384, 72], text: 'first second third' },
+    { parent: 1, tag: 'View', rect: [0, 120, 384, 48], pressable: true, text: 'first second' },
+    { parent: secondParent, tag: 'View', rect: [0, 144, 384, 48], pressable: true, text: 'third' },
+  ];
+  assert.deepEqual(run('touch-overlap', wrapped(1)), []);
+  const [ownOwner] = run('touch-overlap', wrapped(0));
+  assert.equal(ownOwner?.measured, 24);
+  assert.deepEqual(
+    ownOwner?.related?.map(ref => ref.index),
+    [2]
+  );
+
+  // An inline link inside that paragraph is still measured against a control
+  // outside the text.
+  const [linkFinding] = run('touch-overlap', [
+    ...wrapped(1),
+    { parent: 1, tag: 'View', rect: [370, 146, 40, 60], pressable: true, text: 'link' },
+    { parent: 0, tag: 'View', rect: [350, 150, 60, 48], pressable: true, text: 'Done' },
+  ]);
+  assert.equal(linkFinding?.element?.index, 5);
+});
+
 test('overlap: text siblings collide, tolerance, absolute sibling', () => {
   const text = (y: number, style?: ProbeNode['style']): ProbeNode => ({
     parent: 0,

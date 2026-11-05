@@ -124,6 +124,10 @@ function intersects(a: Rect, b: Rect): boolean {
   return overlap[2] > TOLERANCE_DP && overlap[3] > TOLERANCE_DP;
 }
 
+function nearestText(node: LayoutNode): LayoutNode | undefined {
+  return ancestors(node).find(candidate => candidate.isText);
+}
+
 export function checkTouchOverlap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
   const pressables = tree.nodes.filter(node => node.pressable);
@@ -134,6 +138,12 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
       // A sheet the platform presents in its own window takes the tap first, so
       // a control behind it never competes with one on it.
       if (a.presented?.space !== b.presented?.space) continue;
+      // Runs of one laid-out text never compete: two boxes of one paragraph
+      // intersect wherever the text wraps, and the text's own tap owner takes
+      // the press. An inline link inside that text is still measured against
+      // everything outside it.
+      const sharedText = nearestText(a);
+      if (sharedText !== undefined && sharedText === nearestText(b)) continue;
       if (nearestScroll(a) !== nearestScroll(b)) continue;
       if (!intersects(a.visibleRect, b.visibleRect)) continue;
       if (contains(a.rect, b.rect, TOLERANCE_DP) || contains(b.rect, a.rect, TOLERANCE_DP))

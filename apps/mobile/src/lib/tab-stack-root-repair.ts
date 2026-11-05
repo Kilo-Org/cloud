@@ -29,7 +29,7 @@
 export const TAB_STACK_ROOT_ROUTE_NAME = 'index';
 
 /** A route of a tab's Stack, as these rules read and rebuild it. */
-export type TabStackRoute = {
+type TabStackRoute = {
   readonly key: string;
   readonly name: string;
   readonly params?: object;

@@ -40,6 +40,10 @@ const scene = vi.hoisted(() => {
     },
     navigation: {
       isFocused: () => focused,
+      // The tab root repair reads this Stack's state and resets it; this scene
+      // is already the tab's root, so it repairs nothing.
+      getState: () => ({ index: 0, routes: [{ key: 'root', name: 'index' }] }),
+      reset: () => undefined,
       addListener: (event: string, listener: (event?: unknown) => void) => {
         const set = listeners.get(event) ?? new Set<(event?: unknown) => void>();
         set.add(listener);

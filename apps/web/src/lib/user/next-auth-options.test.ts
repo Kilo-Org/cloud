@@ -227,12 +227,33 @@ describe('sessionAuthOptions', () => {
     expect(authOptions.logger).toBe(sessionAuthOptions.logger);
     expect(authOptions.pages).toBe(sessionAuthOptions.pages);
     expect(authOptions.debug).toBe(sessionAuthOptions.debug);
-    expect(authOptions.callbacks?.session).toBe(sessionAuthOptions.callbacks.session);
+    // Server reads keep the per-session claim; the browser-facing session
+    // callback wraps it and removes that claim.
+    expect(authOptions.callbacks?.session).not.toBe(sessionAuthOptions.callbacks.session);
 
     // A session read runs the jwt callback without a trigger.
     const token = { kiloUserId: 'user-id', version: 3 } as JWT;
     await expect(authOptions.callbacks?.jwt?.({ token } as never)).resolves.toBe(token);
     await expect(sessionAuthOptions.callbacks.jwt({ token } as never)).resolves.toBe(token);
+  });
+
+  test('server reads expose webSessionId and the browser response strips it', async () => {
+    const token = {
+      kiloUserId: 'user-id',
+      version: 3,
+      webSessionId: 'per-session-id',
+    } as JWT;
+    const session = {
+      user: { id: 'user-id', email: 'user@example.com' },
+      expires: new Date(Date.now() + 60_000).toISOString(),
+    } as never;
+
+    const serverSession = await sessionAuthOptions.callbacks.session({ session, token } as never);
+    expect(serverSession.webSessionId).toBe('per-session-id');
+
+    const browserSession = await authOptions.callbacks!.session!({ session, token } as never);
+    expect(browserSession).not.toHaveProperty('webSessionId');
+    expect(browserSession).not.toHaveProperty('webSessionPepper');
   });
 });
 
@@ -598,5 +619,7 @@ describe('passkey provider', () => {
     expect(token.kiloUserId).toBe(user.id);
     expect(token.authProvider).toBe('passkey');
     expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
+    // 32 random bytes, base64url, minted only on the sign-in trigger.
+    expect(token.webSessionId).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 });

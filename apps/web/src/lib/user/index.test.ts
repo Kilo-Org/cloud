@@ -147,7 +147,10 @@ import {
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
+  session_step_up_challenges,
+  session_step_up_proofs,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -2108,6 +2111,31 @@ describe('User', () => {
           kilo_user_id: user.id,
           expires_at: new Date().toISOString(),
         });
+        const [stepUpCredential] = await db
+          .insert(passkey_credentials)
+          .values({
+            kilo_user_id: user.id,
+            credential_id: `step-up-credential-${randomUUID()}`,
+            public_key: 'public-key',
+          })
+          .returning();
+        await db.insert(session_step_up_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          purpose: 'session',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+        await db.insert(session_step_up_proofs).values({
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          method: 'webauthn_uv',
+          passkey_credential_id: stepUpCredential!.id,
+          purpose: 'session',
+          verified_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -2151,6 +2179,18 @@ describe('User', () => {
             .select()
             .from(passkey_credentials)
             .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_challenges)
+            .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_proofs)
+            .where(eq(session_step_up_proofs.kilo_user_id, user.id))
         ).toHaveLength(0);
         expect(
           await db
@@ -2470,6 +2510,50 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('removes session step-up rows', async () => {
+      const user = await insertTestUser();
+      const [credential] = await db
+        .insert(passkey_credentials)
+        .values({
+          kilo_user_id: user.id,
+          credential_id: `soft-delete-step-up-${randomUUID()}`,
+          public_key: 'public-key',
+        })
+        .returning();
+      await db.insert(session_step_up_challenges).values({
+        id: randomUUID(),
+        challenge: `challenge-${randomUUID()}`,
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        purpose: 'session',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await db.insert(session_step_up_proofs).values({
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(session_step_up_challenges)
+          .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(session_step_up_proofs)
+          .where(eq(session_step_up_proofs.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
+
     it('deletes OAuth-owned PR watch policy and activity without touching another owner', async () => {
       const user = await insertTestUser({ id: `oauth/github|watch-privacy-${randomUUID()}` });
       const otherUser = await insertTestUser();

@@ -18,6 +18,10 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Admin MFA step-up
+
+- `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. the literal string `true` enforces step-up (any other value, including `TRUE`, is off) on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
+
 ### Code review health monitor
 
 `CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`

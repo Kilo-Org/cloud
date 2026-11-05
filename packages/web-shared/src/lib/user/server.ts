@@ -10,6 +10,7 @@ import {
   verifyRuntimeProxyAttestation,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -29,7 +30,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -45,8 +46,14 @@ import {
   routeFromHeaders,
   userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  deriveCredentialKind,
+  StepUpRequiredError,
+  type PrivilegedCredentialKind,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -98,6 +105,7 @@ export const sessionAuthOptions = {
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
+      session.webSessionId = castToken.webSessionId;
       session.isNewUser = castToken.isNewUser || false;
       session.authProvider = castToken.authProvider;
       session.authenticatedAt = castToken.authenticatedAt;
@@ -156,6 +164,14 @@ export type RequiredPermissions = {
   /** The actual Request method when the caller has one; preferred over headers. */
   requestMethod?: string;
   requestHeaders?: Headers;
+  /** How this admin read arrived; server components are not REST routes. */
+  stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * Layout-only escape hatch: authenticate the admin but let the caller render
+   * the verification interstitial instead of returning a 403. Never use on a
+   * data route.
+   */
+  skipStepUpGuard?: boolean;
 };
 
 type GetAuthResponse =
@@ -180,6 +196,10 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: undefined;
+      webSessionId?: undefined;
+      webSessionPepper?: undefined;
+      authenticatedAt?: undefined;
     }
   | {
       user: User;
@@ -193,6 +213,13 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: PrivilegedCredentialKind;
+      /** Server-only per-session id for MFA step-up; never sent to the browser. */
+      webSessionId?: string;
+      /** Server-only pepper the session was minted with, for primary re-reads. */
+      webSessionPepper?: string | null;
+      /** Unix seconds when the browser session signed in. */
+      authenticatedAt?: number;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -204,7 +231,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: 'rest',
+      surface: opts.stepUpSurface ?? 'rest',
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
@@ -220,6 +247,45 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       userAgentProduct: userAgentProductFromHeaders(headersList),
       ip: clientIpFromHeaders(headersList),
     });
+  }
+
+  if (opts.adminOnly === true && result.user) {
+    const credential = deriveCredentialKind({
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+      const surface = opts.stepUpSurface ?? 'rest';
+      const route = routeFromHeaders(headersList);
+      const method = methodFromHeaders(headersList, opts.requestMethod);
+      const { actionClass } = actionClassForRoute({
+        surface,
+        route: route ?? '',
+        method,
+      });
+      try {
+        await runStepUpGuard({
+          userId: result.user.id,
+          credential,
+          webSessionId: result.webSessionId,
+          actionClass,
+          enabled: true,
+          route,
+          method,
+          surface,
+        });
+      } catch (error) {
+        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          return authError(403, error.cause.code, result.user.id);
+        }
+        // Fail closed. The guard normally converts evaluation failures itself;
+        // this covers anything unexpected around it.
+        reportStepUpFailure('admin_step_up_rest', error);
+        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
+      }
+    }
   }
 
   if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
@@ -253,6 +319,17 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     });
   }
 
+  if (result.user) {
+    return {
+      ...result,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
+    };
+  }
   return result;
 }
 
@@ -263,6 +340,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
   }
 
   return resolveUserFromSession({ adminOnly: false }, db);
+}
+
+/**
+ * Session-only read for MFA step-up. It refuses any bearer credential and
+ * reads the primary so a proof minted a moment ago is usable immediately. The
+ * caller still enforces the route's Origin check before trusting the session.
+ */
+export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession({ adminOnly: true }, db);
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -475,6 +566,11 @@ async function resolveUserFromSession(
     opts,
     isNewUser: session.isNewUser,
     fromDb,
+    webSession: {
+      id: session.webSessionId,
+      pepper: session.webSessionPepper,
+      authenticatedAt: session.authenticatedAt,
+    },
   });
 }
 
@@ -546,6 +642,7 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
+  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
 };
 
 async function validateUserAuthorization({
@@ -560,6 +657,7 @@ async function validateUserAuthorization({
   tokenSource,
   deviceSessionId,
   cloudAgentAuthority,
+  webSession,
 }: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId, {
@@ -639,6 +737,9 @@ async function validateUserAuthorization({
     botId,
     tokenSource,
     deviceSessionId,
+    webSessionId: webSession?.id,
+    webSessionPepper: webSession?.pepper,
+    authenticatedAt: webSession?.authenticatedAt,
   };
 }
 

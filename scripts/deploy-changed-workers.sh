@@ -8,14 +8,12 @@
 # broad rule.
 #
 # A Markdown edit alone does not deploy a Worker unless that Worker reads the
-# file at runtime. Only `services/kiloclaw/container/` ships Markdown into the
-# Worker: its Dockerfile stages `container/TOOLS.md`, which bootstrap.ts copies
-# into the agent workspace, and the Docker build hashes that tree. The
-# remaining Workers were checked in this tree and none imports or reads a
-# repository Markdown file at runtime, so their documentation edits do not
-# redeploy. A Worker that later ships Markdown must be added here. That list is
-# the committed sources only: a Worker can also write generated Markdown into a
-# workspace, and git diff never sees that.
+# file at runtime. No Worker in this workflow does today: none imports or reads
+# a committed Markdown file from its source. `services/kiloclaw` does stage
+# `container/TOOLS.md`, but the Docker image in deploy-kiloclaw.yml builds it and
+# kiloclaw is excluded below. A Worker that later reads committed Markdown must
+# be added to RUNTIME_MARKDOWN. A Worker can also write generated Markdown into a
+# workspace, which git diff never sees.
 #
 # Reads BASE_SHA and TARGET_ENVIRONMENT. Writes the matrix, the ordered
 # cloud-agent-next output and a summary to stdout, and GITHUB_OUTPUT when set.
@@ -31,8 +29,9 @@ EXCLUDED=(
   services/wasteland  # Deployed separately
   services/user-data-export # Automatic deploy suspended
 )
-# Deployable Worker directories that ship Markdown to the running Worker, as
-# whole directory paths. A Markdown edit under one of them deploys that Worker.
+# Deployable Worker directories that ship Markdown to the running Worker,
+# written as a Worker directory (`services/<worker>`), because the loop only
+# ever receives those. A Markdown edit under a listed Worker deploys it.
 # None qualifies today: `services/kiloclaw` stages `container/TOOLS.md`, but the
 # Docker image in deploy-kiloclaw.yml builds it, and kiloclaw is excluded here.
 # Add a Worker when it starts reading a committed Markdown file at runtime. A
@@ -148,9 +147,8 @@ dir_changed() {
     return 1
   fi
 
-  local status path markdown_paths=0 deploy=false
+  local status path deploy=false
   while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-    markdown_paths=0
     if [[ "$status" == R* || "$status" == C* ]]; then
       # A rename or a copy adds its old path first, then its new one.
       local previous="$path"

@@ -957,6 +957,7 @@ test('documentation-only Worker edits do not redeploy, runtime edits still do', 
       ['services/usage-ingest'],
       'a runtime edit redeploys'
     );
+
     assert.deepEqual(
       release(
         'shared dependency',
@@ -1144,6 +1145,91 @@ test('detection keeps renames, deletions, config and runtime assets deploying', 
       ),
       ['services/kilo-chat', 'services/usage-ingest'],
       'an unknown base deploys every Worker'
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a changed session-ingest contract orders cloud-agent-next after it', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'deploy-ordered-'));
+  const write = (path, content) => {
+    mkdirSync(dirname(join(directory, path)), { recursive: true });
+    writeFileSync(join(directory, path), content);
+  };
+  const commit = message => {
+    execFileSync('git', ['add', '-A'], { cwd: directory });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message],
+      { cwd: directory }
+    );
+  };
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: directory });
+    for (const worker of ['usage-ingest', 'session-ingest', 'cloud-agent-next']) {
+      write(`services/${worker}/wrangler.jsonc`, JSON.stringify({ name: worker }));
+      write(`services/${worker}/package.json`, JSON.stringify({ name: worker, private: true }));
+      write(`services/${worker}/src/index.ts`, 'export {};\n');
+    }
+    // Both Workers are workspaces, and the classifier reports them affected, so
+    // the ordered output is the only thing holding cloud-agent-next back.
+    write('pnpm-workspace.yaml', "packages:\n  - 'services/*'\n");
+    write('package.json', '{"name":"fixture","private":true}');
+    write(
+      'classifier.json',
+      '{"full":false,"dirs":["services/session-ingest","services/cloud-agent-next"]}\n'
+    );
+    write('workspaces.json', '[{"path":"fixture"}]\n');
+    write(
+      'scripts/deploy-changed-workers.sh',
+      readFileSync(new URL('deploy-changed-workers.sh', import.meta.url), 'utf8')
+    );
+    commit('base');
+
+    const before = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: directory,
+      encoding: 'utf8',
+    }).trim();
+    write('services/session-ingest/src/contract.ts', 'export const contract = 2;\n');
+    write('services/cloud-agent-next/src/consumer.ts', 'export const consumer = 2;\n');
+    commit('contract');
+
+    const output = join(directory, '.git', 'detect-output');
+    writeFileSync(output, '');
+    // The classifier prints its fixture: this repository's real script reads it
+    // the way `node scripts/affected-workspaces.mjs` prints its own answer.
+    const result = spawnSync(
+      'bash',
+      [
+        '-e',
+        '-c',
+        'node() { cat classifier.json; }; pnpm() { cat workspaces.json; }; ' +
+          'export -f node pnpm; bash scripts/deploy-changed-workers.sh',
+      ],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          SHELLOPTS: 'expand_aliases',
+          GITHUB_OUTPUT: output,
+          BASE_SHA: before,
+          TARGET_ENVIRONMENT: 'production',
+        },
+      }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const outputs = readFileSync(output, 'utf8');
+    assert.equal(
+      outputs.match(/^deploy-cloud-agent-after-session-ingest=(.*)$/m)[1],
+      'true',
+      'a changed session-ingest contract orders cloud-agent-next after it'
+    );
+    assert.deepEqual(
+      JSON.parse(outputs.match(/^matrix=(.*)$/m)[1]),
+      ['services/session-ingest'],
+      'cloud-agent-next leaves the matrix for the ordered job'
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });

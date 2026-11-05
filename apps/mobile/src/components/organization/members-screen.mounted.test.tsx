@@ -260,6 +260,49 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
   });
 });
 
+describe('OrganizationMembersScreen section labels', () => {
+  // The ScreenHeader mock renders only headerRight, so a "Members" text node
+  // in this tree comes from the list's section eyebrow, never the screen title.
+  const activeMember = { status: 'active', id: 'member-1', name: 'Ada', email: 'ada@example.com' };
+  const invitedMember = { status: 'invited', inviteId: 'invite-1', inviteDate: null };
+
+  it('starts the member card under the header when active members are the only group', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+
+    const texts = collectText(renderer.toJSON());
+    expect(texts).not.toContain('Members');
+    expect(texts).not.toContain('Pending invitations');
+
+    const cards = renderer.root.findAll(
+      node =>
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('mx-6 bg-secondary')
+    );
+    expect(cards).toHaveLength(1);
+    const card = cards[0];
+    if (!card) {
+      throw new Error('member card not found');
+    }
+    expect(card.props.className).toContain('rounded-t-lg');
+    unmount();
+  });
+
+  it('keeps both labels when pending invitations follow the members', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember, invitedMember] };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Members');
+    expect(texts).toContain('Pending invitations');
+    unmount();
+  });
+});
+
 describe('OrganizationMembersScreen invite header control', () => {
   it('renders the invite control with at least a 28dp box and a 44pt reach', async () => {
     const { renderer, unmount } = await renderWithProviders(

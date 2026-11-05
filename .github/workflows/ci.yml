@@ -829,8 +829,9 @@ jobs:
           # so a key that carries github.sha writes a new entry on every run for
           # one dependency graph. The lockfile digest keeps its own segment, so
           # the prefix restore-key below still matches this key when only a
-          # source file changed. The source globs stay inside the app tree, so
-          # none of them walks node_modules.
+          # source file changed, which also reaches the sha-keyed entries left
+          # by earlier runs. The source globs stay inside the app tree, so none
+          # of them walks node_modules.
           key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-

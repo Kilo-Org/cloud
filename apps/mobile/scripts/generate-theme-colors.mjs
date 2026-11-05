@@ -35,6 +35,7 @@ export const TOKEN_KEYS = [
   ['mutedSoft', '--muted-soft'],
   ['hairSoft', '--hair-soft'],
   ['controlIdle', '--control-idle'],
+  ['skeletonFill', '--skeleton-fill'],
   ['ringTrack', '--ring-track'],
   ['accentSoft', '--accent-soft'],
   ['accentSoftForeground', '--accent-soft-foreground'],

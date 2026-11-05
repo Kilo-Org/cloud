@@ -117,8 +117,16 @@ Add the index with the existing DO SQLite/Drizzle conventions
 
 Before rollout, define:
 
-- Limits: file count, per-file size (below the Worker request-body limit for the
-  account plan), total bytes, path length and depth.
+- Limits, as named constants. Proposed V1 values:
+  - 50 MiB per file. Bytes never pass through the DO; the cap comes from
+    Cloudflare's Worker ingress limit (100 MB on the lowest plan, and an edge 413
+    can happen before the handler runs), the turn-end flush budget, and
+    `docs/control-plane.md` noting that Vercel forwarding is only verified for
+    8 MiB transfers.
+  - 500 MiB total per workspace, which bounds restore time during preparation.
+  - 1,000 files, 1,024-byte relative paths, depth 16.
+  Larger files can follow with Worker-proxied R2 multipart uploads, where each
+  part request stays under the ingress limit.
 - Retention and asynchronous cleanup of replaced, deleted, and abandoned objects
   (an object written but never committed).
 - Deletion with the workspace, through the existing worktree-deletion flow, and

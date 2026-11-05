@@ -1336,6 +1336,62 @@ describe('User', () => {
       ).toBeDefined();
     });
 
+    it('creates the account without an IP when a trusted path skips admission', async () => {
+      // SCIM directory-sync provisioning has no end user and no forwarded IP.
+      // Without the skip this fails closed with SIGNUP-UNAVAILABLE, which would
+      // block every directory-provisioned account in production.
+      const email = 'skip-admission@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Skip Admission',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'workos' as const,
+        provider_account_id: 'workos-skip-admission',
+      };
+
+      const result = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { skipSignupAdmission: true }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      // Admission is the only gate skipped: the account is still fully provisioned.
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+
+    it('still rejects a request with no IP when admission is not skipped', async () => {
+      // The guard against the skip becoming the default.
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-ip-no-skip@example.com',
+          google_user_name: 'No IP No Skip',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google' as const,
+          provider_account_id: 'google-no-ip-no-skip',
+        },
+        undefined,
+        false
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+    });
+
     it.each([undefined, '', 'not-a-digest', 'has space', 'a'.repeat(129)])(
       'still enforces IP admission with missing or invalid JA4: %s',
       async ja4 => {

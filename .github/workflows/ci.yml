@@ -99,7 +99,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -145,7 +144,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -791,9 +789,6 @@ jobs:
 
       - name: Run Session Ingest Postgres tests
         run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
-
-      - name: Run SCIM Sync Postgres tests
-        run: NODE_ENV=development pnpm --filter cloudflare-scim-sync test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:

@@ -3809,7 +3809,6 @@
     "saved": "Instellingen voor bestedingswaarschuwingen opgeslagen",
     "loadError": "Bestedingswaarschuwingen konden niet worden geladen.",
     "saveError": "Bestedingswaarschuwingen konden niet worden opgeslagen.",
-    "empty": "Bestedingswaarschuwingen staan uit. Zet ze aan om de factuurcontacten van dit bereik te waarschuwen.",
     "sendAlerts": "Waarschuwingen sturen",
     "noSpend": "Nog geen besteding",
     "spend24h": "Besteding in de afgelopen 24 uur",

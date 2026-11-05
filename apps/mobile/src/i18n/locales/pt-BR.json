@@ -3871,7 +3871,6 @@
     "saved": "Configurações dos alertas de gastos salvas",
     "loadError": "Não foi possível carregar os alertas de gastos.",
     "saveError": "Não foi possível salvar os alertas de gastos.",
-    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contatos de cobrança deste escopo.",
     "sendAlerts": "Enviar alertas",
     "noSpend": "Nenhum gasto ainda",
     "spend24h": "Gastos nas últimas 24 horas",

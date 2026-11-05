@@ -3809,7 +3809,6 @@
     "saved": "Instellings vir bestedingswaarskuwings gestoor",
     "loadError": "Kon nie bestedingswaarskuwings laai nie.",
     "saveError": "Kon nie bestedingswaarskuwings stoor nie.",
-    "empty": "Bestedingswaarskuwings is af. Skakel dit aan om hierdie omvang se faktuurkontakte te waarsku.",
     "sendAlerts": "Stuur waarskuwings",
     "noSpend": "Geen besteding nie",
     "spend24h": "Besteding in die afgelope 24 uur",

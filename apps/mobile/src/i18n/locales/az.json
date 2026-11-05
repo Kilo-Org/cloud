@@ -3809,7 +3809,6 @@
     "saved": "Xərc bildirişi parametrləri yadda saxlanıldı",
     "loadError": "Xərc bildirişlərini yükləmək mümkün olmadı.",
     "saveError": "Xərc bildirişlərini yadda saxlamaq mümkün olmadı.",
-    "empty": "Xərc bildirişləri söndürülüb. Bu əhatənin ödəniş əlaqələrini xəbərdar etmək üçün onları yandır.",
     "sendAlerts": "Xərc bildirişlərini göndər",
     "noSpend": "Hələ xərc yoxdur",
     "spend24h": "Son 24 saatda xərc",

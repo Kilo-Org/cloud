@@ -3809,7 +3809,6 @@
     "saved": "Gastu-alerten ezarpenak gorde dira",
     "loadError": "Ezin izan dira gastu-alertak kargatu.",
     "saveError": "Ezin izan dira gastu-alertak gorde.",
-    "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
     "sendAlerts": "Bidali gastu-alertak",
     "noSpend": "Gasturik ez",
     "spend24h": "Azken 24 orduetako gastua",

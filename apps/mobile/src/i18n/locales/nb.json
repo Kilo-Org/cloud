@@ -3809,7 +3809,6 @@
     "saved": "Innstillingene for forbruksvarsler er lagret",
     "loadError": "Forbruksvarslene kunne ikke lastes.",
     "saveError": "Forbruksvarslene kunne ikke lagres.",
-    "empty": "Forbruksvarsler er av. Slå dem på for å varsle faktureringskontaktene i dette området.",
     "sendAlerts": "Send varsler",
     "noSpend": "Ingen forbruk ennå",
     "spend24h": "Forbruk de siste 24 timene",

@@ -3921,7 +3921,6 @@
     "saved": "Nastavenia upozornení na výdavky boli uložené",
     "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
     "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
-    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
     "sendAlerts": "Posielať upozornenia",
     "noSpend": "Zatiaľ žiadne výdavky",
     "spend24h": "Výdavky za posledných 24 hodín",

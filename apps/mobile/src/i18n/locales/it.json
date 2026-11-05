@@ -3865,7 +3865,6 @@
     "saved": "Impostazioni degli avvisi di spesa salvate",
     "loadError": "Impossibile caricare gli avvisi di spesa.",
     "saveError": "Impossibile salvare gli avvisi di spesa.",
-    "empty": "Gli avvisi di spesa sono disattivati. Attivali per avvisare i contatti di fatturazione di questo ambito.",
     "sendAlerts": "Invia avvisi",
     "noSpend": "Ancora nessuna spesa",
     "spend24h": "Spesa nelle ultime 24 ore",

@@ -372,10 +372,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         const existingMemberships =
           childIds.length > 0
             ? await tx
-                .select({
-                  organizationId: organization_memberships.organization_id,
-                  role: organization_memberships.role,
-                })
+                .select({ organizationId: organization_memberships.organization_id })
                 .from(organization_memberships)
                 .where(
                   and(
@@ -388,19 +385,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         const existingMembershipsByOrganizationId = new Map(
           existingMemberships.map(membership => [membership.organizationId, membership])
         );
-
-        if (
-          existingMemberships.some(
-            membership =>
-              membership.role !== 'member' &&
-              !selectedChildOrganizationIds.has(membership.organizationId)
-          )
-        ) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Elevated child team memberships must be managed in the child team',
-          });
-        }
 
         const added = new Set<string>();
         const removed: string[] = [];

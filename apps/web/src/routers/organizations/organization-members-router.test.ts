@@ -939,6 +939,209 @@ describe('organizations members trpc router', () => {
       }
     });
 
+    it.each([
+      { role: 'owner', outcome: 'commit' },
+      { role: 'admin', outcome: 'commit' },
+      { role: 'billing_manager', outcome: 'commit' },
+      { role: 'owner', outcome: 'rollback' },
+      { role: 'admin', outcome: 'rollback' },
+      { role: 'billing_manager', outcome: 'rollback' },
+    ] as const)(
+      'waits for the $outcome of a concurrent $role demotion before deciding removal',
+      async ({ role, outcome }) => {
+        const childOwner = await insertTestUser({ is_admin: false });
+        const child = await createChildOrganization('Concurrent Demotion Child', childOwner.id);
+        await addUserToOrganization(child.id, memberUser.id, role);
+        const caller = await createCallerForUser(billingManagerUser.id);
+        jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+        const demoted = Promise.withResolvers<number>();
+        const allowCompletion = Promise.withResolvers<void>();
+        const rollbackError = new Error('Demotion rolled back');
+        const demotion = db
+          .transaction(async tx => {
+            await updateUserRoleInOrganization(child.id, memberUser.id, 'member', tx);
+            const result = await tx.execute<{ pid: number }>(
+              sql`SELECT pg_backend_pid()::int AS pid`
+            );
+            const pid = result.rows[0]?.pid;
+            if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+            demoted.resolve(pid);
+            await allowCompletion.promise;
+            if (outcome === 'rollback') throw rollbackError;
+          })
+          .then(
+            value => ({ value }),
+            (error: unknown) => {
+              demoted.reject(error);
+              return { error };
+            }
+          );
+        const holderPid = await demoted.promise;
+        let requestFinished = false;
+        const attempt = caller.organizations.members
+          .setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [],
+          })
+          .then(
+            value => {
+              requestFinished = true;
+              return { value };
+            },
+            (error: unknown) => {
+              requestFinished = true;
+              return { error };
+            }
+          );
+
+        try {
+          let blocked = false;
+          for (let i = 0; i < 2000 && !blocked && !requestFinished; i += 1) {
+            const waiting = await db.execute(sql`
+              SELECT 1 FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND ${holderPid} = ANY(pg_blocking_pids(pid))
+            `);
+            blocked = waiting.rows.length > 0;
+            if (!blocked) await new Promise<void>(resolve => setImmediate(resolve));
+          }
+          expect(blocked).toBe(true);
+          expect(requestFinished).toBe(false);
+          allowCompletion.resolve();
+
+          if (outcome === 'commit') {
+            expect(await demotion).toEqual({ value: undefined });
+            expect(await attempt).toEqual({
+              value: { success: true, added: [], removed: [child.id] },
+            });
+          } else {
+            expect(await demotion).toEqual({ error: rollbackError });
+            expect(await attempt).toMatchObject({
+              error: {
+                code: 'FORBIDDEN',
+                message: 'Elevated child team memberships must be managed in the child team',
+              },
+            });
+          }
+
+          const membership = await db.query.organization_memberships.findFirst({
+            where: and(
+              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, memberUser.id)
+            ),
+          });
+          const audits = await db
+            .select({ action: organization_audit_logs.action })
+            .from(organization_audit_logs)
+            .where(eq(organization_audit_logs.organization_id, child.id));
+          const removals = await db
+            .select()
+            .from(organization_membership_removals)
+            .where(eq(organization_membership_removals.organization_id, child.id));
+
+          if (outcome === 'commit') {
+            expect(membership).toBeUndefined();
+            expect(audits).toEqual([{ action: 'organization.member.remove' }]);
+            expect(removals).toHaveLength(1);
+            expect(invalidateOrganizationSessionAccess).toHaveBeenCalledTimes(1);
+            expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+              memberUser.id,
+              child.id
+            );
+          } else {
+            expect(membership?.role).toBe(role);
+            expect(audits).toEqual([]);
+            expect(removals).toEqual([]);
+            expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+          }
+        } finally {
+          allowCompletion.resolve();
+          await demotion;
+          await attempt;
+          await cleanupChildOrganizations([child.id]);
+        }
+      },
+      20_000
+    );
+
+    it('rolls back earlier changes when a later omitted membership is elevated', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const children = await Promise.all([
+        createChildOrganization('Earlier Addition Child', childOwner.id),
+        createChildOrganization('Earlier Removal Child', childOwner.id),
+        createChildOrganization('Later Elevated Child', childOwner.id),
+      ]);
+      const childIds = children.map(child => child.id).sort();
+      const [addedChildId, removedChildId, elevatedChildId] = childIds;
+      if (!addedChildId || !removedChildId || !elevatedChildId) {
+        throw new Error('Child organization IDs unavailable');
+      }
+      await addUserToOrganization(removedChildId, memberUser.id, 'member');
+      await addUserToOrganization(elevatedChildId, memberUser.id, 'admin');
+      const caller = await createCallerForUser(billingManagerUser.id);
+      const createAudit = jest.mocked(createAuditLog);
+      createAudit.mockClear();
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+
+      try {
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [addedChildId],
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        expect(createAudit).toHaveBeenCalledTimes(2);
+        expect(createAudit).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({
+            action: 'organization.member.admin_add',
+            organization_id: addedChildId,
+          })
+        );
+        expect(createAudit).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({
+            action: 'organization.member.remove',
+            organization_id: removedChildId,
+          })
+        );
+
+        const memberships = await db
+          .select({
+            organizationId: organization_memberships.organization_id,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.kilo_user_id, memberUser.id),
+              inArray(organization_memberships.organization_id, childIds)
+            )
+          )
+          .orderBy(organization_memberships.organization_id);
+        expect(memberships).toEqual([
+          { organizationId: removedChildId, role: 'member' },
+          { organizationId: elevatedChildId, role: 'admin' },
+        ]);
+        const audits = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(inArray(organization_audit_logs.organization_id, childIds));
+        const removals = await db
+          .select()
+          .from(organization_membership_removals)
+          .where(inArray(organization_membership_removals.organization_id, childIds));
+        expect(audits).toEqual([]);
+        expect(removals).toEqual([]);
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+      } finally {
+        await cleanupChildOrganizations(childIds);
+      }
+    });
+
     it('refuses removal when a concurrent child role promotion commits first', async () => {
       const childOwner = await insertTestUser({ is_admin: false });
       const existingChild = await createChildOrganization(

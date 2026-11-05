@@ -65,6 +65,7 @@ import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
 import {
   recordKiloAdminElevation,
@@ -948,7 +949,7 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
-    if (ctx.user.is_admin) {
+    if (ctx.user.is_admin && !isSupportAccessEnabled()) {
       // No membership predicate is added at all, so the query spans every
       // organization's sessions. This is the broadest read in the file and it
       // never touches `adminProcedure`, so it must be recorded here.

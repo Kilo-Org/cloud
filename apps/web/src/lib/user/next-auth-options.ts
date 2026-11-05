@@ -839,6 +839,7 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
+      issuer: 'https://discord.com',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,

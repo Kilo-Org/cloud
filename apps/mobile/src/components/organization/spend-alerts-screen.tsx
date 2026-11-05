@@ -445,7 +445,8 @@ function SpendAlertsForm({
 
       {/* One 44dp row on the same 12dp inset as the KvRow card above: the
           switch's own box sets the height, so the card adds no vertical
-          padding of its own. */}
+          padding of its own. The switch's end inset lives in CardSwitch, so
+          every switch on the screen ends level with the label's start. */}
       <View className="min-h-11 flex-row items-center justify-between rounded-lg bg-secondary px-3">
         <Text className="text-sm font-medium">{t('spendAlerts.sendAlerts')}</Text>
         <CardSwitch
@@ -578,21 +579,23 @@ function SpendAlertsForm({
 }
 
 /**
- * The shared `Switch`, pulled out to the end padding line of the card row it
- * sits on.
+ * The shared `Switch`, pulled out to sit level with the row's label.
  *
- * The native switch draws its 32dp track inside a box that reserves the
- * thumb's overhang, so the track ends about 12dp before the box does: on a
- * `px-3` card the track would sit 24dp from the edge while the row's label
- * starts at 12dp, and the same card's KvRow values end at 12dp. Pulling the
- * box out by its own reserved gap puts the track's end on the label's line.
+ * The card ends its content 12dp from the edge (`px-3`), but the text ink the
+ * label paints starts about 10dp in, and the native switch node paints its
+ * track ending about 4dp before the node's end edge, so an unpulled switch's
+ * painted end lands about 16dp from the card edge — visibly deeper than the
+ * label. Pulling the node out by 4dp puts the painted end about 11–12dp from
+ * the edge, level with the label's start, and keeps about 8dp of the node's
+ * hit area inside the card.
+ *
  * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
- * the writing direction, where a hand-picked `-mr-3` would land on the label's
+ * the writing direction, where a hand-picked `-mr-1` would land on the label's
  * side under RTL.
  */
 function CardSwitch(props: ComponentProps<typeof Switch>) {
   return (
-    <View className="-me-3">
+    <View className="-me-1">
       <Switch {...props} />
     </View>
   );

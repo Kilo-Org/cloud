@@ -6,7 +6,12 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import type { CustomerBillingFailure, SessionMessageAdmissionResult } from '../execution/types.js';
-import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
+import {
+  QUEUED_MESSAGE_LIMIT,
+  queueMessage as admitMessage,
+  type SessionMessage,
+} from '../control-plane/session/messages.js';
+import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol.js';
 
 vi.mock('./model-preflight.js', () => ({
   preflightExistingPromptModel: vi.fn(),
@@ -148,15 +153,16 @@ describe('queueMessage', () => {
   });
 
   it.each(['prompt', 'command'] as const)(
-    'reuses an omitted %s ID across a lost send response',
+    'recovers a lost %s acknowledgement with one admitted message',
     async type => {
-      const sent: string[] = [];
-      let attempts = 0;
-      const send = vi.fn(async (payload: { messageId: string }) => {
-        sent.push(payload.messageId);
-        attempts += 1;
-        if (attempts === 1)
+      let messages: SessionMessage[] = [];
+      let replyLost = false;
+      const send = vi.fn(async (payload: ControlPlanePromptPayload) => {
+        messages = admitMessage(messages, payload, Date.now()).messages;
+        if (!replyLost) {
+          replyLost = true;
           throw Object.assign(new Error('Response lost after admission'), { retryable: true });
+        }
         return { type: 'ok' as const };
       });
 
@@ -171,9 +177,9 @@ describe('queueMessage', () => {
         { env: makeEnv({ send }) as Env, userId: 'user_abc' }
       );
 
-      expect(attempts).toBe(2);
-      expect(new Set(sent).size).toBe(1);
-      expect(sent[0]).toBe(response.messageId);
+      expect(response).toMatchObject({ status: 'started', delivery: 'queued' });
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toMatchObject({ messageId: response.messageId, state: 'queued' });
     }
   );
 

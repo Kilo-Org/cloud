@@ -185,7 +185,7 @@ describe('native event delivery', () => {
     });
   });
 
-  it('does not append deltas twice after an ambiguous batched RPC retry or eviction', async () => {
+  it('applies a receipted batch once across a lost reply, deliberate replay and eviction', async () => {
     const { stub, sessionId, part, delta } = await fixture();
     const sandbox = sandboxes.getByName(`native-events-${crypto.randomUUID()}`);
     const calls: ControlPlaneEventsNotification[] = [];
@@ -202,16 +202,18 @@ describe('native event delivery', () => {
             throw Object.assign(new Error('response lost'), { retryable: true });
         },
       } as never);
-      await instance.notifySession(
-        sessionId,
-        { kind: 'events', payload: { events: [delta('same'), delta('same'), delta(' suffix')] } },
-        expiresAt,
-        new AbortController().signal
-      );
+      await expect(
+        instance.notifySession(
+          sessionId,
+          { kind: 'events', payload: { events: [delta('same'), delta('same'), delta(' suffix')] } },
+          expiresAt,
+          new AbortController().signal
+        )
+      ).rejects.toThrow('response lost');
     });
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
     expect(calls[0].delivery).toEqual({ id: expect.any(String), expiresAt });
-    expect(calls[1].delivery).toEqual(calls[0].delivery);
+    await stub.onEvents(calls[0]);
     // A read writes the buffered text, so eviction keeps it.
     await stub.getSession();
     await evictAllDurableObjects();

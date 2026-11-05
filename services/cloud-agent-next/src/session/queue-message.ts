@@ -293,10 +293,12 @@ async function queueControlPlaneMessage(
     }
     throw error;
   }
+  // The immutable message ID deduplicates admission, including a lost acknowledgement.
   const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneSendResult>(
     () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.send(payload),
-    'send'
+    'send',
+    { maxAttempts: 2, baseBackoffMs: 100, maxBackoffMs: 100 }
   );
   if (result.type === 'session-not-found') {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });

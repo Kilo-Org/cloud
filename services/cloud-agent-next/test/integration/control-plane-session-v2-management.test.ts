@@ -314,14 +314,15 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     ).toBe(404);
   });
 
-  it('retries a transient sandbox status upgrade on a fresh peer', async () => {
+  it('returns unavailable without opening another status stream after a surfaced transport failure', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
     const peer = new FakeSandboxPeer();
     let attempts = 0;
     const unavailable = new FakeSandboxPeer();
-    unavailable.fetch = async () => {
+    unavailable.fetch = async request => {
+      unavailable.fetchCalls.push(request);
       throw Object.assign(new Error('Transient DO failure'), { retryable: true });
     };
     await runInDurableObject(stub, instance => {
@@ -335,8 +336,11 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         headers: { Upgrade: 'websocket' },
       })
     );
-    expect(await response.text()).toBe('status-stream');
-    expect(attempts).toBe(2);
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('Sandbox unavailable');
+    expect(response.webSocket).toBeNull();
+    expect(unavailable.fetchCalls).toHaveLength(1);
+    expect(peer.fetchCalls).toHaveLength(0);
   });
 
   it('reads the stored runtime location and returns null when unregistered', async () => {

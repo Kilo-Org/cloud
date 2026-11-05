@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "네이티브 원격 데모",
+    "sessionsEmpty": "아직 네이티브 세션이 없습니다",
+    "hosts": "온라인 호스트",
+    "hostsEmpty": "온라인 호스트가 없습니다",
+    "directory": "작업 디렉터리",
+    "createSession": "네이티브 세션 생성",
+    "queueIfOffline": "호스트가 오프라인이면 프롬프트 대기열에 추가",
+    "prompt": "프롬프트 또는 /command",
+    "localClear": "로컬 화면 지우기",
+    "abort": "턴 중단",
+    "failed": "네이티브 원격 작업 실패",
+    "creationUnknown": "생성 결과를 확인할 수 없습니다. 다시 시도하기 전에 세션 목록을 새로고침하세요.",
+    "commandFailed": "러너 명령 실패",
+    "invalidReply": "잘못된 러너 응답",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents 또는 /clear (로컬 전용)를 사용하세요.",
+    "status": "연결: {{connection}} · 러너: {{runner}}",
+    "presenceStatus": "호스트: {{connection}}",
+    "commandStatus": "명령 전달: {{status}}",
+    "delivered": "전달됨",
+    "expired": "만료됨"
+  },
   "common": {
     "cancel": "취소",
     "done": "완료",

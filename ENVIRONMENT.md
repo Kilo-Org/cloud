@@ -573,6 +573,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
+- `EXPO_PUBLIC_SESSION_SYNC_URL` - Optional native-v2 remote mobile demo relay URL, inlined into the JS bundle. Production builds default to `https://session-sync.kiloapps.io`; non-production builds require an explicit isolated Worker URL (for example, `http://localhost:8817`). The client-only `native-remote-mobile` flag (minimum app version `1.0.15`, default off) gates both the Profile entry and `/native-remote`. It does not change server authorization. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `KILO_CHAT_URL` - Base URL for Kilo Chat in the mobile app. Bundled into the binary. [PUBLIC]

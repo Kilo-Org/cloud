@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "הדגמת שליטה מרחוק בפרוטוקול נייטיב",
+    "sessionsEmpty": "עדיין אין סשנים בפרוטוקול נייטיב",
+    "hosts": "מארחים מחוברים",
+    "hostsEmpty": "אין מארחים מחוברים",
+    "directory": "תיקיית עבודה",
+    "createSession": "יצירת סשן בפרוטוקול נייטיב",
+    "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
+    "prompt": "פרומפט או /command",
+    "localClear": "ניקוי התצוגה המקומית",
+    "abort": "עצירת הסבב",
+    "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
+    "creationUnknown": "תוצאת היצירה אינה ידועה. יש לרענן את רשימת הסשנים לפני ניסיון נוסף.",
+    "commandFailed": "הפקודה לתהליך ההרצה נכשלה",
+    "invalidReply": "תגובה לא תקינה מתהליך ההרצה",
+    "unsafeCommand": "יש להשתמש בפקודות /compact, /new, /skill, /models, /agents או /clear (מקומית בלבד).",
+    "status": "חיבור: {{connection}} · תהליך הרצה: {{runner}}",
+    "presenceStatus": "מארחים: {{connection}}",
+    "commandStatus": "מסירת הפקודה: {{status}}",
+    "delivered": "נמסרה",
+    "expired": "פג התוקף"
+  },
   "common": {
     "cancel": "ביטול",
     "done": "סיום",

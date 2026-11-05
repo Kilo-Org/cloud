@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo de controle remoto nativo",
+    "sessionsEmpty": "Ainda não há sessões nativas",
+    "hosts": "Hosts online",
+    "hostsEmpty": "Nenhum host online",
+    "directory": "Diretório de trabalho",
+    "createSession": "Criar sessão nativa",
+    "queueIfOffline": "Colocar prompt na fila se o host estiver offline",
+    "prompt": "Prompt ou /command",
+    "localClear": "Limpar visualização local",
+    "abort": "Interromper turno",
+    "failed": "Falha na ação remota nativa",
+    "creationUnknown": "Resultado da criação desconhecido. Atualize as sessões antes de tentar novamente.",
+    "commandFailed": "Falha no comando do executor",
+    "invalidReply": "Resposta inválida do executor",
+    "unsafeCommand": "Use /compact, /new, /skill, /models, /agents ou /clear (apenas localmente).",
+    "status": "Conexão: {{connection}} · Executor: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Entrega do comando: {{status}}",
+    "delivered": "Entregue",
+    "expired": "Expirado"
+  },
   "common": {
     "cancel": "Cancelar",
     "done": "Concluir",

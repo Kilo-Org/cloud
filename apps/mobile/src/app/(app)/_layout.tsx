@@ -195,6 +195,7 @@ export default function AppLayout() {
               />
               <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/[session-id]" />
+              <Stack.Screen name="native-remote" />
               <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
               <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />

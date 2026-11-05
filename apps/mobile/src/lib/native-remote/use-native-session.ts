@@ -1,0 +1,111 @@
+import {
+  type NativeSessionConnection,
+  type NativeSessionState,
+  type NativeSessionSummary,
+} from '@kilocode/cloud-agent-sdk';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner-native';
+import { type NativePendingRequests, pendingRequests, sendNativePrompt } from './projections';
+import { nativeError, type NativeRemoteClient } from './use-native-inventory';
+
+export type NativeRemoteSession = {
+  state: NativeSessionState | undefined;
+  busy: boolean;
+  error: string;
+  commandID: string;
+  pending: NativePendingRequests;
+  canControl: boolean;
+  run: (operation: (connection: NativeSessionConnection) => Promise<string>) => Promise<boolean>;
+  send: (text: string, queue: boolean) => Promise<boolean>;
+  clear: () => void;
+};
+
+export function useNativeSession(client: NativeRemoteClient, session?: NativeSessionSummary) {
+  const sessionID = session?.sessionID;
+  const organizationID = session?.tenant.type === 'organization' ? session.tenant.id : undefined;
+  const [state, setState] = useState<NativeSessionState>();
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setError] = useState('');
+  const [commandID, setCommandID] = useState('');
+  const connectionRef = useRef<NativeSessionConnection | null>(null);
+  const scope = useRef({ client, sessionID, organizationID });
+  scope.current = { client, sessionID, organizationID };
+
+  useEffect(() => {
+    let active = true;
+    setState(undefined);
+    setBusy(false);
+    setError('');
+    setCommandID('');
+    const matches = () =>
+      active &&
+      scope.current.client === client &&
+      scope.current.sessionID === sessionID &&
+      scope.current.organizationID === organizationID;
+    const connection = sessionID
+      ? client.connectSession(
+          sessionID,
+          value => {
+            if (matches()) {
+              setState(value);
+            }
+          },
+          organizationID
+        )
+      : null;
+    connectionRef.current = connection;
+    return () => {
+      active = false;
+      connectionRef.current = null;
+      connection?.close();
+    };
+  }, [client, sessionID, organizationID]);
+
+  async function run(operation: (connection: NativeSessionConnection) => Promise<string>) {
+    const connection = connectionRef.current;
+    const started = scope.current;
+    if (!connection || busy) {
+      return false;
+    }
+    const matches = () =>
+      connectionRef.current === connection &&
+      scope.current.client === started.client &&
+      scope.current.sessionID === started.sessionID &&
+      scope.current.organizationID === started.organizationID;
+    setBusy(true);
+    setError('');
+    try {
+      const id = await operation(connection);
+      if (!matches()) {
+        return false;
+      }
+      setCommandID(id);
+      return true;
+    } catch (error) {
+      if (matches()) {
+        const message = nativeError(error);
+        setError(message);
+        toast.error(message);
+      }
+      return false;
+    } finally {
+      if (matches()) {
+        setBusy(false);
+      }
+    }
+  }
+
+  return {
+    state,
+    busy,
+    error: errorMessage,
+    commandID,
+    pending: pendingRequests(state?.events ?? []),
+    canControl: state?.connection === 'connected' && state.runnerConnected && !busy,
+    run,
+    send: (text: string, queue: boolean) =>
+      run(connection => sendNativePrompt(connection, text, queue)),
+    // SDK clear hides transcript messages only; pending remote.state remains intact.
+    clear: () => connectionRef.current?.clear(),
+  };
+}

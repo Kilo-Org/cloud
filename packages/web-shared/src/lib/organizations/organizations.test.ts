@@ -1,8 +1,9 @@
-import { describe, test, expect, afterEach } from '@jest/globals';
+import { describe, test, expect, afterEach, jest } from '@jest/globals';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_context_preferences,
   organizations,
+  external_side_effect_outbox,
   organization_audit_logs,
   organization_invitations,
   organization_memberships,
@@ -1596,6 +1597,257 @@ describe('Organizations', () => {
       });
       expect(result.success).toBe(false);
       expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+    });
+
+    test.each([
+      { relation: 'older than', createdOffsetMs: -1000, status: 'pending', authentication: 'none' },
+      {
+        relation: 'equal to',
+        createdOffsetMs: 0,
+        status: 'sending',
+        authentication: 'wrong source',
+      },
+    ] as const)(
+      'expires and revokes a direct SSO invitation $relation the removal with $authentication authentication',
+      async ({ createdOffsetMs, status, authentication }) => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({
+          google_user_email: `stale-outbox-${createdOffsetMs}@example.com`,
+        });
+        const organization = await createOrganization('Direct SSO Org', owner.id);
+        await db
+          .update(organizations)
+          .set({ sso_domain: 'example.com' })
+          .where(eq(organizations.id, organization.id));
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        expect(invitation.authentication_requirement).toBe('workos');
+
+        const removedAt = new Date(Date.now() - 10000);
+        await db
+          .update(organization_invitations)
+          .set({ created_at: new Date(removedAt.getTime() + createdOffsetMs).toISOString() })
+          .where(eq(organization_invitations.id, invitation.id));
+        const [removal] = await db
+          .insert(organization_membership_removals)
+          .values({
+            organization_id: organization.id,
+            kilo_user_id: invitee.id,
+            removed_by: owner.id,
+            previous_role: 'member',
+            removed_at: removedAt.toISOString(),
+          })
+          .returning();
+        const [outbox] = await db
+          .insert(external_side_effect_outbox)
+          .values({
+            invitation_id: invitation.id,
+            payload: {
+              invitationId: invitation.id,
+              to: invitee.google_user_email,
+              organizationName: organization.name,
+              inviterName: 'Owner',
+              acceptInviteUrl: 'https://example.com/accept-invite',
+            },
+            status,
+            attempts: 2,
+            claimed_at: status === 'sending' ? sql`NOW()` : null,
+            next_attempt_at: sql`NOW() + INTERVAL '1 hour'`,
+            last_error: 'previous failure',
+          })
+          .returning();
+
+        try {
+          const result = await acceptOrganizationInvite(
+            invitee.id,
+            invitation.token,
+            authentication === 'wrong source'
+              ? { provider: 'workos', ssoSourceOrganizationId: 'another-organization' }
+              : {}
+          );
+          expect(result).toEqual({ success: false, error: 'Invitation is no longer valid' });
+
+          const storedInvitation = await db.query.organization_invitations.findFirst({
+            where: eq(organization_invitations.id, invitation.id),
+          });
+          expect(storedInvitation).toBeDefined();
+          expect(storedInvitation?.accepted_at).toBeNull();
+          expect(new Date(storedInvitation?.expires_at ?? '').getTime()).toBeLessThanOrEqual(
+            Date.now()
+          );
+          const storedOutbox = await db.query.external_side_effect_outbox.findFirst({
+            where: eq(external_side_effect_outbox.id, outbox.id),
+          });
+          expect(storedOutbox).toMatchObject({
+            status: 'failed',
+            claimed_at: null,
+            next_attempt_at: null,
+            last_error: 'revoked',
+          });
+          const storedRemoval = await db.query.organization_membership_removals.findFirst({
+            where: eq(organization_membership_removals.id, removal.id),
+          });
+          expect(storedRemoval).toEqual(removal);
+          expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+
+          const freshInvitation = await inviteUserToOrganization(
+            organization.id,
+            owner.id,
+            invitee.google_user_email,
+            'member'
+          );
+          expect(freshInvitation.id).not.toBe(invitation.id);
+          expect(freshInvitation.authentication_requirement).toBe('workos');
+        } finally {
+          await db
+            .delete(external_side_effect_outbox)
+            .where(eq(external_side_effect_outbox.id, outbox.id));
+        }
+      }
+    );
+
+    test('rolls back invitation expiration when outbox revocation fails', async () => {
+      const owner = await insertTestUser();
+      const invitee = await insertTestUser({ google_user_email: 'rollback-outbox@example.com' });
+      const organization = await createOrganization('Direct SSO Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, organization.id));
+      const invitation = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        invitee.google_user_email,
+        'member'
+      );
+      await db.insert(organization_membership_removals).values({
+        organization_id: organization.id,
+        kilo_user_id: invitee.id,
+        removed_by: owner.id,
+        previous_role: 'member',
+        removed_at: sql`NOW() + INTERVAL '1 minute'`,
+      });
+      const [outbox] = await db
+        .insert(external_side_effect_outbox)
+        .values({
+          invitation_id: invitation.id,
+          payload: {
+            invitationId: invitation.id,
+            to: invitee.google_user_email,
+            organizationName: organization.name,
+            inviterName: 'Owner',
+            acceptInviteUrl: 'https://example.com/accept-invite',
+          },
+        })
+        .returning();
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        await db.execute(sql`
+          ALTER TABLE ${external_side_effect_outbox}
+          ADD CONSTRAINT invite_revocation_test_failure CHECK (status <> 'failed') NOT VALID
+        `);
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result).toEqual({ success: false, error: 'An unexpected error occurred' });
+        expect(errorSpy).toHaveBeenCalled();
+        expect(
+          await db.query.organization_invitations.findFirst({
+            where: eq(organization_invitations.id, invitation.id),
+          })
+        ).toEqual(invitation);
+        expect(
+          await db.query.external_side_effect_outbox.findFirst({
+            where: eq(external_side_effect_outbox.id, outbox.id),
+          })
+        ).toEqual(outbox);
+        expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+      } finally {
+        errorSpy.mockRestore();
+        await db.execute(sql`
+          ALTER TABLE ${external_side_effect_outbox}
+          DROP CONSTRAINT IF EXISTS invite_revocation_test_failure
+        `);
+        await db
+          .delete(external_side_effect_outbox)
+          .where(eq(external_side_effect_outbox.id, outbox.id));
+      }
+    });
+
+    test('preserves a newer direct SSO invitation and its outbox on authentication mismatch', async () => {
+      const owner = await insertTestUser();
+      const invitee = await insertTestUser({ google_user_email: 'fresh-outbox@example.com' });
+      const organization = await createOrganization('Direct SSO Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: 'example.com' })
+        .where(eq(organizations.id, organization.id));
+      const [removal] = await db
+        .insert(organization_membership_removals)
+        .values({
+          organization_id: organization.id,
+          kilo_user_id: invitee.id,
+          removed_by: owner.id,
+          previous_role: 'member',
+          removed_at: new Date(Date.now() - 10000).toISOString(),
+        })
+        .returning();
+      const invitation = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        invitee.google_user_email,
+        'member'
+      );
+      expect(invitation.authentication_requirement).toBe('workos');
+      const [outbox] = await db
+        .insert(external_side_effect_outbox)
+        .values({
+          invitation_id: invitation.id,
+          payload: {
+            invitationId: invitation.id,
+            to: invitee.google_user_email,
+            organizationName: organization.name,
+            inviterName: 'Owner',
+            acceptInviteUrl: 'https://example.com/accept-invite',
+          },
+          status: 'sending',
+          attempts: 2,
+          claimed_at: sql`NOW()`,
+          next_attempt_at: sql`NOW() + INTERVAL '1 hour'`,
+          last_error: 'previous failure',
+        })
+        .returning();
+
+      try {
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token, {
+          provider: 'google',
+          ssoSourceOrganizationId: organization.id,
+        });
+        expect(result).toEqual({
+          success: false,
+          error: ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED,
+        });
+        const storedInvitation = await db.query.organization_invitations.findFirst({
+          where: eq(organization_invitations.id, invitation.id),
+        });
+        expect(storedInvitation).toEqual(invitation);
+        const storedOutbox = await db.query.external_side_effect_outbox.findFirst({
+          where: eq(external_side_effect_outbox.id, outbox.id),
+        });
+        expect(storedOutbox).toEqual(outbox);
+        const storedRemoval = await db.query.organization_membership_removals.findFirst({
+          where: eq(organization_membership_removals.id, removal.id),
+        });
+        expect(storedRemoval).toEqual(removal);
+        expect(await isOrganizationMember(db, organization.id, invitee.id)).toBe(false);
+      } finally {
+        await db
+          .delete(external_side_effect_outbox)
+          .where(eq(external_side_effect_outbox.id, outbox.id));
+      }
     });
 
     test('rejects inviting someone who is not a parent organization member', async () => {

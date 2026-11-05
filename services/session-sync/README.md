@@ -741,6 +741,26 @@ References:
 [Secrets Store bindings](https://developers.cloudflare.com/secrets-store/integrations/workers/),
 [Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/deploy/).
 
+## Native client demo
+
+`@kilocode/cloud-agent-sdk` exports `NativeSyncClient`, a platform-neutral native-v2
+reader/controller with injectable `fetch` and WebSocket implementations. It exchanges
+a Kilo credential, mints controller tickets, renews authorization, reconstructs
+revision-consistent snapshots, and resumes ordered live events or refetches after a
+relay reset. Presence commands retain unknown outcomes on timeout; delivery status
+is not execution success. Permission, question, and abort commands require a live
+runner and its current incarnation/run identity. `/clear` only clears the local view.
+
+The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
+PostHog flag `native-remote-web` is enabled. Its same-origin
+`POST /api/native-remote/token` authenticates the web session and issues a five-minute
+Kilo credential; session-sync still enforces all creator ACLs independently of the
+flag. `NEXT_PUBLIC_SESSION_SYNC_URL` optionally selects an isolated local Worker
+(`http://localhost:8817`); otherwise the production destination is used.
+Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`,
+`https://app.kilo.ai`, and `http://localhost:3000`, without cookies. WebSockets continue
+to authenticate exclusively through the ticket subprotocol, never URL parameters.
+
 ## Production prerequisites
 
 Production is provisioned and deploys automatically at `https://session-sync.kiloapps.io`.

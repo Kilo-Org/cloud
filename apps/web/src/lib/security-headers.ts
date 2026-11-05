@@ -43,6 +43,8 @@ export function getConfiguredConnectSrcOrigins(
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
     webSocketOriginFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
+    originFromUrl(env.NEXT_PUBLIC_SESSION_SYNC_URL || 'https://session-sync.kiloapps.io'),
+    webSocketOriginFromUrl(env.NEXT_PUBLIC_SESSION_SYNC_URL || 'https://session-sync.kiloapps.io'),
   ]);
 }
 

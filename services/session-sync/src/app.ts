@@ -1,6 +1,7 @@
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type Next } from 'hono';
+import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { authorize, exchange, type Principal } from './auth';
@@ -147,6 +148,20 @@ function sessionParam(c: C): Result<string> {
 }
 
 export const app = new Hono<AppContext>();
+
+const browserCors = cors({
+  origin: origin =>
+    ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'].includes(origin)
+      ? origin
+      : null,
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Retry-After'],
+  maxAge: 86400,
+});
+app.use('/v1/*', (c: C, next: Next) =>
+  c.req.header('Upgrade')?.toLowerCase() === 'websocket' ? next() : browserCors(c, next)
+);
 
 app.route('/internal', internal);
 

@@ -9,6 +9,7 @@ import { FilterChip } from './filter-chip';
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',

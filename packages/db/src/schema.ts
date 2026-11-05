@@ -8520,6 +8520,10 @@ export const cloud_agent_environments = pgTable(
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
+    // Ordered start commands run in every session after setup, including a
+    // session whose snapshot already ran setup. Not a build input, so it never
+    // advances the revision.
+    start_commands: text().array().default([]).notNull(),
     // Monotonic build-input revision. Advances when commands, plaintext
     // variables or secrets change; a rename or an identical write keeps it.
     configuration_revision: integer().default(1).notNull(),
@@ -10774,6 +10778,8 @@ export const enkrypt_usage = pgTable(
     organization_id: uuid().notNull(),
     kilo_user_id: text().notNull(),
     session_id: text(),
+    // Scans can commit before inference accounting, or reject a request without inference usage.
+    microdollar_usage_id: uuid(),
     api_kind_id: integer()
       .notNull()
       .references(() => api_kind.api_kind_id),
@@ -10796,6 +10802,7 @@ export const enkrypt_usage = pgTable(
     primaryKey({ columns: [table.id, table.created_at] }),
     index('IDX_enkrypt_usage_organization_created_at').on(table.organization_id, table.created_at),
     index('IDX_enkrypt_usage_user_created_at').on(table.kilo_user_id, table.created_at),
+    index('IDX_enkrypt_usage_microdollar_usage_id').on(table.microdollar_usage_id),
   ]
 );
 

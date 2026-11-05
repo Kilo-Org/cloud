@@ -48,15 +48,15 @@ They do not expose API `search` or `call`.
 1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
 2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
 3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
-4. Set `callbackTarget: { "url": "session:parent" }` for completion/failure/interruption messages; omit for none. Prefer callbacks over polling; never wait in a tool for one.
+4. Set `callbackTarget` to `{"url":"workspace:new-chat"}` (parent workspace) or `{"url":"workspace:<session-id>"}` (this chat); omit for none. Prefer callbacks.
 5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
 6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
 7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
 8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
 
-Authority/callbacks belong to the canonical parent (original root chat), even from
-siblings. Only direct children are manageable, never unrelated sessions or the
-parent. No grandchildren.
+Callbacks go to the child's canonical parent workspace: `workspace:new-chat` opens
+a sibling chat there; `workspace:<session-id>` queues into an existing chat. Manage
+only direct children, never the parent. No grandchildren.
 
 ### Examples
 
@@ -67,7 +67,7 @@ const child = await spawn_session({
   githubRepo: 'owner/repo', model: modelId, mode: 'code',
   prompt: 'Fix the bug, run focused tests, and report. Do not commit, push, or create a PR.',
   operationKey: launchUuid, autoCommit: false,
-  callbackTarget: { url: 'session:parent' },
+  callbackTarget: { url: 'workspace:new-chat' },
 });
 ```
 

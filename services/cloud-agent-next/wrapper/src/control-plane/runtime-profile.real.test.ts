@@ -106,8 +106,8 @@ suite('pinned Kilo profile discovery', () => {
       const runtime: TurnKiloRuntime = {
         directory: fixture.directory,
         env: {},
-        client: fixture.wrapper,
-        ensure: async () => fixture.wrapper,
+        client: fixture.harness,
+        ensure: async () => fixture.harness,
         isSuspected: () => false,
         isRestarting: () => false,
         isUnavailable: () => false,

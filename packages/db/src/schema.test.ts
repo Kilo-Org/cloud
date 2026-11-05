@@ -590,6 +590,17 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('indexes Enkrypt usage lookups by inference usage across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
+        WHERE ${schema.enkrypt_usage.microdollar_usage_id} = ${crypto.randomUUID()}::uuid
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (microdollar_usage_id =');
+    });
+  });
+
   it('indexes Enkrypt usage lookups by user across monthly partitions', async () => {
     await schemaTestDb.db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL enable_seqscan = off`);
@@ -638,6 +649,7 @@ describe('database schema', () => {
           id: crypto.randomUUID(),
           organization_id: crypto.randomUUID(),
           kilo_user_id: 'oauth/enkrypt-partition-test',
+          microdollar_usage_id: crypto.randomUUID(),
           api_kind_id: apiKind.api_kind_id,
           decision_id: decision.decision_id,
           charged_microdollars: 100,

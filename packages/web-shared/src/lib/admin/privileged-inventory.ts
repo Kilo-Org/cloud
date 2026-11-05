@@ -94,7 +94,6 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   disputes: sensitiveWrite,
   earlyFraudWarnings: sensitiveWrite,
   emailTesting: platform,
-  enkryptUsage: platform,
   enrichmentData: { read: 'platform_read', write: 'platform_write', target: 'none' },
   extendClawTrial: platform,
   featureInterest: platform,
@@ -414,6 +413,13 @@ const restEntries: PrivilegedInventoryEntry[] = [
     read: 'platform_read',
     write: 'sensitive_write',
     target: 'user',
+  },
+  {
+    id: 'rest.admin.providerMetadata',
+    surface: 'rest',
+    route: '/admin/api/provider-metadata*',
+    read: 'support_read',
+    target: 'none',
   },
   {
     id: 'rest.admin.backfills',

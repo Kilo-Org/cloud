@@ -321,8 +321,10 @@ active consumers; source values alone do not prove what is deployed. See the
 | Retry / recovery | `max_retries=20` after initial delivery, `retry_delay=60` fallback and configured DLQ; handled failures use per-message delays; verify retention | 20 deliveries, 60s retry, 24h TTL, no built-in DLQ |
 | Writer admission | Same existing staging writer, revision, HTTP budget, DB pool and other traffic | Same; omitting the queue cap does not prove achieved concurrency |
 
-Production source uses batch 6 with the same parallelism and cap, and its own EU
-queue and DLQ. These are source settings, not verified hosted settings. Include
+Production source uses batch 6 / timeout 0 / parallelism 2 with
+`max_concurrency=225`, while the staging column above uses batch 2 / parallelism
+2 with `max_concurrency=200`; production also has its own EU queue and DLQ.
+These are source settings, not verified hosted settings. Include
 all retained consumers/partitions and deployed gateway, Worker and writer revisions
 in the run manifest. Do not change production capacity to construct this comparison.
 

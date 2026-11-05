@@ -1,5 +1,5 @@
 {
-  "id": "3167c89b-945e-4e17-ba05-99ede1406583",
+  "id": "4e1c3b50-aa94-4950-a072-688395654104",
   "prevId": "26a582ed-0052-4c76-adb9-20586b77ed1b",
   "version": "7",
   "dialect": "postgresql",
@@ -12670,6 +12670,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "microdollar_usage_id": {
+          "name": "microdollar_usage_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "api_kind_id": {
           "name": "api_kind_id",
           "type": "integer",
@@ -12747,6 +12753,21 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_enkrypt_usage_microdollar_usage_id": {
+          "name": "IDX_enkrypt_usage_microdollar_usage_id",
+          "columns": [
+            {
+              "expression": "microdollar_usage_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -33463,319 +33484,6 @@
         "service_fee_rollback_refunds_succeeded_check": {
           "name": "service_fee_rollback_refunds_succeeded_check",
           "value": "\"service_fee_rollback_refunds\".\"status\" <> 'succeeded' OR \"service_fee_rollback_refunds\".\"stripe_refund_id\" IS NOT NULL"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.session_step_up_challenges": {
-      "name": "session_step_up_challenges",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "challenge": {
-          "name": "challenge",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_id_hash": {
-          "name": "session_id_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purpose": {
-          "name": "purpose",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "action_binding_hash": {
-          "name": "action_binding_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_session_step_up_challenges_expires_at": {
-          "name": "idx_session_step_up_challenges_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_challenges_kilo_user_id": {
-          "name": "idx_session_step_up_challenges_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "session_step_up_challenges_kilo_user_id_kilocode_users_id_fk": {
-          "name": "session_step_up_challenges_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "session_step_up_challenges",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "check_session_step_up_challenges_purpose": {
-          "name": "check_session_step_up_challenges_purpose",
-          "value": "\"session_step_up_challenges\".\"purpose\" IN ('session', 'operation')"
-        },
-        "check_session_step_up_challenges_action_binding": {
-          "name": "check_session_step_up_challenges_action_binding",
-          "value": "(\"session_step_up_challenges\".\"purpose\" = 'operation') = (\"session_step_up_challenges\".\"action_binding_hash\" IS NOT NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.session_step_up_proofs": {
-      "name": "session_step_up_proofs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "session_id_hash": {
-          "name": "session_id_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "method": {
-          "name": "method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "passkey_credential_id": {
-          "name": "passkey_credential_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purpose": {
-          "name": "purpose",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "action_binding_hash": {
-          "name": "action_binding_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "verified_at": {
-          "name": "verified_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revoked_reason": {
-          "name": "revoked_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_session_step_up_proofs_user_session_expires": {
-          "name": "idx_session_step_up_proofs_user_session_expires",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_expires_at": {
-          "name": "idx_session_step_up_proofs_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_passkey_credential_id": {
-          "name": "idx_session_step_up_proofs_passkey_credential_id",
-          "columns": [
-            {
-              "expression": "passkey_credential_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "session_step_up_proofs_kilo_user_id_kilocode_users_id_fk": {
-          "name": "session_step_up_proofs_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "session_step_up_proofs",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "session_step_up_proofs_passkey_credential_id_passkey_credentials_id_fk": {
-          "name": "session_step_up_proofs_passkey_credential_id_passkey_credentials_id_fk",
-          "tableFrom": "session_step_up_proofs",
-          "tableTo": "passkey_credentials",
-          "columnsFrom": [
-            "passkey_credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "check_session_step_up_proofs_method": {
-          "name": "check_session_step_up_proofs_method",
-          "value": "\"session_step_up_proofs\".\"method\" IN ('webauthn_uv')"
-        },
-        "check_session_step_up_proofs_purpose": {
-          "name": "check_session_step_up_proofs_purpose",
-          "value": "\"session_step_up_proofs\".\"purpose\" IN ('session', 'operation')"
-        },
-        "check_session_step_up_proofs_action_binding": {
-          "name": "check_session_step_up_proofs_action_binding",
-          "value": "(\"session_step_up_proofs\".\"purpose\" = 'operation') = (\"session_step_up_proofs\".\"action_binding_hash\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false

@@ -6,6 +6,7 @@ import {
   type PublicationRecoverySignal,
 } from '../publication-recovery.js';
 import type { GitHubReviewTarget } from '../../../src/shared/github-review-target.js';
+import type { HarnessActivity } from './harness-activity.js';
 
 export const REVIEW_PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -33,71 +34,38 @@ export function createReviewPublication(input: {
   }
 
   return {
-    observe(type: string, properties: Record<string, unknown>) {
+    /** Turn lifecycle events: `session.turn.open` and `session.turn.close`. */
+    observe(type: string) {
       if (state === 'abandoned') return;
       if (type === 'session.turn.open' && state === 'submitted') state = 'running';
       if (type === 'session.turn.close' && state === 'running') {
         state = 'spent';
         clearTimer();
       }
-      const info = properties.info;
-      if (
-        type === 'message.updated' &&
-        typeof info === 'object' &&
-        info !== null &&
-        'id' in info &&
-        typeof info.id === 'string' &&
-        'role' in info &&
-        typeof info.role === 'string'
-      ) {
-        roles.set(info.id, info.role);
+    },
+    observeActivity(activity: HarnessActivity) {
+      if (state === 'abandoned') return;
+      if (activity.type === 'message') {
+        const message = activity.message;
+        roles.set(message.id, message.role);
         if (roles.size > 128) roles.delete(roles.keys().next().value ?? '');
+        if (message.role === 'assistant' && messageInfoReportsAssistantError(message))
+          failure = message.error;
+        return;
       }
-      if (
-        type === 'message.updated' &&
-        typeof info === 'object' &&
-        info !== null &&
-        'role' in info &&
-        info.role === 'assistant' &&
-        messageInfoReportsAssistantError(info)
-      ) {
-        if (
-          typeof properties.info === 'object' &&
-          properties.info !== null &&
-          'error' in properties.info
-        )
-          failure = properties.info.error;
-      }
-      const part = properties.part;
-      const messageId =
-        typeof part === 'object' && part !== null && 'messageID' in part
-          ? part.messageID
-          : properties.messageID;
-      if (typeof messageId === 'string' && roles.get(messageId) !== 'assistant') return;
-      if (
-        type === 'message.part.delta' &&
-        typeof properties.partID === 'string' &&
-        typeof properties.delta === 'string' &&
-        (properties.field === 'text' || properties.field === undefined)
-      ) {
+      const messageId = activity.type === 'part' ? activity.part.messageId : activity.messageId;
+      if (roles.get(messageId) !== 'assistant') return;
+      if (activity.type === 'delta') {
         texts.set(
-          properties.partID,
-          `${texts.get(properties.partID) ?? ''}${properties.delta}`.slice(-8192)
+          activity.partId,
+          `${texts.get(activity.partId) ?? ''}${activity.text}`.slice(-8192)
         );
-      }
-      if (type !== 'message.part.updated' && type !== 'message.part.delta') return;
-      const result = classifyPublicationToolPart(part);
-      if (result) signal = result;
-      if (
-        typeof part === 'object' &&
-        part !== null &&
-        'type' in part &&
-        part.type === 'text' &&
-        'text' in part &&
-        typeof part.text === 'string'
-      ) {
-        const id = 'id' in part && typeof part.id === 'string' ? part.id : '';
-        texts.set(id, part.text.slice(-8192));
+      } else {
+        const part = activity.part;
+        const result = part.tool ? classifyPublicationToolPart(part.tool) : null;
+        if (result) signal = result;
+        if (part.kind === 'text' && part.text !== undefined)
+          texts.set(part.id, part.text.slice(-8192));
       }
       if (texts.size > 32) texts.delete(texts.keys().next().value ?? '');
       if (

@@ -236,7 +236,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
     expect(
       GatewayOrganizationFeaturesConfigSchema.parse({ vercel_routing_enabled: true })
         .organization_features
-    ).toEqual({ experimental_byok: [], gateway_settings: [] });
+    ).toEqual({ experimental_byok: [], gateway_settings: [], request_logs: [] });
   });
 
   test('fills features missing from a saved configuration', () => {
@@ -247,6 +247,7 @@ describe('GatewayOrganizationFeaturesConfigSchema', () => {
     ).toEqual({
       experimental_byok: ['00000000-0000-4000-8000-000000000001'],
       gateway_settings: [],
+      request_logs: [],
     });
   });
 });
@@ -268,6 +269,7 @@ describe('OrganizationFeaturesInputSchema', () => {
           '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         ],
         gateway_settings: [],
+        request_logs: [],
       }).experimental_byok
     ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
   });
@@ -277,6 +279,7 @@ describe('OrganizationFeaturesInputSchema', () => {
       OrganizationFeaturesInputSchema.safeParse({
         experimental_byok: ['kilo'],
         gateway_settings: [],
+        request_logs: [],
       }).success
     ).toBe(false);
   });

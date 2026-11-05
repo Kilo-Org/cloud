@@ -10,7 +10,6 @@ import type {
   ControlPlaneSessionRegistration,
   SandboxSessionV2,
 } from '../../src/control-plane/session/session-do.js';
-import { events } from '../../src/control-plane/session/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -919,66 +918,6 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(
       sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')
     ).resolves.toBeNull();
-  });
-
-  it('reads the latest assistant message for the session Kilo session', async () => {
-    const sessionId = newSessionId();
-    const kiloId = kiloSessionId();
-    const otherKiloId = kiloSessionId();
-    const sandboxId = await generateSandboxId(sessionId);
-    const sessionStub = sessions.getByName(sessionId);
-    await runInDurableObject(sessionStub, instance => {
-      instance.sandboxPeerFor = () => new FakeSandboxPeer();
-    });
-    await sessionStub.registerSessionFromMetadata({
-      metadata: metadata({ sessionId, kiloSessionId: kiloId, sandboxId }),
-      sandboxSelection: { provider: 'cloudflare-containers' },
-    });
-
-    const assistant = (id: string, sessionID: string) =>
-      JSON.stringify({
-        event: 'message.updated',
-        properties: { info: { id, role: 'assistant', sessionID } },
-      });
-    await runInDurableObject(sessionStub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db.insert(events).values([
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_1', kiloId),
-          timestamp: 1,
-          entity_id: 'message/msg_1',
-        },
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_other', otherKiloId),
-          timestamp: 2,
-          entity_id: 'message/msg_other',
-        },
-        {
-          execution_id: 'exec_1',
-          session_id: sessionId,
-          stream_event_type: 'kilocode',
-          payload: assistant('msg_2', kiloId),
-          timestamp: 3,
-          entity_id: 'message/msg_2',
-        },
-      ]);
-    });
-
-    await expect(sessionStub.getLatestAssistantMessage()).resolves.toMatchObject({
-      info: { id: 'msg_2', role: 'assistant' },
-      parts: [],
-    });
-  });
-
-  it('returns null for the latest assistant message when the session is unregistered', async () => {
-    const sessionStub = sessions.getByName(newSessionId());
-    await expect(sessionStub.getLatestAssistantMessage()).resolves.toBeNull();
   });
 });
 

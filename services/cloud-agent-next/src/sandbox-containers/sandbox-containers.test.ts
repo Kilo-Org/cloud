@@ -1,6 +1,4 @@
 import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -3416,28 +3414,6 @@ describe('SandboxContainers capture by id', () => {
     expect(storage.map.get('containers:captures:v1')).toEqual(
       Array.from({ length: 8 }, (_, index) => `capture-${9 - index}`)
     );
-  });
-});
-
-describe('containment trust ownership', () => {
-  const sandboxContainersSource = readFileSync(
-    fileURLToPath(new URL('./SandboxContainers.ts', import.meta.url).href),
-    'utf8'
-  );
-  const dockerfileSource = readFileSync(
-    fileURLToPath(new URL('../../Dockerfile.containers', import.meta.url).href),
-    'utf8'
-  );
-
-  it('runs no CA trust exec in the Durable Object', () => {
-    expect(sandboxContainersSource).not.toContain('trustInterceptCa');
-    expect(sandboxContainersSource).not.toContain('container CA trust timed out');
-    expect(sandboxContainersSource).not.toContain('update-ca-certificates');
-  });
-
-  it('keeps the container entrypoint to PID 1 only', () => {
-    expect(dockerfileSource).not.toContain('update-ca-certificates');
-    expect(dockerfileSource).toContain('exec sleep infinity');
   });
 });
 

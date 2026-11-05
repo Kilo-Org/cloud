@@ -57,9 +57,11 @@ const syncActivity = vi.hoisted(() => ({
   updatedAt: 0,
   readFailedAt: 0,
 }));
-const config = vi.hoisted(() => ({
-  data: { slaEnabled: true },
-}));
+const config = vi.hoisted(
+  (): { data: { slaEnabled: boolean; repositorySelectionMode?: string } } => ({
+    data: { slaEnabled: true },
+  })
+);
 const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
   isPending: false,
@@ -79,6 +81,9 @@ const repositories = vi.hoisted(() => ({
   data: [] as unknown[],
   refetch: vi.fn(),
 }));
+// The repositories the shipped scope helper keeps for the current mode. A case
+// narrows this to model a grant that no longer holds the chosen repository.
+const inScopeRepos = vi.hoisted(() => ({ repos: [] as { fullName: string }[] }));
 const capability = vi.hoisted(() => ({
   canManage: false,
   status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
@@ -158,7 +163,13 @@ const retryCards = vi.hoisted(() => ({
 // Captures the dashboard-sections props, so a test can assert the stats payload
 // a failure leaves on screen.
 const sectionsProps = vi.hoisted(() => ({
-  props: [] as { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }[],
+  props: [] as {
+    data?: unknown;
+    slaEnabled?: boolean;
+    neverSynced?: boolean;
+    emptyGrant?: boolean;
+    emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
+  }[],
 }));
 
 // Captures the sections placeholder's props, so a test can assert the loading
@@ -261,7 +272,7 @@ vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
       notAnalyzed: number;
       failed: number;
     }) => analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed,
-    getSecurityRepositoriesInScope: () => [],
+    getSecurityRepositoriesInScope: () => inScopeRepos.repos,
     isPersonalSecurityScope: (scope: string) => scope === 'personal',
   };
 });
@@ -305,7 +316,13 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,
 }));
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
-  DashboardSections: (props: { data?: unknown; slaEnabled?: boolean; neverSynced?: boolean }) => {
+  DashboardSections: (props: {
+    data?: unknown;
+    slaEnabled?: boolean;
+    neverSynced?: boolean;
+    emptyGrant?: boolean;
+    emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
+  }) => {
     sectionsProps.props.push(props);
     return null;
   },
@@ -503,7 +520,9 @@ describe('DashboardScreen before the first sync', () => {
   beforeEach(() => {
     dashboardStats.isPending = false;
     dashboardStats.isError = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
     sharedMetrics.build.mockReturnValue([]);
   });
 
@@ -553,6 +572,7 @@ describe('DashboardScreen sync control terminal states', () => {
     repositories.data = [];
     repositories.refetch.mockClear();
     capability.canManage = false;
+    capability.status = 'allowed';
     dismissFailures.failures = [];
     dismissFailures.clear.mockClear();
     dismissFailures.refresh.mockClear();
@@ -951,6 +971,55 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(manageAccess.handlePress).not.toHaveBeenCalled();
   });
 
+  // A member cannot change repository policy: the repositories screen disables
+  // every mode row for them. The rejection must name who can connect
+  // repositories instead of telling them to choose, and offer nothing to press.
+  it('names who can connect repositories for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositoriesNoManage')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+    expect(syncFailureActions(root.root)).toHaveLength(0);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // The SLA card's repositories link is the dashboard's other route into the
+  // same screen, so a reader who cannot change the policy loses it too.
+  it('leaves the SLA card repository link off for a reader who cannot change them', () => {
+    capability.status = 'denied';
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The role read decides the sentence. Before it settles the manager copy
+  // stays, because telling a real manager they cannot manage would be wrong.
+  it('keeps the manager sentence while the role read is unresolved', () => {
+    capability.status = 'loading';
+    triggerSync.isError = true;
+    triggerSync.error = preconditionError('security_sync_no_repositories');
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.mutations.syncNoRepositories')
+    );
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
   it('names a broken GitHub connection and hands the reader to the GitHub App page', () => {
     triggerSync.isError = true;
     triggerSync.error = preconditionError('security_sync_missing_permission');
@@ -1068,6 +1137,140 @@ describe('DashboardScreen sync control terminal states', () => {
   });
 });
 
+describe('DashboardScreen repository card with an empty grant', () => {
+  beforeEach(() => {
+    capability.status = 'allowed';
+    capability.canManage = false;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.data = [];
+    lastSync.isPending = false;
+    lastSync.data = undefined;
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    dashboardStats.isPending = false;
+    // The dashboard stats always carry repository health; the field decides
+    // whether the repository card can show its own empty state.
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    sharedMetrics.build.mockReturnValue([]);
+    sectionsProps.props = [];
+    router.push.mockClear();
+    manageAccess.handlePress.mockClear();
+    manageAccess.pending = false;
+  });
+
+  // A grant that holds nothing leaves the repository card with no data and no
+  // way to fix it from here. A manager's step is the repository settings, where
+  // the policy and the picker both live.
+  it('hands an empty grant its step to the repository settings', () => {
+    renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrant).toBe(true);
+    expect(props?.emptyGrantAction?.label).toBe(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    act(() => {
+      props?.emptyGrantAction?.handlePress();
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/security/org_123/settings/repositories');
+    expect(manageAccess.handlePress).not.toHaveBeenCalled();
+  });
+
+  // A member cannot change repository policy, so the settings screen would only
+  // tell them so. Their step is the GitHub App page, where the grant itself is
+  // widened — the same control the repositories screen offers them in this state.
+  it('hands a reader who cannot change the policy to the GitHub App page', () => {
+    capability.status = 'denied';
+    const root = renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrantAction?.label).toBe(i18n.t('securityAgent.repositories.manageAccess'));
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    act(() => {
+      props?.emptyGrantAction?.handlePress();
+    });
+
+    expect(manageAccess.handlePress).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // A grant that holds repositories has no grant to fix: nothing is pending but
+  // the first sync, so the card keeps its own pending copy and no step.
+  it('leaves a grant that holds repositories without a step', () => {
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    renderScreen('org_123');
+    const props = sectionsProps.props.at(-1);
+
+    expect(props?.emptyGrant).toBe(false);
+    expect(props?.emptyGrantAction).toBeNull();
+  });
+
+  // An unsettled role read keeps the manager path, as the sync rejection does:
+  // telling a real manager they cannot manage would be wrong.
+  it('keeps the manager step while the role read has not settled', () => {
+    capability.status = 'loading';
+    renderScreen('org_123');
+
+    expect(sectionsProps.props.at(-1)?.emptyGrantAction?.label).toBe(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The repository card below carries the step out of the empty grant, so the
+  // SLA card's link to the same screen would offer one destination twice: the
+  // screen's own rule against repeating an affordance sends it back.
+  it('leaves the same destination to the repository card on an empty grant', () => {
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  it('keeps the SLA card link while the grant holds repositories', () => {
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // The repository card renders only once the sync-status read settles, so
+  // taking this link away before then would leave a screen with an empty grant
+  // and nothing to press.
+  it('keeps the SLA card link until the card that carries the step can render', () => {
+    lastSync.isPending = true;
+    lastSync.data = undefined;
+    dashboardStats.isPending = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+
+  // A grant narrowed after a sync leaves the card listing the findings already
+  // stored, where it shows no step. The link is the shortcut a manager keeps.
+  it('keeps the SLA card link when stored findings outlive the emptied grant', () => {
+    dashboardStats.data = {
+      sla: { overall: { total: 0 } },
+      repoHealth: [{ repoFullName: 'kilo/repo' }],
+    };
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+  });
+});
+
 describe('DashboardScreen capability recovery', () => {
   beforeEach(() => {
     capability.status = 'allowed';
@@ -1110,6 +1313,7 @@ describe('DashboardScreen repository filter sheet', () => {
     lastSync.refetch.mockReset();
     lastSync.refetch.mockResolvedValue({ isError: false });
     config.data = { slaEnabled: true };
+    inScopeRepos.repos = [];
     sheet.show.mockClear();
     retryCards.cards = [];
   });
@@ -1139,6 +1343,70 @@ describe('DashboardScreen repository filter sheet', () => {
     const filter = findFilterControl(root.root);
 
     expect(filter.props.disabled).toBe(true);
+  });
+
+  // The settings overview names a settled empty grant "No repositories", and
+  // this row labels the same scope one tap away: claiming every repository here
+  // would contradict the row above it and send the reader looking for scans
+  // that cannot run.
+  it('names a settled empty grant instead of claiming every repository', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    const root = renderScreen('org_123');
+    const filter = findFilterControl(root.root);
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(renderedTexts(root.root)).not.toContain(i18n.t('common.allRepositories'));
+    // Nothing in scope leaves no filter to open: its only option would be the
+    // scope it cannot offer.
+    expect(filter.props.disabled).toBe(true);
+  });
+
+  it('keeps the every-repository label while the grant read has not settled', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.isLoading = true;
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+  });
+
+  it('keeps the every-repository label while the grant holds repositories', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(false);
+  });
+
+  // A filter applied while the repository was in scope outlives the grant that
+  // allowed it. The row would name a repository this dashboard can no longer
+  // show, and the sheet that clears the filter is the control the empty scope
+  // closes, so the filter has to drop by itself.
+  it('drops a filter whose repository left the settled scope', () => {
+    config.data = { slaEnabled: true, repositorySelectionMode: 'all' };
+    repositories.data = [{ fullName: 'kilo/repo' }];
+    inScopeRepos.repos = [{ fullName: 'kilo/repo' }];
+    const root = renderScreen('org_123');
+
+    act(() => {
+      (findFilterControl(root.root).props.onPress as () => void)();
+    });
+    const chooseRepository = sheet.show.mock.calls.at(-1)?.[1] as (index?: number) => void;
+    act(() => {
+      chooseRepository(1);
+    });
+    expect(renderedTexts(root.root)).toContain('kilo/repo');
+
+    // The grant narrows out of band: the settled answer no longer holds it.
+    repositories.data = [];
+    inScopeRepos.repos = [];
+    act(() => {
+      root.update(dashboardTree('org_123'));
+    });
+
+    expect(renderedTexts(root.root)).not.toContain('kilo/repo');
+    expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.repositories.noRepositories'));
+    expect(findFilterControl(root.root).props.disabled).toBe(true);
   });
 
   it('renders a retryable card for a failed repositories fetch and retries on tap', () => {

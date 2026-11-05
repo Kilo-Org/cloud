@@ -34,4 +34,14 @@ if [ -n "${DOCKER_SOCKET:-}" ]; then
     *) export DOCKER_HOST="unix://$DOCKER_SOCKET" ;;
   esac
 fi
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+service_dir="$(CDPATH= cd -- "$script_dir/.." && pwd)"
+has_config=0
+for arg in "$@"; do
+  case "$arg" in --config | --config=* | -c | -c*) has_config=1 ;; esac
+done
+if [ "$has_config" = 0 ] && [ -f "$service_dir/wrangler.kilo2-local.json" ]; then
+  set -- "$@" --config "$service_dir/wrangler.kilo2-local.json"
+fi
 exec wrangler dev "$@"

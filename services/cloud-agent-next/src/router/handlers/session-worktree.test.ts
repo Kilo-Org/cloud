@@ -1079,6 +1079,19 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it('rejects a new destination before recording ownership when runtime admission is missing', async () => {
+    const { caller, input, destinationStub } = fixture();
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { tokenPurpose: 'control' } });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Runtime authorization denied',
+    });
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
+
   it('preserves legacy registration for audience-bound tokens without modern policy markers', async () => {
     const controlToken = 'legacy.header.signature';
     verifyKiloTokenForPolicyMock.mockResolvedValue({

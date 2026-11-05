@@ -678,6 +678,10 @@ async function createDestinationRuntimeAuthorization(
   }
 }
 
+async function assertNewDestinationRuntimeAdmission(ctx: TRPCContext): Promise<void> {
+  await requiresRuntimeAuthorization(ctx);
+}
+
 /**
  * A source on a retired runtime, including a legacy shared sandbox, never loads
  * (`loadSourceMetadata`), so the sandbox needs no check here.
@@ -1217,6 +1221,9 @@ async function executeWorktreeCreate(
   preissuedRuntimeAuthorization?: WorktreeRuntimeAuthorization
 ): Promise<OperationProgress> {
   const startedAt = Date.now();
+  if (preissuedRuntimeAuthorization === undefined) {
+    await assertNewDestinationRuntimeAdmission(ctx);
+  }
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: options.requestedCloudAgentSessionId ?? generateSessionId(),
     kiloSessionId: options.requestedKiloSessionId ?? generateKiloSessionId(),
@@ -1338,6 +1345,8 @@ async function reconcileWorktreeCreate(
       progress.cloudAgentSessionId,
       preissuedRuntimeAuthorization !== undefined
     );
+  } else if (preissuedRuntimeAuthorization === undefined) {
+    await assertNewDestinationRuntimeAdmission(ctx);
   }
 
   const ownership = await findOwnershipRow(

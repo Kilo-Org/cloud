@@ -244,6 +244,7 @@ test('every Chromium install skips apt and restores the browser cache first', ()
 
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
+  ['ci.yml', 'typecheck-trpc', 'scripts/typecheck-all.sh --group trpc'],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
@@ -276,11 +277,7 @@ for (const [file, name, command, condition] of [
 }
 
 const harnessBuildGuards = [
-  [
-    'ci.yml',
-    'lint-groups',
-    "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
-  ],
+  ['ci.yml', 'lint-trpc', "contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')"],
   ...['ios', 'android'].map(name => [
     'mobile-native-build.yml',
     name,
@@ -428,8 +425,9 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
 // One job compiles the tRPC declarations per commit. The typecheck and lint
 // matrices both relied on the same cache key and started together, so a miss
 // compiled the program twice and both jobs raced to save one key. The producer
-// keeps the cache and every consumer downloads its artifact.
-test('one job builds the tRPC declarations and both matrices download them', () => {
+// keeps the cache, and only the two trpc rows download its artifact: the web
+// and packages typecheck rows and the lint-rest row must not wait for it.
+test('one job builds the tRPC declarations and only the trpc rows download them', () => {
   const trpcAction = './.github/actions/trpc-declarations';
   const ci = workflows['ci.yml'];
   const producerName = 'trpc-declarations';
@@ -458,17 +456,61 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.equal(upload.with['retention-days'], 1);
   assert.equal(upload.with['if-no-files-found'], 'error');
 
-  for (const [name, guard] of [
-    ['typecheck-groups', "matrix.group == 'trpc'"],
-    ['lint-groups', "matrix.group == 'trpc'"],
+  // The rows that read no declarations depend on `changes` alone.
+  for (const [name, matrix] of [
+    ['typecheck-groups', 'typecheck_groups_non_trpc'],
+    ['lint-groups', 'lint_groups_non_trpc'],
+  ]) {
+    const job = ci.jobs[name];
+    assert.equal(job.needs, 'changes', `${name} must not wait for the producer`);
+    assert.equal(
+      job.if,
+      `needs.changes.outputs.${matrix} != '[]'`,
+      `${name} runs whenever its own list is non-empty`
+    );
+    assert.equal(
+      job.strategy.matrix.group,
+      `\${{ fromJSON(needs.changes.outputs.${matrix}) }}`,
+      `${name} lists only the rows that need no declarations`
+    );
+    assert.deepEqual(
+      job.steps.filter(step => String(step.uses).startsWith('actions/download-artifact@')),
+      [],
+      `${name} never downloads the declarations`
+    );
+    assert.deepEqual(
+      job.steps.filter(step => step.uses === trpcAction),
+      [],
+      `${name} never builds the declarations itself`
+    );
+  }
+
+  // A run that selects the trpc group still fails the required check when the
+  // producer fails: the trpc rows always run and their download fails.
+  for (const [name, guard, groupOutput, checkName, command] of [
+    [
+      'typecheck-trpc',
+      "contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc')",
+      'typecheck_groups',
+      'typecheck (trpc)',
+      'scripts/typecheck-all.sh --group trpc',
+    ],
+    [
+      'lint-trpc',
+      "contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')",
+      'lint_groups',
+      'lint (trpc)',
+      'scripts/lint-all.sh --group trpc',
+    ],
   ]) {
     const job = ci.jobs[name];
     assert.deepEqual(job.needs, ['changes', producerName], `${name} waits for the producer`);
-    assert.match(
+    assert.equal(
       job.if,
-      /^always\(\) && needs\.changes\.result == 'success' && needs\.changes\.outputs\./,
+      `always() && needs.changes.result == 'success' && ${guard}`,
       `${name} runs even when the producer is skipped or failed`
     );
+    assert.equal(job.name, checkName, `${name} keeps the check name of the row it replaced`);
     assert.deepEqual(
       job.steps.filter(step => step.uses === trpcAction),
       [],
@@ -480,27 +522,35 @@ test('one job builds the tRPC declarations and both matrices download them', () 
     const download = job.steps[downloadIndex];
     assert.equal(download.with.name, 'trpc-declarations');
     assert.equal(download.with.path, 'packages/trpc/dist');
-    assert.equal(download.if, guard);
+    assert.equal(download.if, undefined, `${name} always needs the artifact`);
     const installIndex = job.steps.findIndex(step =>
       /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
     );
     assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
+    const step = job.steps.find(candidate => candidate.run === command);
+    assert.ok(step, `${name} runs ${command}`);
+    assert.equal(step.env.KILO_AFFECTED, '${{ needs.changes.outputs.affected }}');
+    assert.ok(
+      ci.jobs.changes.outputs[groupOutput],
+      `the producer and ${name} select themselves from ${groupOutput}`
+    );
   }
 
   // The trpc typecheck row consumes the declarations, so its group script and
   // apps/web's typecheck skip their own build there.
-  const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
+  const typecheck = ci.jobs['typecheck-trpc'].steps.find(step =>
     (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
-  assert.equal(
-    typecheck.env.KILO_TYPECHECK_TRPC_BUILT,
-    "${{ matrix.group == 'trpc' && '1' || '' }}"
+  assert.equal(typecheck.env.KILO_TYPECHECK_TRPC_BUILT, '1');
+  const otherTypecheck = ci.jobs['typecheck-groups'].steps.find(step =>
+    (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
+  assert.equal(otherTypecheck.env.KILO_TYPECHECK_TRPC_BUILT, undefined);
 
-  // The required aggregators keep their needs; a failed download fails the
-  // group they already wait for.
-  assert.deepEqual(ci.jobs.typecheck.needs, ['changes', 'typecheck-groups']);
-  assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups']);
+  // The required aggregators wait for both halves, so a failed producer or a
+  // failed trpc row fails the check instead of vanishing as a skipped job.
+  assert.deepEqual(ci.jobs.typecheck.needs, ['changes', 'typecheck-groups', 'typecheck-trpc']);
+  assert.deepEqual(ci.jobs.lint.needs, ['changes', 'lint-groups', 'lint-trpc']);
 });
 
 function runTypecheck(

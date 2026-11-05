@@ -44,7 +44,12 @@ jobs:
       # groups and cloud-agent-next parts it needs.
       affected: ${{ steps.affected.outputs.affected }}
       typecheck_groups: ${{ steps.affected.outputs.typecheck_groups }}
+      # The same lists with the trpc row removed. Only the trpc rows read the
+      # trpc-declarations artifact, so they get their own jobs and the other
+      # rows must not wait for the producer.
+      typecheck_groups_non_trpc: ${{ steps.affected.outputs.typecheck_groups_non_trpc }}
       lint_groups: ${{ steps.affected.outputs.lint_groups }}
+      lint_groups_non_trpc: ${{ steps.affected.outputs.lint_groups_non_trpc }}
       cloud_agent_next_parts: ${{ steps.affected.outputs.cloud_agent_next_parts }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -279,6 +284,11 @@ jobs:
               (select($all or ($d | index("apps/extension"))) | "trpc"),
               (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
             ]' <<< "$affected")
+          # Only the trpc rows read the trpc-declarations artifact, so those
+          # rows get their own jobs. These lists drive the matrices that must
+          # start as soon as `changes` completes.
+          typecheck_groups_non_trpc=$(jq -c 'map(select(. != "trpc"))' <<< "$typecheck_groups")
+          lint_groups_non_trpc=$(jq -c 'map(select(. != "trpc"))' <<< "$lint_groups")
           # Every part when cloud-agent-next is affected. When only its tests
           # read changed data, the unit part covers a reading test under src/,
           # scripts/ or test/unit/; any other reading test runs every part.
@@ -291,7 +301,9 @@ jobs:
           {
             echo "affected=$(jq -c . <<< "$affected")"
             echo "typecheck_groups=$typecheck_groups"
+            echo "typecheck_groups_non_trpc=$typecheck_groups_non_trpc"
             echo "lint_groups=$lint_groups"
+            echo "lint_groups_non_trpc=$lint_groups_non_trpc"
             echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
 
@@ -397,13 +409,13 @@ jobs:
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
   # compiled the same declaration program in two 4 vCPU jobs that started
   # together, and both raced to save the one cache key. The cache stays here;
-  # every consumer downloads the built tree instead of building it again.
+  # the two trpc rows below, each its own job, download the built tree instead
+  # of building it again.
   trpc-declarations:
     needs: changes
-    # Only the trpc rows consume the declarations: the typecheck group that
-    # covers the extension, and the lint group that lints it. The web and
-    # packages groups never read packages/trpc/dist, so a run that selects only
-    # them must not wait for this job.
+    # Only the trpc rows consume the declarations, so only they wait for this
+    # job. The web and packages typecheck rows and the lint-rest row run in
+    # jobs that need `changes` alone and never read packages/trpc/dist.
     if: contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -436,18 +448,15 @@ jobs:
           # A hit that restored nothing must fail here, not in a consumer.
           if-no-files-found: error
 
+  # The typecheck rows that read no trpc-declarations artifact. They need
+  # `changes` alone, so they start as soon as the group lists exist.
   typecheck-groups:
-    needs: [changes, trpc-declarations]
-    # `always()` keeps every non-trpc group running when the producer is
-    # skipped, and makes a failed producer surface as a failed download in the
-    # trpc group instead of a quietly skipped row the aggregator would pass. A
-    # failed `changes` job keeps them skipped, because its outputs carry no
-    # group list.
-    if: always() && needs.changes.result == 'success' && needs.changes.outputs.typecheck_groups != '[]'
+    needs: changes
+    if: needs.changes.outputs.typecheck_groups_non_trpc != '[]'
     strategy:
       fail-fast: false
       matrix:
-        group: ${{ fromJSON(needs.changes.outputs.typecheck_groups) }}
+        group: ${{ fromJSON(needs.changes.outputs.typecheck_groups_non_trpc) }}
     name: typecheck (${{ matrix.group }})
     # tsgo loads the whole web program, which outgrows the 8 GB of the default
     # 2 vCPU runner. The 4 vCPU runner has 16 GB.
@@ -478,8 +487,51 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
+      - name: Typecheck
+        env:
+          KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
+        run: scripts/typecheck-all.sh --group ${{ matrix.group }}
+
+  # The trpc typecheck row: the extension group, the only typecheck row that
+  # reads the trpc-declarations artifact. `always()` makes a failed producer
+  # surface as a failed download here instead of a quietly skipped row the
+  # aggregator would pass, and it lets a run with no trpc typecheck row skip
+  # this job alone. A failed `changes` job keeps it skipped, because its
+  # outputs carry no group list.
+  typecheck-trpc:
+    needs: [changes, trpc-declarations]
+    if: always() && needs.changes.result == 'success' && contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc')
+    name: typecheck (trpc)
+    # tsgo loads the whole web program, which outgrows the 8 GB of the default
+    # 2 vCPU runner. The 4 vCPU runner has 16 GB.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache compiler plugins
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
       - name: Download tRPC declarations
-        if: matrix.group == 'trpc'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: trpc-declarations
@@ -488,13 +540,14 @@ jobs:
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
-          KILO_TYPECHECK_TRPC_BUILT: ${{ matrix.group == 'trpc' && '1' || '' }}
-        run: scripts/typecheck-all.sh --group ${{ matrix.group }}
+          # The download above is the build, so the script must not rebuild it.
+          KILO_TYPECHECK_TRPC_BUILT: '1'
+        run: scripts/typecheck-all.sh --group trpc
 
   # Required check. Skipped groups (nothing affected) pass; a failed or
   # cancelled group fails this job.
   typecheck:
-    needs: [changes, typecheck-groups]
+    needs: [changes, typecheck-groups, typecheck-trpc]
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -508,16 +561,15 @@ jobs:
             exit 1
           fi
 
+  # The lint rows that read no trpc-declarations artifact. They need `changes`
+  # alone, so they start as soon as the group lists exist.
   lint-groups:
-    needs: [changes, trpc-declarations]
-    # `always()` so a skipped producer (a lint-rest-only run) or a failed one
-    # cannot skip every lint group; the trpc download below fails loudly. A
-    # failed `changes` job keeps them skipped.
-    if: always() && needs.changes.result == 'success' && needs.changes.outputs.lint_groups != '[]'
+    needs: changes
+    if: needs.changes.outputs.lint_groups_non_trpc != '[]'
     strategy:
       fail-fast: false
       matrix:
-        group: ${{ fromJSON(needs.changes.outputs.lint_groups) }}
+        group: ${{ fromJSON(needs.changes.outputs.lint_groups_non_trpc) }}
     name: lint (${{ matrix.group }})
     # Type-aware lint loads the same program as the typecheck groups.
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
@@ -539,28 +591,61 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The extension sources lint against the built tRPC types. A full lint
-      # also covers apps/mobile, which needs the harness SDK build too.
-      - name: Download tRPC declarations
-        if: matrix.group == 'trpc'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: trpc-declarations
-          path: packages/trpc/dist
-
-      - name: Restore or build the harness SDK
-        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        uses: ./.github/actions/harness-sdk-build
-
       - name: Lint
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
         run: scripts/lint-all.sh --group ${{ matrix.group }}
 
+  # The trpc lint row: the extension sources lint against the built tRPC types,
+  # and the only lint row that reads the trpc-declarations artifact. `always()`
+  # makes a failed producer surface as a failed download here instead of a
+  # quietly skipped row the aggregator would pass, and it lets a run with no
+  # trpc lint row skip this job alone. A failed `changes` job keeps it skipped,
+  # because its outputs carry no group list.
+  lint-trpc:
+    needs: [changes, trpc-declarations]
+    if: always() && needs.changes.result == 'success' && contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
+    name: lint (trpc)
+    # Type-aware lint loads the same program as the typecheck groups.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+
+      # A full lint also covers apps/mobile, which needs the harness SDK build.
+      - name: Restore or build the harness SDK
+        if: contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
+        uses: ./.github/actions/harness-sdk-build
+
+      - name: Lint
+        env:
+          KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
+        run: scripts/lint-all.sh --group trpc
+
   # Required check. Skipped groups (nothing affected) pass; a failed or
   # cancelled group fails this job.
   lint:
-    needs: [changes, lint-groups]
+    needs: [changes, lint-groups, lint-trpc]
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

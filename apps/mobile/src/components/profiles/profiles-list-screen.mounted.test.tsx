@@ -1,9 +1,17 @@
 import { createElement, type ReactNode } from 'react';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfilesListScreen } from '@/components/profiles/profiles-list-screen';
+import {
+  findAll,
+  findOne,
+  profile,
+  type ProfileSummary,
+  rowTitles,
+  textChildren,
+} from '@/components/profiles/profiles-list-screen.test-helpers';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -17,19 +25,6 @@ type ListResult = {
   error?: unknown;
   isRefetching: boolean;
   refetch: () => void;
-};
-
-type ProfileSummary = {
-  id: string;
-  name: string;
-  isDefault: boolean;
-  varCount: number;
-  commandCount: number;
-  mcpServerCount: number;
-  skillCount: number;
-  kiloCommandCount: number;
-  agentCount: number;
-  ownerType?: 'organization' | 'user';
 };
 
 const refetchFn = vi.hoisted(() => vi.fn());
@@ -78,6 +73,10 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `${options.stack === 'app' ? '/app-stack' : ''}/profiles/${profileId}${
       options.organizationId ? `?org=${options.organizationId}` : ''
     }`,
+  getRepoBindingsPath: (options: { organizationId?: string; stack?: string } = {}) =>
+    `${options.stack === 'app' ? '/app-stack' : '/(app)/(tabs)/(3_profile)/profiles'}/repo-bindings${
+      options.organizationId ? `?organizationId=${options.organizationId}` : ''
+    }`,
 }));
 
 vi.mock('react-native', () => ({
@@ -106,6 +105,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
+  GitBranch: 'GitBranch',
   Plus: 'Plus',
   SlidersHorizontal: 'SlidersHorizontal',
   Star: 'Star',
@@ -113,40 +113,6 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSummary {
-  return {
-    name: 'Backend debugging',
-    isDefault: false,
-    varCount: 0,
-    commandCount: 0,
-    mcpServerCount: 0,
-    skillCount: 0,
-    kiloCommandCount: 0,
-    agentCount: 0,
-    ...overrides,
-  };
-}
-
-function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-function findOne(root: ReactTestInstance, type: string): ReactTestInstance {
-  const node = findAll(root, type)[0];
-  if (!node) {
-    throw new Error(`${type} was not rendered`);
-  }
-  return node;
-}
-
-function rowTitles(root: ReactTestInstance): string[] {
-  return findAll(root, 'ConfigureRow').map(row => String(row.props.title));
-}
-
-function textChildren(root: ReactTestInstance): string[] {
-  return findAll(root, 'Text').map(node => String(node.props.children));
-}
 
 async function mount(stack: 'app' | 'profileTab' = 'profileTab') {
   const result = await renderWithProviders(createElement(ProfilesListScreen, { stack }));
@@ -235,6 +201,9 @@ describe('ProfilesListScreen', () => {
 
     const emptyState = findOne(renderer.root, 'EmptyState');
     expect(emptyState.props.title).toBe('No profiles yet');
+    // The repo-defaults entry needs a profile to bind, so it stays out of the
+    // empty state the brief leaves unchanged.
+    expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
 
     const action = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
@@ -264,7 +233,11 @@ describe('ProfilesListScreen', () => {
 
     expect(textChildren(renderer.root)).toContain('Organization');
     expect(textChildren(renderer.root)).toContain('Personal');
-    expect(rowTitles(renderer.root)).toEqual(['Org profile', 'Personal profile']);
+    expect(rowTitles(renderer.root)).toEqual([
+      'Org profile',
+      'Personal profile',
+      'Default Profiles for Repos',
+    ]);
 
     const personalRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Personal profile'
@@ -328,7 +301,7 @@ describe('ProfilesListScreen', () => {
 
     const { renderer, unmount } = await mount();
 
-    expect(rowTitles(renderer.root)).toEqual(['Personal profile']);
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default Profiles for Repos']);
     expect(textChildren(renderer.root)).not.toContain('Organization');
     // `agentProfiles.list` does not tag owner, so every row is personal.
     expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
@@ -345,7 +318,7 @@ describe('ProfilesListScreen', () => {
 
     expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
     // The cached rows stay usable under the banner.
-    expect(rowTitles(renderer.root)).toEqual(['Personal profile']);
+    expect(rowTitles(renderer.root)).toEqual(['Personal profile', 'Default Profiles for Repos']);
 
     unmount();
   });
@@ -367,7 +340,12 @@ describe('ProfilesListScreen', () => {
 
     const { renderer, unmount } = await mount('app');
 
-    const row = findOne(renderer.root, 'ConfigureRow');
+    const row = findAll(renderer.root, 'ConfigureRow').find(
+      candidate => candidate.props.title === 'Personal profile'
+    );
+    if (!row) {
+      throw new Error('profile row missing');
+    }
     act(() => {
       (row.props as { onPress: () => void }).onPress();
     });

@@ -15,6 +15,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   Building2,
+  GitBranch,
   type LucideIcon,
   Plus,
   SlidersHorizontal,
@@ -33,6 +34,7 @@ import { useOrganization } from '@/lib/organization-context';
 import {
   getNewProfilePath,
   getProfileOverviewPath,
+  getRepoBindingsPath,
   type ProfileManagementStack,
 } from '@/lib/profile-agent-navigation';
 
@@ -112,6 +114,16 @@ export function ProfilesListScreen({
         stack,
       })
     );
+  };
+
+  /**
+   * The repo-defaults screen lists this context's bindings, so the list that
+   * names the context opens it. The list is the route's parent, so its stack
+   * repair finds it beneath and Back returns here; only the composer passes
+   * `openedFrom`, which is what opts a caller out of that repair.
+   */
+  const openRepoBindings = () => {
+    router.push(getRepoBindingsPath({ organizationId: organizationId ?? undefined, stack }));
   };
 
   return (
@@ -211,6 +223,20 @@ export function ProfilesListScreen({
               })}
             </View>
           ))}
+        {/* The defaults screen binds a repo to one of this list's profiles, so
+            it needs a profile to point at: the entry appears with the rows and
+            leaves the loading, error and empty states as they were. */}
+        {!isListLoading && sections.length > 0 && (
+          <View className="gap-3">
+            <ConfigureRow
+              icon={GitBranch}
+              title={t('profiles.repoBindings.title')}
+              className="rounded-lg bg-secondary px-3"
+              last
+              onPress={openRepoBindings}
+            />
+          </View>
+        )}
       </TabScreenScrollView>
     </View>
   );

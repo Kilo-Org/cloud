@@ -1471,7 +1471,7 @@ describe('api routes', () => {
     vi.mocked(getWorkerDb).mockReturnValue(db);
 
     const app = makeApiApp();
-    const invalid = 'not-a-session';
+    const invalid = 'not%20a%20session';
     const res = await app.fetch(
       new Request(`http://local/session/${invalid}/export`, {
         method: 'GET',
@@ -1481,6 +1481,28 @@ describe('api routes', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/export serves a session created before the canonical id shape', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'xmw2l780h18' }]);
+
+    const payload = JSON.stringify({ success: true, events: [] });
+    const ingestStub = {
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/xmw2l780h18/export', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
   });
 
   it('GET /session/:sessionId/export returns 404 when access is denied', async () => {

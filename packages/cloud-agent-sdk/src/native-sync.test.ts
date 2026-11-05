@@ -531,6 +531,46 @@ test('recovery runs beside live events and reapplies frames newer than its snaps
   connection.close();
 });
 
+test('a transient recovery read keeps the remaining attempts', async () => {
+  snapshot
+    .mockResolvedValueOnce(incomplete(5))
+    .mockRejectedValueOnce(new NativeSyncError('HTTP 500', 500))
+    .mockResolvedValueOnce(complete(6));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(true), 3);
+  await flush();
+  await jest.advanceTimersByTimeAsync(800);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(3);
+  expect(state?.messages[0]?.incomplete).toBeUndefined();
+  connection.close();
+});
+
+test('a permanent recovery read failure stops recovery with an error', async () => {
+  snapshot
+    .mockResolvedValueOnce(incomplete(5))
+    .mockRejectedValueOnce(new NativeSyncError('forbidden', 403));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(true), 3);
+  await flush();
+  await jest.advanceTimersByTimeAsync(10_000);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(state?.messages[0]?.incomplete).toBe(true);
+  expect(state?.error).toBe('forbidden');
+  connection.close();
+});
+
 test.each([
   ['deleted session', () => Object.assign(new Error('deleted'), { code: 'session_deleted' })],
   ['forbidden read', () => new NativeSyncError('forbidden', 403)],

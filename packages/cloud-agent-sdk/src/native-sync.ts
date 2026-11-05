@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { fetchNativeSnapshot, type NativeMessage } from './native-sync-snapshot';
+import {
+  fetchNativeSnapshot,
+  type NativeMessage,
+  type NativeSnapshot,
+} from './native-sync-snapshot';
 import { cloudAgentSdkRuntime } from './runtime';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
@@ -502,7 +506,18 @@ export class NativeSyncClient {
             recoveryTimer = setTimeout(resolve, 250 * 2 ** current.attempt++);
           });
           if (closed) return;
-          const next = await readSnapshot();
+          let next: NativeSnapshot;
+          try {
+            next = await readSnapshot();
+          } catch (error) {
+            // A transient read keeps the remaining attempts; permanent authorization and
+            // deletion failures end recovery.
+            if (isPermanent(error) || current.attempt >= 4) {
+              publish({ error: reason(error) });
+              return;
+            }
+            continue;
+          }
           const stale = next.position < snapshotPosition;
           let messages = next.messages;
           for (const frame of current.replay)

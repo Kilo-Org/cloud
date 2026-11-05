@@ -207,6 +207,22 @@ export async function resolveProviderAndPolicy(
   if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
     return reject(managedGatewayDisabledResponse(providerType));
   }
+  const providerBaseUrl =
+    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
+  const providerDomain = URL.parse(providerBaseUrl)
+    ?.hostname.replace(/\.$/, '')
+    .split('.')
+    .slice(-2)
+    .join('.');
+  const gatewayByDomain =
+    providerDomain === 'openrouter.ai'
+      ? 'openrouter'
+      : providerDomain === 'vercel.sh'
+        ? 'vercel'
+        : undefined;
+  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+    return reject(managedGatewayDisabledResponse(gatewayByDomain));
+  }
   if (orgAutoRouteTarget) {
     try {
       const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);

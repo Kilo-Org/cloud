@@ -18,7 +18,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   ENKRYPT_VERDICT_CACHE_ENABLED,
-  rememberAllowedRequest,
+  rememberRequestVerdict,
   scanRequestWithVerdictCache,
   type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
@@ -30,7 +30,7 @@ const notScanned: EnkryptCachedScanResult = {
   verdict: { action: 'skip' },
   usageRecords: [],
   report: null,
-  allowedKey: null,
+  cacheEntry: null,
 };
 
 const verdictCacheStore = ENKRYPT_VERDICT_CACHE_ENABLED ? redisClient : null;
@@ -38,8 +38,8 @@ const verdictCacheStore = ENKRYPT_VERDICT_CACHE_ENABLED ? redisClient : null;
 export type EnkryptInputGuardrail = {
   /**
    * Await immediately before the upstream call. Never rejects. Waits only for the blocking
-   * detectors' scan. The measured wait is the latency the guardrail added to the request, and is
-   * stored on one of the request's usage records.
+   * detectors' scan and, for a block, its cache write. The measured wait is the latency the
+   * guardrail added to the request, and is stored on one of the request's usage records.
    */
   awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
   /**
@@ -90,7 +90,7 @@ export function usageRecordsWithAddedLatency(
  * reject it.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
- * early still accounts for a scan Enkrypt performed. An allowed request's verdict cache entry is
+ * early still accounts for a scan Enkrypt performed. A request's verdict cache entry is
  * written as soon as the verdict is known, so the agent's next step can already use it, and
  * `after()` keeps the function alive until the write finishes.
  */
@@ -121,7 +121,7 @@ export function startEnkryptInputGuardrail(
         verdict: { action: 'unavailable', reason: 'failed' },
         usageRecords: [],
         report: null,
-        allowedKey: null,
+        cacheEntry: null,
       };
     });
   const logOnlyResult = scans
@@ -137,9 +137,9 @@ export function startEnkryptInputGuardrail(
       return notScanned;
     });
   const cacheWrites = [blockingResult, logOnlyResult].map(result =>
-    result.then(async ({ allowedKey }): Promise<VerdictCacheWrite> => {
-      if (!allowedKey || !verdictCacheStore) return 'skipped';
-      return (await rememberAllowedRequest(allowedKey, verdictCacheStore)) ? 'written' : 'failed';
+    result.then(async ({ cacheEntry }): Promise<VerdictCacheWrite> => {
+      if (!cacheEntry || !verdictCacheStore) return 'skipped';
+      return rememberRequestVerdict(cacheEntry, verdictCacheStore);
     })
   );
   for (const cacheWrite of cacheWrites) after(cacheWrite);
@@ -173,6 +173,7 @@ export function startEnkryptInputGuardrail(
     async awaitVerdict() {
       const waitStartedAt = performance.now();
       const { verdict } = await blockingResult;
+      if (verdict.action === 'block') await cacheWrites[0];
       addedLatencyMs = Math.round(performance.now() - waitStartedAt);
       return verdict;
     },

@@ -6,6 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
+  getManagedGatewayFromUrl,
   getOrganizationGatewaySettings,
   isManagedGatewayDisabled,
   NO_ORGANIZATION_GATEWAY_SETTINGS,
@@ -209,17 +210,7 @@ export async function resolveProviderAndPolicy(
   }
   const providerBaseUrl =
     providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
-  const providerDomain = URL.parse(providerBaseUrl)
-    ?.hostname.replace(/\.$/, '')
-    .split('.')
-    .slice(-2)
-    .join('.');
-  const gatewayByDomain =
-    providerDomain === 'openrouter.ai'
-      ? 'openrouter'
-      : providerDomain === 'vercel.sh'
-        ? 'vercel'
-        : undefined;
+  const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
   if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
     return reject(managedGatewayDisabledResponse(gatewayByDomain));
   }

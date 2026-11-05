@@ -1,5 +1,6 @@
 import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { buildDirectProvider } from './build-direct-provider';
 import { upstreamRequest } from './upstream-request';
 
@@ -129,15 +130,19 @@ describe('upstreamRequest through the secure proxy', () => {
     const { headers, body } = await sendThroughSecureProxy(false, true);
 
     expect(headers.has('Mt-User-Id')).toBe(false);
-    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe('kilo:task-cache-key');
+    expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe(
+      'kilo:' + generateProviderSpecificHash('user-1', secureProxyProvider(false, true))
+    );
   });
 
   it.each(['\u4e2d\u6587', 'key\r\nInjected: value', 'key\0'])(
-    'still sends the request when cache key %s cannot be used as a header',
+    'sends the user hash when cache key %s cannot be used as a header',
     async cacheKey => {
       const { body } = await sendThroughSecureProxy(false, true, cacheKey);
 
-      expect(body.kilo_secure_proxy.headers).not.toHaveProperty('mt-user-id');
+      expect(body.kilo_secure_proxy.headers['mt-user-id']).toBe(
+        'kilo:' + generateProviderSpecificHash('user-1', secureProxyProvider(false, true))
+      );
       expect(body.prompt_cache_key).toBe(cacheKey);
     }
   );

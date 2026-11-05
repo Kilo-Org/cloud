@@ -13,10 +13,12 @@ describe('formatRequestLogProvider', () => {
     expect(formatRequestLogProvider('deepinfra')).toBe('DeepInfra');
     expect(formatRequestLogProvider('bedrock')).toBe('Amazon Bedrock');
     expect(formatRequestLogProvider('novita')).toBe('Novita AI');
+    expect(formatRequestLogProvider('meituan')).toBe('Meituan LongCat');
   });
 
   test('resolves known inference providers case-insensitively', () => {
     expect(formatRequestLogProvider('DEEPINFRA')).toBe('DeepInfra');
+    expect(formatRequestLogProvider('MEITUAN')).toBe('Meituan LongCat');
   });
 
   test('title-cases an unknown inference provider', () => {

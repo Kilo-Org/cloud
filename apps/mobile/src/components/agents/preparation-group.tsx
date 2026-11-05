@@ -26,6 +26,8 @@ import {
   preparationGroupExpandedByDefault,
 } from './preparation-group-state';
 
+/** Reaches the 44 dp touch floor on a header and a child row without growing either. */
+const ROW_TOUCH_SLOP = { top: 5, bottom: 5 } as const;
 /** The caret column of a child row, shared by the caret and its empty slot. */
 const STEP_CARET_SIZE = 14;
 /** The status column of a child row: every drawn mark fits this box. */
@@ -59,6 +61,7 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         accessibilityRole="button"
         accessibilityLabel={copy.title}
         accessibilityState={{ expanded }}
+        hitSlop={ROW_TOUCH_SLOP}
         className="flex-row items-center gap-2 px-3 py-3 active:bg-secondary"
       >
         {expanded ? (
@@ -217,6 +220,7 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
         accessibilityRole={hasDetails ? 'button' : undefined}
         accessibilityLabel={label}
         accessibilityState={hasDetails ? { expanded } : undefined}
+        hitSlop={ROW_TOUCH_SLOP}
         className="flex-row items-center gap-2 px-2 py-2.5 active:bg-secondary"
       >
         {hasDetails ? (

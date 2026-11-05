@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   resolveComposerTopFadeHeight,
+  resolveNewSessionFormFrameHeight,
   resolveNewSessionPromptMinHeight,
 } from './new-session-prompt-fit';
 
@@ -159,6 +160,60 @@ describe('resolveNewSessionPromptMinHeight', () => {
     expect(
       LONG_DRAFT.cardTop + LONG_DRAFT.cardChromeHeight + PREFERRED_MIN_HEIGHT
     ).toBeLessThanOrEqual(frameHeight);
+  });
+});
+
+describe('the New Session keyboard destination', () => {
+  const frame = {
+    containerY: 118,
+    containerHeight: 756,
+    footerHeight: 221,
+    windowHeight: 874,
+    keyboardVerticalOffset: 0,
+  };
+
+  it('fits the smaller whole-line input before the keyboard reaches its final height', () => {
+    const closed = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 0 });
+    const opened = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 335 });
+    const chrome = { cardTop: 14, cardChromeHeight: 101 };
+
+    expect(closed).toBe(535);
+    expect(opened).toBe(200);
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: closed })).toBe(
+      88
+    );
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: opened })).toBe(
+      64
+    );
+  });
+
+  it('keeps an already padded Android navigation inset out of the keyboard overlap', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        keyboardHeight: 335,
+        keyboardVerticalOffset: -24,
+      })
+    ).toBe(224);
+  });
+
+  it('subtracts only the keyboard overlap when the form stops above the window bottom', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        containerY: 100,
+        containerHeight: 600,
+        footerHeight: 140,
+        windowHeight: 900,
+        keyboardHeight: 300,
+      })
+    ).toBe(360);
+  });
+
+  it('never gives the input a negative viewport when the footer fills the available space', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({ ...frame, footerHeight: 700, keyboardHeight: 335 })
+    ).toBe(0);
   });
 });
 

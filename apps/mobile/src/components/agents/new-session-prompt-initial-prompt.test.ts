@@ -91,6 +91,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
+  createAnimatedComponent: (component: unknown) => component,
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   // The composer's top fade resizes on the UI thread; there is none here, so

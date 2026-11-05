@@ -1,4 +1,5 @@
 import { AppState, type AppStateStatus } from 'react-native';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -63,6 +64,9 @@ const getServerSnapshot = getSnapshot;
 export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResult {
   const { disabled, getDraft, onDraftChange } = options;
   const { userId } = useCurrentUserId();
+  // The router of the root that renders this surface, not the module-level one
+  // that the navigation container rebinds and unbinds across a recreation.
+  const router = useRouter();
 
   const ownerRef = useRef<string | null>(null);
   ownerRef.current ??= nextOwnerId();
@@ -86,6 +90,30 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   const voiceLanguageRef = useRef(voiceLanguage);
   voiceLanguageRef.current = voiceLanguage;
 
+  // A feedback alert outlives the surface that raised it: its native dialog
+  // stays on screen while the route, or the whole signed-in tree, is replaced
+  // underneath it. A press then belongs to no owner, so it must not route into
+  // whatever tree is in front now.
+  const ownerAliveRef = useRef(true);
+  useEffect(() => {
+    ownerAliveRef.current = true;
+    return () => {
+      ownerAliveRef.current = false;
+    };
+  }, []);
+
+  // Read through a ref for the same reason: the action created once below must
+  // push through the router of the root that renders this surface now.
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
+  const openTranscriptionModelPicker = useCallback((): void => {
+    if (!ownerAliveRef.current) {
+      return;
+    }
+    routerRef.current.push('/(app)/transcription-model-picker' as Href);
+  }, []);
+
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const feedback = useSyncExternalStore(
@@ -103,6 +131,7 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     getOnDraftChange: () => getOnDraftChangeRef.current,
     getOwner: () => owner,
     getUserId: () => getUserIdRef.current,
+    openTranscriptionModelPicker,
   });
   const actions = actionsRef.current;
 

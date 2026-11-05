@@ -11,14 +11,19 @@
  * readable as code, so a comma or an apostrophe inside one desynchronises the
  * caller's loop and a whole call site silently drops out of the audit.
  *
- * Template-literal `${…}` interpolations are not interpreted here: this module
- * reports where the literal ends. A caller that needs the expression inside an
- * interpolation walks it itself.
+ * A template literal is opaque whole: `${…}` may nest another template, so
+ * `endOfTemplate` follows the interpolation's own brackets, strings and
+ * comments to the literal's closing backtick. `endOfQuoted` answers a narrower
+ * question — where the next unescaped quote is — and is only safe for a run
+ * that cannot contain an interpolation. `endOfQuotedOrComment` is the one test
+ * a scanning loop needs, and it takes the template-aware path for a backtick.
  */
 
 /**
- * The index just past the JS string or template literal starting at `start`.
- * An unterminated run ends at the end of the text.
+ * The index just past the JS string starting at `start`. Only the matching
+ * quote character ends the run: a template literal's `${…}` is not
+ * interpreted, so callers holding a backtick use `endOfTemplate` instead. An
+ * unterminated run ends at the end of the text.
  */
 export function endOfQuoted(text, start) {
   const quote = text[start];
@@ -27,6 +32,72 @@ export function endOfQuoted(text, start) {
     index += text[index] === '\\' ? 2 : 1;
   }
   return Math.min(index + 1, text.length);
+}
+
+/**
+ * The index just past the template literal starting at `start`, across its
+ * `${…}` interpolations: an interpolation is walked as code, so a nested
+ * template, string or comment inside it is skipped whole and only the `}` that
+ * closes it ends the expression. The literal's own backtick then ends the run.
+ * An unterminated run ends at the end of the text.
+ */
+export function endOfTemplate(text, start) {
+  let index = start + 1;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '\\') {
+      index += 2;
+      continue;
+    }
+    if (char === '`') {
+      return index + 1;
+    }
+    if (char === '$' && text[index + 1] === '{') {
+      const end = endOfInterpolation(text, index + 2);
+      if (end === -1) {
+        return text.length;
+      }
+      index = end;
+      continue;
+    }
+    index++;
+  }
+  return text.length;
+}
+
+/**
+ * The index just past the `}` closing the interpolation whose expression starts
+ * at `start`, or -1 when the text ends first. Brackets, strings, templates and
+ * comments are balanced inside the expression, so a `}` in any of them is text.
+ */
+function endOfInterpolation(text, start) {
+  let depth = 1;
+  let index = start;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '"' || char === "'") {
+      index = endOfQuoted(text, index);
+      continue;
+    }
+    if (char === '`') {
+      index = endOfTemplate(text, index);
+      continue;
+    }
+    if (char === '/') {
+      const comment = endOfComment(text, index);
+      if (comment !== -1) {
+        index = comment;
+        continue;
+      }
+    }
+    if (char === '{') {
+      depth++;
+    } else if (char === '}' && --depth === 0) {
+      return index + 1;
+    }
+    index++;
+  }
+  return -1;
 }
 
 /**
@@ -49,14 +120,19 @@ export function endOfComment(text, start) {
 }
 
 /**
- * The index just past the quoted run or comment starting at `start`, or -1 when
- * `start` begins neither. The one test a scanning loop needs before applying
- * its own depth rule.
+ * The index just past the quoted run, template literal or comment starting at
+ * `start`, or -1 when `start` begins none. The one test a scanning loop needs
+ * before applying its own depth rule: a backtick run is skipped whole, its
+ * `${…}` interpolations included, so an apostrophe or a bracket inside one
+ * never reaches the caller's loop.
  */
 export function endOfQuotedOrComment(text, start) {
   const char = text[start];
-  if (char === '"' || char === "'" || char === '`') {
+  if (char === '"' || char === "'") {
     return endOfQuoted(text, start);
+  }
+  if (char === '`') {
+    return endOfTemplate(text, start);
   }
   if (char === '/') {
     return endOfComment(text, start);

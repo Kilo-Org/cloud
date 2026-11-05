@@ -9,6 +9,7 @@ import {
   testCommands,
   type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -57,21 +59,32 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
+    FormField: (props: {
+      defaultValue?: string;
+      labelAccessory?: unknown;
+      onChangeText?: (value: string) => void;
+    }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      return createElement('FormField', {
-        ...props,
-        nativeText: nativeText.current,
-        onChangeText: (value: string) => {
-          nativeText.current = value;
-          props.onChangeText?.(value);
+      // The real field renders its label accessory beside the label, so the
+      // caller's row controls are children of the mocked field too.
+      return createElement(
+        'FormField',
+        {
+          ...props,
+          nativeText: nativeText.current,
+          onChangeText: (value: string) => {
+            nativeText.current = value;
+            props.onChangeText?.(value);
+          },
         },
-      });
+        props.labelAccessory as never
+      );
     },
   };
 });
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
@@ -83,6 +96,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen without the manage role', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     permissionState.canManage = false;
     Object.assign(h.query, {
       data: undefined,
@@ -92,15 +106,22 @@ describe('ProfileCommandsScreen without the manage role', () => {
     });
   });
 
-  it('shows no add, reorder, or delete control to a member', async () => {
-    h.query.data = testCommands(['a', 'b']);
+  it('shows each command in full to a member, with no editable field or row control', async () => {
+    const commands = [
+      'pnpm install --frozen-lockfile && pnpm build'.padEnd(420, 'z'),
+      'b'.repeat(500),
+    ];
+    h.query.data = testCommands(commands);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(findFields(renderer.root).map(field => field.props.disabled)).toEqual([true, true]);
+    expect(findFields(renderer.root)).toHaveLength(0);
     expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    const values = findAll(renderer.root, 'SelectableText');
+    expect(values.map(value => value.props.children)).toEqual(commands);
+    expect(values.map(value => value.props.accessibilityLabel)).toEqual(['Command 1', 'Command 2']);
 
     unmount();
   });

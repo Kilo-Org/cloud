@@ -6,6 +6,9 @@
 // loading), and the later-page failure footer (rows kept + Retry). The query layer
 // is mocked so each state is driven directly through the screen JSX.
 
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+
 import { createElement, Fragment, type ReactElement } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -216,6 +219,32 @@ beforeEach(() => {
   pageHook.hasMore = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+});
+
+describe('OrganizationInvoicesScreen status badges', () => {
+  it('gives the void status a band the row card does not already paint', async () => {
+    pageHook.entries = [{ ...INVOICE, id: 'inv-void', status: 'void' }];
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationInvoicesScreen));
+
+    const pills = renderer.root.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('rounded-full')
+    );
+    expect(pills).toHaveLength(1);
+    const pill = pills[0];
+    if (!pill) {
+      throw new Error('status badge not found');
+    }
+
+    // The theme's --muted equals the row card's --secondary, so a bg-muted
+    // badge paints no band at all on a row and the word reads as loose text.
+    const css = readFileSync(new URL('../../global.css', import.meta.url), 'utf8');
+    const token = (name: string) => new RegExp(`--${name}:\\s*([^;]+);`).exec(css)?.[1];
+    expect(token('muted')).toBe(token('secondary'));
+    expect(pill.props.className).not.toMatch(/(?:^|\s)bg-muted(?:\s|$)/);
+    expect(pill.props.className).toContain('bg-neutral-200');
+  });
 });
 
 describe('OrganizationInvoicesScreen loading', () => {

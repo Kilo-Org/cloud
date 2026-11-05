@@ -9,7 +9,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -21,34 +23,45 @@ export function ScopeListScreen() {
   const { t } = useTranslation();
   const {
     data: orgs,
-    isLoading,
     isError,
     isFetching,
+    fetchStatus,
     refetch,
   } = useQuery(trpc.organizations.list.queryOptions());
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const openScope = (scope: string) => {
     pushOnce(getSecurityAgentPath(scope));
   };
 
   // An org-list failure only degrades the organization section — the
-  // Personal scope doesn't depend on it and must stay reachable.
-  const showOrgsError = isError && !orgs;
+  // Personal scope doesn't depend on it and must stay reachable. Only a
+  // delivered read may say which organizations exist: a failed read, or one
+  // paused by lost connectivity, delivered nothing and names its cause with
+  // Retry instead of silently dropping the section.
+  const orgsBody = classifyListBody({
+    rowCount: orgs?.length ?? 0,
+    hasDeliveredData: orgs !== undefined,
+    isError: isError && orgs === undefined,
+    isFetching,
+    fetchStatus,
+    connectivityKnown,
+  });
 
   const renderOrgSection = () => {
-    if (showOrgsError) {
+    if (orgsBody.status === 'error') {
       return (
         <QueryError
           placement="top"
-          variant="server"
+          variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
           title={t('common.couldNotLoadOrganizations')}
           onRetry={() => void refetch()}
-          isRetrying={isFetching}
+          isRetrying={orgsBody.isRetrying}
           className="mt-3"
         />
       );
     }
-    if (isLoading) {
+    if (orgsBody.status === 'loading') {
       return <Skeleton className="mt-3 h-[54px] w-full rounded-lg" />;
     }
     return orgs?.map((org, index) => (
@@ -75,7 +88,7 @@ export function ScopeListScreen() {
           onPress={() => {
             openScope(PERSONAL_SECURITY_SCOPE);
           }}
-          last={!isLoading && !showOrgsError && (orgs?.length ?? 0) === 0}
+          last={orgsBody.status === 'empty'}
         />
         {renderOrgSection()}
       </TabScreenScrollView>

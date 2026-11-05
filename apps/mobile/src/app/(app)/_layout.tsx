@@ -23,11 +23,14 @@ import {
 } from '@/lib/auth/push-registration-reconciliation';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
+import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
@@ -135,6 +138,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <LeaveSettleMount />
       <BriefingSyncMount />
       <ToolSummaryTranslationRetryMount />
       <StorePurchaseRecoveryMount />
@@ -158,6 +162,13 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              {/* The profile tree's screens land without a transition when the
+                  stack repair pushes them (`profile-route-stack.ts`), so a
+                  profile link opened without its parents does not slide the
+                  rebuilt screens past the reader. */}
+              {getProfileRouteNames('app').map(name => (
+                <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+              ))}
               <Stack.Screen
                 name="model-catalog/[owner]/[repo]"
                 options={{

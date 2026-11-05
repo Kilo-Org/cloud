@@ -46,6 +46,7 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',

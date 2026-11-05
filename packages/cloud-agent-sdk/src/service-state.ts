@@ -12,6 +12,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { upsertByRequestId } from './pending-requests';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
   PREPARATION_MAX_ATTEMPTS,
@@ -171,23 +172,6 @@ type ServiceReplayBatch = {
   branch: string | null;
   hadSessionInfo: boolean;
 };
-
-/**
- * FIFO upsert. A repeat of the same requestId replaces the entry in place —
- * the wrapper replays pending requests after a snapshot, and a replay must
- * not enqueue a duplicate card. A new requestId goes to the back, so the
- * oldest pending request is always the head.
- */
-function upsertByRequestId<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
 
 function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let config = initialConfig;
@@ -737,8 +721,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const parsedCommit = sessionCommitDataSchema.safeParse(event);
     const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
     if (parsedCommit.success) {
-      if (seenCommits.has(parsedCommit.data.commitHash)) return;
-      seenCommits.add(parsedCommit.data.commitHash);
+      const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
+      if (seenCommits.has(identity)) return;
+      seenCommits.add(identity);
       commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
     }
     if (event.success || commitHash) {

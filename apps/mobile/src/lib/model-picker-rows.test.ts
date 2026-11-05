@@ -86,10 +86,17 @@ describe('buildModelPickerRows', () => {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
       { key: 'all', title: 'All models', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
     ]);
   });
 
@@ -102,6 +109,7 @@ describe('buildModelPickerRows', () => {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
     ]);
@@ -109,7 +117,13 @@ describe('buildModelPickerRows', () => {
       buildModelPickerRows({ models: gatewayModels, search: 'openai/', favoriteIds: noFavorites })
     ).toEqual([
       { key: 'all', title: 'All models', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
     ]);
   });
 
@@ -135,7 +149,13 @@ describe('buildModelPickerRows', () => {
 
     expect(rows).toEqual([
       { key: 'recommended', title: i18n.t('common.recommended'), type: 'header' },
-      { key: 'model:kilo-auto/efficient', model: autoEfficient, isFavorite: false, type: 'model' },
+      {
+        key: 'model:kilo-auto/efficient',
+        model: autoEfficient,
+        isFavorite: false,
+        showsProvider: true,
+        type: 'model',
+      },
     ]);
   });
 
@@ -163,7 +183,15 @@ describe('buildModelPickerRows', () => {
           search,
           favoriteIds: noFavorites,
         }).filter(row => row.type === 'model')
-      ).toEqual([{ key: `model:${model.id}`, model, isFavorite: false, type: 'model' }]);
+      ).toEqual([
+        {
+          key: `model:${model.id}`,
+          model,
+          isFavorite: false,
+          showsProvider: false,
+          type: 'model',
+        },
+      ]);
     }
   });
 
@@ -186,7 +214,13 @@ describe('buildModelPickerRows', () => {
     ]) {
       expect(buildModelPickerRows({ models: [model], search, favoriteIds })).toEqual([
         { key: 'favorites', title: i18n.t('agentChat.modelPicker.favorites'), type: 'header' },
-        { key: `model:${model.id}`, model, isFavorite: true, type: 'model' },
+        {
+          key: `model:${model.id}`,
+          model,
+          isFavorite: true,
+          showsProvider: true,
+          type: 'model',
+        },
       ]);
     }
   });
@@ -207,12 +241,19 @@ describe('buildModelPickerRows', () => {
     const favoriteIds = new Set(['openai/gpt-5']);
     expect(buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds })).toEqual([
       { key: 'favorites', title: 'Favorites', type: 'header' },
-      { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: true, type: 'model' },
+      {
+        key: 'model:openai/gpt-5',
+        model: gatewayModels[1],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
       { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
+        showsProvider: true,
         type: 'model',
       },
     ]);
@@ -223,9 +264,21 @@ describe('buildModelPickerRows', () => {
       buildModelPickerRows({ models: remoteModels, search: '', favoriteIds: noFavorites })
     ).toEqual([
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-0', model: remoteModels[0], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-0',
+        model: remoteModels[0],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
       { key: 'provider:custom-openai', title: 'CUSTOM OPENAI', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
     expect(
       buildModelPickerRows({
@@ -235,7 +288,13 @@ describe('buildModelPickerRows', () => {
       })
     ).toEqual([
       { key: 'provider:custom-openai', title: 'CUSTOM OPENAI', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
     expect(
       buildModelPickerRows({
@@ -257,9 +316,21 @@ describe('buildModelPickerRows', () => {
     const favoriteIds = new Set(['remote:custom-openai:shared/model.id']);
     expect(buildModelPickerRows({ models: remoteModels, search: '', favoriteIds })).toEqual([
       { key: 'favorites', title: 'Favorites', type: 'header' },
-      { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: true, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: remoteModels[1],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-0', model: remoteModels[0], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-0',
+        model: remoteModels[0],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
   });
 
@@ -273,9 +344,21 @@ describe('buildModelPickerRows', () => {
     ];
     expect(buildModelPickerRows({ models: reordered, search: '', favoriteIds })).toEqual([
       { key: 'favorites', title: 'Favorites', type: 'header' },
-      { key: 'model:remote-model-0', model: reordered[0], isFavorite: true, type: 'model' },
+      {
+        key: 'model:remote-model-0',
+        model: reordered[0],
+        isFavorite: true,
+        showsProvider: true,
+        type: 'model',
+      },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
-      { key: 'model:remote-model-1', model: reordered[1], isFavorite: false, type: 'model' },
+      {
+        key: 'model:remote-model-1',
+        model: reordered[1],
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
     ]);
   });
 
@@ -288,7 +371,13 @@ describe('buildModelPickerRows', () => {
     expect(buildModelPickerRows({ models: [model], search: '', favoriteIds: noFavorites })).toEqual(
       [
         { key: 'provider:kilo-instance', title: 'KİLO İNSTANCE', type: 'header' },
-        { key: 'model:remote-model-0', model, isFavorite: false, type: 'model' },
+        {
+          key: 'model:remote-model-0',
+          model,
+          isFavorite: false,
+          showsProvider: false,
+          type: 'model',
+        },
       ]
     );
   });

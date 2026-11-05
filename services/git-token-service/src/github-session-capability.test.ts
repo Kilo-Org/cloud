@@ -28,6 +28,14 @@ const claims = {
 } as const;
 
 describe('GitHubSessionCapabilityCodec', () => {
+  it('rejects repository-only authority on user-source or unbound capabilities', () => {
+    const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+    expect(() => codec.issue({ ...claims, permissionScope: 'repository' })).toThrow();
+    const { outboundContainerId: _binding, ...unbound } = claims;
+    expect(() =>
+      codec.issue({ ...unbound, source: 'installation', permissionScope: 'repository' })
+    ).toThrow();
+  });
   it('produces an opaque prefixed capability with time-bounded bound claims', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-30T12:00:00.000Z'));

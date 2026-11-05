@@ -1,7 +1,12 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
-import { extractAndUploadAttachments } from '@/lib/bot/attachments';
+import {
+  discardUploadedAttachments,
+  extractAndUploadAttachments,
+  type UploadedBotAttachments,
+} from '@/lib/bot/attachments';
 import { botPlatforms } from '@/lib/bot/platforms';
+import type { BotPlatform } from '@/lib/bot/platforms/types';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
@@ -105,9 +110,16 @@ async function processMessage({
 
   // Upload all supported files through the canonical attachments contract so
   // mixed image/document messages share one path and one five-file limit.
-  let attachments: Awaited<ReturnType<typeof extractAndUploadAttachments>>;
+  let uploadedAttachments: UploadedBotAttachments | undefined;
   try {
-    attachments = await extractAndUploadAttachments(message, user.id);
+    const fetchAttachmentUrl = await resolveAttachmentUrlFetcher({
+      botPlatform,
+      platformIntegration,
+      message,
+    });
+    uploadedAttachments = await extractAndUploadAttachments(message, user.id, {
+      fetchAttachmentUrl,
+    });
   } catch (error) {
     console.error(
       '[KiloBot] Failed to extract/upload attachments, continuing without them:',
@@ -127,7 +139,8 @@ async function processMessage({
       user,
       botRequestId,
       prompt: message.text,
-      attachments,
+      attachments: uploadedAttachments?.attachments,
+      declinedAttachmentFilenames: uploadedAttachments?.declinedFilenames,
       actorLogin: message.author.userName,
     });
 
@@ -138,15 +151,26 @@ async function processMessage({
     });
 
     if (!result.startedCloudAgentSession) {
+      // The run never handed these files to a session, so release their
+      // pending rows and objects now. The reclaim starts before the reply and
+      // is still awaited before returning, so the user is not held behind
+      // storage work and the invocation does not leave it behind.
+      const discarded = discardUploadedAttachments(user.id, uploadedAttachments);
       await botPlatform.withAuthContext({
         platformIntegration,
         fn: () => thread.post({ markdown: result.finalText }),
       });
+      await discarded;
     }
 
     return result.startedCloudAgentSession;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
+
+    // A started session's rows are already linked, so this only reclaims the
+    // uploads of a run that failed before a session took them. Start it before
+    // the error reply and await it at the end of the branch.
+    const discarded = discardUploadedAttachments(user.id, uploadedAttachments);
 
     updateBotRequest(botRequestId, {
       status: 'error',
@@ -161,7 +185,36 @@ async function processMessage({
       fn: () =>
         thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     });
+    await discarded;
 
     return false;
+  }
+}
+
+/**
+ * The platform's own authorization for its attachment URLs, when it has one and
+ * this message carries attachments. A failure to build it is not a reason to
+ * drop the message's files: the caller then reads them through the adapter's
+ * own fetch.
+ */
+async function resolveAttachmentUrlFetcher({
+  botPlatform,
+  platformIntegration,
+  message,
+}: {
+  botPlatform: BotPlatform;
+  platformIntegration: PlatformIntegration;
+  message: Message;
+}): Promise<((url: string) => Promise<Response>) | undefined> {
+  if (message.attachments.length === 0) return undefined;
+
+  try {
+    return await botPlatform.createAttachmentUrlFetcher?.({ platformIntegration });
+  } catch (error) {
+    console.warn('[KiloBot] Falling back to the adapter attachment fetch:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'create-attachment-url-fetcher' },
+    });
+    return undefined;
   }
 }

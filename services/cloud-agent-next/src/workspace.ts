@@ -4,6 +4,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 
 import { resolveSandboxIdClass, type SandboxKind } from './sandbox-placement.js';
+import { ISOLATED_CONTAINER_WORKSPACE_PATH } from './shared/environment-workspace.js';
 
 /**
  * Sanitize a string for use in filesystem paths by replacing forbidden characters with dashes.
@@ -13,7 +14,8 @@ export function sanitizeIdForPath(value: string): string {
   return value.replace(/[/:]/g, '-');
 }
 
-export const ISOLATED_CONTAINER_WORKSPACE_PATH = '/workspace/app';
+// Defined with the rest of the workspace layout, which the wrapper bundle shares.
+export { ISOLATED_CONTAINER_WORKSPACE_PATH };
 
 const FORBIDDEN_PATH_SEGMENTS = new Set(['.', '..']);
 

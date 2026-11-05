@@ -17,11 +17,12 @@
  * Usage: node tools/nativewind/check-classes.mjs
  */
 import { createRequire } from 'node:module';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuoted, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 // Resolve from the app: react-native-css is the app's dependency, not the repo root's.
 const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
@@ -260,13 +261,13 @@ function ownClassStrings(attributes) {
   const strings = [];
   let depth = 0;
   for (let index = 0; index < attributes.length; index++) {
+    const skipped = endOfQuotedOrComment(attributes, index);
+    if (skipped !== -1) {
+      index = skipped - 1;
+      continue;
+    }
     const char = attributes[index];
-    if (char === '"' || char === "'" || char === '`') {
-      index = endOfQuoted(attributes, index) - 1;
-    } else if (char === '/') {
-      const end = endOfComment(attributes, index);
-      index = end === -1 ? index : end - 1;
-    } else if (char === '{') {
+    if (char === '{') {
       depth++;
     } else if (char === '}') {
       depth--;
@@ -303,7 +304,7 @@ function ownClassStrings(attributes) {
   return strings;
 }
 
-export function checkScrollPadding(relative, text) {
+export function checkScrollPadding(relative, text, index = lineIndex(text)) {
   const problems = [];
   for (const match of text.matchAll(SCROLL_TAG)) {
     let attributesStart = match.index + match[0].length;
@@ -321,7 +322,7 @@ export function checkScrollPadding(relative, text) {
       .flatMap(classes => classes.split(/\s+/))
       .filter(classes => HORIZONTAL_PADDING.test(classes));
     if (padding.length > 0) {
-      const line = text.slice(0, match.index).split('\n').length;
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
       );
@@ -333,10 +334,12 @@ export function checkScrollPadding(relative, text) {
 /**
  * `Text` from `react-native` renders without the shared component's RTL
  * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
- * Hebrew while everything beside it mirrors. Importing it under an alias is
- * fine: `type Text as RNText` is how callers type a ref.
+ * Hebrew while everything beside it mirrors. The type alone is safe — callers
+ * annotate refs with `import type { Text }` or `type Text as RNText` — but a
+ * runtime import renders the raw component under whatever name it takes, so an
+ * alias is reported like a bare import.
  */
-const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
+const RAW_TEXT_IMPORT = /import\s+(type\s*)?\{([^}]*)\}\s*from\s*'react-native'/gs;
 const RAW_TEXT_EXEMPT = new Set([
   // A hidden node measured for height. It must not inherit the shared
   // component's base font classes, or the measurement stops matching the
@@ -348,17 +351,41 @@ const RAW_TEXT_EXEMPT = new Set([
   // environment. Both apply `withRtlWritingDirection` from the same source.
   'apps/mobile/src/components/agents/markdown-html.tsx',
   'apps/mobile/src/components/agents/markdown-html-details.tsx',
+  // The code surfaces — both diff rows, the highlighted runs inside them and
+  // the fenced code block — name their own LTR base direction, because code
+  // reads left to right in every interface language, and they nest a raw
+  // `Text` run under the line's own `Text` so the run inherits the mono font.
+  // The shared component's base font classes would override that font on every
+  // run and its paragraph direction would flip the code in an RTL locale.
+  'apps/mobile/src/components/agents/code-block.tsx',
+  'apps/mobile/src/components/pr-review/diff/diff-line.tsx',
+  'apps/mobile/src/components/pr-review/diff/highlight-runs.tsx',
+  'apps/mobile/src/components/pr-review/diff/pr-diff-side-by-side-row.tsx',
 ]);
 
-export function checkRawText(relative, text) {
+/**
+ * Whether one named specifier brings the runtime component in: a bare `Text`
+ * and `Text as <name>` do, while `type Text` and `type Text as <name>` are the
+ * annotations callers type refs with. The `as` split leaves that leading
+ * `type` in the imported name, so the name comparison alone excludes them.
+ */
+function importsRuntimeText(specifier) {
+  const [imported] = specifier.split(/\s+as\s+/);
+  return imported.trim() === 'Text';
+}
+
+export function checkRawText(relative, text, index = lineIndex(text)) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
     return problems;
   }
   for (const match of text.matchAll(RAW_TEXT_IMPORT)) {
-    const bare = match[1].split(',').some(name => name.trim() === 'Text');
-    if (bare) {
-      const line = text.slice(0, match.index).split('\n').length;
+    // `import type { … }` types the list, so nothing in it is rendered.
+    const typeOnly = match[1] !== undefined;
+    const runtime =
+      !typeOnly && match[2].split(',').some(specifier => importsRuntimeText(specifier));
+    if (runtime) {
+      const line = lineOf(index.lineStarts, match.index);
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
@@ -394,55 +421,112 @@ const WIDGET_PROCESS_LAYOUTS = new Set([
   'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
 ]);
 
-export function checkDirectIntl(relative, absolute, text) {
+/**
+ * A line whose first non-space run opens a comment is documentation, not a
+ * violation: a ban list and a formatter rule both quote themselves in one.
+ */
+const COMMENT_LINE = /^\s*(?:\/\/|\*|\/\*)/;
+
+/**
+ * One file's line facts: the offset each line starts at, and the 1-based lines
+ * that begin a comment. A whole-text scan needs both to report the line it
+ * found, and one file pays for the split once however many rules read it.
+ */
+function lineIndex(text) {
+  const lineStarts = [0];
+  const commentLines = new Set();
+  let start = 0;
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] !== '\n') {
+      continue;
+    }
+    if (COMMENT_LINE.test(text.slice(start, index))) {
+      commentLines.add(lineStarts.length);
+    }
+    start = index + 1;
+    lineStarts.push(start);
+  }
+  if (COMMENT_LINE.test(text.slice(start))) {
+    commentLines.add(lineStarts.length);
+  }
+  return { lineStarts, commentLines };
+}
+
+/** The 1-based line holding `index`, from one file's line starts. */
+function lineOf(lineStarts, index) {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (lineStarts[mid] <= index) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return low + 1;
+}
+
+/**
+ * Every match of `pattern` that reads as code, in text order: the pattern runs
+ * once over the whole file instead of once per line, its match index maps back
+ * to the line it reports, and a match on a comment line is dropped.
+ *
+ * A match across a line break is dropped too, and the scan then resumes one
+ * character into it: the per-line scan this replaced could not see `new\nX`,
+ * but it did see the `X(…)` starting on the next line, so the rejected match
+ * must not consume it. `exec` rather than `matchAll` because the loop rewinds
+ * `lastIndex`; the pattern's own index is reset on the way in and out.
+ */
+function codeMatches(text, pattern, index) {
+  const matches = [];
+  pattern.lastIndex = 0;
+  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
+    if (match[0].includes('\n')) {
+      pattern.lastIndex = match.index + 1;
+      continue;
+    }
+    if (match[0].length === 0) {
+      pattern.lastIndex = match.index + 1;
+      continue;
+    }
+    const line = lineOf(index.lineStarts, match.index);
+    if (index.commentLines.has(line)) {
+      continue;
+    }
+    matches.push({ line, match });
+  }
+  pattern.lastIndex = 0;
+  return matches;
+}
+
+/**
+ * `index` is the file's line index when the caller already built one, so
+ * `checkSourceFile` pays for it once for every whole-text scan.
+ */
+export function checkDirectIntl(relative, absolute, text, index = lineIndex(text)) {
   const problems = [];
   if (
     !absolute.startsWith(DIRECT_INTL_DIR) ||
     relative.endsWith('lib/intl-cache.ts') ||
-    WIDGET_PROCESS_LAYOUTS.has(relative.replace(/^\//, ''))
+    WIDGET_PROCESS_LAYOUTS.has(relative)
   ) {
     return problems;
   }
-  for (const [index, line] of text.split('\n').entries()) {
-    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
-      continue;
-    }
-    for (const match of line.matchAll(DIRECT_INTL)) {
-      problems.push(
-        `${relative}:${index + 1}: "${match[0]}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`
-      );
-    }
+  for (const { line, match } of codeMatches(text, DIRECT_INTL, index)) {
+    problems.push(
+      `${relative}:${line}: "${match[0]}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`
+    );
   }
   return problems;
 }
 
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
-/** The ban list over one file's lines: every match of every rule. */
-export function checkRules(relative, text) {
+/** The ban list over one file: every match of every rule, in text order. */
+export function checkRules(relative, text, index = lineIndex(text)) {
   const problems = [];
-  const lines = text.split('\n');
   for (const rule of rules()) {
-    for (const [index, line] of lines.entries()) {
-      // A rule's own explanatory comment must not trip it.
-      if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
-        continue;
-      }
-      for (const match of line.matchAll(rule.pattern)) {
-        problems.push(`${relative}:${index + 1}: "${match[0]}" ${rule.advice}`);
-      }
+    for (const { line, match } of codeMatches(text, rule.pattern, index)) {
+      problems.push(`${relative}:${line}: "${match[0]}" ${rule.advice}`);
     }
   }
   return problems;
@@ -512,13 +596,20 @@ export function checkCompilerStillDropsThese() {
  * Every problem one source file has, from every rule this checker owns. The
  * problems are returned, not kept in module state, so one file's findings
  * cannot leak into the next call.
+ *
+ * `relative` is the path from the repository root without a leading separator;
+ * a `./` or `/` prefix is stripped here, once, so every exemption lookup,
+ * prefix test and diagnostic below reads the same spelling of the path. The
+ * file's line index is built here too and shared by every whole-text scan.
  */
 export function checkSourceFile(relative, absolute, text) {
+  const path = relative.replace(/^(?:\.?\/)+/, '');
+  const index = lineIndex(text);
   return [
-    ...checkScrollPadding(relative, text),
-    ...checkRawText(relative, text),
-    ...checkDirectIntl(relative, absolute, text),
-    ...checkRules(relative, text),
+    ...checkScrollPadding(path, text, index),
+    ...checkRawText(path, text, index),
+    ...checkDirectIntl(path, absolute, text, index),
+    ...checkRules(path, text, index),
   ];
 }
 
@@ -526,7 +617,7 @@ export function checkSourceFile(relative, absolute, text) {
 function run() {
   const problems = [];
   for (const dir of SOURCE_DIRS) {
-    for (const file of sourceFiles(dir)) {
+    for (const file of sourceFiles(dir, isTestArtifact)) {
       problems.push(...checkSourceFile(file.slice(ROOT.length), file, readFileSync(file, 'utf8')));
     }
   }

@@ -2,7 +2,13 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { PROFILE_OWNER_CHOICES } from '@/components/profiles/profile-owner-model';
 import { NewProfileScreen } from '@/components/profiles/new-profile-screen';
-import { NEW_PROFILE_RETURNS, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
+import { useRepairProfileRouteStack } from '@/lib/hooks/use-repair-profile-route-stack';
+import {
+  getNewProfilePath,
+  NEW_PROFILE_RETURNS,
+  type ProfileManagementStack,
+} from '@/lib/profile-agent-navigation';
+import { LIST_CHILD_PARENTS } from '@/lib/profile-route-stack';
 import { parseParam } from '@/lib/route-params';
 
 /**
@@ -18,12 +24,23 @@ export default function NewProfileRoute() {
     returnTo: rawReturnTo,
     organizationId: rawOrganizationId,
   } = useLocalSearchParams<{ owner?: string; returnTo?: string; organizationId?: string }>();
+  const owner = parseParam(rawOwner, PROFILE_OWNER_CHOICES) ?? undefined;
+  const returnTo = parseParam(rawReturnTo, NEW_PROFILE_RETURNS) ?? undefined;
+  const organizationId = parseParam(rawOrganizationId) ?? undefined;
+  // A link that arrives without the profiles list beneath it rebuilds it, so
+  // Back returns to the list instead of leaving the profile tree.
+  useRepairProfileRouteStack({
+    organizationId,
+    parents: LIST_CHILD_PARENTS,
+    self: getNewProfilePath(stack, { owner, returnTo, organizationId }),
+    stack,
+  });
   return (
     <NewProfileScreen
       stack={stack}
-      initialOwner={parseParam(rawOwner, PROFILE_OWNER_CHOICES) ?? undefined}
-      returnToCaller={parseParam(rawReturnTo, NEW_PROFILE_RETURNS) !== null}
-      organizationId={parseParam(rawOrganizationId) ?? undefined}
+      initialOwner={owner}
+      returnToCaller={returnTo !== undefined}
+      organizationId={organizationId}
     />
   );
 }

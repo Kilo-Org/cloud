@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import type { CloudAgentSessionFailureStage } from '@kilocode/db/schema';
+
+export type { CloudAgentSessionFailureStage } from '@kilocode/db/schema';
 
 export const CLOUD_AGENT_FAILURE_STAGES = [
   'pre_dispatch',
@@ -30,6 +33,7 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'payment_required',
   'admission_billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -76,9 +80,11 @@ const USER_FAILURE_MESSAGES = {
   wrapper_error_after_activity: 'Agent wrapper failed while processing the message',
   missing_assistant_reply: 'No assistant reply was produced',
   payment_required: 'Assistant request failed: insufficient credits',
-  admission_billing_unavailable: 'Sandbox billing is unavailable',
+  admission_billing_unavailable:
+    'Sandbox billing or capacity verification is unavailable. Try again shortly.',
   container_limit_reached:
-    'Concurrent container limit reached (20 for personal accounts, 50 for organizations). Stop an existing container before starting another.',
+    'Concurrent container limit reached. Stop an existing container before starting another.',
+  account_blocked: 'This account is blocked.',
   user_interrupt: 'The message was interrupted by the user',
   container_shutdown: 'The agent container shut down',
   system_interrupt: 'The message was interrupted',
@@ -127,10 +133,9 @@ export const CLOUD_AGENT_SESSION_FAILURE_STAGES = [
   'registration',
   'initial_admission',
   'transport',
-] as const;
+] as const satisfies readonly CloudAgentSessionFailureStage[];
 
 export const CloudAgentSessionFailureStageSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_STAGES);
-export type CloudAgentSessionFailureStage = z.infer<typeof CloudAgentSessionFailureStageSchema>;
 
 export const SESSION_FAILURE_MESSAGES = {
   sandbox_id_derivation_failed: 'Could not create the session (sandbox identity)',
@@ -230,6 +235,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'session_import_failed',
   'setup_command_timeout',
   'container_limit_reached',
+  'account_blocked',
   'admission_capacity',
   'admission_not_found',
   'admission_internal',
@@ -477,6 +483,8 @@ export function classifyCloudAgentFailure(
   switch (input.code) {
     case 'container_limit_reached':
       return classified('user', 'container_limit_reached');
+    case 'account_blocked':
+      return classified('user', 'account_blocked');
     case 'workspace_setup_failed':
       return classifyWorkspaceFailure(input.workspaceSubtype);
     case 'sandbox_connect_failed':

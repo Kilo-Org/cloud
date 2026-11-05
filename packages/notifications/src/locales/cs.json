@@ -9,6 +9,7 @@
       "lowBalance": "Váš zůstatek vyžaduje pozornost",
       "spendAlert": "Vaše útrata vyžaduje pozornost",
       "securityFinding": "Nález zabezpečení vyžaduje pozornost",
+      "securityUpdate": "Kontrola zabezpečení má aktualizaci",
       "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Nález zabezpečení vyžaduje pozornost"
+      "body": "Kontrola zabezpečení má aktualizaci"
     }
   },
   "instanceLifecycle": {

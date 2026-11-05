@@ -14,7 +14,6 @@ import {
   BODY_VERTICAL_PADDING,
   resolveCommentBodyFade,
   resolveCommentBodyMaxHeight,
-  resolveFadeColor,
 } from '@/components/pr-review/comment-body-geometry';
 import {
   PrFormSheetFooter,
@@ -24,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
 
 // Body field geometry (line box, whole-line caps) lives in
@@ -106,8 +106,8 @@ export function CommentBodyField({
         <LinearGradient
           pointerEvents="none"
           colors={[
-            resolveFadeColor(colors.foreground, 0),
-            resolveFadeColor(colors.foreground, 0.06),
+            resolveAlphaColor(colors.foreground, 0),
+            resolveAlphaColor(colors.foreground, 0.06),
           ]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}

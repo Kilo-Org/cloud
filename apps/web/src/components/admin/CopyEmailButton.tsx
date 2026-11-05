@@ -7,9 +7,16 @@ type CopyTextButtonProps = {
   text: string;
   className?: string;
   showText?: boolean;
+  /** Replaces the default tooltip when the copied text is not the whole value. */
+  description?: string;
 };
 
-export function CopyTextButton({ text, className = '', showText = false }: CopyTextButtonProps) {
+export function CopyTextButton({
+  text,
+  className = '',
+  showText = false,
+  description,
+}: CopyTextButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -50,7 +57,7 @@ export function CopyTextButton({ text, className = '', showText = false }: CopyT
     <button
       onClick={handleCopy}
       className={`inline-flex items-center gap-1 rounded p-1 transition-all duration-200 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none ${className}`}
-      title={copied ? 'Copied!' : `Copy '${text}' to clipboard`}
+      title={copied ? 'Copied!' : (description ?? `Copy '${text}' to clipboard`)}
     >
       <div className={`transition-all duration-200 ${copied ? 'scale-110' : 'scale-100'}`}>
         {copied ? (

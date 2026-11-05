@@ -9,6 +9,7 @@
       "lowBalance": "Twoje saldo wymaga uwagi",
       "spendAlert": "Twoje wydatki wymagają uwagi",
       "securityFinding": "Wynik bezpieczeństwa wymaga uwagi",
+      "securityUpdate": "Kontrola bezpieczeństwa ma aktualizację",
       "activeAgentsGlanceable": "Aktywni agenci mają aktualizację"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Wynik bezpieczeństwa wymaga uwagi"
+      "body": "Kontrola bezpieczeństwa ma aktualizację"
     }
   },
   "instanceLifecycle": {

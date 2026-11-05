@@ -25,9 +25,9 @@ export function MethodPicker({
   const { t } = useTranslation();
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        {t('prReview.merge.methodLabel')}
-      </Text>
+      {/* Same label style as the sheet's commit-title and commit-message
+          fields: the chips below are form controls, not a section heading. */}
+      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.methodLabel')}</Text>
       <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;
@@ -48,7 +48,14 @@ export function MethodPicker({
               accessibilityHint={prMergeDescription(option.value)}
               className={cn(
                 'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
-                active && 'border-primary bg-primary',
+                // The selected chip is a selection state, not a call to action:
+                // light fills with `primary`, dark with the muted `selection`
+                // olive, because dark's `primary` is the brand yellow
+                // (#ffdd00), which glares as a full pill on the near-black
+                // page. Dark's `selection` is the same olive hue lifted for the
+                // dark page (global.css), so it still stands 3.6:1 off the
+                // background. The Merge button keeps the brand fill.
+                active && 'border-primary bg-primary dark:border-selection dark:bg-selection',
                 !active && isDisabled && 'border-hair-soft bg-secondary',
                 !active && !isDisabled && 'border-border bg-secondary'
               )}
@@ -56,7 +63,7 @@ export function MethodPicker({
               <Text
                 className={cn(
                   'text-sm font-medium',
-                  active && 'text-primary-foreground',
+                  active && 'text-primary-foreground dark:text-selection-foreground',
                   !active && isDisabled && 'text-muted-foreground',
                   !active && !isDisabled && 'text-foreground'
                 )}

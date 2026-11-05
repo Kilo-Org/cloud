@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { sessionLiveActivityRelevance } from '@kilocode/notifications';
+import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
 import {
   _resetLiveActivitySwitchForTests,

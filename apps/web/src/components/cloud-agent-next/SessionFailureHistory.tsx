@@ -11,6 +11,32 @@ type SessionFailureHistoryProps = {
   cloudAgentSessionId: string;
 };
 
+type FailureQueryErrorData = {
+  data?: { code?: string; httpStatus?: number };
+};
+
+function failureQueryErrorData(error: unknown): FailureQueryErrorData['data'] {
+  if (error === null || typeof error !== 'object') return undefined;
+  return (error as FailureQueryErrorData).data;
+}
+
+export function isTerminalAccessError(error: unknown): boolean {
+  const data = failureQueryErrorData(error);
+  return (
+    data?.code === 'FORBIDDEN' ||
+    data?.code === 'UNAUTHORIZED' ||
+    data?.code === 'NOT_FOUND' ||
+    data?.httpStatus === 403 ||
+    data?.httpStatus === 404
+  );
+}
+
+export function shouldRetryFailureQuery(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 2 || isTerminalAccessError(error)) return false;
+  const status = failureQueryErrorData(error)?.httpStatus;
+  return status === undefined || status >= 500;
+}
+
 function formatTimestamp(value: string): string {
   return new Date(value).toLocaleString(undefined, {
     month: 'short',
@@ -23,7 +49,7 @@ function formatTimestamp(value: string): string {
 export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHistoryProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<'json' | 'csv' | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const enabled = /^(agent|workspace)_/.test(cloudAgentSessionId);
@@ -33,7 +59,7 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
       enabled ? { cloudAgentSessionId } : skipToken
     ),
     staleTime: 30_000,
-    retry: 2,
+    retry: shouldRetryFailureQuery,
   });
 
   const history = historyQuery.data;
@@ -43,6 +69,13 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
   }
 
   if (historyQuery.isError && !history) {
+    if (isTerminalAccessError(historyQuery.error)) {
+      return (
+        <p className="text-muted-foreground text-xs">
+          You do not have access to this session's diagnostics.
+        </p>
+      );
+    }
     return (
       <section
         className="border-border bg-muted/30 space-y-3 rounded-lg border p-4 text-sm"
@@ -70,7 +103,7 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
   }
 
   const handleDownload = async (format: 'json' | 'csv') => {
-    setIsDownloading(true);
+    setDownloadingFormat(format);
     setDownloadError(null);
     let url: string | null = null;
     let anchor: HTMLAnchorElement | null = null;
@@ -93,7 +126,7 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
     } finally {
       anchor?.remove();
       if (url !== null) URL.revokeObjectURL(url);
-      setIsDownloading(false);
+      setDownloadingFormat(null);
     }
   };
 
@@ -164,9 +197,9 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
             variant="outline"
             size="sm"
             onClick={() => void handleDownload('json')}
-            disabled={isDownloading}
+            disabled={downloadingFormat !== null}
           >
-            {isDownloading ? (
+            {downloadingFormat === 'json' ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Preparing diagnostics...
@@ -183,9 +216,16 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
             variant="ghost"
             size="sm"
             onClick={() => void handleDownload('csv')}
-            disabled={isDownloading}
+            disabled={downloadingFormat !== null}
           >
-            Download CSV
+            {downloadingFormat === 'csv' ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Preparing CSV...
+              </>
+            ) : (
+              'Download CSV'
+            )}
           </Button>
         </div>
         <p className="text-muted-foreground text-xs">
@@ -198,9 +238,9 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
           </p>
         )}
         <p className="text-muted-foreground text-xs">
-          The list shows the latest {history.retention.historyRunLimit} runs. Diagnostics are stored
-          for {history.retention.diagnosticDays} days. Failure records are kept for{' '}
-          {history.retention.runWindowDays} days from session creation.
+          The list shows the latest {history.retention.historyRunLimit} runs from the last{' '}
+          {history.retention.runWindowDays} days. Diagnostics are stored for{' '}
+          {history.retention.diagnosticDays} days.
         </p>
       </div>
     </section>

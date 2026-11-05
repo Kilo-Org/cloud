@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { OAuth2Client } from 'google-auth-library';
 
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { processGooglePlayKiloPassNotification } from '@/lib/kilo-pass/google-play-notifications';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 
@@ -35,10 +36,7 @@ async function verifyGooglePlayRtdnToken(idToken: string): Promise<void> {
 
 export async function POST(request: Request) {
   try {
-    const authorization = request.headers.get('authorization');
-    const bearerToken = authorization?.startsWith('Bearer ')
-      ? authorization.slice('Bearer '.length)
-      : null;
+    const bearerToken = extractBearerToken(request.headers.get('authorization'));
     if (!bearerToken) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }

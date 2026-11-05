@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
+import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
 import {
   createTRPCRouter,
   baseProcedure,
@@ -13,6 +14,7 @@ import {
   listProposalsPage,
   listRepositoriesWithRecentFeedback,
   rejectProposal,
+  ReviewMemoryProposalConflictError,
   updateProposal,
   type ReviewMemoryOwner,
 } from '@/lib/code-reviews/review-memory/db';
@@ -151,13 +153,21 @@ export const reviewMemoryRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
-      const proposal = await updateProposal({
-        owner,
-        proposalId: input.proposalId,
-        title: input.title,
-        rationale: input.rationale,
-        proposedMarkdown: input.proposedMarkdown,
-      });
+      let proposal: CodeReviewMemoryProposal | null;
+      try {
+        proposal = await updateProposal({
+          owner,
+          proposalId: input.proposalId,
+          title: input.title,
+          rationale: input.rationale,
+          proposedMarkdown: input.proposedMarkdown,
+        });
+      } catch (error) {
+        if (error instanceof ReviewMemoryProposalConflictError) {
+          throw new TRPCError({ code: 'CONFLICT', message: error.message });
+        }
+        throw error;
+      }
       if (!proposal) {
         throw new TRPCError({
           code: 'NOT_FOUND',

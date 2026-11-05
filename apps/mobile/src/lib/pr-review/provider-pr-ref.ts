@@ -14,6 +14,7 @@
 // `[owner]/[repo]/[number]` route; `providerPrRoutePath` sends a GitHub ref
 // back there so that surface is untouched.
 
+import { CODE_REVIEW_PLATFORMS } from '@kilocode/app-shared/code-review';
 import {
   type GitHubPrRef,
   PROVIDER_REVIEW_CAPABILITIES,
@@ -31,11 +32,9 @@ import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 export { providerPrRefKey, type GitHubPrRef, type ProviderPrPlatform, type ProviderPrRef };
 
-const PROVIDER_PR_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
-
 /** Narrows an already-parsed route segment onto the platform vocabulary. */
 export function isProviderPrPlatform(value: string | null): value is ProviderPrPlatform {
-  return value !== null && (PROVIDER_PR_PLATFORMS as readonly string[]).includes(value);
+  return value !== null && (CODE_REVIEW_PLATFORMS as readonly string[]).includes(value);
 }
 
 /** The GitHub arm of the ref, from the triple the existing route already parses. */

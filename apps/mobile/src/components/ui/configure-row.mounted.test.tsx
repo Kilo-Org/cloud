@@ -48,14 +48,23 @@ const PREFERENCES_HUB_ROW_TITLES = [
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderRow(props: { title?: string; tone?: 'good' | 'warn' | 'danger' } = {}) {
+function renderRow(
+  props: {
+    title?: string;
+    tone?: 'good' | 'warn' | 'danger';
+    disabled?: boolean;
+    /** `false` renders the inert row a display-only row is: no Pressable at all. */
+    pressable?: boolean;
+  } = {}
+) {
   act(() => {
     const element = createElement(ConfigureRow, {
       icon: Globe,
       title: props.title ?? 'General',
       subtitle: 'Transcribe',
-      onPress: () => undefined,
+      ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
+      ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
     });
     if (renderer) {
       renderer.update(element);
@@ -152,5 +161,80 @@ describe('ConfigureRow icon tile', () => {
     expect(danger.tileClassName).toContain('bg-danger-tile-bg');
     expect(danger.iconColor).toBe('#F28B7A');
     expect(danger.iconColor).not.toBe(neutral.iconColor);
+  });
+});
+
+/** The mounted text node carrying `content`. */
+function textOf(root: TestRenderer.ReactTestInstance, content: string): string[] {
+  const node = root.find(
+    candidate => Object.is(candidate.type, 'Text') && Object.is(candidate.props.children, content)
+  );
+  return String(node.props.className).split(' ');
+}
+
+describe('ConfigureRow disabled cue', () => {
+  // Regression: a disabled row halved the entire row with `opacity-50` on top
+  // of its already-muted subtitle, which lands that line at 2.15:1 on the dark
+  // `bg-secondary` card and 1.95:1 on the light one — under the 3:1 floor, so a
+  // row the user cannot open stopped being readable. The cue is the muted ink,
+  // applied once; no row carries a second dim.
+  it('dims a disabled row by token, never by row opacity', () => {
+    expect(rowClasses(renderRow({ disabled: true }))).not.toContain('opacity-50');
+    expect(rowClasses(renderRow())).not.toContain('opacity-50');
+  });
+
+  it('puts a disabled title on the muted ink and an enabled one on the foreground', () => {
+    const disabled = textOf(renderRow({ disabled: true }), 'General');
+    const enabled = textOf(renderRow(), 'General');
+
+    expect(disabled).toContain('text-muted-foreground');
+    expect(disabled).not.toContain('text-foreground');
+    expect(enabled).toContain('text-foreground');
+    expect(textOf(renderRow({ disabled: true }), 'Transcribe')).toContain('text-muted-foreground');
+  });
+
+  it('strokes a disabled icon with the muted ink and keeps the enabled one on its hue', () => {
+    const disabled = tileOf(renderRow({ disabled: true }));
+    const enabled = tileOf(renderRow());
+
+    expect(disabled.iconColor).toBe('#8A8680');
+    expect(enabled.iconColor).toBe('#F2F0EB');
+    // The tile chrome is the row's own low-alpha tint in both states, so the
+    // disabled row does not change size or band.
+    expect(disabled.tileClassName).toBe(enabled.tileClassName);
+  });
+
+  it('keeps a disabled row non-tappable: no chevron and the disabled state', () => {
+    const root = renderRow({ disabled: true });
+
+    expect(root.findAllByType('ChevronRight' as never)).toHaveLength(0);
+    expect(
+      root.find(
+        node => Object.is(node.type, 'Pressable') && node.props.accessibilityRole === 'button'
+      ).props.accessibilityState
+    ).toEqual({ disabled: true });
+    expect(renderRow().findAllByType('ChevronRight' as never)).toHaveLength(1);
+  });
+
+  // The state belongs to the element that owns the accessible role. The inner
+  // layout View has no role and is never a stop a reader reaches, so a state on
+  // it announces disablement nowhere while making a second copy that can drift
+  // from the Pressable's.
+  it('declares the disabled state once, on the Pressable that owns the role', () => {
+    const root = renderRow({ disabled: true });
+    const withState = root.findAll(node => node.props.accessibilityState !== undefined);
+
+    expect(withState).toHaveLength(1);
+    expect(withState[0]?.type).toBe('Pressable');
+    expect(withState[0]?.props.accessibilityRole).toBe('button');
+  });
+
+  it('declares no interactive state on an inert row', () => {
+    const root = renderRow({ disabled: true, pressable: false });
+
+    // No onPress means no Pressable: the row is one plain View, and it carries
+    // no state of its own to announce from a node a reader never reaches.
+    expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
+    expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
   });
 });

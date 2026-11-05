@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { endOfComment, endOfQuotedOrComment } from '../lib/js-scan.mjs';
+import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -69,7 +70,10 @@ export const NO_AGREEMENT = new Map([
     'chat.reactions.accessibility',
     'bare count after a label: "{{emoji}} reaction, {{displayCount}}"',
   ],
-  ['codeReviewer.overview.nSelected', 'participle: "{{displayCount}} selected" has no count form'],
+  [
+    'codeReviewer.repos.allModeCount',
+    'bare count after a label: "Repositories available: {{displayCount}}" names no inflected word',
+  ],
   ['prReview.checks.pending', 'participle: "{{displayCount}} pending" has no count form'],
   [
     'prReview.discussion.reactionPill',
@@ -78,10 +82,6 @@ export const NO_AGREEMENT = new Map([
   [
     'securityAgent.auditReport.severityCount',
     'bare count before a severity adjective: "{{displayCount}} Critical" has no inflected word',
-  ],
-  [
-    'securityAgent.analysis.whereFound',
-    'bare count in parentheses: "Where this was found ({{displayCount}})"',
   ],
   [
     'securityAgent.remediation.attemptHistory',
@@ -147,25 +147,6 @@ export const NO_AGREEMENT = new Map([
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
 ]);
 
-/** The source files the audit scans: app code, not tests or mounted harnesses. */
-function sourceFiles(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') {
-        sourceFiles(path, out);
-      }
-    } else if (
-      /\.tsx?$/.test(entry.name) &&
-      !entry.name.includes('.test.') &&
-      !entry.name.includes('.mounted.')
-    ) {
-      out.push(path);
-    }
-  }
-  return out;
-}
-
 /** Whether the character opens/closes a bracket that changes nesting depth. */
 const OPENERS = '([{';
 const CLOSERS = ')]}';
@@ -217,53 +198,104 @@ function findTopLevelComma(text) {
 }
 
 /**
- * The property names written directly on the options object `{ … }`. A nested
- * call's argument named `count` is not a property of the options, so the depth
- * filter keeps the scan honest.
+ * The property names written in key position on the options object `{ … }`.
+ *
+ * Only a token the object's own grammar puts in key position counts: the first
+ * token after the object's `{` or after a depth-1 comma. There it is a name
+ * when it is an identifier (or shorthand closed by `,`/`}`), a quoted literal
+ * or a backtick literal without `${`, and followed by `:`. A value never is:
+ * in `{ label: count }` only `label` names an option, in `{ format: () => count }`
+ * the arrow body is inside `()` and `{}`, and a nested call's argument is inside
+ * its own brackets. A computed key such as `{ [key]: n }` holds an expression,
+ * which this scan cannot read, so it names nothing; the audit reports a counted
+ * call only through the names it can see.
  */
 function optionsPropertyNames(objectText) {
   const names = new Set();
   if (!objectText.startsWith('{')) {
     return names;
   }
-  let depth = 0;
+  const stack = [];
+  let expectKey = false;
   let i = 0;
   while (i < objectText.length) {
-    const skipped = endOfQuotedOrComment(objectText, i);
-    if (skipped !== -1) {
-      i = skipped;
+    const ch = objectText[i];
+    if (/\s/.test(ch)) {
+      i++;
       continue;
     }
-    const ch = objectText[i];
+    if (ch === '/') {
+      const comment = endOfComment(objectText, i);
+      if (comment !== -1) {
+        i = comment;
+        continue;
+      }
+    }
     if (OPENERS.includes(ch)) {
-      depth++;
+      stack.push(ch);
+      expectKey = ch === '{' && stack.length === 1;
       i++;
       continue;
     }
     if (CLOSERS.includes(ch)) {
-      depth--;
+      stack.pop();
+      expectKey = false;
       i++;
       continue;
     }
-    if (depth === 1 && /[A-Za-z_$]/.test(ch)) {
-      let end = i;
-      while (end < objectText.length && /[\w$]/.test(objectText[end])) {
-        end++;
+    if (ch === ',') {
+      expectKey = stack.length === 1;
+      i++;
+      continue;
+    }
+    if (expectKey && stack.length === 1) {
+      expectKey = false;
+      const key = propertyNameAt(objectText, i);
+      if (key !== null) {
+        names.add(key.name);
+        i = key.end;
+        continue;
       }
-      const name = objectText.slice(i, end);
-      let next = end;
-      while (next < objectText.length && /\s/.test(objectText[next])) {
-        next++;
-      }
-      if (objectText[next] === ':' || objectText[next] === ',' || objectText[next] === '}') {
-        names.add(name);
-      }
-      i = end;
+    }
+    // Everywhere else a quoted run is a value: a bracket or a comma inside it
+    // is text, and nothing in it names an option.
+    const quoted = endOfQuotedOrComment(objectText, i);
+    if (quoted !== -1) {
+      expectKey = false;
+      i = quoted;
       continue;
     }
     i++;
   }
   return names;
+}
+
+/**
+ * The property name written at `start` when it is a key rather than an
+ * expression, with the index just past it.
+ */
+function propertyNameAt(text, start) {
+  const char = text[start];
+  if (char === '"' || char === "'" || char === '`') {
+    const end = endOfQuotedOrComment(text, start);
+    const literal = text.slice(start + 1, end - 1);
+    // A `${…}` in a backtick key makes it a computed key, not a literal one.
+    if (char === '`' && literal.includes('${')) {
+      return null;
+    }
+    return text[firstCodeIndex(text, end)] === ':' ? { name: literal, end } : null;
+  }
+  if (!/[A-Za-z_$]/.test(char)) {
+    return null;
+  }
+  let end = start;
+  while (end < text.length && /[\w$]/.test(text[end])) {
+    end++;
+  }
+  const next = text[firstCodeIndex(text, end)];
+  return next === ':' || next === ',' || next === '}'
+    ? { name: text.slice(start, end), end }
+    : null;
 }
 
 /** A quoted literal key argument: `'k'`, `"k"` or a backtick run without `${`. */
@@ -382,7 +414,7 @@ function dynamicCallsFrom(calls) {
 function collectCountedCalls(rootDir) {
   const calls = [];
   const callPattern = /(?<![\w.$])(?:i18n\.)?t\s*\(/g;
-  for (const file of sourceFiles(rootDir)) {
+  for (const file of sourceFiles(rootDir, isTestArtifact)) {
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(callPattern)) {
       const call = countedCall(text, match.index);
@@ -471,6 +503,21 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
       ],
       reason:
         'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
+    },
+  ],
+  [
+    'BUCKET_KEYS[bucket]',
+    {
+      keys: [
+        'securityAgent.dashboard.repoSummaryOpen',
+        'securityAgent.dashboard.repoSummaryCritical',
+        'securityAgent.dashboard.repoSummaryHigh',
+        'securityAgent.dashboardMetrics.breakdownCritical',
+        'securityAgent.dashboardMetrics.breakdownHigh',
+        'securityAgent.dashboardMetrics.breakdownMediumLow',
+      ],
+      reason:
+        'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
 ]);
@@ -666,8 +713,8 @@ function run() {
 
   console.log(
     sourceOnly
-      ? 'check-plurals: en declares a plural family for every counted message'
-      : 'check-plurals: every counted message and every locale declares its plural categories'
+      ? 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT'
+      : 'check-plurals: every counted message declares a plural family or is reviewed in NO_AGREEMENT, and every required plural family declares its locale categories'
   );
 }
 

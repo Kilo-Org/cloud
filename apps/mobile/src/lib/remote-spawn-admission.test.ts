@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
 
 import {
+  type OrganizationPlanState,
   remoteSpawnFilesNotSupportedToast,
+  remoteStartPlanRefusal,
   resolveRemoteSpawnAdmission,
+  resolveRemoteStartPlan,
 } from './remote-spawn-admission';
 
 const instance: InstancePickerInstance = {
@@ -24,6 +28,13 @@ const filesPayload: SharePayload = {
   ],
   failedFiles: [],
 };
+
+const lapsed: OrganizationPlanState[] = [
+  { organizationId: 'org-1', isTrialExpiredForEnforcement: true },
+];
+const entitled: OrganizationPlanState[] = [
+  { organizationId: 'org-1', isTrialExpiredForEnforcement: false },
+];
 
 describe('resolveRemoteSpawnAdmission', () => {
   it('rejects files for an explicitly incapable instance', () => {
@@ -61,5 +72,118 @@ describe('resolveRemoteSpawnAdmission', () => {
     expect(resolveRemoteSpawnAdmission({ instance, payload: textOnly })).toEqual({
       allowed: true,
     });
+  });
+
+  it('refuses a start in an organization whose trial lapsed, before any other check', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance: { ...instance, capabilities: { attachments: false } },
+        payload: filesPayload,
+        plan: { organizationId: 'org-1', organizations: lapsed },
+      })
+    ).toEqual({ allowed: false, toast: i18n.t('common.organizationTrialEnded') });
+  });
+
+  it('admits a start in an organization the gate keeps entitled', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance,
+        payload: null,
+        plan: { organizationId: 'org-1', organizations: entitled },
+      })
+    ).toEqual({ allowed: true });
+  });
+
+  it('admits a start in an organization the list does not hold', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance,
+        payload: null,
+        plan: { organizationId: 'org-2', organizations: lapsed },
+      })
+    ).toEqual({ allowed: true });
+  });
+
+  it('admits a personal start even when another membership lapsed', () => {
+    expect(
+      resolveRemoteSpawnAdmission({
+        instance,
+        payload: null,
+        plan: { organizationId: null, organizations: lapsed },
+      })
+    ).toEqual({ allowed: true });
+  });
+});
+
+describe('resolveRemoteStartPlan', () => {
+  it('refuses with the organization trial explanation for a lapsed organization', () => {
+    expect(resolveRemoteStartPlan({ organizationId: 'org-1', organizations: lapsed })).toEqual({
+      allowed: false,
+      toast: i18n.t('common.organizationTrialEnded'),
+    });
+  });
+
+  it('admits an entitled organization', () => {
+    expect(resolveRemoteStartPlan({ organizationId: 'org-1', organizations: entitled })).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('admits on an unsettled membership list', () => {
+    expect(resolveRemoteStartPlan({ organizationId: 'org-1', organizations: undefined })).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('admits a personal start', () => {
+    expect(resolveRemoteStartPlan({ organizationId: null, organizations: lapsed })).toEqual({
+      allowed: true,
+    });
+  });
+});
+
+describe('remoteStartPlanRefusal', () => {
+  it('explains a remote start under a lapsed organization before any press', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: lapsed,
+      })
+    ).toBe(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('leaves an entitled organization, a personal start and an unsettled list alone', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: entitled,
+      })
+    ).toBeNull();
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: null,
+        organizations: lapsed,
+      })
+    ).toBeNull();
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: true,
+        organizationId: 'org-1',
+        organizations: undefined,
+      })
+    ).toBeNull();
+  });
+
+  it('never refuses a Cloud Agent start: the server gate answers that path', () => {
+    expect(
+      remoteStartPlanRefusal({
+        isRemoteTargetSelected: false,
+        organizationId: 'org-1',
+        organizations: lapsed,
+      })
+    ).toBeNull();
   });
 });

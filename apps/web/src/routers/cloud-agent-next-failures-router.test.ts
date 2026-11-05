@@ -128,6 +128,15 @@ describe('cloudAgentNextFailuresRouter', () => {
         error_message_redacted: 'Expired diagnostic',
         error_expires_at: '2025-02-01 00:00:00+00',
       },
+      {
+        cloud_agent_session_id: PERSONAL_SESSION_ID,
+        message_id: 'msg_failures_history_no_timestamps',
+        status: 'failed',
+        failure_stage: 'pre_dispatch',
+        failure_code: 'container_limit_reached',
+        failure_responsibility: 'user',
+        failure_reason: 'container_limit_reached',
+      },
     ]);
 
     caller = await createCallerForUser(owner.id);
@@ -181,11 +190,10 @@ describe('cloudAgentNextFailuresRouter', () => {
         diagnosticExpiresAt: '2035-02-01T00:00:00.000Z',
       });
 
-      expect(result.runs).toHaveLength(3);
+      expect(result.runs).toHaveLength(2);
       expect(result.runs.map(run => run.messageId)).toEqual([
         'msg_failures_history_expired',
         'msg_failures_history_failed',
-        'msg_failures_history_completed',
       ]);
 
       const failed = result.runs[1];
@@ -198,10 +206,16 @@ describe('cloudAgentNextFailuresRouter', () => {
       const expired = result.runs[0];
       expect(expired.diagnostic).toBeNull();
       expect(expired.diagnosticExpiresAt).toBeNull();
+    });
 
-      const completed = result.runs[2];
-      expect(completed.userVisibleError).toBeNull();
-      expect(completed.diagnostic).toBeNull();
+    it('omits runs outside the retention window and runs without usable timestamps', async () => {
+      const result = await caller.cloudAgentNextFailures.getSessionFailureHistory({
+        cloudAgentSessionId: PERSONAL_SESSION_ID,
+      });
+
+      const messageIds = result.runs.map(run => run.messageId);
+      expect(messageIds).not.toContain('msg_failures_history_no_timestamps');
+      expect(messageIds).not.toContain('msg_failures_history_completed');
     });
 
     it('denies a session owned by another user, even when the caller is an org member', async () => {
@@ -242,7 +256,7 @@ describe('cloudAgentNextFailuresRouter', () => {
         source: string;
         session: { cloudAgentSessionId: string; kiloSessionId: string };
         setupFailure: { occurredAt: string } | null;
-        runs: Array<{ status: string; userVisibleError: string | null }>;
+        runs: Array<{ messageId: string; status: string; userVisibleError: string | null }>;
       };
 
       expect(document.source).toBe('kilo-cloud-session-diagnostics');
@@ -250,9 +264,13 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(document.session.kiloSessionId).toBe('ses_failures_history_personal');
       expect(document.setupFailure?.occurredAt).toBe('2035-01-10T00:06:00.000Z');
       expect(document.runs.filter(run => run.status === 'failed')).toHaveLength(2);
+      expect(document.runs.map(run => run.messageId)).toEqual([
+        'msg_failures_history_expired',
+        'msg_failures_history_failed',
+      ]);
     });
 
-    it('builds a CSV export with setup and run rows', async () => {
+    it('builds a CSV export with the setup row and one row per run', async () => {
       const file = await caller.cloudAgentNextFailures.exportSessionDiagnostics({
         cloudAgentSessionId: PERSONAL_SESSION_ID,
         format: 'csv',
@@ -262,12 +280,11 @@ describe('cloudAgentNextFailuresRouter', () => {
 
       const lines = file.content.trimEnd().split('\n');
       expect(lines[0]).toContain('source,occurred_at,status,stage,code');
-      expect(lines).toHaveLength(5);
+      expect(lines).toHaveLength(3);
       expect(lines[1]).toContain('setup');
       expect(lines[1]).toContain("'=Failures report");
       expect(lines[2]).toContain('run');
-      expect(lines[3]).toContain('run');
-      expect(lines[3]).toContain('wrapper_failures_history');
+      expect(lines[2]).toContain('wrapper_failures_history');
     });
   });
 });

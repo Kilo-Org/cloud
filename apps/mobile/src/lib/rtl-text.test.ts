@@ -1,7 +1,13 @@
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { containsJoinedScript, hasRtlScript, JOINED_SCRIPT, withoutMonoFamily } from './rtl-text';
+import {
+  containsJoinedScript,
+  hasRtlScript,
+  JOINED_SCRIPT,
+  rtlBlockTextAlign,
+  withoutMonoFamily,
+} from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
 // is Flow-syntax source this node project cannot load.
@@ -183,5 +189,18 @@ describe('withoutMonoFamily', () => {
 
   it('keeps an unrelated token that merely starts with font-mono', () => {
     expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
+  });
+});
+
+describe('rtlBlockTextAlign', () => {
+  // A native markdown paragraph resolves its direction from its first strong
+  // character, so an English reply would sit at the left edge of an Arabic
+  // interface while the rows around it sit on the start edge.
+  it('names the start edge in a right-to-left interface', () => {
+    expect(rtlBlockTextAlign(true)).toEqual({ textAlign: 'right' });
+  });
+
+  it('leaves the renderer its natural alignment in a left-to-right interface', () => {
+    expect(rtlBlockTextAlign(false)).toEqual({});
   });
 });

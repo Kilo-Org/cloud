@@ -70,6 +70,7 @@ const payload: UsageRecordRequest = {
     mode: null,
     auto_model: null,
     reasoning_setting: 'medium',
+    inference_region: 'eu',
     market_cost: null,
     non_inference_cost: null,
     is_free: null,
@@ -86,9 +87,11 @@ const config = jest.requireMock<{
 }>('@kilocode/web-shared/lib/config.server');
 const mockFetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>();
 const nativeFetch = globalThis.fetch;
+const originalRegion = process.env.VERCEL_REGION;
 let warn: jest.SpiedFunction<typeof console.warn>;
 
 beforeEach(() => {
+  delete process.env.VERCEL_REGION;
   config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-publisher-secret';
   mockFetch.mockReset();
@@ -97,6 +100,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalRegion === undefined) delete process.env.VERCEL_REGION;
+  else process.env.VERCEL_REGION = originalRegion;
   jest.restoreAllMocks();
   jest.useRealTimers();
 });
@@ -114,6 +119,7 @@ function expectUnavailableWarning(
       'usage enqueue unavailable',
       {
         usageId: payload.core.id,
+        execution_region: 'unknown',
         kind: 'unavailable',
         reason,
         ...(duplicatePossible && { duplicate_possible: true }),
@@ -127,6 +133,42 @@ function expectUnavailableWarning(
 }
 
 describe('enqueueUsage', () => {
+  test.each([
+    ['fra1', 'fra1'],
+    ['sfo1', 'sfo1'],
+    ['lhr1', 'unknown'],
+    ['', 'unknown'],
+    [undefined, 'unknown'],
+  ])('logs execution region %s as %s on retries and terminal failure', async (region, expected) => {
+    if (region === undefined) delete process.env.VERCEL_REGION;
+    else process.env.VERCEL_REGION = region;
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 429 }));
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    const work = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await work).toEqual({ kind: 'unavailable', reason: 'http_401' });
+    expect(warn.mock.calls).toEqual([
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, execution_region: expected, reason: 'http_429', attempt: 1 },
+      ],
+      [
+        'usage enqueue unavailable',
+        {
+          usageId: payload.core.id,
+          execution_region: expected,
+          kind: 'unavailable',
+          reason: 'http_401',
+        },
+      ],
+    ]);
+    expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify(payload),
+      JSON.stringify(payload),
+    ]);
+  });
   test('preserves the complete payload and ID with dedicated publisher authentication', async () => {
     const event = {
       ...payload,
@@ -293,6 +335,7 @@ describe('enqueueUsage transient retries', () => {
           'usage enqueue retrying',
           {
             usageId: payload.core.id,
+            execution_region: 'unknown',
             reason: failure === 'network' ? 'request_failed' : `http_${failure}`,
             attempt: 1,
             ...(failure !== 408 && failure !== 429 && { duplicate_possible: true }),
@@ -455,6 +498,7 @@ describe('enqueueUsage transient retries', () => {
         'usage enqueue retrying',
         {
           usageId: payload.core.id,
+          execution_region: 'unknown',
           reason: 'request_failed',
           attempt: 1,
           duplicate_possible: true,
@@ -464,6 +508,7 @@ describe('enqueueUsage transient retries', () => {
         'usage enqueue retrying',
         {
           usageId: payload.core.id,
+          execution_region: 'unknown',
           reason: 'request_failed',
           attempt: 2,
           duplicate_possible: true,
@@ -473,6 +518,7 @@ describe('enqueueUsage transient retries', () => {
         'usage enqueue retrying',
         {
           usageId: payload.core.id,
+          execution_region: 'unknown',
           reason: 'request_failed',
           attempt: 3,
           duplicate_possible: true,
@@ -482,6 +528,7 @@ describe('enqueueUsage transient retries', () => {
         'usage enqueue unavailable',
         {
           usageId: payload.core.id,
+          execution_region: 'unknown',
           kind: 'unavailable',
           reason: 'request_failed',
           duplicate_possible: true,
@@ -501,6 +548,7 @@ describe('enqueueUsage transient retries', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
       usageId: payload.core.id,
+      execution_region: 'unknown',
       kind: 'unavailable',
       reason: 'http_401',
       duplicate_possible: true,
@@ -518,12 +566,26 @@ describe('enqueueUsage transient retries', () => {
     expect(await result).toEqual({ kind: 'unavailable', reason: 'http_408' });
     expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
     expect(warn.mock.calls).toEqual([
-      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_408', attempt: 1 }],
-      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_429', attempt: 2 }],
-      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_408', attempt: 3 }],
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, execution_region: 'unknown', reason: 'http_408', attempt: 1 },
+      ],
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, execution_region: 'unknown', reason: 'http_429', attempt: 2 },
+      ],
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, execution_region: 'unknown', reason: 'http_408', attempt: 3 },
+      ],
       [
         'usage enqueue unavailable',
-        { usageId: payload.core.id, kind: 'unavailable', reason: 'http_408' },
+        {
+          usageId: payload.core.id,
+          execution_region: 'unknown',
+          kind: 'unavailable',
+          reason: 'http_408',
+        },
       ],
     ]);
   });
@@ -561,6 +623,7 @@ describe('enqueueUsage transient retries', () => {
         expect(warn).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith('usage enqueue retrying', {
           usageId: payload.core.id,
+          execution_region: 'unknown',
           reason: failure === 'timeout' ? 'timeout' : 'request_failed',
           attempt: 1,
           duplicate_possible: true,
@@ -603,6 +666,7 @@ describe('enqueueUsage transient retries', () => {
       ).toHaveLength(3);
       expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
         usageId: payload.core.id,
+        execution_region: 'unknown',
         kind: 'unavailable',
         reason: 'timeout',
         duplicate_possible: true,

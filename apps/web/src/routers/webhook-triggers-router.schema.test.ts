@@ -1,12 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from './admin-webhook-triggers-router';
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
+import { webhookTriggerModeSchema } from '@/lib/webhook-trigger-validation';
 import type {
   createWorkerTrigger as createWorkerTriggerType,
   getWorkerTrigger as getWorkerTriggerType,
@@ -21,6 +23,7 @@ import type {
   webhookTriggersRouter as webhookTriggersRouterType,
 } from './webhook-triggers-router';
 import {
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   getSandboxAllocationRequest,
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -278,6 +281,119 @@ describe('webhook trigger variant inputs', () => {
     expect(mockSelectWhere).not.toHaveBeenCalled();
     expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
   });
+
+  it.each(['architect', 'code', 'ask', 'debug', 'orchestrator', 'plan', 'build'])(
+    'preserves built-in mode %s in create and update inputs',
+    mode => {
+      expect(webhookTriggerModeSchema.parse(mode)).toBe(mode);
+      expect(WebhookTriggerCreateInput.parse({ ...createInput, mode }).mode).toBe(mode);
+      expect(WebhookTriggerUpdateInput.parse({ triggerId: 'trigger-id', mode }).mode).toBe(mode);
+    }
+  );
+
+  it('expresses the reserved custom slug in the generated JSON Schema', () => {
+    const schema = z.toJSONSchema(webhookTriggerModeSchema);
+    expect(schema.pattern).toBeDefined();
+    const pattern = new RegExp(schema.pattern ?? '');
+    expect(pattern.test('custom')).toBe(false);
+    expect(pattern.test('custom-reviewer')).toBe(true);
+    expect(pattern.test('plan')).toBe(true);
+  });
+
+  it.each(['a', 'reviewer', 'team-reviewer-2', 'a'.repeat(50)])(
+    'accepts named custom mode %s without rewriting it',
+    mode => {
+      expect(webhookTriggerModeSchema.parse(mode)).toBe(mode);
+      expect(WebhookTriggerCreateInput.parse({ ...createInput, mode }).mode).toBe(mode);
+      expect(WebhookTriggerUpdateInput.parse({ triggerId: 'trigger-id', mode }).mode).toBe(mode);
+    }
+  );
+
+  it.each([
+    '',
+    'a'.repeat(51),
+    'Reviewer',
+    'teamReviewer',
+    'team_reviewer',
+    'team.reviewer',
+    'team/reviewer',
+    'team reviewer',
+    ' reviewer',
+    'reviewer ',
+    'reviewer\n',
+    '1reviewer',
+    '-reviewer',
+    'r\u00e9viewer',
+    'custom',
+    null,
+    123,
+  ])('rejects malformed or reserved mode %j in create and update inputs', mode => {
+    expect(webhookTriggerModeSchema.safeParse(mode).success).toBe(false);
+    expect(WebhookTriggerCreateInput.safeParse({ ...createInput, mode }).success).toBe(false);
+    expect(WebhookTriggerUpdateInput.safeParse({ triggerId: 'trigger-id', mode }).success).toBe(
+      false
+    );
+  });
+
+  describe.each(['webhook', 'scheduled'] as const)('%s custom agent forwarding', activationMode => {
+    it.each([createInput.profileId, undefined, null])(
+      'forwards the custom mode and create profile %j to the worker',
+      async profileId => {
+        await createCaller({ user }).create({
+          ...createInput,
+          mode: 'team-reviewer-2',
+          profileId,
+          activationMode,
+          ...(activationMode === 'scheduled' ? { cronExpression: '0 9 * * *' } : {}),
+        });
+
+        expect(mockCreateWorkerTrigger).toHaveBeenCalledTimes(1);
+        expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+          user.id,
+          undefined,
+          createInput.triggerId,
+          expect.objectContaining({ mode: 'team-reviewer-2', profileId, activationMode })
+        );
+      }
+    );
+
+    it.each([createInput.profileId, undefined, null])(
+      'forwards the custom mode and update profile %j to the worker',
+      async profileId => {
+        mockSelectWhere.mockResolvedValue([
+          { id: 'trigger-row', activation_mode: activationMode, target_type: 'cloud_agent' },
+        ]);
+
+        await createCaller({ user }).update({
+          triggerId: createInput.triggerId,
+          mode: 'team-reviewer-2',
+          profileId,
+        });
+
+        expect(mockUpdateWorkerTrigger).toHaveBeenCalledTimes(1);
+        expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+          user.id,
+          undefined,
+          createInput.triggerId,
+          expect.objectContaining({ mode: 'team-reviewer-2', profileId })
+        );
+      }
+    );
+  });
+
+  it.each(['create', 'update'] as const)(
+    'rejects reserved custom mode before %s reaches the worker',
+    async operation => {
+      const caller = createCaller({ user });
+      await expect(caller[operation]({ ...createInput, mode: 'custom' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      expect(mockDbInsert).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+      expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['high', 'High', 'a'.repeat(50)])('accepts valid create variant %s', variant => {
     expect(WebhookTriggerCreateInput.safeParse({ ...createInput, variant }).success).toBe(true);
@@ -773,17 +889,37 @@ describe('webhook trigger variant inputs', () => {
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { activationMode: 'webhook', sandboxAllocation: 'isolated-standard' },
-    { activationMode: 'scheduled', sandboxAllocation: 'isolated-standard' },
-    { activationMode: 'webhook', sandboxAllocation: 'cloudflare-single' },
-    { activationMode: 'scheduled', sandboxAllocation: 'cloudflare-single' },
-  ] as const)(
-    'allows an enrolled organization member to retain $sandboxAllocation on $activationMode triggers without a picker option',
-    async ({ activationMode, sandboxAllocation }) => {
+  it.each(['webhook', 'scheduled'] as const)(
+    'rejects the retired isolated-standard allocation on %s triggers without a picker option',
+    async activationMode => {
       const organizationId = '00000000-0000-4000-8000-000000000003';
       mockEnsureOrganizationAccess.mockResolvedValue('member');
       mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: true, options: [] });
+      await expect(
+        createCaller({ user }).create({
+          ...createInput,
+          organizationId,
+          activationMode,
+          ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
+          sandboxAllocation: 'isolated-standard',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'allows an enrolled organization member to retain the cloudflare-single alias on %s triggers when its native size is offered',
+    async activationMode => {
+      const sandboxAllocation = 'cloudflare-single';
+      const organizationId = '00000000-0000-4000-8000-000000000003';
+      mockEnsureOrganizationAccess.mockResolvedValue('member');
+      mockGetSandboxSelectionOptions.mockResolvedValue({
+        enabled: true,
+        options: [
+          { allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION) },
+        ],
+      });
       await createCaller({ user }).create({
         ...createInput,
         organizationId,
@@ -857,13 +993,13 @@ describe('webhook trigger variant inputs', () => {
     ]);
     mockGetSandboxSelectionOptions.mockResolvedValueOnce({
       enabled: true,
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-shared') }],
+      options: [{ allocation: getSandboxAllocationRequest('vercel-large') }],
     });
 
     await createCaller({ user }).update({
       triggerId: 'trigger-id',
       organizationId,
-      sandboxAllocation: 'cloudflare-shared',
+      sandboxAllocation: 'vercel-large',
     });
 
     expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
@@ -875,7 +1011,7 @@ describe('webhook trigger variant inputs', () => {
       undefined,
       organizationId,
       'trigger-id',
-      expect.objectContaining({ sandboxAllocation: 'cloudflare-shared' })
+      expect.objectContaining({ sandboxAllocation: 'vercel-large' })
     );
   });
 

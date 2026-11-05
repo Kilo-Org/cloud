@@ -9,7 +9,7 @@
 
 import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   remoteSpawnNonRetryableToast,
@@ -106,7 +106,9 @@ vi.mock('@/lib/organization-context', () => ({
 }));
 const organizationsListMock = vi.hoisted(() => ({
   current: {
-    data: [{ organizationId: 'org-selected' }] as { organizationId: string }[] | undefined,
+    data: [{ organizationId: 'org-selected' }] as
+      | { organizationId: string; isTrialExpiredForEnforcement?: boolean }[]
+      | undefined,
     isFetched: true,
     isFetching: false,
     isError: false,
@@ -580,5 +582,59 @@ describe('ShareGateSheet new-session organization', () => {
     const href = await commitNewSession(shareId);
 
     expect(href).toContain('organizationId=org-lost');
+  });
+});
+
+describe('ShareGateSheet organization plan gate', () => {
+  beforeEach(() => {
+    spawnMock.mockClear();
+    toastError.mockClear();
+    shareDestinationListProps.current = null;
+    __resetSharePayloadStoreForTests();
+    __resetPendingShareNavigationForTests();
+  });
+
+  afterEach(() => {
+    organizationMock.current = { organizationId: null, isLoaded: true };
+    organizationsListMock.current = {
+      data: [{ organizationId: 'org-selected' }],
+      isFetched: true,
+      isFetching: false,
+      isError: false,
+      isRefetchError: false,
+    };
+  });
+
+  it('refuses a remote spawn into an organization whose trial has lapsed', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: true },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('still spawns into an organization the gate keeps entitled', async () => {
+    organizationMock.current = { organizationId: 'org-lapsed', isLoaded: true };
+    organizationsListMock.current.data = [
+      { organizationId: 'org-lapsed', isTrialExpiredForEnforcement: false },
+    ];
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+
+    await pressSpawn(captureListProps().onSpawnInstance);
+
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    act(() => {
+      renderer.unmount();
+    });
   });
 });

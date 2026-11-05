@@ -222,7 +222,7 @@ export async function generateReviewPrompt(
   }
 
   const effectiveModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
-  const freeModel = await isFreeModel(effectiveModel);
+  const freeModel = isFreeModel(effectiveModel);
   const applyFreeModelBudget = freeModel && !omitSubAgentGuidance;
 
   // Helper to replace common placeholders

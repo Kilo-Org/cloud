@@ -307,6 +307,27 @@ export function resolvePrefillRepoSelection(
 }
 
 /**
+ * The repository a new-session form seeds from its durable draft, as the
+ * picker's `platform:fullName` key, or null while the form must keep what it
+ * has.
+ *
+ * Only a form that arrived without a repository request takes it: an explicit
+ * route prefill names where the person chose to go, so it outranks the last
+ * selection, and a form that already holds one (the person picked while the
+ * draft was still loading) is never overwritten.
+ */
+export function resolveStoredRepoSelection(input: {
+  prefill: NewSessionPrefill;
+  selectedRepo: string;
+  storedRepo: string | null;
+}): string | null {
+  if (input.prefill.repo || input.selectedRepo || !input.storedRepo) {
+    return null;
+  }
+  return input.storedRepo;
+}
+
+/**
  * Describe what could not be carried over, if anything.
  *
  * `settled` means "the list finished loading, without error, and is

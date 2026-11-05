@@ -74,6 +74,9 @@ type ConfirmDialogRequest = {
   /** A third, non-destructive choice rendered between Cancel and the confirm. */
   extraAction?: { label: string; onPress: () => void };
   onConfirm: () => void;
+  /** Runs when the confirmation is dismissed unconfirmed: Cancel, the backdrop,
+   * or Android Back. Omit it when nothing has to learn the answer. */
+  onCancel?: () => void;
 };
 
 /**
@@ -91,7 +94,8 @@ type ConfirmDialogRequest = {
  * The node renders nothing while no request is pending. Do not call `confirm`
  * from a tree that unmounts before the user answers — mount the dialog in a
  * tree that outlives the trigger, as `FeedbackPromptProvider` does for the
- * feedback prompt.
+ * feedback prompt. A caller that has to act on the answer either way passes
+ * both `onConfirm` and `onCancel`; the request carries no promise of its own.
  */
 export function useConfirmDialog() {
   const [request, setRequest] = useState<ConfirmDialogRequest | null>(null);
@@ -116,7 +120,10 @@ export function useConfirmDialog() {
           setRequest(null);
           request.onConfirm();
         }}
-        onCancel={dismiss}
+        onCancel={() => {
+          dismiss();
+          request.onCancel?.();
+        }}
       />
     );
 

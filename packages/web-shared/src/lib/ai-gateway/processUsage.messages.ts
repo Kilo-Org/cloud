@@ -2,7 +2,7 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
@@ -19,6 +19,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 type MaybeHasVercelProviderMetadata = {
   provider_metadata?: VercelProviderMetaData;
@@ -82,7 +83,7 @@ export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats,
-  provider: ProviderId
+  provider: ProviderType
 ): JustTheCostsUsageStats {
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
@@ -103,10 +104,11 @@ export async function parseMessagesMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
-  provider: ProviderId,
+  provider: ProviderType,
   statusCode: number,
   usesUserCredentials: boolean,
-  requestStartedAt?: number
+  requestStartedAt?: number,
+  metadataCapture?: AiProviderMetadataCapture
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -141,6 +143,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     }
 
     if (event.data === '[DONE]') {
+      metadataCapture?.captureVercelMetadata('[DONE]');
       return;
     }
 
@@ -154,6 +157,13 @@ export async function parseMessagesMicrodollarUsageFromStream(
       });
       return;
     }
+
+    const eventProviderMetadata = (
+      (json.type === 'message_start' ? json.message : json) as
+        | MaybeHasVercelProviderMetadata
+        | undefined
+    )?.provider_metadata;
+    metadataCapture?.captureVercelMetadata(json);
 
     if (json.type === 'error') {
       reportedError = true;
@@ -177,12 +187,6 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (openRouterProvider) {
         inference_provider = openRouterProvider;
       }
-      const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        model = getVercelResolvedModel(meta) ?? model;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-      }
     }
 
     if (
@@ -196,12 +200,13 @@ export async function parseMessagesMicrodollarUsageFromStream(
     if (json.type === 'message_delta') {
       finish_reason = json.delta.stop_reason;
       deltaUsage = json.usage ?? deltaUsage;
-      const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
-      if (meta) {
-        providerMetadata = meta;
-        model = getVercelResolvedModel(meta) ?? model;
-        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-      }
+    }
+
+    if (eventProviderMetadata && (json.type === 'message_start' || json.type === 'message_delta')) {
+      providerMetadata = eventProviderMetadata;
+      model = getVercelResolvedModel(eventProviderMetadata) ?? model;
+      inference_provider =
+        eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
     }
   };
 
@@ -244,14 +249,15 @@ export async function parseMessagesMicrodollarUsageFromStream(
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number,
-  provider: ProviderId
+  provider: ProviderType,
+  metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
     | null;
-
   const usage = responseJson?.usage;
   const providerMetadata = responseJson?.provider_metadata ?? null;
+  metadataCapture?.captureVercelMetadata(responseJson);
   const inference_provider =
     providerMetadata?.gateway?.routing?.finalProvider ?? responseJson?.provider ?? null;
 

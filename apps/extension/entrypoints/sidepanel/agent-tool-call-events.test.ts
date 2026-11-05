@@ -126,16 +126,6 @@ describe('kilo browser tool call events', () => {
     expect(isKiloBrowserToolCallName('mcp_test_tool')).toBe(false);
   });
 
-  it('accepts a kilo_browser_ name in the gateway tool union', () => {
-    const request: KiloGatewayToolCallRequest = {
-      arguments: { element: 'Save', ref: 'e5' },
-      id: 'call-click',
-      name: 'kilo_browser_click',
-    };
-
-    expect(request.name).toBe('kilo_browser_click');
-  });
-
   it('carries the upstream arguments verbatim in dangerous mode', () => {
     const nestedArguments = {
       element: 'Save',

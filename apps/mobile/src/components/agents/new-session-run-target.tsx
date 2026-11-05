@@ -1,5 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -25,6 +31,8 @@ type NewSessionRunTargetProps = {
   disabled: boolean;
 };
 
+const REFRESH_SPIN_MS = 800;
+
 /**
  * The Run-on block of the new-session form: the instance selector plus its
  * refresh control when the selector is offered, or a read-only target line
@@ -43,6 +51,25 @@ export function NewSessionRunTarget({
 }: Readonly<NewSessionRunTargetProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // The glyph is the button's whole identity, so it stays drawn in every state:
+  // a refetch runs on a cold launch and on every foreground return, and a busy
+  // button that swapped the glyph for a spinner left an empty square with a
+  // stray indicator dot in one cell of the design gate. The tap spins the same
+  // glyph instead, so the busy response is visible without hiding the control.
+  const rotation = useSharedValue(0);
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  function handleRefresh() {
+    rotation.value = 0;
+    rotation.value = withTiming(360, {
+      duration: REFRESH_SPIN_MS,
+      easing: Easing.inOut(Easing.cubic),
+    });
+    onRefreshInstances();
+  }
+
   const targetLabel =
     runOnInstance !== null ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   if (showRunOnSelector) {
@@ -65,12 +92,18 @@ export function NewSessionRunTarget({
           <Button
             variant="outline"
             size="icon"
-            onPress={onRefreshInstances}
-            disabled={disabled || isFetchingInstances}
-            loading={isFetchingInstances}
+            onPress={handleRefresh}
+            disabled={disabled}
+            // A refetch in flight is not a disabled state: the button keeps the
+            // glyph at full foreground ink and stays pressable, and the tap
+            // animates the same glyph. Disabling it would dim the only mark it
+            // has (Button dims a disabled non-primary control to half opacity).
+            accessibilityState={{ busy: isFetchingInstances }}
             accessibilityLabel={t('common.refresh')}
           >
-            {!isFetchingInstances ? <RefreshCw size={18} color={colors.foreground} /> : null}
+            <Animated.View style={spinStyle}>
+              <RefreshCw size={18} color={colors.foreground} />
+            </Animated.View>
           </Button>
         </View>
       </View>

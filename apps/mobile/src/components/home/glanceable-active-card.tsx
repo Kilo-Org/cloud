@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   countGlanceableSessions,
@@ -13,6 +13,7 @@ import {
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { CardControl } from '@/components/home/adaptive-home-card-frame';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -119,7 +120,14 @@ export function GlanceableActiveCard({
         })}
       </View>
       <View className={DIVIDER_CLASS} />
-      <Pressable
+      {/* Keyed by the newest session: the zero state has to be its own host
+          view. React Native copies the previous props and applies only the keys
+          it receives, so a label this component stops passing keeps its old
+          value on the native view, and Android keeps announcing the previous
+          account's session from the reused node. A new node per session and
+          per zero state is the same remedy the PR-review inbox slot uses. */}
+      <CardControl
+        key={newestSession?.id ?? 'no-session'}
         disabled={newestSession === null}
         onPress={() => {
           if (newestSession !== null) {
@@ -128,7 +136,6 @@ export function GlanceableActiveCard({
         }}
         accessibilityRole={newestSession === null ? undefined : 'button'}
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
-        className="active:opacity-70"
       >
         <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
           {newestTitle !== null && newestKind !== null ? (
@@ -148,7 +155,7 @@ export function GlanceableActiveCard({
             <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
           )}
         </View>
-      </Pressable>
+      </CardControl>
     </View>
   );
 }

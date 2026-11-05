@@ -46,6 +46,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@/lib/web-config.server', () => ({
   ...jest.requireActual<Record<string, unknown>>('@/lib/web-config.server'),
+  SESSION_SYNC_WORKER_URL: 'https://sync.test',
   USER_DELETION_AUDIT_HMAC_KEY: Buffer.alloc(32, 1).toString('base64'),
   USER_DELETION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
 }));
@@ -295,6 +296,11 @@ describe('historical GDPR user-ID backfill', () => {
       jest.mocked(fetch).mockImplementation(async (input, init) => {
         const url = String(input);
         const method = init?.method ?? 'GET';
+        if (url === `https://sync.test/internal/users/${encodeURIComponent(user.id)}/erase`) {
+          expect(method).toBe('POST');
+          expect(init?.body).toBeUndefined();
+          return new Response(null, { status: 202 });
+        }
         if (url === `https://ingest.test/api/session/${sessionId}`) {
           expect(method).toBe('DELETE');
           await db
@@ -451,6 +457,7 @@ describe('historical GDPR user-ID backfill', () => {
       });
       expect(sendAccountDeletionCompletedEmail).not.toHaveBeenCalled();
       expect(jest.mocked(fetch).mock.calls.map(([input]) => String(input))).toEqual([
+        `https://sync.test/internal/users/${encodeURIComponent(user.id)}/erase`,
         `https://ingest.test/api/session/${sessionId}`,
         posthogLookupUrl,
         ...(posthogMatch === 'matched'

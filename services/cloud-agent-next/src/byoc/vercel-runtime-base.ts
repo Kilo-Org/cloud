@@ -1,10 +1,11 @@
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import { RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
+import { installPinnedArchiveScript } from '../shared/runtime-toolchain.js';
 
 export const VERCEL_BASE_SYSTEM_SETUP =
-  'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip; sudo mkdir -p /workspace /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace; test -w /workspace; sudo git lfs install --system --skip-repo';
+  'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip unzip; sudo mkdir -p /workspace /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace; test -w /workspace; sudo git lfs install --system --skip-repo';
 
-export const VERCEL_BASE_NODE_SETUP = `set -euo pipefail; node_path="$(node -p 'process.execPath')"; sudo ln -sf "$node_path" /usr/local/bin/node; test -x /usr/local/bin/node; curl -fsSL https://bun.sh/install | bash -s bun-v${RUNTIME_DISTRIBUTION.bun}; sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`;
+export const VERCEL_BASE_NODE_SETUP = `set -euo pipefail; node_path="$(node -p 'process.execPath')"; sudo ln -sf "$node_path" /usr/local/bin/node; test -x /usr/local/bin/node; ${installPinnedArchiveScript('bun')}`;
 
 /** Downloaded releases replace CLI/control files; only base dependencies require a new snapshot. */
 export async function vercelRuntimeBaseDigest(): Promise<string> {

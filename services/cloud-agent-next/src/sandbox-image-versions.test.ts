@@ -22,30 +22,13 @@ function readServiceFile(relativePath: string): string {
 }
 
 describe('sandbox image version parity', () => {
-  it('keeps every sandbox image aligned with the Cloudflare sandbox SDK', () => {
-    const packageJson = JSON.parse(readServiceFile('../package.json')) as {
-      dependencies: Record<string, string>;
-    };
-    const sandboxVersion = packageJson.dependencies['@cloudflare/sandbox'];
-    const dockerfile = readServiceFile('../Dockerfile');
-    const devDockerfile = readServiceFile('../Dockerfile.dev');
-    const dindDockerfile = readServiceFile('../Dockerfile.dind');
-
-    expect(dockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
-    expect(devDockerfile).toContain(`FROM docker.io/cloudflare/sandbox:${sandboxVersion}`);
-    expect(dindDockerfile).toContain(`ARG SANDBOX_VERSION="${sandboxVersion}"`);
-  });
-
-  it('keeps the Kilo SDK pins, CLI runtime pins, and slash-command source aligned', () => {
+  it('keeps the containers image aligned with the Kilo SDK pins, CLI runtime pins, and slash-command source', () => {
     const packageJson = JSON.parse(readServiceFile('../package.json')) as {
       devDependencies: Record<string, string>;
     };
     const wrapperPackageJson = JSON.parse(readServiceFile('../wrapper/package.json')) as {
       dependencies: Record<string, string>;
     };
-    const dockerfile = readServiceFile('../Dockerfile');
-    const devDockerfile = readServiceFile('../Dockerfile.dev');
-    const dindDockerfile = readServiceFile('../Dockerfile.dind');
     const containersDockerfile = readServiceFile('../Dockerfile.containers');
     const wranglerConfig = readServiceFile('../wrangler.jsonc');
     const imageVar = `"KILOCODE_CLI_VERSION": "${KILO_CLI_VERSION}"`;
@@ -54,23 +37,22 @@ describe('sandbox image version parity', () => {
       packageJson.devDependencies['@kilocode/sdk']
     );
     expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
-    expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(containersDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(wranglerConfig.split(imageVar)).toHaveLength(17);
+    expect(wranglerConfig.split(imageVar)).toHaveLength(3);
     expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });
 
 describe('runtime distribution packaging', () => {
-  const dockerfiles = ['Dockerfile', 'Dockerfile.dev', 'Dockerfile.containers', 'Dockerfile.dind'];
+  const containersDockerfile = '../Dockerfile.containers';
+  const runtimeFreeDockerfile = '../Dockerfile.containers.runtime-free';
+  const dockerfiles = [containersDockerfile, runtimeFreeDockerfile];
 
   it('pins the shared toolchain versions', () => {
     expect(RUNTIME_DISTRIBUTION.bun).toBe('1.4.4');
     expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
-    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.102.0');
+    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.103.3');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
   });
 
@@ -83,50 +65,38 @@ describe('runtime distribution packaging', () => {
   });
 
   it('builds wrapper bundles from the shared entrypoint list instead of duplicate commands', () => {
-    for (const file of dockerfiles) {
-      const dockerfile = readServiceFile(`../${file}`);
-      expect(dockerfile).toContain('bun run build.ts --install-dir');
-      expect(dockerfile).not.toContain('bun build');
-      for (const bundle of WRAPPER_BUNDLES) {
-        expect(dockerfile).not.toContain(`outfile=/usr/local/bin/${bundle.installName}`);
-      }
+    const dockerfile = readServiceFile(containersDockerfile);
+    expect(dockerfile).toContain('bun run build.ts --install-dir');
+    expect(dockerfile).not.toContain('bun build');
+    for (const bundle of WRAPPER_BUNDLES) {
+      expect(dockerfile).not.toContain(`outfile=/usr/local/bin/${bundle.installName}`);
     }
   });
 
   it('keeps Docker bootstrap ARG pins aligned with the contract', () => {
-    for (const file of [...dockerfiles, 'Dockerfile.containers.runtime-free']) {
-      const dockerfile = readServiceFile(`../${file}`);
+    for (const file of dockerfiles) {
+      const dockerfile = readServiceFile(file);
       expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
       expect(dockerfile).toContain(`ARG PNPM_VERSION="${RUNTIME_DISTRIBUTION.pnpm}"`);
       expect(dockerfile).toContain(`ARG GLAB_VERSION="${RUNTIME_DISTRIBUTION.glab}"`);
-      expect(dockerfile).toContain(`ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`);
     }
-    const runtimeFree = readServiceFile('../Dockerfile.containers.runtime-free');
-    const containers = readServiceFile('../Dockerfile.containers');
+    const runtimeFree = readServiceFile(runtimeFreeDockerfile);
+    const containers = readServiceFile(containersDockerfile);
     const nodeVersion = containers.match(/ARG NODE_VERSION="([^"]+)"/)?.[1];
     expect(nodeVersion?.split('.')[0]).toBe(RUNTIME_DISTRIBUTION.nodeMajor);
     expect(runtimeFree).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
-    for (const file of ['Dockerfile', 'Dockerfile.dev']) {
-      const dockerfile = readServiceFile(`../${file}`);
-      expect(dockerfile).toContain(`ARG NODE_VERSION="${nodeVersion}"`);
-      expect(dockerfile).toContain(
-        'FROM docker.io/library/node:${NODE_VERSION}-slim AS node-runtime'
-      );
-      expect(dockerfile).toContain(
-        'COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node'
-      );
-      expect(dockerfile).toContain(
-        'RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack'
-      );
-      expect(dockerfile).toContain(
-        'COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules'
-      );
-    }
+  });
+
+  it('updates gh in the runtime-free image without changing the standard containers image', () => {
+    expect(readServiceFile(runtimeFreeDockerfile)).toContain(
+      `ARG GH_VERSION="${RUNTIME_DISTRIBUTION.gh}"`
+    );
+    expect(readServiceFile(containersDockerfile)).toContain('ARG GH_VERSION="2.102.0"');
   });
 
   it('does not install gh from a legacy apt/dnf package in the pinned images', () => {
-    for (const file of [...dockerfiles, 'Dockerfile.containers.runtime-free']) {
-      const dockerfile = readServiceFile(`../${file}`);
+    for (const file of dockerfiles) {
+      const dockerfile = readServiceFile(file);
       expect(dockerfile).not.toMatch(/apt-get install[^;]*\bgh\b/s);
       expect(dockerfile).toContain(
         `https://github.com/cli/cli/releases/download/v\${GH_VERSION}/gh_\${GH_VERSION}_linux_amd64.tar.gz`
@@ -147,28 +117,15 @@ describe('runtime distribution packaging', () => {
     expect(CONTROL_WRAPPER_PATH).toBe(runtimeInstallPath('kilocode-control-plane-wrapper.js'));
   });
 
-  it('copies and links the shared credential helper layout in every image', () => {
+  it('copies and links the shared credential helper layout in the containers image', () => {
     const realPath = SYSTEM_GIT_CONFIG_ENV.GIT_CONFIG_VALUE_0;
     expect(realPath).toBe(GIT_CREDENTIAL_HELPER.realPath);
     expect(GIT_CREDENTIAL_HELPER.linkPath).toBe(
       runtimeInstallPath(GIT_CREDENTIAL_HELPER.installName)
     );
-    for (const file of dockerfiles) {
-      const dockerfile = readServiceFile(`../${file}`);
-      expect(dockerfile).toContain(`COPY ${GIT_CREDENTIAL_HELPER.packagePath} ${realPath}`);
-      expect(dockerfile).toContain(`ln -sf ${realPath} ${GIT_CREDENTIAL_HELPER.linkPath}`);
-    }
-  });
-
-  it('links the shared install inventory through the builder in DinD', () => {
-    const dind = readServiceFile('../Dockerfile.dind');
-    expect(dind).toContain(
-      'bun run build.ts --install-dir /opt/kilo-cloud --link-dir /usr/local/bin'
-    );
-    for (const bundle of WRAPPER_BUNDLES) {
-      expect(dind).not.toContain(`ln -sf /opt/kilo-cloud/${bundle.installName}`);
-    }
-    expect(dind).not.toContain('ln -sf /opt/kilo-cloud/kilocode-control-plane-supervisor.sh');
+    const dockerfile = readServiceFile(containersDockerfile);
+    expect(dockerfile).toContain(`COPY ${GIT_CREDENTIAL_HELPER.packagePath} ${realPath}`);
+    expect(dockerfile).toContain(`ln -sf ${realPath} ${GIT_CREDENTIAL_HELPER.linkPath}`);
   });
 
   it('ships a self-contained control-plane smoke harness', () => {

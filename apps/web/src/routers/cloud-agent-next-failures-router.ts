@@ -3,11 +3,12 @@ import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/i
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import {
   cloud_agent_session_runs,
   cloud_agent_sessions,
   cli_sessions_v2,
+  type CloudAgentSessionRunStatus,
 } from '@kilocode/db/schema';
 import {
   CLOUD_AGENT_FAILURE_CODES,
@@ -24,13 +25,15 @@ const RUN_EXPORT_LIMIT = 500;
 const RUN_RETENTION_DAYS = 90;
 const DIAGNOSTIC_RETENTION_DAYS = 30;
 
-const cloudAgentRunStatusSchema = z.enum([
+const CLOUD_AGENT_SESSION_RUN_STATUSES = [
   'queued',
   'accepted',
   'completed',
   'failed',
   'interrupted',
-]);
+] as const satisfies readonly CloudAgentSessionRunStatus[];
+
+const cloudAgentRunStatusSchema = z.enum(CLOUD_AGENT_SESSION_RUN_STATUSES);
 
 const isoTimestampSchema = z.string().datetime();
 const nullableIsoTimestampSchema = isoTimestampSchema.nullable();
@@ -66,7 +69,7 @@ const setupFailureSchema = z.object({
 const failureSessionSchema = z.object({
   cloudAgentSessionId: z.string(),
   kiloSessionId: z.string(),
-  createdAt: isoTimestampSchema,
+  createdAt: isoTimestampSchema.nullable(),
   organizationId: z.string().uuid().nullable(),
   sandboxId: z.string().nullable(),
   title: z.string().nullable(),
@@ -102,16 +105,16 @@ type FailureRun = z.infer<typeof failureRunSchema>;
 type SetupFailure = z.infer<typeof setupFailureSchema>;
 type FailureSession = z.infer<typeof failureSessionSchema>;
 
-function iso(value: string): string {
-  return new Date(value).toISOString();
-}
-
-function nullableIso(value: string | null): string | null {
-  return value ? iso(value) : null;
+function isoOrNull(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
 
 function isExpired(expiresAt: string | null): boolean {
-  return expiresAt !== null && new Date(expiresAt).getTime() <= Date.now();
+  if (expiresAt === null) return false;
+  const time = new Date(expiresAt).getTime();
+  return !Number.isFinite(time) || time <= Date.now();
 }
 
 function retainedDiagnostic(
@@ -121,7 +124,7 @@ function retainedDiagnostic(
   if (!message || !expiresAt || isExpired(expiresAt)) {
     return { diagnostic: null, diagnosticExpiresAt: null };
   }
-  return { diagnostic: message, diagnosticExpiresAt: iso(expiresAt) };
+  return { diagnostic: message, diagnosticExpiresAt: isoOrNull(expiresAt) };
 }
 
 function runUserVisibleError(code: string | null): string | null {
@@ -226,16 +229,20 @@ async function loadSessionFailureDetail(
       wrapperRunId: cloud_agent_session_runs.wrapper_run_id,
     })
     .from(cloud_agent_session_runs)
-    .where(eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId))
-    .orderBy(
-      sql`coalesce(${cloud_agent_session_runs.queued_at}, ${cloud_agent_session_runs.terminal_at}) desc nulls last`
+    .where(
+      and(
+        eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId),
+        sql`coalesce(${cloud_agent_session_runs.queued_at}, ${cloud_agent_session_runs.terminal_at}) >= now() - interval '90 days'`
+      )
     )
+    .orderBy(desc(cloud_agent_session_runs.queued_at), desc(cloud_agent_session_runs.terminal_at))
     .limit(runLimit);
 
+  const failureAt = isoOrNull(sessionRow?.failureAt);
   const setupFailure: SetupFailure | null =
-    sessionRow?.failureAt !== undefined && sessionRow?.failureAt !== null
+    sessionRow && failureAt !== null
       ? {
-          occurredAt: iso(sessionRow.failureAt),
+          occurredAt: failureAt,
           stage: sessionRow.failureStage ?? null,
           code: sessionRow.failureCode ?? null,
           responsibility: sessionRow.failureResponsibility ?? null,
@@ -249,7 +256,7 @@ async function loadSessionFailureDetail(
     session: {
       cloudAgentSessionId,
       kiloSessionId: accessible.kiloSessionId,
-      createdAt: iso(sessionRow?.createdAt ?? cliRow.createdAt),
+      createdAt: isoOrNull(sessionRow?.createdAt ?? cliRow.createdAt),
       organizationId: cliRow.organizationId ?? null,
       sandboxId: sessionRow?.sandboxId ?? null,
       title: cliRow.title ?? null,
@@ -259,10 +266,10 @@ async function loadSessionFailureDetail(
     runs: runRows.map(run => ({
       messageId: run.messageId,
       status: run.status,
-      queuedAt: nullableIso(run.queuedAt),
-      dispatchAcceptedAt: nullableIso(run.dispatchAcceptedAt),
-      agentActivityObservedAt: nullableIso(run.agentActivityObservedAt),
-      terminalAt: nullableIso(run.terminalAt),
+      queuedAt: isoOrNull(run.queuedAt),
+      dispatchAcceptedAt: isoOrNull(run.dispatchAcceptedAt),
+      agentActivityObservedAt: isoOrNull(run.agentActivityObservedAt),
+      terminalAt: isoOrNull(run.terminalAt),
       failureStage: run.failureStage ?? null,
       failureCode: run.failureCode ?? null,
       failureResponsibility: run.failureResponsibility ?? null,

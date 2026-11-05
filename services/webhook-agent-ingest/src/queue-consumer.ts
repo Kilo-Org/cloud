@@ -432,6 +432,7 @@ async function processWebhookMessage(
         model: string;
         variant?: string;
         sandboxAllocation?: SandboxAllocation;
+        requestedEnvironment?: { id: string };
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
@@ -467,6 +468,9 @@ async function processWebhookMessage(
       }
       if (triggerConfig.variant !== undefined) {
         prepareSessionBody.variant = triggerConfig.variant;
+      }
+      if (triggerConfig.environmentId) {
+        prepareSessionBody.requestedEnvironment = { id: triggerConfig.environmentId };
       }
       const sandboxAllocation =
         triggerConfig.sandboxAllocation !== undefined

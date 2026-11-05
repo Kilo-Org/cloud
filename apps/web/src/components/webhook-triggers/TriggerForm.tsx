@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
+import { environmentMembers, useCloudAgentEnvironments } from '@/hooks/useCloudAgentEnvironments';
 import { RepoProfileBindingsDialog } from '@/components/cloud-agent/RepoProfileBindingsDialog';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { LEGACY_MODE_OPTIONS, ModeCombobox } from '@/components/shared/ModeCombobox';
@@ -90,6 +91,7 @@ export type TriggerFormData = {
   sandboxAllocation?: SandboxAllocation | null;
   promptTemplate: string;
   profileId?: string | null;
+  environmentId?: string | null;
   bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
@@ -117,6 +119,7 @@ export type TriggerFormProps = {
     sandboxAllocation?: SandboxAllocation | null;
     promptTemplate: string;
     profileId?: string;
+    environmentId?: string | null;
     bodySchema?: WebhookBodySchema | null;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
@@ -201,6 +204,23 @@ export function TriggerForm({
   const [triggerId, setTriggerId] = useState(initialData?.triggerId ?? '');
   const [triggerIdError, setTriggerIdError] = useState<string | null>(null);
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
+  const [environmentId, setEnvironmentId] = useState<string | null>(
+    initialData?.environmentId ?? null
+  );
+  const {
+    data: environments,
+    isLoading: isLoadingEnvironments,
+    isError: hasEnvironmentsError,
+    refetch: refetchEnvironments,
+  } = useCloudAgentEnvironments({
+    organizationId,
+    repository: githubRepo ? { platform: 'github', fullName: githubRepo } : undefined,
+  });
+  const selectedEnvironment = environments?.find(environment => environment.id === environmentId);
+  const environmentIsUnchanged =
+    isEditMode && environmentId === (initialData?.environmentId ?? null);
+  const environmentUnavailable =
+    !!environmentId && !isLoadingEnvironments && !hasEnvironmentsError && !selectedEnvironment;
   const [agentMode, setAgentMode] = useState(initialData?.mode ?? 'ask');
   const [useCustomAgent, setUseCustomAgent] = useState(
     !!initialData?.mode &&
@@ -287,6 +307,7 @@ export function TriggerForm({
       setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       setTriggerId(initialData.triggerId);
       setGithubRepo(initialData.githubRepo);
+      setEnvironmentId(initialData.environmentId ?? null);
       setAgentMode(initialData.mode ?? 'ask');
       setUseCustomAgent(
         !!initialData.mode &&
@@ -307,6 +328,7 @@ export function TriggerForm({
     }
     if (!initialData) {
       setRunAsCreator(false);
+      setEnvironmentId(null);
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
       setSandboxAllocation('automatic');
@@ -409,6 +431,9 @@ export function TriggerForm({
     if (!githubRepo) {
       errors.push('Repository is required');
     }
+    if (environmentId && !environmentIsUnchanged && !selectedEnvironment) {
+      errors.push('Select an available environment or Automatic.');
+    }
 
     if (!model) {
       errors.push('Model is required');
@@ -457,6 +482,9 @@ export function TriggerForm({
     isScheduled,
     cronExpression,
     githubRepo,
+    environmentId,
+    environmentIsUnchanged,
+    selectedEnvironment,
     model,
     agentModeError,
     promptTemplate,
@@ -522,6 +550,7 @@ export function TriggerForm({
       promptTemplate: promptTemplate.trim(),
       profileId:
         isEditMode && profileId === (initialData?.profileId ?? null) ? undefined : profileId,
+      environmentId: environmentIsUnchanged ? undefined : environmentId,
       ...(!isScheduled ? { bodySchema } : {}),
       autoCommit,
       condenseOnComplete,
@@ -531,6 +560,8 @@ export function TriggerForm({
   }, [
     isFormValid,
     profileId,
+    environmentId,
+    environmentIsUnchanged,
     bodySchema,
     bodySchemaValid,
     triggerId,
@@ -718,6 +749,7 @@ export function TriggerForm({
                   value={githubRepo}
                   onValueChange={repository => {
                     setGithubRepo(repository);
+                    setEnvironmentId(null);
                     onRepositoryChange?.(repository);
                   }}
                   isLoading={isLoadingRepositories}
@@ -726,6 +758,77 @@ export function TriggerForm({
                   emptyStateText="Requires a GitHub integration — configure in Integrations"
                   hideLabel
                 />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="environmentId">Environment</Label>
+              <Select
+                value={environmentId ?? 'automatic'}
+                onValueChange={value => setEnvironmentId(value === 'automatic' ? null : value)}
+                disabled={isLoading || !githubRepo || isLoadingEnvironments}
+              >
+                <SelectTrigger
+                  id="environmentId"
+                  className="w-full min-w-0 pointer-coarse:min-h-11 sm:max-w-lg"
+                  aria-describedby="environmentHelp"
+                  aria-invalid={environmentUnavailable && !environmentIsUnchanged}
+                >
+                  <SelectValue placeholder="Automatic" />
+                </SelectTrigger>
+                <SelectContent className="max-w-[calc(100vw-2rem)]">
+                  <SelectItem value="automatic" className="pointer-coarse:min-h-11">
+                    Automatic
+                  </SelectItem>
+                  {environments?.map(environment => (
+                    <SelectItem
+                      key={environment.id}
+                      value={environment.id}
+                      textValue={environment.name}
+                      className="pointer-coarse:min-h-11"
+                    >
+                      <span className="whitespace-normal break-words">{environment.name}</span>
+                    </SelectItem>
+                  ))}
+                  {environmentId && !selectedEnvironment && (
+                    <SelectItem value={environmentId} disabled>
+                      Saved environment{environmentUnavailable ? ' (unavailable)' : ''}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p
+                id="environmentHelp"
+                role={hasEnvironmentsError || environmentUnavailable ? 'alert' : undefined}
+                className="text-muted-foreground max-w-prose text-xs"
+              >
+                {!githubRepo
+                  ? 'Select a repository to choose an environment.'
+                  : isLoadingEnvironments
+                    ? 'Loading environments...'
+                    : hasEnvironmentsError
+                      ? 'Environments could not be loaded. Retry, keep the saved selection, or choose Automatic.'
+                      : environmentUnavailable
+                        ? 'The saved environment is no longer available for this repository. Choose another environment or Automatic before running.'
+                        : 'Automatic uses the matching environment when exactly one exists; otherwise runs without an environment. Choose an environment to use it for every run.'}
+              </p>
+              {hasEnvironmentsError && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetchEnvironments()}
+                >
+                  Retry environments
+                </Button>
+              )}
+              {selectedEnvironment && (
+                <p className="text-muted-foreground max-w-prose text-xs break-words">
+                  Repositories:{' '}
+                  {environmentMembers(selectedEnvironment)
+                    .map(member => member.repoFullName)
+                    .join(', ')}
+                </p>
               )}
             </div>
 

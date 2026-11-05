@@ -147,10 +147,8 @@ Consequences:
 
 ### 2.2 BYOC is per session
 
-For a BYOC binding, `generateSandboxRoutingTarget` always returns the existing
-isolated `ses-{hash(sessionId)}` shape. Do not add BYOC organizations to
-`PER_SESSION_SANDBOX_ORG_IDS`; BYOC is intrinsically isolated and must not
-alter their Cloudflare behavior.
+One sandbox serves one workspace, so a BYOC binding always gets its own
+sandbox key. BYOC does not change the Cloudflare behavior of the organization.
 
 This avoids repinning a shared `SandboxControl` between provider sources. The
 accepted MVP trade-off is one customer-paid VM and one cold start per open

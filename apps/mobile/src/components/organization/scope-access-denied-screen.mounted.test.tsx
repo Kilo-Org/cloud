@@ -37,8 +37,13 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/ui/button', () => ({
-  Button: (props: { onPress?: () => void; children?: ReactNode; accessibilityLabel?: string }) =>
-    createElement('ButtonMock', { onPress: props.onPress }, [
+  Button: (props: {
+    onPress?: () => void;
+    children?: ReactNode;
+    accessibilityLabel?: string;
+    variant?: string;
+  }) =>
+    createElement('ButtonMock', { onPress: props.onPress, variant: props.variant }, [
       createElement('ButtonLabelMock', { label: props.accessibilityLabel }),
       props.children,
     ]),
@@ -117,6 +122,15 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(error?.props.message).toBe('You do not have access to this organization.');
     expect(button('Retry', renderer.root)).toBeDefined();
     expect(button('Back to profile', renderer.root)).toBeDefined();
+    // Retry is the recovery this state exists for, so it carries the filled
+    // primary; leaving the organization is the outlined secondary under it.
+    expect(button('Retry', renderer.root)?.props.variant ?? 'default').toBe('default');
+    expect(button('Back to profile', renderer.root)?.props.variant).toBe('outline');
+    expect(
+      findByType(renderer.root, 'ButtonMock').filter(
+        node => (node.props.variant ?? 'default') === 'default'
+      )
+    ).toHaveLength(1);
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.title).toBe('Security Agent');
 
     act(() => {

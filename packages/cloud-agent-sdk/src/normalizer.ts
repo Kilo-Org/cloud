@@ -173,6 +173,7 @@ export type ServiceEvent =
   | { type: 'autocommit_started'; messageId: string; message?: string | undefined }
   | {
       type: 'autocommit_completed';
+      repository?: string | undefined;
       messageId: string;
       success: boolean;
       message?: string | undefined;
@@ -604,6 +605,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'autocommit_completed',
+        repository: r.data.repository,
         messageId: r.data.messageId,
         success: r.data.success,
         message: r.data.message,

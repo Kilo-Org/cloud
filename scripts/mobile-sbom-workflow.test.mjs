@@ -206,3 +206,23 @@ test('the repo-wide pnpm SBOM stays a separate family', () => {
     'sbom.yml must not fold in the per-artifact generator'
   );
 });
+
+test('the repo-wide SBOM runs on main only when its inputs change', () => {
+  // syft catalogs pnpm-lock.yaml, so a source-only main push produces the same
+  // document. Without this filter every push spends a job to upload a copy of an
+  // unchanged dependency graph under the new commit's name.
+  const trigger = readYaml(repoWideSbomPath).on;
+  const push = trigger?.push;
+
+  assert.deepEqual(push?.branches, ['main'], 'the push trigger must stay on main');
+  assert.deepEqual(
+    [...(push?.paths ?? [])].sort(),
+    ['.github/workflows/sbom.yml', 'pnpm-lock.yaml'],
+    'the push trigger must list exactly the inputs the job reads'
+  );
+
+  // The weekly run re-scans the unchanged lockfile against newly disclosed CVEs,
+  // and dispatch stays for manual runs; neither may inherit the paths filter.
+  assert.deepEqual(trigger?.schedule, [{ cron: '0 4 * * 1' }], 'the weekly cron must stay');
+  assert.ok('workflow_dispatch' in (trigger ?? {}), 'manual dispatch must stay');
+});

@@ -9,6 +9,8 @@
  * derivation rules can be unit tested in isolation.
  */
 
+import type { SessionConfig } from '@kilocode/cloud-agent-sdk';
+
 /** The subset of a cloud session's runtime state this feature reads. */
 export type CloudRuntimeConfig = {
   platform?: 'github' | 'gitlab' | 'bitbucket' | (string & {});
@@ -18,14 +20,20 @@ export type CloudRuntimeConfig = {
   model?: string;
   variant?: string;
   autoCommit?: boolean;
-  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  runtimeAgents?: SessionConfig['runtimeAgents'];
 };
 
 /** Runtime agent in the shape the `prepareSession` schema expects. */
 export type CloudRuntimeAgentInput = {
   slug: string;
   name: string;
-  config: { model?: string; variant?: string };
+  config: {
+    model?: string;
+    variant?: string;
+    mode?: 'primary' | 'subagent' | 'all' | undefined;
+    hidden?: boolean | undefined;
+    disable?: boolean | undefined;
+  };
 };
 
 export type CloudForkRejectionReason =
@@ -113,13 +121,16 @@ export function deriveCloudSessionForkFields(input: {
 
 /** Map the flat runtime-agent shape into the nested `prepareSession` input shape. */
 function toPrepareRuntimeAgents(
-  agents: Array<{ slug: string; name: string; model?: string; variant?: string }>
+  agents: NonNullable<SessionConfig['runtimeAgents']>
 ): CloudRuntimeAgentInput[] {
   const prepared: CloudRuntimeAgentInput[] = [];
   for (const agent of agents) {
     if (!/^[a-z][a-z0-9-]*$/.test(agent.slug) || agent.slug.length > 50) continue;
     if (!agent.name || agent.name.length > 100) continue;
     const config: CloudRuntimeAgentInput['config'] = {};
+    if (agent.mode !== undefined) config.mode = agent.mode;
+    if (agent.hidden !== undefined) config.hidden = agent.hidden;
+    if (agent.disable !== undefined) config.disable = agent.disable;
     if (agent.model && agent.model.length <= 200) {
       config.model = agent.model;
       // A variant is model-specific; only forward it alongside its model.

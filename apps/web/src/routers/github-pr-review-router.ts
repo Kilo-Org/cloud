@@ -1116,6 +1116,8 @@ export async function assertTermsAccepted(userId: string): Promise<void> {
  * - `duplicate_in_flight` / `duplicate_reconcile_in_progress`: CONFLICT
  *   `operation_in_progress` (never re-execute).
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
+ * - `organization_mismatch`: CONFLICT `operation_key_reuse_mismatch`; the row
+ *   was admitted in another organization scope and carries no row.
  *
  * The ledger identity is `(user, domain, operation_key)`, so `admitOperation`
  * returns the row for that key regardless of intent. Before ANY outcome is
@@ -1136,6 +1138,10 @@ async function runPrLedgerMutation<T>(
     taxonomy: 'reconcile-first',
     leaseSeconds: PR_LEDGER_LEASE_SECONDS,
   });
+
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: PR_OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({

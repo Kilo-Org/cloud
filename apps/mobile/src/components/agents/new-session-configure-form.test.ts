@@ -11,6 +11,7 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
@@ -415,6 +416,36 @@ describe('NewSessionConfigureForm', () => {
     expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
+  it('shows the plan refusal in the scroll body under the composer, not the footer', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: 'The organization trial has ended.',
+    }) as Node;
+
+    // A three-line explanation in the pinned footer shrinks the scroll frame
+    // and cuts the launch folder on a compact screen, so the body carries it.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, AccessibleStatus)).toMatchObject({
+      message: 'The organization trial has ended.',
+      tone: 'error',
+    });
+    // The footer keeps only the start-blocked reason (its own component): the
+    // refusal must not take height from the form a second time. The pinned
+    // footer is the KeyboardAvoidingView's second child, after the scroll body,
+    // and it must be found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByComponent(footer, AccessibleStatus)).toBeNull();
+  });
+
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -433,7 +464,7 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
-  it('renders the organization section above the run-target block', async () => {
+  it('renders the account section above the run-target block', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -441,17 +472,17 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: null,
       showRunOnSelector: true,
-      organizationSection: 'Organization section',
+      accountSection: 'Account section',
     }) as Node;
 
     // The labeled section renders inside the same scroll body as the other
     // form sections (the run-target block itself is a string-host mock here).
     const scrollBody = findElement(element, 'ScrollView');
     expect(scrollBody).not.toBeNull();
-    expect(findTextContent(scrollBody as Node, text => text === 'Organization section')).toBe(true);
+    expect(findTextContent(scrollBody as Node, text => text === 'Account section')).toBe(true);
   });
 
-  it('hides the organization section when the caller omits it', async () => {
+  it('hides the account section when the caller omits it', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -461,7 +492,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
     }) as Node;
 
-    expect(findTextContent(element, text => text === 'Organization section')).toBe(false);
+    expect(findTextContent(element, text => text === 'Account section')).toBe(false);
   });
 
   // ── Case 1b: ordered repository array passes through unchanged ──

@@ -13,9 +13,15 @@ import type { StoredMessage, ToolPart } from './types';
 
 jest.mock('./CloudAgentProvider', () => ({
   useManager: jest.fn(),
+  ReadOnlyCloudAgentBoundary: ({ children }: { children: React.ReactNode }) => children,
   useOptionalManager: jest.fn(),
 }));
-jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => createElement('p', null, children),
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
+jest.mock('./worktree-review', () => ({ parseWorktreeReviewMessage: () => null }));
 jest.mock('@/components/ui/sheet', () => {
   const stub =
     (slot: string) =>
@@ -203,6 +209,86 @@ describe('ChildSessionSection live subscription', () => {
     expect(container.textContent).toContain('2 tool calls');
   });
 
+  it('passes the current live getter into an open recursive transcript and refreshes it from SDK state', () => {
+    const store = createStore();
+    const grandchildId = 'ses_00000000000000000000000001';
+    const child = childMessageWithTools(1);
+    const initialGetter = (id: string) =>
+      id === childSessionId
+        ? [child]
+        : id === grandchildId
+          ? [
+              {
+                ...child,
+                parts: [
+                  {
+                    id: 'grand-text',
+                    sessionID: grandchildId,
+                    messageID: 'grand',
+                    type: 'text' as const,
+                    text: 'Grandchild initial',
+                  },
+                ],
+              },
+            ]
+          : [];
+    const sourceAtom = atom({ getter: initialGetter });
+    const childMessagesAtom = atom(get => get(sourceAtom).getter);
+    jest.mocked(useOptionalManager).mockReturnValue({
+      atoms: { childMessages: childMessagesAtom },
+    } as unknown as SessionManager);
+    act(() =>
+      root?.render(
+        createElement(
+          Provider,
+          { store },
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            renderChildTranscript: (_messages, _depth, currentGetter) => {
+              const grandchild = currentGetter?.(grandchildId)[0];
+              return createElement(
+                'p',
+                null,
+                grandchild?.parts
+                  .filter(part => part.type === 'text')
+                  .map(part => part.text)
+                  .join('')
+              );
+            },
+          })
+        )
+      )
+    );
+    const button = container.querySelector('button');
+    if (!button) throw new Error('Missing child expansion control');
+    click(button);
+    expect(container.textContent).toContain('Grandchild initial');
+    act(() =>
+      store.set(sourceAtom, {
+        getter: (id: string) =>
+          id === grandchildId
+            ? [
+                {
+                  ...child,
+                  parts: [
+                    {
+                      id: 'grand-text',
+                      sessionID: grandchildId,
+                      messageID: 'grand',
+                      type: 'text',
+                      text: 'Grandchild updated',
+                    },
+                  ],
+                },
+              ]
+            : initialGetter(id),
+      })
+    );
+    expect(container.textContent).toContain('Grandchild updated');
+    expect(container.textContent).not.toContain('Grandchild initial');
+  });
+
   it('falls back to the childMessages prop when the manager has no childMessages atom', () => {
     jest.mocked(useOptionalManager).mockReturnValue({ atoms: {} } as unknown as SessionManager);
 
@@ -230,6 +316,62 @@ describe('ChildSessionSection live subscription', () => {
     });
     expect(container.textContent).toContain('1 tool call');
   });
+
+  it.each([
+    [
+      'read',
+      { filePath: '/cloud-agent/sessions/ses_test/src/nested/read.ts' },
+      'Read src/nested/read.ts',
+    ],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'Edit src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'Write src/write.ts'],
+    ['read', { filePath: '/cloud-agent/sessions/ses_test' }, 'Read .'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/src' }, 'List src'],
+    [
+      'bash',
+      { command: 'pnpm test', cwd: '/cloud-agent/sessions/ses_test/src' },
+      'Shell pnpm · src',
+    ],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/root.ts' }, 'Custom src/root.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test', pattern: '*.ts' }, 'Glob . · *.ts'],
+    [
+      'grep',
+      { path: '/cloud-agent/sessions/ses_test/src', pattern: 'needle' },
+      'Grep src · needle',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'Mcp src/mcp.ts',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'normalizes file and directory context in child %s activity',
+    (tool, input, expected) => {
+      const child = childMessageWithTools(1);
+      const part = readToolPart('tool-1');
+      part.tool = tool;
+      part.state = { status: 'running', input, time: { start: 1 } };
+      child.parts = [part];
+
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            childMessages: [child],
+          })
+        )
+      );
+
+      expect(container.textContent).toContain(expected);
+      expect(container.innerHTML).not.toContain('ses_test');
+      expect(container.textContent).not.toContain('/cloud-agent/');
+    }
+  );
 });
 
 describe('ChildSessionSection drawer entry', () => {
@@ -299,9 +441,17 @@ describe('ChildSessionDrawer header', () => {
   let root: Root | undefined;
   let container: HTMLElement;
   let cleanup: () => void;
+  const readDrawerMessages = jest.fn((messages: StoredMessage[]) => [...messages]);
+  const drawerSource = atom<StoredMessage[]>([]);
+  const drawerStore = createStore();
   const manager = {
     atoms: {
-      childMessages: atom(() => (_sessionId: string): StoredMessage[] => []),
+      isStreaming: atom(false),
+      activeQuestion: atom(null),
+      childMessages: atom(get => {
+        const messages = get(drawerSource);
+        return (_sessionId: string): StoredMessage[] => readDrawerMessages(messages);
+      }),
       childSessionHydrationState: atom(() => (_sessionId: string): ChildSessionHydrationState => ({
         status: 'ready',
         cursor: null,
@@ -337,15 +487,30 @@ describe('ChildSessionDrawer header', () => {
     act(() => {
       root = createRoot(container);
       root.render(
-        createElement(ChildSessionDrawer, {
-          stack: [entry],
-          onBack: () => undefined,
-          onOpenChange: () => undefined,
-          onOpenChildSession: () => undefined,
-        })
+        createElement(
+          Provider,
+          { store: drawerStore },
+          createElement(ChildSessionDrawer, {
+            stack: [entry],
+            onBack: () => undefined,
+            onOpenChange: () => undefined,
+            onOpenChildSession: () => undefined,
+          })
+        )
       );
     });
   }
+
+  it('reuses the child snapshot on unrelated drawer updates', () => {
+    drawerStore.set(drawerSource, [childMessageWithTools(1)]);
+    renderDrawer({ sessionId: childSessionId, description: 'Child snapshot' });
+    readDrawerMessages.mockClear();
+    act(() => drawerStore.set(manager.atoms.isStreaming, true));
+    expect(readDrawerMessages).not.toHaveBeenCalled();
+    act(() => drawerStore.set(drawerSource, [childMessageWithTools(2)]));
+    expect(readDrawerMessages).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll('[data-message-id="child-1"]')).toHaveLength(1);
+  });
 
   it('shows the routed model next to the agent', () => {
     renderDrawer({
@@ -368,5 +533,64 @@ describe('ChildSessionDrawer header', () => {
 
     expect(container.innerHTML).toContain('Agent: explore');
     expect(container.innerHTML).not.toContain('Model:');
+  });
+  it('keeps completed child rows idle while unfinished text and reasoning stream, then completes them', () => {
+    const completed = {
+      ...childMessageWithTools(0),
+      parts: [
+        {
+          id: 'done-text',
+          type: 'text' as const,
+          sessionID: childSessionId,
+          messageID: 'child-1',
+          text: 'Completed answer',
+          time: { start: 1, end: 2 },
+        },
+      ],
+    };
+    const running: StoredMessage = {
+      ...completed,
+      info: { ...completed.info, id: 'running-child', time: { created: 3 } },
+      parts: [
+        {
+          id: 'running-text',
+          type: 'text',
+          sessionID: childSessionId,
+          messageID: 'running-child',
+          text: 'Streaming answer',
+          time: { start: 3 },
+        },
+        {
+          id: 'running-reason',
+          type: 'reasoning',
+          sessionID: childSessionId,
+          messageID: 'running-child',
+          text: 'Inspecting the next step',
+          time: { start: 3 },
+        },
+      ],
+    };
+    drawerStore.set(drawerSource, [completed, running]);
+    renderDrawer({ sessionId: childSessionId, description: 'Streaming child' });
+    expect(container.querySelector('[data-message-id="running-child"] .invisible')).not.toBeNull();
+    expect(container.querySelector('[data-message-id="child-1"] .invisible')).toBeNull();
+    expect(container.querySelector('[data-message-id="running-child"]')?.textContent).toContain(
+      'Thinking'
+    );
+    if (running.info.role !== 'assistant') throw new Error('Expected assistant fixture');
+    const finished: StoredMessage = {
+      ...running,
+      info: { ...running.info, time: { created: 3, completed: 4 } },
+      parts: running.parts.map(part =>
+        part.type === 'text' || part.type === 'reasoning'
+          ? { ...part, time: { start: 3, end: 4 } }
+          : part
+      ),
+    };
+    act(() => drawerStore.set(drawerSource, [completed, finished]));
+    expect(container.querySelector('[data-message-id="running-child"] .invisible')).toBeNull();
+    expect(container.querySelector('[data-message-id="running-child"]')?.textContent).not.toContain(
+      'Thinking'
+    );
   });
 });

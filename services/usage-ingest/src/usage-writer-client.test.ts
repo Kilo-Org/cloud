@@ -42,6 +42,142 @@ afterEach(() => {
 });
 
 describe('usage writer client', () => {
+  it.each(['queue_limit', 'pool_waiting', 'pool_busy'] as const)(
+    'recognizes only a complete bounded admission rejection (%s)',
+    async reason => {
+      fetchMock.mockResolvedValue(
+        Response.json({ error: 'Usage writer overloaded', reason }, { status: 429 })
+      );
+      expect(await recordUsage(usage, config)).toEqual({
+        kind: 'unavailable',
+        reason: 'http_error',
+        status: 429,
+        admissionReason: reason,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    JSON.stringify({ error: 'Other overload', reason: 'queue_limit' }),
+    JSON.stringify({ error: 'Usage writer overloaded', reason: 'unknown' }),
+    JSON.stringify({
+      error: 'Usage writer overloaded',
+      reason: 'pool_busy',
+      secret: 'synthetic-writer-secret',
+    }),
+    JSON.stringify({ reason: 'pool_waiting' }),
+    'null',
+    '[1]',
+    '{',
+    '<html>synthetic-writer-secret</html>',
+    new Uint8Array([0xff]),
+  ])('preserves generic429 for invalid admission bytes %s', async body => {
+    fetchMock.mockResolvedValue(new Response(body, { status: 429 }));
+    expect(await recordUsage(usage, config)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts4096 bytes, rejects4097 bytes and cancels the oversized stream', async () => {
+    const json = JSON.stringify({ error: 'Usage writer overloaded', reason: 'queue_limit' });
+    fetchMock.mockResolvedValueOnce(
+      new Response(json.padEnd(MAX_WRITER_RESPONSE_BYTES, ' '), { status: 429 })
+    );
+    expect(await recordUsage(usage, config)).toMatchObject({ admissionReason: 'queue_limit' });
+    const cancel = vi.fn();
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(json.padEnd(MAX_WRITER_RESPONSE_BYTES + 1, ' '))
+            );
+          },
+          cancel,
+        }),
+        { status: 429 }
+      )
+    );
+    expect(await recordUsage(usage, config)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 429,
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not classify a partial rejection until its body closes', async () => {
+    const stream = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = stream.writable.getWriter();
+    fetchMock.mockResolvedValue(new Response(stream.readable, { status: 429 }));
+    let complete = false;
+    const work = recordUsage(usage, config).then(result => {
+      complete = true;
+      return result;
+    });
+    await writer.write(new TextEncoder().encode('{"error":"Usage writer overloaded",'));
+    expect(complete).toBe(false);
+    await writer.write(new TextEncoder().encode('"reason":"pool_waiting"}'));
+    expect(complete).toBe(false);
+    await writer.close();
+    expect(await work).toMatchObject({ status: 429, admissionReason: 'pool_waiting' });
+  });
+
+  it.each(['abort', 'truncate'] as const)(
+    'keeps HTTP429 feedback after a slow/%s body fails',
+    async failure => {
+      const timeout = AbortSignal.timeout.bind(AbortSignal);
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+        expect(ms).toBe(160_000);
+        return timeout(5);
+      });
+      fetchMock.mockImplementation(async (_url, options) => {
+        const signal = options?.signal;
+        if (!signal) throw new Error('Expected signal');
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"error":"Usage writer overloaded",'));
+              if (failure === 'truncate')
+                controller.error(new Error('synthetic private body failure'));
+              else
+                signal.addEventListener('abort', () => controller.error(signal.reason), {
+                  once: true,
+                });
+            },
+          }),
+          { status: 429 }
+        );
+      });
+      expect(await recordUsage(usage, config)).toEqual({
+        kind: 'unavailable',
+        reason: 'http_error',
+        status: 429,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not parse a503 error body as admission', async () => {
+    const response = Response.json(
+      { error: 'Usage writer overloaded', reason: 'queue_limit' },
+      { status: 503 }
+    );
+    if (!response.body) throw new Error('Expected body');
+    const read = vi.spyOn(response.body, 'getReader');
+    fetchMock.mockResolvedValue(response);
+    expect(await recordUsage(usage, config)).toEqual({
+      kind: 'unavailable',
+      reason: 'http_error',
+      status: 503,
+    });
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('preserves the complete event and waits for a matching recorded acknowledgement', async () => {
     const event = {
       ...usage,

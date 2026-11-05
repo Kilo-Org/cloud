@@ -269,18 +269,13 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
-  const result = await validateUserAuthorization(
-    auth.userId,
+  const result = await validateUserAuthorization({
+    kiloUserId: auth.userId,
     user,
-    { adminOnly: false },
-    false,
-    undefined,
-    undefined,
-    db,
-    undefined,
-    undefined,
-    auth.claims.deviceSessionId
-  );
+    opts: { adminOnly: false },
+    isNewUser: false,
+    deviceSessionId: auth.claims.deviceSessionId,
+  });
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -374,18 +369,18 @@ async function resolveUserFromAuth(
     const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    const result = await validateUserAuthorization(
-      authorizationValidationResult.kiloUserId,
+    const result = await validateUserAuthorization({
+      kiloUserId: authorizationValidationResult.kiloUserId,
       user,
       opts,
-      false,
+      isNewUser: false,
       organizationId,
       internalApiUse,
       fromDb,
       botId,
       tokenSource,
-      deviceSessionId
-    );
+      deviceSessionId,
+    });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
         credentialsRejected: true,
@@ -413,15 +408,13 @@ async function resolveUserFromSession(
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
-  return await validateUserAuthorization(
-    maybeKiloUserId,
+  return await validateUserAuthorization({
+    kiloUserId: maybeKiloUserId,
     user,
     opts,
-    session.isNewUser,
-    undefined,
-    undefined,
-    fromDb
-  );
+    isNewUser: session.isNewUser,
+    fromDb,
+  });
 }
 
 export async function getUserFromAuthOrRedirect(
@@ -470,18 +463,31 @@ function authError(
   };
 }
 
-async function validateUserAuthorization(
-  kiloUserId: string,
-  user: User | undefined,
-  opts: RequiredPermissions,
-  isNewUser?: boolean,
-  organizationId?: Organization['id'],
-  internalApiUse?: boolean,
-  fromDb: typeof db = db,
-  botId?: string,
-  tokenSource?: string,
-  deviceSessionId?: string
-): Promise<GetAuthResponse> {
+type UserAuthorizationRequest = {
+  kiloUserId: string;
+  user: User | undefined;
+  opts: RequiredPermissions;
+  isNewUser?: boolean;
+  organizationId?: Organization['id'];
+  internalApiUse?: boolean;
+  fromDb?: typeof db;
+  botId?: string;
+  tokenSource?: string;
+  deviceSessionId?: string;
+};
+
+async function validateUserAuthorization({
+  kiloUserId,
+  user,
+  opts,
+  isNewUser,
+  organizationId,
+  internalApiUse,
+  fromDb = db,
+  botId,
+  tokenSource,
+  deviceSessionId,
+}: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
   } else if (await isUserBlacklistedByDomain(user)) {

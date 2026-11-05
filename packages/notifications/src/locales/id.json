@@ -9,6 +9,7 @@
       "lowBalance": "Saldo Anda perlu diperhatikan",
       "spendAlert": "Pengeluaran Anda perlu diperhatikan",
       "securityFinding": "Temuan keamanan perlu diperhatikan",
+      "securityUpdate": "Pemeriksaan keamanan memiliki pembaruan",
       "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Temuan keamanan perlu diperhatikan"
+      "body": "Pemeriksaan keamanan memiliki pembaruan"
     }
   },
   "instanceLifecycle": {

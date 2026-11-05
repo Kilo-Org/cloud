@@ -5,7 +5,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
 import { _resetIosSinkForTests, getActivityKitDenied, iosSink } from '@/glanceable-ios/ios-sink';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';

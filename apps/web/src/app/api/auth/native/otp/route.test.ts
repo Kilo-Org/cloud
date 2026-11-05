@@ -56,6 +56,13 @@ describe('POST /api/auth/native/otp', () => {
     expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('user@example.com', '123456');
   });
 
+  it('issues and delivers the code to the same lowercased address, keeping the plus suffix', async () => {
+    await POST(createRequest({ email: 'Alias+News@Example.com' }));
+
+    expect(mockCreateSignInCode).toHaveBeenCalledWith('alias+news@example.com');
+    expect(mockSendSignInCodeEmail).toHaveBeenCalledWith('alias+news@example.com', '123456');
+  });
+
   it('checks eligibility before issuing a code', async () => {
     await POST(createRequest({ email: 'user@example.com' }));
 

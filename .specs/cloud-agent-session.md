@@ -20,7 +20,10 @@ status contract alongside shared worktree navigation and durability; revised
 revised 2026-10-07 to add the optional repository environment; revised
 2026-10-21 to apply the repository environment automatically and move the
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
-show profile conflicts before saving.
+show profile conflicts before saving; revised 2026-10-29 to allow several
+repositories in one environment; revised 2026-10-31 to define worktree-owned
+shared runtime and MCP configuration; revised 2026-11-04 to state that one
+sandbox serves one workspace.
 
 ## Conventions
 
@@ -33,9 +36,18 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
-- **Repository environment**: an optional saved setup for one repository --
-  setup commands, plaintext variables, secrets, and a sandbox size -- distinct
-  from the sandbox Environment. An owner has at most one per repository.
+- **Sandbox**: the compute that hosts one Environment. One sandbox serves one
+  workspace only: the sibling chats of that workspace share it, and no other
+  workspace uses it.
+- **Repository environment**: an optional saved setup for one or several
+  repositories -- setup commands, plaintext variables, secrets, and a sandbox
+  size -- distinct from the sandbox Environment. A repository MAY belong to
+  several environments of one owner.
+- **Multi-repository environment** (V2): a repository environment that lists its
+  repositories. Multi-repository environments are available to all personal and
+  organization accounts, subject to existing environment management permissions.
+  The editor creates every new environment as V2, also with one repository. An environment
+  without a list (V1) belongs to one repository and behaves as before.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request
   or for a session, that later sessions of that environment start from.
@@ -71,10 +83,12 @@ repository.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
 6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord,
    a webhook, or a schedule MUST use the owner's repository environment
-   for the chosen repository when one exists. The user does not select it. Code
+   for the chosen repository when one exists. With one match, the user does not
+   select it. Code
    review and security sessions MUST NOT use it. A repository without one
    launches unchanged. Its setup commands MUST run as preparation steps and
-   MUST NOT reveal secret values.
+   MUST NOT reveal secret values. When several environments contain the
+   repository, rules 14 to 16 decide.
 7. While a repository environment applies, profile setup commands MUST NOT run.
    Profile variables, and variables and commands sent with the request, still
    apply over the environment.
@@ -107,6 +121,37 @@ repository.
     pipeline failure without requiring `set -e` in the script. A failed script
     MUST stop preparation and show the failure. Each script MAY contain up to
     16,000 characters.
+14. A repository matches every environment that contains it. When exactly one
+    matches, it MUST apply with no choice.
+15. When several match, the new-session form in the web UI MUST require a valid
+    choice and MUST NOT start the session without one. The form MUST
+    remember the last choice per repository and personal/organization scope and
+    restore it only while it still matches the repository. A request that
+    marks the choice as required and names no environment MUST fail with a
+    conflict that names the matching environments. A request that names an
+    environment that does not contain the repository MUST fail.
+16. When several match and the request does not mark the choice as required, the
+    session MUST start with no environment. This covers the mobile app, the
+    extension, fork and review-fix routes, continuing in Cloud Agent, and every
+    automatic origin. On an origin that applies no environment, a request that
+    names one is ignored, but a request that lists additional repositories MUST
+    fail.
+17. A session on a multi-repository environment MUST ignore the repository's
+    profile binding while applying the effective default profile. A profile the
+    user selects explicitly MUST replace the default. The new-session form MUST
+    show the same profiles that will apply.
+18. A session on a multi-repository environment MUST run in an isolated sandbox.
+    One repository MUST run at `/workspace/<name>`. Several MUST each be cloned
+    at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
+    Setup MUST run once. Each additional repository MAY have its own branch;
+    otherwise it MUST use the session's generated branch.
+19. Saving a multi-repository environment with a Vercel sandbox MUST fail, and
+    so MUST a session request for one. A saved default of that kind (repository
+    or owner) MUST be skipped, and the session MUST start on another sandbox.
+20. A new session MUST NOT start on a sandbox that another workspace uses. The
+    picker MUST NOT offer a shared sandbox. A request for the retired shared
+    sandbox MUST fail with a specific message, and a saved shared default MUST
+    be skipped so that the session starts on another sandbox.
 
 ### Preparation
 
@@ -121,8 +166,9 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild. A
-   failing or timed-out setup command MUST fail preparation and the turn.
+5. Setup commands MUST run on the first prepare and again on every rebuild,
+   except when restoring a private session disk snapshot. A failing or timed-out
+   setup command MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -138,12 +184,15 @@ repository.
 
 ### Environment snapshots
 
-1. A session MUST NOT save its workspace as a snapshot. Only an environment
-   build MAY create an environment snapshot.
+1. Only an environment build MAY create a reusable environment snapshot.
+   Private session disk snapshots MUST follow the separate session snapshot
+   rules below and MUST NOT be published as environment snapshots.
 2. A session that uses a repository environment MAY start from that
    environment's published snapshot when the owner, repository, sandbox image
    and runtime match and the snapshot revision is not newer than the
-   session's configuration revision. Otherwise, and when the lookup is unavailable, it MUST start from
+   session's configuration revision. For a multi-repository environment, the
+   environment, owner and the same list of repositories MUST match instead of
+   one repository. Otherwise, and when the lookup is unavailable, it MUST start from
    the base image. The lookup MUST NOT delay the start by more than 15 seconds
    and MUST NOT wait for a build.
 3. A session that starts from a snapshot MUST still run setup with the
@@ -164,9 +213,43 @@ repository.
    environment MUST cancel its builds.
 9. Automatic builds started by sessions MUST back off after repeated failures
    of one revision. A manual build MUST stay available during backoff.
-10. Environment, profile, and launch screens MUST show a non-blocking notice
-    that sessions can reuse a snapshot and cached files may retain earlier
-    values. The notice MUST NOT block a save or a launch or show a value.
+
+### Session disk snapshots
+
+1. Session disk snapshots MUST be disabled by default and enabled only for
+   explicitly enrolled users or organizations. Capture and restore MUST both
+   check enrollment independently of environment snapshot enrollment.
+2. An enrolled session MAY capture its container disk after two minutes idle,
+   using the existing wrapper heartbeat and sandbox alarm. Capture MUST NOT
+   delay turn completion or Stop and MUST run at most once per idle period.
+3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
+   owner. Only isolated, single-session native Cloudflare Containers at
+   `/workspace/app` with an interactive origin (`cloud-agent-web`, `desktop` or
+   `agent-manager`) MAY capture or restore. Allocations that hosted another
+   session MUST NOT produce a session snapshot.
+4. Capture publication MUST reject changed allocation, connection, preparation,
+   activity or session identity. Active heartbeats, new delivery, Stop and
+   release MUST invalidate older disk state. Capture failure MUST be best effort
+   without repeatedly retrying in the same idle period.
+5. A cold start MAY prefer its own compatible session snapshot over an
+   environment snapshot or base image. Selection MUST use the Sandbox DO's
+   local metadata and MUST NOT consume the snapshot before work is delivered.
+   Runtime release changes MUST NOT disqualify a checkpoint with compatible
+   startup mode and image. Downloaded startup MUST install the currently selected
+   Kilo and wrapper runtime over the restored disk.
+6. Restore MUST preserve local branches, unpushed commits, the Git index,
+   dirty, untracked and ignored files, and session home state. It MUST NOT run
+   environment-template adoption, checkout, setup replay, or older file recovery
+   over the restored disk. It MUST refresh current credentials and configuration,
+   reuse the restored session history with ordinary ingest fallback, and validate
+   workspace provenance before reporting ready.
+7. Unsupported runtimes, failed restore, or failed restored preparation MUST
+   use the bounded fresh-start fallback without silently hanging the session.
+   Existing history and worktree recovery MUST remain available on that fallback.
+8. A private disk snapshot MAY contain session credentials, caches, and user
+   secrets. It MUST NOT be shared with another session or an environment build.
+   Invalidation or session release MUST NOT claim physical deletion where the
+   provider offers no delete API.
 
 ### Turn
 
@@ -258,7 +341,9 @@ repository.
    the user-set worktree name, otherwise the first surviving chat's non-default
    title, otherwise the repository and branch. This fallback MUST NOT depend on
    which chats are visible in the current search or recent-session page.
-   Selecting the worktree MUST open its latest chat. The row MUST remain visibly
+   Selecting the worktree MUST open its latest open chat; when all its listed
+   chats are closed, it MUST open the worktree without reopening any of them.
+   The row MUST remain visibly
    selected while any sibling is active and MUST reflect busy, question, or
    permission activity across all its chats. Its timestamp and overflow menu
    MUST share the session-row action slot. Associated pull-request information
@@ -303,7 +388,12 @@ repository.
 10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
     or stop its running work. Closed-tab preferences and tab order MUST survive
     refresh and remain scoped to the current user and personal or organization
-    context.
+    context. A closed chat MUST reopen only when the user opens that chat
+    itself, for example from the Sessions list or its own link. Selecting its
+    worktree, closing it while the app is still switching to it, going back
+    from the closed tab, refreshing or restoring a window, or another window
+    still showing the chat MUST NOT reopen it; a window
+    showing a chat closed elsewhere MUST move to an open chat or the worktree.
 11. The selected worktree MUST offer a **Sessions** list inside the split control's
     chevron menu, containing only closed chats and excluding already-open tabs.
     Most recently closed chats MUST appear first, including after refresh;
@@ -322,6 +412,73 @@ repository.
     and current personal or organization access MUST be checked server-side.
     Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
     MUST NOT permit late creation or ingestion to resurrect the worktree.
+14. Chats in one worktree MUST share one runtime and one MCP configuration.
+    Runtime and MCP configuration MUST NOT be isolated per chat, and a sibling
+    MUST NOT replace the worktree's configuration. Independent worktrees MUST
+    remain isolated. The worktree's MCP configuration MUST be established when
+    the worktree is created, MAY be restored when its runtime is rehydrated, and
+    MUST be reused by later chats.
+15. A workspace's delegated Cloud Agent MCP connection MAY create independent
+    child sessions and list, inspect, check exact message results, interrupt, or
+    send prompt follow-ups to its direct children. Each management operation
+    MUST check current canonical-parent authorization and persisted child
+    lineage, owner and organization. It MUST NOT manage the parent itself,
+    sibling chats or unrelated sessions. Child completion callbacks MUST target
+    either a new chat created in the parent's workspace
+    (`workspace:new-chat`) or one existing chat in that workspace
+    (`workspace:<session-id>`). The server MUST verify that a session target is
+    a root or sibling chat with the same owner, organization and workspace, and
+    that it is still accessible; it MUST reject a target outside the spawning
+    parent's workspace or any target that is a child session. The target chat
+    learns its own session id from the `cloud-agent-context` line in its turns.
+    A `workspace:new-chat` callback starts the new chat with the child result as
+    its first message, and every workspace callback MUST be idempotent for the
+    persisted callback message ID. A child completion callback MUST render as a
+    distinct child session message that identifies the child session, shows its
+    reported result or failure, and links to that session. It MUST NOT render
+    the serialized callback envelope as the user's message.
+
+### Watch PR (Observation-Only Pilot)
+
+Implementation status: lifecycle controls and activity are backend/API and MCP
+capabilities. Client watch controls and confirmation described below remain
+planned; the current client only shows passive PR hover-card observation counts.
+Watch PR admission is best-effort: observer errors do not fail the enclosing
+webhook. Only successfully persisted state survives; bounded Redis CI receipts
+are not a complete recovery mechanism. Exact recovery limits are documented in
+`docs/plans/cloud-agent-watch-pr.md`.
+
+1. An eligible verified GitHub PR MUST offer an accessible watch control without
+   requiring hover. Enabling a watch MUST require a writable grouped Cloud Agent
+   worktree, current repository access, an open same-repository PR, and pilot
+   enablement. Arbitrary PR URLs, fork PRs, and legacy ungrouped sessions MUST NOT
+   be eligible.
+2. The confirmation MUST state that this pilot observes future delivered webhook
+   events only. Pre-existing reviews and checks MAY be missing. It MUST clearly
+   state that no automatic repair, agent run, edit, or push occurs. Saved repair
+   preferences MUST NOT authorize present or future automatic writes, and MUST
+   NOT hide observed problems.
+3. Watch state and observations MUST survive closing the browser and sleeping
+   compute. Waiting MUST NOT start or keep an environment awake or incur agent
+   usage charges. Watching MUST NOT promise complete GitHub delivery coverage or
+   merge readiness.
+4. Details MUST distinguish Watching, Paused, Finished, observed problems, and
+   observations needing attention. Empty evidence MAY say **No observed problems**
+   only alongside future-event coverage and last-received timing. Pending,
+   ambiguous, and truncated evidence MUST NOT be presented as merge readiness.
+5. The user MUST be able to Pause, Resume when pilot enablement permits it, Stop
+   watching, and inspect recent activity. Pause MUST preserve observations and
+   MUST NOT cause automated execution. Stop, confirmed PR closure/merge, expiry,
+   and source worktree deletion MUST fence further watch work. A finished watch
+   MUST NOT restart from a delayed webhook or PR reopen event.
+6. **Recheck PR lifecycle** MUST be an explicit user action. This pilot's recheck
+   MUST state that it verifies PR identity and open/closed/merged lifecycle only,
+   not review or check completeness. Refreshing the watch display MUST NOT fetch
+   GitHub state. Existing watches MUST remain manageable when new enablement is
+   disabled.
+7. One PR's control MUST NOT display or mutate a different PR's watch, including
+   sibling chats and worktrees reused for another PR. Stale controls MUST fail
+   visibly and allow refreshing rather than silently overwriting newer state.
 
 ### Sandbox Status
 
@@ -342,8 +499,9 @@ repository.
    provider information rather than an arbitrary provider string. When present,
    `runtime` MUST contain only nullable `sandboxType`, `kiloCliVersion`,
    `wrapperVersion`, `startedAt`, and `stoppedAt` fields. Sandbox types MUST be
-   bounded to shared, isolated-small, isolated-standard, code-review,
-   devcontainer, containers-standard-3, containers-standard-4, or unknown.
+   bounded to shared (legacy sessions only), isolated-small,
+   isolated-standard, code-review, devcontainer, containers-standard-3,
+   containers-standard-4, or unknown.
    Versions MUST be bounded, validated values reported
    by the relevant runtime, not inferred from the current deployment. Runtime
    identifiers, owner identifiers, infrastructure addresses or regions,
@@ -508,7 +666,57 @@ The following use SHOULD and are not enforced today:
    path currently logs the failure and continues, so the same session can look
    ready with setup half-done.)
 
+4. A session on a multi-repository environment has these gaps:
+   - A GitHub repository that is reachable only through a connection that is
+     restricted to agents is not found.
+   - GraphQL requests in the additional repositories use the access of the
+     launch repository.
+   - A repository on another git platform than the launch repository gets no
+     CLI token.
+   - A repository that cannot be authorized fails the start with a generic
+     message that does not name it. A timeout while authorizing fails as a
+     workspace setup failure.
+   - The sandbox picker does not know the environment. It can show a Vercel
+     default that the session skips.
+   - With several repositories, the agent runs at `/workspace` and does not
+     load the `AGENTS.md` or skills of each repository.
+
 ## Changelog
+
+### 2026-11-04 -- One sandbox per workspace
+
+- One sandbox serves one workspace only. The shared sandbox is retired: new
+  sessions cannot request it, and a saved shared default is skipped.
+- Stored sessions, settings and triggers that name the shared sandbox still
+  load. A session on it does not resume and needs a new session.
+
+### 2026-11-03 -- Environment selection preferences
+
+- Remember the environment choice per repository and personal/organization scope.
+- Apply the effective default profile to multi-repository environments unless an
+  explicit profile replaces it. Repository bindings remain ignored.
+
+### 2026-11-03 -- Snapshot notice removal
+
+- Removed the snapshot-reuse notice requirement to match the simplified
+  environment, profile, and launch screens. Snapshot reuse and cached-file
+  retention rules remain unchanged.
+
+### 2026-10-31 -- Worktree-owned runtime and MCP configuration
+
+- Chats in one worktree share the worktree's runtime and MCP configuration; they
+  are not isolated from each other per chat.
+- Independent worktrees remain isolated. MCP configuration is established when
+  the worktree is created or rehydrated and is reused by later chats.
+
+### 2026-10-29 -- Multi-repository environments
+
+- An environment can contain several repositories, and a repository can be in
+  several environments. One match applies; several need a choice in the web UI
+  and give no environment elsewhere.
+- Multi-repository environments ignore the repository binding and the implicit
+  default profile, run in an isolated sandbox under `/workspace`, and start only
+  from a snapshot of the same repositories.
 
 ### 2026-10-22 -- Environment editor and profile transition
 
@@ -536,6 +744,13 @@ The following use SHOULD and are not enforced today:
   base image, consumed by sessions of the same environment and an equal or
   newer revision, with a bounded lookup and one fresh fallback.
 - Removed session capture and the "saving the repository" preparation step.
+
+### 2026-10-15 -- Observation-only Watch PR pilot
+
+- Added the flagged observation-only contract, lifecycle controls, future-event
+  coverage, and lifecycle-only manual recheck. Automatic repairs remain blocked
+  on exclusive runtime admission and revocable publication enforcement; this is
+  not the automatic-repair MVP in `docs/plans/cloud-agent-watch-pr.md`.
 
 ### 2026-10-07 -- Repository environments
 

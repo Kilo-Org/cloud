@@ -5,6 +5,7 @@ import {
   isProfileScopeStale,
   staleProfileScopeExit,
 } from '@/components/profiles/profile-scope-model';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -19,13 +20,15 @@ type StackNavigation = {
 };
 
 /**
- * Leave a profile route whose organization is no longer the account the app
- * shows, and report whether it is stale so the caller can keep the previous
- * account's profile off screen while the dismissal runs.
+ * Leave a profile route that shows the account the app has switched away from,
+ * and report whether it is stale so the caller can keep the previous account's
+ * profile off screen while the dismissal runs.
  *
  * The account switch itself changes no navigation state (`setOrganizationId`),
  * so a detail pushed under the previous account stays mounted and keeps reading
- * and writing that organization's profile. This closes it.
+ * and writing that organization's profile. This closes it: back to the list it
+ * was opened from, back to the screen that opened it, or past a pushed list
+ * when it is the only route of its stack (`staleProfileScopeExit`).
  *
  * Focus is part of the decision, not only of the call: the tabs freeze a
  * blurred scene (`freezeOnBlur`), so a switch made from another tab settles
@@ -38,6 +41,7 @@ export function useLeaveStaleProfileScope(
 ): boolean {
   const router = useRouter();
   const navigation = useNavigation<StackNavigation>();
+  const { replace: pushPastStale } = useStackSafeReplace();
   const routeFocused = useRouteFocused();
   const { organizationId, isLoaded } = useOrganization();
   // The account this screen was opened under. A screen may legitimately carry
@@ -62,18 +66,21 @@ export function useLeaveStaleProfileScope(
       return;
     }
     const state = navigation.getState();
-    if (
-      staleProfileScopeExit({
-        routes: state.routes,
-        currentIndex: state.index,
-        profilesRouteName: getProfilesRouteName(stack),
-      }) === 'profiles-list'
-    ) {
+    const exit = staleProfileScopeExit({
+      routes: state.routes,
+      currentIndex: state.index,
+      profilesRouteName: getProfilesRouteName(stack),
+    });
+    if (exit === 'profiles-list') {
       router.dismissTo(getProfilesPath(stack));
       return;
     }
+    if (exit === 'push-list') {
+      pushPastStale(getProfilesPath(stack));
+      return;
+    }
     router.back();
-  }, [navigation, routeFocused, router, stack, stale]);
+  }, [navigation, pushPastStale, routeFocused, router, stack, stale]);
 
   return stale;
 }

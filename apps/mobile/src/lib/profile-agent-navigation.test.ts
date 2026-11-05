@@ -8,6 +8,9 @@ import {
   getProfileCommandsPath,
   getProfileMcpPath,
   getProfileOverviewPath,
+  getProfileOverviewRouteName,
+  getProfileRouteNames,
+  getProfileSectionRouteName,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
   getProfilesPath,
@@ -81,7 +84,7 @@ describe('Profile management paths', () => {
   });
 
   it('carries the organization id on each organization profile tab path', () => {
-    expect(getProfileOverviewPath('profile-1', 'org-1')).toBe(
+    expect(getProfileOverviewPath('profile-1', { organizationId: 'org-1' })).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/profile-1?organizationId=org-1'
     );
     expect(getProfileVariablesPath('profile-1', 'org-1')).toBe(
@@ -109,14 +112,14 @@ describe('Profile management paths in the app stack', () => {
   it('builds the entry a root-level screen opens', () => {
     expect(getProfilesPath('app')).toBe('/(app)/profile-management');
     expect(getNewProfilePath('app')).toBe('/(app)/profile-management/new');
-    expect(getRepoBindingsPath(undefined, 'app')).toBe('/(app)/profile-management/repo-bindings');
-    expect(getRepoBindingsPath('org-1', 'app')).toBe(
+    expect(getRepoBindingsPath({ stack: 'app' })).toBe('/(app)/profile-management/repo-bindings');
+    expect(getRepoBindingsPath({ organizationId: 'org-1', stack: 'app' })).toBe(
       '/(app)/profile-management/repo-bindings?organizationId=org-1'
     );
   });
 
   it('keeps every profile screen in the stack that opened it', () => {
-    expect(getProfileOverviewPath('profile-1', undefined, 'app')).toBe(
+    expect(getProfileOverviewPath('profile-1', { stack: 'app' })).toBe(
       '/(app)/profile-management/profile-1'
     );
     expect(getProfileVariablesPath('profile-1', 'org-1', 'app')).toBe(
@@ -141,7 +144,7 @@ describe('Profile management paths in the app stack', () => {
 
   it('defaults to the Profile tab stack', () => {
     expect(getNewProfilePath()).toBe('/(app)/(tabs)/(3_profile)/profiles/new');
-    expect(getRepoBindingsPath('org-1')).toBe(
+    expect(getRepoBindingsPath({ organizationId: 'org-1' })).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/repo-bindings?organizationId=org-1'
     );
   });
@@ -163,5 +166,60 @@ describe('Profile management paths in the app stack', () => {
         organizationId: 'org-1',
       })
     ).toBe('/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1');
+  });
+});
+
+describe('Profile route names', () => {
+  it('names the overview and each section the way the Stack registers them', () => {
+    expect(getProfileOverviewRouteName()).toBe('profiles/[profileId]/index');
+    expect(getProfileOverviewRouteName('app')).toBe('profile-management/[profileId]/index');
+    expect(getProfileSectionRouteName('agents')).toBe('profiles/[profileId]/agents');
+    expect(getProfileSectionRouteName('slash-commands', 'app')).toBe(
+      'profile-management/[profileId]/slash-commands'
+    );
+  });
+
+  it('lists every profile screen of a Stack, the list first', () => {
+    expect(getProfileRouteNames('app')).toEqual([
+      'profile-management/index',
+      'profile-management/new',
+      'profile-management/repo-bindings',
+      'profile-management/[profileId]/index',
+      'profile-management/[profileId]/agents',
+      'profile-management/[profileId]/commands',
+      'profile-management/[profileId]/mcp',
+      'profile-management/[profileId]/skills',
+      'profile-management/[profileId]/slash-commands',
+      'profile-management/[profileId]/variables',
+    ]);
+    expect(getProfileRouteNames()[0]).toBe('profiles/index');
+    expect(getProfileRouteNames()).toHaveLength(10);
+  });
+});
+
+describe('Profile routes opened from outside the tree', () => {
+  it('carries the opener that keeps Back with the screen that asked', () => {
+    expect(
+      getRepoBindingsPath({ organizationId: 'org-1', stack: 'app', openedFrom: 'composer' })
+    ).toBe('/(app)/profile-management/repo-bindings?organizationId=org-1&openedFrom=composer');
+    expect(getProfileOverviewPath('profile-1', { stack: 'app', openedFrom: 'session' })).toBe(
+      '/(app)/profile-management/profile-1?openedFrom=session'
+    );
+    expect(
+      getProfileOverviewPath('profile-1', { organizationId: 'org-1', openedFrom: 'session' })
+    ).toBe('/(app)/(tabs)/(3_profile)/profiles/profile-1?organizationId=org-1&openedFrom=session');
+  });
+
+  it('carries the opener into the create form the repository defaults open', () => {
+    expect(
+      getNewProfilePath('app', {
+        owner: 'organization',
+        returnTo: 'back',
+        organizationId: 'org-1',
+        openedFrom: 'composer',
+      })
+    ).toBe(
+      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1&openedFrom=composer'
+    );
   });
 });

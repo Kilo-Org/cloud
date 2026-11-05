@@ -37,6 +37,21 @@ export function parseTimestamp(value: string | null | undefined): Date {
   return new Date(iso);
 }
 
+/**
+ * Epoch milliseconds of one backend time, or null when it is missing or does not
+ * parse.
+ *
+ * Every comparison, sort, and duration in the shared surface code reads an
+ * instant through this helper, so they all interpret a timestamp the same way.
+ * A row whose time does not parse yields null and its caller takes its own
+ * fallback — skipped in an aggregation, ranked last in a sort — rather than
+ * being read as now, which would understate a wait or invent activity.
+ */
+export function timestampMs(value: string | null | undefined): number | null {
+  const at = parseTimestamp(value).getTime();
+  return Number.isFinite(at) ? at : null;
+}
+
 /** Returns the first non-empty string, or '' when none is set. */
 export function firstNonEmpty(...values: (string | null | undefined)[]): string {
   for (const value of values) {

@@ -40,6 +40,7 @@ import {
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
+  inference_region,
   microdollar_usage_metadata,
   microdollar_usage_view,
   organization_user_usage,
@@ -54,8 +55,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
@@ -188,7 +191,7 @@ describe('processOpenRouterUsage', () => {
     );
 
     test('bills the reported cost from providers that never report is_byok', () => {
-      const result = processOpenRouterUsage(usage, coreProps, 'martian');
+      const result = processOpenRouterUsage(usage, coreProps, 'direct-byok');
 
       expect(result.cost_mUsd).toBe(75966);
       expect(result.is_byok).toBeNull();
@@ -933,6 +936,7 @@ describe('logMicrodollarUsage', () => {
       project_id: null,
       requested_model: 'anthropic/claude-3.7-sonnet',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'You are a helpful assistant',
         system_prompt_length: 'You are a helpful assistant'.length,
@@ -950,6 +954,7 @@ describe('logMicrodollarUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
@@ -1037,6 +1042,36 @@ describe('logMicrodollarUsage', () => {
     }
   );
 
+  test.each([
+    { region: 'eu', stored: true },
+    { region: null, stored: false },
+  ] as const)('stores inference region $region in the lookup table', async ({ region, stored }) => {
+    const user = await insertTestUser({
+      id: `test-log-user-region-${region}`,
+      microdollars_used: 1000,
+      google_user_email: `test-region-${region}@example.com`,
+    });
+    const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-region-${region}` };
+
+    await logMicrodollarUsage(usageStats, {
+      ...createBaseUsageContext(user),
+      inference_region: region,
+    });
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+    });
+    if (!stored) {
+      expect(metadataRecord?.inference_region_id).toBeNull();
+      return;
+    }
+    const [lookup] = await db
+      .select()
+      .from(inference_region)
+      .where(eq(inference_region.inference_region_id, metadataRecord!.inference_region_id!));
+    expect(lookup?.inference_region).toBe('eu');
+  });
+
   test('stores session_id when provided', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-session',
@@ -1061,6 +1096,26 @@ describe('logMicrodollarUsage', () => {
     });
     expect(metadataRecord).toBeTruthy();
     expect(metadataRecord?.session_id).toBe('task-abc123');
+  });
+
+  test('stores the usage and metadata rows under the id chosen before the request', async () => {
+    const user = await insertTestUser({ microdollars_used: 0 });
+    const usageId = crypto.randomUUID();
+
+    const usageIdentity = await logMicrodollarUsage(
+      { ...BASE_USAGE_STATS, messageId: `test-msg-${usageId}` },
+      { ...createBaseUsageContext(user), usageId }
+    );
+
+    expect(usageIdentity?.usageId).toBe(usageId);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, usageId),
+    });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, usageId),
+    });
+    expect(usageRecord?.kilo_user_id).toBe(user.id);
+    expect(metadataRecord?.message_id).toBe(`test-msg-${usageId}`);
   });
 
   test('stores usage data without incrementing user microdollars for zero cost', async () => {
@@ -1703,7 +1758,7 @@ describe('logMicrodollarUsage', () => {
 
         expect(fetchGeneration).toHaveBeenCalledWith(
           'gen-stt-123',
-          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+          expect.objectContaining({ type: 'openrouter', apiKey: expectedApiKey })
         );
       }
     );
@@ -1842,24 +1897,74 @@ describe('logMicrodollarUsage', () => {
     expect(metadataRecord?.is_free).toBe(true);
   });
 
-  test.each(['deleted', 'unavailable'] as const)(
-    'keeps a selected custom LLM free when its catalog entry is %s',
-    async catalogState => {
+  test('bills custom LLM usage at the custom LLM pricing instead of the upstream cost', async () => {
+    const user = await insertTestUser({
+      id: 'test-custom-llm-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'custom-llm-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 300, cacheDiscount_mUsd: 50 },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'custom',
+        requested_model: 'acme/priced-custom-model',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({ provider: 'custom', cost: pricedCost });
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord).toMatchObject({ is_free: false, market_cost: 300 });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
+  test.each([
+    ['custom', 'deleted'],
+    ['custom', 'unavailable'],
+    ['custom-public', 'deleted'],
+    ['custom-public', 'unavailable'],
+  ] as const)(
+    'preserves selected %s usage when its catalog entry is %s',
+    async (provider, catalogState) => {
       const user = await insertTestUser({
-        id: `test-${catalogState}-custom-llm-user`,
+        id: `test-${catalogState}-${provider}-llm-user`,
         microdollars_used: 1000,
-        google_user_email: `${catalogState}-custom-llm@example.com`,
+        google_user_email: `${catalogState}-${provider}-llm@example.com`,
       });
       const organization = await createTestOrganization('Deleted custom LLM', user.id, 10_000);
-      const modelId = `acme/${catalogState}-custom-model`;
-      await insertCustomLlmForTest(modelId);
+      const modelId = `acme/${catalogState}-${provider}-model`;
+      await insertCustomLlmForTest(
+        modelId,
+        provider === 'custom-public' ? publicCustomLlmDefinition(['acme']) : customLlmDefinition()
+      );
       const catalogReadSpy = jest.spyOn(readDb, 'select');
       try {
         expect(await isCustomLlm(modelId)).toBe(true);
         const usageContext: MicrodollarUsageContext = {
           ...createBaseUsageContext(user),
           organizationId: organization.id,
-          provider: 'custom',
+          provider,
           requested_model: modelId,
           is_free: true,
         };
@@ -1880,7 +1985,13 @@ describe('logMicrodollarUsage', () => {
         const usageRecord = await db.query.microdollar_usage.findFirst({
           where: eq(microdollar_usage.id, result.usageId),
         });
-        expect(usageRecord).toMatchObject({ provider: 'custom', cost: 0, cache_discount: 0 });
+        expect(usageRecord).toMatchObject({
+          provider,
+          model: modelId,
+          requested_model: modelId,
+          cost: 0,
+          cache_discount: 0,
+        });
         const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
           where: eq(microdollar_usage_metadata.id, result.usageId),
         });
@@ -1928,6 +2039,133 @@ describe('logMicrodollarUsage', () => {
       market_cost: 700,
     });
     expect((await findUserById(user.id))?.microdollars_used).toBe(userByok ? 1000 : 1700);
+  });
+
+  describe.each([
+    {
+      apiKind: 'chat_completions',
+      response: {
+        id: 'direct-chat',
+        model: 'upstream-model',
+        choices: [
+          { index: 0, message: { content: 'hi' }, delta: { content: 'hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+      },
+    },
+    {
+      apiKind: 'messages',
+      response: {
+        id: 'direct-message',
+        model: 'upstream-model',
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 2 },
+      },
+    },
+    {
+      apiKind: 'responses',
+      response: {
+        id: 'direct-response',
+        model: 'upstream-model',
+        status: 'completed',
+        output: [],
+        usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
+      },
+    },
+  ] as const)('direct BYOK $apiKind usage', ({ apiKind, response }) => {
+    test.each([false, true])(
+      'persists the serving inference provider with streaming=%s',
+      async isStreaming => {
+        const user = await insertTestUser();
+        const events =
+          apiKind === 'messages'
+            ? [
+                { type: 'message_start', message: response },
+                {
+                  type: 'message_delta',
+                  delta: { stop_reason: 'end_turn' },
+                  usage: response.usage,
+                },
+              ]
+            : apiKind === 'responses'
+              ? [{ type: 'response.completed', response }]
+              : [response];
+        const body = isStreaming
+          ? events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
+          : JSON.stringify(response);
+
+        const result = await countAndStoreUsage(
+          new Response(body),
+          {
+            ...createBaseUsageContext(user),
+            api_kind: apiKind,
+            provider: 'direct-byok',
+            user_byok: true,
+            isStreaming,
+            requested_model: 'neuralwatt/upstream-model',
+          },
+          undefined,
+          { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'neuralwatt' }
+        );
+
+        assert(result);
+        const usageRecord = await db.query.microdollar_usage.findFirst({
+          where: eq(microdollar_usage.id, result.usageId),
+        });
+        expect(usageRecord).toMatchObject({
+          provider: 'direct-byok',
+          inference_provider: 'neuralwatt',
+          input_tokens: 10,
+          output_tokens: 2,
+          has_error: false,
+        });
+      }
+    );
+  });
+
+  test.each([
+    {
+      name: 'preserves the upstream inference provider',
+      upstream: 'upstream-provider',
+      servingProvider: { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'z-ai' },
+      expected: 'upstream-provider',
+    },
+    {
+      name: 'leaves unknown direct BYOK attribution null',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, type: 'direct-byok' },
+      expected: null,
+    },
+    {
+      name: 'leaves attribution null without a serving provider',
+      upstream: null,
+      servingProvider: undefined,
+      expected: null,
+    },
+    {
+      name: 'uses configured attribution regardless of provider type',
+      upstream: null,
+      servingProvider: { ...OPENROUTER, inferenceProviderId: 'z-ai' },
+      expected: 'z-ai',
+    },
+  ] as const)('$name', async ({ upstream, servingProvider, expected }) => {
+    const user = await insertTestUser();
+    const result = await processTokenData(
+      { ...BASE_USAGE_STATS, messageId: null, inference_provider: upstream },
+      {
+        ...createBaseUsageContext(user),
+        provider: servingProvider?.type ?? 'direct-byok',
+        user_byok: true,
+      },
+      servingProvider
+    );
+
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord?.inference_provider).toBe(expected);
   });
 
   test.each([
@@ -2340,6 +2578,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       project_id: null,
       requested_model: 'provider/requested-model',
       is_free: false,
+      custom_llm_pricing: null,
       promptInfo: {
         system_prompt_prefix: 'sys-prefix',
         system_prompt_length: 10,
@@ -2357,6 +2596,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     }) satisfies MicrodollarUsageContext;

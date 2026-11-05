@@ -13,21 +13,21 @@
 
 /**
  * Whether the profile route has lost its account: the account the app shows
- * changed away from the one this screen was opened under, and the route still
- * names an organization that is not the new account.
+ * changed away from the one this screen was opened under, and the route names
+ * that same account.
  *
- * Only a route that names an organization can go stale: a personal profile has
- * no organization id and stays readable in every context, exactly as the
- * profiles list shows personal profiles inside an organization context
- * (`profile-owner-model.ts`, `splitProfilesByOwner`).
+ * Only the account's own screen can go stale. A profile route carries the
+ * organization it shows, which is not always the persisted selection: an agent
+ * session renders and opens the profile of its own organization
+ * (`session-detail-content.tsx`), and the new-session composer can carry an
+ * organization the selection does not (`new-session-organization.ts`). Those
+ * screens were opened for a scope of their own and keep working when an account
+ * they never showed changes underneath them; the defect is a screen that shows
+ * the previous account's profile.
  *
- * A screen mounted under one account is not stale because its route names
- * another one. Organization-scoped profile screens are legitimately opened for
- * a scope that is not the persisted selection — an agent session renders and
- * opens the profile of its own organization (`session-detail-content.tsx`), and
- * the new-session composer can carry an organization the selection does not
- * (`new-session-organization.ts`). Those screens must keep working; the defect
- * is a screen that outlives a switch made while it was mounted.
+ * A personal profile carries no organization and stays readable in every
+ * context, exactly as the profiles list shows personal profiles inside an
+ * organization context (`profile-owner-model.ts`, `splitProfilesByOwner`).
  */
 export function isProfileScopeStale({
   isLoaded,
@@ -48,13 +48,13 @@ export function isProfileScopeStale({
     return false;
   }
   return (
-    activeOrganizationId !== openedUnderOrganizationId &&
-    routeOrganizationId !== activeOrganizationId
+    routeOrganizationId === openedUnderOrganizationId &&
+    activeOrganizationId !== openedUnderOrganizationId
   );
 }
 
-/** How a stale profile screen leaves: to the profiles list, or back one route. */
-export type StaleProfileScopeExit = 'profiles-list' | 'back';
+/** How a stale profile screen leaves: to the profiles list, back, or past a pushed list. */
+export type StaleProfileScopeExit = 'profiles-list' | 'back' | 'push-list';
 
 /**
  * The way out of a stale profile route.
@@ -62,12 +62,16 @@ export type StaleProfileScopeExit = 'profiles-list' | 'back';
  * The profiles list is the screen the stale detail was opened from in the
  * Profile tab stack and in both list entries of the root stack, so returning to
  * it truncates the stack with a single pop (`router.dismissTo` dispatches
- * POP_TO over the existing route). When the list is not beneath — a profile
- * detail opened from an agent session in the root stack — the same call would
- * have to remove the current route and insert the list in one commit, the
- * native-stack swap `stack-safe-replace.ts` avoids on Android, so the screen
- * goes back to the route that opened it instead. A detail with nothing beneath
- * it has no pop to make, and the list is the only screen left to show.
+ * POP_TO over the existing route) while the list is already beneath.
+ *
+ * POP_TO with no matching route rewrites the stack in one commit — the vendored
+ * `StackRouter` keeps `activeRoutes.slice(0, currentIndex)` and appends the
+ * list — the remove-and-insert shape that crashes the Android native stack
+ * (`stack-safe-replace.ts`). So when the list is not beneath,
+ * the screen goes back to the route that opened it. A detail with nothing
+ * beneath it — restored or deep-linked as the only route of its stack — has
+ * neither a pop to make nor a list to reuse: it pushes the list and retires
+ * itself after the transition.
  */
 export function staleProfileScopeExit({
   routes,
@@ -84,8 +88,8 @@ export function staleProfileScopeExit({
   const listBeneath = routes
     .slice(0, Math.max(currentIndex, 0))
     .some(route => route.name === profilesRouteName);
-  if (listBeneath || currentIndex <= 0) {
+  if (listBeneath) {
     return 'profiles-list';
   }
-  return 'back';
+  return currentIndex <= 0 ? 'push-list' : 'back';
 }

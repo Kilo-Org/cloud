@@ -20,28 +20,46 @@ journal entries, except in the cases that this section lists. If generated DDL
 is wrong, correct the schema and regenerate.
 
 For an index declared with Drizzle's `.concurrently()`, the generated SQL may
-receive only the transaction boundaries needed by this repository's
-transactional migrator: add `COMMIT;` immediately before and `BEGIN;`
-immediately after the unchanged generated `CREATE [UNIQUE] INDEX CONCURRENTLY`
-statement group, each separated with `--> statement-breakpoint`. Do not alter
-the generated index definition, name, or expression; leave snapshots, journal,
-and all other generated index DDL untouched. This narrow exception is not
-permission to hand-edit arbitrary generated DDL.
+receive only the hand edits below, which make the migration work with this
+repository's transactional migrator and safe to retry. Do not alter the
+generated index definition, name, or expression; leave snapshots, journal, and
+all other generated DDL untouched. This narrow exception is not permission to
+hand-edit arbitrary generated DDL.
 
-Do not automatically add `IF NOT EXISTS` to concurrent-index migrations. If a
-concurrent build fails, first inspect the index state; recover an invalid index
-explicitly with `DROP INDEX CONCURRENTLY` or `REINDEX INDEX CONCURRENTLY` as
-appropriate before retrying. `IF NOT EXISTS` can mask an invalid index.
+A concurrent build can be cancelled on any table, not only a large one. It
+waits for every transaction that was open when it started, on any table, so a
+long-running query elsewhere on the primary (for example an analytics sync)
+stalls it until the server default `statement_timeout` cancels it. A cancelled
+build leaves an `INVALID` index under its name and has already committed the
+migration's first transaction, but the migration is not recorded. Production
+deploys then fail on every retry until the migration is fixed. Every
+concurrent-index migration must therefore survive a retry:
 
-A second exception covers a long concurrent build on a large table. The
-production server sets a default `statement_timeout` that cancels such a build.
-Add `SET statement_timeout = 0;` after `COMMIT;` and `RESET statement_timeout;`
-before `BEGIN;`. A cancelled build still commits the migration's first
-transaction without recording the migration, so a retry must not fail on DDL
-that already applied. You can wrap that transaction's unchanged generated DDL in
-a `DO` block that skips it when its first created object exists, as
-`0314_scheduled_briefing_snapshots.sql` does. Precede the build with
-`DROP INDEX CONCURRENTLY IF EXISTS`. Leave the snapshot and journal untouched.
+1. Add `COMMIT;` immediately before and `BEGIN;` immediately after the unchanged
+   generated `CREATE [UNIQUE] INDEX CONCURRENTLY` statement group, each
+   separated with `--> statement-breakpoint`.
+2. Add `SET statement_timeout = 0;` after `COMMIT;` and `RESET
+   statement_timeout;` before `BEGIN;`. The deploy job's `timeout-minutes`
+   still caps how long the build can wait.
+3. Precede each `CREATE ... INDEX CONCURRENTLY` with `DROP INDEX CONCURRENTLY
+   IF EXISTS` for the same index name, so a retry rebuilds an `INVALID` index.
+4. If the first transaction, before `COMMIT;`, contains DDL that fails when
+   repeated (`CREATE TABLE`, `ADD COLUMN`, `ADD CONSTRAINT`), wrap that
+   unchanged generated DDL in a `DO` block that skips it when its first created
+   object exists. That transaction is atomic, so one object marks whether all
+   of it applied. Skip this step when the migration only builds indexes.
+
+`0314_scheduled_briefing_snapshots.sql` shows all four. Do not add `IF NOT
+EXISTS` to the `CREATE ... INDEX CONCURRENTLY` statements instead of step 3: it
+skips an `INVALID` index and leaves it broken.
+
+To recover a deploy that is already failing on a concurrent-index migration:
+
+- Check `drizzle.__drizzle_migrations` to confirm the migration is not recorded.
+- Check `pg_index.indisvalid` for each of its indexes.
+- Check `pg_stat_activity` for long-running transactions.
+- Then make the unrecorded migration retry-safe as above. Editing it is safe
+  because drizzle only compares the newest recorded migration timestamp.
 
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema

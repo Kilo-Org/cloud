@@ -1,9 +1,11 @@
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { MicrodollarUsage, Organization } from '@kilocode/db';
+import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { GatewayApiKind } from '@kilocode/usage-contracts';
 import type { OpenAI } from 'openai';
+import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 export type OpenRouterUsage = {
   cost?: number;
@@ -126,9 +128,11 @@ export type MicrodollarUsageContext = {
   kiloUserId: string;
   fraudHeaders: FraudDetectionHeaders;
   organizationId?: Organization['id'];
-  provider: ProviderId;
+  provider: ProviderType;
   requested_model: string;
   readonly is_free: boolean;
+  /** The requested custom LLM's pricing, which takes precedence over custom pricing. */
+  custom_llm_pricing: CustomPricingTiers | null;
   promptInfo: PromptInfo;
   max_tokens: number | null;
   has_middle_out_transform: boolean | null;
@@ -143,8 +147,6 @@ export type MicrodollarUsageContext = {
   /** True if user/org is using their own API key - cost should be zeroed out */
   user_byok: boolean;
   has_tools: boolean;
-  botId?: string;
-  tokenSource?: string;
   /** Which product feature generated this API call. NULL if header not sent. */
   feature: FeatureValue | null;
   /** Client session/task identifier from X-KiloCode-TaskId header. */
@@ -155,6 +157,8 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Bounded labels for the reasoning configuration requested by the client. */
   reasoning_setting: string | null;
+  /** The Vercel AI Gateway inference region the request was pinned to, or null for global routing. */
+  inference_region: string | null;
   /**
    * Time until the upstream response headers arrived, in milliseconds. Stored as
    * `latency` only when the usage stats do not carry a measured latency.
@@ -177,6 +181,13 @@ export type MicrodollarUsageContext = {
    * reports a usage event; absent only on the internal classifier overhead row.
    */
   bouncer?: BouncerUsageContext;
+  /**
+   * The `microdollar_usage` id, chosen before the upstream request so records written outside
+   * usage accounting can be keyed by it. Only a context that yields a single usage row may set
+   * it: a second row with the same id would be dropped as a redelivery and go unbilled.
+   */
+  usageId?: string;
+  providerMetadataCapture?: AiProviderMetadataCapture;
 };
 
 /**
@@ -285,6 +296,7 @@ export type UsageMetaData = {
   mode: string | null;
   auto_model: string | null;
   reasoning_setting: string | null;
+  inference_region: string | null;
   market_cost: number | null;
   non_inference_cost: number | null;
   is_free: boolean | null;

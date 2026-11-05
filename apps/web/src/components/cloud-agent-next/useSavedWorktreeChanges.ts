@@ -9,11 +9,13 @@ import type { RootRouter } from '@/routers/root-router';
 import { getWorktreeChangesQueryKey, preserveNewerWorktreeChanges } from './worktree-changes';
 
 export function useSavedWorktreeChanges({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
   enabled,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -21,8 +23,8 @@ export function useSavedWorktreeChanges({
 }) {
   const trpcClient = useRawTRPCClient();
   const queryKey = useMemo(
-    () => getWorktreeChangesQueryKey({ organizationId, worktreeId, cloudAgentSessionId }),
-    [organizationId, worktreeId, cloudAgentSessionId]
+    () => getWorktreeChangesQueryKey({ userId, organizationId, worktreeId, cloudAgentSessionId }),
+    [userId, organizationId, worktreeId, cloudAgentSessionId]
   );
   const saved = useQuery<GetWorktreeChangesOutput, TRPCClientErrorLike<RootRouter>>({
     queryKey,

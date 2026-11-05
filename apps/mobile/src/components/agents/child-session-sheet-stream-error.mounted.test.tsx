@@ -21,6 +21,10 @@ import { HELD_CHILD_LOAD_RETRY_MS } from './child-session-sheet';
 import { i18n } from '@/i18n';
 import { QueryError } from '@/components/query-error';
 
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));

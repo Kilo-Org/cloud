@@ -7,6 +7,13 @@ export const WastelandCredentialRecord = z.object({
   encrypted_token: z.string(),
   dolthub_org: z.string(),
   rig_handle: z.string().nullable(),
+  // The DoltHub org a verified flow established for this credential by
+  // writing to it (a join registration, or a bootstrap of a repository
+  // the org owns). Only the worker's own flows set it — the public
+  // `storeCredential` mutation never does — so a stored handle is only
+  // trusted together with a proof recorded here. Rows written before
+  // this column existed carry NULL and prove nothing.
+  proven_org: z.string().nullable(),
   // When true, the stored token has push access to the upstream — we
   // unlock "admin mode" (direct pushes, merge/accept controls). The user
   // sets this via an explicit checkbox on connect/settings; we don't
@@ -32,6 +39,7 @@ export function createTableWastelandCredentials(): string {
     encrypted_token: `text not null`,
     dolthub_org: `text not null`,
     rig_handle: `text`,
+    proven_org: `text`,
     is_upstream_admin: `integer not null default 0`,
     connected_at: `text not null default (datetime('now'))`,
   });
@@ -49,4 +57,15 @@ export function migrateAddIsUpstreamAdmin(sql: SqlStorage): void {
   sql.exec(
     `ALTER TABLE wasteland_credentials ADD COLUMN is_upstream_admin integer not null default 0`
   );
+}
+
+/**
+ * Idempotent migration that adds `proven_org`. Existing rows keep NULL,
+ * which is the intended meaning: their org was never recorded with a
+ * DoltHub proof, so nothing trusts it.
+ */
+export function migrateAddProvenOrg(sql: SqlStorage): void {
+  const cols = [...sql.exec<{ name: string }>(`PRAGMA table_info(wasteland_credentials)`)];
+  if (cols.some(c => c.name === 'proven_org')) return;
+  sql.exec(`ALTER TABLE wasteland_credentials ADD COLUMN proven_org text`);
 }

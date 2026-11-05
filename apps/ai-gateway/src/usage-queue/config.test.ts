@@ -7,17 +7,12 @@ test.each([undefined, '', 'cloudflare', 'VERCEL', 'other'])(
   transport => {
     const original = { ...process.env };
     try {
-      process.env.USAGE_QUEUE_ONLY_ENABLED = 'true';
       process.env.VERCEL_TARGET_ENV = 'staging';
       process.env.VERCEL_ENV = 'preview';
       process.env.BYOK_ENCRYPTION_KEY = 'synthetic-key';
       if (transport === undefined) delete process.env.USAGE_QUEUE_TRANSPORT;
       else process.env.USAGE_QUEUE_TRANSPORT = transport;
       jest.isolateModules(() => {
-        const actual = jest.requireActual<typeof ServerConfig>(
-          '@kilocode/web-shared/lib/config.server'
-        );
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(true);
         expect(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED
@@ -54,14 +49,10 @@ test.each(
         else process.env[key] = value;
       }
       jest.isolateModules(() => {
-        const actual = jest.requireActual<typeof ServerConfig>(
-          '@kilocode/web-shared/lib/config.server'
-        );
         expect(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED
         ).toBe(enabled);
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(enabled);
       });
     } finally {
       process.env = original;
@@ -74,7 +65,7 @@ test.each(
     [
       { region: 'sfo1', master: 'true', exposure: '1', selected: true },
       { region: 'sfo1', master: 'true', exposure: '0', selected: false },
-      { region: 'sfo1', master: 'false', exposure: '1', selected: false },
+      { region: 'sfo1', master: 'false', exposure: '1', selected: true },
       { region: 'fra1', master: 'true', exposure: '1', selected: false },
     ].map(config => ({ ...config, transport }))
   )
@@ -89,7 +80,6 @@ test.each(
       process.env.USAGE_QUEUE_ONLY_ENABLED = master;
       process.env.USAGE_QUEUE_SFO_EXPOSURE = exposure;
       process.env.BYOK_ENCRYPTION_KEY = 'synthetic-key';
-      delete process.env.USAGE_QUEUE_SFO_USER_IDS;
       if (transport === undefined) delete process.env.USAGE_QUEUE_TRANSPORT;
       else process.env.USAGE_QUEUE_TRANSPORT = transport;
       jest.isolateModules(() => {
@@ -99,7 +89,6 @@ test.each(
         const { isSfoUsageQueueSelected } = jest.requireActual<typeof SfoPolicy>(
           '@kilocode/web-shared/lib/ai-gateway/usage-queue-policy'
         );
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(false);
         expect(
           jest.requireActual<typeof QueueConfig>('@kilocode/usage-queue/vercel/config')
             .USAGE_VERCEL_QUEUE_ENABLED

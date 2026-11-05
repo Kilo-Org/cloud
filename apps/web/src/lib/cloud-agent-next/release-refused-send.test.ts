@@ -51,6 +51,55 @@ describe('releaseRefusedSend', () => {
     expect(mockRelease).not.toHaveBeenCalled();
   });
 
+  it('keeps the rows when the send timed out', async () => {
+    await releaseRefusedSend(
+      { attachments, error: refusal(408), kiloUserId: 'user-1', linkedObjectKeys },
+      dependencies
+    );
+
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it('keeps the rows when the caller closed the request', async () => {
+    await releaseRefusedSend(
+      { attachments, error: refusal(499), kiloUserId: 'user-1', linkedObjectKeys },
+      dependencies
+    );
+
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, true],
+    [401, true],
+    [402, true],
+    [403, true],
+    [404, true],
+    [405, true],
+    [408, false],
+    [409, true],
+    [412, true],
+    [413, true],
+    [415, true],
+    [422, true],
+    [429, true],
+    [499, false],
+    [501, false],
+    [503, false],
+    [418, false],
+    [700, false],
+  ] as const)(
+    'returns the rows for status %s only when it proves the worker refused',
+    async (status, releases) => {
+      await releaseRefusedSend(
+        { attachments, error: refusal(status), kiloUserId: 'user-1', linkedObjectKeys },
+        dependencies
+      );
+
+      expect(mockRelease).toHaveBeenCalledTimes(releases ? 1 : 0);
+    }
+  );
+
   it('returns the rows when the client rewrote a credits refusal', async () => {
     await releaseRefusedSend(
       {

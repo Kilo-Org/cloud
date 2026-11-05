@@ -119,7 +119,7 @@ export const DeleteHostedWorkspaceSessionOutput = z
 type HostedWorkspaceCreate = z.infer<typeof CreateHostedWorkspaceInput>;
 type HostedWorkspaceCreateResult = z.infer<typeof CreateHostedWorkspaceOutput>;
 
-function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeId {
+export function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeId {
   const parsed = cloudAgentWorktreeIdSchema.safeParse(
     `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
   );
@@ -155,7 +155,7 @@ export function hostedWorkspaceCreateRequest(input: HostedWorkspaceCreate): Sess
   };
 }
 
-async function verifyWorkspaceIdentity(
+export async function verifyWorkspaceIdentity(
   db: WorkerDb,
   userId: string,
   kiloSessionId: string,
@@ -401,6 +401,9 @@ async function resumeMissingSessionDeletion(input: {
     taxonomy: 'safe-retry',
     leaseSeconds: DELETE_LEDGER_LEASE_SECONDS,
   });
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
   assertSessionOperationIdentity(admission.row, {
     userId: input.userId,
     intent: 'delete_workspace_session',
@@ -544,6 +547,9 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       taxonomy: 'safe-retry',
       leaseSeconds: DELETE_LEDGER_LEASE_SECONDS,
     });
+    if (admission.admission === 'organization_mismatch') {
+      throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+    }
     assertSessionOperationIdentity(admission.row, {
       userId: ctx.userId,
       intent: 'delete_workspace_session',

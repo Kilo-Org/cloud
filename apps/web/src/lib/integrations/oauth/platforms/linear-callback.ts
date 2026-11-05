@@ -2,8 +2,9 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeLinearOAuthCode,
   fetchLinearOAuthIdentity,
@@ -33,6 +34,7 @@ import {
   buildIntegrationOAuthRedirectPathFromOwner,
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
+  organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
@@ -222,7 +224,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear OAuth error', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { error, state },
+        extra: { error, ...safeCallbackContext(searchParams) },
       });
       return NextResponse.redirect(
         new URL(
@@ -242,7 +244,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback missing code', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(
         new URL(
@@ -261,7 +263,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       captureMessage('Linear callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
-        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -286,8 +288,11 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
+    // An organization connection carries a shared bot token and model policy, and
+    // completing an install can move the connection to another workspace, so this
+    // completion requires the organization role that governs the integration.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
@@ -391,15 +396,27 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     const state = searchParams.get('state');
     const verified = state ? verifyOAuthState(state) : null;
 
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromOwner(
+            PLATFORM.LINEAR,
+            verified?.owner,
+            `error=${denialCode}`,
+            verified?.returnTo
+          ),
+          APP_URL
+        )
+      );
+    }
+
     captureException(error, {
       tags: {
         endpoint: 'linear/callback',
         source: 'linear_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

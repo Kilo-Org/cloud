@@ -54,8 +54,8 @@ function urlsOf(name: string, apiUrl: string, overrides: ProviderApiUrlOverrides
 // Every upstream URL hard-coded in the gateway's chat providers. Custom LLM
 // URLs come from the database, and the local fake LLM only runs in development.
 const PROVIDER_URLS = [
-  ...urlsOf(OPENROUTER.id, OPENROUTER.apiUrl, OPENROUTER.apiUrlOverrides),
-  ...urlsOf(VERCEL_AI_GATEWAY.id, VERCEL_AI_GATEWAY.apiUrl, VERCEL_AI_GATEWAY.apiUrlOverrides),
+  ...urlsOf(OPENROUTER.type, OPENROUTER.apiUrl, OPENROUTER.apiUrlOverrides),
+  ...urlsOf(VERCEL_AI_GATEWAY.type, VERCEL_AI_GATEWAY.apiUrl, VERCEL_AI_GATEWAY.apiUrlOverrides),
   ['openai-chatgpt', OPENAI_CHATGPT_API_URL],
 ];
 

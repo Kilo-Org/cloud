@@ -13,6 +13,12 @@ function neverResolves() {
   return jest.fn((_hostname: string) => new Promise<string[]>(() => {}));
 }
 
+function after(ms: number): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, ms);
+  return promise;
+}
+
 function check(url: string, resolveHostAddresses: ResolveHostAddresses, signal?: AbortSignal) {
   return findUpstreamUrlViolation(url, { resolveHostAddresses, signal });
 }
@@ -78,6 +84,18 @@ describe('findUpstreamUrlViolation', () => {
     expect(failing).toHaveBeenCalledTimes(2);
   });
 
+  it('retries a resolver that throws before returning a promise', async () => {
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      if (calls === 1) throw new Error('getaddrinfo EAI_AGAIN');
+      return Promise.resolve(['104.18.2.115']);
+    });
+
+    await expect(check('https://llm.example.com/v1', resolve)).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
   it('accepts a host whose first lookup fails transiently', async () => {
     const resolve = jest
       .fn(async (_hostname: string) => ['104.18.2.115'])
@@ -87,25 +105,39 @@ describe('findUpstreamUrlViolation', () => {
     expect(resolve).toHaveBeenCalledTimes(2);
   });
 
-  it('gives up on a stalled resolver after a deadline per attempt', async () => {
+  it('reports dns_lookup_failed after one deadline for a stalled resolver', async () => {
     const resolve = neverResolves();
     const startedAt = performance.now();
 
     await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBe(
       'dns_lookup_failed'
     );
-    expect(resolve).toHaveBeenCalledTimes(2);
-    expect(performance.now() - startedAt).toBeLessThan(6_000);
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(performance.now() - startedAt).toBeLessThan(3_000);
+  }, 10_000);
+
+  it('keeps a single attempt when the resolution settles after its deadline', async () => {
+    const resolve = jest.fn(async (_hostname: string) => {
+      await after(2_600);
+      return ['104.18.2.115'];
+    });
+
+    await expect(check('https://late.example.com/v1', resolve)).resolves.toBe('dns_lookup_failed');
+    await after(1_000);
+    expect(resolve).toHaveBeenCalledTimes(1);
   }, 10_000);
 
   it('rejects with the abort reason as soon as the signal aborts during a lookup', async () => {
+    const resolve = neverResolves();
     const controller = new AbortController();
     const reason = new DOMException('client went away', 'AbortError');
-    const pending = check('https://stalled.example.com/v1', neverResolves(), controller.signal);
+    const pending = check('https://stalled.example.com/v1', resolve, controller.signal);
 
     controller.abort(reason);
 
     await expect(pending).rejects.toBe(reason);
+    await after(200);
+    expect(resolve).toHaveBeenCalledTimes(1);
   });
 
   it('does not start a lookup when the signal has already aborted', async () => {
@@ -117,6 +149,15 @@ describe('findUpstreamUrlViolation', () => {
     ).rejects.toBe(reason);
     expect(resolve).not.toHaveBeenCalled();
   });
+
+  it('leaves no cached verdict for a host whose lookup reached the deadline', async () => {
+    const stalled = neverResolves();
+    await expect(check('https://slow.example.com/v1', stalled)).resolves.toBe('dns_lookup_failed');
+
+    const healthy = resolvesTo('104.18.2.115');
+    await expect(check('https://slow.example.com/v1', healthy)).resolves.toBeNull();
+    expect(healthy).toHaveBeenCalledTimes(1);
+  }, 10_000);
 
   it('reuses a public verdict but re-resolves a rejected host', async () => {
     const publicResolve = resolvesTo('104.18.2.115');

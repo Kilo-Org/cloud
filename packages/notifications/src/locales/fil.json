@@ -9,6 +9,7 @@
       "lowBalance": "Kailangan ng atensyon ang iyong balance",
       "spendAlert": "Kailangan ng atensyon ang iyong gastos",
       "securityFinding": "Kailangan ng atensyon ang isang security finding",
+      "securityUpdate": "May update ang isang security check",
       "activeAgentsGlanceable": "May update ang mga aktibong agent"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Kailangan ng atensyon ang isang security finding"
+      "body": "May update ang isang security check"
     }
   },
   "instanceLifecycle": {

@@ -315,7 +315,8 @@ export function PasskeysScreen() {
       <View className="gap-3">
         {SKELETON_ROWS.map(index => (
           <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            <Skeleton className="h-[18px] w-[18px] rounded" />
+            {/* Reserves the loaded row's 30 dp IconTile frame. */}
+            <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
             <View className="flex-1 gap-1.5">
               <Skeleton className="h-5 w-28" />
               <Skeleton className="h-4 w-40" />
@@ -391,7 +392,7 @@ export function PasskeysScreen() {
       <ScreenHeader title={t('profile.passkeysTitle')} />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4"
+        contentContainerClassName="gap-3 px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {body}
@@ -402,7 +403,7 @@ export function PasskeysScreen() {
           the query renders skeletons, no rows, or rows. The notice that
           explains a failed or unavailable add shares the slot, beside the
           control it is about. */}
-      <View className="gap-2 px-6 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
+      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
         {footerNotice}
         {addControl}
       </View>

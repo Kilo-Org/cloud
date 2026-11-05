@@ -126,9 +126,15 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
-Scope each PR form header with a native safe-area provider outside the scroll view.
-Apply its top inset with `SafeAreaView`, not the app root inset.
-Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
+its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
+once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`
+mode names which surface owns the top of the window (`always` for a full-screen surface that may apply its own
+top edge, `bottom-form-sheet`, `android-window-top`, `ios-page-sheet`, `never`). A formSheet that is its stack's
+first screen presents at the window top and its header reserves the inset; a sheet pushed over another screen
+settles an inset lower, so it reserves nothing — `useRouteIsStackRoot` (`@/lib/navigation/route-focus`) answers
+which, before the first frame.
+Keep `pt-5` for the sheet grabber on top of that clearance.
 
 ## Implementation Rules
 
@@ -146,8 +152,8 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
-- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
-- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
+- Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
 - Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
@@ -240,11 +246,13 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
+- The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
-- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one.
+- For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
 - For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
 
 ## Debugging
@@ -253,6 +261,10 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
 
 ## Chat tab
 

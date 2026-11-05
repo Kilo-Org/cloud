@@ -1,11 +1,6 @@
-// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
-import { createElement, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
+import { compileClassName, compiledDimensions } from '@/test/native-dimensions';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,27 +13,29 @@ import {
 import { Text } from './text';
 
 vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
-vi.mock('@/components/ui/activity-indicator', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-}));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The palette the ink table indexes. Every token it names is present, so a
+// variant whose mark token was added to the table without a mock entry fails
+// here as an undefined colour rather than passing silently.
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#123456',
     primary: '#345678',
     primaryForeground: '#abcdef',
+    secondaryForeground: '#123456',
+    destructive: '#654321',
+    destructiveSolidForeground: '#fedcba',
+    accentSoftTintForeground: '#1a1a10',
   }),
 }));
 
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function render(element: ReactElement) {
@@ -58,31 +55,19 @@ function render(element: ReactElement) {
 const busyWrappers = (node: TestRenderer.ReactTestInstance) =>
   node.findAll(n => `${n.props.className ?? ''}`.startsWith(BUTTON_BUSY_LABEL_CLASS));
 
+const BusyMark = 'ActivityIndicator' as ElementType;
+const busyMarks = (node: TestRenderer.ReactTestInstance) => node.findAllByType(BusyMark);
+
+/** The compiled box of the classes the button row carries. */
+function nativeDimensions(button: TestRenderer.ReactTestInstance) {
+  return compiledDimensions(button.props.className as string);
+}
+
 function renderButton({
   children = createElement(Text, null, 'Retry'),
   ...props
 }: ButtonProps = {}) {
   return render(createElement(Button, { accessibilityLabel: 'Retry', ...props }, children));
-}
-
-/** The native style a className compiles to, through the app's theme and installed compilers. */
-async function compiledStyles(className: string) {
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${className}; }`,
-    { from: import.meta.filename }
-  );
-  // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
-}
-
-function nativeDimensions(button: TestRenderer.ReactTestInstance) {
-  return compiledStyles(
-    (button.props.className as string)
-      .split(' ')
-      .filter(className => /^(?:min-h|h|w)-/.test(className))
-      .join(' ')
-  );
 }
 
 beforeEach(() => {
@@ -110,15 +95,15 @@ describe('Button native target contract', () => {
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 48 }]);
   });
 
-  it('keeps a 36-point compact minimum plus four-point hitSlop on every edge', async () => {
+  it('keeps a 36-point compact minimum plus five-point hitSlop on every edge', async () => {
     const button = renderButton({ size: 'sm' });
     expect(await nativeDimensions(button)).toEqual([{ minHeight: 36 }]);
-    expect(button.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
+    expect(button.props.hitSlop).toEqual({ top: 5, bottom: 5, left: 5, right: 5 });
   });
 
-  it('keeps an icon target 44 points wide and tall without requiring label content', async () => {
+  it('gives the icon size the shared 48dp target without label content', async () => {
     const button = renderButton({ size: 'icon', children: null, accessibilityLabel: 'Close' });
-    expect(await nativeDimensions(button)).toEqual([{ height: 44, width: 44 }]);
+    expect(await nativeDimensions(button)).toEqual([{ height: 48, width: 48 }]);
     expect(button.props.role).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Close');
   });
@@ -134,6 +119,7 @@ describe('Button native target contract', () => {
     'default',
     'destructive',
     'outline',
+    'outline-destructive',
     'secondary',
     'ghost',
     'link',
@@ -157,7 +143,7 @@ describe('Button native target contract', () => {
         disabled: true,
         busy: true,
       });
-      expect(button.findByType(ActivityIndicator).props.size).toBe('small');
+      expect(busyMarks(button)[0]?.props.size).toBe('small');
 
       const ready = renderButton({
         variant,
@@ -167,7 +153,7 @@ describe('Button native target contract', () => {
       expect(ready).toBe(button);
       expect(ready.findByType(NativeText)).toBe(label);
       expect(label.children).toEqual(['Retry']);
-      expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+      expect(busyMarks(ready)).toHaveLength(0);
       expect(ready.props.disabled).toBe(false);
       expect(ready.props.accessibilityState).toEqual({
         selected: true,
@@ -223,19 +209,20 @@ describe('Button native target contract', () => {
     expect(wrappers).toHaveLength(1);
     expect(wrappers[0]?.props.accessibilityElementsHidden).toBe(true);
     expect(wrappers[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
-    // The spinner is out of flow, so it adds no width of its own and sits on
-    // the button's centre rather than beside the label.
-    const spinner = button.findByType(ActivityIndicator);
-    expect(spinner.props.size).toBe('small');
-    expect(spinner.parent?.props.className).toBe(BUTTON_BUSY_OVERLAY_CLASS);
-    const overlayStyles = await compiledStyles(BUTTON_BUSY_OVERLAY_CLASS);
+    // The mark is out of flow, so it adds no width of its own and sits on the
+    // button's centre rather than beside the label.
+    const spinner = busyMarks(button)[0];
+    expect(spinner?.props.size).toBe('small');
+    const overlay = button.find(n => n.props.className === BUTTON_BUSY_OVERLAY_CLASS);
+    expect(overlay.findAllByType(BusyMark)).toHaveLength(1);
+    const overlayStyles = await compileClassName(BUTTON_BUSY_OVERLAY_CLASS);
     expect(overlayStyles).toContainEqual(expect.objectContaining({ position: 'absolute' }));
 
     // The wrapper and the label are the same elements once loading ends; only
-    // the opacity, the accessibility hiding and the indicator change.
+    // the opacity, the accessibility hiding and the mark change.
     const ready = renderButton({ loading: false });
     expect(ready.findByType(NativeText)).toBe(label);
-    expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(ready)).toHaveLength(0);
     expect(busyWrappers(ready)).toHaveLength(1);
     expect(busyWrappers(ready)[0]?.props.className).not.toContain('opacity-0');
   });
@@ -286,7 +273,7 @@ describe('Button native target contract', () => {
     const button = renderButton({ disabled: true, loading: false });
     expect(button.props.disabled).toBe(true);
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: false });
-    expect(button.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(button)).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
   });
 
@@ -322,8 +309,11 @@ describe('Button native target contract', () => {
     expect(classes).toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+    // A busy non-primary control has only its indicator to show, so it must not
+    // dim either: half opacity leaves an icon-only button looking empty on dark.
+    const outlined = renderButton({ variant: 'outline', size: 'icon', loading: true });
+    expect((outlined.props.className as string).split(' ')).not.toContain('opacity-50');
   });
-
   it('centers the label so a wrapped label stays under its own lines', () => {
     // Android can paint a wrapped label even when the layout reports one line;
     // centered text keeps the wrapped lines aligned under each other instead
@@ -354,7 +344,7 @@ describe('Button native target contract', () => {
     }
     const button = render(createElement(Action));
     expect(button.props.disabled).toBe(false);
-    expect(button.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(busyMarks(button)).toHaveLength(0);
     expect(button.findByType(NativeText).children).toEqual(['Start']);
     act(() => {
       (button.props.onPress as () => void)();

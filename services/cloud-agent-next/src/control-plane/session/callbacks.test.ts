@@ -19,59 +19,62 @@ const metadata = {
 } satisfies SessionMetadata;
 
 describe('control-plane callback recent activity', () => {
-  it('retains the parent message identity through durable outbox repair and retries', async () => {
-    const stored = new Map<string, PendingCallbackJob>();
-    const sent: PendingCallbackJob['job'][] = [];
-    const dependencies = {
-      storage: {
-        kv: {
-          get: <T>(key: string) => stored.get(key) as T | undefined,
-          put: (key: string, value: PendingCallbackJob) => stored.set(key, value),
-          delete: (key: string) => stored.delete(key),
-          list: () => stored,
-        } as DurableObjectStorage['kv'],
-      },
-      getMetadata: () => ({ ...metadata, callback: { target: { url: 'session:parent' } } }),
-      getCallbackQueue: () => ({
-        send: async (job: PendingCallbackJob['job']) => {
-          sent.push(structuredClone(job));
-          if (sent.length === 1) throw new Error('Ambiguous queue send');
-          return { metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } };
+  it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(
+    'retains the parent message identity through durable outbox repair and retries for %s',
+    async url => {
+      const stored = new Map<string, PendingCallbackJob>();
+      const sent: PendingCallbackJob['job'][] = [];
+      const dependencies = {
+        storage: {
+          kv: {
+            get: <T>(key: string) => stored.get(key) as T | undefined,
+            put: (key: string, value: PendingCallbackJob) => stored.set(key, value),
+            delete: (key: string) => stored.delete(key),
+            list: () => stored,
+          } as DurableObjectStorage['kv'],
         },
-      }),
-      getAssistantMessageForUserMessage: () => null,
-      getRecentAssistantMessagesForUserMessage: () => [],
-    };
-    const message = {
-      messageId: 'original_user',
-      intent: { agent: {} },
-      state: 'completed',
-      createdAt: 1,
-      acceptedAt: 2,
-      settledAt: 3,
-      reason: null,
-    } as SessionMessage;
-    const callbacks = createMessageCallbacks(dependencies);
-    expect(callbacks.persistDrainedBatchCallback([message], new Set([message.messageId]))).toBe(
-      true
-    );
-    const key = `${CALLBACK_OUTBOX_PREFIX}${message.messageId}`;
-    const pending = stored.get(key);
-    expect(pending?.job.parentSession).toEqual({
-      userId: metadata.identity.userId,
-      messageId: expect.stringMatching(/^msg_/),
-    });
-    expect(parseCallbackOutboxValue(pending)).toEqual(pending);
-    expect(
-      parseCallbackOutboxValue({ ...pending, job: { ...pending?.job, parentSession: undefined } })
-    ).toBeUndefined();
-    await callbacks.repair();
-    expect(stored.size).toBe(1);
-    await createMessageCallbacks(dependencies).repair(Date.now() + 60_000);
-    expect(sent).toHaveLength(2);
-    expect(sent[1]).toEqual(sent[0]);
-    expect(stored.size).toBe(0);
-  });
+        getMetadata: () => ({ ...metadata, callback: { target: { url } } }),
+        getCallbackQueue: () => ({
+          send: async (job: PendingCallbackJob['job']) => {
+            sent.push(structuredClone(job));
+            if (sent.length === 1) throw new Error('Ambiguous queue send');
+            return { metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } };
+          },
+        }),
+        getAssistantMessageForUserMessage: () => null,
+        getRecentAssistantMessagesForUserMessage: () => [],
+      };
+      const message = {
+        messageId: 'original_user',
+        intent: { agent: {} },
+        state: 'completed',
+        createdAt: 1,
+        acceptedAt: 2,
+        settledAt: 3,
+        reason: null,
+      } as SessionMessage;
+      const callbacks = createMessageCallbacks(dependencies);
+      expect(callbacks.persistDrainedBatchCallback([message], new Set([message.messageId]))).toBe(
+        true
+      );
+      const key = `${CALLBACK_OUTBOX_PREFIX}${message.messageId}`;
+      const pending = stored.get(key);
+      expect(pending?.job.parentSession).toEqual({
+        userId: metadata.identity.userId,
+        messageId: expect.stringMatching(/^msg_/),
+      });
+      expect(parseCallbackOutboxValue(pending)).toEqual(pending);
+      expect(
+        parseCallbackOutboxValue({ ...pending, job: { ...pending?.job, parentSession: undefined } })
+      ).toBeUndefined();
+      await callbacks.repair();
+      expect(stored.size).toBe(1);
+      await createMessageCallbacks(dependencies).repair(Date.now() + 60_000);
+      expect(sent).toHaveLength(2);
+      expect(sent[1]).toEqual(sent[0]);
+      expect(stored.size).toBe(0);
+    }
+  );
   it.each([
     { state: 'completed', finalText: '' },
     { state: 'completed', finalText: 'Complete answer' },

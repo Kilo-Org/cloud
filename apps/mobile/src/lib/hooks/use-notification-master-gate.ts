@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { getDevicePushToken, getNotificationPermissionStatus } from '@/lib/notifications';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 import { deriveGateSettled } from './agent-push-preference';
@@ -18,6 +19,12 @@ export type NotificationMasterGate = Readonly<{
   loading: boolean;
   /** Every input answered, including by failing. */
   settled: boolean;
+  /**
+   * Every input answered with data rather than failing. A surface may only
+   * claim pushes are off when this is true: a read that failed leaves the
+   * answer unknown.
+   */
+  answered: boolean;
   /** The OS allows this app to post notifications. */
   permissionGranted: boolean;
   /** OS permission granted and this device's token is registered on the account. */
@@ -52,6 +59,9 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   const pushTokens = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
     enabled: authToken != null,
+    // The history screen waits for this gate, so a paused read would hold its
+    // content behind a gate that never answers.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const settled = deriveGateSettled({
@@ -68,6 +78,9 @@ export function useNotificationMasterGate(): NotificationMasterGate {
   return {
     loading: !settled,
     settled,
+    answered:
+      permission.isSuccess &&
+      (!permissionGranted || (pushTokens.isSuccess && deviceToken.isSuccess)),
     permissionGranted,
     pushEnabled: permissionGranted && serverRegistered,
   };

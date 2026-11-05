@@ -1,7 +1,10 @@
 import { type ConnectionConfig, createConnection } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
-import { fetchCloudAgentStreamTicket } from '@/lib/cloud-agent-stream-ticket';
+import {
+  fetchCloudAgentStreamTicket,
+  type FetchStreamTicketOptions,
+} from '@/lib/cloud-agent-stream-ticket';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
@@ -29,7 +32,8 @@ type StreamConnectionLike = { connect: () => void; destroy: () => void };
 export type PendingPermissionResolverDeps = {
   getTicket?: (
     cloudAgentSessionId: string,
-    organizationId?: string
+    organizationId?: string,
+    options?: FetchStreamTicketOptions
   ) => Promise<{ ticket: string; expiresAt: number }>;
   createConnection?: (config: ConnectionConfig) => StreamConnectionLike;
   now?: () => number;
@@ -86,9 +90,14 @@ export async function resolvePendingPermissionId(
     let settled = false;
     let cancelDeadline: (() => void) | null = null;
     let connection: StreamConnectionLike | null = null;
+    // The budget covers the ticket POST as well as the stream: closing the read
+    // cancels whatever is still in flight, so no request outlives the settled
+    // promise and a second tap cannot stack another one behind it.
+    const ticketAbort = new AbortController();
     const close = (): void => {
       settled = true;
       cancelDeadline?.();
+      ticketAbort.abort();
       connection?.destroy();
     };
     const settle = (permissionId: string | null): void => {
@@ -112,7 +121,9 @@ export async function resolvePendingPermissionId(
     // end the ask as retryable rather than hold the worker for its full stop.
     const open = async (): Promise<void> => {
       try {
-        const ticket = await getTicket(input.cloudAgentSessionId, organizationId);
+        const ticket = await getTicket(input.cloudAgentSessionId, organizationId, {
+          signal: ticketAbort.signal,
+        });
         if (settled) {
           return;
         }

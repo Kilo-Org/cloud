@@ -31,6 +31,7 @@ import {
   resolveRemoteSpawnFailure,
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
 import { withComposerHandoff } from '@/lib/share-navigation';
 
@@ -135,6 +136,7 @@ export function useRemoteSpawnDispatch({
     mode,
     selection,
     organizationId,
+    organizations: useOrganizationsList().data,
     directory,
     cloneFromKiloSessionId,
     cloneUpToMessageId,
@@ -156,6 +158,7 @@ export function useRemoteSpawnDispatch({
     const admission = resolveRemoteSpawnAdmission({
       instance: runOnInstance,
       payload: submitPayload,
+      plan: { organizationId: fields.organizationId, organizations: fields.organizations },
     });
     if (!admission.allowed) {
       setRemoteSpawnFailure({ retryable: false, message: admission.toast });

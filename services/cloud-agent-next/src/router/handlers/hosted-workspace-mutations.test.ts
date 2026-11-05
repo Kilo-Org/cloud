@@ -341,6 +341,26 @@ describe('deleteHostedWorkspaceSession partial-failure recovery', () => {
     });
     expect(mocks.admitOperation).not.toHaveBeenCalled();
   });
+
+  it('refuses an admission stored in another organization scope without any effect', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
+    );
+    mocks.admitOperation.mockResolvedValue({ admission: 'organization_mismatch' });
+    const ingest = vi.fn();
+    const deleteSession = vi.fn();
+    const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(ingest).not.toHaveBeenCalled();
+    expect(deleteSession).not.toHaveBeenCalled();
+    expect(mocks.recordOperationProgress).not.toHaveBeenCalled();
+    expect(mocks.settleOperation).not.toHaveBeenCalled();
+  });
 });
 
 describe('createHostedWorkspaceSession organization authorization', () => {

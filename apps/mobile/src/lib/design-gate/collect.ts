@@ -1,15 +1,24 @@
 /* eslint-disable anti-slop/no-runtime-typeof, anti-slop/no-unknown-returns -- this module reads React's untyped private fiber fields on every dump; a schema parse per node would slow the gate's sampling loop */
 import { type HostInstance, StyleSheet } from 'react-native';
+// @ts-expect-error React Native exposes this measurement helper only as Flow source.
+import { getBoundingClientRect } from 'react-native/src/private/webapis/dom/nodes/ReadOnlyElement';
 
 type Rect = readonly [x: number, y: number, width: number, height: number];
 export type Insets = Readonly<{ top: number; right: number; bottom: number; left: number }>;
 export type Document = NonNullable<HostInstance['ownerDocument']>;
 type Element = Document['documentElement'];
+const measureLayout = getBoundingClientRect as (
+  element: Element,
+  options: { includeTransform: false }
+) => Pick<DOMRect, 'x' | 'y' | 'width' | 'height'>;
+type Offset = Readonly<{ x: number; y: number }>;
+const ZERO_OFFSET: Offset = { x: 0, y: 0 };
 
 export type ProbeNode = Readonly<{
   parent: number;
   tag: string;
   rect: Rect;
+  layoutRect: Rect;
   owners?: readonly string[];
   text?: string;
   testID?: string;
@@ -141,8 +150,9 @@ function renderedText(tag: string, element: Element, props: unknown): string | u
   return undefined;
 }
 
-function describe(element: Element, parent: number): ProbeNode {
+function describe(element: Element, parent: number, viewport: Offset): ProbeNode {
   const box = element.getBoundingClientRect();
+  const layout = measureLayout(element, { includeTransform: false });
   const fiber = field(element, '__internalInstanceHandle');
   const props = field(fiber, 'memoizedProps');
   const tag = element.tagName.replace(/^RN:/, '');
@@ -151,6 +161,12 @@ function describe(element: Element, parent: number): ProbeNode {
     parent,
     tag,
     rect: [round(box.x), round(box.y), round(box.width), round(box.height)],
+    layoutRect: [
+      round(layout.x - viewport.x),
+      round(layout.y - viewport.y),
+      round(layout.width),
+      round(layout.height),
+    ],
     owners: owners(fiber),
     text: renderedText(tag, element, props),
     testID: text(field(props, 'testID')) ?? text(field(props, 'nativeID')),
@@ -177,22 +193,31 @@ function elementChildren(element: Element): Element[] {
 }
 
 /**
- * Every host element of the surface in depth-first pre-order, with frames in dp
- * relative to the surface root and transforms applied. The probe's own anchor is
- * left out; it has no children.
+ * Every host element in depth-first pre-order. Both frames are surface-relative dp:
+ * rect includes transforms; layoutRect excludes them. The probe anchor is omitted.
  */
 export function collect(document: Document): ProbeNode[] {
   const nodes: ProbeNode[] = [];
-  const pending: { element: Element; parent: number }[] = [
-    { element: document.documentElement, parent: -1 },
+  const root = document.documentElement;
+  const visualRoot = root.getBoundingClientRect();
+  const layoutRoot = measureLayout(root, { includeTransform: false });
+  const viewport: Offset = { x: visualRoot.x - layoutRoot.x, y: visualRoot.y - layoutRoot.y };
+  const pending: { element: Element; parent: number; viewport: Offset }[] = [
+    { element: root, parent: -1, viewport },
   ];
   for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-    const node = describe(next.element, next.parent);
+    const node = describe(
+      next.element,
+      next.parent,
+      next.parent === -1 ? ZERO_OFFSET : next.viewport
+    );
     if (node.testID !== DESIGN_GATE_ANCHOR_ID) {
       const index = nodes.length;
       nodes.push(node);
+      // Native modal descendants form another RootNodeKind and exclude the outer viewport.
+      const childViewport = node.tag === 'ModalHostView' ? ZERO_OFFSET : next.viewport;
       for (const child of elementChildren(next.element).toReversed()) {
-        pending.push({ element: child, parent: index });
+        pending.push({ element: child, parent: index, viewport: childViewport });
       }
     }
   }

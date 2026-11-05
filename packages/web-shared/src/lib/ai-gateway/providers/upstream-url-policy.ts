@@ -103,10 +103,9 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 
 /**
  * One retry absorbs a transient resolver failure such as `EAI_AGAIN`. Each
- * attempt has its own deadline, so a stalled resolver ends in
- * `dns_lookup_failed` within about two deadlines instead of holding the
- * request. An abort of `signal` (client disconnect or the request budget)
- * rejects at once with its reason.
+ * attempt has its own deadline, and a resolver that does not answer within it
+ * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
+ * disconnect or the request budget) rejects at once with its reason.
  */
 async function resolveWithRetry(
   hostname: string,
@@ -128,8 +127,11 @@ async function resolveWithRetry(
       if (addresses.length > 0) return addresses;
     } catch {
       if (signal?.aborted) throw signal.reason;
-      // A failed or timed-out attempt is retried; the caller reports
-      // dns_lookup_failed once attempts run out.
+      // A resolution that reaches its deadline ends the validation here; the
+      // caller reports the retryable `dns_lookup_failed` outcome.
+      if (deadline.aborted) return null;
+      // A resolution that finished with a transient failure is retried; the
+      // caller reports dns_lookup_failed once attempts run out.
     }
   }
   return null;

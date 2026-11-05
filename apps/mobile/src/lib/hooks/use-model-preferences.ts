@@ -9,6 +9,7 @@ import {
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type ModelPreferences = inferRouterOutputs<MobileRouter>['modelPreferences']['get'];
@@ -37,7 +38,12 @@ export function useModelPreferences(organizationId: string | undefined) {
 
   const input = useMemo(() => (organizationId ? { organizationId } : undefined), [organizationId]);
 
-  const query = useQuery(trpc.modelPreferences.get.queryOptions(input));
+  const query = useQuery({
+    ...trpc.modelPreferences.get.queryOptions(input),
+    // A paused read keeps the saved model and favorites out of the picker until
+    // a connectivity edge that may never come.
+    ...SETTLE_WHILE_OFFLINE,
+  });
 
   // Partial key (no input) so org-scoped and org-less caches both refresh.
   const invalidate = useCallback(async () => {

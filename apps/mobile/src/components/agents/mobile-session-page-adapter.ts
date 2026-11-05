@@ -39,8 +39,15 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
   return 'messages' in history && Array.isArray(history.messages);
 }
 
+/** A page read plus the parent id the same payload carried. */
+export type MobileSessionSnapshotRead = {
+  outcome: SessionSnapshotPageOutcome;
+  /** `null` is an answer — a root session; `undefined` means the payload lacks it. */
+  parentSessionId: string | null | undefined;
+};
+
 /**
- * Fetch a bounded page of session messages for the mobile client.
+ * Read a bounded page of session messages for the mobile client.
  *
  * Maps the shared `KiloSdkMessageHistory` union to the SDK's
  * `SessionSnapshotPageOutcome`:
@@ -52,15 +59,25 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
  *
  * The adapter does not re-validate the tRPC response; it trusts the shared
  * contract and uses structural narrowing to distinguish page from failure.
+ *
+ * The parent id is returned beside the outcome rather than folded into its
+ * `info`: the transport replays that `info` as `session.created`, and a page
+ * that reports a parent there would enter the SDK's root-session bookkeeping as
+ * a child, which is not what the opened session is.
  */
-export async function fetchMobileSessionSnapshotPage(
+export async function readMobileSessionSnapshotPage(
   kiloSessionId: KiloSessionId,
   options: { cursor?: string }
-): Promise<SessionSnapshotPageOutcome> {
+): Promise<MobileSessionSnapshotRead> {
   const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
     session_id: kiloSessionId,
     ...(options.cursor ? { cursor: options.cursor } : {}),
   });
+  // The router always projects the parent id, but mobile ships independently of
+  // the API: an older server omits the field, so it is read as optional here.
+  // The assignment widens `result` structurally; it is not an assertion.
+  const payload: { parentSessionId?: string | null } = result;
+  const parentSessionId = payload.parentSessionId;
 
   // The goal lives in the session metadata, which the messages page carries
   // alongside the bounded history. Rebuilding `info` from the page (instead
@@ -75,25 +92,40 @@ export async function fetchMobileSessionSnapshotPage(
   const history = result.history as KiloSdkMessageHistory | null;
   if (history === null) {
     return {
-      kind: 'success',
-      info,
-      messages: [],
-      nextCursor: null,
-      omittedItemCount: 0,
-      watermarkEventId: result.watermarkEventId ?? undefined,
+      parentSessionId,
+      outcome: {
+        kind: 'success',
+        info,
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+        watermarkEventId: result.watermarkEventId ?? undefined,
+      },
     };
   }
 
   if (isHistoryPage(history)) {
     return {
-      kind: 'success',
-      info,
-      messages: history.messages as SessionSnapshotPage['messages'],
-      nextCursor: history.nextCursor,
-      omittedItemCount: history.omittedItemCount,
-      watermarkEventId: result.watermarkEventId ?? undefined,
+      parentSessionId,
+      outcome: {
+        kind: 'success',
+        info,
+        messages: history.messages as SessionSnapshotPage['messages'],
+        nextCursor: history.nextCursor,
+        omittedItemCount: history.omittedItemCount,
+        watermarkEventId: result.watermarkEventId ?? undefined,
+      },
     };
   }
 
-  return history;
+  return { parentSessionId, outcome: history };
+}
+
+/** The page outcome alone, for callers that do not read the parent id. */
+export async function fetchMobileSessionSnapshotPage(
+  kiloSessionId: KiloSessionId,
+  options: { cursor?: string }
+): Promise<SessionSnapshotPageOutcome> {
+  const { outcome } = await readMobileSessionSnapshotPage(kiloSessionId, options);
+  return outcome;
 }

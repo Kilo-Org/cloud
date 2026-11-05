@@ -6,6 +6,7 @@ import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -206,15 +207,10 @@ export function usePrMergeSubmit({
       void performSubmit();
     };
     if (mode === 'merge') {
-      const [confirmTitle, confirmMessage] = prRef
-        ? [
-            t('prReview.merge.confirmTitleTerm', { term: t(providerPrNounKey(prRef.platform)) }),
-            t('prReview.merge.confirmMessage'),
-          ]
-        : [t('prReview.merge.confirmTitle'), t('prReview.merge.confirmMessage')];
+      const confirmTitle = providerPrMergeTitles(t, prRef ? prRef.platform : 'github').confirm;
       confirm({
         title: confirmTitle,
-        message: confirmMessage,
+        message: t('prReview.merge.confirmMessage'),
         confirmLabel: t('prReview.merge.merge'),
         onConfirm: submit,
       });

@@ -16,7 +16,7 @@ jest.mock('../../fetchWithBackoff', () => ({
 }));
 
 const provider: Provider = {
-  id: 'openrouter',
+  type: 'openrouter',
   apiUrl: 'https://openrouter.example/api/v1',
   apiUrlOverrides: {},
   disableUrlSuffix: false,

@@ -2142,6 +2142,14 @@ describe('createServiceState', () => {
       });
     });
 
+    it('retains repository identity and deduplicates within each repository', () => {
+      const state = createServiceState(makeConfig());
+      for (const repository of ['acme/web', 'acme/api', 'acme/web']) {
+        state.process({ type: 'autocommit_completed', success: true, ...localCommit, repository });
+      }
+      expect(state.getCommits().map(commit => commit.repository)).toEqual(['acme/web', 'acme/api']);
+    });
+
     it('deduplicates immutable facts and keeps multiple commits at one anchor', () => {
       const state = createServiceState(makeConfig());
       const second = {

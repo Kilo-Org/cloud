@@ -212,7 +212,7 @@ test('parseSamples validates in-app samples and expandSamples repeats them', () 
     },
     nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 100, 200] }],
   };
-  const samples = parseSamples(
+  const parsed = parseSamples(
     JSON.stringify({
       samples: [
         { t: 0, repeat: 3, dump },
@@ -220,14 +220,16 @@ test('parseSamples validates in-app samples and expandSamples repeats them', () 
       ],
     })
   );
+  assert.equal(parsed.truncated, false);
   assert.deepEqual(
-    samples.map(sample => [sample.t, sample.repeat]),
+    parsed.samples.map(sample => [sample.t, sample.repeat]),
     [
       [0, 3],
       [360, 1],
     ]
   );
-  assert.equal(expandSamples(samples).length, 4);
+  assert.equal(expandSamples(parsed.samples).length, 4);
+  assert.equal(parseSamples(JSON.stringify({ samples: [], truncated: true })).truncated, true);
   assert.throws(() => parseSamples('{}'), InfraError);
   assert.throws(
     () => parseSamples(JSON.stringify({ samples: [{ t: 0, repeat: 0, dump }] })),

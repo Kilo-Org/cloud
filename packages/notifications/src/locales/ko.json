@@ -9,6 +9,7 @@
       "lowBalance": "잔액 확인이 필요합니다",
       "spendAlert": "지출 확인이 필요합니다",
       "securityFinding": "보안 발견 사항 확인이 필요합니다",
+      "securityUpdate": "보안 검사에 업데이트가 있습니다",
       "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "보안 발견 사항 확인이 필요합니다"
+      "body": "보안 검사에 업데이트가 있습니다"
     }
   },
   "instanceLifecycle": {

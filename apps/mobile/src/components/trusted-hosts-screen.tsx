@@ -135,7 +135,7 @@ export function TrustedHostsScreen() {
       ) : (
         <TabScreenScrollView
           className="flex-1"
-          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerClassName="gap-3 px-4 pt-4"
           showsVerticalScrollIndicator={false}
         >
           {!hasLoaded ? (

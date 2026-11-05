@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseTimestamp } from './utils';
+import { parseTimestamp, timestampMs } from './utils';
 
 function inTimeZone<T>(timeZone: string, run: () => T): T {
   vi.stubEnv('TZ', timeZone);
@@ -73,5 +73,19 @@ describe('parseTimestamp', () => {
   it('returns an invalid date for a missing timestamp instead of throwing', () => {
     expect(Number.isNaN(parseTimestamp(null).getTime())).toBe(true);
     expect(Number.isNaN(parseTimestamp(undefined).getTime())).toBe(true);
+  });
+});
+
+describe('timestampMs', () => {
+  it('returns the epoch milliseconds of a backend time', () => {
+    expect(timestampMs('2026-03-16 15:21:40.957+00')).toBe(Date.UTC(2026, 2, 16, 15, 21, 40, 957));
+  });
+
+  it('returns null instead of an invalid instant', () => {
+    expect(timestampMs(null)).toBeNull();
+    expect(timestampMs(undefined)).toBeNull();
+    expect(timestampMs('')).toBeNull();
+    expect(timestampMs('2026-02-30')).toBeNull();
+    expect(timestampMs('not-a-timestamp')).toBeNull();
   });
 });

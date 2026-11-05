@@ -145,6 +145,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter kilo-extension exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
+
       - name: Install Playwright Chromium
         # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.
         run: pnpm --filter kilo-extension exec playwright install chromium

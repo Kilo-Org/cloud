@@ -217,29 +217,55 @@ export function LiveSessionFeedback({
     }
   }
 
+  // The connection row paints only where the surface reports these inline (the
+  // Agents live tab): the offline line, the visible connection status, or the
+  // retry that backs it. Elsewhere — Home puts the same facts in its section
+  // header notice — the row was an empty child of the Home column's `gap-2`, so
+  // an invisible box still held the card 7 dp below the section label.
+  const offlineLine = inlineNotices && internet === 'offline';
+  const connectionStatus = inlineNotices && reconnectExhausted && connectionLabel !== null;
+  const connectionRetry =
+    inlineNotices && context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry;
+  const connectionRow = offlineLine || connectionStatus || connectionRetry;
+
+  // Status only the screen reader consumes, mounted here rather than inside the
+  // visible column: the column is drawn and dropped with its content, and a
+  // remount starts the announcement dedupe from nothing and speaks an unchanged
+  // message again. One node per message, one position. When the connection row
+  // paints its own visible status that row is the channel, so this copy clears.
+  const announcements = (
+    <>
+      <AccessibleStatus
+        message={connectionStatus ? null : connectionLabel}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      <AccessibleStatus
+        message={content === 'pending' ? t('common.loading') : null}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
+        <AccessibleStatus
+          message={t('agents.sessionList.updating')}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
+    </>
+  );
+
   const feedback = (
     <View className={cn(compactSpacing ? 'gap-0' : 'gap-2', centered && 'px-6')}>
-      <View className="flex-row items-center gap-2">
-        {/* The app-wide OfflineBanner owns the offline announcement. */}
-        {internet === 'offline' ? (
-          inlineNotices && (
+      {connectionRow ? (
+        <View className="flex-row items-center gap-2">
+          {/* The app-wide OfflineBanner owns the offline announcement. */}
+          {internet === 'offline' ? (
             <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
-          )
-        ) : (
-          <AccessibleStatus
-            message={connectionLabel}
-            tone="status"
-            className={cn(
-              'flex-1 text-xs',
-              (!reconnectExhausted || !inlineNotices) && 'absolute size-px overflow-hidden'
-            )}
-          />
-        )}
-        {inlineNotices &&
-          context.isReady &&
-          !isConnected &&
-          reconnectExhausted &&
-          !failureOwnsRetry && (
+          ) : (
+            <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
+          )}
+          {connectionRetry && (
             <Button
               variant="ghost"
               size="sm"
@@ -252,14 +278,14 @@ export function LiveSessionFeedback({
               <Text>{t('common.retry')}</Text>
             </Button>
           )}
-      </View>
-      {refresh && content === 'rows' ? (
+        </View>
+      ) : null}
+      {refresh && content === 'rows' && (
         // The live tab's reserved status line: screen-reader Updating while
         // the pull is in flight, visible "Couldn't refresh" + Retry when it
-        // failed. It takes the slot of the (layout-free) loading status so the
-        // column has the same children either way, and its height is allocated
-        // whenever rows are shown: a failure that arrives while the kept rows
-        // are on screen replaces empty space instead of pushing the rows down.
+        // failed. Its height is allocated whenever rows are shown: a failure
+        // that arrives while the kept rows are on screen replaces empty space
+        // instead of pushing the rows down.
         <View className="min-h-5">
           <SessionListRefreshStatus
             busy={refresh.busy}
@@ -268,26 +294,25 @@ export function LiveSessionFeedback({
             progressInBody={refresh.progressInBody}
           />
         </View>
-      ) : (
-        <AccessibleStatus
-          message={content === 'pending' ? t('common.loading') : null}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
-      )}
-      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
-        <AccessibleStatus
-          message={t('agents.sessionList.updating')}
-          tone="status"
-          className="absolute size-px overflow-hidden"
-        />
       )}
       {failure}
     </View>
   );
-  return centered ? (
-    <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
-  ) : (
-    feedback
+  // The column is dropped when it would paint nothing: Home's card column then
+  // holds one child, so the card starts on the header's content edge instead of
+  // 7 dp below an invisible box. The announcements above keep their position
+  // either way, so nothing is re-spoken when the column appears or goes.
+  const hasVisibleContent = centered || connectionRow || refresh !== undefined || failure !== null;
+
+  return (
+    <>
+      {announcements}
+      {hasVisibleContent &&
+        (centered ? (
+          <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+        ) : (
+          feedback
+        ))}
+    </>
   );
 }

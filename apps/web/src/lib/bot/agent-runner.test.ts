@@ -38,7 +38,7 @@ type AgentOptions = {
 };
 
 const mockAgentOptions = jest.fn<void, [AgentOptions]>();
-const mockGenerate = jest.fn<Promise<{ text: string }>, []>();
+const mockGenerate = jest.fn<Promise<{ text: string }>, [{ prompt: string }]>();
 const mockGetConversationContext = jest.fn<Promise<string>, []>();
 const mockGetGitHubIntegrationById = jest.fn<Promise<PlatformIntegration | null>, unknown[]>();
 const mockPrepareSession = jest.fn<
@@ -129,7 +129,7 @@ jest.mock('@/lib/auth/cloud-agent-workflow-user', () => ({
   prepareCloudAgentWorkflowUser: async (user: User) => user,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: async () => false,
+  isFreeModel: () => false,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock(
@@ -247,8 +247,6 @@ beforeEach(() => {
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
-  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
-  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
@@ -414,6 +412,28 @@ it('can bind the repository from trusted webhook metadata', async () => {
   );
 });
 
+it('tells the run which referenced files were declined', async () => {
+  const params = runParams();
+
+  await runBotAgent({
+    ...params,
+    attachments: { path: 'message-1', files: ['one.md'] },
+    declinedAttachmentFilenames: ['screenshot.png', 'report.pdf'],
+  });
+
+  const prompt = mockGenerate.mock.calls[0]?.[0].prompt;
+  expect(prompt).toContain('The user attached 1 supported attachment');
+  expect(prompt).toContain('"screenshot.png"');
+  expect(prompt).toContain('"report.pdf"');
+  expect(prompt).toContain('not forwarded');
+});
+
+it('says nothing about attachments when none were referenced', async () => {
+  await runBotAgent(runParams());
+
+  expect(mockGenerate.mock.calls[0]?.[0]).toEqual({ prompt: 'Review the current pull request' });
+});
+
 describe.each(['slack', 'linear'] as const)('%s repository selection', platform => {
   it.each(['github', 'gitlab'] as const)(
     'preserves model-selected %s repositories',
@@ -442,6 +462,12 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           })
         );
       } else {
+        expect(validateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+          'org-1',
+          'bot-user-1',
+          gitlabProject
+        );
+        expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
             gitUrl: `https://gitlab.com/${gitlabProject}.git`,
@@ -452,4 +478,22 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
       }
     }
   );
+
+  it('rejects inaccessible GitLab projects before looking up a token or preparing a session', async () => {
+    jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(false);
+    toolInput = { ...toolInput, gitlabProject };
+
+    const result = await runBotAgent(runParams(platform));
+
+    expect(result.startedCloudAgentSession).toBe(false);
+    expect(result.finalText).toContain('not available');
+    expect(validateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'org-1',
+      'bot-user-1',
+      gitlabProject
+    );
+    expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(createCloudAgentNextClient).not.toHaveBeenCalled();
+  });
 });

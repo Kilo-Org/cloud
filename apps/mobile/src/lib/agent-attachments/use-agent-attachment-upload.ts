@@ -62,6 +62,14 @@ export type AgentAttachmentCandidate = {
 };
 
 /**
+ * How many local images are encoded at once when a message is sent. One decode
+ * is already bounded to `MAX_EDGE`, so this is what keeps the peak independent
+ * of how many photos the sender attached; two keeps a multi-photo send from
+ * paying every encode in series.
+ */
+const CONCURRENT_LOCAL_READS = 2;
+
+/**
  * Delete a cache-owned file after its upload is cancelled or its chip is
  * removed. A picker-provided URI is not owned by the app and is never deleted.
  * Best-effort: a failed delete is reported to Sentry and never surfaces as an
@@ -809,25 +817,42 @@ export function useAgentAttachmentUpload(
     if (chips.some(chip => chip.status === 'error')) {
       return { ok: false };
     }
-    const read = await Promise.all(
-      chips.map(async chip => {
-        try {
-          return await encodeLocalImage(chip.localUri);
-        } catch (error) {
-          const key =
-            error instanceof LocalImageError && error.reason === 'tooLarge'
-              ? 'agentChat.composer.imageTooLarge'
-              : 'agentChat.composer.imageUnreadable';
-          updateAttachment(chip.id, {
-            status: 'error',
-            error: i18n.t(key),
-            terminal: true,
-            progress: null,
-          });
-          announcingToast.error(i18n.t(key));
-          return null;
+    const readOne = async (chip: AgentAttachment): Promise<LocalImage | null> => {
+      try {
+        return await encodeLocalImage(chip.localUri);
+      } catch (error) {
+        const key =
+          error instanceof LocalImageError && error.reason === 'tooLarge'
+            ? 'agentChat.composer.imageTooLarge'
+            : 'agentChat.composer.imageUnreadable';
+        updateAttachment(chip.id, {
+          status: 'error',
+          error: i18n.t(key),
+          terminal: true,
+          progress: null,
+        });
+        announcingToast.error(i18n.t(key));
+        return null;
+      }
+    };
+    // Each read holds a decoded image, so reading the whole strip at once made
+    // the peak scale with the photo count. Every chip is still attempted and
+    // results land at their chip's index, so order and failures are unchanged.
+    const read: (LocalImage | null)[] = chips.map(() => null);
+    let next = 0;
+    const drain = async (): Promise<void> => {
+      while (next < chips.length) {
+        const index = next;
+        next += 1;
+        const chip = chips[index];
+        if (chip !== undefined) {
+          // eslint-disable-next-line no-await-in-loop -- a worker takes its next chip only after this read ends, which is the bound
+          read[index] = await readOne(chip);
         }
-      })
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENT_LOCAL_READS, chips.length) }, drain)
     );
     const images = read.filter(image => image !== null);
     return images.length === chips.length

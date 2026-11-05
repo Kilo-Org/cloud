@@ -23,6 +23,13 @@ Retained objects use these keys in the private runtime bucket:
 - `runtime-artifacts/v1/releases/<sha256>.json`: release descriptors.
 - `runtime-artifacts/v1/bases/<input-id>.json`: immutable base references.
 - `runtime-artifacts/v1/handoffs/<source-sha>.json`: source, base, descriptor, compatibility and payload references.
+- `runtime-artifacts/v1/sources/cli-linux-x64-baseline-<version>-<sha256>.tgz`: the verified pinned CLI
+  tarball. Publication downloads it from npm only when this object is missing, and accepts a cached copy
+  only when it matches the pinned SHA-256. A version bump with a stale digest misses the cache and fails
+  the registry check.
+
+Transfers retry bounded transport failures, including timeouts while a body is streaming. Definitive
+answers, such as a missing bucket or a 404 from the registry, fail without retrying.
 
 The Worker configuration contains the descriptor's 64-character SHA-256 in
 `RUNTIME_RELEASE_DESCRIPTOR`. The Worker reads the full descriptor through its private R2 binding
@@ -34,7 +41,7 @@ Branch changes and deletion do not remove these objects. This stack adds no garb
 
 The separate publication workflow validates the repository, CI workflow identity, run event, main
 branch, successful conclusion and exact SHA through GitHub metadata before it receives write credentials.
-It checks out that SHA. PR, fork, merge-group and failed CI runs cannot publish. Publication serializes
+It checks out that SHA and installs only the publisher and wrapper dependency graphs. PR, fork, merge-group and failed CI runs cannot publish. Publication serializes
 retries of the same SHA. Different SHAs publish concurrently, independently of deployment.
 Concurrent base builds retain the first verified digest for their shared input identity.
 Each publisher verifies that retained digest before use. A Worker-only SHA still creates its own handoff.
@@ -52,7 +59,9 @@ Publication requires these approved and provisioned resources:
 
 An automatic run publishes only when `runtime-targets.json` at the source SHA has a downloaded default
 or named target. The admission job reads that catalog through the GitHub API for the exact SHA.
-A preinstalled-only catalog skips the publish job, so ordinary main CI runs build nothing.
+A preinstalled-only catalog skips the publish job. With the checked-in downloaded default, every
+eligible successful main-push CI run publishes its exact-SHA handoff, even without runtime changes.
+The publisher reuses a verified cached base when its inputs have not changed.
 
 A manual `workflow_dispatch` run accepts an exact main SHA and requires a successful trusted CI push
 run for that SHA. A manual run publishes whatever the catalog contains.
@@ -66,7 +75,14 @@ for rendering, isolated qualification and rollback.
 
 Downloaded deployment preparation uses the exact checked-out source SHA. The same downloaded catalog
 starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
-without holding the publisher's concurrency lock. It checks source identity,
+without holding the publisher's concurrency lock. Publication runs are titled with their source SHA,
+so preparation reads their state with the deploy's read-only token. While any run for the SHA is
+queued or running, including a re-run, preparation keeps waiting. Before any run exists, preparation
+also keeps waiting while the SHA's main push CI is queued or running. When every run has finished without
+a handoff, or no run starts within 10 minutes of that CI succeeding, preparation fails immediately with
+the run links and the `workflow_dispatch` command, instead of holding the deployment for the full wait.
+A SHA without a successful main CI run fails after 10 minutes of waiting, since it cannot publish.
+If run state cannot be read, preparation keeps waiting within the same bound. It checks source identity,
 base inputs, stored payload bytes, compatibility and target image configuration before Wrangler or
 its custom build can run. Runtime-free targets use the recorded registry digest. Registry credentials
 stay in a temporary Docker configuration, which the command removes on exit.

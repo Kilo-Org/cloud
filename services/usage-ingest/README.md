@@ -7,18 +7,20 @@ always processes queued events through the existing Frankfurt writer. Only a
 matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
-The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
-for staging or for the production regional cohorts controlled independently by
-`USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
-The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
-exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
-accounting transport, not request routing.
-Unselected events keep direct accounting or the existing SFO handoff. Background
-shadow publication and its flag have been removed. Reconcile and drain historically
+The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
+and `VERCEL_ENV` not `production`), for eligible production Frankfurt
+deployments, or for the production SFO cohort controlled by
+`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). Production Frankfurt accounting
+has no exposure control; it queues every payer with an identity. FRA deployments
+other than staging and production `fra1`, and SFO payers outside the cohort,
+keep direct accounting or the existing SFO handoff. Background shadow
+publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before deploying processing; this change does not remove
-old messages. Keep production selection off until the processing consumer is
-independently verified. Selection being off does not stop processing of queued
-events. Follow the [production merge gates](eu-queues.md#production-merge-gate).
+old messages. Keep SFO production selection off until the processing consumer is
+independently verified. Production FRA has no exposure switch, so do not deploy
+this gateway source to production until then. Selection being off does not stop
+processing of queued events. Follow the
+[production merge gates](eu-queues.md#production-merge-gate).
 
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
@@ -36,7 +38,7 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Each environment connects only its EU pair. Production uses batch6/parallelism2/cap200 (up to 400 writer calls);
+Each environment connects only its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
@@ -59,7 +61,7 @@ ID, delivery attempt count, and categorical outcome/reason.
 
 Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
 batch have been handled. Each successful message keeps its explicit ACK; failed
-messages keep their explicit retry using the configured delay and retry/DLQ budget.
+messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
 `writer_status` and `invocation_failure: "writer_overloaded"`.
@@ -81,8 +83,33 @@ at the outcome log, including writer wait in processing mode; it is omitted for
 invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
 
+Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
+`usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
+`usage_ingest_processing`) are always emitted; see
+[queue delivery diagnostics](diagnostics.md).
+
 Processing also logs `queue_wait_ms` from the queue message timestamp to the start
-of handling that message, independently of writer duration. Shared direct and
+of handling that message, independently of writer duration. Selected existing processing
+outcomes also include `handler_entry_queue_age_ms`, the non-negative wall-clock
+age of the queue message at invocation entry, and `slot_wait_ms`, the rounded
+monotonic time from invocation entry until that message starts processing in a
+slot. Queue age crosses clocks and may include skew; it is not an exact transport
+duration. Slot wait includes local scheduling as well as time behind other messages.
+The fields appear when entry age, queue wait, slot wait, or writer duration reaches
+1,000 ms, or when a stable hash of queue message ID and attempt falls in a nominal
+1% bucket. Actual coverage depends on the message ID distribution.
+This enriches existing outcomes without adding a log stream; the baseline is
+repeatable and is not a uniform random sample of distinct usage IDs.
+
+For an individual delivery, find `usage_ingest_processing` by exact `usage_id`
+and retain `queue_message_id` and `delivery_attempts` to distinguish redeliveries.
+Read its entry age, slot wait, and `writer_duration_ms` together; correlate the
+same usage ID with `usage_record_completion` for the writer's persistence time.
+Multiple attempts may exist; usage ID alone cannot uniquely match a writer attempt.
+Do not subtract subgroup percentiles to infer a
+phase duration, or treat timestamps from different hosts as exact.
+
+Shared direct and
 HTTP-writer persistence attempts emit `usage_record_completion` logs with
 outcome, duration, event age, execution region and finite caller context. See the
 completion sampling policy below and the
@@ -153,8 +180,8 @@ Redirects are terminal 3xx failures; their targets are never followed.
 ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
 `usageId` and categorical `reason`; accounting returns null and emits no gateway
 persistence completion. This is not durable recovery: unaccepted events may be
-lost, and ambiguous failures may still be recorded later by the consumer. With
-queue-only off, the existing SFO handoff-to-local fallback remains unchanged.
+lost, and ambiguous failures may still be recorded later by the consumer. For
+unselected events, the existing SFO handoff-to-local fallback remains unchanged.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across
@@ -200,16 +227,154 @@ two writer slots per invocation:
 |---|---|---|
 | `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `200` in both environments | Parallelism 2 allows at most `200 × 2 = 400` concurrent queue writer calls per environment. |
-| `max_retries` | `3` | Initial delivery plus up to three retries. |
-| `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
+| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. |
+| `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
+| `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
+
+The production cap `225` is an intentional single-knob trial from the previous
+`200`. Batch size 6, fill timeout 0, parallelism 2, retries, staging settings and
+the writer pool/admission limits are unchanged. `225 × 2 = 450` is a theoretical
+maximum writer HTTP call ceiling versus `400`; it is not 450 database
+connections, guaranteed active consumers or measured throughput. The trial
+window, measurement and rollback are operator decisions. Merging this source
+enables the existing scheduled production deployment but does not itself start a
+hosted trial or support a latency claim.
+
+### Native congestion retries and launch budget
+
+Healthy events still make one HTTP call and ACK only a matching `recorded` or
+`duplicate` result, with no added delay. Failed items make no additional HTTP call
+inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
+for that item, freeing invocation slots while waiting for redelivery. Successful
+siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+the invocation after all sibling processing and dispositions settle; other
+unavailable/configuration failures do not newly trigger that feedback.
+
+Fast retry requires a positively recognized admission 429. Under the existing
+160-second HTTP timeout, the shared writer client reads at most 4096 bytes and
+requires valid UTF-8/JSON with exactly `error: 'Usage writer overloaded'` and reason
+`queue_limit`, `pool_waiting`, or `pool_busy`. Unknown fields/reasons, generic 429,
+HTML, malformed/oversized/truncated bodies and body timeouts remain generic 429
+and use the conservative schedule. Other error bodies are not parsed. A recognized
+pre-write rejection describes this HTTP attempt only; an earlier delivery of the
+same usage ID may already have committed. Generic errors can include ambiguous
+writes, so stable IDs and idempotent persistence remain essential.
+
+For native attempt `a` (initial delivery 1), calculate
+`base = min(300, 2 ** min(a - 1, 9))`; for all failures except recognized
+admission 429, use `base = max(60, base)`. Choose an integer uniformly from
+`base` through `2 * base`, inclusive. Positive safe-integer attempts are capped
+at 21 before exponentiation; invalid metadata uses attempt 1. Mixed failure classes
+share the same native count; switching classes never resets it.
+
+| Native attempt | Recognized admission 429 | Other handled failure |
+|---|---|---|
+| 1 | 1–2 s | 60–120 s |
+| 2 | 2–4 s | 60–120 s |
+| 3 | 4–8 s | 60–120 s |
+| 4 | 8–16 s | 60–120 s |
+| 5 | 16–32 s | 60–120 s |
+| 6 | 32–64 s | 60–120 s |
+| 7 | 64–128 s | 64–128 s |
+| 8 | 128–256 s | 128–256 s |
+| 9 | 256–512 s | 256–512 s |
+| 10–20 | 300–600 s | 300–600 s |
+
+Processing logs add bounded `retry_class`, selected `retry_delay_seconds`, and
+recognized `admission_reason` to the existing usage ID/native-attempt fields.
+Selected delay is computed outside diagnostics, so logging failures cannot change
+disposition. Bodies, headers and secrets are never included.
+
+The invocation has an 840-second monotonic launch budget. A new HTTP call starts
+only with **at least 180 seconds remaining**, including equality at that boundary,
+leaving room for its full unchanged 160-second timeout and margin. Later unstarted
+valid items retry conservatively with reason `invocation_budget`; they are neither
+ACKed nor labelled writer overload. This covers parallelism 1 fallback and growing
+batches without shortening timeouts or abandoning in-flight writes. Current
+batch 6/par 2 has three 160-second waves (480 seconds of nominal HTTP allowance),
+so normal work stays unchanged. Scheduling/AbortSignal deadlines are cooperative,
+not hard guarantees against runtime stalls or the platform's 900-second wall limit.
+
+The budget increase is global to each CF consumer: a continually failing valid
+message can nominally make 21 HTTP attempts instead of 4; healthy traffic still
+needs one. At-least-once delivery and operator replay can add further attempts.
+Under sustained failure, polling eventually slows to **5–10 minutes** between
+eligible attempts, so recovery can still wait that long plus scheduling/backlog.
+For a new event receiving only recognized admission rejections, the 20 requested
+delays sum to 63m 31s–127m 02s; for only other handled failures, 68m 28s–136m 56s.
+These are conditional scheduled-delay sums, **not DLQ timing guarantees**, minimum
+recovery windows, or retention requirements. Processing, implicit 60-second
+retries, mixed histories, consumed attempts, scheduling and retention affect the
+actual lifecycle. Increasing the configured count does not reset existing attempts.
+
+Deploy and verify this retry consumer **before merging/deploying default-on
+writer admission PR #9241**. Merging both ahead of one deployment is insufficient:
+the production workflow promotes web before Workers. That rollout kept pool 10,
+batch 6/par 2, consumer cap 200 and exposure unchanged; admission is per-runtime
+and does not establish aggregate database capacity for larger settings.
+
+Persistent failures still reach the configured DLQ after the finite retry budget;
+a DLQ is a recovery queue, not proof the payload is poison. Before guard rollout,
+verify actual source/DLQ retention, alerting, replay ownership, and a controlled
+stable-ID reconciliation/replay procedure. This change performs no hosted
+retention or DLQ readback. A safe rollback must **not lower retries back to 3 while
+higher-attempt messages remain outstanding**, because their next failure could
+immediately dead-letter them. Preserve stable IDs and reconcile ambiguous writes
+before replay; do not republish to reset attempts or discard accepted events.
+
+The isolated staging Vercel queue keeps its own retry settings; it shares only the
+bounded writer-response classification. No new environment knob or worker binding
+is introduced. This preparation does not claim a healthy-traffic p95 improvement
+or authorize a production rollout, capacity increase, or replay.
+
+### Writer admission protection
+
+The Frankfurt HTTP writer authenticates and validates the request before applying
+one immediate, nonwaiting admission guard to `queue` and `queue_vercel` callers.
+Both transports share a per-runtime active-call limit of
+`max(1, pool.options.max - 2)`, currently **8** with the unchanged pool maximum of
+10. The writer returns HTTP **429** before usage database work when that limit
+is occupied, when the primary pool has waiting clients, or when checked-out
+connections (`totalCount - idleCount`) reach the same limit. The response reason
+is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
+
+A slot remains held until the awaited persistence call completes, including
+awaited post-commit work, and is released on success, duplicate, `not_recorded`,
+or an exception. Rejection never acknowledges the usage or triggers direct
+accounting fallback: the existing Cloudflare consumer individually retries failed
+messages using the native policy above, ACKs successful siblings, and rejects
+the invocation after all siblings settle. The staging Vercel consumer throws rather than returning an ACKable
+success. Direct gateway writes, region handoff, and missing/unknown source callers
+retain their existing behavior.
+
+The two connections of nominal headroom are a starting local policy, **not
+reserved connections** or a measured global capacity bound. Other traffic can
+compete after the snapshot, a writer may perform several database operations,
+background work can outlive the awaited call, and each runtime instance has its
+own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
+consumer concurrency at 225 in production (200 in staging), parallelism at 2, and
+batch size at 6 in production and 2 in staging; retry settings also stay unchanged.
+There is no new environment knob; merging this change activates queue rejection
+when the normal automatic deployment reaches the writer.
+
+`usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
+all rejected decisions. Fields contain only the bounded caller/outcome/reason,
+active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+change admission or persistence results.
+
+The source policy remains finite: initial delivery plus up to **20 retries**
+under the native congestion schedule above. Sustained overload can exhaust that
+budget and move events into the **DLQ**; this guard does not keep arbitrary bursts
+in the source queue indefinitely. PR #9248 must be confirmed deployed before this
+guard is merged/deployed; its merge alone does not verify deployment. Local tests
+do not establish hosted throughput, spare capacity, or latency improvements.
 
 ### Experiment control and verification
 
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`
 and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
-parallelism 2 and invocation cap 200. Production selects processing at cap 200
+parallelism 2 and invocation cap 200. Production selects processing at cap 225
 with batch 6 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
 
 `USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
@@ -239,17 +404,18 @@ attributing any hosted latency effect.
 The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
-both diagnostics and parallelism variables, and the writer target. Keep one
-consumer per environment at cap 200 / parallelism 2, with production batch 6 and
-staging batch 2 (at most 400 writer calls each); do not reconnect a
+the parallelism variable, and the writer target. Keep one
+consumer per environment at parallelism 2, with production cap 225 and staging cap
+200; production batch 6 and staging batch 2 give at most 450 and 400 writer calls
+respectively. Do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
 checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
-timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
-writer route, retry delay/budget and per-message dispositions.
+timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
+route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
@@ -270,7 +436,7 @@ attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
 environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production uses its EU pair with batch6/parallelism2/cap200 and the existing retry policy.
+Production uses its EU pair with batch6/parallelism2/cap225 and the existing retry policy.
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
@@ -294,10 +460,14 @@ deployment, append `/usage` to the hostname shown for `usage-ingest` or
 `POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
 the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
 and secret before gateway startup; redeploy the gateway after changing either.
-Provision and verify the Worker-side publisher secret before enabling the launch
-or SFO cohort controls; a missing Worker secret returns 503.
-The HTTP address alone selects no traffic: production selection still requires
-the existing `USAGE_QUEUE_ONLY_ENABLED` and SFO cohort controls above. No custom
+Provision and verify the Worker-side publisher secret before selecting staging
+or the SFO cohort; a missing Worker secret returns 503.
+The HTTP address alone selects no traffic: production SFO selection still requires
+both production environment labels, a trusted `sfo1` function region and the SFO
+cohort control above; production FRA selection requires both production labels and
+`fra1`.
+Verify the deployed gateway version and effective settings before drawing conclusions
+about live selection; source defaults alone do not establish deployed state. No custom
 routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
@@ -342,7 +512,7 @@ in both environments.
 Processing calls the configured Vercel writer directly. The shared writer client
 retains the internal key, optional Vercel protection bypass, stable usage identity,
 160-second timeout, redirect/response validation and recorded/duplicate ACK rule.
-Publisher/consumer timing diagnostics and the queue policy are unchanged.
+Direct writer transport and completion diagnostics remain in place; the native retry policy is described above.
 
 The retired Frankfurt relay source, service binding, diagnostics and deployment
 step have been removed. The existing private `usage-writer-relay-staging` Worker
@@ -362,3 +532,29 @@ writer credentials and stable identity, ACK after writer completion, duplicate
 ACK, and retry on transport/response failures. No hosted latency or placement
 improvement is claimed. EU routing rollback remains a separate operation in the
 [EU setup](eu-queues.md).
+
+### Authenticated HTTP 400 diagnostics
+
+`usage_ingest_rejected` emits one best-effort warning for each authenticated
+HTTP 400: `missing_body`, `body_read_failure`, `invalid_utf8`, `malformed_json`,
+or `schema_failure`. Statuses, response bodies, validation and queue behavior
+are unchanged. Failed authentication never reads the body or emits this event.
+
+Schema diagnostics contain at most eight issues and an omitted count. Each issue
+has an allowlisted code, a schema-owned path (at most four segments; unknown
+segments stop at `[redacted]`), and allowlisted expected/received type labels.
+Labels are at most 17 characters and path segments at most 26 characters.
+`unknown` covers unsupported expected types, including enum contents; values,
+validator messages, unrecognized-key lists and exception text are never logged.
+Received types use bounded own data-property traversal of parsed JSON only.
+A usage ID is included only after independent validation by the contract's UUID
+schema; body/JSON failures have no usage ID. Log sink/formatting failure is isolated.
+
+In Cloudflare Workers Logs, open the warning's invocation (or join using the
+platform request ID). Read the executing revision from the same invocation's
+`$workers.scriptVersion.id` metadata. This is the deployed Worker version,
+not a Git source SHA; no version binding or configuration change is required.
+The log's own fields intentionally contain no raw request/headers or request ID.
+After a separately authorized rollout, an operator still needs to capture an
+actual rejection and its invocation/version to establish a production cause.
+This diagnostic does not recover missing usage or explain HTTP 409 responses.

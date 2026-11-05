@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Rect } from '../tree';
+import type { ProbeNode, Rect } from '../tree';
 import { checkShift } from './index';
 import { tree } from './test-dump';
 
@@ -125,6 +125,44 @@ test('layout-shift: text-only identities repeated within a sample are not tracke
     checkShift([sample(10, true), sample(10, true), sample(40, true), sample(40, true)], 120),
     []
   );
+});
+
+test('layout-shift: transforms do not hide late content moving a fixed-size wrapper', () => {
+  const sample = (visualY: number, layoutY: number, absolute = false) =>
+    tree([
+      {
+        parent: 0,
+        tag: 'View',
+        rect: [0, visualY, 400, 200],
+        layoutRect: [0, layoutY, 400, 200],
+      },
+      {
+        parent: 1,
+        tag: 'Paragraph',
+        rect: [0, visualY + 10, 100, 20],
+        layoutRect: [0, layoutY + 10, 100, 20],
+        text: 'Title',
+        testID: 'title',
+        style: absolute ? { position: 'absolute' } : undefined,
+      },
+    ]);
+  assert.deepEqual(
+    checkShift([sample(0, 0), sample(0, 0), sample(300, 0), sample(300, 0)], 120),
+    []
+  );
+  for (const absolute of [false, true]) {
+    const findings = checkShift(
+      [
+        sample(0, 0, absolute),
+        sample(0, 0, absolute),
+        sample(300, 30, absolute),
+        sample(300, 30, absolute),
+      ],
+      120
+    );
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].measured, 30);
+  }
 });
 
 test('layout-shift: a route change starts a new rest', () => {

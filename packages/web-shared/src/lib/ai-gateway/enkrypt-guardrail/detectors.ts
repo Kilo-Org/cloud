@@ -1,8 +1,11 @@
 import {
   ENKRYPT_DETECTOR_IDS,
+  ENKRYPT_OUTPUT_DETECTOR_IDS,
   ENKRYPT_PII_ENTITIES,
   type EnkryptDetectorId,
   type EnkryptInputDetectors,
+  type EnkryptOutputDetectorId,
+  type EnkryptOutputDetectors,
   type EnkryptPiiEntity,
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
@@ -76,6 +79,61 @@ export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): En
     const detector = detectors[id];
     return 'action' in detector ? detector.action === 'block' : true;
   });
+}
+
+/** Output scanning has no Kilo Default, so every output detector starts off. */
+export function createEmptyEnkryptOutputDetectors(): EnkryptOutputDetectors {
+  return {
+    pii: { enabled: false, action: 'block', entities: ['secrets'] },
+    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
+    topic_detector: { enabled: false, action: 'block', topic: [] },
+    policy_violation: {
+      enabled: false,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: [],
+    },
+    toxicity: { enabled: false, action: 'block' },
+    nsfw: { enabled: false, action: 'block' },
+    bias: { enabled: false, action: 'block' },
+  };
+}
+
+export function enabledEnkryptOutputDetectorIds(
+  detectors: EnkryptOutputDetectors
+): EnkryptOutputDetectorId[] {
+  return ENKRYPT_OUTPUT_DETECTOR_IDS.filter(id => detectors[id].enabled);
+}
+
+/** Enabled output detectors whose detection blocks the response. */
+export function blockingEnkryptOutputDetectorIds(
+  detectors: EnkryptOutputDetectors
+): EnkryptOutputDetectorId[] {
+  return enabledEnkryptOutputDetectorIds(detectors).filter(id => detectors[id].action === 'block');
+}
+
+/** Enkrypt scans a response with the same detector settings as a request. */
+export function enkryptOutputDetectorsAsInputDetectors(
+  detectors: EnkryptOutputDetectors
+): EnkryptInputDetectors {
+  const { topic_detector, policy_violation } = detectors;
+  return {
+    injection_attack: { enabled: false },
+    pii: detectors.pii,
+    keyword_detector: detectors.keyword_detector,
+    topic_detector: { enabled: topic_detector.enabled, topic: topic_detector.topic },
+    policy_violation: {
+      enabled: policy_violation.enabled,
+      format: policy_violation.format,
+      policy_text: policy_violation.policy_text,
+      rules: policy_violation.rules,
+    },
+    toxicity: { enabled: detectors.toxicity.enabled },
+    nsfw: { enabled: detectors.nsfw.enabled },
+    bias: detectors.bias,
+    sponge_attack: { enabled: false },
+  };
 }
 
 type EnabledToggle = { enabled: true };

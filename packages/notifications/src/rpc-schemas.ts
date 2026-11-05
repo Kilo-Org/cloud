@@ -282,7 +282,7 @@ export const dispatchPushInputSchema = z.object({
   agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
-      badgeBucket: z.string().min(1),
+      badgeBucket: badgeBucketSchema,
       delta: z.number().int(),
     })
     .nullable(),

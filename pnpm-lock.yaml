@@ -2543,8 +2543,8 @@ importers:
         specifier: 3.1.0
         version: 3.1.0
       tar-stream:
-        specifier: 3.1.7
-        version: 3.1.7
+        specifier: 3.1.9
+        version: 3.1.9
       zod:
         specifier: 4.6.7
         version: 4.6.7

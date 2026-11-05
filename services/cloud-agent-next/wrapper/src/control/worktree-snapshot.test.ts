@@ -141,6 +141,10 @@ function tarGnuLongNameEntry(name: string, data: Buffer, mode = 0o644): Buffer[]
   ];
 }
 
+function tarMetadataEntry(type: 'L' | 'x', size: number): Buffer[] {
+  return tarEntry(type === 'L' ? '././@LongLink' : '././@PaxHeader', Buffer.alloc(size, 97), type);
+}
+
 function tarArchive(entries: Buffer[][]): Buffer {
   return Buffer.concat([...entries.flat(), Buffer.alloc(1024)]);
 }
@@ -1980,6 +1984,57 @@ describe('worktree snapshot apply', () => {
         );
       }
       expect(await fs.readdir(directory)).not.toContain('escape.txt');
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('bounds extended header metadata before the tar decoder buffers it', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-metadata-cap-'));
+    try {
+      const paxHeaders: Buffer[][] = [];
+      for (let index = 0; index < 16; index += 1) {
+        paxHeaders.push(tarMetadataEntry('x', 512 * 1024));
+      }
+      for (const entries of [
+        [tarEntry('snapshot.json', manifestBytes()), ...paxHeaders],
+        [tarEntry('snapshot.json', manifestBytes()), tarMetadataEntry('L', 2 * 1024 * 1024)],
+      ]) {
+        const archivePath = await writeArchive(directory, gzipSync(tarArchive(entries)));
+        await expectFailure(
+          applyWorktreeSnapshot({
+            directory,
+            worktreeId: 'worktree_test',
+            archivePath,
+            signal: signal(),
+          }),
+          /extended header metadata exceeded the limit/
+        );
+      }
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the 64 MiB decompressed cap across normal file payloads', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-decompressed-cap-'));
+    try {
+      const tenMiB = Buffer.alloc(10 * 1024 * 1024, 97);
+      const entries: Buffer[][] = [tarEntry('snapshot.json', manifestBytes())];
+      for (let index = 0; index < 6; index += 1) {
+        entries.push(tarEntry(`files/large-${index}.bin`, tenMiB));
+      }
+      entries.push(tarEntry('files/large-6.bin', Buffer.alloc(4 * 1024 * 1024, 97)));
+      const archivePath = await writeArchive(directory, gzipSync(tarArchive(entries)));
+      await expectFailure(
+        applyWorktreeSnapshot({
+          directory,
+          worktreeId: 'worktree_test',
+          archivePath,
+          signal: signal(),
+        }),
+        /decompressed data exceeded the limit/
+      );
     } finally {
       await fs.rm(directory, { recursive: true, force: true });
     }

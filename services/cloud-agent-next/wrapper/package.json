@@ -10,7 +10,7 @@
   "dependencies": {
     "@kilocode/sdk": "7.8.17",
     "fuzzysort": "3.1.0",
-    "tar-stream": "3.1.7",
+    "tar-stream": "3.1.9",
     "zod": "4.6.7"
   },
   "devDependencies": {

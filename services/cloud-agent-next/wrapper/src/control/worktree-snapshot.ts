@@ -43,6 +43,7 @@ export const MAX_WORKTREE_SNAPSHOT_TOTAL_BYTES = 50 * 1024 * 1024;
 export const MAX_WORKTREE_SNAPSHOT_ARCHIVE_BYTES = WORKTREE_SNAPSHOT_MAX_BYTES;
 
 const MAX_SNAPSHOT_MANIFEST_BYTES = 4 * 1024 * 1024;
+const MAX_SNAPSHOT_METADATA_BYTES = 1024 * 1024;
 const MAX_SNAPSHOT_OMISSIONS = MAX_WORKTREE_SNAPSHOT_FILES;
 const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_GIT_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -1083,7 +1084,12 @@ function archiveError(error: unknown): Error {
   return new InvalidWorktreeSnapshotError('snapshot archive is corrupt', { cause: error });
 }
 
-function decompressionLimiter(clock: Clock): Transform {
+type ArchiveInputBudget = {
+  metadataRemaining: number;
+  payloadRemaining: number;
+};
+
+function archiveInputLimiter(clock: Clock, budget: ArchiveInputBudget): Transform {
   let totalBytes = 0;
   return new Transform({
     transform(chunk: Buffer, _encoding, callback) {
@@ -1096,9 +1102,30 @@ function decompressionLimiter(clock: Clock): Transform {
       totalBytes += chunk.length;
       if (totalBytes > MAX_DECOMPRESSED_BYTES) {
         callback(
-          new InvalidWorktreeSnapshotError('snapshot archive exceeded the decompressed limit')
+          new InvalidWorktreeSnapshotError('snapshot archive decompressed data exceeded the limit')
         );
         return;
+      }
+
+      let offset = 0;
+      while (offset < chunk.length) {
+        if (budget.payloadRemaining > 0) {
+          const take = Math.min(budget.payloadRemaining, chunk.length - offset);
+          budget.payloadRemaining -= take;
+          offset += take;
+          continue;
+        }
+        const take = Math.min(budget.metadataRemaining, chunk.length - offset);
+        budget.metadataRemaining -= take;
+        offset += take;
+        if (take === 0) {
+          callback(
+            new InvalidWorktreeSnapshotError(
+              'snapshot archive extended header metadata exceeded the limit'
+            )
+          );
+          return;
+        }
       }
       callback(null, chunk);
     },
@@ -1120,8 +1147,18 @@ async function extractArchive(
   await chmod(temporaryDirectory, 0o700);
   const input = createReadStream(archivePath);
   const gunzip = createGunzip();
-  const decompressed = decompressionLimiter(clock);
+  const budget: ArchiveInputBudget = {
+    metadataRemaining: MAX_SNAPSHOT_METADATA_BYTES,
+    payloadRemaining: 0,
+  };
+  const decompressed = archiveInputLimiter(clock, budget);
   const extractor = tarExtract({ filenameEncoding: 'utf8' });
+  extractor.on('entry', header => {
+    // Rebase the metadata gap at each real entry so file payloads do not consume it.
+    const size = header.size ?? 0;
+    budget.metadataRemaining = MAX_SNAPSHOT_METADATA_BYTES;
+    budget.payloadRemaining = Number.isSafeInteger(size) && size >= 0 ? size + tarPadding(size) : 0;
+  });
   input.on('error', error => gunzip.destroy(archiveError(error)));
   gunzip.on('error', error => decompressed.destroy(archiveError(error)));
   decompressed.on('error', error => extractor.destroy(archiveError(error)));

@@ -9,16 +9,18 @@ import { i18n } from '@/i18n';
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
 /**
- * The statement a transport failure draws, keyed by its `reason`. A message the
+ * The statement a delivery failure draws, keyed by its `reason`. A message the
  * person stopped says so and nothing more. A message the transport gave up on
- * says it was not sent, and a second line says how often it tried; that is also
- * the one failure drawn on a failed bubble, because the message itself is what
- * did not arrive.
+ * says it was not sent, and a second line says how often it tried; that is the
+ * only failure drawn on a failed bubble, because the message itself is what did
+ * not arrive.
  *
- * `execution` is absent: it is the response failing, and it draws the
- * assistant-failure copy instead (see `AGENT_EXECUTION_DELIVERY_REASON`).
+ * `execution` is the response failing, not the message: the row draws the
+ * assistant-failure title instead (see `AGENT_EXECUTION_DELIVERY_REASON`), so
+ * this line is never rendered. It stays in the record to keep the reason
+ * coverage complete.
  */
-const TRANSPORT_FAILURE_COPY = {
+const DELIVERY_FAILURE_COPY = {
   interrupted: {
     titleKey: 'agentChat.messageFailure.deliveryInterrupted',
     detailKey: null,
@@ -29,8 +31,13 @@ const TRANSPORT_FAILURE_COPY = {
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
     undelivered: true,
   },
+  execution: {
+    titleKey: 'agentChat.messageFailure.deliveryExecution',
+    detailKey: null,
+    undelivered: false,
+  },
 } as const satisfies Record<
-  Exclude<DeliveryReason, 'execution'>,
+  DeliveryReason,
   { titleKey: string; detailKey: string | null; undelivered: boolean }
 >;
 
@@ -272,8 +279,8 @@ export function selectMessageFailure(input: {
     // takes the same branch instead of drawing an unlabelled row.
     const copy =
       deliveryState.reason === 'interrupted'
-        ? TRANSPORT_FAILURE_COPY.interrupted
-        : TRANSPORT_FAILURE_COPY.exhausted;
+        ? DELIVERY_FAILURE_COPY.interrupted
+        : DELIVERY_FAILURE_COPY.exhausted;
     return {
       kind: 'delivery',
       side: 'user',

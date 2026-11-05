@@ -452,7 +452,7 @@ describe('MessageBubble failure footer', () => {
       retryAvailable: false,
     });
 
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);

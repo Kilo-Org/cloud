@@ -14,17 +14,22 @@ In scope:
 - Create, update, and delete files using normal filesystem operations.
 - Artifacts shared across sibling chats in the same workspace. Access stays
   owner-only, matching Changes and session history.
-- Offline listing and downloads.
-- Restore artifacts when replacing a sandbox.
+- Offline listing and downloads of everything ever synchronized for the
+  workspace.
 
 Out of scope:
 
+- Restoring R2 contents into a replacement sandbox. The local folder comes back
+  only through a workspace tail snapshot (Section 5).
 - Publish tool, filesystem watcher, browser editing, previews, version history.
 - Native mobile UI (`.specs/cloud-agent-session.md` already scopes mobile out).
 - Files larger than the per-file cap (multipart uploads are a follow-up).
 
 Naming: "runtime artifacts" already exists (`runtime-artifact-routes.ts`). Use
 "workspace artifacts" / `workspaceArtifact*` in code, routes, and events.
+
+All paths are relative to `services/cloud-agent-next/` unless they start with
+`apps/`, `packages/`, `docs/`, or `.specs/`.
 
 ## Key Decisions
 
@@ -33,11 +38,14 @@ Naming: "runtime artifacts" already exists (`runtime-artifact-routes.ts`). Use
 | Byte path | Wrapper → Worker HTTP route → R2 binding | `WORKER_URL` is already on the native egress allowlist; direct R2 hosts are not |
 | Transport | Generalize the existing log upload channel | Already has scoped grants, size checks, and idempotent writes |
 | Bytes through the DO | Never | 8 MiB control outbox, single-threaded DO shared by all sibling chats |
-| Control-socket changes | None for artifacts | No new frames, no `hello` capability negotiation |
-| Index owner | Sandbox DO SQLite | Keyed by stable `sandboxId`, shared by sibling chats, survives replacement |
+| Control-socket changes | None | No new frames, no `hello` capability negotiation |
+| Index owner | Sandbox DO SQLite | Keyed by stable `sandboxId`; one sandbox serves exactly one workspace |
 | Stale-wrapper fence | Current `allocationId` + `wrapperId` in `AllocationState` | Existing state; do not add a new epoch |
-| Replacement detection | Existing workspace stamp | Do not add a separate marker |
+| Grant lifetime | Artifact scope bound to DO liveness, not a short expiry | Wrappers can outlive four hours (12-hour turns, unbounded allocations) |
+| Replacement sandboxes | No manual restore; rely on workspace tail snapshots | Avoids a second restore mechanism; R2 keeps the user-facing copy either way |
+| Safety without restore | Baseline on first scan; publish only observed changes | An empty or stale folder can never delete or overwrite newer R2 state |
 | Durability point | Turn-end flush | Idle stop destroys compute without a `shutdown` frame |
+| Downloads | Presigned R2 GET with forced attachment disposition | Decided; needs a read-only key scoped to the artifacts bucket |
 | Notification | Copy `worktree_changes` | Persisted, deduplicated, revisioned, refetch on reconnect |
 | UI shape | Copy the Changes toggle | Changes replaces the chat content area; it is not a side panel |
 
@@ -50,20 +58,18 @@ Sandbox DO.
 | Constant | V1 value | Why |
 |---|---|---|
 | `WORKSPACE_ARTIFACT_MAX_FILE_BYTES` | 50 MiB | Under Cloudflare's lowest-plan 100 MB Worker ingress limit, which can 413 at the edge before the handler runs; fits the turn-end flush budget |
-| `WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES` | 500 MiB | Bounds restore time during preparation |
+| `WORKSPACE_ARTIFACT_MAX_TOTAL_BYTES` | 500 MiB | Bounds storage per workspace |
 | `WORKSPACE_ARTIFACT_MAX_FILES` | 1,000 | Keeps scans and index reads cheap |
 | `WORKSPACE_ARTIFACT_MAX_PATH_BYTES` | 1,024 | Relative path, UTF-8 |
 | `WORKSPACE_ARTIFACT_MAX_DEPTH` | 16 | Directory levels under `/artifacts` |
 | `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS` | 4,000 | Between the end of one scan and the next start |
-| `WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS` | 120,000 | Per upload or download request |
+| `WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS` | 120,000 | Per upload request |
 | `WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS` | 30,000 | Turn-end flush |
-| `WORKSPACE_ARTIFACT_RESTORE_BUDGET_MS` | 120,000 | Including retries |
-| `WORKSPACE_ARTIFACT_DOWNLOAD_URL_SECONDS` | 300 | Browser download links |
+| `WORKSPACE_ARTIFACT_DOWNLOAD_URL_SECONDS` | 300 | Presigned browser download links |
 
-Before raising the per-file cap, confirm the account's Worker ingress limit and
-verify Vercel forwarding at the target size. `docs/control-plane.md` records that
-Vercel forwarding is only verified for 8 MiB transfers; verify 50 MiB as part of
-this work.
+Before raising the per-file cap, confirm the account's Worker ingress limit.
+Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
+(`docs/control-plane.md` records only 8 MiB transfers as verified).
 
 ## 1. Generalize The Existing Sandbox Upload Channel
 
@@ -85,14 +91,24 @@ this work.
 - `wrapper/src/control-plane/main.ts` reads and deletes the env values. It
   deletes `CONTROL_WRAPPER_INSTANCE_ID` without using it. The control
   connection (`connection.ts`) generates its own random `wrapperId`.
+- There is no cap on allocation lifetime, and the grant is fixed at launch, so
+  log uploads from a wrapper older than four hours already fail with `401`. The
+  12-hour turn work makes this common (see Section 8).
 
 ### Changes
 
 1. **Grant.** Rename `log-upload-grant.ts` to `sandbox-transfer-grant.ts`.
    - Claims: `type: 'sandbox_transfer'`, `aud: 'cloud-agent-sandbox-transfer'`,
      `identity`, `scopes: ('logs' | 'workspace_artifacts')[]`, `iat`, `exp`.
-   - Keep the current strict validation (`exp - iat` cap, clock skew,
-     max header length).
+   - Keep the current strict validation (signature, audience, clock skew,
+     maximum header length).
+   - Validate age per scope:
+     - `logs`: `now - iat` within `CONTROL_LOG_GRANT_SECONDS`, as today. The log
+       route does not consult the DO, so it keeps a short window.
+     - `workspace_artifacts`: no age window beyond `exp`, because every artifact
+       route asks the Sandbox DO whether this exact allocation and wrapper are
+       connected. A grant is useless once its wrapper is replaced or stopped.
+   - Set `exp` long enough for any wrapper (for example 30 days).
    - Accept the old `control_log_upload` grant on log routes only, until older
      wrapper releases age out.
 2. **Minting.** Mint the grant on every wrapper launch, independent of whether
@@ -119,17 +135,13 @@ this work.
    - Log routes keep their buffered, JSON-validated path.
 6. **Wrapper client.** Add `wrapper/src/control/sandbox-transfer-client.ts`.
    - Holds the base URL and grant.
-   - Provides `put`, `get`, `delete` with `redirect: 'error'`, abort signals,
+   - Provides `put` and `delete` with `redirect: 'error'`, abort signals,
      per-request timeouts, and bounded retry with jittered backoff on network
      errors, 429, and 5xx.
    - Returns a classified result (`ok`, `rejected` with status, `unavailable`).
    - The log uploader and diagnostics migrate to it with no behavior change.
 7. **Routes.** Register `/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/logs/...`
    with identical behavior to today, and keep `/sandbox-logs/...` as an alias.
-8. **Grant lifetime.** Confirm whether a wrapper can outlive four hours. If it
-   can, renew the grant in the `hello` acknowledgement over the existing control
-   connection; do not add a new credential path. Until then, a `401` from the
-   transfer route pauses artifact sync and reports a diagnostic.
 
 Main integration:
 
@@ -147,9 +159,6 @@ Main integration:
 - `wrapper/src/control-plane/connection.ts`
 - `wrapper/src/control-plane/main.ts`
 
-All paths in this document are relative to `services/cloud-agent-next/` unless
-they start with `apps/`, `packages/`, `docs/`, or `.specs/`.
-
 ## 2. Storage And Ownership
 
 ### Ownership
@@ -157,16 +166,19 @@ they start with `apps/`, `packages/`, `docs/`, or `.specs/`.
 The Sandbox DO owns the index. It is addressed by the workspace's stable
 `sandboxId` (`SANDBOX_CONTROL.getByName(sandboxId)`), which sibling chats share
 through `metadata.workspace.sandboxId` and which survives allocation replacement.
+One sandbox serves exactly one workspace, so `/artifacts` and the index are
+per workspace. Correct `docs/control-plane.md` test scenario 5 ("two worktrees in
+one sandbox"), which contradicts this.
 
-Confirm that one sandbox serves exactly one workspace. `docs/control-plane.md`
-states it in its model section, but its test scenario 5 describes two worktrees
-in one sandbox. If a sandbox can host more than one workspace, `/artifacts` and
-the index must become per-workspace before V1.
-
-### Bucket
+### Bucket and credentials
 
 - Add a dedicated private bucket binding, `WORKSPACE_ARTIFACTS_BUCKET`, in
   production and dev in `wrangler.jsonc`, and to the Worker `Env` type.
+- Add a bucket name variable and a read-only S3 access key scoped to that bucket
+  for presigned downloads: `WORKSPACE_ARTIFACTS_BUCKET_NAME`,
+  `WORKSPACE_ARTIFACTS_READONLY_ACCESS_KEY_ID`,
+  `WORKSPACE_ARTIFACTS_READONLY_SECRET_ACCESS_KEY` (reuse `R2_ENDPOINT`).
+  Document them in `ENVIRONMENT.md`.
 - Object keys: `<sandboxId>/<uuid>`, generated by the Worker. Each upload gets a
   new key, so a failed or rejected upload cannot damage the current file.
 - Write with `onlyIf: { etagDoesNotMatch: '*' }`.
@@ -205,10 +217,9 @@ incremented in the same transaction as each index change.
 - Replaced, deleted, and rejected objects go to the orphan table in the same
   transaction as the index change. The existing Sandbox DO alarm deletes them in
   batches.
-- Uncommitted objects (upload succeeded, commit never happened) are swept by an
-  R2 lifecycle rule. Committed objects are never deleted by lifecycle rules, so
-  the sweep relies on the orphan table. Alternative if needed: the Worker inserts
-  an orphan row before the upload and removes it at commit.
+- Uncommitted objects (upload succeeded, commit never happened, for example a
+  Worker crash between the two): the route inserts an orphan row before the
+  upload and removes it at commit, so the alarm sweeps anything left behind.
 - Workspace deletion (`worktree-deletion.ts` flow) deletes the index and queues
   every object. Account deletion goes through the same workspace deletion path.
 - Retention: artifacts live as long as the workspace.
@@ -222,7 +233,7 @@ Main integration:
   of `sandbox-do.ts`)
 - `src/control-plane/sandbox/worktree-deletion.ts`
 - `drizzle.sandbox.config.ts`
-- `wrangler.jsonc`, `src/types.ts`
+- `wrangler.jsonc`, `src/types.ts`, `ENVIRONMENT.md`
 - `docs/do-sqlite-drizzle.md`
 
 ## 3. Artifact Transfer Routes
@@ -230,7 +241,7 @@ Main integration:
 Register under
 `/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/artifacts`. Each
 route runs `authorizeTransfer(c, 'workspace_artifacts')`, then calls a Sandbox DO
-RPC.
+RPC. The wrapper only uploads and deletes; it never downloads.
 
 ### Sandbox DO RPCs
 
@@ -238,17 +249,13 @@ All RPCs take the grant identity and first check that
 `AllocationState.kind === 'connected'`, `allocationId` matches, and `wrapperId`
 equals `wrapperInstanceId`. A mismatch returns `stale` and the route responds
 `409`. The upload is stateless, so this check runs at commit time, not only at
-upload start.
+upload start. This liveness check is also what makes the long-lived artifact
+grant safe (Section 1).
 
 ```ts
-getWorkspaceArtifactIndex(identity): Promise<
-  | { status: 'ok'; revision: number; entries: WorkspaceArtifactEntry[] }
-  | { status: 'stale' }
->
-
-resolveWorkspaceArtifactObject(identity, relativePath): Promise<
-  | { status: 'ok'; objectKey: string; contentHash: string; sizeBytes: number }
-  | { status: 'stale' | 'not_found' }
+reserveWorkspaceArtifactUpload(identity, { relativePath, sizeBytes }): Promise<
+  | { status: 'ok'; objectKey: string }          // orphan row inserted
+  | { status: 'stale' | 'quota_exceeded' | 'invalid_path' }
 >
 
 commitWorkspaceArtifact(identity, {
@@ -266,26 +273,24 @@ deleteWorkspaceArtifact(identity, { relativePath, expectedHash }): Promise<
 
 Commit rules:
 
-- Same path and same hash: `unchanged`; queue the new object as an orphan.
+- Same path and same hash: `unchanged`; the new object stays queued as an orphan.
 - New entry: check file count and total bytes against the limits.
 - Replacement: queue the previous object as an orphan.
 - Increment the revision and notify (Section 6) only on real changes.
 
 Delete rules: remove only when the stored hash equals `expectedHash`, so a late
-delete cannot remove a newer file.
+or stale delete cannot remove a newer file.
 
 ### HTTP contract
 
 | Route | Request | Success | Errors |
 |---|---|---|---|
-| `GET .../index` | none | `200` JSON `{ revision, entries }` | `401`, `403`, `409` stale |
-| `GET .../objects?path=<p>` | none | `200` stream, `Content-Length`, `ETag` | `404`, `409` |
 | `PUT .../objects?path=<p>` | headers `Content-Length`, `Content-Type`, `X-Content-SHA256` | `200` JSON `{ status, revision }` | `400` invalid path, `409` stale, `411`, `413` file or quota, `422` hash mismatch, `503` storage |
 | `DELETE .../objects?path=<p>&hash=<h>` | none | `200` JSON `{ status, revision }` | `409` stale |
 
-`PUT` flow: validate path and declared size, stream to a new key with the
-`sha256` option, call `commitWorkspaceArtifact`. If the commit is rejected, queue
-the new object as an orphan and return the mapped error.
+`PUT` flow: validate path and declared size, reserve (orphan row and key), stream
+to the key with the `sha256` option, commit. If the commit is rejected, the
+object stays queued as an orphan and the route returns the mapped error.
 
 Path validation (shared by wrapper, routes, and DO): relative, NFC, no empty,
 `.`, or `..` segments, no backslashes, NUL, or control characters, within the
@@ -305,22 +310,51 @@ Add `wrapper/src/control-plane/workspace-artifacts.ts`:
 ```ts
 createWorkspaceArtifactSync(options: {
   root: string;                      // '/artifacts'
+  statePath: string;                 // outside /artifacts, see "Baseline"
+  allocationId: string;
   client: SandboxTransferClient;
   timers: Timers;
   log: (message: string) => void;
   onDiagnostic: DiagnosticSink;
 }): {
-  restore(signal: AbortSignal): Promise<RestoreResult>;
-  start(): void;                     // after restore succeeded
+  start(): void;
   flush(budgetMs: number): Promise<void>;
   isFlushing(): boolean;
   stop(): Promise<void>;
 }
 ```
 
-One instance per wrapper, which is one per sandbox. `main.ts` creates it when
-`SANDBOX_TRANSFER_URL` and the `workspace_artifacts` scope are present, and stops
-it in `lifecycle.stop`. Follow the `file-log-uploader.ts` loop shape.
+One instance per wrapper, which is one per sandbox. `main.ts` creates and starts
+it at wrapper startup, before any route preparation, when `SANDBOX_TRANSFER_URL`
+and the `workspace_artifacts` scope are present. It stops in `lifecycle.stop`.
+Follow the `file-log-uploader.ts` loop shape.
+
+### Baseline
+
+Without a restore, the folder at wrapper start may be empty (fresh sandbox),
+older than R2 (a tail snapshot captured before a later allocation whose capture
+failed), or setup output from an environment snapshot. None of these may delete
+or overwrite newer R2 state. So the synchronizer only publishes changes it
+observes:
+
+- The synchronizer keeps a small state file (`statePath`, for example
+  `/var/lib/kilo/workspace-artifacts.json`) with `allocationId` and, per path, the
+  last observed `{ size, mtimeNs, inode, publishedHash }`. Write it atomically.
+- **Same allocation** (wrapper restart): state file `allocationId` matches.
+  Resume from it; anything that changed while the wrapper was down is published
+  normally.
+- **New allocation** (fresh disk or any snapshot): no state file, or one from
+  another allocation (a tail snapshot carries the old file). The first complete
+  scan records every existing file as baseline and publishes nothing.
+- A baseline file is published only after it changes (size, mtime, or inode).
+- A baseline file that disappears is deleted remotely with `expectedHash` set to
+  its baseline hash. If R2 holds a different (newer) version, the DO returns
+  `hash_mismatch` and nothing is removed.
+- New files created after baseline are published normally.
+
+Consequence: in a sandbox without a tail snapshot, files from earlier sandboxes
+remain in R2 and in the Artifacts view, but are not present locally. Writing the
+same path again replaces the R2 copy.
 
 ### Scan
 
@@ -328,14 +362,14 @@ Run a scan every `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS`, never overlapping:
 
 1. Enumerate regular files under `/artifacts` with `lstat`.
 2. Record relative path, size, `mtimeNs`, `ctimeNs`, and inode.
-3. A file is eligible once unchanged across two successful scans.
-4. Hash eligible files (streaming SHA-256). Skip files whose hash matches the
-   last committed hash for that path.
+3. A changed or new file is eligible once unchanged across two successful scans.
+4. Hash eligible files (streaming SHA-256). Skip files whose hash equals the
+   last published hash for that path.
 5. Upload one file at a time. Re-`stat` after hashing and after the upload; if
    anything changed, discard the result and wait for stability again.
-6. The `PUT` route commits on success.
-7. Delete remote entries for paths absent across two complete scans, sending the
-   last known hash.
+6. The `PUT` route commits on success; record `publishedHash` in the state file.
+7. For paths absent across two complete scans that were published or baselined,
+   send `DELETE` with the last known hash.
 
 ### Rules
 
@@ -347,8 +381,6 @@ Run a scan every `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS`, never overlapping:
 - Files over the per-file cap, paths over the limits, and files that would
   exceed the quota are skipped with a diagnostic. They are retried only when
   they change.
-- Never run the deletion pass until `restore()` has succeeded for this
-  allocation.
 - `409` (stale) stops the synchronizer. `401` pauses it with a diagnostic.
   `503` and network errors back off and retry on the next scan.
 
@@ -365,9 +397,10 @@ the only exception.
 - Cloudflare: `RUN mkdir -p /artifacts` in `Dockerfile.containers` (root, which
   the wrapper and agent run as).
 - Vercel: add `/artifacts` to the `sudo mkdir -p` and `sudo chown` line in
-  `src/byoc/vercel-runtime-base.ts`.
-- The wrapper also runs `mkdir -p /artifacts` before restore, so older images
-  still work.
+  `src/byoc/vercel-runtime-base.ts`. Vercel is not live; ship the provisioning,
+  defer end-to-end verification.
+- The wrapper also runs `mkdir -p /artifacts` at startup, so older images still
+  work.
 - `/artifacts` sits outside every git root, so auto-commit and worktree diffs
   ignore it.
 
@@ -385,44 +418,34 @@ run. Unattended sessions can stop one minute after activity.
   stays alive for at most the budget.
 - Do not delay the turn outcome for the flush.
 
-### Restore
+Because a workspace tail snapshot is captured only after one minute without
+activity, and the flush counts as activity, capture happens after the flush. The
+snapshot's `/artifacts` therefore matches R2 at capture time.
 
-Restore when the workspace is a replacement: the stamp is absent, `foreign`, or
-from another allocation. Do not restore when the stamp says `same`; that is a
-surviving disk (reconnect or wrapper restart), and local files win.
+### Replacement sandboxes
 
-Steps:
+There is no manual restore. What the agent sees locally depends on how the
+replacement starts:
 
-1. `GET .../index`.
-2. Remove local files under `/artifacts` that are not in the index. This handles
-   stale files resurrected by a tail or environment snapshot. R2 always wins.
-3. For each entry whose local hash differs, download to a temporary file in
-   `/artifacts/.kilo-restore/`, verify size and SHA-256, then rename into place.
-4. Remove the temporary directory. Seed the synchronizer's last-committed hashes
-   from the index.
+| Start | Local `/artifacts` | R2 / Artifacts view |
+|---|---|---|
+| Workspace tail snapshot | As of the last capture | Unchanged |
+| Environment snapshot or image | Empty, or setup output | Unchanged |
+| Same allocation (reconnect, wrapper restart) | Untouched | Unchanged |
 
-Failure: retry within `WORKSPACE_ARTIFACT_RESTORE_BUDGET_MS`, then fail
-preparation with a specific reason (`workspace_artifacts_restore_failed`) instead
-of starting against a partially restored folder. If a degraded mode is preferred
-later, it must disable the deletion pass.
+Workspace tail snapshots cover only part of the fleet (`docs/control-plane.md`,
+"Workspace tail snapshots"; `src/control-plane/sandbox/workspace-snapshot.ts`):
 
-### Where restore runs in `prepare.ts`
+- Owners enrolled through `WORKSPACE_SNAPSHOT_ORG_IDS` / `WORKSPACE_SNAPSHOT_USER_IDS`
+  only; empty disables the feature.
+- Isolated native Cloudflare Containers and registered `worktree_*` workspaces
+  only; standalone sessions and other providers never capture or restore.
+- Capture is best effort and runs once per idle period.
 
-Inside `withWorkspaceLock`, so sibling chats cannot race it, at three points:
-
-- On the normal path, before `runPreparationCommands`. The existing
-  `onReplacementWorkspace` hook runs after setup, which is too late.
-- On the tail-snapshot path, before its start commands.
-- In the branch for routes with no git and no setup commands.
-
-Use the existing workspace stamp (`workspace-stamp.ts`) to decide. For workspaces
-with no git, `classifyWorkspace` always reports `empty`, so compare
-`stamp.allocationId` directly. Write the stamp only after restore completes,
-matching root-recovery behavior. Restore runs once per allocation; later routes
-see the result and skip it.
-
-Report preparation progress through `emitProgress` while restoring, adding an
-`artifacts` step to the progress schema if the existing steps do not fit.
+This is acceptable for V1 because the user-facing copy lives in R2 regardless,
+and the baseline rule keeps R2 safe from empty or stale folders. If agents need
+earlier artifacts locally outside tail-snapshot coverage, add an on-demand
+restore later.
 
 ### Shutdown
 
@@ -431,8 +454,6 @@ durability point.
 
 Main integration:
 
-- `wrapper/src/control-plane/prepare.ts`
-- `wrapper/src/control-plane/workspace-stamp.ts`
 - `wrapper/src/control-plane/main.ts`
 - `wrapper/src/control-plane/turn.ts`
 - `Dockerfile.containers`
@@ -446,25 +467,27 @@ Add `src/router/handlers/session-workspace-artifacts.ts`, modeled on
 `session-worktree-changes.ts`, and compose it in `src/router.ts`:
 
 - `listWorkspaceArtifacts({ sessionId })` returns `{ revision, entries }`.
-- `getWorkspaceArtifactDownload({ sessionId, relativePath })` returns
+- `getWorkspaceArtifactDownloadUrl({ sessionId, relativePath })` returns
   `{ url, expiresAt }`.
 
 Both use `protectedProcedure` and `requireCurrentSessionAccess`. They resolve
 the session's `sandboxId` and read the Sandbox DO index. They never prepare,
 start, or wake a sandbox.
 
-### Downloads
+### Downloads (presigned R2 GET)
 
 - Resolve the object key server-side from `relativePath` after the access check.
   Never accept bucket keys from the browser.
-- Preferred: a Worker download route with a short-lived signed token, streaming
-  from the binding. No new R2 credentials, and it works the same everywhere.
-- Alternative: a presigned R2 GET with a new read-only key scoped to the
-  artifacts bucket (`r2-client.ts` supports `responseContentDisposition`). This
-  needs a new secret and a CSP check.
-- Always send `Content-Disposition: attachment` with an RFC 5987 encoded
-  filename, `X-Content-Type-Options: nosniff`, and the stored content type.
-  HTML and SVG are never rendered inline.
+- Sign with `createR2Client` from `packages/worker-utils/src/r2-client.ts`, using
+  the read-only key scoped to the artifacts bucket, expiring after
+  `WORKSPACE_ARTIFACT_DOWNLOAD_URL_SECONDS`.
+- Always set `response-content-disposition: attachment; filename*=UTF-8''<name>`
+  (RFC 5987). Extend `getSignedURL` with an optional `responseContentType` and
+  set `application/octet-stream` for HTML, SVG, and XML so they can never render
+  as active content on the R2 origin.
+- The browser starts the download by navigating to the URL (`window.location` or
+  an anchor without `download`, which is ignored cross-origin). Navigation is not
+  subject to `connect-src`; confirm no CSP directive blocks it.
 
 ### Web tRPC
 
@@ -504,6 +527,7 @@ Main integration:
 - `src/control-plane/sandbox/notifications.ts`
 - `src/control-plane/sandbox/sandbox-do.ts`
 - `src/shared/protocol.ts`, `src/websocket/types.ts`
+- `packages/worker-utils/src/r2-client.ts`
 - `packages/cloud-agent-sdk/src/schemas.ts`
 - `packages/cloud-agent-sdk/src/normalizer.ts`
 - `packages/cloud-agent-sdk/src/session-manager.ts`
@@ -541,17 +565,19 @@ Follow `DESIGN.md` and the `kilo-design-cloud` skill.
 Update `buildCloudAgentRules` in `src/shared/cloud-agent-rules.ts`:
 
 - Replace "The filesystem is ephemeral and will not persist after the session
-  ends" with: the filesystem is ephemeral, except `/artifacts`.
+  ends" with: the filesystem is ephemeral, except that files saved in
+  `/artifacts` are kept for the user.
 - Add an "Artifacts" section: put user-facing outputs (reports, screenshots,
-  exports, generated files) in `/artifacts`; they are shown to the user and kept
-  after the session ends. State the per-file and total limits.
+  exports, generated files) in `/artifacts`; the user can see and download them
+  after the session ends. Files from earlier sessions may not be present in the
+  folder. State the per-file and total limits.
 - Do not mention synchronization.
 
 ### Spec
 
 Add a rule under `### Workspace` in `.specs/cloud-agent-session.md` (shared
-artifacts, offline access, owner-only, restore on replacement) and a Changelog
-entry.
+artifacts, offline access, owner-only, no restore outside tail snapshots) and a
+Changelog entry.
 
 Main integration:
 
@@ -570,49 +596,63 @@ Main integration:
   shows whatever exists.
 - Old routes and grant types (`/sandbox-logs`, `control_log_upload`) stay until
   telemetry shows no older wrappers.
-- Deploy order: Worker and DO (routes, schema, RPCs) before the wrapper release
-  that uses them, then the UI.
+- Deploy order: Worker and DO (routes, schema, RPCs, secrets) before the wrapper
+  release that uses them, then the UI.
+- Coordinate with the 12-hour turn work: log uploads still stop after four hours
+  under this plan, because the log route does not consult the DO. Fixing that
+  (renewal, or a DO liveness check on log routes) belongs to the 12-hour work,
+  and should reuse the generalized grant from Section 1.
 
 ## 9. Verify
 
 ### Unit and integration tests
 
 - **Transfer channel:** existing log and diagnostic tests pass unchanged; scopes
-  are not interchangeable; a grant for one allocation or wrapper is rejected for
-  another; old grants work only on log routes.
+  are not interchangeable; a `logs` grant older than four hours is rejected
+  while an older `workspace_artifacts` grant still works for the connected
+  wrapper; a grant for a replaced allocation or wrapper is rejected; old grants
+  work only on log routes.
 - **Routes:** missing or oversized `Content-Length`, hash mismatch, quota, invalid
   paths, stale wrapper at commit, idempotent repeat commit, late delete with a
-  stale hash.
+  stale hash, uncommitted objects swept.
 - **DO index:** migration applies on an existing DO; revision increments only on
   real changes; orphans are queued and swept; workspace deletion clears
   everything; data survives DO eviction.
 - **Synchronizer:** creation, modification, deletion, unchanged files, failed
   and incomplete scans, missing root, concurrent writes, symlinks and special
   files, oversized files, retries and back-off, `409` stop, `401` pause.
-- **Restore:** replacement versus `same` stamp, no-git workspaces, stale snapshot
-  files removed, interrupted restore, restore failure surfaces the specific error.
+- **Baseline:** fresh allocation with an empty folder deletes nothing; a stale
+  tail-snapshot folder neither overwrites nor deletes newer R2 entries; a
+  baseline file that changes is published; a baseline file that disappears is
+  deleted only when R2 still holds the baseline hash; wrapper restart in the same
+  allocation resumes from the state file.
 - **Lifecycle:** turn-end flush keeps `active` only within its budget; idle
   polling never sets `active`.
 - **Notifications:** dedup by revision, reconnect refetch, sibling fan-out.
+- **Downloads:** URL carries attachment disposition and octet-stream for HTML and
+  SVG; unauthorized sessions and unknown paths are rejected.
 
-### End to end
+### End to end (Cloudflare)
 
 - Sibling chats share one folder and one synchronizer.
 - A file written in a turn's last seconds is uploaded before an unattended idle
   stop.
-- Uploads work in a restricted-egress Cloudflare container.
-- A 50 MiB upload and restore succeed on both providers.
-- On both providers: create artifacts, stop the sandbox, list and download them
-  offline, then replace the sandbox (including from a Cloudflare tail snapshot)
-  and verify restoration before setup commands and the next turn.
-- View states on desktop and mobile web; downloads of HTML and SVG save as
-  attachments.
+- Uploads work in a restricted-egress container.
+- A 50 MiB upload succeeds.
+- Create artifacts, stop the sandbox, list and download them offline.
+- Start a replacement without a tail snapshot: R2 is unchanged, the agent sees an
+  empty folder, and new files sync.
+- Start a replacement from a tail snapshot (enrolled owner): the folder matches
+  R2 and nothing is re-uploaded.
+- View states on desktop and mobile web; HTML and SVG downloads save as files.
+
+Vercel end-to-end verification is deferred until Vercel BYOC is live.
 
 ### Checks
 
 Run focused formatting, type checks, and tests for
-`services/cloud-agent-next`, its wrapper, `packages/cloud-agent-sdk`, and
-`apps/web`.
+`services/cloud-agent-next`, its wrapper, `packages/worker-utils`,
+`packages/cloud-agent-sdk`, and `apps/web`.
 
 ## Expected Behavior And Limitations
 
@@ -623,27 +663,35 @@ Run focused formatting, type checks, and tests for
 - R2 holds the last successfully synchronized state. Files written outside a
   turn (for example by a background process) and lost to a crash or idle stop
   before the next scan are not recoverable.
+- Outside workspace tail snapshot coverage, a replacement sandbox starts with an
+  empty `/artifacts`. Earlier files stay downloadable but are not available to
+  the agent.
 - Files over 50 MiB or beyond the quota are not synchronized; the agent is told
   the limits.
 
+## Resolved Questions
+
+| Question | Answer |
+|---|---|
+| Can a sandbox host more than one workspace? | No. One `/artifacts` and one index per sandbox |
+| Can a wrapper outlive the four-hour grant? | Yes (12-hour turns, no allocation cap). Artifact scope relies on DO liveness instead of a short expiry |
+| Download path | Presigned R2 GET |
+| Restore on replacement | None. Rely on workspace tail snapshots; baseline rule protects R2 |
+
 ## Open Questions
 
-1. Can a sandbox ever host more than one workspace? If yes, make `/artifacts`
-   per workspace before V1.
-2. Can a wrapper outlive the four-hour grant? If yes, add renewal in the `hello`
-   acknowledgement.
-3. What is the account's Worker ingress limit, and does Vercel forwarding pass at
-   50 MiB?
-4. Download path: Worker streaming route (preferred) or presigned R2 GET?
-5. Should a restore failure block the turn, or start with sync disabled and a
-   visible warning?
+1. What is the account's Worker ingress limit? It decides whether the 50 MiB cap
+   can be raised.
+2. Vercel forwarding at 50 MiB: verify before Vercel BYOC launches.
 
 ## Implementation Order
 
-1. Generalize the transfer channel: grant scopes, shared wrapper identity, route
-   helpers, wrapper client. No behavior change for logs.
-2. Artifact bucket, index schema and migration, DO RPCs, transfer routes.
-3. Wrapper synchronizer and turn-end flush.
-4. Folder provisioning and restore hooks in `prepare.ts`.
-5. Worker read procedures, downloads, and notifications through the SDK.
+1. Generalize the transfer channel: grant scopes and per-scope age rules, shared
+   wrapper identity, route helpers, wrapper client. No behavior change for logs.
+2. Artifact bucket, credentials, index schema and migration, DO RPCs, transfer
+   routes.
+3. Wrapper synchronizer with baseline state, and the turn-end flush.
+4. Folder provisioning.
+5. Worker read procedures, presigned downloads, and notifications through the
+   SDK.
 6. Web tRPC, Artifacts view, agent rules, and spec.

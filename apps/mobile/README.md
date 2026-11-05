@@ -55,8 +55,10 @@ The iOS swipe guard requires a native build with the `react-native-screens` patc
 
 For local computer, folder, model, and effort picker verification, run
 `pnpm dev:seed app:connected-computer kilo-<name>@example.com`.
-The fixture requires an existing fake account and a localhost database. It serves
-read-only picker commands and rejects execution commands.
+The fixture requires an existing fake account, a localhost database,
+`NEXTAUTH_SECRET`, and a running local `cloudflare-session-ingest` service.
+The optional `sessionIngestPort` argument selects an explicit local port.
+The fixture serves read-only picker commands and rejects execution commands.
 
 ## Organization credit-activity links
 

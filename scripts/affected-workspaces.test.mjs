@@ -97,6 +97,7 @@ test('an unattributable or global change selects everything', () => {
     '.github/actions/harness-sdk-build/action.yml',
     'scripts/trpc-declaration-key.mjs',
     'scripts/harness-sdk-build-key.mjs',
+    'scripts/build-key-inputs.mjs',
     'patches/a.patch',
   ]) {
     const result = select([file]);

@@ -27,7 +27,7 @@ const GLOBAL = [
   /^(patches|tools\/oxlint)\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
-  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs)$/,
+  /^scripts\/(affected-workspaces\.mjs|changed-dependencies\.mjs|build-key-inputs\.mjs|trpc-declaration-key\.mjs|harness-sdk-build-key\.mjs)$/,
 ];
 
 // Root scripts that change one check for every workspace, and nothing else.

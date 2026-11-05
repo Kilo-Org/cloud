@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the empty-state, section-label, and invite-control suites share one native + FlashList mock harness */
 // Screen-level empty-state precedence regression: when the member query errors
 // with no data, both member arrays are empty, so the list's empty component
 // must render the QueryError — not "No members yet". The item builder and the

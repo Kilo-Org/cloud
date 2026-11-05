@@ -68,6 +68,12 @@ import {
   OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
   probeOpenAiChatGptEligibility,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
+import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { claudeSignInProvider } from '@/lib/auth/claude/sign-in-provider';
+import {
+  CLAUDE_OIDC_ISSUER,
+  CLAUDE_SIGN_IN_CLIENT_ID,
+} from '@kilocode/web-shared/lib/auth/claude/config';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -251,6 +257,27 @@ function createOpenAiAccountInfo(
     // Issuer-qualified subject: a `sub` from any other issuer or client can
     // never collide with an OpenAI account.
     provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+    display_name: null,
+  };
+}
+
+function createClaudeAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'claude') return null;
+  assert(user.email, 'User email is required for Claude auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.claude,
+    provider: account.provider,
+    // Issuer-qualified subject: a `sub` from any other issuer or client can
+    // never collide with a Claude account. NextAuth sets `providerAccountId`
+    // from `parseClaudeProfile`, which requires a non-empty `sub`.
+    provider_account_id: `${CLAUDE_OIDC_ISSUER}#${account.providerAccountId}`,
     display_name: null,
   };
 }
@@ -583,6 +610,7 @@ function createAccountInfo(
     createGoogleAccountInfo(account, user, profile) ??
     createAnacondaAccountInfo(account, user) ??
     createOpenAiAccountInfo(account, user, profile) ??
+    createClaudeAccountInfo(account, user) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -803,6 +831,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
     openAiProvider,
+    // Registered only where the Claude sign-in app is configured.
+    ...(CLAUDE_SIGN_IN_CLIENT_ID ? [claudeSignInProvider] : []),
     {
       id: 'anaconda',
       name: 'Anaconda',
@@ -993,6 +1023,12 @@ export const authOptions: NextAuthOptions = {
       };
       try {
         if (!account) return `TRAP: No account found`;
+
+        // Sign in with Claude stays closed until its launch toggle is on, also
+        // for a sign-in or link started by URL instead of the button.
+        if (account.provider === 'claude' && !(await isClaudeSignInEnabled())) {
+          return redirectUrlForCode('UNKNOWN-ERROR');
+        }
 
         // early return for fake auth
         const isFakeLogin = account.provider === 'fake-login';

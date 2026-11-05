@@ -176,6 +176,15 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
 - `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
+- `CLAUDE_SIGN_IN_CLIENT_ID` - Client ID of the "Sign in with Claude" OAuth app in the Claude Console. The Claude provider is registered only when it is set; the PostHog release toggle `sign-in-with-claude` then shows the button and allows sign-in and linking (development always allows it). [SERVER]
+- `CLAUDE_SIGN_IN_ASSERTION_AUDIENCE` - The audience that the sign-in app's **Client authentication** tab shows; the `aud` of its client assertions. [SERVER]
+- `CLAUDE_FEDERATION_ISSUER` - The issuer URL of Kilo's federation issuer registered with Anthropic (inline JWKS); the `iss` of every Kilo-signed Claude JWT. [SERVER]
+- `CLAUDE_FEDERATION_SUBJECT` - The `sub` of every Kilo-signed Claude JWT; must match the subject pattern of the OAuth apps and the federation rule. [SERVER]
+- `CLAUDE_FEDERATION_KEY_ID` - The `kid` of the federation signing key, as registered in the inline JWKS. [SERVER]
+- `CLAUDE_FEDERATION_PRIVATE_KEY` - PKCS#8 PEM of Kilo's P-256 federation signing key; `\n` escapes are accepted. Anthropic holds only the public key. `[SECRET]`
+- `CLAUDE_OIDC_ISSUER` - Optional override for the Claude ID-token issuer and discovery base; defaults to `https://identity.anthropic.com/users`. Set it only for the local stub (`pnpm dev:mock-anthropic`). [SERVER]
+- `CLAUDE_AUTH_BASE_URL` - Optional override for the Claude authorization server; defaults to `https://auth.claude.com`. Set it only for the local stub. [SERVER]
+- `CLAUDE_API_BASE_URL` - Optional override for the Claude API; defaults to `https://api.anthropic.com`. Set it only for the local stub. [SERVER]
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`

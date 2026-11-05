@@ -144,6 +144,7 @@
     "google-auth-library": "10.6.2",
     "jotai": "2.18.1",
     "jotai-minidb": "0.0.8",
+    "jose": "catalog:",
     "js-yaml": "4.3.2",
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.2",

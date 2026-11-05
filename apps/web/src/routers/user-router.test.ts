@@ -30,6 +30,7 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -50,6 +51,10 @@ jest.mock('@/lib/user/gdpr-removal', () => ({
 jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual('@/lib/account-linking-session'),
   createAccountLinkingSession: jest.fn(),
+}));
+
+jest.mock('@/lib/auth/claude/access.server', () => ({
+  isClaudeSignInEnabled: jest.fn(async () => true),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -149,6 +154,19 @@ describe('user router - linkAuthProvider', () => {
     // cannot complete and must not open a linking session.
     mockCreateLinkingSession.mockClear();
     await expect(caller.user.linkAuthProvider({ provider: 'apple' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Claude link while Sign in with Claude is not launched', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+    jest.mocked(isClaudeSignInEnabled).mockResolvedValueOnce(false);
+    mockCreateLinkingSession.mockClear();
+
+    await expect(caller.user.linkAuthProvider({ provider: 'claude' })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();

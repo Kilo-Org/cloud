@@ -42,6 +42,7 @@
     "dev:infra-env": "tsx dev/local/infra-env.ts",
     "dev:env:mobile": "tsx dev/local/mobile-env.ts",
     "dev:mock-github": "tsx dev/mock-github/server.ts",
+    "dev:mock-anthropic": "tsx dev/mock-anthropic/server.ts",
     "dev:byok-kms": "tsx dev/byok-kms/server.ts",
     "dev:mobile:android": "tsx dev/local/mobile-android.ts",
     "dev:mobile:ios": "tsx dev/local/mobile-ios-build.ts",

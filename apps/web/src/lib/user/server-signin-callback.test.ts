@@ -35,6 +35,9 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+jest.mock('@/lib/auth/claude/access.server', () => ({
+  isClaudeSignInEnabled: jest.fn(async () => true),
+}));
 
 import jwt from 'jsonwebtoken';
 import { encode } from 'next-auth/jwt';
@@ -47,6 +50,8 @@ import {
   getOrganizationById,
   getUserOrgMemberships,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isClaudeSignInEnabled } from '@/lib/auth/claude/access.server';
+import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -455,5 +460,54 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     } as never);
 
     await expect(openAiSharedServicesSignIn()).resolves.toBe(true);
+  });
+});
+
+describe('authOptions.callbacks.signIn for Claude', () => {
+  const claudeSignIn = (profile: Record<string, unknown>) =>
+    signIn({
+      user: { id: 'x', email: 'claude-cb@example.com', name: 'Claude CB', image: '' },
+      account: { provider: 'claude', providerAccountId: 'pairwise-sub', type: 'oauth' },
+      profile: { sub: 'pairwise-sub', email: 'claude-cb@example.com', ...profile },
+    } as never);
+
+  beforeEach(() => {
+    cookieStore.clear();
+    mockCreateOrUpdateUser.mockReset().mockResolvedValue({
+      success: true,
+      user: { id: 'settled-user', blocked_reason: null } as never,
+      isNew: false,
+    });
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  it('refuses a Claude sign-in before settlement while it is not launched', async () => {
+    jest.mocked(isClaudeSignInEnabled).mockResolvedValueOnce(false);
+    setValidTurnstileCookie();
+
+    const result = await claudeSignIn({ email_verified: true });
+
+    expect(result).toEqual(expect.stringContaining('error=UNKNOWN-ERROR'));
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('settles an issuer-qualified Claude account and auto-links only a verified email', async () => {
+    setValidTurnstileCookie();
+    await expect(claudeSignIn({ email_verified: true })).resolves.toBe(true);
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[0]).toMatchObject({
+      provider: 'claude',
+      provider_account_id: `${CLAUDE_OIDC_ISSUER}#pairwise-sub`,
+      hosted_domain: '@@claude@@',
+    });
+    expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
+
+    // Anthropic omits email_verified when it did not verify the address itself.
+    setValidTurnstileCookie();
+    await expect(claudeSignIn({})).resolves.toBe(true);
+    expect(mockCreateOrUpdateUser.mock.calls[1]?.[2]).toBe(false);
   });
 });

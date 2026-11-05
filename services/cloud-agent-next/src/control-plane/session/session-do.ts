@@ -2712,7 +2712,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             (view.state === 'preparing' ? view.detail : undefined) ??
               (route.step === undefined
                 ? 'Preparing environment'
-                : PREPARING_STEP_MESSAGE[route.step])
+                : PREPARING_STEP_MESSAGE[route.step]),
+            view.state === 'preparing' ? view.snapshotCapturedAt : undefined
           );
         }
         return;

@@ -334,7 +334,6 @@ import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
-import { environmentSnapshotName } from '../../shared/environment-snapshot-name.js';
 import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
@@ -4781,7 +4780,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log('selected', candidate.sessionId, candidate.owner.workspaceId);
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
-        detail: `Restoring the workspace snapshot (captured ${environmentSnapshotName(descriptor.capturedAt)})`,
+        detail: 'Using workspace snapshot',
+        snapshotCapturedAt: descriptor.capturedAt,
       });
       return { snapshotId: descriptor.snapshotId, baseImage: descriptor.baseImage };
     });
@@ -4840,6 +4840,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await notifyPreparingRoutes(this.routeContext(state), {
       step: 'environment_snapshot',
       detail: environmentStartDetail(candidate.reference, lookup),
+      ...(lookup.kind === 'resolved' && lookup.resolution.snapshot !== null
+        ? { snapshotCapturedAt: lookup.resolution.snapshot.capturedAt }
+        : {}),
     });
     return { options: snapshot === undefined ? {} : { snapshot }, skipped: false };
   }

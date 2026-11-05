@@ -698,8 +698,11 @@ describe('idle workspace disk checkpoint', () => {
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
     await waitFor(async () => {
       const attempts = await sibling.session.getPreparationAttempts();
-      expect(attempts.flatMap(attempt => attempt.steps).map(step => step.latestDetail)).toContain(
-        'Restoring the workspace snapshot (captured 24 Oct 2026, 21:32:19 UTC)'
+      expect(attempts.flatMap(attempt => attempt.steps)).toContainEqual(
+        expect.objectContaining({
+          latestDetail: 'Using workspace snapshot',
+          snapshotCapturedAt: Date.parse('2026-10-24T21:32:19Z'),
+        })
       );
     });
     expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({

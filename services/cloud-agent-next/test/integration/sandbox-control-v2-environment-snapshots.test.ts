@@ -614,7 +614,8 @@ describe('environment snapshot launch', () => {
         attemptId: expect.any(String),
         step: 'environment_snapshot',
         detail:
-          'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+          'Using environment snapshot; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+        snapshotCapturedAt: 1,
       })
     );
   });

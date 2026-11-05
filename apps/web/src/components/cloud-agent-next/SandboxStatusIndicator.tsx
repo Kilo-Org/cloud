@@ -22,6 +22,7 @@ import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
 import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';
+import { formatSnapshotTime } from './snapshot-display';
 
 const statusBadgeIcons = {
   active: Circle,
@@ -72,10 +73,7 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
             <dt className="text-muted-foreground">Captured</dt>
             <dd className="text-right tabular-nums">
               <time dateTime={new Date(view.snapshotCapturedAt).toISOString()}>
-                {new Date(view.snapshotCapturedAt).toLocaleString([], {
-                  dateStyle: 'medium',
-                  timeStyle: 'medium',
-                })}
+                {formatSnapshotTime(view.snapshotCapturedAt)}
               </time>
             </dd>
           </dl>

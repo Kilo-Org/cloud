@@ -75,6 +75,8 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     await insertTestUser({ google_user_email: 'first@second@mailinator.com' });
     // An address without '@' is its own host, matched on a dotted suffix.
     await insertTestUser({ google_user_email: 'deep.spam.org' });
+    // Its whole text is never an exact entry.
+    await insertTestUser({ google_user_email: 'spam.org' });
 
     mockedGetBlacklistedDomains.mockResolvedValue(['mailinator.com', 'spam.org']);
 

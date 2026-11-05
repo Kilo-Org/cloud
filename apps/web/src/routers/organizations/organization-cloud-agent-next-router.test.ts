@@ -23,6 +23,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
+import type * as PreviewWorktreeAccess from '@/lib/cloud-agent-next/preview-worktree-access';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -166,6 +167,8 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyOrgOwnsSessionV2ByCloudAgentId>();
+const mockVerifyOrgOwnsPreviewWorktree =
+  jest.fn<typeof PreviewWorktreeAccess.verifyOrgOwnsPreviewWorktree>();
 const mockSignPreviewTicket = jest.fn<typeof StreamTicketModule.signPreviewTicket>();
 const mockFetchBitbucketRepositoriesForOrganization =
   jest.fn<
@@ -295,6 +298,10 @@ jest.mock('@/lib/cloud-agent/order-repositories', () => ({
 
 jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyOrgOwnsSessionV2ByCloudAgentId: mockVerifyOrgOwnsSessionV2ByCloudAgentId,
+}));
+
+jest.mock('@/lib/cloud-agent-next/preview-worktree-access', () => ({
+  verifyOrgOwnsPreviewWorktree: mockVerifyOrgOwnsPreviewWorktree,
 }));
 
 jest.mock('@/lib/cloud-agent/stream-ticket', () => {
@@ -436,12 +443,16 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     cloudAgentSessionId: string;
   }) => Promise<unknown>;
-  createPreview: (input: {
-    organizationId: string;
-    cloudAgentSessionId: `workspace_${string}`;
-    port: number;
-    path?: string;
-  }) => Promise<{ url: string; expiresAt: number }>;
+  createPreview: (
+    input:
+      | { organizationId: string; worktreeId: `worktree_${string}`; port: number; path?: string }
+      | {
+          organizationId: string;
+          cloudAgentSessionId: `workspace_${string}`;
+          port: number;
+          path?: string;
+        }
+  ) => Promise<{ url: string; expiresAt: number }>;
   resizeTerminal: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
@@ -1795,6 +1806,57 @@ describe('organizationCloudAgentNextRouter.createPreview', () => {
     expect(decoded.port).toBe(8000);
     expect(decoded.exp! - decoded.iat!).toBe(60);
     expect(result.expiresAt).toBe(decoded.exp);
+  });
+
+  it('mints a worktree ticket after verifying ownership in the exact organization', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyOrgOwnsPreviewWorktree.mockResolvedValue(true);
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({
+      organizationId: ORGANIZATION_ID,
+      worktreeId,
+      port: 8000,
+    });
+
+    expect(mockVerifyOrgOwnsPreviewWorktree).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      worktreeId
+    );
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockSignPreviewTicket).toHaveBeenCalledWith({
+      userId: user.id,
+      worktreeId,
+      port: 8000,
+      organizationId: ORGANIZATION_ID,
+    });
+
+    const ticket = new URL(result.url).searchParams.get('ticket') ?? '';
+    const decoded = jwt.verify(ticket, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'cloud-agent-preview',
+    }) as jwt.JwtPayload & {
+      worktreeId?: string;
+      cloudAgentSessionId?: string;
+      organizationId?: string;
+    };
+    expect(decoded.worktreeId).toBe(worktreeId);
+    expect(decoded.cloudAgentSessionId).toBeUndefined();
+    expect(decoded.organizationId).toBe(ORGANIZATION_ID);
+  });
+
+  it('does not mint a ticket for a worktree outside this organization', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyOrgOwnsPreviewWorktree.mockResolvedValue(false);
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.createPreview({ organizationId: ORGANIZATION_ID, worktreeId, port: 8000 })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
   });
 
   it('passes the requested path to the Worker open hop', async () => {

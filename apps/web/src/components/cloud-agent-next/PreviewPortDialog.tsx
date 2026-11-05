@@ -17,17 +17,18 @@ import {
   PREVIEW_PORT_MAX,
   PREVIEW_PORT_MIN,
 } from '../../../../../services/cloud-agent-next/src/shared/preview-port';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { useOpenPreview } from './use-preview';
 
 export function PreviewPortDialog({
   open,
   onOpenChange,
-  cloudAgentSessionId,
+  target,
   organizationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cloudAgentSessionId: `workspace_${string}`;
+  target: PreviewTarget;
   organizationId?: string;
 }) {
   const { openPreview, isOpening } = useOpenPreview(organizationId);
@@ -46,12 +47,12 @@ export function PreviewPortDialog({
             Open a server running inside this sandbox in a new browser tab.
           </DialogDescription>
         </DialogHeader>
-        {/* DialogContent unmounts on close, so each open and each session starts with an empty form. */}
+        {/* DialogContent unmounts on close, so each open and each target starts with an empty form. */}
         <PreviewPortForm
           isOpening={isOpening}
           onCancel={() => onOpenChange(false)}
           onOpenPort={async port => {
-            if (await openPreview(cloudAgentSessionId, port)) onOpenChange(false);
+            if (await openPreview(target, port)) onOpenChange(false);
           }}
         />
       </DialogContent>

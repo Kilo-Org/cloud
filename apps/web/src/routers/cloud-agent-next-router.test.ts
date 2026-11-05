@@ -15,6 +15,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
+import type * as PreviewWorktreeAccess from '@/lib/cloud-agent-next/preview-worktree-access';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -123,10 +124,9 @@ const mockGetSandboxSelectionOptions =
   jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
 const mockGetPreviewOptions =
   jest.fn<
-    (input: {
-      cloudAgentSessionId: string;
-      organizationId?: string;
-    }) => Promise<{ enabled: false } | { enabled: true; hostTemplate: string }>
+    (
+      input: CloudAgentClientModule.GetPreviewOptionsInput
+    ) => Promise<{ enabled: false } | { enabled: true; hostTemplate: string }>
   >();
 
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
@@ -163,6 +163,8 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyUserOwnsSessionV2ByCloudAgentId>();
+const mockVerifyUserOwnsPreviewWorktree =
+  jest.fn<typeof PreviewWorktreeAccess.verifyUserOwnsPreviewWorktree>();
 const mockReleaseRefusedSend = jest.fn<typeof releaseRefusedSend>(async () => {});
 const mockSignPreviewTicket = jest.fn<typeof StreamTicketModule.signPreviewTicket>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
@@ -270,6 +272,10 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyUserOwnsSessionV2ByCloudAgentId: mockVerifyUserOwnsSessionV2ByCloudAgentId,
 }));
 
+jest.mock('@/lib/cloud-agent-next/preview-worktree-access', () => ({
+  verifyUserOwnsPreviewWorktree: mockVerifyUserOwnsPreviewWorktree,
+}));
+
 jest.mock('@/lib/cloud-agent/stream-ticket', () => {
   const actual = jest.requireActual<typeof StreamTicketModule>('@/lib/cloud-agent/stream-ticket');
   mockSignPreviewTicket.mockImplementation(actual.signPreviewTicket);
@@ -322,18 +328,19 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   refreshWorktreeChanges: (input: {
     cloudAgentSessionId: string;
   }) => Promise<RefreshWorktreeChangesOutput>;
-  createPreview: (input: {
-    cloudAgentSessionId: `workspace_${string}`;
-    port: number;
-    path?: string;
-  }) => Promise<{
+  createPreview: (
+    input:
+      | { worktreeId: `worktree_${string}`; port: number; path?: string }
+      | { cloudAgentSessionId: `workspace_${string}`; port: number; path?: string }
+  ) => Promise<{
     url: string;
     expiresAt: number;
   }>;
-  getPreviewOptions: (input: {
-    cloudAgentSessionId: `workspace_${string}`;
-    organizationId?: string;
-  }) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
+  getPreviewOptions: (
+    input:
+      | { worktreeId: `worktree_${string}`; organizationId?: string }
+      | { cloudAgentSessionId: `workspace_${string}`; organizationId?: string }
+  ) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -2084,6 +2091,46 @@ describe('cloudAgentNextRouter.createPreview', () => {
     expect(result.expiresAt).toBe(decoded.exp);
   });
 
+  it('mints a worktree ticket after verifying the caller owns the worktree', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(true);
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({ worktreeId, port: 5173 });
+
+    expect(mockVerifyUserOwnsPreviewWorktree).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      worktreeId
+    );
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockSignPreviewTicket).toHaveBeenCalledWith({
+      userId: user.id,
+      worktreeId,
+      port: 5173,
+    });
+
+    const ticket = new URL(result.url).searchParams.get('ticket') ?? '';
+    const decoded = jwt.verify(ticket, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'cloud-agent-preview',
+    }) as jwt.JwtPayload & { worktreeId?: string; cloudAgentSessionId?: string };
+    expect(decoded.worktreeId).toBe(worktreeId);
+    expect(decoded.cloudAgentSessionId).toBeUndefined();
+  });
+
+  it('does not mint a ticket for a worktree the caller does not own', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(false);
+    const caller = createCaller({ user });
+
+    await expect(caller.createPreview({ worktreeId, port: 5173 })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+  });
+
   it('keeps a local ws worker origin and its port', async () => {
     process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'ws://localhost:8794';
     mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
@@ -2227,6 +2274,24 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
     await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
       enabled: true,
       urlTemplate: 'http://p{port}-abc.localhost:8794',
+    });
+  });
+
+  it('passes a worktree target to the Worker gate', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockGetPreviewOptions.mockResolvedValueOnce({
+      enabled: true,
+      hostTemplate: 'w{port}-abc.preview.example.com',
+    });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ worktreeId })).resolves.toEqual({
+      enabled: true,
+      urlTemplate: 'https://w{port}-abc.preview.example.com',
+    });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
+      worktreeId,
+      organizationId: undefined,
     });
   });
 });

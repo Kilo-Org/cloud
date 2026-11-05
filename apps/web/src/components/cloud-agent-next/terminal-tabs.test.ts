@@ -50,6 +50,7 @@ let mockParentSession:
   | undefined;
 const mockSkipToken = Symbol('skip');
 const mockParentQuery = jest.fn();
+const mockPreviewOptions = jest.fn((_target: unknown, _organizationId?: string) => null);
 const mockParentQueryOptions = jest.fn((input: unknown) => ({
   queryKey: [['worktreeParent'], input],
 }));
@@ -123,7 +124,8 @@ jest.mock('./useSavedWorktreeChanges', () => ({
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
-  usePreviewUrlTemplate: () => null,
+  usePreviewUrlTemplate: (target: unknown, organizationId?: string) =>
+    mockPreviewOptions(target, organizationId),
   useOpenPreview: () => ({ openPreview: jest.fn(), isOpening: false }),
 }));
 jest.mock('./CloudAgentProvider', () => ({
@@ -488,6 +490,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockQueryClient.query.mockReset();
     mockParentSession = undefined;
     mockParentQuery.mockClear();
+    mockPreviewOptions.mockClear();
     mockParentQueryOptions.mockClear();
     mockAtomValues = {
       sessionId: 'workspace_recent',
@@ -519,6 +522,30 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     const { currentUserId = 'owner', ...rest } = props;
     act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
   }
+
+  it('keeps preview workspace-scoped across main, unregistered sibling and worktree-only views', () => {
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = 'ses_new_sibling';
+    mockAtomValues.sessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+
+    mockSessionId = null;
+    render();
+    expect(mockPreviewOptions).toHaveBeenLastCalledWith(
+      { worktreeId: 'worktree_shared' },
+      undefined
+    );
+  });
 
   it('preserves parent navigation across sibling, terminal, and worktree-only views', () => {
     mockParentSession = {

@@ -1,23 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import {
-  gatePreviewSessionId,
-  selectPreviewSessionId,
+  gatePreviewTarget,
+  selectPreviewTarget,
   type PreviewSessionInput,
 } from './select-preview-session';
 import { useOpenPreview, usePreviewUrlTemplate, type PreviewLinks } from './use-preview';
 
 export type PreviewControllerInput = PreviewSessionInput & {
-  /** Preview uses the terminal permission. */
-  canOpenTerminal: boolean;
+  canOpenPreview: boolean;
   organizationId: string | undefined;
 };
 
 export type PreviewPortDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cloudAgentSessionId: `workspace_${string}`;
+  target: PreviewTarget;
   organizationId: string | undefined;
 };
 
@@ -30,47 +30,54 @@ export type PreviewController = {
 };
 
 /**
- * The chat page's preview state: the session that the preview button and the
- * chat links target, the links context value, and the port dialog.
+ * The chat page's preview state: the target that the preview button and the
+ * chat links use, the links context value, and the port dialog.
  */
 export function usePreviewController({
-  canOpenTerminal,
+  selectedWorktreeId,
+  sessionId,
+  canOpenPreview,
   organizationId,
-  ...sessionInput
 }: PreviewControllerInput): PreviewController {
-  const actionSessionId = selectPreviewSessionId(sessionInput);
-  const sessionId = gatePreviewSessionId(actionSessionId, canOpenTerminal);
-  const urlTemplate = usePreviewUrlTemplate(sessionId, organizationId);
+  const actionTarget = useMemo(
+    () => selectPreviewTarget({ selectedWorktreeId, sessionId }),
+    [selectedWorktreeId, sessionId]
+  );
+  const target = useMemo(
+    () => gatePreviewTarget(actionTarget, canOpenPreview),
+    [actionTarget, canOpenPreview]
+  );
+  const urlTemplate = usePreviewUrlTemplate(target, organizationId);
   const { openPreview } = useOpenPreview(organizationId);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // A stale open dialog must not open against the next action session.
+  // A stale open dialog must not open against the next preview target.
   useEffect(() => {
     setDialogOpen(false);
-  }, [actionSessionId]);
+  }, [actionTarget?.worktreeId, actionTarget?.cloudAgentSessionId, organizationId]);
 
   const openDialog = useCallback(() => {
-    if (!actionSessionId) return;
+    if (!actionTarget) return;
     setDialogOpen(true);
-  }, [actionSessionId]);
+  }, [actionTarget]);
 
   const links = useMemo<PreviewLinks | null>(
     () =>
-      sessionId !== null && urlTemplate !== null
+      target !== null && urlTemplate !== null
         ? {
             urlTemplate,
-            open: (port, path) => void openPreview(sessionId, port, path),
+            open: (port, path) => void openPreview(target, port, path),
           }
         : null,
-    [sessionId, urlTemplate, openPreview]
+    [target, urlTemplate, openPreview]
   );
 
   const dialog =
-    links !== null && sessionId !== null
+    links !== null && target !== null
       ? {
           open: dialogOpen,
           onOpenChange: setDialogOpen,
-          cloudAgentSessionId: sessionId,
+          target,
           organizationId,
         }
       : null;

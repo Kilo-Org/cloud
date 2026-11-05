@@ -28,6 +28,10 @@ import {
   PREVIEW_PORT_MAX,
   PREVIEW_PORT_MIN,
 } from '../../../../services/cloud-agent-next/src/shared/preview-port';
+import {
+  previewTargetSchema,
+  type PreviewTarget,
+} from '../../../../services/cloud-agent-next/src/shared/preview-target';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
@@ -796,25 +800,44 @@ export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
 
-const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-
-export const baseCreatePreviewNextSchema = z.object({
-  cloudAgentSessionId: previewSessionIdSchema,
+const previewRequestSchema = z.object({
   port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
   /** Where the preview opens; the Worker validates it where it redirects. */
   path: z.string().startsWith('/').max(2048).optional(),
 });
+
+export const baseCreatePreviewNextSchema = z.intersection(
+  previewTargetSchema,
+  previewRequestSchema
+);
 
 export const baseCreatePreviewNextOutputSchema = z.object({
   url: z.url(),
   expiresAt: z.number().int().positive(),
 });
 
-export const basePreviewOptionsNextSchema = z.object({
-  cloudAgentSessionId: previewSessionIdSchema,
-  /** The route's organization; the Worker uses it only to decide whether to show preview. */
-  organizationId: z.uuid().optional(),
-});
+export const basePreviewOptionsNextSchema = z.intersection(
+  previewTargetSchema,
+  z.object({
+    /** The route's organization; the Worker uses it only to decide whether to show preview. */
+    organizationId: z.uuid().optional(),
+  })
+);
+
+/**
+ * The target from a parsed preview input. The shared schema guarantees exactly
+ * one field; this narrows the union for the ownership check and ticket payload.
+ */
+export function previewTargetFromInput(input: {
+  worktreeId?: `worktree_${string}`;
+  cloudAgentSessionId?: `workspace_${string}`;
+}): PreviewTarget | null {
+  if (input.worktreeId !== undefined) return { worktreeId: input.worktreeId };
+  if (input.cloudAgentSessionId !== undefined) {
+    return { cloudAgentSessionId: input.cloudAgentSessionId };
+  }
+  return null;
+}
 
 /** The Worker's answer: its preview hostname with a `{port}` placeholder. */
 export const workerPreviewOptionsSchema = z.discriminatedUnion('enabled', [

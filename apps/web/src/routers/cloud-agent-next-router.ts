@@ -66,6 +66,7 @@ import {
   baseCreatePreviewNextOutputSchema,
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
+  previewTargetFromInput,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
@@ -82,6 +83,7 @@ import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/preview-open-url';
+import { verifyUserOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-worktree-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -522,12 +524,31 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseCreatePreviewNextSchema)
     .output(baseCreatePreviewNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const target = previewTargetFromInput(input);
+      if (target === null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A preview target is required' });
+      }
+
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyUserOwnsPreviewWorktree(
+          db,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertUserOwnsSession(ctx.user.id, target.cloudAgentSessionId);
+      }
 
       const { ticket, expiresAt } = signPreviewTicket({
         userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
         port: input.port,
+        ...target,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
@@ -541,10 +562,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(basePreviewOptionsNextSchema)
     .output(basePreviewOptionsNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      const target = previewTargetFromInput(input);
+      if (target === null) return { enabled: false };
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const options = await createCloudAgentNextClient(authToken)
         .getPreviewOptions({
-          cloudAgentSessionId: input.cloudAgentSessionId,
+          ...target,
           organizationId: input.organizationId,
         })
         .catch((error: unknown) => {

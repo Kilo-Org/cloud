@@ -22,6 +22,8 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
   baseSendMessageNextSchema,
+  baseCreatePreviewNextSchema,
+  basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -1047,5 +1049,49 @@ describe('baseCancelQueuedMessageNextSchema', () => {
     expect(
       baseCancelQueuedMessageNextSchema.safeParse({ messageId: VALID_MESSAGE_ID }).success
     ).toBe(false);
+  });
+});
+
+describe('preview target schemas', () => {
+  const WORKTREE_ID = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const WORKSPACE_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  it('accepts a worktree target or a standalone session target', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: WORKTREE_ID, port: 5173 }).success
+    ).toBe(true);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: WORKSPACE_ID, port: 5173 })
+        .success
+    ).toBe(true);
+  });
+
+  it('requires exactly one target', () => {
+    expect(baseCreatePreviewNextSchema.safeParse({ port: 5173 }).success).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        cloudAgentSessionId: WORKSPACE_ID,
+        port: 5173,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects malformed targets', () => {
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ worktreeId: 'worktree_1', port: 5173 }).success
+    ).toBe(false);
+    expect(
+      baseCreatePreviewNextSchema.safeParse({ cloudAgentSessionId: 'agent_1', port: 5173 }).success
+    ).toBe(false);
+  });
+
+  it('carries the route organization alongside a target', () => {
+    expect(
+      basePreviewOptionsNextSchema.safeParse({
+        worktreeId: WORKTREE_ID,
+        organizationId: '11111111-1111-4111-8111-111111111111',
+      }).success
+    ).toBe(true);
   });
 });

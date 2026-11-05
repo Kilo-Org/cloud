@@ -46,11 +46,6 @@ const TAB_BAR_ICON_STYLE = {
 
 export const unstable_settings = {
   initialRouteName: '(0_home)',
-  // Stop inheriting the authenticated stack's screen boundary: each tab stack
-  // carries `TabStackErrorBoundary`, whose fallback keeps the tab's own header
-  // and refetches only that tab's reads. Without this, the inherited boundary
-  // would catch a tab screen's throw first and take over that recovery.
-  screenErrorBoundary: null,
 };
 
 function TabBarBackground() {

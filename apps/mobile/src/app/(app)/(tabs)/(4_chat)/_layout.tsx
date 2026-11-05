@@ -11,6 +11,11 @@ const CHAT_STACK_QUERY_PREFIXES: readonly (readonly unknown[])[] = [
 
 export const unstable_settings = {
   initialRouteName: 'index',
+  // This stack carries `TabStackErrorBoundary`, whose fallback keeps the tab's
+  // own header and refetches this tab's reads. Opt out of the authenticated
+  // stack's screen boundary, which would otherwise catch a tab screen's throw
+  // first and take that recovery over.
+  screenErrorBoundary: null,
 };
 
 export default function ChatLayout() {

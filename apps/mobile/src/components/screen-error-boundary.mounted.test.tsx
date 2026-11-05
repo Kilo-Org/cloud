@@ -13,10 +13,18 @@ let events: TelemetryEvent[] = [];
 
 // A fresh navigation object per test: the recovery registry keys on this
 // identity and only grows, so one shared object would leak a scope between
-// tests.
+// tests. `parent` is what a nested screen walks to when it declared no scope.
+type NavigationStub = {
+  isFocused: () => boolean;
+  getParent: () => NavigationStub | undefined;
+};
 const navigation = vi.hoisted(() => {
-  const initial: { isFocused: () => boolean } = { isFocused: () => true };
-  return { current: initial };
+  const stub = (parent?: NavigationStub): NavigationStub => ({
+    isFocused: () => true,
+    getParent: () => parent,
+  });
+  const initial = stub();
+  return { current: initial, parent: stub(), make: stub };
 });
 const router = vi.hoisted(() => ({
   canGoBack: vi.fn(() => true),
@@ -79,7 +87,8 @@ function pressGoBack(tree: TestRenderer.ReactTestRenderer) {
 }
 
 beforeEach(() => {
-  navigation.current = { isFocused: () => true };
+  navigation.parent = navigation.make();
+  navigation.current = navigation.make(navigation.parent);
   router.canGoBack.mockReturnValue(true);
   router.back.mockReset();
   router.replace.mockReset();
@@ -145,6 +154,26 @@ describe('ScreenErrorBoundary', () => {
     expect(refetch.mock.calls.every(call => call[0]?.type === 'all')).toBe(true);
     expect(retry).toHaveBeenCalledOnce();
     expect(tree.root.findByType(QueryError as never).props.isRetrying).toBe(false);
+  });
+
+  it('refetches the scope the enclosing layout declared for a screen that declares none', async () => {
+    const queryPrefixes = [[['githubPrReview']]] as const;
+    setRouteRecoveryScope(navigation.parent, queryPrefixes);
+    const retry = vi.fn<() => Promise<void>>(() => Promise.resolve());
+    const { tree, client } = mount({
+      error: new Error('poisoned review payload'),
+      retry: retry as unknown as () => Promise<void>,
+    });
+    const refetch = vi.spyOn(client, 'refetchQueries').mockResolvedValue(undefined);
+
+    await act(async () => {
+      pressRetry(tree);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(refetch.mock.calls.map(call => call[0]?.queryKey)).toEqual([[['githubPrReview']]]);
+    expect(retry).toHaveBeenCalledOnce();
   });
 
   it('remounts without a refetch when the route declares no scope', async () => {

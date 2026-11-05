@@ -59,7 +59,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
 // One object for the whole test file, like the navigators hand a route: the
 // recovery registry keys on this identity, so a fresh object per call would hide
 // what the screen boundary reads back.
-const navigation = { isFocused: () => focusState.isFocused };
+const navigation = { isFocused: () => focusState.isFocused, getParent: () => undefined };
 
 vi.mock('expo-router', () => ({
   // `isFocused()` is a live call, so a test can blur the route without

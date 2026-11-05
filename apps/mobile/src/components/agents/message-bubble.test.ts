@@ -100,6 +100,7 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: () => null,
   Clock: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

@@ -4,7 +4,7 @@ import {
   type Part,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { Clock } from '@/components/ui/icons';
+import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -183,12 +183,21 @@ function MessageBubbleImpl({
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
       <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
-        <Text
-          className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-          accessibilityLabel={messageFailureLabel(failure)}
-        >
-          {failure.title}
-        </Text>
+        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+          {failure.undelivered ? (
+            // The marker is the state, not copy: the title beside it says what
+            // happened, so it carries no text of its own for a screen reader.
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <AlertCircle size={14} color={colors.destructive} />
+            </View>
+          ) : null}
+          <Text
+            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+            accessibilityLabel={messageFailureLabel(failure)}
+          >
+            {failure.title}
+          </Text>
+        </View>
         {failure.detail !== null ? (
           <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
             {failure.detail}
@@ -233,23 +242,13 @@ function MessageBubbleImpl({
     const fileParts = parts.filter(part => isFilePart(part));
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
-    // A message the transport gave up on is drawn as failed, so the bubble and
-    // the status under it read as one item rather than a normal message with a
-    // stray note beside it. A destructive hairline marks it without touching the
-    // ink: dimming the bubble would composite the message text over the page and
-    // drop it below the contrast the 15px copy needs. A message the person
-    // stopped, and every failure of the response, leaves the bubble whole.
-    const undelivered = failureFooter !== null && failure?.undelivered === true;
 
     return (
       <View>
         <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
           <View className="items-end gap-1">
             {message.parts.some(partRendersContent) ? (
-              <Bubble
-                side="user"
-                className={undelivered ? 'border border-destructive' : undefined}
-              >
+              <Bubble side="user">
                 <InMessageBubbleContext.Provider value>
                   {userTextContent ? (
                     <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />

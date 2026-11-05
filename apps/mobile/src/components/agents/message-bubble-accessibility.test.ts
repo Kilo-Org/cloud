@@ -39,7 +39,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/components/ui/icons', () => ({ Clock: 'Clock' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Clock: 'Clock' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
@@ -174,14 +174,12 @@ describe('MessageBubble failed message treatment', () => {
       deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
     });
 
-    expect(findElementByType(undelivered, 'Bubble')?.props.className).toBe(
-      'border border-destructive'
-    );
-    expect(findElementByType(execution, 'Bubble')?.props.className).toBeUndefined();
-    // A message the person stopped did reach the agent, so only its status
-    // line says what happened.
-    expect(findElementByType(stopped, 'Bubble')?.props.className).toBeUndefined();
-    // Without a wired action the row states nothing, so the bubble stays whole.
-    expect(findElementByType(unexplained, 'Bubble')?.props.className).toBeUndefined();
+    // Only the give-up carries the marker beside its title; the bubble keeps the
+    // same fill and ink as a delivered one in every state.
+    expect(findElementByType(undelivered, 'AlertCircle')).not.toBeNull();
+    expect(findElementByType(execution, 'AlertCircle')).toBeNull();
+    expect(findElementByType(stopped, 'AlertCircle')).toBeNull();
+    // Without a wired action the row states nothing, so no marker is drawn.
+    expect(findElementByType(unexplained, 'AlertCircle')).toBeNull();
   });
 });

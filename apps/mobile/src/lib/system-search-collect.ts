@@ -39,12 +39,59 @@ import {
 
 const queryKeyPathSchema = z.array(z.string()).min(1);
 
+const sessionTimestampNumberSchema = z.number();
+const sessionTimestampTextSchema = z.string();
+const sessionTimestampInputSchema = z
+  .union([sessionTimestampTextSchema, sessionTimestampNumberSchema, z.date()])
+  .nullish();
+
+/** The same value, already read as milliseconds, so rows carry a usable time. */
+const sessionTimestampSchema = sessionTimestampInputSchema.transform(readSessionTimestamp);
+
+/**
+ * The row's update time in milliseconds, or null when it cannot be read.
+ *
+ * The read can hand back a `Date`, an ISO string, or a Postgres-rendered string,
+ * and this module must accept all three: a schema that only accepted one would
+ * drop the whole row, which costs the row its search entry as well. An
+ * unreadable time only lowers the row's priority, never removes the row.
+ */
+function readSessionTimestamp(value: z.infer<typeof sessionTimestampInputSchema>): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.getTime();
+  }
+  const timestampNumber = sessionTimestampNumberSchema.safeParse(value);
+  if (timestampNumber.success) {
+    return Number.isFinite(timestampNumber.data) ? timestampNumber.data : null;
+  }
+  const text = sessionTimestampTextSchema.safeParse(value);
+  if (!text.success) {
+    return null;
+  }
+  const iso = Date.parse(text.data);
+  if (!Number.isNaN(iso)) {
+    return iso;
+  }
+  // Postgres renders `YYYY-MM-DD HH:MM:SS[.fff][+TZ]`, which is not the ISO form
+  // every engine parses. Normalise the separator, the offset's hours-only form
+  // and the UTC suffix once, and give up if it still does not read.
+  const normalised = text.data
+    .replace(' ', 'T')
+    .replace(/\s+UTC$/, 'Z')
+    .replace(/([+-]\d{2})$/, '$1:00');
+  const parsed = Date.parse(normalised);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 const storedSessionRowSchema = z.object({
   session_id: z.string(),
   title: z.string().nullish(),
   organization_id: z.string().nullish(),
   git_branch: z.string().nullish(),
-  updated_at: z.string().nullish(),
+  updated_at: sessionTimestampSchema,
 });
 
 const storedSessionsDataSchema = z.object({
@@ -56,7 +103,7 @@ const activeSessionRowSchema = z.object({
   title: z.string().nullish(),
   organizationId: z.string().nullish(),
   gitBranch: z.string().nullish(),
-  updatedAt: z.string().nullish(),
+  updatedAt: sessionTimestampSchema,
 });
 
 const activeSessionsDataSchema = z.object({ sessions: z.array(z.unknown()) });
@@ -648,18 +695,11 @@ async function recentPrDocuments(): Promise<{
  * search index offering the same names.
  */
 function namedSessions(
-  rows: readonly { id: string; title: string | null | undefined; updatedAt?: string | null }[]
+  rows: readonly { id: string; title: string | null | undefined; updatedAt?: number | null }[]
 ): SessionCatalogCandidate[] {
   return rows.flatMap(row => {
     const title = sessionDisplayTitle(row.title);
-    if (title === undefined) {
-      return [];
-    }
-    const updatedAt =
-      row.updatedAt === null || row.updatedAt === undefined
-        ? Number.NaN
-        : Date.parse(row.updatedAt);
-    return [{ id: row.id, title, updatedAt: Number.isNaN(updatedAt) ? null : updatedAt }];
+    return title === undefined ? [] : [{ id: row.id, title, updatedAt: row.updatedAt ?? null }];
   });
 }
 

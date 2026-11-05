@@ -62,6 +62,7 @@ function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<
 export function SystemSearchIndexMount(): null {
   const { status } = useAppUnlock();
   const syncRef = useRef<SystemSearchIndexSync | null>(null);
+  const lastStatus = useRef<string | null>(null);
 
   useEffect(() => {
     const sync = new SystemSearchIndexSync({
@@ -90,15 +91,19 @@ export function SystemSearchIndexMount(): null {
   }, []);
 
   // The catalog follows the one gate that hides content. Entering the lock wipes
-  // the titles, and the publish above refuses while any status other than
-  // `unlocked` stands — including the launch that is still reading the
-  // preference, where the lock surface is already covering the app.
+  // the titles, and so does a launch that is still reading the preference: the
+  // lock surface already covers the app then, so the catalog the previous
+  // process persisted must not stay readable for the length of that read. The
+  // publish above refuses while any status other than `unlocked` stands.
   //
   // The unlock edge is also the retry for a publish that the gate refused: the
   // run that would have carried the titles happened while the lock stood, so
   // nothing else would re-publish them until an unrelated cache write.
   useEffect(() => {
-    if (setAppLockStatus(status)) {
+    setAppLockStatus(status);
+    const closed = status !== 'unlocked' && lastStatus.current !== status;
+    lastStatus.current = status;
+    if (closed) {
       clearSessionCatalogBestEffort();
     }
     if (status === 'unlocked') {

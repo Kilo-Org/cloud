@@ -2,11 +2,11 @@
  * The app's own privacy lock, as the App Intents catalog sees it.
  *
  * Two readers, neither a React component: the catalog publish checks the gate
- * immediately before it writes, and the lock's own clear runs from the one
- * place that observes the transition. A module-level value is what lets both
- * work without a render. It carries no imports on purpose — the unlock provider
- * is above everything, and every module it reached would load the native bridge
- * and the whole Expo runtime into the provider's own tests.
+ * immediately before it writes, and the launch clear runs from the one place
+ * that observes the status. A module-level value is what lets both work without
+ * a render. It carries no imports on purpose — the unlock provider is above
+ * everything, and every module it reached would load the native bridge and the
+ * whole Expo runtime into the provider's own tests.
  *
  * The value is the provider's status, not a boolean, because "not yet known" is
  * a third state: `AppUnlockScene` hides the tree for every status except
@@ -24,11 +24,11 @@ export function isCatalogPublishAllowed(): boolean {
 }
 
 /**
- * Publishes the provider's status and reports whether this call entered the
- * lock, which is the edge the catalog clear belongs to.
+ * Publishes the provider's status.
+ *
+ * A value other than `'unlocked'` closes the gate: the publish refuses, and the
+ * caller wipes what the previous status left readable.
  */
-export function setAppLockStatus(next: AppLockStatus): boolean {
-  const enteredLock = next === 'locked' && status !== 'locked';
+export function setAppLockStatus(next: AppLockStatus): void {
   status = next;
-  return enteredLock;
 }

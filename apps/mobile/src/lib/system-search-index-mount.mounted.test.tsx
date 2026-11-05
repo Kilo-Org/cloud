@@ -163,6 +163,9 @@ describe('the App Intents catalog and the privacy lock', () => {
     const mounted = await mountSync();
 
     expect(nativeBridge.replaceNativeSessionCatalog).not.toHaveBeenCalled();
+    // The lock surface already covers the app during that read, so the titles
+    // the previous process persisted are wiped for its length.
+    expect(nativeBridge.clearNativeSessionCatalog).toHaveBeenCalledOnce();
 
     // The unlock edge is the retry for a publish the gate refused.
     await mounted.update('unlocked');

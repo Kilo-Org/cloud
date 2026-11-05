@@ -18,7 +18,6 @@ import {
 } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { canUseClaudeBilling } from '@/lib/claude-billing/access';
 
 /**
  * The owner's Claude billing connection: one Kilo organization connection or
@@ -48,11 +47,6 @@ async function resolveOwner(
   organizationId: string | undefined
 ): Promise<{ owner: ClaudeBillingOwner; canManage: boolean }> {
   if (!ctx.user) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'User not authenticated' });
-  if (!(await canUseClaudeBilling(ctx.user.id)))
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Claude connections are not available for this account.',
-    });
   if (!organizationId) {
     return { owner: { kind: 'personal', kiloUserId: ctx.user.id }, canManage: true };
   }

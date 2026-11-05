@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ClaudeLogo } from '@/components/auth/ClaudeLogo';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { CLAUDE_BILLING_FLAG } from '@/lib/auth/claude/access';
 import type { ClaudeBillingStatus } from '@/routers/claude-billing-router';
 
 const CONNECTED_PLATFORMS_URL = 'https://platform.claude.com/connected-platforms';
@@ -190,6 +192,7 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
   const searchParams = useSearchParams();
   const [connecting, setConnecting] = useState(false);
   const statusQuery = useQuery(trpc.claudeBilling.status.queryOptions({ organizationId }));
+  const flagEnabled = useFeatureFlagEnabled(CLAUDE_BILLING_FLAG);
   const removeMutation = useMutation(
     trpc.claudeBilling.remove.mutationOptions({
       onSuccess: () =>
@@ -198,6 +201,12 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
         }),
     })
   );
+  // Before launch the card appears only for an owner who already has a
+  // connection, so they can still see its state and remove it.
+  const launched = process.env.NODE_ENV === 'development' || flagEnabled === true;
+  const hasConnection =
+    statusQuery.data !== undefined && statusQuery.data.state !== 'not_connected';
+  if (!launched && !hasConnection) return null;
   return (
     <ClaudeBillingCardView
       status={statusQuery.data}

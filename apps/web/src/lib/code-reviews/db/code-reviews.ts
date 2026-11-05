@@ -592,7 +592,8 @@ export async function createCodeReviewAttempt(params: {
           execution_id: params.executionId ?? null,
           analytics_enabled_at_dispatch: params.analyticsEnabledAtDispatch ?? null,
           status,
-          error_message: params.errorMessage ?? null,
+          error_message:
+            params.errorMessage === undefined ? null : sanitizePostgresString(params.errorMessage),
           terminal_reason: params.terminalReason ?? null,
           started_at:
             params.startedAt?.toISOString() ?? (status === 'running' ? now.toISOString() : null),

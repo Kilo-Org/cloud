@@ -3275,6 +3275,18 @@ describe('error message normalization', () => {
 
     expect(updated.error_message).toBe('agent exited\ufffd with code 1');
   });
+
+  it('stores a NUL byte in an error message that arrives before any attempt exists', async () => {
+    const reviewId = await insertReview();
+
+    const created = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'failed',
+      errorMessage: 'agent never started\u0000',
+    });
+
+    expect(created.error_message).toBe('agent never started\ufffd');
+  });
 });
 
 describe('review list paging', () => {

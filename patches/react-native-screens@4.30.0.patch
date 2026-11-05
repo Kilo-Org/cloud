@@ -70,3 +70,30 @@ index 800407998ed12d559a6fde732dde1a6ae8b3f172..4bb4e2d1c40f0678e913f606c4be8de3
      private fun handleHostFragmentOnPause() {
          InsetsObserverProxy.removeOnApplyWindowInsetsListener(this)
      }
+diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
+index 5da11964f5932cb44e1131c44a2480803c0a62b5..14fe061acf36f6111c40e1db89cddda85f89bc53 100644
+--- a/ios/RNSScreenStack.mm
++++ b/ios/RNSScreenStack.mm
+@@ -870,6 +870,22 @@ RNS_IGNORE_SUPER_CALL_END
+ }
+ 
+ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
++{
++  if (![self dismissGestureShouldBegin:gestureRecognizer]) {
++    return NO;
++  }
++  RNSScreenView *topScreen = _reactSubviews.lastObject;
++  if (!topScreen.preventNativeDismiss) {
++    return YES;
++  }
++  // A screen that prevents its removal answers the swipe in JS (usePreventRemove)
++  // instead of letting UIKit pop it and push it back after the gesture ends.
++  _isFullWidthSwipingWithPanGesture = NO;
++  [topScreen notifyDismissCancelledWithDismissCount:1];
++  return NO;
++}
++
++- (BOOL)dismissGestureShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+ {
+   if (_disableSwipeBack) {
+     return NO;

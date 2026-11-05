@@ -43,6 +43,7 @@ type Harness = {
   alarms: number[];
   gitUnavailable?: boolean;
   billingAdmission?: (allocation: BuilderAllocation) => Promise<void>;
+  unsupportedReason: string | null;
 };
 
 /** The profile package's reference, the shape `readEnvironmentReference` returns. */
@@ -90,6 +91,7 @@ async function setup(): Promise<Harness> {
     launchError: null,
     currentImage: 'registry.example/runtime-free:1',
     alarms: [],
+    unsupportedReason: null,
   };
   const provider: BuilderProvider = {
     admitBilling: async allocation => {
@@ -179,7 +181,7 @@ async function setup(): Promise<Harness> {
         metadata: { origin: 'environment-build' },
       }),
       builderSandboxId: 'sbx-' + '0'.repeat(48),
-      unsupportedReason: () => null,
+      unsupportedReason: () => harness.unsupportedReason,
       log: () => undefined,
     };
     host.coordinator = new EnvironmentBuildCoordinator(environmentId, deps);
@@ -752,6 +754,87 @@ describe('environment snapshot resolution', () => {
     owner: OWNER,
     configurationRevision: revision,
     repository: REPOSITORY,
+  });
+
+  const UNSUPPORTED = 'Native containers are not configured';
+
+  it('denies manual and automatic builds while builds are unsupported', async () => {
+    const harness = await setup();
+    harness.unsupportedReason = UNSUPPORTED;
+    expect(await manualBuild(harness)).toEqual({
+      status: 'rejected',
+      reason: 'unsupported_provider',
+    });
+    expect(
+      await harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+      })
+    ).toEqual({
+      snapshot: null,
+      reason: 'unsupported',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
+    expect(await status(harness)).toMatchObject({
+      supported: false,
+      unsupportedReason: UNSUPPORTED,
+      activeBuild: null,
+      published: null,
+    });
+    expect(harness.launches).toHaveLength(0);
+  });
+
+  it('retains a published snapshot but refuses restore once builds become unsupported', async () => {
+    const harness = await setup();
+    const { auth } = await readyBuild(harness);
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+    expect((await status(harness)).published).not.toBeNull();
+    harness.unsupportedReason = UNSUPPORTED;
+    expect(
+      await harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+      })
+    ).toMatchObject({
+      snapshot: null,
+      reason: 'unsupported',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
+    expect(await status(harness)).toMatchObject({
+      supported: false,
+      published: expect.any(Object),
+    });
+  });
+
+  it('does not launch a queued build once builds become unsupported', async () => {
+    const harness = await setup();
+    await manualBuild(harness);
+    harness.unsupportedReason = UNSUPPORTED;
+    await drive(harness);
+    expect(harness.launches).toHaveLength(0);
+    expect(await status(harness)).toMatchObject({
+      activeBuild: null,
+      latestBuild: { state: 'obsolete', failureReason: 'snapshots_disabled' },
+    });
+  });
+
+  it('stops a running builder once builds become unsupported', async () => {
+    const harness = await setup();
+    await readyBuild(harness);
+    harness.unsupportedReason = UNSUPPORTED;
+    await drive(harness);
+    expect(harness.stops).toHaveLength(1);
+    expect(harness.captures).toHaveLength(0);
+    expect(await status(harness)).toMatchObject({
+      activeBuild: null,
+      latestBuild: { state: 'obsolete' },
+    });
   });
 
   it.each(['queued', 'preparing'] as const)(

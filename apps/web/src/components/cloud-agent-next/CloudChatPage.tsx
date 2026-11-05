@@ -295,6 +295,7 @@ export default function CloudChatPage({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
@@ -537,6 +538,7 @@ export default function CloudChatPage({
     remoteModelState,
     observedModel,
     remoteModelOverride,
+    cloudAgentModelOverride,
     gatewayModelId: composerSettings?.model,
     gatewayVariant: composerSettings?.variant,
     // A chat listed under this route belongs to its organization, so its models load at once.
@@ -633,8 +635,8 @@ export default function CloudChatPage({
   const newChatComposer = composerSettings
     ? {
         mode: composerSettings.mode,
-        model: composerSettings.model,
-        variant: composerSettings.variant ?? null,
+        model: sessionModels.selectedValue ?? composerSettings.model,
+        variant: sessionModels.selectedVariant ?? null,
       }
     : null;
   const handleCreateWorktreeChat = useCallback(() => {
@@ -658,26 +660,13 @@ export default function CloudChatPage({
       // produces no output, so the resume keeps the position instead of being
       // abandoned at the bottom.
       const resumeStateAtSend = captureSendPosition();
-      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
-        a => a.slug === sessionConfig?.mode
-      );
-      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
-      // An agent's variant only applies when it also pins a model — variants
-      // are model-specific (validated at write time in AgentConfigSchema). When
-      // an agent pins a model, its variant (if any) wins; otherwise the
-      // user-selected session variant applies.
-      const agentVariantOverrideForSend = agentModelOverrideForSend
-        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
-        : undefined;
       const acceptedPromise = manager.send({
         payload: {
           type: 'prompt',
           prompt,
           mode: normalizeAlias(sessionConfig?.mode) || 'code',
-          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-          variant: agentModelOverrideForSend
-            ? agentVariantOverrideForSend
-            : (sessionConfig?.variant ?? undefined),
+          model: sessionModels.selectedValue ?? '',
+          variant: sessionModels.selectedVariant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -702,6 +691,8 @@ export default function CloudChatPage({
       manager,
       scheduleScrollToBottom,
       sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
       supportsAttachments,
       captureSendPosition,
       followAcceptedSend,
@@ -1228,9 +1219,10 @@ export default function CloudChatPage({
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
-        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
-          ? sessionConfig.variant
+        sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
+          ? sessionModels.selectedVariant
           : newModelVariants[0];
+      manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
@@ -1250,7 +1242,9 @@ export default function CloudChatPage({
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
         return;
       }
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
+      if (!sessionConfig || !sessionModels.selectedValue) return;
+      manager.setCloudAgentModelOverride({ model: sessionModels.selectedValue, variant });
+      setSessionConfig({ ...sessionConfig, model: sessionModels.selectedValue, variant });
     },
     [
       activeSessionType,
@@ -1281,11 +1275,7 @@ export default function CloudChatPage({
 
   const showChatInterface =
     Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(model =>
-    activeSessionType === 'remote'
-      ? model.id === sessionModels.selectedValue
-      : model.id === sessionConfig?.model
-  );
+  const currentModelOption = modelOptions.find(model => model.id === displayModel);
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
@@ -1402,7 +1392,7 @@ export default function CloudChatPage({
             : (sessionBranch ?? undefined)
       }
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
-      model={workspaceControlSession?.model ?? sessionConfig?.model}
+      model={workspaceControlSession?.model ?? displayModel}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
         !workspaceControlSession && isCurrentSession && fetchedSessionData

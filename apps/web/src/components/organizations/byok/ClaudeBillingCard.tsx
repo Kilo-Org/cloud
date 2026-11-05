@@ -240,7 +240,7 @@ function ClaudeBillingCardContent({ organizationId }: { organizationId?: string 
 
 export function ClaudeBillingCard({ organizationId }: { organizationId?: string }) {
   return (
-    <Suspense fallback={<ClaudeBillingCardView status={undefined} />}>
+    <Suspense fallback={null}>
       <ClaudeBillingCardContent organizationId={organizationId} />
     </Suspense>
   );

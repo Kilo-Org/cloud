@@ -9,7 +9,7 @@ type WriterPool = {
   readonly waitingCount: number;
 };
 
-type QueueSource = 'queue' | 'queue_vercel';
+type AdmittedSource = 'queue' | 'queue_vercel' | 'ingress_direct';
 type RejectionReason = 'queue_limit' | 'pool_waiting' | 'pool_busy';
 type Admission =
   | { admitted: false; reason: RejectionReason }
@@ -19,17 +19,23 @@ type Admission =
 export function createQueueWriterAdmission(writerPool: WriterPool) {
   const poolMax = writerPool.options.max;
   const limit = Math.max(1, poolMax - 2);
+  // A ceiling, not a reservation: direct writes may hold at most `directLimit` of the
+  // shared slots, and queue callers can use all of `limit`. Queue callers keep three
+  // slots free of direct writes only while `limit >= 4` (pool max >= 6).
+  const directLimit = Math.max(1, limit - 3);
   let active = 0;
+  let activeDirect = 0;
 
   return {
-    tryAcquire(source: QueueSource, usageId: string): Admission {
+    tryAcquire(source: AdmittedSource, usageId: string): Admission {
+      const direct = source === 'ingress_direct';
       const gauges = {
         total: writerPool.totalCount,
         idle: writerPool.idleCount,
         waiting: writerPool.waitingCount,
       };
       const reason: RejectionReason | null =
-        active >= limit
+        active >= limit || (direct && activeDirect >= directLimit)
           ? 'queue_limit'
           : gauges.waiting > 0
             ? 'pool_waiting'
@@ -37,7 +43,10 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
               ? 'pool_busy'
               : null;
       // Reserve synchronously: concurrent requests can all see an empty pool queue.
-      if (reason === null) active++;
+      if (reason === null) {
+        active++;
+        if (direct) activeDirect++;
+      }
       try {
         const sampleRate = reason === null ? 0.01 : 1;
         if (sampleRate === 1 || Math.random() < sampleRate) {
@@ -45,10 +54,13 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
             JSON.stringify({
               event: 'usage_writer_admission',
               writer_caller: source,
+              writer_class: direct ? 'direct' : 'queue',
               outcome: reason === null ? 'admitted' : 'rejected',
               reason,
               active,
+              active_direct: activeDirect,
               limit,
+              direct_limit: directLimit,
               pool_max: poolMax,
               pool: gauges,
               sample_rate: sampleRate,
@@ -68,6 +80,7 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
           if (released) return;
           released = true;
           active--;
+          if (direct) activeDirect--;
         },
       };
     },

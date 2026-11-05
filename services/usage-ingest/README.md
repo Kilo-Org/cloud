@@ -150,13 +150,14 @@ contain only the usage ID and categorical outcome or HTTP status.
 `usage_record_completion` is a persistence event for lasting
 diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 `writer_endpoint`, or `unknown`; `writer_caller` is `queue`, `queue_vercel`,
-`region_handoff`, or `unknown`. These finite fields separate concurrent paths:
+`ingress_direct`, `region_handoff`, or `unknown`. These finite fields separate concurrent paths:
 
 | Persistence path | `entrypoint` | `writer_caller` |
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
 | Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Ingress Worker direct write ahead of its queue | `writer_endpoint` | `ingress_direct` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -164,8 +165,9 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 The Queue consumer explicitly opts into `x-usage-write-source: queue`; the SFO
 handoff client sets `region_handoff`. Other shared-client users, including the
 classifier and benchmark grader, omit the marker. After internal API authentication,
-the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
-or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
+the writer route accepts only `queue`, `queue_vercel`, `ingress_direct`, or
+`region_handoff`; missing or other values map to `unknown` without logging the raw
+header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
 See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
 the isolated staging transport and its `queue_vercel` caller label.
@@ -350,6 +352,25 @@ is occupied, when the primary pool has waiting clients, or when checked-out
 connections (`totalCount - idleCount`) reach the same limit. The response reason
 is bounded to `queue_limit`, `pool_waiting`, or `pool_busy`.
 
+The same guard also admits `ingress_direct`, the source for a direct write from the
+ingress Worker ahead of its queue. Direct calls count against the shared limit and
+have their own ceiling inside it: at most `max(1, limit - 3)` direct calls, currently
+**5 of 8**, may hold a slot in one runtime instance at a time. A direct call over
+that ceiling receives the same HTTP 429 body with reason `queue_limit`, so the
+shared writer client's strict rejection schema is unchanged.
+
+The direct ceiling is a cap, not a reservation in either direction. It guarantees
+direct calls no slot: `queue` and `queue_vercel` can still use all of the shared
+limit. When the shared limit is at least 4 (pool maximum at least 6), direct calls
+cannot occupy the last three slots of an instance. With today's pool of 10, that
+leaves `queue` and `queue_vercel` at least three of the instance's eight. Below that
+the ceiling is `max(1, …)`. For example, a pool maximum of 3 gives a shared limit of
+1 and a direct ceiling of 1, so a direct call can take the only slot. The pool gauge
+checks still apply to both classes. This is a per-instance counter, like the shared
+limit. It does not reserve connections, and it does not guarantee queue slots across
+the fleet, because each instance counts only its own calls and other traffic can
+still fill the pool.
+
 A slot remains held until the awaited persistence call completes, including
 awaited post-commit work, and is released on success, duplicate, `not_recorded`,
 or an exception. Rejection never acknowledges the usage or triggers direct
@@ -370,8 +391,9 @@ There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
-all rejected decisions. Fields contain only the bounded caller/outcome/reason,
-active count/limit, pool gauges/max, and sample rate; diagnostic failures cannot
+all rejected decisions. Fields contain only the bounded caller, `writer_class`
+(`queue` or `direct`), outcome/reason, active count/limit, `active_direct` and
+`direct_limit`, pool gauges/max, and sample rate; diagnostic failures cannot
 change admission or persistence results.
 
 The source policy remains finite: initial delivery plus up to **20 retries**

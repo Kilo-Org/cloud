@@ -16,12 +16,14 @@ import {
  * Frankfurt-local sink for usage writes against the PostgreSQL primary.
  *
  * `writer_caller` comes from `x-usage-write-source`: `queue` (the usage-ingest
- * consumer), `queue_vercel` (the staging Vercel queue consumer),
- * `region_handoff` (an SFO `kilocode-ai-gateway` handoff through
- * `recordUsageInPrimaryRegion`), or `unknown` when that header is missing or
- * any other value. Executing the write here collapses the row-lock hold on
- * `kilocode_users` / `organizations` / `organization_user_usage` from hundreds
- * of milliseconds to single-digit milliseconds. See `usage-record-client.ts`
+ * consumer), `queue_vercel` (the staging Vercel queue consumer), `ingress_direct`
+ * (the usage-ingest Worker's direct write ahead of its queue, with its own
+ * ceiling inside writer admission), `region_handoff` (an SFO
+ * `kilocode-ai-gateway` handoff through `recordUsageInPrimaryRegion`), or
+ * `unknown` when that header is missing or any other value. Executing the
+ * write here collapses the row-lock hold on `kilocode_users` / `organizations`
+ * / `organization_user_usage` from hundreds of milliseconds to single-digit
+ * milliseconds. See `usage-record-client.ts`
  * for the `region_handoff` caller.
  *
  * This route only does the right thing on a deployment whose functions run in
@@ -90,10 +92,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
     parsed.data;
   const source = request.headers.get('x-usage-write-source');
+  const writerCaller =
+    source === 'queue' ||
+    source === 'queue_vercel' ||
+    source === 'ingress_direct' ||
+    source === 'region_handoff'
+      ? source
+      : 'unknown';
   const admission =
-    source === 'queue' || source === 'queue_vercel'
-      ? queueWriterAdmission.tryAcquire(source, core.id)
-      : null;
+    writerCaller === 'region_handoff' || writerCaller === 'unknown'
+      ? null
+      : queueWriterAdmission.tryAcquire(writerCaller, core.id);
   if (admission && !admission.admitted) {
     return NextResponse.json(
       { error: 'Usage writer overloaded', reason: admission.reason },
@@ -112,13 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       prior_microdollar_usage,
       posthog_distinct_id,
       bouncer_usage_event ?? null,
-      {
-        entrypoint: 'writer_endpoint',
-        writer_caller:
-          source === 'queue' || source === 'queue_vercel' || source === 'region_handoff'
-            ? source
-            : 'unknown',
-      }
+      { entrypoint: 'writer_endpoint', writer_caller: writerCaller }
     );
   } finally {
     clearInterval(poolSampler);

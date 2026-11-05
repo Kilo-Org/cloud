@@ -16,7 +16,8 @@ export type UsageWriterConfig = {
   url?: string;
   secret?: string;
   protectionBypass?: string;
-  source?: 'queue' | 'queue_vercel';
+  source?: 'queue' | 'queue_vercel' | 'ingress_direct';
+  timeoutMs?: number;
 };
 
 export type UsageWriteOutcome =
@@ -63,7 +64,11 @@ export async function recordUsage(
 
   if (!config.url || !config.secret) return unavailable('missing_config');
 
-  const signal = AbortSignal.timeout(USAGE_WRITER_TIMEOUT_MS);
+  const timeoutMs =
+    config.timeoutMs !== undefined && Number.isSafeInteger(config.timeoutMs) && config.timeoutMs > 0
+      ? config.timeoutMs
+      : USAGE_WRITER_TIMEOUT_MS;
+  const signal = AbortSignal.timeout(timeoutMs);
   let response: Response | undefined;
   try {
     response = await fetchWriter(config.url, {

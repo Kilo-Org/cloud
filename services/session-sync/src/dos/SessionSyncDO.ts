@@ -272,6 +272,12 @@ export class SessionSyncDO extends DurableObject<Env> {
           )
         : null;
       if (prior && !prior.ok) return prior;
+      if (!existing) {
+        const pending = { tenant: principal.tenant, sessionID, creatorID: principal.userID };
+        await this.ctx.storage.put('pendingRegistration', pending);
+        this.pendingRegistration = pending;
+        await this.scheduleSweep();
+      }
       const indexed = await this.tenantCall(() =>
         getTenantStub(this.env, { type: 'user', id: principal.userID }).trackCreatedSession({
           principal,
@@ -299,10 +305,6 @@ export class SessionSyncDO extends DurableObject<Env> {
         await this.clearLeaseReconcile();
         return registered;
       }
-      const pending = { tenant: principal.tenant, sessionID, creatorID: principal.userID };
-      await this.ctx.storage.put('pendingRegistration', pending);
-      this.pendingRegistration = pending;
-      await this.scheduleSweep();
       const admitted = await this.tenantCall(() =>
         getTenantStub(this.env, principal.tenant).reserve({
           tenant: principal.tenant,

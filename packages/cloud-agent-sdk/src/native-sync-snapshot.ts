@@ -221,8 +221,10 @@ async function readSnapshot(request: Request, sessionID: string): Promise<Native
       resolved.push({ entity, value: entity.value });
       continue;
     }
+    // Asset bodies are raw bytes that transcript reconstruction never reads; keep only the reference.
+    if (entity.kind === 'asset') continue;
     if (!blobs.has(entity.blob.hash)) {
-      // Entity bodies are JSON, unlike the asset bytes referenced inside them.
+      // Non-asset entity bodies are canonical JSON.
       blobs.set(
         entity.blob.hash,
         z.json().parse(await request<unknown>(`${path}/blobs/${entity.blob.hash}`))

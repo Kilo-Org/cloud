@@ -120,6 +120,13 @@ const record = (value: unknown): Record<string, unknown> =>
     : {};
 const reason = (error: unknown) =>
   error instanceof Error ? error['message'] : 'Native connection failed';
+/**
+ * Authorization failures and deleted sessions cannot recover by reconnecting. A 404 stays
+ * retryable: a just-created session is briefly unknown until its runner registers it.
+ */
+const isPermanent = (error: unknown) =>
+  (error instanceof NativeSyncError && (error.status === 401 || error.status === 403)) ||
+  (error instanceof Error && 'code' in error && error.code === 'session_deleted');
 
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
@@ -250,9 +257,7 @@ export class NativeSyncClient {
                 send({ type: 'reauth', ticket: ticket.ticket });
             })
             .catch((error: unknown) => {
-              if (current !== generation || stopped) return;
-              onConnection('disconnected', reason(error));
-              socket?.close();
+              if (current === generation && !stopped) reconnect(error);
             });
         },
         Math.max(0, deadline - Date.now())
@@ -260,8 +265,15 @@ export class NativeSyncClient {
     };
     const reconnect = (error?: unknown) => {
       if (stopped) return;
+      // Retire the current socket so its queued frames and renewal cannot act.
+      generation++;
       clearTimeout(renewalTimer);
+      socket?.close();
       onConnection('disconnected', error ? reason(error) : undefined);
+      if (isPermanent(error)) {
+        stopped = true;
+        return;
+      }
       clearTimeout(reconnectTimer);
       const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
       reconnectTimer = setTimeout(
@@ -314,9 +326,7 @@ export class NativeSyncClient {
               await onFrame(frame, sendCurrent);
             })
             .catch((error: unknown) => {
-              if (stopped || current !== generation) return;
-              onConnection('disconnected', reason(error));
-              next.close();
+              if (!stopped && current === generation) reconnect(error);
             });
         };
       } catch (error) {
@@ -459,6 +469,25 @@ export class NativeSyncClient {
       if (!closed)
         publish({ messages: snapshot.messages.filter(message => !clearedIDs.has(message.id)) });
     };
+    // The producer uploads asynchronously. Recover omitted or deferred parts only
+    // from a complete durable snapshot, never by declaring partial text complete.
+    const recoverIncomplete = async () => {
+      for (let attempt = 0; attempt < 4 && !closed; attempt++) {
+        if (!state.messages.some(message => message.incomplete)) return;
+        await new Promise<void>(resolve => {
+          cancelRecovery = resolve;
+          recoveryTimer = setTimeout(resolve, 250 * 2 ** attempt);
+        });
+        if (closed) return;
+        await snapshot();
+      }
+    };
+    let recoverWhenIdle = false;
+    // Attaching mid-run must not stall live deltas; an active producer is recovered once it is idle.
+    const recoverAfterAttach = async () => {
+      if (state.runnerConnected) recoverWhenIdle = true;
+      else await recoverIncomplete();
+    };
     const connection = this.socket(
       `${path}/live`,
       `${path}/live-ticket`,
@@ -473,15 +502,21 @@ export class NativeSyncClient {
               lastSeq = frame.seq;
             }
             if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
+            await recoverAfterAttach();
           }
           if (frame.type === 'reset_required') {
             await snapshot();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             if (!closed) send({ type: 'subscribe', afterSeq: lastSeq });
+            await recoverAfterAttach();
           }
           if (frame.type === 'runner_status') {
             if (body['runnerConnected'] !== true) identity = undefined;
             publish({ runnerConnected: body['runnerConnected'] === true });
+            if (!state.runnerConnected && recoverWhenIdle) {
+              recoverWhenIdle = false;
+              await recoverIncomplete();
+            }
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
             const parsed = commandStatusSchema.safeParse(body['status']);
@@ -523,22 +558,13 @@ export class NativeSyncClient {
                 message => !clearedIDs.has(message.id)
               ),
         });
-        if (
-          frame.type.startsWith('session.execution.') &&
-          frame.type !== 'session.execution.started' &&
-          state.messages.some(message => message.incomplete)
-        ) {
-          // The producer uploads asynchronously. Recover omitted/deferred parts only
-          // from a complete durable snapshot, never by declaring partial text complete.
-          for (let attempt = 0; attempt < 4 && !closed; attempt++) {
-            await new Promise<void>(resolve => {
-              cancelRecovery = resolve;
-              recoveryTimer = setTimeout(resolve, 250 * 2 ** attempt);
-            });
-            if (closed) break;
-            await snapshot();
-            if (!state.messages.some(message => message.incomplete)) break;
-          }
+        const settled =
+          (frame.type.startsWith('session.execution.') &&
+            frame.type !== 'session.execution.started') ||
+          (frame.type === 'remote.state' && body['running'] === false && recoverWhenIdle);
+        if (settled) {
+          recoverWhenIdle = false;
+          await recoverIncomplete();
         }
       },
       (connection, error) => {
@@ -728,8 +754,10 @@ export function applyNativeEvent(messages: NativeMessage[], frame: NativeEvent):
         part['state'] = { ...state, metadata: data['metadata'] };
       return { ...message, content: parts, partOrdinals };
     }
-    if (frame.type === 'session.message.content.updated' && Array.isArray(data['content']))
-      return { ...message, content: data['content'] };
+    if (frame.type === 'session.message.content.updated' && Array.isArray(data['content'])) {
+      const { partOrdinals: _replaced, ...rest } = message;
+      return { ...rest, content: data['content'] };
+    }
     return message;
   });
 }

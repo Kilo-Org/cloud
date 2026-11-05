@@ -1,11 +1,12 @@
 import {
   NativeSyncClient,
+  NativeSyncError,
   applyNativeEvent,
   type NativeSocket,
   type NativeSessionState,
   type NativePresenceState,
 } from './native-sync';
-import { fetchNativeSnapshot } from './native-sync-snapshot';
+import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 
 jest.mock('./native-sync-snapshot', () => ({ fetchNativeSnapshot: jest.fn() }));
 const snapshot = jest.mocked(fetchNativeSnapshot);
@@ -440,15 +441,151 @@ test('native inbox payloads and sparse part ordinals project correctly', () => {
     { type: 'text', text: 'two' },
     { type: 'text', text: 'ten!' },
   ]);
+  const replaced = applyNativeEvent(
+    messages,
+    frame('session.message.content.updated', {
+      messageID: 'm',
+      content: [{ type: 'text', text: 'replacement' }],
+    })
+  );
+  expect(replaced[0]?.content).toEqual([{ type: 'text', text: 'replacement' }]);
+  expect(replaced[0]?.partOrdinals).toBeUndefined();
   expect(
     applyNativeEvent(
-      messages,
-      frame('session.message.content.updated', {
-        messageID: 'm',
-        content: [{ type: 'text', text: 'replacement' }],
-      })
+      replaced,
+      frame('session.text.delta', { assistantMessageID: 'm', ordinal: 0, delta: '!' })
     )[0]?.content
-  ).toEqual([{ type: 'text', text: 'replacement' }]);
+  ).toEqual([{ type: 'text', text: 'replacement!' }]);
+});
+
+const incomplete = (position: number) => ({
+  position,
+  revision: 1,
+  entities: [],
+  messages: [{ id: 'm', role: 'assistant', content: [], seq: 1, incomplete: true }],
+});
+const complete = (position: number) => ({
+  position,
+  revision: 2,
+  entities: [],
+  messages: [{ id: 'm', role: 'assistant', content: [{ type: 'text', text: 'done' }], seq: 1 }],
+});
+
+test('attach without a runner retries an incomplete snapshot within a bound', async () => {
+  snapshot.mockResolvedValueOnce(incomplete(5)).mockResolvedValueOnce(complete(6));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(false), 3);
+  await flush();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(state?.messages[0]?.incomplete).toBeUndefined();
+  snapshot.mockResolvedValue(incomplete(7));
+  connectedSocket().frame('reset_required', { seq: 9 }, 9);
+  await flush();
+  await jest.advanceTimersByTimeAsync(10_000);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(7);
+  connection.close();
+});
+
+test('attach during a run defers snapshot recovery until runner state is idle', async () => {
+  snapshot.mockResolvedValueOnce(incomplete(5)).mockResolvedValueOnce(complete(6));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(true), 3);
+  await flush();
+  socket.frame(
+    'session.text.delta',
+    { syncPosition: 5, data: { data: { assistantMessageID: 'm', ordinal: 0, delta: 'live' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'live' }]);
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  socket.frame(
+    'remote.state',
+    { syncPosition: 6, running: false, pending: { permissions: [], questions: [] } },
+    5,
+    'events'
+  );
+  await flush();
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot).toHaveBeenCalledTimes(2);
+  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'done' }]);
+  connection.close();
+});
+
+test.each([
+  ['deleted session', () => Object.assign(new Error('deleted'), { code: 'session_deleted' })],
+  ['forbidden read', () => new NativeSyncError('forbidden', 403)],
+])('a %s ends the connection without reconnecting', async (_name, failure) => {
+  snapshot.mockRejectedValueOnce(failure());
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello());
+  await flush();
+  await jest.advanceTimersByTimeAsync(120_000);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(1);
+  expect(state?.connection).toBe('disconnected');
+  connection.close();
+});
+
+test('a missing session snapshot stays retryable', async () => {
+  snapshot.mockRejectedValueOnce(new NativeSyncError('session_not_found', 404));
+  const { client } = fixture();
+  const connection = client.connectSession('ses_a', () => {});
+  await flush();
+  connectedSocket().frame('hello', hello());
+  await flush();
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(2);
+  connection.close();
+});
+
+test('frames queued behind a closing socket cannot renew or resubscribe it', async () => {
+  let release: (value: NativeSnapshot) => void = () => {};
+  snapshot.mockReturnValueOnce(
+    new Promise<NativeSnapshot>(resolve => {
+      release = resolve;
+    })
+  );
+  const { client, calls } = fixture();
+  const connection = client.connectSession('ses_a', () => {});
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  socket.frame('reset_required', { seq: 2 }, 2);
+  socket.frame('reauthorized', hello(), 2);
+  await flush();
+  socket.close();
+  release({ position: 0, revision: 1, entities: [], messages: [] });
+  await flush();
+  await jest.advanceTimersByTimeAsync(61_000);
+  await flush();
+  expect(socket.sent).toEqual([]);
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  expect(FakeSocket.sockets).toHaveLength(2);
+  expect(calls.filter(call => call.path.endsWith('live-ticket'))).toHaveLength(2);
+  connection.close();
 });
 
 test('binds the browser default fetch receiver', async () => {

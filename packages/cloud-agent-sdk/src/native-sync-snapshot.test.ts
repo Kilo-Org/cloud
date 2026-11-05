@@ -309,12 +309,25 @@ describe('fetchNativeSnapshot', () => {
           { kind: 'instruction-blob', id: 'one', revision: 4, blob },
           { kind: 'instruction-blob', id: 'two', revision: 4, blob },
           entity('asset', 'attachment', { blob: { hash: 'c'.repeat(64), bytes: 50 } }),
+          {
+            kind: 'asset',
+            id: 'raw-attachment',
+            revision: 4,
+            blob: { hash: 'd'.repeat(64), bytes: 50 },
+          },
         ]),
       },
       { path: `${sessionPath}/blobs/${hash}`, body: { text: 'instruction' } },
     ]);
 
-    expect((await fetchNativeSnapshot(request, sessionID)).messages).toEqual([]);
+    const result = await fetchNativeSnapshot(request, sessionID);
+    expect(result.messages).toEqual([]);
+    expect(result.entities).toContainEqual({
+      kind: 'asset',
+      id: 'raw-attachment',
+      revision: 4,
+      blob: { hash: 'd'.repeat(64), bytes: 50 },
+    });
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 

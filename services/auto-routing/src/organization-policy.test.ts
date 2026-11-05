@@ -17,15 +17,12 @@ function storedDomains(extra: number): string[] {
 }
 
 function stubRedis(store: Map<string, string>): void {
-  vi.stubGlobal(
-    'fetch',
-    async (_url: string, init?: RequestInit): Promise<Response> => {
-      const body = typeof init?.body === 'string' ? init.body : '[]';
-      const [command, key] = JSON.parse(body) as [string, string];
-      const result = command === 'GET' ? (store.get(key) ?? null) : null;
-      return { ok: true, json: async () => ({ result }) } as Response;
-    }
-  );
+  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit): Promise<Response> => {
+    const body = typeof init?.body === 'string' ? init.body : '[]';
+    const [command, key] = JSON.parse(body) as [string, string];
+    const result = command === 'GET' ? (store.get(key) ?? null) : null;
+    return { ok: true, json: async () => ({ result }) } as Response;
+  });
 }
 
 function storeFor(config: unknown, updatedAt: string): Map<string, string> {

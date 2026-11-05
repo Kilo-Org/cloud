@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   JWT_TOKEN_VERSION,
   validateAuthorizationHeader,
@@ -4788,7 +4789,14 @@ describe('Enkrypt output guardrail', () => {
       const response = await sendRequest('chat_completions', false);
 
       expect(response.status).toBe(402);
-      expect(await response.json()).toMatchObject({ error_type: 'usage_limit_exceeded' });
+      expect(await response.json()).toMatchObject({
+        error: {
+          title: 'Organization Credits Required',
+          balance,
+          buyCreditsUrl: `${APP_URL}/organizations/org-1`,
+        },
+        error_type: 'usage_limit_exceeded',
+      });
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       expect(mockedRecordEnkryptUsage).not.toHaveBeenCalled();
@@ -5419,7 +5427,16 @@ describe('Enkrypt input guardrail', () => {
       );
 
       expect(response.status).toBe(402);
-      expect(await response.json()).toMatchObject({ error_type: 'usage_limit_exceeded' });
+      expect(await response.json()).toMatchObject({
+        error: {
+          title: 'Organization Credits Required',
+          message:
+            'Your organization needs credits to run Enkrypt guardrails, including on free models and BYOK requests. Ask an organization owner to add credits.',
+          balance,
+          buyCreditsUrl: `${APP_URL}/organizations/org-1`,
+        },
+        error_type: 'usage_limit_exceeded',
+      });
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       expect(recordEnkryptUsage).not.toHaveBeenCalled();

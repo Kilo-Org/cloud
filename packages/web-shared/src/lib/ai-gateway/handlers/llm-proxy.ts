@@ -14,6 +14,8 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import {
   findCustomLlm,
   isPublicCustomLlm,
@@ -29,7 +31,7 @@ import {
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
-  creditsBlockedResponse,
+  topUpInProgressResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -243,11 +245,27 @@ export async function handleLlmProxyRequest(
       ? fromMicrodollars(payer.totalMicrodollarsAcquired - payer.microdollarsUsed)
       : 0;
     if (organizationBalance <= 0) {
-      return creditsBlockedResponse({
-        user: guardrailCaller.user,
-        organizationId: guardrailCaller.organizationId,
-        balance: organizationBalance,
-      });
+      if (
+        await isAutoTopUpInFlight({
+          userId: guardrailCaller.user.id,
+          organizationId: guardrailCaller.organizationId,
+        })
+      ) {
+        return topUpInProgressResponse();
+      }
+      return NextResponse.json(
+        {
+          error: {
+            title: 'Organization Credits Required',
+            message:
+              'Your organization needs credits to run Enkrypt guardrails, including on free models and BYOK requests. Ask an organization owner to add credits.',
+            balance: organizationBalance,
+            buyCreditsUrl: `${APP_URL}/organizations/${guardrailCaller.organizationId}`,
+          },
+          error_type: ProxyErrorType.usage_limit_exceeded,
+        },
+        { status: 402 }
+      );
     }
   }
 

@@ -256,3 +256,20 @@ describe('exchangeClaudeSignInCode', () => {
     ).rejects.toThrow('malformed');
   });
 });
+
+describe('Claude callback binding', () => {
+  test.each([undefined, 'other-browser-state'])(
+    'refuses a callback with state %s before exchanging the code',
+    async state => {
+      const token = provider.claudeSignInProvider.token;
+      if (!token || typeof token === 'string' || !token.request)
+        throw new Error('Expected a custom code exchange');
+      await expect(
+        token.request({
+          params: { code: 'one-use-code', state },
+          checks: { state: 'browser-state', code_verifier: 'verifier', nonce: 'nonce' },
+        } as never)
+      ).rejects.toThrow('state does not match');
+    }
+  );
+});

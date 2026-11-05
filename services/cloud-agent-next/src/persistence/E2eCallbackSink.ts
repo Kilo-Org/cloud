@@ -53,7 +53,8 @@ export class E2eCallbackSink extends DurableObject<Env> {
     /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
     retryable(this.prototype.read);
     /* oxlint-enable typescript/unbound-method */
-  } /** Record the owning user and arm the TTL alarm. */
+  }
+
   async register(ownerUserId: string, ttlMs: number): Promise<void> {
     const now = Date.now();
     await this.ctx.storage.put<CallbackSinkMeta>(META_KEY, {

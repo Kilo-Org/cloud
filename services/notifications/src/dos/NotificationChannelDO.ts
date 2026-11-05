@@ -67,7 +67,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
     retryable(this.prototype.listNonZeroBuckets);
     /* oxlint-enable typescript/unbound-method */
-  } // In-flight claims by idempotency key. The DO serializes turns, but a turn
+  }
+
+  // In-flight claims by idempotency key. The DO serializes turns, but a turn
   // yields the isolate on every external `await` (presence RPC, Expo send), so a
   // concurrent replay of the same key can interleave: it would read the storage
   // `pending` marker the first attempt left before its send, treat it as a

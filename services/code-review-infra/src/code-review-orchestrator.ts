@@ -460,7 +460,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
     retryable(this.prototype.status, this.prototype.getStatus);
     /* oxlint-enable typescript/unbound-method */
-  } /** In-memory cache of current review state */
+  }
+
   private state!: CodeReview;
 
   /** Shared typed client for cloud-agent-next tRPC endpoints */

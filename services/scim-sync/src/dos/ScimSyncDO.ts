@@ -19,7 +19,9 @@ export class ScimSyncDO extends DurableObject<Env> {
     /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
     retryable(this.prototype.getStatus);
     /* oxlint-enable typescript/unbound-method */
-  } /**
+  }
+
+  /**
    * Arms the poll loop unless it is already armed. Idempotent, because the cron
    * watchdog calls it every five minutes and must never disturb a live alarm.
    */

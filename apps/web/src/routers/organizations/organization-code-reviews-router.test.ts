@@ -1012,12 +1012,19 @@ describe('organization review agent router: repository_selection_mode', () => {
       autoConfigureWebhooks: false,
     });
 
-    const stored = await caller.organizations.reviewAgent.getReviewConfig({
-      organizationId: organization.id,
-      platform: 'gitlab',
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
     });
-    expect(stored.repositorySelectionMode).toBe('selected');
-    expect(stored.selectedRepositoryIds).toEqual([303]);
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [303],
+      })
+    );
   });
 
   it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
@@ -1034,12 +1041,19 @@ describe('organization review agent router: repository_selection_mode', () => {
       autoConfigureWebhooks: false,
     });
 
-    const stored = await caller.organizations.reviewAgent.getReviewConfig({
-      organizationId: organization.id,
-      platform: 'gitlab',
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
     });
-    expect(stored.repositorySelectionMode).toBe('selected');
-    expect(stored.selectedRepositoryIds).toEqual([404]);
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [404],
+      })
+    );
   });
 
   it('reports selected for the organization GitLab default config and keeps GitHub unchanged', async () => {

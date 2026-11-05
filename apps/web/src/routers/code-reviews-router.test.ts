@@ -2348,6 +2348,11 @@ describe('review agent config repository_selection_mode reads', () => {
       );
   });
 
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
   it('reports selected for a personal GitLab config stored with the mode "all"', async () => {
     await db.insert(agent_configs).values({
       owned_by_user_id: testUser.id,

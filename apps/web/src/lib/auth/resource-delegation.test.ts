@@ -62,9 +62,10 @@ test.each(['owner', 'member', 'admin', 'billing_manager'] as const)(
     jest
       .mocked(getUserFromSessionForCredentialIssuance)
       .mockResolvedValue({ user: current, authFailedResponse: null });
-    jest
-      .mocked(getAuthorizedOrgContext)
-      .mockResolvedValue({ success: true, data: { user: { ...current, role }, organization } });
+    jest.mocked(getAuthorizedOrgContext).mockResolvedValue({
+      success: true,
+      data: { user: { ...current, role }, organization, access: { kind: 'member', role } },
+    });
     const request = () =>
       new NextRequest('https://example.test/api/auth/resource-token', {
         method: 'POST',
@@ -616,6 +617,7 @@ describe('explicit delegated organization authority', () => {
               data: {
                 user: { ...(state === 'different-user' ? other : current), role: 'member' },
                 organization,
+                access: { kind: 'member', role: 'member' },
               },
             }
       );

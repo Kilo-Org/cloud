@@ -7,6 +7,7 @@ import type {
   PrivilegedActionClass,
   PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type { SupportDecision } from '@kilocode/web-shared/lib/admin/support-access';
 import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
 
 /**
@@ -135,6 +136,11 @@ export type AdminAccessAttribution = {
    */
   method: string | null;
   ip: string | null;
+  /** Resolution verdict for explicit support-organization access. */
+  supportDecision: SupportDecision | null;
+  supportGrantId: string | null;
+  supportActionId: string | null;
+  inventoryId: string | null;
 };
 
 /**
@@ -225,6 +231,10 @@ export type AdminAccessEventInput = {
   route: string | null;
   method: string | null;
   ip: string | null;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
 } & (
   | { kind: 'admin_guard'; user: AdminAccessUser }
   | {
@@ -285,6 +295,10 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
     route: params.route,
     method: params.method,
     ip: params.ip,
+    supportDecision: params.supportDecision ?? null,
+    supportGrantId: params.supportGrantId ?? null,
+    supportActionId: params.supportActionId ?? null,
+    inventoryId: params.inventoryId ?? null,
   };
   // Audit logging is a side effect that must never deny a legitimate admin
   // action: swallow (and report) any sink failure rather than propagate it.
@@ -387,6 +401,11 @@ export type AdminAuditContext = {
   headersList?: Headers;
   trpcPath?: string;
   trpcType?: string;
+  /** REST/server-component surface when the caller already knows it. */
+  auditSurface?: AdminAccessSurface;
+  /** Actual request method for a REST caller. */
+  auditMethod?: string;
+  delegatedWorkload?: boolean;
 };
 
 /** Membership observation carried by an elevation event. */
@@ -421,6 +440,10 @@ export async function recordKiloAdminElevation(
   params: {
     reason: KiloAdminElevationReason;
     target: string;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
@@ -437,8 +460,15 @@ export async function recordKiloAdminElevation(
       internalApiUse: ctx.internalApiUse,
       reason: params.reason,
       target: params.target,
+      surface: ctx.auditSurface,
+      method: ctx.auditMethod,
+      delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
+      supportDecision: params.supportDecision,
+      supportGrantId: params.supportGrantId,
+      supportActionId: params.supportActionId,
+      inventoryId: params.inventoryId,
       issuanceId: params.issuanceId,
     });
     return;
@@ -465,6 +495,10 @@ export async function recordKiloAdminElevation(
     ip: ctx.ip ?? null,
     reason: params.reason,
     target: params.target,
+    supportDecision: params.supportDecision,
+    supportGrantId: params.supportGrantId,
+    supportActionId: params.supportActionId,
+    inventoryId: params.inventoryId,
     issuanceId: params.issuanceId ?? null,
   });
   if (ctx.authViaToken) {
@@ -548,6 +582,10 @@ export async function recordKiloAdminElevationForRequest(
     headersList?: Headers;
     internalApiUse?: boolean;
     delegatedWorkload?: boolean;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
@@ -573,6 +611,10 @@ function recordKiloAdminElevationFromHeaders(
     method?: string;
     internalApiUse?: boolean;
     delegatedWorkload?: boolean;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
     issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): void {
@@ -601,6 +643,10 @@ function recordKiloAdminElevationFromHeaders(
     ip: clientIpFromHeaders(params.headersList),
     reason: params.reason,
     target: params.target,
+    supportDecision: params.supportDecision,
+    supportGrantId: params.supportGrantId,
+    supportActionId: params.supportActionId,
+    inventoryId: params.inventoryId,
     issuanceId: params.issuanceId ?? null,
   });
   if (authViaToken) {

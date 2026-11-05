@@ -176,7 +176,7 @@ function MessageBubbleImpl({
   const trailingFailure = isUser;
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
+      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
         <Text
           className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
           accessibilityLabel={messageFailureLabel(failure)}
@@ -184,7 +184,12 @@ function MessageBubbleImpl({
           {failure.title}
         </Text>
         {failure.detail !== null ? (
-          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
             {failure.detail}
           </Text>
         ) : null}

@@ -143,6 +143,8 @@ describe('KiloPassSubscriptionCard loading layout', () => {
   it('reserves the single-row card height at phone widths', () => {
     cardState.content = { kind: 'loading' };
     const root = renderCard(true);
-    expect(String(root.findByProps({ className: 'h-[66px]' }).props.className)).toBe('h-[66px]');
+    // The card's rem is 14 pt: p-3 (21) + the h-10 icon row (35) + the two
+    // 1 px borders, matching the loaded card the reserve stands in for.
+    expect(String(root.findByProps({ className: 'h-[58px]' }).props.className)).toBe('h-[58px]');
   });
 });

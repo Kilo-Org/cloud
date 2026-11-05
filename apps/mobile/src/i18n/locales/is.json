@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Sýnidæmi um native-fjarstýringu",
+    "sessionsEmpty": "Engar native-lotur enn",
+    "hosts": "Tengdar vélar",
+    "hostsEmpty": "Engar tengdar vélar",
+    "directory": "Vinnumappa",
+    "createSession": "Stofna native-lotu",
+    "queueIfOffline": "Setja fyrirmæli í biðröð ef vélin er ótengd",
+    "prompt": "Fyrirmæli eða /command",
+    "localClear": "Hreinsa staðbundna sýn",
+    "abort": "Stöðva umferð",
+    "failed": "Aðgerð með native-fjarstýringu mistókst",
+    "creationUnknown": "Óvíst hvort lota var stofnuð. Endurnýjaðu lotulistann áður en þú reynir aftur.",
+    "commandFailed": "Skipun til keyrsluferlis mistókst",
+    "invalidReply": "Ógilt svar frá keyrsluferli",
+    "unsafeCommand": "Notaðu /compact, /new, /skill, /models, /agents eða /clear (aðeins staðbundið).",
+    "status": "Tenging: {{connection}} · Keyrsluferli: {{runner}}",
+    "presenceStatus": "Vélar: {{connection}}",
+    "commandStatus": "Afhending skipunar: {{status}}",
+    "delivered": "Afhent",
+    "expired": "Útrunnið"
+  },
   "common": {
     "cancel": "Hætta við",
     "done": "Lokið",

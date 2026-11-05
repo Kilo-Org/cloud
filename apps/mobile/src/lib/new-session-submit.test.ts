@@ -613,12 +613,51 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('select-repository');
   });
 
-  it('returns null when another precondition blocks Start', () => {
+  it('names the repository/provider step on the initial empty form, before any prompt', () => {
+    // The form opens with an empty composer, so the empty composer must not
+    // hide the step the user can act on: without it Start is disabled with no
+    // reason on screen.
     expect(
       resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ hasPrompt: false }) })
+        newSessionReasonInput({
+          hasRepositories: false,
+          hasConnectableProvider: true,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
       )
-    ).toBeNull();
+    ).toBe('connect-provider');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: false,
+          hasConnectableProvider: false,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('refresh-repositories');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: true,
+          hasConnectableProvider: true,
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('select-repository');
+  });
+
+  it('keeps the empty composer beside a chosen repository as the named reason', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ hasPrompt: false }),
+        })
+      )
+    ).toBe('enter-prompt');
+  });
+
+  it('returns null when another precondition blocks Start', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
@@ -632,6 +671,20 @@ describe('resolveNewSessionStartBlockedReason', () => {
     expect(
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({ gate: newSessionGate({ isSubmitting: true }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          gate: newSessionGate({ hasPrompt: false, attachmentsIsUploading: true }),
+        })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          gate: newSessionGate({ hasPrompt: false, attachmentsHasFailed: true }),
+        })
       )
     ).toBeNull();
   });

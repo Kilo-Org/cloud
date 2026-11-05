@@ -189,6 +189,7 @@
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a ",
     "terms": "Felhasználási feltételeket",
+    "termsInSentence": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",

@@ -198,7 +198,7 @@ function findLink(root: I, label: string): I {
 
 /** The sentence end a legal link's accessibility label sits at. */
 function linkEdge(label: string | undefined): 'start' | 'end' {
-  return label === 'Terms' ? 'start' : 'end';
+  return label === 'Terms of Use' ? 'start' : 'end';
 }
 
 /**
@@ -930,7 +930,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Terms');
+    expect(texts(renderer.root)).toContain('Terms of Use');
     expect(texts(renderer.root)).toContain('Privacy Policy');
   });
 
@@ -939,7 +939,10 @@ describe('IdleAuth email continue copy', () => {
     const renderer = await mountIdleAuth(start);
 
     const links = linkPressables(renderer.root);
-    expect(links.map(link => link.props.accessibilityLabel)).toEqual(['Terms', 'Privacy Policy']);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual([
+      'Terms of Use',
+      'Privacy Policy',
+    ]);
 
     for (const link of links) {
       const box = boxDp(link.props.className as string);
@@ -960,10 +963,10 @@ describe('IdleAuth email continue copy', () => {
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
-    // The sentence's copy is unchanged: both labels still render, with the
+    // The sentence's copy is unchanged: both links still render, with the
     // connector and suffix the sentence carried before.
     expect(texts(renderer.root)).toEqual(
-      expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
+      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
     );
 
     act(() => {
@@ -1000,7 +1003,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findLink(renderer.root, 'Terms');
+    const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
@@ -1030,7 +1033,7 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(wrapper.props.accessibilityRole).toBe('text');
     expect(wrapper.props.accessibilityLabel).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     expect(wrapper.props.accessibilityActions).toEqual([
       { name: 'openTerms', label: 'Terms' },
@@ -1230,7 +1233,7 @@ describe('IdleAuth layout repairs', () => {
     // tight against "Privacy Policy". The links' own px-1 padding widened every
     // boundary it touched.
     expect(legalSentence(renderer.root)).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);

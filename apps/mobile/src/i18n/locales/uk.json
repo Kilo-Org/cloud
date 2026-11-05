@@ -189,6 +189,7 @@
     "resendCode": "Надіслати код повторно",
     "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими ",
     "terms": "Умовами",
+    "termsInSentence": "Умовами",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Інші способи входу",

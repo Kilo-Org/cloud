@@ -189,6 +189,7 @@
     "resendCode": "Kodu yenidən göndər",
     "termsPrefix": "Davam etməklə bu sənədlərlə razılaşırsan: ",
     "terms": "Şərtlər",
+    "termsInSentence": "Şərtlər",
     "termsConnector": " və ",
     "termsSuffix": ".",
     "moreSignInOptions": "Digər giriş üsulları",

@@ -62,11 +62,11 @@ work, work after the upstream request starts, and exceptional paths may use it.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
-The queue launch and SFO exposure controls and rollback are documented in
+The queue launch and retirement rollback are documented in
 [`ENVIRONMENT.md`](../../ENVIRONMENT.md) and
 [`services/usage-ingest/README.md`](../../services/usage-ingest/README.md).
-Source defaults do not establish the deployed SFO cohort; production FRA
-selection follows the deployed source.
+Source defaults do not establish deployed selection; production SFO and FRA
+selection follow the deployed source and have no runtime cohort switch.
 
 ## Data collection versus ZDR
 

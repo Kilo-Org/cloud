@@ -1,7 +1,7 @@
-diff --git a/android/src/main/java/expo/modules/taskManager/TaskService.java b/android/src/main/java/expo/modules/taskManager/TaskService.java
-index fdb832e..649ea8e 100644
---- a/android/src/main/java/expo/modules/taskManager/TaskService.java
-+++ b/android/src/main/java/expo/modules/taskManager/TaskService.java
+diff --git a/android/src/main/java/expo/modules/taskmanager/TaskService.java b/android/src/main/java/expo/modules/taskmanager/TaskService.java
+index 94e95b2..2d51340 100644
+--- a/android/src/main/java/expo/modules/taskmanager/TaskService.java
++++ b/android/src/main/java/expo/modules/taskmanager/TaskService.java
 @@ -424,7 +424,15 @@ public class TaskService implements SingletonModule, TaskServiceInterface {
      }
      mTasksAndEventsRepository.putEventForAppScopeKey(appScopeKey, body);

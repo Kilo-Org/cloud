@@ -509,19 +509,30 @@ const AttachmentChip = memo(function AttachmentChip({
           ) : null}
 
           {description.showRemove ? (
-            <Pressable
-              onPress={() => {
-                onRemove(attachment.id);
-              }}
-              hitSlop={removeHitSlop()}
-              className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70"
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
-                filename: attachment.filename,
-              })}
+            // The badge rides in a full-surface row so it centers on the chip's
+            // height in both shapes — the 46 dp document chip and the 64 dp
+            // image thumbnail — instead of pinning to a corner. `box-none`
+            // leaves the chip body's tap target whole; only the badge itself
+            // takes a touch. Its end inset matches the content's own `px-2`
+            // start inset, so the badge clears the surface's rounded corner.
+            <View
+              className="absolute inset-0 items-end justify-center pe-2"
+              pointerEvents="box-none"
             >
-              <X size={14} color={colors.foreground} />
-            </Pressable>
+              <Pressable
+                onPress={() => {
+                  onRemove(attachment.id);
+                }}
+                hitSlop={removeHitSlop()}
+                className="h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
+                  filename: attachment.filename,
+                })}
+              >
+                <X size={14} color={colors.foreground} />
+              </Pressable>
+            </View>
           ) : null}
         </View>
       </GestureDetector>

@@ -4,12 +4,13 @@
 
 | Environment | Worker | Source / DLQ | Mode and capacity |
 |---|---|---|---|
-| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch6/parallelism2/cap225 (up to 450 writer calls) |
+| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch3/parallelism2/cap225 (up to 450 writer calls) |
 | Staging | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` / `usage-ingest-processing-dlq-staging-eu` | Processing, batch2/parallelism2/cap200 (at most400 writer calls) |
 
-Production uses batch6/parallelism2/cap225; staging policy is unchanged at
-batch2/parallelism2/cap200. The production cap `225` is a bounded single-knob
-trial; batch, fill timeout, parallelism, retries and staging are unchanged.
+Production uses batch3/parallelism2/cap225; staging policy is unchanged at
+batch2/parallelism2/cap200. The production cap `225` was a bounded single-knob
+trial; at that trial, batch (then 6), fill timeout, parallelism, retries and
+staging were unchanged. Production batch 3 is a later, separate change.
 Complete the production merge gate below before merge or deployment. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production

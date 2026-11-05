@@ -1166,6 +1166,7 @@ export const GetSessionOutput = z.object({
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
   userId: z.string().describe('Owner user ID'),
   orgId: z.string().optional().describe('Organization ID if applicable'),
+  environmentId: z.string().uuid().optional().describe('Environment used to create the workspace'),
   sandboxId: z
     .string()
     .optional()
@@ -1187,6 +1188,10 @@ export const GetSessionOutput = z.object({
     .nullable()
     .optional()
     .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+  parentCloudAgentSessionId: z
+    .string()
+    .optional()
+    .describe('Canonical parent Cloud Agent session ID when this session was spawned by a parent'),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),

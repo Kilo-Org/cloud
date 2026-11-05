@@ -308,7 +308,8 @@ export type KiloRuntimeOptions = {
   onDeadline?: (
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ) => void;
   readSnapshot?: typeof readSessionSnapshot;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
@@ -969,7 +970,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       timers,
       now: () => scheduler.now(),
       readSnapshot: options.readSnapshot,
-      onDeadline: (identity, reason, retry) => options.onDeadline?.(identity, reason, retry),
+      onDeadline: (identity, reason, retry, stopped) =>
+        options.onDeadline?.(identity, reason, retry, stopped),
       onChange: () => options.onActivityChange?.(),
       onFault: reason => {
         if (nativeRuntimeId !== processId) return true;
@@ -1304,7 +1306,8 @@ export type KiloRuntimesOptions = Omit<
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
     retry: ExecutionRetry | undefined,
-    key: string
+    key: string,
+    stopped: Promise<boolean>
   ) => void;
   onActivityChange?: (key: string) => void;
   onMemoryHold?: (info: { directory: string; held: boolean; key: string }) => void;
@@ -1479,8 +1482,8 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         ...(input.workload ? { workload: input.workload } : {}),
         onEvent: event => options.onEvent?.({ ...event, runtimeKey: input.key }),
         onRestart: info => options.onRestart?.({ ...info, key: input.key }),
-        onDeadline: (identity, reason, retry) =>
-          options.onDeadline?.(identity, reason, retry, input.key),
+        onDeadline: (identity, reason, retry, stopped) =>
+          options.onDeadline?.(identity, reason, retry, input.key, stopped),
         onActivityChange: () => options.onActivityChange?.(input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
         onMemoryHold: info => options.onMemoryHold?.({ ...info, key: input.key }),

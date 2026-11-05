@@ -16,9 +16,10 @@ establish a separately agreed test setup before comparing direct and queued runs
 For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
 than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
 exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
-Production retains separate FRA/SFO exposure and SFO allowlist controls and
-[rollout gates](eu-queues.md#production-merge-gate); no production change is
-part of this recipe. Keep the Worker processing mode, writer endpoint and queue
+Production queues every request in any function region,
+without a regional or exposure control; the
+[rollout gates](eu-queues.md#production-merge-gate) still apply before
+deployment. No production change is part of this recipe. Keep the Worker processing mode, writer endpoint and queue
 policy fixed.
 
 Background shadow publication has been
@@ -32,9 +33,10 @@ accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
 reuse the same event and may create duplicate deliveries after ambiguous acceptance.
 Include the retry-enabled Cloudflare publisher's 25-second elapsed budget
-(four attempts of up to five seconds plus full-jitter waits, clipped to remaining
-budget) and runtime scheduling overhead, excluding subsequent Bouncer reporting,
-in accounting completion deadlines. Non-retry HTTP publication remains one
+(four attempts, a first of up to ten seconds and later ones of up to five, plus
+full-jitter waits, clipped to remaining budget, so a later attempt can be shorter)
+and runtime scheduling overhead, excluding subsequent Bouncer reporting, in
+accounting completion deadlines. Non-retry HTTP publication remains one
 two-second attempt; Vercel queue transport is unchanged. There is no durable recovery
 for unaccepted events in this path; an ambiguous failure such as a timeout may
 still be followed by consumer persistence, so reconcile those IDs separately.
@@ -104,7 +106,7 @@ Consumer `usage_ingest_processing` events additionally expose:
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
   to settle. Production uses batch size 6, two writer slots
-  and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
+  and invocation cap 225 (up to 450 concurrent writer calls). Its deployment and activation are subject to the
   [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
   does not activate it. An ACK follows a matching recorded/duplicate writer response only.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.

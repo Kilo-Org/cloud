@@ -220,6 +220,7 @@ export async function handleLlmProxyRequest(
   void organizationGroupPolicyPromise.catch(() => {});
 
   const headers = readLlmProxyHeaders(request);
+  const usageId = randomUUID();
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
   // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
@@ -231,6 +232,7 @@ export async function handleLlmProxyRequest(
       if (!config) return null;
       return {
         sessionId: headers.sessionId,
+        microdollarUsageId: usageId,
         organizationId: caller.organizationId,
         kiloUserId: caller.user.id,
         apiKind: requestBodyParsed.kind,
@@ -370,7 +372,6 @@ export async function handleLlmProxyRequest(
   const autoModel = modelResolution.kind === 'routed' ? modelResolution.autoModel : null;
 
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
-  const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
   providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerPolicy = await resolveProviderAndPolicy({
@@ -450,6 +451,7 @@ export async function handleLlmProxyRequest(
     session_id: usageContext.session_id,
     vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
+    enkrypt: enkryptGuardrail.requestLogs,
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
@@ -519,6 +521,7 @@ export async function handleLlmProxyRequest(
         ? resolveEnkryptOutputScan(
             {
               sessionId: usageContext.session_id,
+              microdollarUsageId: usageId,
               organizationId,
               kiloUserId: user.id,
               apiKind: requestBodyParsed.kind,

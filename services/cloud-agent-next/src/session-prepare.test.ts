@@ -478,7 +478,6 @@ describe('sandbox selection Worker API', () => {
     async kilocodeOrganizationId => {
       const ctx = createInternalApiContext({});
       ctx.env.SANDBOX_SELECTION_IDS = '*';
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
       const caller = appRouter.createCaller(ctx);
       const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
       expect(normal.defaultDestination).toEqual(
@@ -1162,11 +1161,9 @@ describe('prepareSession endpoint', () => {
   });
 
   it('rejects the retired shared allocation before allocation or registration', async () => {
-    const overrideStore = { get: vi.fn().mockResolvedValue('shared-slot-v1'), put: vi.fn() };
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     context.env.SANDBOX_SELECTION_IDS = '*';
-    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
 
     await expect(
@@ -1181,7 +1178,6 @@ describe('prepareSession endpoint', () => {
       message: expect.stringContaining('has been retired'),
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(overrideStore.get).not.toHaveBeenCalled();
   });
 
   it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
@@ -2182,7 +2178,6 @@ describe('start endpoint', () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
-      PER_SESSION_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_TOKEN: 'private-vercel-token',
       VERCEL_TEAM_ID: 'team-id',

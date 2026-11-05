@@ -44,7 +44,7 @@ the value can be copied forward by hand.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Interval, cursor, next alarm time, and the last poll result. |
+| `GET /status` | Interval, cursor, next alarm time, the last poll result, and PostgreSQL reachability. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is
@@ -85,6 +85,84 @@ npx wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 \
   --name WORKOS_API_KEY --scopes workers
 ```
 
+## Database
+
+Reads the shared PostgreSQL through the `HYPERDRIVE` binding — the same
+instance and Hyperdrive config as every other service in this repo. Workers
+cannot hold long-lived connections, so Hyperdrive owns the regional pool and
+`getPgDb` opens a `max: 1` pool per call against the string it hands out.
+
+**Read-only for now.** The query modules under `src/db/` only select; nothing
+writes. The poll loop does not use them yet, so `/status` is their only caller.
+
+The WorkOS directory hierarchy maps onto the organization hierarchy:
+
+| WorkOS | Kilo | Binding |
+|---|---|---|
+| directory | parent organization | `directory_id` |
+| directory group | **sub-organization** | `directory_group_id`, `directory_idp_id` |
+| directory user | user | `kilocode_users.external_id` |
+| group membership | membership on that sub-organization | — |
+
+The binding columns live on every `organizations` row, parent or child, which is
+what makes a sub-organization the thing a directory group resolves to. So
+`findOrganizationByDirectoryGroupId` is the group-resolution query and
+`findDirectoryBoundChildOrganizations` lists a directory's groups.
+
+Not every sub-organization is a directory group: `createChildOrganization`
+makes children with no directory binding, so a parent can hold a mix.
+`findChildOrganizations` returns all of them and
+`findDirectoryBoundChildOrganizations` only the bound ones — enumerating groups
+with the former would treat a hand-made sub-organization as a directory group.
+
+`getPgDb` must be called per operation and never cached in module scope. A
+cached client outlives the request or Durable Object context that created it,
+and its I/O then fails in whatever context picks it up next. Calling per use is
+also why the probe recovers on its own after a database restart.
+
+Four schema facts the query modules encode, each easy to get wrong:
+
+- **`organizations.deleted_at IS NULL` on every org query.** The unique indexes
+  on `directory_group_id` and `external_org_id` are *partial*, scoped to live
+  rows, so a soft-deleted organization can hold the same binding as a live one.
+  Omit the filter and those lookups stop being deterministic.
+- **`organization_memberships` has no foreign keys** on either column, so a row
+  does not prove the organization or user exists, and neither side is cleaned
+  up when the other goes away.
+- **`kilocode_users.external_id` is not unique**, so `findUsersByExternalId`
+  returns an array. A caller needing exactly one must decide what a duplicate
+  means rather than taking the first row.
+- **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
+  validate, parse, or cast one as a UUID.
+
+Kilo's `organization_groups` table is unrelated to WorkOS directory groups and
+is not read here. A group is a named bundle of policies scoped to one
+organization, and the only policy type is `model_access` — modes `all`, `none`,
+or `selected` with model and provider allow-lists
+(`packages/db/src/schema-types.ts:1457-1466`). It decides which models a member
+may call: the policies a member's groups carry are unioned over the org-wide
+default and enforced in the AI gateway, which denies the request
+(`packages/web-shared/src/lib/ai-gateway/handlers/llm-proxy.ts:1065-1070`).
+Groups are enterprise-only, administered by an owner or admin, and nothing
+populates them from directory sync.
+
+So groups and sub-organizations are orthogonal rather than alternatives: a
+sub-organization is a tenant boundary with its own members, credits, and seats,
+while a group is a model allow-list inside one organization. A directory group
+maps to a sub-organization, not to a row in `organization_groups`.
+
+**A write path has to account for one cascade.**
+`organization_group_memberships` holds a composite foreign key into
+`organization_memberships` with `ON DELETE CASCADE`, so deleting a membership
+also destroys that user's group assignments in that organization — their
+model-access grants. Re-adding the membership later does not restore them. A
+`dsync.group.user_removed` followed by a re-add therefore loses configuration
+that no directory event describes and that WorkOS cannot replay.
+
+Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
+strict ISO validators such as `z.string().datetime()` reject. Normalize before
+sending them across a strict boundary.
+
 ## Commands
 
 ```sh
@@ -99,9 +177,21 @@ pnpm types       # regenerate worker-configuration.d.ts after config changes
 curl http://127.0.0.1:8819/cdn-cgi/local/scheduled
 ```
 
-There are no tests. The poll has one branch worth asserting — the interval
-clamp — and everything else is the SDK's behavior or WorkOS's; tests arrive with
-the cursor persistence that has real invariants.
+```sh
+pnpm test:postgres   # query modules against a real database
+```
+
+Needs a running local PostgreSQL (`dev/docker-compose.yml`) with migrations
+applied. If a query fails on a missing column, the local database is behind the
+schema:
+
+```sh
+POSTGRES_URL='postgres://postgres:postgres@localhost:5432/postgres' \
+  NODE_ENV=development pnpm drizzle migrate
+```
+
+The poll loop itself has no tests: its one branch worth asserting is the
+interval clamp, and everything else is the SDK's behavior or WorkOS's.
 
 ## Deployment
 

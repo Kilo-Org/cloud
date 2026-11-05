@@ -157,7 +157,7 @@ async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
@@ -175,7 +175,7 @@ afterEach(async () => {
 
 describe('sandbox status badge projection (B10)', () => {
   it('reports unknown when the sandbox has no owner', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const sandbox = sandboxes.getByName(sandboxId);
 
     const snapshot = SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot());
@@ -189,7 +189,7 @@ describe('sandbox status badge projection (B10)', () => {
   });
 
   it('reports active while connected and sleeping after the provider is gone', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const sessionId = newSessionId();
@@ -304,7 +304,7 @@ describe('sandbox status badge projection (B10)', () => {
 
   it('returns the Sandbox DO snapshot through the Session DO RPC', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const expected = {
@@ -350,7 +350,7 @@ describe('sandbox status badge projection (B10)', () => {
 
   it('composes the passive workspace runtime status without preparing a route', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const expected = {
@@ -403,7 +403,7 @@ describe('sandbox status badge projection (B10)', () => {
 describe('compute billing status metadata read (B10)', () => {
   it('exposes the metadata the billing handler reads from the session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const kindaSession = kiloSessionId();
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();

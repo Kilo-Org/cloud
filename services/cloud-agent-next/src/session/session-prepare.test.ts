@@ -23,10 +23,6 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
-import {
-  resolveSharedSandboxAssignment,
-  SHARED_SANDBOX_FAILOVER_SUFFIX,
-} from '../shared-sandbox-route.js';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
 import type { Env } from '../types.js';
@@ -34,11 +30,9 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type { SessionMessageAdmissionResult } from '../execution/types.js';
 import type { SessionCreateRequest } from './session-requests.js';
-import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SessionPlaneModule from '../session-identity.js';
 import type * as ByocCredentialResolverModule from '../byoc/vercel-credential-resolver.js';
 import { ByocCredentialMissingError } from '../byoc/vercel-credential-resolver.js';
-import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import type * as SandboxPlacementModule from '../sandbox-placement.js';
 import type * as MessageIdModule from './message-id.js';
 import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
@@ -73,7 +67,6 @@ const {
   createSessionReportMock,
   recordSandboxIdentityMock,
   recordSessionFailureMock,
-  generateSandboxRoutingTargetMock,
   getSandboxAllocationCandidatesMock,
   selectControlPlaneSandboxMock,
   fetchByocVercelEnrollmentMock,
@@ -91,7 +84,6 @@ const {
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
-  generateSandboxRoutingTargetMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn().mockResolvedValue({}),
   selectControlPlaneSandboxMock: vi.fn(),
   fetchByocVercelEnrollmentMock: vi.fn(),
@@ -177,14 +169,6 @@ vi.mock('./message-id.js', async importOriginal => {
   };
 });
 
-vi.mock('../sandbox-id.js', async importOriginal => {
-  const actual = await importOriginal<typeof SandboxIdModule>();
-  return {
-    ...actual,
-    generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
-  };
-});
-
 vi.mock('../sandbox-placement.js', async importOriginal => {
   const actual = await importOriginal<typeof SandboxPlacementModule>();
   selectControlPlaneSandboxMock.mockImplementation(actual.selectControlPlaneSandbox);
@@ -197,14 +181,6 @@ vi.mock('../byoc/vercel-credential-resolver.js', async importOriginal => {
     ...actual,
     fetchByocVercelEnrollment: fetchByocVercelEnrollmentMock,
     fetchByocVercelEnrollmentForUser: fetchByocVercelEnrollmentForUserMock,
-  };
-});
-
-vi.mock('../shared-sandbox-route.js', async importOriginal => {
-  const actual = await importOriginal<typeof SharedSandboxRouteModule>();
-  return {
-    ...actual,
-    resolveSharedSandboxAssignment: vi.fn(),
   };
 });
 
@@ -512,7 +488,6 @@ describe('explicit sandbox session creation', () => {
     const ctx = makeContext(doStub);
     Object.assign(ctx.env, vercel, {
       SANDBOX_SELECTION_IDS: orgId,
-      PER_SESSION_SANDBOX_ORG_IDS: '*',
       VERCEL_SANDBOX_ORG_IDS: '*',
       CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
     });
@@ -526,7 +501,7 @@ describe('explicit sandbox session creation', () => {
     expect(doStub.registerSession).not.toHaveBeenCalled();
   }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     admitOperationMock.mockReset();
     fetchByocVercelEnrollmentMock.mockReset();
@@ -535,12 +510,6 @@ describe('explicit sandbox session creation', () => {
     );
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    const routing = await vi.importActual<typeof SandboxIdModule>('../sandbox-id.js');
-    generateSandboxRoutingTargetMock.mockImplementation(routing.generateSandboxRoutingTarget);
-    vi.mocked(resolveSharedSandboxAssignment).mockImplementation(async (_store, routeKey) => ({
-      sandboxId: await routing.deriveSharedSandboxId(routeKey, SHARED_SANDBOX_FAILOVER_SUFFIX),
-      suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
-    }));
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({ organization_id: orgId }),
@@ -1284,7 +1253,6 @@ describe('explicit sandbox session creation', () => {
       const ctx = selectedContext(doStub);
       if (preset.startsWith('vercel-')) {
         Object.assign(ctx.env, { VERCEL_SANDBOX_ORG_IDS: '' });
-        ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '';
       }
       await runCreate(
         ctx,
@@ -1327,8 +1295,6 @@ describe('explicit sandbox session creation', () => {
       expect(metadata.workspace?.sandboxId).toMatch(/^sbx-[0-9a-f]{48}$/);
       expect(metadata.workspace?.sandboxKind).toBe(sandboxKind);
       expect(metadata.workspace?.sandboxRoute).toBeUndefined();
-      expect(resolveSharedSandboxAssignment).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
 
@@ -2650,10 +2616,6 @@ describe('createSessionWithLedger admission ladder', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
@@ -2922,7 +2884,6 @@ describe('createSessionWithLedger admission ladder', () => {
       replayed: true,
     });
     expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
@@ -4726,10 +4687,6 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     fetchByocVercelEnrollmentMock.mockReset();
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
@@ -5539,7 +5496,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({ kind: 'isolated', sandboxId });
     selectControlPlaneSandboxMock.mockResolvedValue(PLACED_SANDBOX_DECISION);
     admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
     settleOperationMock.mockResolvedValue({ settled: true });
@@ -5823,7 +5779,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
       // The replay rebuilds the recorded placed key; it never decides a second one.
       expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(1);
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
       const rpcInput = createdRpcInput(doStub);
       expect(rpcInput.metadata).toMatchObject({
@@ -6091,7 +6046,6 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       });
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(recordOperationProgressMock).not.toHaveBeenCalled();
       expect(deleteCliSessionMock).not.toHaveBeenCalled();
       expect(storedProgress[SESSION_CREATE_FINALIZATION_VERSION_KEY]).toBeUndefined();
@@ -6186,10 +6140,10 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       provider: 'vercel' as const,
     },
     {
-      label: 'placed Cloudflare sandbox',
+      label: 'placed Cloudflare Containers sandbox',
       storedSandboxId: PLACED_SANDBOX_ID,
-      provider: 'cloudflare' as const,
-      sandboxKind: 'shared' as const,
+      provider: 'cloudflare-containers' as const,
+      sandboxKind: 'isolated' as const,
     },
   ])(
     'restores the recorded $label without recomputing routing',
@@ -6250,12 +6204,36 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(createdMetadata(doStub)?.workspace?.sandboxKind).toBe(sandboxKind);
       expect(controlGet).toHaveBeenCalled();
       expect(legacyGet).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a recorded create on a retired shared sandbox', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input, {
+          sandboxId: PLACED_SANDBOX_ID,
+          sandboxProvider: 'cloudflare',
+          sandboxKind: 'shared',
+        }),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('has been retired'),
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['without its kind', {}],
@@ -6394,10 +6372,6 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({ organization_id: ORIGINAL_OPTIONS.kilocodeOrganizationId }),
@@ -6960,10 +6934,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
@@ -7252,7 +7222,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     });
 
     expect(admitOperationMock).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
@@ -7679,10 +7648,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
     selectControlPlaneSandboxMock.mockImplementation(actualPlacement.selectControlPlaneSandbox);
     generateSessionIdMock.mockReturnValue(SANDBOX_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
-    generateSandboxRoutingTargetMock.mockResolvedValue({
-      kind: 'isolated',
-      sandboxId: 'ses-0123456789abcdef',
-    });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
@@ -7870,7 +7835,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
         })
       );
       expect(generateSessionIdMock).not.toHaveBeenCalled();
-      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
 

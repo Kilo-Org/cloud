@@ -684,6 +684,45 @@ describe('MessageBubble copy-to-composer human text', () => {
     expect(onCopyToComposer).toHaveBeenCalledWith('prompt');
   });
 
+  it('passes the prompt, not injected server context, to Copy', async () => {
+    const message = userMessage('m-copy-context');
+    message.parts = [
+      {
+        id: 'm-copy-context-synthetic',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-context',
+        type: 'text',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      },
+      {
+        id: 'm-copy-context-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm-copy-context',
+        type: 'text',
+        text: 'prompt',
+      },
+    ] as typeof message.parts;
+
+    const onCopyToComposer = vi.fn<(text: string) => void>();
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onCopyToComposer,
+    });
+
+    const copy = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Copy to composer'
+    );
+    expect(copy).not.toBeNull();
+    if (!copy) {
+      throw new Error('expected Copy to composer button');
+    }
+    (copy.props.onPress as () => void)();
+    expect(onCopyToComposer).toHaveBeenCalledWith('prompt');
+  });
+
   it('hides Copy for a file-only failed row', async () => {
     const message = userMessage('m-copy-file');
     message.parts = [
@@ -788,6 +827,35 @@ describe('MessageBubble user text join', () => {
       expect(element?.props.value as string).toContain('\n\n');
     }
   );
+
+  it('renders only the prompt, not injected server context', async () => {
+    const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+
+    const message = userMessage('m-context');
+    message.parts = [
+      {
+        id: 'm-context-synthetic',
+        sessionID: 'ses_1',
+        messageID: 'm-context',
+        type: 'text',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      },
+      {
+        id: 'm-context-prompt',
+        sessionID: 'ses_1',
+        messageID: 'm-context',
+        type: 'text',
+        text: 'prompt',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+
+    const element = findElementByTypeFn(tree, MockChatMarkdownText);
+    expect(element).not.toBeNull();
+    expect(element?.props.value).toBe('prompt');
+  });
 });
 
 describe('MessageBubble assistant treatment', () => {

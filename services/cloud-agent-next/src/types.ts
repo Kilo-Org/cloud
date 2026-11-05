@@ -485,8 +485,6 @@ export type Env = {
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
   /** e2e-only callback sink; bound only by the rendered e2e configs. */
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
-  /** One-way shared sandbox failover overrides keyed by shared identity */
-  SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -550,8 +548,6 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
-  PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
@@ -580,8 +576,8 @@ export type Env = {
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
   ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_USER_IDS?: string;
+  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
+  WORKSPACE_SNAPSHOT_USER_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

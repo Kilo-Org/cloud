@@ -12,6 +12,7 @@ import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-author
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   assertCloudAgentParentAuthority,
   CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
@@ -21,6 +22,7 @@ import {
   CloudAgentAuthoritySchema,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
+import { sessionCallbackContext } from './callback-context.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -1080,6 +1082,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async authorizeCloudAgentWorkspaceSibling(input: {
+    siblingSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentWorkspaceSibling({
+      parentSessionId: this.metadata?.identity.sessionId ?? '',
+      siblingSessionId: input.siblingSessionId,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
   async issueCloudAgentMcpGrant(
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
@@ -1479,9 +1497,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A delete queued ahead of this task made the session not-found; do not
       // persist a queued row against wiped storage.
       if (this.registration === null) return { type: 'session-not-found' };
-      const admitted = await this.admitMessage(parsed);
+      const admitted = await this.admitMessage(await this.withSessionCallbackContext(parsed));
       return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
     });
+  }
+
+  /**
+   * Gives an interactive chat the server-signed values it needs to route a
+   * child callback back to itself. The token is derived from the session's
+   * immutable identity, so a retry and a replay produce the same context.
+   */
+  private async withSessionCallbackContext(
+    intent: ControlPlanePromptPayload
+  ): Promise<ControlPlanePromptPayload> {
+    if (intent.turn.type !== 'prompt') return intent;
+    const context = sessionCallbackContext(this.metadata);
+    return context === undefined ? intent : { ...intent, context };
   }
 
   /**

@@ -281,6 +281,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   const routes = new Map<string, TurnRoute>();
   const turns = new Map<string, Turn>();
+  const interruptedFinalizations = new Map<
+    string,
+    { route: TurnRoute; abort: AbortController; done: Promise<void> }
+  >();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
   /** Runtime keys whose Kilo is held under memory pressure (`onRuntimeMemoryHold`). */
@@ -432,7 +436,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   function canRestartRuntime(runtimeKeyValue: string): boolean {
-    return turnsForRuntimeKey(runtimeKeyValue).length === 0;
+    return (
+      turnsForRuntimeKey(runtimeKeyValue).length === 0 &&
+      ![...interruptedFinalizations.values()].some(
+        entry => entry.route.runtimeKey === runtimeKeyValue
+      )
+    );
   }
 
   function queueState(route: TurnRoute): QueueState {
@@ -546,6 +555,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
    * Parking behind it keeps dispatch order equal to receipt order; the next drain re-chains both.
    */
   function mustPark(turn: Turn, pending: PendingPrompt): boolean {
+    if (interruptedFinalizations.has(turn.route.sessionId)) return true;
     if (queueState(turn.route) === 'queue') return true;
     for (const earlier of turn.prompts) {
       if (earlier === pending) return false;
@@ -627,6 +637,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             : { variant: pending.payload.agent.variant }),
           ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
+          ...(pending.payload.context === undefined ? {} : { context: pending.payload.context }),
           ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
         });
       } else if (pending.payload.turn.command === 'compact') {
@@ -712,6 +723,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   function drainInbox(turn: Turn): void {
     if (turn.inbox.length === 0) return;
+    if (interruptedFinalizations.has(turn.route.sessionId)) return;
     const state = queueState(turn.route);
     if (state === 'queue') return;
     if (state === 'unavailable') {
@@ -831,6 +843,51 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       sendOutcome(turn, 'completed');
       return;
+    }
+  }
+
+  async function finalizeInterruptedTurn(turn: Turn, stopped: Promise<boolean>): Promise<void> {
+    if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
+    const { sessionId, runtimeKey: key, kiloSessionId } = turn.route;
+    if (interruptedFinalizations.has(sessionId)) return;
+    const abort = new AbortController();
+    const done = Promise.withResolvers<void>();
+    interruptedFinalizations.set(sessionId, { route: turn.route, abort, done: done.promise });
+    const cancelled = Promise.withResolvers<never>();
+    const onAbort = () => cancelled.reject(abort.signal.reason);
+    abort.signal.addEventListener('abort', onAbort, { once: true });
+    const timer = scheduler.setTimeout(
+      () => abort.abort(new Error('interruption auto-commit timed out')),
+      DEFAULT_CONDENSE_TIMEOUT_MS
+    );
+    try {
+      if (!(await Promise.race([stopped, cancelled.promise]))) {
+        emitWarning(sessionId, 'Auto-commit skipped: agent cancellation was not confirmed');
+        return;
+      }
+      abort.signal.throwIfAborted();
+      const runtime = deps.runtimes.get(key);
+      if (
+        queueState(turn.route) !== 'ready' ||
+        runtime?.sessionState(kiloSessionId) !== undefined
+      ) {
+        emitWarning(sessionId, 'Auto-commit skipped: agent is not idle and available');
+        return;
+      }
+      await runAutoCommitStep(turn, abort.signal);
+    } catch {
+      emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
+    } finally {
+      scheduler.clearTimeout(timer);
+      abort.signal.removeEventListener('abort', onAbort);
+      interruptedFinalizations.delete(sessionId);
+      const next = turns.get(sessionId);
+      if (next) {
+        for (const pending of next.prompts) pending.deliveryResumedAt = now();
+        if (!abort.signal.aborted) drainInbox(next);
+      }
+      maybeApplyPendingCredentials(key);
+      done.resolve();
     }
   }
 
@@ -979,6 +1036,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       drainInbox(turn);
       refreshSerializedWaits(turn);
+      if (interruptedFinalizations.has(turn.route.sessionId)) {
+        for (const pending of turn.prompts) pending.deliveryResumedAt = now();
+      }
       const pending = turn.prompts.find(entry => deliveryExpired(turn, entry));
       if (pending && turn.phase !== 'finalizing') {
         pending.abort.abort(new Error('Prompt delivery timed out'));
@@ -1137,6 +1197,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
   return {
     canRestartRuntime,
 
+    async cancelInterruptedFinalizations(directory: string): Promise<void> {
+      const pending = [...interruptedFinalizations.values()].filter(
+        entry => entry.route.directory === directory
+      );
+      for (const entry of pending) entry.abort.abort(new Error('worktree deleted'));
+      await Promise.all(pending.map(entry => entry.done));
+    },
+
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },
@@ -1163,6 +1231,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     release(sessionId: string): void {
+      interruptedFinalizations.get(sessionId)?.abort.abort(new Error('session released'));
       const route = routes.get(sessionId);
       if (route !== undefined) {
         turnByKiloSession.delete(route.kiloSessionId);
@@ -1181,6 +1250,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     abort(sessionId: string): void {
+      interruptedFinalizations.get(sessionId)?.abort.abort(new Error('aborted'));
       const route = routes.get(sessionId);
       if (route !== undefined) void abortKilo(route);
       const turn = turns.get(sessionId);
@@ -1434,7 +1504,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       identity: ExecutionIdentity,
       reason: ExecutionFailure,
       retry: ExecutionRetry | undefined,
-      key: string
+      key: string,
+      stopped: Promise<boolean>
     ): void {
       const root = [identity.sessionId, ...(identity.ancestorSessionIds ?? [])]
         .map(resolveRootKiloSession)
@@ -1456,6 +1527,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       const failure = retry ? retryFailure(retry) : undefined;
       if (turn) {
         turn.stepAbort?.abort(new Error(reason));
+        void finalizeInterruptedTurn(turn, stopped);
         if (failure) {
           sendOutcome(turn, 'failed', failure.safeMessage, {
             assistantReason: failure.reason,
@@ -1477,17 +1549,20 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     hasPendingWork(): boolean {
-      return [...turns.values()].some(
-        turn =>
-          turn.phase === 'finalizing' ||
-          turn.prompts.some(
-            entry =>
-              !entry.nativeObserved &&
-              // The live native execution running the serialized command owns compute,
-              // including sleeping while that command waits on the user.
-              !blockedBySerializedCommand(turn, entry) &&
-              !deliveryExpired(turn, entry)
-          )
+      return (
+        interruptedFinalizations.size > 0 ||
+        [...turns.values()].some(
+          turn =>
+            turn.phase === 'finalizing' ||
+            turn.prompts.some(
+              entry =>
+                !entry.nativeObserved &&
+                // The live native execution running the serialized command owns compute,
+                // including sleeping while that command waits on the user.
+                !blockedBySerializedCommand(turn, entry) &&
+                !deliveryExpired(turn, entry)
+            )
+        )
       );
     },
 
@@ -1496,6 +1571,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
     tick,
 
     shutdown(): void {
+      for (const entry of interruptedFinalizations.values()) {
+        entry.abort.abort(new Error('wrapper shutting down'));
+      }
       if (tickHandle === undefined) return;
       scheduler.clearInterval(tickHandle);
       tickHandle = undefined;

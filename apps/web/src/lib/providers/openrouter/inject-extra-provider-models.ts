@@ -18,6 +18,7 @@ import {
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
 
@@ -84,14 +85,6 @@ export function injectExtraProviderModels(
   }
 }
 
-function toDisplayName(providerId: string) {
-  return providerId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 type VercelOnlyProviderMetadata = {
   displayName: string;
   termsOfServiceURL: string;
@@ -129,7 +122,9 @@ const providersOnlyVercelLists = new WeakSet<OpenRouterProvider>();
 
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
   const metadata = vercelOnlyProviderMetadata.get(providerId);
-  const displayName = metadata?.displayName ?? toDisplayName(providerId);
+  const displayName =
+    metadata?.displayName ??
+    normalizePublicInferenceProvider(providerId.replace(/[-_]+/g, ' ')).name;
   const provider: OpenRouterProvider = {
     name: displayName,
     displayName,

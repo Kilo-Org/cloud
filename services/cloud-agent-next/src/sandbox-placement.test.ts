@@ -13,7 +13,6 @@ import {
 import type { SandboxId } from './types.js';
 
 const SESSION_ID = 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e';
-const OTHER_SESSION_ID = 'workspace_00000000-0000-4000-8000-000000000000';
 const PLACED_ID = `sbx-${'a'.repeat(48)}` as SandboxId;
 
 /** The legacy prefixed key that encoded each kind before the stored kind existed. */
@@ -64,8 +63,8 @@ describe('placed key billing parity with the legacy prefix table', () => {
 });
 
 describe('selectControlPlaneSandbox', () => {
-  it('isolates a session by default, whatever the per-session org list says', async () => {
-    const envCases = [{}, { PER_SESSION_SANDBOX_ORG_IDS: 'org-1' }];
+  it('isolates a session by default', async () => {
+    const envCases = [{}];
     for (const env of envCases) {
       const decision = await selectControlPlaneSandbox({
         env,
@@ -83,30 +82,17 @@ describe('selectControlPlaneSandbox', () => {
     }
   });
 
-  it('derives one deterministic shared key per owner and bot', async () => {
-    const select = (sessionId: string, input: { orgId?: string; botId?: string }) =>
+  it('rejects the retired shared allocation', async () => {
+    await expect(
       selectControlPlaneSandbox({
         env: {},
-        sessionId,
+        sessionId: SESSION_ID,
         userId: 'user-1',
-        ...input,
+        orgId: 'org-1',
         codeReview: false,
         sandboxAllocation: 'cloudflare-shared',
-      });
-
-    const first = await select(SESSION_ID, { orgId: 'org-1' });
-    const second = await select(OTHER_SESSION_ID, { orgId: 'org-1' });
-    const bot = await select(SESSION_ID, { orgId: 'org-1', botId: 'bot-1' });
-    const personal = await select(SESSION_ID, {});
-
-    expect(first).toEqual({
-      sandboxId: sha256Key('control-shared-v2:org-1__user-1'),
-      provider: 'cloudflare',
-      sandboxKind: 'shared',
-    });
-    expect(second.sandboxId).toBe(first.sandboxId);
-    expect(bot.sandboxId).toBe(sha256Key('control-shared-v2:org-1__user-1__bot:bot-1'));
-    expect(personal.sandboxId).toBe(sha256Key('control-shared-v2:user:user-1__user-1'));
+      })
+    ).rejects.toThrow('Shared sandboxes are retired');
   });
 
   it.each([{}, { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' }])(
@@ -131,7 +117,6 @@ describe('selectControlPlaneSandbox', () => {
   it.each([
     ['cloudflare-single', 'cloudflare', 'isolated'],
     ['isolated-standard', 'cloudflare', 'isolated-standard'],
-    ['cloudflare-shared', 'cloudflare', 'shared'],
     ['vercel-small', 'vercel', 'isolated'],
     ['cloudflare-containers-standard-3', 'cloudflare-containers', 'isolated'],
   ] as const)('places an explicit %s allocation', async (allocation, provider, sandboxKind) => {

@@ -3,6 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { WORKTREE_REVIEW_PROMPT_INTRO, type WorktreeReviewComment } from './worktree-review';
+import {
+  CHILD_SESSION_CALLBACK_DATA_NOTICE,
+  CHILD_SESSION_CALLBACK_INTRO,
+  formatChildSessionCallbackPrompt,
+} from '@kilocode/worker-utils/cloud-agent-child-callback';
 
 jest.mock('@/components/shared/TimeAgo', () => ({ TimeAgo: () => null }));
 jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
@@ -13,6 +18,8 @@ jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', (
 import { MessageBubble } from './assistant-ui/test-renderers';
 import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
 import { CloudThread } from './assistant-ui/CloudThread';
+
+Object.assign(globalThis, { React });
 
 const reviewComment: WorktreeReviewComment = {
   id: 'comment-1',
@@ -269,6 +276,81 @@ describe('MessageBubble', () => {
     expect(malformedHtml).toContain('Please address the following worktree review feedback');
     expect(ordinaryHtml).not.toContain('Code review feedback');
     expect(ordinaryHtml).toContain('Please inspect this file.');
+  });
+
+  it('renders a child session callback as a card with the child result and session link', () => {
+    const raw = formatChildSessionCallbackPrompt({
+      version: 1,
+      cloudAgentSessionId: 'workspace_2e43e20d-cd4a-4779-b715-d218cffa8f6b',
+      kiloSessionId: 'ses_e5c884bceffff2tD0tPYMXMdbi',
+      messageId: 'msg_1a37a0bcd000D1kD5ytWNBYC9D',
+      status: 'completed',
+      branch: 'fix/cloud-environment-selection',
+      result: 'PR: https://github.com/Kilo-Org/cloud/pull/9723',
+    });
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(raw) })
+    );
+
+    expect(html).toContain('Subagent');
+    expect(html).toContain('Completed');
+    expect(html).toContain('PR: ');
+    expect(html).toContain(
+      'href="/cloud/sessions/ses_e5c884bceffff2tD0tPYMXMdbi?at=msg_1a37a0bcd000D1kD5ytWNBYC9D"'
+    );
+    expect(html).toContain('>ses_e5c884bceffff2tD0tPYMXMdbi</a>');
+    expect(html).not.toContain('Open child session');
+    expect(html).not.toContain('"cloudAgentSessionId"');
+    expect(html).not.toContain('"version":1');
+    expect(html).not.toContain('A child Cloud Agent task finished');
+  });
+
+  it('renders a legacy child callback without a version field', () => {
+    const raw = `${CHILD_SESSION_CALLBACK_INTRO}
+${CHILD_SESSION_CALLBACK_DATA_NOTICE}
+${JSON.stringify({
+  cloudAgentSessionId: 'workspace_legacy',
+  status: 'completed',
+  result: 'Finished the legacy child task.',
+})}`;
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(raw) })
+    );
+
+    expect(html).toContain('Subagent');
+    expect(html).toContain('Finished the legacy child task.');
+    expect(html).not.toContain('A child Cloud Agent task finished');
+  });
+
+  it('shows the failure reason for a failed child callback', () => {
+    const raw = formatChildSessionCallbackPrompt({
+      version: 1,
+      cloudAgentSessionId: 'workspace_failed',
+      status: 'failed',
+      errorMessage: 'The setup command failed',
+    });
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(raw) })
+    );
+
+    expect(html).toContain('Subagent');
+    expect(html).toContain('Failed');
+    expect(html).toContain('The setup command failed');
+  });
+
+  it('keeps malformed child callback JSON as an ordinary bubble', () => {
+    const raw = `${formatChildSessionCallbackPrompt({
+      version: 1,
+      cloudAgentSessionId: 'workspace_malformed',
+      status: 'completed',
+      result: 'Finished.',
+    })} trailing text`;
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(raw) })
+    );
+
+    expect(html).not.toContain('Subagent');
+    expect(html).toContain('A child Cloud Agent task finished');
   });
 });
 

@@ -446,16 +446,9 @@ export function createSessionManagementHandlers() {
 
           const sandboxId =
             sessionMetadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              sessionMetadata.identity.orgId,
-              userId,
-              sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId,
-              {
-                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(sessionMetadata.identity.sessionId, {
+              createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
@@ -481,6 +474,7 @@ export function createSessionManagementHandlers() {
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
+            environmentId: sessionMetadata.environment?.environmentId,
             sandboxId,
 
             ...(worktreeId
@@ -489,6 +483,9 @@ export function createSessionManagementHandlers() {
                   parentSessionId: worktreeOwnership?.parentSessionId ?? null,
                   cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
                 }
+              : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
               : {}),
 
             githubRepo: repositoryFields.githubRepo,
@@ -622,16 +619,9 @@ export function createSessionManagementHandlers() {
 
           const sandboxId: SandboxId =
             metadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              metadata.identity.orgId,
-              userId,
-              metadata.identity.sessionId,
-              metadata.identity.botId,
-              {
-                createdOnPlatform: metadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(metadata.identity.sessionId, {
+              createdOnPlatform: metadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
 

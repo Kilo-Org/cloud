@@ -57,6 +57,45 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('workspace tail snapshot authority', () => {
+  it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+    const registered = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId: workspaceId,
+        },
+      }),
+      selection
+    );
+    expect(registered.credentials.workspaceId).toBe(workspaceId);
+    expect(registered.credentials.scopeId).toBe(workspaceId);
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), selection).credentials.workspaceId
+    ).toBeUndefined();
+  });
+
+  it('rejects caller-supplied workspace restore provenance at both registration boundaries', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+    const spec = {
+      ...registration.spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_00000000-0000-4000-8000-000000000001',
+        directory: registration.spec.directory,
+        sourceAllocationId: 'source',
+      },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(spec).success).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({ spec, credentials: registration.credentials })
+        .success
+    ).toBe(false);
+  });
+});
+
 describe('egress policy registration', () => {
   it.each(
     ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>

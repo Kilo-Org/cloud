@@ -2,7 +2,7 @@ import type { OrganizationGroupModelAccessPolicy } from '@kilocode/db/schema-typ
 import * as z from 'zod';
 
 export const ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE = 'model_access';
-export const MAX_ORGANIZATION_GROUP_MODEL_IDS = 500;
+export const MAX_ORGANIZATION_GROUP_MODEL_IDS = 2_000;
 export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS = 500;
 
 export const OrganizationGroupModelAccessPolicyDataSchema = z.discriminatedUnion('mode', [

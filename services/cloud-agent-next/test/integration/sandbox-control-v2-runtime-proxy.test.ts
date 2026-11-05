@@ -299,7 +299,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   it('keeps a shared modern sibling authorized after releasing the creator and denies its deleted handle', async () => {
     const creatorId = newSessionId();
     const siblingId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, creatorId);
+    const sandboxId = await generateSandboxId(creatorId);
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const provider = createProvider();
     const sandbox = await installSandbox(sandboxId, provider);
@@ -382,7 +382,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const startedAt = Date.now();
       const sessionId = newSessionId();
       const kiloId = kiloSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const provider = createProvider();
       const broker = createFakeCredentialBroker();
       const sandboxStub = await installSandbox(sandboxId, provider, broker);
@@ -605,7 +605,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('rejects unsupported direct Vercel admission before storing or queuing the session', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const stub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     const result = await stub.createSessionWithInitialAdmission({
       metadata: metadata({
@@ -623,7 +623,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('mints a handle on the connected prepare, projects it into the credentials, and resolves it', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -656,7 +656,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandbox = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -722,7 +722,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     'prepares without optional MCP credentials after issuance %s and retries on reconnect',
     async failure => {
       const sessionId = newSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const provider = createProvider();
       const sandbox = await installSandbox(sandboxId, provider);
       const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -800,7 +800,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     'authorizes the model facade while disconnected %s and completes after same-wrapper reconnect',
     async disconnectAt => {
       const sessionId = newSessionId();
-      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const sandboxId = await generateSandboxId(sessionId);
       const provider = createProvider();
       const sandboxStub = await installSandbox(sandboxId, provider);
       const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -908,7 +908,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('re-prepares and mints a new handle after a wrapper restart, invalidating the old one', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -954,7 +954,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('re-mints on a still-preparing route when a wrapper restart supersedes the handle', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -998,7 +998,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('resends the identical handle on a plain reconnect without re-binding', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -1048,7 +1048,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('does not send a stale handle when the fence changes between bind and send', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -1108,7 +1108,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
 
   it('fails the route as workspace_setup_failed when the handle cannot be minted', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     // A session peer that cannot mint stands in for a mint failure (no active
@@ -1187,7 +1187,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey, privateKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(
       sandboxId,
@@ -1232,7 +1232,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey, privateKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     const sandboxStub = await installSandbox(
       sandboxId,
@@ -1288,7 +1288,7 @@ describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
     const { publicKey } = generateSecretsKeyPair();
     const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
     // No AGENT_ENV_VARS_PRIVATE_KEY binding: decryption fails at send time.
     const sandboxStub = await installSandbox(sandboxId, provider);

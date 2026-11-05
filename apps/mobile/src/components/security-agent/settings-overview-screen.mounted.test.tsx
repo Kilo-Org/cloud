@@ -414,6 +414,62 @@ describe.each([
     }
   });
 
+  // The Repositories row's subtitle is a claim about the GitHub App grant, so a
+  // settled empty grant must not make it: the repositories screen one tap away
+  // answers this state with its own no-repositories empty state, and the two
+  // readings must not disagree.
+  it('names an empty repository grant in the Repositories row', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    repositoriesData = [];
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('No repositories');
+  });
+
+  it('keeps the all-repositories subtitle for a grant that holds repositories', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
+  // A read in flight is not a proven empty grant: an empty label there would
+  // replace the truthful one on every first paint.
+  it('keeps the all-repositories subtitle while the list is still loading', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    gates.set('getRepositories', Promise.withResolvers<undefined>().promise);
+    const root = await mount('personal');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
+  // The same holds for a failed read: a stale or absent list proves nothing.
+  it('keeps the all-repositories subtitle after the list read fails', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.repositorySelectionMode = 'all';
+    failures.add('getRepositories');
+    const root = await mount('personal');
+    await advanceBy(60_000);
+    expect(texts(root)).toContain('Could not load repositories');
+    const row = host(root, 'ConfigureRow').find(node => node.props.title === 'Repositories');
+    expect(row?.props.subtitle).toBe('All repositories');
+  });
+
   // The header is not part of the body's loading state: a ⋯ that appeared only
   // once the queries answered changed the header between the two states.
   it('keeps the header action while the settings load', async () => {

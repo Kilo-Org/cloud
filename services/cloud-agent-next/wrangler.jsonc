@@ -84,8 +84,8 @@
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
     "ENVIRONMENT_SNAPSHOT_ORG_IDS": "*",
-    "SESSION_SNAPSHOT_ORG_IDS": "",
-    "SESSION_SNAPSHOT_USER_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
+    "WORKSPACE_SNAPSHOT_ORG_IDS": "",
+    "WORKSPACE_SNAPSHOT_USER_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
     "PREVIEW_ENABLED_IDS": "*",
     "BYOC_VERCEL_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
@@ -323,11 +323,6 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  "kv_namespaces": [
-    {
-      "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-  ],
 
   /**
    * Queue Bindings
@@ -378,11 +373,6 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "SHARED_SANDBOX_OVERRIDES",
-        },
-      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
@@ -397,7 +387,6 @@
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
-        "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
@@ -407,8 +396,8 @@
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
         "ENVIRONMENT_SNAPSHOT_ORG_IDS": "*",
-        "SESSION_SNAPSHOT_ORG_IDS": "",
-        "SESSION_SNAPSHOT_USER_IDS": "",
+        "WORKSPACE_SNAPSHOT_ORG_IDS": "",
+        "WORKSPACE_SNAPSHOT_USER_IDS": "",
         "PREVIEW_ENABLED_IDS": "*",
         "BYOC_VERCEL_IDS": "",
         "VERCEL_SANDBOX_RUNTIME": "node24",

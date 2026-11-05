@@ -138,6 +138,10 @@ function isSessionNotFoundError(err: unknown): boolean {
   return false;
 }
 
+function isParentLookupUnavailableError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'FORBIDDEN' || isSessionNotFoundError(err);
+}
+
 const privateTranscriptPathFields = new Set([
   'directory',
   'cwd',
@@ -738,6 +742,10 @@ const WorktreeInputSchema = z.object({
   organizationId: z.uuid().nullable(),
 });
 
+function workspaceAnchorSessionId(worktreeId: string): string {
+  return `workspace_${worktreeId.slice('worktree_'.length)}`;
+}
+
 const WorktreeDetailsInputSchema = z.object({
   worktreeIds: z
     .array(cloudAgentWorktreeIdSchema)
@@ -1172,6 +1180,105 @@ export const cliSessionsV2Router = createTRPCRouter({
       );
     }
     return { worktrees };
+  }),
+
+  worktreeParent: baseProcedure.input(WorktreeInputSchema).query(async ({ ctx, input }) => {
+    if (input.organizationId !== null) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
+
+    const anchorSessionId = workspaceAnchorSessionId(input.worktreeId);
+    const organizationCondition =
+      input.organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : eq(cli_sessions_v2.organization_id, input.organizationId);
+    const worktreeJoin = eq(
+      cloud_agent_worktrees.worktree_id,
+      cli_sessions_v2.cloud_agent_worktree_id
+    );
+    const worktreeScope = or(
+      isNull(cloud_agent_worktrees.worktree_id),
+      and(
+        eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+        sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+      )
+    );
+
+    const [anchor] = await db
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, anchorSessionId),
+          eq(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!anchor) return null;
+
+    let parentCloudAgentSessionId: string | undefined;
+    try {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: input.organizationId ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const anchorMetadata =
+        await createCloudAgentNextClient(authToken).getSession(anchorSessionId);
+      parentCloudAgentSessionId = anchorMetadata.parentCloudAgentSessionId;
+    } catch (error) {
+      if (isParentLookupUnavailableError(error)) return null;
+      throw error;
+    }
+
+    if (
+      !parentCloudAgentSessionId ||
+      parentCloudAgentSessionId === anchorSessionId ||
+      !parentCloudAgentSessionId.startsWith('workspace_')
+    ) {
+      return null;
+    }
+
+    const [parent] = await db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        title: cli_sessions_v2.title,
+        organizationId: cli_sessions_v2.organization_id,
+        worktreeName: cloud_agent_worktrees.name,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, parentCloudAgentSessionId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!parent) return null;
+
+    const worktreeName = parent.worktreeName?.trim();
+    return {
+      session_id: parent.sessionId,
+      title: worktreeName ? worktreeName : parent.title,
+      organization_id: parent.organizationId ?? null,
+    };
   }),
 
   renameWorktree: baseProcedure

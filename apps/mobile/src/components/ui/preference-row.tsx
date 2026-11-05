@@ -2,8 +2,10 @@ import { type LucideIcon } from '@/components/ui/icons';
 import { Pressable, useColorScheme, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -68,9 +70,15 @@ export function PreferenceRow({
   const flip = () => {
     onValueChange(!(resolveValue?.() ?? value));
   };
+  // The label column keeps 7 dp from the switch, not 10.5. The longest row
+  // title ("Keep screen on while on session page") lands within a few pixels
+  // of the column width at 360 dp: Android then measures the title against
+  // that boundary, reports a two-line frame while it paints one line, and the
+  // description drops a whole line below the title. The extra 3.5 dp keeps the
+  // title clear of the boundary, so the frame is the line the row paints.
   return (
     <View
-      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 rounded-lg bg-secondary p-3')}
     >
       <Pressable
         className={cn(
@@ -83,9 +91,15 @@ export function PreferenceRow({
         importantForAccessibility="no-hide-descendants"
       >
         {busy ? (
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
+          // The busy spinner takes the icon's place inside the tile, never the
+          // tile's place: a row that loses its 30 dp column while it saves
+          // moves its own title sideways.
+          <IconTile
+            tint={NEUTRAL_TINT}
+            content={<ActivityIndicator size="small" color={colors.mutedForeground} />}
+          />
         ) : (
-          <Icon size={18} color={colors.secondaryForeground} />
+          <IconTile icon={Icon} tint={NEUTRAL_TINT} />
         )}
         <View accessible={false} importantForAccessibility="no" className="min-w-0 flex-1">
           {/* Disabled cue is the muted title, not row opacity — see the same

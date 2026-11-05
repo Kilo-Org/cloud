@@ -153,13 +153,7 @@ type ActiveSession = {
 };
 
 async function startReadySession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createCountingProvider();
   await installSandbox(sandboxId, provider.adapter);
 

@@ -68,20 +68,23 @@ export type TabStackRootInsertion = {
  * The Stack state with the tab's root inserted directly beneath the focused
  * screen, or null when the root is already there.
  *
+ * The inserted root carries an EMPTY key on purpose. Expo Router derives a
+ * nested navigator's state key and every route key under it from the parent
+ * route key's chain (`stateKeys.createRouteKeyMinter`), so a key this module
+ * invented would hand the tab's screens a chain that is not their own and the
+ * navigator would fail on the next render. The reset action mints a key for a
+ * route that has none, from the same sequence as every other key in the state
+ * (`routers/BaseRouter.js`, `RESET`), which is the only key that fits.
+ *
  * The insertion keeps every existing route, and so its key: the screen the
  * reader is on keeps its identity and its state (a half-filled form, a draft)
  * and only falls to the next index. It is a reset that leaves the focused
  * route focused, so the Android native stack never sees a screen removed and
  * another inserted in one commit (`stack-safe-replace.ts`).
  *
- * The inserted key is derived from the screen it is inserted under, so it is
- * unique in this state and a second repair after the app replaced that screen
- * gets a new one. The root takes no params: it is a tab's landing screen.
+ * The root takes no params: it is a tab's landing screen.
  */
-export function tabStackRootRepair({
-  index,
-  routes,
-}: TabStackState): TabStackRootInsertion | null {
+export function tabStackRootRepair({ index, routes }: TabStackState): TabStackRootInsertion | null {
   if (!isTabStackRootMissing({ index, routes })) {
     return null;
   }
@@ -91,7 +94,7 @@ export function tabStackRootRepair({
   }
   const repaired = [...routes];
   repaired.splice(index, 0, {
-    key: `${focused.key}:${TAB_STACK_ROOT_ROUTE_NAME}`,
+    key: '',
     name: TAB_STACK_ROOT_ROUTE_NAME,
     params: {},
   });

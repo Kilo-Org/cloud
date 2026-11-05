@@ -88,10 +88,12 @@ describe('useRepairTabStackRoot', () => {
     mount(harness);
 
     expect(harness.resets).toHaveLength(1);
+    // The inserted root is keyless: the reset action mints its key from the
+    // state's own sequence, which is the chain the tab's screens derive from.
     expect(harness.state()).toEqual({
       index: 1,
       routes: [
-        { key: 'preferences:index', name: 'index', params: {} },
+        { key: '', name: 'index', params: {} },
         { name: 'preferences', key: 'preferences' },
       ],
     });
@@ -147,7 +149,7 @@ describe('useRepairTabStackRoot', () => {
     expect(harness.state()).toEqual({
       index: 1,
       routes: [
-        { key: 'history:index', name: 'index', params: {} },
+        { key: '', name: 'index', params: {} },
         { name: 'history', key: 'history' },
       ],
     });

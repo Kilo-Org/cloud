@@ -52,10 +52,14 @@ describe('tabStackRootRepair', () => {
     expect(repaired?.routes[1]?.key).toBe('p');
   });
 
-  it('gives the inserted root a key derived from the screen it is inserted under', () => {
+  it('leaves the inserted root keyless so the reset mints its key', () => {
+    // Expo Router derives a nested navigator's state keys from the parent
+    // route key's chain, so an invented one breaks the tab's screens. The
+    // reset mints a key for a route whose key is empty.
     const repaired = tabStackRootRepair({ routes: [route('p', 'preferences')], index: 0 });
 
-    expect(repaired?.routes[0]?.key).toBe(`p:${TAB_STACK_ROOT_ROUTE_NAME}`);
+    expect(repaired?.routes[0]?.key).toBe('');
+    expect(repaired?.routes[0]?.name).toBe(TAB_STACK_ROOT_ROUTE_NAME);
     expect(repaired?.routes[0]?.params).toEqual({});
   });
 

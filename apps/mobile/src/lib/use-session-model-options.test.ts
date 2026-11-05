@@ -438,7 +438,10 @@ describe('buildSessionModelOptions', () => {
     expect(result.pickerDisabled).toBe(true);
     expect(result.options).toEqual([
       expect.objectContaining({
-        name: 'muse-spark-1.3-contributor',
+        // The identity stays the cache's model id; only its copy is readable
+        // when no catalogue names it.
+        displayId: 'muse-spark-1.3-contributor',
+        name: 'muse spark 1.3 contributor',
         unavailable: true,
       }),
     ]);

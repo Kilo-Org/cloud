@@ -1882,15 +1882,20 @@ export function SessionDetailContent({
           messageCount: messages.length,
         })
       : null;
-  // A read-only transcript ends in the continue section, which states the
-  // read-only fact once and replaces the composer and its send reason.
-  const isReadOnlyTranscript = isReadOnly && messages.length > 0;
+  // A read-only session ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason. The fact
+  // is the kind the session resolved to, not how many rows its transcript
+  // holds: a stored session with no messages has nowhere to write either, so it
+  // must not mount a composer under the read-only line. `activeSessionType` is
+  // set only by a successful resolve, so a failed open (which may also read
+  // `isReadOnly`) keeps its composer beside the error's Retry.
+  const isReadOnlySession = activeSessionType === 'read-only';
   const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
-    hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlySession,
     messageCount: messages.length,
   });
 
@@ -1995,9 +2000,9 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // The composer stays mounted for every writable session. A read-only
-  // transcript replaces it with the continue section, which names the
-  // destination it opens.
+  // The composer stays mounted for every writable session. A read-only session
+  // replaces it with the continue section, which names the destination it
+  // opens — whether or not its transcript holds a row.
   // The bottom BlurBar reserves the composer's space and shares its visibility
   // condition, so a blocking card or the continue section never leaves the bar
   // claiming space the composer does not fill. The strip is a pure full-bleed
@@ -2010,9 +2015,9 @@ export function SessionDetailContent({
   // session may not have. Reserve the area in the shape this session's kind
   // ends in instead, so one state ends where the other begins: a read-only
   // session keeps the read-only footer's area, and every other session keeps
-  // the composer's. `isReadOnly` is the kind the session resolved to, so a
-  // writable session no longer jumps from the footer's block to its composer,
-  // and a read-only one no longer jumps the other way. Both reserves are
+  // the composer's. `isReadOnly` is the settled read-only fact, so a writable
+  // session no longer jumps from the footer's block to its composer, and a
+  // read-only one no longer jumps the other way. Both reserves are
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
@@ -2022,8 +2027,9 @@ export function SessionDetailContent({
     activeQuestion === null &&
     activePermission === null;
   const isComposerVisible =
-    !hasBlockingInteraction && !isReadOnlyTranscript && !isSessionStatePending;
-  const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
+    !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
+  const isReadOnlyContinueVisible =
+    isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
   const isReadOnlyFooterPlaceholderVisible =
     isSessionStatePending && !hasBlockingInteraction && isReadOnly;
   const isComposerSkeletonVisible = isSessionStatePending && !hasBlockingInteraction && !isReadOnly;
@@ -2686,7 +2692,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isReadOnlyTranscript || isSessionStatePending ? null : (
+        {isReadOnlySession || isSessionStatePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}

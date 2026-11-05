@@ -2043,6 +2043,9 @@ describe('session detail slow load', () => {
   // row. A lost transport now owns the body, so the skeleton is gone and the
   // failure is stated once, with the Retry that resolves it.
   it('replaces the skeleton with one retryable error when the agent transport is lost', async () => {
+    // A writable session: the composer this case inspects is a writable
+    // session's control.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails(null);
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
 
@@ -2081,6 +2084,7 @@ describe('session detail slow load', () => {
   it('resolves a lost transport whose indicator carries no error type', async () => {
     // The SDK's own code names the failure; the indicator's type must not decide
     // whether the skeleton keeps painting beside the connection-lost line.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails(null);
     act(() => {
       view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
@@ -2443,6 +2447,8 @@ describe('session detail connection latch', () => {
 
 describe('session detail bottom strip', () => {
   it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
+    // The strip backs the composer's area, so this is a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
     const { renderer } = await mountDetails([]);
     const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
     expect(strips).toHaveLength(1);
@@ -3219,6 +3225,8 @@ describe('session detail exit retry row', () => {
       await Promise.resolve();
     });
 
+    // Exit lives on the composer, so this case needs a writable session.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     const onExitSession = composer.props.onExitSession as (
@@ -3650,6 +3658,7 @@ describe('session detail composer cannot-send reason', () => {
     // The open fails, the transcript is empty and the manager cannot send. The
     // body states the failure once with the Retry that resolves it, so the
     // reason beside send does not name the same failure a second time.
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -3701,6 +3710,7 @@ describe('session detail composer cannot-send reason', () => {
   });
 
   it('passes no reason while the session can send', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
@@ -4276,6 +4286,7 @@ describe('SessionDetailContent fixed indicator row', () => {
   );
 
   it('renders no footer item while the error card owns the empty transcript', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
@@ -4304,14 +4315,23 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 
   it('states the cannot-send reason in the row with the row item typography', async () => {
-    // An empty read-only transcript keeps the composer, so its reason is the
-    // row's item.
+    // A writable session names the phase it is in beside the composer it keeps.
+    // (A read-only session has no composer to carry it: its continue section
+    // states the read-only fact instead.)
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'progress', message: 'Committing changes', code: 'committing', timestamp: 0 }
+      );
+    });
     const items = footerRowItems(view);
     expect(items).toHaveLength(1);
     const reason = items[0];
     expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
-    expect(reason?.props.message).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.committing'));
     expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
     const className = String(reason?.props.className ?? '');
     // The row's own typography, not the composer's narrower one: a shorter item
@@ -4376,6 +4396,29 @@ describe('session detail read-only composer', () => {
     );
   });
 
+  it('replaces the composer on an empty read-only transcript too', async () => {
+    // A stored session with no rows has nowhere to write either. The read-only
+    // fact is the resolved kind, so the composer must not mount beside it and
+    // the continue affordance must still be offered.
+    const view = await mountDetails([]);
+    await view.respond(ROOT_ID, []);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+  });
+
   it('opens the new-session composer once on a repeated continue press', async () => {
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const continueControl = view.renderer.root.find(
@@ -4413,6 +4456,7 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
   // can pass is catalog copy, so the proof is that the mounted composer always
   // receives a non-empty catalog string — never 'undefined' and never a raw key.
   it('passes catalog copy to the composer, never the literal undefined', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     expect(composer.props.placeholder).toBe(i18n.t('common.message'));
@@ -4435,6 +4479,7 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
 
 describe('session detail composer mode chip', () => {
   it('hands the composer a mode control, because a session has modes', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     expect(composer.props.modeControl).toMatchObject({

@@ -171,5 +171,13 @@ if [ ${#pnpm_filters[@]} -eq 0 ]; then
   exit 0
 fi
 
+# The wrapper workspace compiles ../src/shared (wrapper/tsconfig.json includes
+# it), and a package filter follows package.json dependencies only. CI's
+# affected run selects the wrapper through that include; select it here too, so
+# a shared-source change still typechecks the wrapper.
+if [[ " ${pnpm_filters[*]} " == *" cloud-agent-next... "* ]]; then
+  pnpm_filters+=(--filter '@kilocode/cloud-agent-wrapper')
+fi
+
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"
 pnpm -r "${pnpm_filters[@]}" "${workspace_typecheck_filters[@]}" run typecheck

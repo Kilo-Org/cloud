@@ -315,6 +315,11 @@ function runTypecheck(
   mkdirSync(bin, { recursive: true });
   mkdirSync(join(dir, 'apps/extension'), { recursive: true });
   writeFileSync(join(dir, 'apps/extension/package.json'), JSON.stringify(extension));
+  mkdirSync(join(dir, 'services/cloud-agent-next'), { recursive: true });
+  writeFileSync(
+    join(dir, 'services/cloud-agent-next/package.json'),
+    JSON.stringify({ name: 'cloud-agent-next', private: true })
+  );
   const cli = `#!/usr/bin/env node
 const { appendFileSync } = require('node:fs');
 const { basename } = require('node:path');
@@ -326,6 +331,7 @@ if (name === 'git') {
   if (args[0] === 'merge-base') console.log('base');
   else if (args.includes('packages/trpc/src/**') && changes.includes('trpc')) console.log('packages/trpc/src/index.ts');
   else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
+  else if (args.includes('*.ts') && changes.includes('cloud-agent-next')) console.log('services/cloud-agent-next/src/shared/protocol.ts');
   else if (args.includes('*.ts')) console.log('apps/extension/package.json');
 } else if (name === 'pnpm' && args[0] === '-r') {
   appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
@@ -417,6 +423,20 @@ test('a failed root tRPC build stops the typecheck', t => {
   const result = runTypecheck(t, { root: true, buildExit: 7 });
   assert.equal(result.status, 7);
   assert.deepEqual(result.commands, ['pnpm --filter @kilocode/trpc run build']);
+});
+
+// The wrapper compiles the service's own shared sources (its tsconfig includes
+// ../src/shared), which a package filter does not follow. A changes-only run
+// selects the wrapper through its own filter, once.
+test('a changes-only run selects the wrapper when the service changes', t => {
+  const result = runTypecheck(t, { root: true, changes: 'cloud-agent-next' });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command.startsWith('pnpm -r')),
+    [
+      `pnpm -r --filter cloud-agent-next... --filter @kilocode/cloud-agent-wrapper ${workspaceFilters} run typecheck`,
+    ]
+  );
 });
 
 // `pnpm-workspace.yaml` lists workspaces that sit inside another workspace

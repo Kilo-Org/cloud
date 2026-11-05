@@ -220,7 +220,9 @@ export function NewSessionPrompt({
   });
   const keyboardProgress = useKeyboardMotionProgress();
   const promptHeightStyle = useAnimatedStyle(() => ({
-    height: closedPromptHeight + (promptHeight - closedPromptHeight) * keyboardProgress.value,
+    height:
+      closedPromptHeight +
+      (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, keyboardProgress.value)),
   }));
 
   // The draft's own laid-out height, reported by the input on every content

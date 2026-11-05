@@ -621,9 +621,11 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   it('interpolates from the compact closed preference to the typing preference', async () => {
     const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
     for (const { progress, height } of [
+      { progress: -0.1, height: 40 },
       { progress: 0, height: 40 },
       { progress: 0.5, height: 64 },
       { progress: 1, height: 88 },
+      { progress: 1.1, height: 88 },
     ]) {
       keyboardMotion.value = progress;
       const element = renderPrompt({
@@ -635,5 +637,18 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
       expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height })]));
     }
+  });
+
+  it('keeps at least one full line when native keyboard progress exceeds its destination', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    keyboardMotion.value = 1.1;
+    const element = renderPrompt({
+      ...defaultProps(),
+      lineCount: 1,
+      keyboardClosedLineCount: 3,
+    }) as Node;
+    const input = findElementByType(element, 'TextInput');
+
+    expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height: 40 })]));
   });
 });

@@ -26,8 +26,6 @@ describe('reserved environment keys', () => {
       'CONTROL_LOG_UPLOAD_URL',
       'CONTROL_LOG_UPLOAD_GRANT',
       'CONTROL_WRAPPER_INSTANCE_ID',
-      'CLOUD_AGENT_SENTRY_DSN',
-      'CLOUD_AGENT_SENTRY_ENVIRONMENT',
       'XDG_DATA_HOME',
       'KILOCODE_TOKEN',
       'KILO_PLATFORM',

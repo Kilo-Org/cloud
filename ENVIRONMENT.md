@@ -517,9 +517,8 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 ### Cloud Agent Services
 
 Cloud Agent Sentry coverage is explicit, not blanket Durable Object instrumentation.
-It captures unexpected Worker HTTP/tRPC, queue and scheduled exceptions,
-control-plane wrapper startup/crash failures, and exceptions from the instrumented
-exports in
+It captures unexpected Worker HTTP/tRPC, queue and scheduled exceptions and exceptions
+from the instrumented exports in
 `services/cloud-agent-next/src/index.ts`: `SandboxSession`, `SandboxControl`,
 `SandboxContainers`, `StreamTicketNonceDO`, and `UserKiloFacade`.
 
@@ -528,16 +527,16 @@ status, failure records and structured logs remain the investigation path;
 unexpected standalone RPC/alarm exceptions in those classes are not guaranteed to
 reach Sentry. Raw `SandboxContainment` and `SandboxSmallContainment` exports are also excluded: they
 retain the SDK container lifecycle, billing hooks and outbound-handler registration
-without Sentry wrapping. The control-plane wrapper's own crash reporting is
-independent of these exports.
+without Sentry wrapping. The control-plane wrapper is not instrumented; its
+structured and file logs remain the investigation path.
 Abrupt OOM/SIGKILL failures and synthetic session failure events are not captured.
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
 - `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
 - `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
 - `WRAPPER_LOG_PATH` - File path for the Cloud Agent Next wrapper's log output. [SERVER]
-- `CLOUD_AGENT_SENTRY_DSN` - Optional Worker-owned Sentry DSN for the `kilo-code/kilo-cloud-agent` project, used for Cloud Agent exceptions and wrapper crashes. Forwarded only at wrapper launch, never taken from agent profiles. Missing or invalid disables reporting. [SERVER]
-- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Sentry environment label; defaults to `production`. Use a separate label for nonproduction deployments. [SERVER]
+- `CLOUD_AGENT_SENTRY_DSN` - Optional Worker-owned Sentry DSN for the `kilo-code/kilo-cloud-agent` project, used for Cloud Agent Worker exceptions. Used only by the Worker and not forwarded to sandboxes. Missing or invalid disables reporting. [SERVER]
+- `CLOUD_AGENT_SENTRY_ENVIRONMENT` - Cloud Agent Worker Sentry environment label; defaults to `production`. Use a separate label for nonproduction deployments. [SERVER]
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]

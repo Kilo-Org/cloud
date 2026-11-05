@@ -49,7 +49,7 @@ PREVIEW_ENABLED_IDS=*
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
-# Optional Cloud Agent error reporting; application SENTRY_* settings are separate.
+# Optional Cloud Agent Worker error reporting; application SENTRY_* settings are separate.
 CLOUD_AGENT_SENTRY_DSN=
 CLOUD_AGENT_SENTRY_ENVIRONMENT=development
 

@@ -18,8 +18,6 @@ function childEnv(url: string): Record<string, string> {
   }
   return {
     ...environment,
-    CLOUD_AGENT_SENTRY_DSN: '',
-    CLOUD_AGENT_SENTRY_ENVIRONMENT: '',
     CONTROL_LOG_UPLOAD_URL: '',
     CONTROL_LOG_UPLOAD_GRANT: '',
     CONTROL_PLANE_NATIVE_LOGS: '1',

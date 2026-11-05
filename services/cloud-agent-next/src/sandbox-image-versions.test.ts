@@ -3,14 +3,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { runtimeDistributionSourceFiles } from '../scripts/runtime-manifest.js';
 import { DEFAULT_SLASH_COMMANDS_SOURCE } from './shared/default-slash-commands.generated.js';
 import { KILO_CLI_VERSION } from './shared/kilo-cli-version.js';
 import {
-  CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
-  RUNTIME_INSTALL_DIR,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
 } from './shared/runtime-distribution.js';
@@ -79,40 +76,13 @@ describe('runtime distribution packaging', () => {
     expect(wrapperPackageJson.devDependencies['@types/bun']).toBe(RUNTIME_DISTRIBUTION.bun);
   });
 
-  it('copies the prebuilt shared runtime inventory without rebuilding wrappers in any image', () => {
-    const inventory = runtimeDistributionSourceFiles('/package');
-    expect(inventory.map(artifact => artifact.installName)).toEqual([
-      ...WRAPPER_BUNDLES.map(bundle => bundle.installName),
-      CONTROL_PLANE_SUPERVISOR.installName,
-      GIT_CREDENTIAL_HELPER.installName,
-    ]);
-    for (const bundle of WRAPPER_BUNDLES) {
-      expect(inventory).toContainEqual({
-        installName: bundle.installName,
-        installPath: runtimeInstallPath(bundle.installName),
-        executable: bundle.executable,
-        localPath: `/package/wrapper/dist/${bundle.distName}`,
-      });
-    }
-    expect(inventory).toContainEqual({
-      installName: CONTROL_PLANE_SUPERVISOR.installName,
-      installPath: runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName),
-      executable: true,
-      localPath: `/package/wrapper/${CONTROL_PLANE_SUPERVISOR.wrapperPath}`,
-    });
-    const builder = readServiceFile('../wrapper/build.ts');
-    expect(builder).toContain("const runtimeDir = resolve('dist/runtime')");
-    expect(builder).toContain(
-      'copyFile(resolve(artifactDir, bundle.installName), resolve(runtimeDir, bundle.installName))'
-    );
-    expect(builder).toContain('resolve(runtimeDir, CONTROL_PLANE_SUPERVISOR.installName)');
+  it('builds wrapper bundles from the shared entrypoint list instead of duplicate commands', () => {
     const dockerfile = readServiceFile(containersDockerfile);
-    expect(dockerfile.match(/^COPY wrapper\S* .*$/gm)).toEqual([
-      `COPY wrapper/dist/runtime/ ${RUNTIME_INSTALL_DIR}/`,
-    ]);
-    expect(dockerfile).not.toMatch(/\bbun (?:build|install|run build\.ts)\b/);
-    expect(dockerfile).not.toContain('COPY src/shared');
-    expect(dockerfile).not.toContain('SENTRY_AUTH_TOKEN');
+    expect(dockerfile).toContain('bun run build.ts --install-dir');
+    expect(dockerfile).not.toContain('bun build');
+    for (const bundle of WRAPPER_BUNDLES) {
+      expect(dockerfile).not.toContain(`outfile=/usr/local/bin/${bundle.installName}`);
+    }
   });
 
   it('keeps Docker bootstrap ARG pins aligned with the contract', () => {

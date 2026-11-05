@@ -1,4 +1,4 @@
-import { chmod, copyFile, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, rm, symlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import {
@@ -6,12 +6,6 @@ import {
   RUNTIME_DISTRIBUTION,
   WRAPPER_BUNDLES,
 } from '../src/shared/runtime-distribution.js';
-import {
-  prepareBunSentryArtifact,
-  readSentryArtifact,
-  runSentryCli,
-  sha256,
-} from '../scripts/sentry-source-maps.js';
 
 function argValue(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
@@ -27,31 +21,15 @@ if (Bun.version !== RUNTIME_DISTRIBUTION.bun) {
   throw new Error(`Wrapper build requires Bun ${RUNTIME_DISTRIBUTION.bun}, got ${Bun.version}`);
 }
 
-async function buildBundle(entry: string, outdir: string, naming: string): Promise<string> {
+async function buildBundle(entry: string, outdir: string, naming: string): Promise<void> {
   const result = await Bun.build({
     entrypoints: [`./${entry}`],
     outdir,
     naming,
     target: 'bun',
     minify: true,
-    sourcemap: 'external',
   });
   if (!result.success) throw new Error(`bun build failed for ${entry}`);
-  const bundle = result.outputs.find(output => output.kind === 'entry-point');
-  if (!bundle) throw new Error(`bun build produced no bundle for ${entry}`);
-  const release = `cloud-agent-wrapper@${sha256(await bundle.text())}`;
-  const instrumented = await Bun.build({
-    entrypoints: [`./${entry}`],
-    outdir,
-    naming,
-    target: 'bun',
-    minify: true,
-    sourcemap: 'external',
-    banner: `globalThis.SENTRY_RELEASE = { id: ${JSON.stringify(release)} };`,
-  });
-  if (!instrumented.success) throw new Error(`bun build failed for ${entry}`);
-  await prepareBunSentryArtifact(outdir, naming);
-  return release;
 }
 
 async function linkInstalled(installed: readonly string[]): Promise<void> {
@@ -65,46 +43,11 @@ async function linkInstalled(installed: readonly string[]): Promise<void> {
   }
 }
 
-const artifactDir = resolve('dist/sentry');
-const runtimeDir = resolve('dist/runtime');
-await rm(artifactDir, { force: true, recursive: true });
-await rm(runtimeDir, { force: true, recursive: true });
-await mkdir(artifactDir, { recursive: true });
-await mkdir(runtimeDir, { recursive: true });
-const releases = new Map<string, string>();
-for (const bundle of WRAPPER_BUNDLES) {
-  releases.set(
-    bundle.installName,
-    await buildBundle(bundle.entry, artifactDir, bundle.installName)
-  );
-}
-runSentryCli(['sourcemaps', 'inject', artifactDir]);
-const artifacts = await Promise.all(
-  WRAPPER_BUNDLES.filter(bundle => bundle.installName.endsWith('.js')).map(bundle => {
-    const release = releases.get(bundle.installName);
-    if (!release) throw new Error(`Missing release for ${bundle.installName}`);
-    return readSentryArtifact(artifactDir, bundle.installName, release);
-  })
-);
-await writeFile(resolve(artifactDir, 'sentry-artifacts.json'), JSON.stringify(artifacts, null, 2));
-for (const bundle of WRAPPER_BUNDLES) {
-  await copyFile(resolve(artifactDir, bundle.installName), resolve(runtimeDir, bundle.installName));
-  if (bundle.executable) await chmod(resolve(runtimeDir, bundle.installName), 0o755);
-}
-await copyFile(
-  CONTROL_PLANE_SUPERVISOR.wrapperPath,
-  resolve(runtimeDir, CONTROL_PLANE_SUPERVISOR.installName)
-);
-await chmod(resolve(runtimeDir, CONTROL_PLANE_SUPERVISOR.installName), 0o755);
-
 if (installDir) {
   await mkdir(installDir, { recursive: true });
   const installed: string[] = [];
   for (const bundle of WRAPPER_BUNDLES) {
-    await copyFile(
-      resolve(runtimeDir, bundle.installName),
-      resolve(installDir, bundle.installName)
-    );
+    await buildBundle(bundle.entry, installDir, bundle.installName);
     if (bundle.executable) await chmod(`${installDir}/${bundle.installName}`, 0o755);
     installed.push(bundle.installName);
   }
@@ -122,17 +65,7 @@ if (installDir) {
   if (linkDir) throw new Error('--link-dir requires --install-dir');
   await rm('./dist/kilo-bitbucket-review', { force: true });
   for (const bundle of WRAPPER_BUNDLES) {
-    await copyFile(resolve(runtimeDir, bundle.installName), resolve('dist', bundle.distName));
-    await copyFile(
-      resolve(artifactDir, `${bundle.installName}.map`),
-      resolve('dist', `${bundle.distName}.map`)
-    );
-    if (bundle.installName !== bundle.distName) {
-      await copyFile(
-        resolve(artifactDir, `${bundle.installName}.map`),
-        resolve('dist', `${bundle.installName}.map`)
-      );
-    }
+    await buildBundle(bundle.entry, './dist', bundle.distName);
     if (bundle.executable) await chmod(`./dist/${bundle.distName}`, 0o755);
   }
   console.log(

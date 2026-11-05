@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -12,10 +12,6 @@ export const sentryArtifactSchema = z.object({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   mapSha256: z.string().regex(/^[a-f0-9]{64}$/),
   debugId: z.uuid(),
-  release: z
-    .string()
-    .regex(/^cloud-agent-wrapper@[a-f0-9]{64}$/)
-    .optional(),
 });
 
 export type SentryArtifact = z.infer<typeof sentryArtifactSchema>;
@@ -28,23 +24,9 @@ export function runSentryCli(args: string[]): void {
   execFileSync(require.resolve('@sentry/cli/bin/sentry-cli'), args, { stdio: 'inherit' });
 }
 
-export async function prepareBunSentryArtifact(directory: string, file: string): Promise<void> {
-  const codePath = join(directory, file);
-  const mapPath = `${codePath}.map`;
-  const [code, rawMap] = await Promise.all([readFile(codePath, 'utf8'), readFile(mapPath, 'utf8')]);
-  const map = z.looseObject({ debugId: z.string().optional() }).parse(JSON.parse(rawMap));
-  // CLI skips Bun's native marker, which does not register an ID with the SDK.
-  delete map.debugId;
-  await Promise.all([
-    writeFile(codePath, code.replace(/^\/\/# debugId=.*\n?/gm, '')),
-    writeFile(mapPath, JSON.stringify(map)),
-  ]);
-}
-
 export async function readSentryArtifact(
   directory: string,
-  file: string,
-  release?: string
+  file: string
 ): Promise<SentryArtifact> {
   const [code, mapBytes] = await Promise.all([
     readFile(join(directory, file), 'utf8'),
@@ -59,7 +41,6 @@ export async function readSentryArtifact(
   }
   return {
     file,
-    release,
     debugId,
     sha256: sha256(code),
     mapSha256: sha256(mapBytes),
@@ -75,7 +56,7 @@ export async function validateSentryArtifacts(
     .min(1)
     .parse(JSON.parse(await readFile(join(directory, 'sentry-artifacts.json'), 'utf8')));
   for (const artifact of artifacts) {
-    const actual = await readSentryArtifact(directory, artifact.file, artifact.release);
+    const actual = await readSentryArtifact(directory, artifact.file);
     if (
       actual.sha256 !== artifact.sha256 ||
       actual.mapSha256 !== artifact.mapSha256 ||

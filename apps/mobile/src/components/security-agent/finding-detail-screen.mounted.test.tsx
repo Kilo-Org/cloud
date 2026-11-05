@@ -18,6 +18,7 @@ import { FindingAnalysisPanel } from './finding-analysis-panel';
 import { FindingRemediationPanel } from './finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type SecurityFinding } from '@/lib/security-agent';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { FindingDetailScreen } from './finding-detail-screen';
 
 const dismissDraft = vi.hoisted(() => ({
@@ -180,6 +181,23 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   vi.unstubAllGlobals();
+});
+
+describe('FindingDetailScreen tab touch target', () => {
+  // Regression: each tab was a `min-h-11` node, 38.5 dp in this app's rem, so
+  // the strip's upper and lower bands were not part of the tab. The floor has
+  // to be the tab node's own class; `hitSlop` would not move the rect a
+  // control-size audit measures.
+  it('carries the shared row floor on every tab node', () => {
+    const tree = renderScreen();
+    const tabs = findingTabs(tree);
+
+    expect(tabs).toHaveLength(3);
+    for (const tab of tabs) {
+      expect(String(tab.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(tab.props.hitSlop).toBeUndefined();
+    }
+  });
 });
 
 describe('FindingDetailScreen pane containers', () => {

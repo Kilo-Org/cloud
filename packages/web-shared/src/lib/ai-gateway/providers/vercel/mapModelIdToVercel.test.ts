@@ -6,10 +6,7 @@ import {
   mapResolvedModelIdToVercelWithoutOverrides,
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
 const overrides = [
   { openrouter_model_id: 'meta/muse-wonder', vercel_model_id: 'meta/muse-wonder-1.0' },
@@ -115,16 +112,9 @@ describe('mapModelIdToVercel', () => {
     });
   });
 
-  describe('kilo-exclusive models', () => {
-    useKiloExclusiveModel();
-
-    it('maps an exclusive to its internal id', async () => {
-      await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
-        'google/gemma-4-26b-a4b-it'
-      );
-      await expect(mapModelIdToVercel(kiloExclusiveModelFixture.public_id)).resolves.toBe(
-        kiloExclusiveModelFixture.internal_id
-      );
-    });
+  it('maps the auto small free model to the paid model', async () => {
+    await expect(mapModelIdToVercel(AUTO_SMALL_TARGET_MODELS.free)).resolves.toBe(
+      AUTO_SMALL_TARGET_MODELS.paid
+    );
   });
 });

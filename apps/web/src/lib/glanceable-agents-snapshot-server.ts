@@ -17,7 +17,7 @@ import {
   user_activity_tokens,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications/schemas';
 import {
   sessionLiveSummarySchema,
   type SessionLiveSummary,

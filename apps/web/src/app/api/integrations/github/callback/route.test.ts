@@ -1593,6 +1593,24 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     );
   });
 
+  test('redirects with installation_unavailable when the installation itself refuses completion', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+      ok: false,
+      reason: 'installation_unavailable',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, `/integrations/github?error=installation_unavailable`);
+  });
+
   test('rejects an install when admin check returns false', async () => {
     mockedAssertUserAdministersInstallation.mockResolvedValue(false);
 

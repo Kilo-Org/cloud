@@ -23,6 +23,10 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createSignedToken } from '@/lib/signed-token';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 
 const mockIsEnabledForBot = jest.fn();
 const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
@@ -69,6 +73,9 @@ jest.mock('@/lib/bot/platforms', () => ({
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
+}));
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -472,6 +479,133 @@ describe('GET /api/integrations/linear/callback', () => {
 describe('verifyOAuthState (self-check, to keep tests honest)', () => {
   test('rejects a tampered signature', () => {
     expect(verifyOAuthState('payload.badsig')).toBeNull();
+  });
+});
+
+const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedCaptureException = jest.mocked(captureException);
+
+const memberDeniedError = new TRPCError({
+  code: 'UNAUTHORIZED',
+  message: 'You do not have the required organizational role to access this feature',
+});
+
+function createOrgProviderState() {
+  return createOAuthState(`org_${ORGANIZATION_ID}`, USER_ID, undefined, {
+    provider: 'linear',
+    purpose: 'provider_install',
+  });
+}
+
+describe('GET /api/integrations/linear/callback organization authority', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    mockCancelProviderOAuthAttempt.mockResolvedValue(true);
+    mockedVerifyLinearBotLinkState.mockReturnValue(null);
+    mockedEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: USER_ID },
+      authFailedResponse: null,
+    } as never);
+    mockedExchangeLinearOAuthCode.mockResolvedValue({
+      accessToken: 'lin_app_tok',
+      refreshToken: null,
+      expiresIn: null,
+      scope: null,
+    });
+    mockedFetchLinearOAuthIdentity.mockResolvedValue({
+      viewerId: 'linear-bot-user',
+      viewerName: 'Kilo',
+      organizationId: ORGANIZATION_ID,
+      organizationName: 'Acme Workspace',
+    });
+    mockedGetConflictingLinearInstallation.mockResolvedValue(null);
+    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+    mockedBotGetAdapter.mockReturnValue({
+      getInstallation: jest.fn(async () => null),
+      setInstallation: jest.fn(async () => undefined),
+      deleteInstallation: jest.fn(async () => undefined),
+    } as never);
+  });
+
+  test('requires the organization integration role to complete an organization install', async () => {
+    mockedEnsureOrganizationAccess.mockRejectedValue(memberDeniedError);
+    const state = createOrgProviderState();
+
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORGANIZATION_ID}/integrations/linear?error=permission_required`
+    );
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
+      { user: expect.objectContaining({ id: USER_ID }) },
+      ORGANIZATION_ID,
+      ORGANIZATION_BILLING_ROLES
+    );
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockedExchangeLinearOAuthCode).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
+  test('reports a lost organization membership with its own error code', async () => {
+    mockedEnsureOrganizationAccess.mockRejectedValue(
+      new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      })
+    );
+    const state = createOrgProviderState();
+
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORGANIZATION_ID}/integrations/linear?error=organization_access_required`
+    );
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+  });
+
+  test.each(['billing_manager', 'admin', 'owner'] as const)(
+    'completes an organization install for a %s',
+    async role => {
+      mockedEnsureOrganizationAccess.mockResolvedValue(role);
+      const state = createOrgProviderState();
+
+      const response = await callLinearCallback(
+        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+      );
+
+      expectRedirectLocation(
+        response,
+        `/organizations/${ORGANIZATION_ID}/integrations/linear?success=installed`
+      );
+      expect(mockConsumeProviderOAuthAttempt).toHaveBeenCalledTimes(1);
+      expect(mockedExchangeLinearOAuthCode).toHaveBeenCalledWith('abc');
+      expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: { type: 'org', id: ORGANIZATION_ID } }),
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
+
+  test('does not require organization authority for a personal install', async () => {
+    const state = createProviderState();
+
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+
+    expectRedirectLocation(response, '/integrations/linear?success=installed');
+    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockConsumeProviderOAuthAttempt).toHaveBeenCalledTimes(1);
   });
 });
 

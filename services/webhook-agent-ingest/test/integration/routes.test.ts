@@ -483,5 +483,44 @@ describe('Hono Routes', () => {
       expect(await response.json()).toMatchObject({ success: true });
       expect(Date.now() - started).toBeLessThan(5_000);
     });
+
+    it('captures a body for a stored over-budget pattern', async () => {
+      const userId = 'body-schema-user';
+      const triggerId = 'stored-over-budget-pattern';
+      const namespace = `user/${userId}`;
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+      await stub.configure(namespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+        bodySchema: { type: 'object', properties: { event: { type: 'string' } } },
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .update(triggerConfig)
+          .set({
+            body_schema: {
+              type: 'object',
+              properties: { event: { type: 'string', pattern: '^' + 'a+'.repeat(20) + 'b$' } },
+              required: ['event'],
+              additionalProperties: false,
+            },
+          })
+          .where(eq(triggerConfig.trigger_id, triggerId))
+          .run();
+      });
+
+      const started = Date.now();
+      const response = await SELF.fetch(`http://localhost/inbound/user/${userId}/${triggerId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'aab' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true });
+      expect(Date.now() - started).toBeLessThan(5_000);
+    });
   });
 });

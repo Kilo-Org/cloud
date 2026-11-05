@@ -82,6 +82,15 @@ export async function withOwnerCopyTurn<T>(
   }
 }
 
+/**
+ * Drop the in-process copy turns. An aborted copy keeps its turn until its
+ * work settles, so a test that abandons a copy must not leave every later copy
+ * for the same account queued behind it.
+ */
+export function resetOwnerCopyTurnsForTests(): void {
+  ownerCopyTurns.clear();
+}
+
 export type PublishSharedSessionCopyParams = {
   kiloUserId: string;
   sessionId: string;

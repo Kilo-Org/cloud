@@ -21,6 +21,12 @@ const PROOF_URL = 'https://slack.com/openid/connect/authorize?state=signed-proof
 
 const mockedBeginLinkAccountProof = jest.fn((_params: unknown) => PROOF_URL);
 
+const widePlatformStub = {
+  usesGenericLinkAccountRoute: true,
+  beginLinkAccountProof: mockedBeginLinkAccountProof,
+  withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+} as never;
+
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
@@ -102,12 +108,15 @@ function verifiedToken(identity: PlatformIdentity = slackIdentity) {
 function postRequest({
   token = 'signed',
   origin = APP_ORIGIN,
+  secFetchSite,
 }: {
   token?: string | null;
   origin?: string | null;
+  secFetchSite?: string;
 } = {}) {
   const headers = new Headers();
   if (origin !== null) headers.set('origin', origin);
+  if (secFetchSite !== undefined) headers.set('sec-fetch-site', secFetchSite);
 
   const body = new URLSearchParams();
   if (token !== null) body.set('token', token);
@@ -118,11 +127,7 @@ function postRequest({
 beforeEach(() => {
   jest.clearAllMocks();
 
-  mockedBotPlatforms.require.mockReturnValue({
-    usesGenericLinkAccountRoute: true,
-    beginLinkAccountProof: mockedBeginLinkAccountProof,
-    withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
-  } as never);
+  mockedBotPlatforms.require.mockReturnValue(widePlatformStub);
 
   mockedVerifySlackBotLinkState.mockReturnValue({
     userId: 'kilo-user-id',
@@ -237,6 +242,49 @@ describe('POST /api/chat/link-account', () => {
     expect(noOrigin.status).toBe(403);
     expect(mockedVerifyLinkToken).not.toHaveBeenCalled();
     expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
+  });
+
+  test('accepts the Origin: null a no-referrer confirmation page produces', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const response = await POST(
+      postRequest({ origin: 'null', secFetchSite: 'same-origin' }) as never
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(PROOF_URL);
+    expect(mockedBeginLinkAccountProof).toHaveBeenCalledTimes(1);
+  });
+
+  test('trusts Sec-Fetch-Site over a matching Origin', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const responses = await Promise.all(
+      ['same-site', 'cross-site', 'none'].map(secFetchSite =>
+        POST(postRequest({ origin: APP_ORIGIN, secFetchSite }) as never)
+      )
+    );
+
+    for (const response of responses) expect(response.status).toBe(403);
+    expect(mockedVerifyLinkToken).not.toHaveBeenCalled();
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
+  });
+
+  test('falls back to Origin when the browser sends no Sec-Fetch-Site', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const nullOrigin = await POST(postRequest({ origin: 'null' }) as never);
+    const crossOrigin = await POST(postRequest({ origin: 'https://evil.example' }) as never);
+
+    expect(nullOrigin.status).toBe(403);
+    expect(crossOrigin.status).toBe(403);
+    expect(mockedBeginLinkAccountProof).not.toHaveBeenCalled();
+
+    const sameOrigin = await POST(postRequest({ origin: APP_ORIGIN }) as never);
+
+    expect(sameOrigin.status).toBe(303);
+    expect(sameOrigin.headers.get('location')).toBe(PROOF_URL);
+    expect(mockedBeginLinkAccountProof).toHaveBeenCalledTimes(1);
   });
 
   test('writes nothing when the user cannot access the integration owner', async () => {

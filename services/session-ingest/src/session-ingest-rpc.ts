@@ -34,6 +34,7 @@ import {
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
@@ -60,6 +61,7 @@ import {
   getCloudAgentWorkspaceStatusSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
+  isDefaultSessionTitle,
   kiloSdkSessionSnapshotOutcomeSchema,
   listCloudAgentRootSessionsSchema,
   listCloudAgentWorkspacesSchema,
@@ -124,10 +126,22 @@ import {
   HostedWorkspaceSessionDeleteError,
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
+import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
+
+const setGeneratedTitleForCloudAgentSchema = z.object({
+  sessionId: sessionIdSchema,
+  kiloUserId: z.string().min(1),
+  cloudAgentSessionId: cloudAgentSessionIdSchema,
+  title: reportSessionTitleSchema.shape.title,
+});
+
+const canGenerateTitleForCloudAgentSchema = setGeneratedTitleForCloudAgentSchema.omit({
+  title: true,
+});
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
@@ -535,6 +549,99 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const existing = rows[0];
     if (!existing) return 'missing';
     return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
+  }
+
+  async setGeneratedTitleForCloudAgent(params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }): Promise<{ applied: boolean }> {
+    const parsed = setGeneratedTitleForCloudAgentSchema.parse(params);
+    const input = reportSessionTitleSchema.parse({ title: parsed.title, generated: true });
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const result = await applyReportedSessionTitle(db, {
+      sessionId: parsed.sessionId,
+      kiloUserId: parsed.kiloUserId,
+      input,
+      scope: eq(cli_sessions_v2.cloud_agent_session_id, parsed.cloudAgentSessionId),
+    });
+    if (result.kind !== 'applied') return { applied: false };
+
+    const session = mapSessionEventRow(result.row);
+    notifyUserSessionEvent(
+      this.env,
+      parsed.kiloUserId,
+      {
+        type: 'session.updated',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      },
+      this.ctx
+    );
+    return { applied: true };
+  }
+
+  async canGenerateTitleForCloudAgent(params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+  }): Promise<boolean> {
+    const parsed = canGenerateTitleForCloudAgentSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+
+    const [current] = await db
+      .select({
+        session_id: cli_sessions_v2.session_id,
+        title: cli_sessions_v2.title,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
+        organization_id: cli_sessions_v2.organization_id,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+          eq(cli_sessions_v2.cloud_agent_session_id, parsed.cloudAgentSessionId),
+          isNull(cli_sessions_v2.parent_session_id)
+        )
+      )
+      .limit(1);
+
+    if (!current || !isDefaultSessionTitle(current.title)) return false;
+    if (current.cloud_agent_worktree_id === null) return true;
+
+    // Workspace defaultTitle comes only from the earliest root, so a later
+    // chat must not generate a title once that root exists.
+    const [earliestRoot] = await db
+      .select({
+        session_id: cli_sessions_v2.session_id,
+        title: cli_sessions_v2.title,
+        workspace_name: cloud_agent_worktrees.name,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(
+        cloud_agent_worktrees,
+        and(
+          eq(cloud_agent_worktrees.kilo_user_id, cli_sessions_v2.kilo_user_id),
+          eq(cloud_agent_worktrees.worktree_id, cli_sessions_v2.cloud_agent_worktree_id),
+          sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+        )
+      )
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+          eq(cli_sessions_v2.cloud_agent_worktree_id, current.cloud_agent_worktree_id),
+          isNull(cli_sessions_v2.parent_session_id),
+          sql`${cli_sessions_v2.organization_id} IS NOT DISTINCT FROM ${current.organization_id}`
+        )
+      )
+      .orderBy(asc(cli_sessions_v2.created_at), asc(cli_sessions_v2.session_id))
+      .limit(1);
+
+    if (!earliestRoot) return false;
+    if (earliestRoot.session_id !== parsed.sessionId) return false;
+    if (!isDefaultSessionTitle(earliestRoot.title)) return false;
+    return earliestRoot.workspace_name === null || earliestRoot.workspace_name.length === 0;
   }
 
   async resolveCloudAgentRootSessionForKiloSession(

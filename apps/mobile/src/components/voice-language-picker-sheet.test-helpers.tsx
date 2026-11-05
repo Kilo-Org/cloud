@@ -90,6 +90,7 @@ const flashListMock = vi.hoisted(
 );
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: () => undefined },
   View: 'View',
   TextInput: 'TextInput',
   I18nManager: { isRTL: false },

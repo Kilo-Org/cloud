@@ -278,6 +278,40 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.completed_at).toBeTruthy();
   });
 
+  it('reports that nothing changed when the review finished before the local cancel', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'queued', {
+          platform_integration_id: integration.id,
+          check_run_id: 777,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    // The status read that precedes the cancel saw a queued review; by the time
+    // the guarded cancel runs, the worker path has finished it.
+    mockCancelReview.mockImplementation(async () => {
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'completed', completed_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { success: false, reviewId: review.id };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Code review is no longer running' });
+    expect(storedReview?.status).toBe('completed');
+    expect(storedReview?.error_message).toBeNull();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
   it('cancels pending reviews locally without calling the Worker', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -752,6 +786,71 @@ describe('personalReviewAgent.createManualReviewJob', () => {
       id: testUser.id,
       userId: testUser.id,
     });
+  });
+
+  it('replays the review an accepted start created when a retry carries the same operation key', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '0f7b7d0e-9d43-4d8f-9a11-2b0c3d4e5f60';
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // The retry a stalled start sends: the first attempt was already accepted,
+    // its response lost, so the same key must resolve to the same review.
+    const retry = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    expect(retry).toEqual(first);
+    // The replay repeats no provider read and creates no second row.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        manualOperationKey: cloud_agent_code_reviews.manual_operation_key,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows).toEqual([{ id: first.reviewId, manualOperationKey: operationKey }]);
+  });
+
+  it('refuses an operation key that already produced a review for another change', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '4b2b6b0f-1234-4c9a-8f1d-0a1b2c3d4e5f';
+
+    await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/2`,
+        modelSlug: 'test-model',
+        operationKey,
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('CONFLICT');
+    expect(rejection.message).toBe('operation_key_reuse_mismatch');
   });
 
   // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
@@ -3914,7 +4013,6 @@ describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', (
     // stored integration row regardless of their concrete values).
     expect(status.integration).toEqual(
       expect.objectContaining({
-        isValid: true,
         instanceUrl: 'https://gitlab.example.com',
       })
     );
@@ -4169,7 +4267,6 @@ describe('personalReviewAgent.getGitHubStatus connection rule', () => {
         accountLogin: 'octocat',
         repositorySelection: 'all',
         installedAt: '2026-01-01 00:00:00+00',
-        isValid: true,
       },
     });
   });
@@ -4233,7 +4330,6 @@ describe('personalReviewAgent.getGitHubStatus connection rule', () => {
         accountLogin: 'octocat-new',
         repositorySelection: 'all',
         installedAt: '2026-01-01 00:00:00+00',
-        isValid: true,
       },
     });
   });

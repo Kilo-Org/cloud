@@ -199,9 +199,11 @@ describe('Organizations', () => {
           'balance',
           'created_at',
           'isSalesDemo',
+          'isTrialExpiredForEnforcement',
           'memberCount',
           'organizationId',
           'organizationName',
+          'parentOrganizationId',
           'plan',
           'requireSeats',
           'role',
@@ -209,6 +211,47 @@ describe('Organizations', () => {
         ].sort()
       );
       expect(Object.keys(result[0].seatCount).sort()).toEqual(['total', 'used'].sort());
+    });
+
+    test('carries the subscription gate verdict for a hard-expired trial', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Lapsed Trial Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          require_seats: true,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.isTrialExpiredForEnforcement).toBe(true);
+    });
+
+    test('keeps a running trial entitled', async () => {
+      const user = await insertTestUser();
+      await createOrganization('Running Trial Org', user.id);
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.isTrialExpiredForEnforcement).toBe(false);
+    });
+
+    test('keeps a lapsed trial entitled when trial messaging is suppressed', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Sponsored Trial Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          settings: { suppress_trial_messaging: true },
+        })
+        .where(eq(organizations.id, organization.id));
+
+      const [row] = await getUserOrganizationsWithSeats(user.id);
+
+      expect(row?.isTrialExpiredForEnforcement).toBe(false);
     });
   });
 

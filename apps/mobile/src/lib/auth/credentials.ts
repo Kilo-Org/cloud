@@ -231,7 +231,6 @@ export async function persistSignInCredentialsAtEpoch(
 }
 
 export async function performRefresh(): Promise<RefreshOutcome> {
-  // Single-flight: if a refresh is already in progress, await that outcome.
   if (refreshPromise) {
     const outcome = await refreshPromise;
     return outcome;

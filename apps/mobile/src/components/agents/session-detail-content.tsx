@@ -132,7 +132,11 @@ import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agen
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
-import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SessionComposerSkeleton,
+  SessionReadOnlyFooterPlaceholder,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
@@ -326,6 +330,11 @@ export function SessionDetailContent({
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  // A failed row offers Retry only when this session can accept the re-send now.
+  // A read-only stored transcript has no transport send at all, and a remote
+  // session with no CLI owner cannot deliver; both used to fail inside the SDK
+  // and report transient connection trouble for a turn nobody re-sent.
+  const retryAvailable = !isReadOnly && canSend;
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
@@ -570,13 +579,15 @@ export function SessionDetailContent({
     if (sessionProfile) {
       // The session screen is on the root `(app)` Stack: the profile editor has
       // to join it there, or Back would land on the Profile tab root instead of
-      // this session.
+      // this session. The `openedFrom` marker also keeps Back here rather than
+      // rebuilding the profiles list under a screen the reader reached from a
+      // session (`profile-route-stack.ts`).
       router.push(
-        getProfileOverviewPath(
-          sessionProfile.id,
-          profileOrganizationId(organizationId, sessionProfile),
-          'app'
-        )
+        getProfileOverviewPath(sessionProfile.id, {
+          organizationId: profileOrganizationId(organizationId, sessionProfile),
+          stack: 'app',
+          openedFrom: 'session',
+        })
       );
     }
   };
@@ -1328,6 +1339,13 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
+      // Read the live capability at tap time: a stale row could outlive the
+      // session's writability (a read-only transcript, or a remote session whose
+      // CLI owner went away) and the SDK would report the refusal as connection
+      // trouble for a prompt it never sent.
+      if (store.get(manager.atoms.isReadOnly) || !store.get(manager.atoms.canSend)) {
+        return;
+      }
       const target = resolveRetryTarget(message, messagesRef.current);
       if (target === null) {
         return;
@@ -1391,7 +1409,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId, store]
   );
 
   const handleCancelQueued = useCallback(
@@ -1578,6 +1596,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
@@ -1610,6 +1629,7 @@ export function SessionDetailContent({
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
+      retryAvailable,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,
@@ -1767,6 +1787,24 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // One failure owns the screen. The body's terminal error is resolved here,
+  // before the footer rows, so the footer never restates a failure the body
+  // already states and the loading skeleton never paints beside a lost
+  // connection. `connectionLost` is the app-wide leg's answer for a session
+  // whose own status atom carries nothing yet, and it only counts while the
+  // open still has nothing to show: a settled empty session keeps its empty
+  // state instead of a Retry it cannot use.
+  const connectionLost = connectionState === 'exhausted' && shouldShowLoading;
+  const terminalError = useMemo(
+    () =>
+      resolveSessionTerminalError({
+        error,
+        statusIndicator,
+        messageCount: messages.length,
+        connectionLost,
+      }),
+    [error, statusIndicator, messages.length, connectionLost]
+  );
   // A failed last row states its own failure and carries the action. The fixed
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
@@ -1796,6 +1834,7 @@ export function SessionDetailContent({
     ]
   );
   const footerStatusIndicator =
+    terminalError === null &&
     statusIndicator !== null &&
     !statusIndicatorDuplicatesMessageFailure({
       indicator: statusIndicator,
@@ -1829,24 +1868,34 @@ export function SessionDetailContent({
   // the reason must not restate that sentence beside it. Dropping it here keeps
   // the reason's lower branches alive — a read-only session then names read-only
   // instead of repeating the failed row.
-  const sendDisabledReason = resolveComposerSendDisabledReason({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator: footerStatusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
-  });
+  // The body already states this failure once, with the action that resolves
+  // it, so the reason beside send stays silent instead of naming the same
+  // failure a second time (mobile-app gate finding: the load-error card and
+  // "The session could not be loaded. Retry first." on one screen).
+  const sendDisabledReason =
+    terminalError === null
+      ? resolveComposerSendDisabledReason({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
   // The tone rides the same inputs, so a progress phase ("Setting up
   // environment…") never renders in the destructive error color.
-  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator: footerStatusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
-  });
+  const sendDisabledReasonTone =
+    terminalError === null
+      ? resolveComposerSendDisabledReasonTone({
+          canSend,
+          isReadOnly,
+          error,
+          statusIndicator: footerStatusIndicator,
+          cloudStatus,
+          messageCount: messages.length,
+        })
+      : null;
   // A read-only transcript ends in the continue section, which states the
   // read-only fact once and replaces the composer and its send reason.
   const isReadOnlyTranscript = isReadOnly && messages.length > 0;
@@ -1969,8 +2018,29 @@ export function SessionDetailContent({
   // background/spacer: it hosts no controls, so it deliberately carries no
   // horizontal safe-area padding — the composer's own content clears the
   // landscape sensor insets.
-  const isComposerVisible = !hasBlockingInteraction && !isReadOnlyTranscript;
+  // The bottom slot belongs to the session, and while the open still has
+  // nothing to show and no state of its own has arrived, the session's own
+  // transport has not answered: an editable composer there is a control the
+  // session may not have. Reserve the area in the shape this session's kind
+  // ends in instead, so one state ends where the other begins: a read-only
+  // session keeps the read-only footer's area, and every other session keeps
+  // the composer's. `isReadOnly` is the kind the session resolved to, so a
+  // writable session no longer jumps from the footer's block to its composer,
+  // and a read-only one no longer jumps the other way. Both reserves are
+  // placeholders, so neither offers a control. A failure, an agent status or a
+  // pending ask is the session speaking, and each keeps the composer it already
+  // has.
+  const isSessionStatePending =
+    shouldShowLoading &&
+    terminalError === null &&
+    activeQuestion === null &&
+    activePermission === null;
+  const isComposerVisible =
+    !hasBlockingInteraction && !isReadOnlyTranscript && !isSessionStatePending;
   const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
+  const isReadOnlyFooterPlaceholderVisible =
+    isSessionStatePending && !hasBlockingInteraction && isReadOnly;
+  const isComposerSkeletonVisible = isSessionStatePending && !hasBlockingInteraction && !isReadOnly;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2378,7 +2448,11 @@ export function SessionDetailContent({
           ) : (
             <View
               style={{ height: bottom }}
-              className={isReadOnlyContinueVisible ? 'bg-secondary' : 'bg-background'}
+              className={
+                isReadOnlyContinueVisible || isReadOnlyFooterPlaceholderVisible
+                  ? 'bg-secondary'
+                  : 'bg-background'
+              }
             />
           )}
 
@@ -2606,13 +2680,17 @@ export function SessionDetailContent({
           />
         ) : null}
 
+        {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
+
+        {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
+
         {isReadOnlyContinueVisible ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
             </Text>
             <Button
-              variant="outline"
+              variant="default"
               size="action"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
@@ -2622,7 +2700,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {isReadOnlyTranscript ? null : (
+        {isReadOnlyTranscript || isSessionStatePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -2697,11 +2775,6 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    const terminalError = resolveSessionTerminalError({
-      error,
-      statusIndicator,
-      messageCount: messages.length,
-    });
     if (terminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,
@@ -2721,6 +2794,13 @@ export function SessionDetailContent({
               onRetry={
                 terminalError.retryable
                   ? () => {
+                      // A spent reconnect budget on the shared transport leg is
+                      // only cleared by resetting that leg; reopening the
+                      // session over the same dead socket would return here.
+                      if (terminalError.retryWith === 'connection') {
+                        retrySessionConnection();
+                        return;
+                      }
                       void manager.switchSession(sessionId);
                     }
                   : undefined
@@ -2830,7 +2910,7 @@ export function SessionDetailContent({
     return (
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
-      // skeleton's `exiting` crossfade still carries the swap visually.
+      // skeleton is swapped for the rows in one commit, so it needs none.
       <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}

@@ -1078,19 +1078,31 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileKiloCommandsService.createKiloCommand(
-        db,
-        input.profileId,
-        {
-          name: input.name,
-          description: input.description,
-          template: input.template,
-          agent: input.agent,
-          model: input.model,
-          subtask: input.subtask,
-        },
-        owner
-      );
+      try {
+        return await profileKiloCommandsService.createKiloCommand(
+          db,
+          input.profileId,
+          {
+            name: input.name,
+            description: input.description,
+            template: input.template,
+            agent: input.agent,
+            model: input.model,
+            subtask: input.subtask,
+          },
+          owner
+        );
+      } catch (error) {
+        // The per-profile name unique index: the clients turn CONFLICT into
+        // their duplicate-name message instead of an opaque server error.
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A command with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
     }),
 
   updateKiloCommand: baseProcedure
@@ -1106,20 +1118,30 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileKiloCommandsService.updateKiloCommand(
-        db,
-        input.profileId,
-        input.commandId,
-        {
-          name: input.name,
-          description: input.description,
-          template: input.template,
-          agent: input.agent,
-          model: input.model,
-          subtask: input.subtask,
-        },
-        owner
-      );
+      try {
+        await profileKiloCommandsService.updateKiloCommand(
+          db,
+          input.profileId,
+          input.commandId,
+          {
+            name: input.name,
+            description: input.description,
+            template: input.template,
+            agent: input.agent,
+            model: input.model,
+            subtask: input.subtask,
+          },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A command with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
       return { success: true };
     }),
 

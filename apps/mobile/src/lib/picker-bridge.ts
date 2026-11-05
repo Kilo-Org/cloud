@@ -20,6 +20,13 @@ export type ModelPickerBridge = {
   options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
+  /**
+   * Whether the caller keeps the thinking effort it picks. A caller that stores
+   * only the model id cannot, so the picker leaves the effort chips out for it
+   * and treats a model tap as the whole selection: offering a choice the caller
+   * must drop would discard the user's pick without saying so.
+   */
+  acceptsVariant: boolean;
   selectionScope: ModelPickerSelectionScope;
   isSelectionCurrent: (scope: ModelPickerSelectionScope) => boolean;
   onSelect: (selection: ModelPickerSelection) => void;
@@ -149,7 +156,7 @@ type LanguagePickerBridge = {
 let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options'>,
   value: string,
   variant: string
 ): ModelPickerSelection | null {
@@ -165,7 +172,7 @@ export function resolveModelPickerSelection(
 }
 
 export function commitModelPickerSelection(
-  bridge: ModelPickerBridge,
+  bridge: Pick<ModelPickerBridge, 'options' | 'selectionScope' | 'isSelectionCurrent' | 'onSelect'>,
   value: string,
   variant: string
 ): boolean {

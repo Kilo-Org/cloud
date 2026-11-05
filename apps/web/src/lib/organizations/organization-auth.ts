@@ -16,6 +16,10 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  loadEffectiveMembershipRows,
+  observeMembershipRole,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
@@ -55,15 +59,21 @@ export async function getAuthorizedOrgContext(
      * `'server-component'`.
      */
     surface?: AdminAccessSurface;
+    /** The actual Request method when the caller has one. */
+    requestMethod?: string;
   } = {}
 ): Promise<DataOrNextError<{ user: UserWithRole; organization: Organization }>> {
-  const { getUserFromAuthOverride, surface } = options;
+  const { getUserFromAuthOverride, surface, requestMethod } = options;
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
       : getUserFromAuth;
 
-  const { authFailedResponse, user, tokenSource } = await getUserFromAuthFn({ adminOnly: false });
+  const { authFailedResponse, user, tokenSource, internalApiUse, cloudAgentAuthority } =
+    await getUserFromAuthFn({
+      adminOnly: false,
+      requestMethod,
+    });
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
   }
@@ -77,16 +87,28 @@ export async function getAuthorizedOrgContext(
   const organizationId = data;
 
   if (user.is_admin) {
-    // Recorded before the lookup so an admin probing a non-existent organization
-    // is still attributed, rather than vanishing into the 404 below.
+    const organizationResult = getOrganizationById(organizationId).then(
+      value => ({ ok: true as const, value }),
+      error => ({ ok: false as const, error })
+    );
+    const observation = await observeMembershipRole(
+      () => loadEffectiveMembershipRows(user.id, organizationId),
+      roles
+    );
     await recordKiloAdminElevationForRequest({
       user,
       tokenSource,
+      internalApiUse,
+      delegatedWorkload: cloudAgentAuthority !== undefined,
       reason: 'organization_access_rest',
       target: organizationTarget(organizationId),
       surface,
+      method: requestMethod,
+      ...observation,
     });
-    const organization = await getOrganizationById(organizationId);
+    const lookup = await organizationResult;
+    if (!lookup.ok) throw lookup.error;
+    const organization = lookup.value;
     if (!organization) {
       const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
       return { success: false, nextResponse: res };

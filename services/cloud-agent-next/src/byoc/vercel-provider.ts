@@ -40,6 +40,7 @@ export function createByocVercelProviderAdapter(deps: {
   sandboxName: string;
   resources?: VercelSandboxResources;
   locator?: VercelProviderLocator | null;
+  persistRuntimeLocator?: (locator: VercelProviderLocator) => Promise<void>;
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
   readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
 }): ProviderAdapter {
@@ -58,6 +59,13 @@ export function createByocVercelProviderAdapter(deps: {
       try {
         const config = await resolveByocVercelRuntimeConfig(deps.env, deps.source, value => {
           snapshot = value;
+        });
+        await deps.persistRuntimeLocator?.({
+          teamId: config.teamId,
+          projectId: config.projectId,
+          snapshotId: config.snapshotId,
+          runtimeBuildId: config.runtimeBuildId,
+          runtime: config.runtime,
         });
         const adapter = createVercelProviderAdapter({
           ...deps,

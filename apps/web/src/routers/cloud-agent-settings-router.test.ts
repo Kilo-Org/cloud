@@ -117,7 +117,9 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
 
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setRepositorySettings({
         repoFullName: 'Acme/Web',
         platform: 'github',
@@ -127,7 +129,7 @@ describe('cloud-agent-settings router', () => {
 
       const result = await caller.cloudAgentSettings.get({});
       expect(result.canManage).toBe(true);
-      expect(result.contextAllocation).toBe('cloudflare-single');
+      expect(result.contextAllocation).toBe('cloudflare-containers-standard-3');
       expect(result.repositories).toEqual([
         {
           repositoryFullName: 'acme/web',
@@ -142,7 +144,7 @@ describe('cloud-agent-settings router', () => {
     test('does not leak another user settings', async () => {
       const ownerCaller = await createCallerForUser(ownerUser.id);
       await ownerCaller.cloudAgentSettings.setContextAllocation({
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
 
       const otherCaller = await createCallerForUser(otherUser.id);
@@ -158,7 +160,9 @@ describe('cloud-agent-settings router', () => {
       });
       const caller = await createCallerForUser(ownerUser.id);
       await expect(
-        caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' })
+        caller.cloudAgentSettings.setContextAllocation({
+          allocation: 'cloudflare-containers-standard-3',
+        })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
@@ -182,7 +186,9 @@ describe('cloud-agent-settings router', () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
 
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setContextAllocation({ allocation: null });
       expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBeNull();
 
@@ -190,7 +196,7 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
       await caller.cloudAgentSettings.setRepositorySettings({
@@ -207,11 +213,11 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId: null,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
       row = (await caller.cloudAgentSettings.get({})).repositories[0];
       expect(row.profileId).toBeNull();
-      expect(row.allocation).toBe('cloudflare-shared');
+      expect(row.allocation).toBe('cloudflare-containers-standard-4');
     });
 
     test('removing both empty fields deletes the whole row atomically', async () => {
@@ -222,7 +228,7 @@ describe('cloud-agent-settings router', () => {
         repoFullName: 'acme/web',
         platform: 'github',
         profileId,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
       await caller.cloudAgentSettings.setRepositorySettings({
@@ -249,7 +255,7 @@ describe('cloud-agent-settings router', () => {
           repoFullName: 'acme/web',
           platform: 'github',
           profileId: foreignProfileId,
-          allocation: 'cloudflare-shared',
+          allocation: 'cloudflare-containers-standard-4',
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
@@ -317,7 +323,7 @@ describe('cloud-agent-settings router', () => {
       await expect(
         memberCaller.cloudAgentSettings.setContextAllocation({
           organizationId: organization.id,
-          allocation: 'cloudflare-single',
+          allocation: 'cloudflare-containers-standard-3',
         })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
@@ -326,7 +332,7 @@ describe('cloud-agent-settings router', () => {
           organizationId: organization.id,
           repoFullName: 'acme/web',
           platform: 'github',
-          allocation: 'cloudflare-single',
+          allocation: 'cloudflare-containers-standard-3',
         })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
@@ -340,26 +346,30 @@ describe('cloud-agent-settings router', () => {
 
       await ownerCaller.cloudAgentSettings.setContextAllocation({
         organizationId: organization.id,
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
       expect(
         (await ownerCaller.cloudAgentSettings.get({ organizationId: organization.id }))
           .contextAllocation
-      ).toBe('cloudflare-single');
+      ).toBe('cloudflare-containers-standard-3');
     });
 
     test('personal and organization settings stay separate', async () => {
       const caller = await createCallerForUser(ownerUser.id);
-      await caller.cloudAgentSettings.setContextAllocation({ allocation: 'cloudflare-single' });
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-3',
+      });
       await caller.cloudAgentSettings.setContextAllocation({
         organizationId: organization.id,
-        allocation: 'cloudflare-shared',
+        allocation: 'cloudflare-containers-standard-4',
       });
 
-      expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBe('cloudflare-single');
+      expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBe(
+        'cloudflare-containers-standard-3'
+      );
       expect(
         (await caller.cloudAgentSettings.get({ organizationId: organization.id })).contextAllocation
-      ).toBe('cloudflare-shared');
+      ).toBe('cloudflare-containers-standard-4');
     });
 
     test('rejects binding a profile owned by a different scope', async () => {
@@ -390,7 +400,7 @@ describe('cloud-agent-settings router', () => {
       await caller.cloudAgentSettings.setRepositorySettings({
         repoFullName: 'acme/allocation-only',
         platform: 'gitlab',
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
 
       const rows = (await caller.cloudAgentSettings.get({})).repositories;
@@ -400,7 +410,7 @@ describe('cloud-agent-settings router', () => {
       ]);
       expect(rows[0]).toMatchObject({
         profileId: null,
-        allocation: 'cloudflare-single',
+        allocation: 'cloudflare-containers-standard-3',
       });
       expect(rows[1]).toMatchObject({ profileId, profileName: 'Bound', allocation: null });
     });

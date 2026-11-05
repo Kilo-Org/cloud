@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { useAtomValue } from 'jotai';
 import { AlertCircle, ArrowDown, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/sheet';
 import type { ChildSessionHydrationState, OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
-import { MessageBubble } from './MessageBubble';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { isMessageStreaming } from './types';
+import { CloudReadOnlyThread } from './assistant-ui/CloudThread';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { OlderMessagesHeader } from './OlderMessagesHeader';
 import {
@@ -58,11 +58,17 @@ export function ChildSessionDrawer({
   portalContainer,
 }: ChildSessionDrawerProps) {
   const manager = useManager();
+  const useStreaming = useAtomValue(manager.atoms.isStreaming);
+  const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const selectedEntry = stack[stack.length - 1];
   const selectedSessionId = selectedEntry?.sessionId;
-  const messages = selectedSessionId ? getChildMessages(selectedSessionId) : [];
+  const messages = useMemo(
+    () => (selectedSessionId ? getChildMessages(selectedSessionId) : []),
+    [getChildMessages, selectedSessionId]
+  );
+  const messageGroups = useMemo(() => messages.map(message => [message]), [messages]);
   const hydrationState = selectedSessionId
     ? getChildSessionHydrationState(selectedSessionId)
     : IDLE_HYDRATION_STATE;
@@ -372,15 +378,18 @@ export function ChildSessionDrawer({
 
               {hasMessages ? (
                 <div>
-                  {messages.map(message => (
-                    <MessageErrorBoundary key={message.info.id}>
-                      <MessageBubble
-                        message={message}
-                        getChildMessages={getChildMessages}
-                        onOpenChildSession={onOpenChildSession}
-                      />
-                    </MessageErrorBoundary>
-                  ))}
+                  <CloudReadOnlyThread
+                    messages={messages}
+                    isStreaming={messages.some(isMessageStreaming)}
+                    messageGroups={messageGroups}
+                    getChildMessages={getChildMessages}
+                    onOpenChildSession={onOpenChildSession}
+                    presentationMode="live"
+                    questionState={{
+                      isStreaming: useStreaming,
+                      hasActiveQuestion: Boolean(activeQuestion),
+                    }}
+                  />
                 </div>
               ) : hydrationState.status === 'loading' ||
                 hydrationState.status === 'error' ? null : (

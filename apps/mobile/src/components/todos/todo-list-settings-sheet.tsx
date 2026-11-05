@@ -231,6 +231,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                 variant={variant ?? ''}
                 options={models}
                 isLoading={isLoadingModels}
+                acceptsVariant
                 onSelect={(modelId, nextVariant) => {
                   setModel(modelId);
                   setVariant(nextVariant || null);

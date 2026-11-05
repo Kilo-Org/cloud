@@ -1,8 +1,12 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
-import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
+import {
+  CURRENCY_ZERO_THRESHOLD,
+  formatClockTime,
+  formatCurrency,
+  formatNumber,
+} from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -181,7 +185,7 @@ function clockTime(timestamp: string | null | undefined): string | null {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(date);
+  return formatClockTime(date, i18n.language);
 }
 
 /**
@@ -239,6 +243,25 @@ export function sectionAwareTimeMeta(
 }
 
 /**
+ * The one place a visible session cost decides its digits: at or above half a
+ * cent (`>= 5000` µ$) the amount needs two decimals, below it four, and the
+ * band that would round to `$0.0000` (1..49 µ$) is omitted rather than printed
+ * as a false zero. `null` means the surface shows no cost at all.
+ */
+function visibleCostAmount(
+  microdollars: number | null | undefined
+): { usd: number; fractionDigits: number } | null {
+  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
+    return null;
+  }
+  const usd = microdollars / 1_000_000;
+  if (usd < CURRENCY_ZERO_THRESHOLD) {
+    return null;
+  }
+  return { usd, fractionDigits: usd >= 0.005 ? 2 : 4 };
+}
+
+/**
  * Canonical visible cost for every mobile session surface (list row, detail
  * header, context sheet total).
  *
@@ -253,17 +276,30 @@ export function sectionAwareTimeMeta(
  * the currency follows the applied locale.
  */
 export function formatSessionTotalCost(microdollars: number | null | undefined): string | null {
-  if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
+  const amount = visibleCostAmount(microdollars);
+  if (amount === null) {
     return null;
   }
-  const usd = microdollars / 1_000_000;
-  if (usd >= 0.005) {
-    return formatCurrency(usd, i18n.language, 2);
-  }
-  if (usd < CURRENCY_ZERO_THRESHOLD) {
+  return formatCurrency(amount.usd, i18n.language, amount.fractionDigits);
+}
+
+/**
+ * The header pill's cost slot: the same amount and digits as
+ * `formatSessionTotalCost`, with the sign in front of the number and no
+ * separator. Several languages format USD as a suffix (`0.0005 $`), which in a
+ * right-to-left interface reads as a currency sign detached from its amount;
+ * the pill shows the sign and the amount as one run in every language, the same
+ * `$0.0005` the percentage sits beside.
+ */
+export function formatSessionCostBadge(microdollars: number | null | undefined): string | null {
+  const amount = visibleCostAmount(microdollars);
+  if (amount === null) {
     return null;
   }
-  return formatCurrency(usd, i18n.language, 4);
+  return `$${formatNumber(amount.usd, i18n.language, {
+    minimumFractionDigits: amount.fractionDigits,
+    maximumFractionDigits: amount.fractionDigits,
+  })}`;
 }
 
 /**

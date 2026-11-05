@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  KILO_BROWSER_TOOL_NAMES,
-  KILO_SAFE_BROWSER_TOOL_NAMES,
-  createKiloBrowserToolDefinitions,
-} from './browser-tool-definitions';
+import { createKiloBrowserToolDefinitions } from './browser-tool-definitions';
 import { BROWSER_TOOL_CONTRACT, toKiloBrowserToolName } from './browser-tool-contract';
 
 const allKiloNames = BROWSER_TOOL_CONTRACT.map(entry => toKiloBrowserToolName(entry.name));
@@ -114,10 +110,5 @@ describe('kilo browser tool definitions', () => {
     expect(
       JSON.stringify(definitionByName.get('kilo_browser_network_request')?.parameters)
     ).toContain('kilo_browser_network_requests');
-  });
-
-  it('exports the ordered name lists the runners and the e2e fixture assert', () => {
-    expect(KILO_BROWSER_TOOL_NAMES).toStrictEqual(allKiloNames);
-    expect(KILO_SAFE_BROWSER_TOOL_NAMES).toStrictEqual(safeKiloNames);
   });
 });

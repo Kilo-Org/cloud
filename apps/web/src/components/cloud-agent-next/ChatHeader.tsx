@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { CornerUpLeft, ExternalLink, MoreHorizontal } from 'lucide-react';
+import Link from 'next/link';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 import type { SessionUsage } from './session-token-usage';
@@ -21,6 +22,9 @@ import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 
 type ChatHeaderProps = {
+  /** The signed-in user: worktree caches are partitioned by user. */
+  currentUserId: string;
+  parentSessionHref?: string;
   cloudAgentSessionId: string;
   changesCloudAgentSessionId?: string;
   worktreeId?: string;
@@ -51,6 +55,8 @@ type ChatHeaderProps = {
 };
 
 export function ChatHeader({
+  currentUserId,
+  parentSessionHref,
   cloudAgentSessionId,
   changesCloudAgentSessionId = cloudAgentSessionId,
   worktreeId,
@@ -129,7 +135,8 @@ export function ChatHeader({
             instead of moving the other controls. */}
         {onToggleChanges && (
           <WorktreeChangesButton
-            key={`worktree-changes:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            key={`worktree-changes:${currentUserId}:${organizationId ?? 'personal'}:${worktreeId ?? changesCloudAgentSessionId}`}
+            userId={currentUserId}
             cloudAgentSessionId={changesCloudAgentSessionId}
             organizationId={organizationId}
             worktreeId={worktreeId}
@@ -162,6 +169,17 @@ export function ChatHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {parentSessionHref && (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href={parentSessionHref}>
+                    <CornerUpLeft aria-hidden="true" />
+                    Open parent session
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
               Share or Fork
             </DropdownMenuItem>

@@ -4,7 +4,7 @@ import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeSlackOAuthCode,
   getConflictingSlackInstallation,
@@ -51,13 +51,13 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
  * Complete a link started from the generic `/api/chat/link-account` page.
  *
  * The page wrote nothing; it only sent the browser here after the Kilo user was
- * authenticated and authorized for the integration. This handler is where the
- * Slack identity is actually proven:
+ * authenticated and authorized for the integration. This handler completes the
+ * identity confirmation:
  *
  *  1. the Kilo user finishing the flow must be the one who started it;
  *  2. Slack must accept the authorization code and answer `userinfo` for it;
- *  3. the identity Slack asserts must equal the identity the pending link
- *     named — that is the proof the URL alone never provided;
+ *  3. the identity Slack reports must equal the identity the pending link
+ *     names;
  *  4. the integration must still resolve and the user must still have access;
  *  5. only then is the single-use context consumed and the mapping written,
  *     compare-and-set, so an existing mapping is never reassigned.
@@ -213,7 +213,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       captureMessage('Slack OAuth error', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { error, state },
+        extra: { error, ...safeCallbackContext(searchParams) },
       });
 
       return NextResponse.redirect(
@@ -234,7 +234,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       captureMessage('Slack callback missing code', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
 
       return NextResponse.redirect(
@@ -251,7 +251,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       captureMessage('Slack callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
+        extra: safeCallbackContext(searchParams),
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -390,10 +390,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
         endpoint: 'slack/callback',
         source: 'slack_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

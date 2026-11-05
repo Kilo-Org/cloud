@@ -70,13 +70,8 @@ beforeEach(() => {
 describe('sandbox selection policy', () => {
   it.each([
     {
-      name: 'isolated Cloudflare without an allowlist',
+      name: 'isolated Cloudflare by default',
       overrides: {},
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
-      name: 'isolated Cloudflare with an empty allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
@@ -92,11 +87,6 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'isolated Cloudflare outside the former allowlist',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-    },
-    {
       name: 'missing Vercel configuration',
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
@@ -105,9 +95,9 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'keeps Cloudflare sandbox small when containment is disabled',
+      name: 'ignores the obsolete containment opt-out',
       overrides: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
-      expected: getSandboxAllocationRequest('cloudflare-single'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'enforced default skips Vercel even when explicit Vercel is enrolled',
@@ -119,9 +109,8 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
-      name: 'Cloudflare containers when the isolated owner is enrolled',
+      name: 'Cloudflare containers when the owner is enrolled',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
@@ -204,28 +193,32 @@ describe('sandbox selection policy', () => {
         .defaultDestination
     );
     for (const preset of sandboxAllocationSchema.options) {
-      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow('not enabled');
+      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
+        preset === 'cloudflare-shared' || preset === 'isolated-standard'
+          ? 'has been retired'
+          : 'not enabled'
+      );
     }
   });
 
-  it('keeps the trigger-only allocation out of the manual picker', () => {
+  it('offers only the native default without enrollment or BYOC credentials', () => {
     const capabilities = getSandboxSelectionCapabilities(configured as Env, owner);
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
     ]);
     expect(
       capabilities.options.some(
-        option => getSandboxAllocation(option.allocation) === 'isolated-standard'
+        option =>
+          getSandboxAllocation(option.allocation) === 'cloudflare-shared' ||
+          getSandboxAllocation(option.allocation) === 'isolated-standard'
       )
     ).toBe(false);
   });
 
-  it('reports the native small allocation and gates larger containers on enrollment', () => {
+  it('reports the native default without enrollment and gates larger containers on enrollment', () => {
     const missingContainers = { ...configured } as Env;
     expect(availableOptions(getSandboxSelectionCapabilities(missingContainers, owner))).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
     ]);
 
     const enrolledContainers = {
@@ -233,7 +226,6 @@ describe('sandbox selection policy', () => {
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
     } as Env;
     expect(availableOptions(getSandboxSelectionCapabilities(enrolledContainers, owner))).toEqual([
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),
     ]);
@@ -243,7 +235,7 @@ describe('sandbox selection policy', () => {
     const env = { ...configured, SANDBOX_SELECTION_IDS: owner.userId } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, { userId: owner.userId });
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(2);
+    expect(availableOptions(capabilities)).toHaveLength(1);
   });
 
   it('enables personal selection for wildcard rollouts', () => {
@@ -270,13 +262,17 @@ describe('sandbox selection policy', () => {
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.enabled).toBe(true);
-    expect(availableOptions(capabilities)).toHaveLength(3);
+    expect(availableOptions(capabilities)).toHaveLength(2);
     expect(capabilities.options.every(option => !('available' in option))).toBe(true);
     expect(JSON.stringify(capabilities)).not.toContain('test-token');
     for (const preset of sandboxAllocationSchema.options) {
       if (preset.startsWith('vercel-'))
         expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
           'Configure Vercel BYOC'
+        );
+      else if (preset === 'cloudflare-shared' || preset === 'isolated-standard')
+        expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
+          'has been retired'
         );
       else expect(() => assertSandboxAllocationAvailable(env, owner, preset)).not.toThrow();
     }
@@ -290,14 +286,16 @@ describe('sandbox selection policy', () => {
       expect(capabilities.enabled).toBe(true);
       expect(availableOptions(capabilities)).toEqual([
         getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-        getSandboxAllocationRequest('cloudflare-shared'),
       ]);
       for (const preset of ['vercel-small', 'vercel-large'] as const) {
         expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
           'Configure Vercel BYOC'
         );
       }
-      expect(() => assertSandboxAllocationAvailable(env, owner, 'isolated-standard')).not.toThrow();
+      expect(() => assertSandboxAllocationAvailable(env, owner, 'cloudflare-single')).not.toThrow();
+      expect(() => assertSandboxAllocationAvailable(env, owner, 'isolated-standard')).toThrow(
+        'has been retired'
+      );
     }
   );
 
@@ -314,12 +312,14 @@ describe('sandbox selection policy', () => {
     );
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
-    for (const preset of ['cloudflare-single', 'cloudflare-shared'] as const) {
-      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).not.toThrow();
+    expect(() => assertSandboxAllocationAvailable(env, owner, 'cloudflare-single')).not.toThrow();
+    for (const preset of ['cloudflare-shared', 'isolated-standard'] as const) {
+      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
+        'has been retired'
+      );
     }
     expect(() => assertSandboxAllocationAvailable(env, owner, 'vercel-small')).not.toThrow();
   });
@@ -371,10 +371,9 @@ describe('sandbox selection policy', () => {
       );
       expect(availableOptions(capabilities)).toEqual([
         getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-        getSandboxAllocationRequest('cloudflare-shared'),
       ]);
       expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
-      expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-shared')).toBe(true);
+      expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-single')).toBe(true);
     }
   );
 
@@ -390,7 +389,7 @@ describe('sandbox selection policy', () => {
     const capabilities = getSandboxSelectionCapabilities(env, owner, readiness);
     expect(readiness.vercelUnavailableReason).toBeTruthy();
     expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
-    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-shared')).toBe(true);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-single')).toBe(true);
   });
 
   it('disables only Vercel when BYOC credential lookup fails', async () => {
@@ -445,7 +444,6 @@ describe('sandbox selection policy', () => {
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(availableOptions(capabilities)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
     ]);
     for (const preset of ['vercel-small', 'vercel-large'] as const) {
       expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
@@ -516,7 +514,6 @@ describe('sandbox selection policy', () => {
   it('offers Cloudflare containers to an enrolled owner under enforced organization billing', () => {
     const env = {
       ...configured,
-      PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
       CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
@@ -534,29 +531,37 @@ describe('sandbox selection policy', () => {
     );
   });
 
-  it('reports a repository-unavailable reason while keeping a provider-available option listed', () => {
-    const gitlab = getSandboxSelectionCapabilities(
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'offers enrolled Vercel compute for managed %s repositories',
+    repositoryType => {
+      const capabilities = getSandboxSelectionCapabilities(
+        { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
+        owner,
+        { repositoryType }
+      );
+      const vercel = capabilities.options.find(
+        option => getSandboxAllocation(option.allocation) === 'vercel-small'
+      );
+      expect(vercel?.unavailableReason).toBeUndefined();
+      expect(vercel?.repositoryUnavailableReason).toBeUndefined();
+      expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
+    }
+  );
+
+  it.each(['git'] as const)('offers enrolled Vercel compute for %s', repositoryType => {
+    const capabilities = getSandboxSelectionCapabilities(
       { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
       owner,
       {
-        repositoryType: 'gitlab',
+        repositoryType,
       }
     );
-    const vercel = gitlab.options.find(
+    const vercel = capabilities.options.find(
       option => getSandboxAllocation(option.allocation) === 'vercel-small'
     );
     expect(vercel?.unavailableReason).toBeUndefined();
-    expect(vercel?.repositoryUnavailableReason).toBeTruthy();
-    expect(isSandboxAllocationAvailable(gitlab, 'vercel-small')).toBe(false);
-
-    const github = getSandboxSelectionCapabilities(
-      { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env,
-      owner,
-      {
-        repositoryType: 'github',
-      }
-    );
-    expect(isSandboxAllocationAvailable(github, 'vercel-small')).toBe(true);
+    expect(vercel?.repositoryUnavailableReason).toBeUndefined();
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
   });
 
   it('marks Vercel unavailable for review and remediation origins while Cloudflare stays eligible', () => {
@@ -574,20 +579,17 @@ describe('sandbox selection policy', () => {
     }
   });
 
-  it('admits the trigger-only allocation without listing it', () => {
-    expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, 'isolated-standard')).toBe(
-      true
-    );
-    expect(
-      isSandboxAllocationAvailable(
-        {
-          enabled: true,
-          options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
-        },
-        'isolated-standard'
-      )
-    ).toBe(true);
-    expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, 'isolated-standard')).toBe(
+  it('rejects retired explicit allocations and keeps the single alias', () => {
+    for (const retired of ['cloudflare-shared', 'isolated-standard'] as const) {
+      expect(() => assertSandboxAllocationAvailable(configured as Env, owner, retired)).toThrow(
+        'has been retired'
+      );
+      expect(isSandboxAllocationAvailable({ enabled: true, options: [] }, retired)).toBe(false);
+    }
+    expect(() =>
+      assertSandboxAllocationAvailable(configured as Env, owner, 'cloudflare-single')
+    ).not.toThrow();
+    expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, 'cloudflare-single')).toBe(
       false
     );
   });
@@ -616,7 +618,6 @@ describe('sandbox selection API', () => {
     );
     expect(availableOptions(result)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
@@ -640,7 +641,6 @@ describe('sandbox selection API', () => {
     );
     expect(availableOptions(result)).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
     ]);
     const vercel = result.options.find(
       option => getSandboxAllocation(option.allocation) === 'vercel-small'

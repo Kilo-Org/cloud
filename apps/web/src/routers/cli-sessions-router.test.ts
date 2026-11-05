@@ -11,28 +11,34 @@ import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import {
   CLI_SESSION_FORK_MAX_PER_OWNER,
   CLI_SESSION_SHARE_MAX_PER_OWNER,
+  resetOwnerCopyTurnsForTests,
 } from '@/lib/cli-sessions/session-copies';
+import { copyBlobs, deleteBlobs, generateSignedUrls } from '@/lib/r2/cli-sessions';
 import { eq, and, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import { sanitizeGitUrl, isValidGitUrl, sanitizeForPostgres } from './cli-sessions-router';
+
+const signedSessionBlobUrls = {
+  api_conversation_history_blob_url: 'https://signed-url.example.com/api_conversation_history',
+  task_metadata_blob_url: 'https://signed-url.example.com/task_metadata',
+  ui_messages_blob_url: 'https://signed-url.example.com/ui_messages',
+  git_state_blob_url: 'https://signed-url.example.com/git_state',
+};
+
+const copiedSessionBlobUrls = {
+  api_conversation_history_blob_url: 'sessions/new-id/api_conversation_history.json',
+  task_metadata_blob_url: 'sessions/new-id/task_metadata.json',
+  ui_messages_blob_url: 'sessions/new-id/ui_messages.json',
+  git_state_blob_url: 'sessions/new-id/git_state.json',
+};
 
 jest.mock('@/lib/r2/cli-sessions', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/r2/cli-sessions');
   return {
     ...actual,
-    generateSignedUrls: jest.fn().mockResolvedValue({
-      api_conversation_history_blob_url: 'https://signed-url.example.com/api_conversation_history',
-      task_metadata_blob_url: 'https://signed-url.example.com/task_metadata',
-      ui_messages_blob_url: 'https://signed-url.example.com/ui_messages',
-      git_state_blob_url: 'https://signed-url.example.com/git_state',
-    }),
-    deleteBlobs: jest.fn().mockResolvedValue(undefined),
-    copyBlobs: jest.fn().mockResolvedValue({
-      api_conversation_history_blob_url: 'sessions/new-id/api_conversation_history.json',
-      task_metadata_blob_url: 'sessions/new-id/task_metadata.json',
-      ui_messages_blob_url: 'sessions/new-id/ui_messages.json',
-      git_state_blob_url: 'sessions/new-id/git_state.json',
-    }),
+    generateSignedUrls: jest.fn(),
+    deleteBlobs: jest.fn(),
+    copyBlobs: jest.fn(),
   };
 });
 
@@ -60,11 +66,14 @@ async function heldOwnerCopyLocks(): Promise<number> {
     FROM pg_locks
     WHERE locktype = 'advisory'
       AND granted
+      AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
       AND classid = (hashtext('cli_session_copy')::bigint & 4294967295)::oid
   `);
 
   return Number(result.rows[0]?.held ?? 0);
 }
+
+jest.setTimeout(15_000);
 
 describe('cli-sessions-router', () => {
   beforeAll(async () => {
@@ -88,6 +97,22 @@ describe('cli-sessions-router', () => {
       })
       .returning();
     testOrganization = org;
+  });
+
+  beforeEach(() => {
+    jest.mocked(generateSignedUrls).mockResolvedValue(signedSessionBlobUrls);
+    jest.mocked(copyBlobs).mockResolvedValue(copiedSessionBlobUrls);
+    jest.mocked(deleteBlobs).mockResolvedValue(undefined);
+  });
+
+  // A copy that a test abandons keeps its in-process turn and its queued mock
+  // implementations. Reset both so one slow or failing test cannot queue every
+  // later copy for the same account behind it.
+  afterEach(() => {
+    resetOwnerCopyTurnsForTests();
+    jest.mocked(generateSignedUrls).mockReset();
+    jest.mocked(copyBlobs).mockReset();
+    jest.mocked(deleteBlobs).mockReset();
   });
 
   describe('list procedure', () => {

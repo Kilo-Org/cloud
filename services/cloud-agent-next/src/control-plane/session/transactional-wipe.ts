@@ -44,7 +44,7 @@ export type TransactionalWipeInput = {
   generationKey: string;
   generation: number;
   locator: unknown;
-  /** Deletes the two application tables through Drizzle (synchronous `.run()`). */
+  /** Deletes the application tables through Drizzle (synchronous `.run()`). */
   deleteApplicationTables: () => void;
 };
 

@@ -16,7 +16,12 @@ import type * as ReactI18next from 'react-i18next';
 
 import { lightColors } from '@/lib/hooks/use-theme-colors';
 
-import { describePrState, PrRefsRow, PrStateChip } from './pr-review-overview-parts';
+import {
+  describePrState,
+  formatPrCounts,
+  PrRefsRow,
+  PrStateChip,
+} from './pr-review-overview-parts';
 
 const { compile: compileNative } = createRequire(import.meta.url)(
   'react-native-css/compiler'
@@ -43,6 +48,10 @@ vi.mock('@/components/ui/icons', () => ({
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
   Plus: 'Plus',
+}));
+
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
 }));
 
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
@@ -177,14 +186,25 @@ describe('PrRefsRow width constraints', () => {
     },
   ])('constrains $name without dropping either ref', ({ name: _name, displayedHead, ...props }) => {
     const renderer = renderRefs(props);
-    const [head, arrow, base] = renderer.root.findAllByType('Text');
-    if (!head || !arrow || !base) {
-      throw new Error('Expected source, arrow, and target');
+    const [head, base] = renderer.root.findAllByType('Text');
+    if (!head || !base) {
+      throw new Error('Expected a source and a target ref');
     }
 
     expect(head.children.filter(child => typeof child === 'string').join('')).toBe(displayedHead);
     expect(base.children).toEqual([props.baseRef]);
-    expect(arrow.children).toEqual(['←']);
+
+    // The flow reads between the two refs as one mirrored icon, sized to the
+    // 13 px ref text and colored like the row's branch mark, so it centers on
+    // the row instead of riding a text glyph's baseline.
+    const rowChildren = renderer.root
+      .findByType('View')
+      .children.map(child => (typeof child === 'string' ? child : child.type));
+    expect(rowChildren).toEqual(['GitBranch', 'Text', 'DirectionalArrowLeft', 'Text']);
+    expect(renderer.root.findByType('DirectionalArrowLeft').props).toMatchObject({
+      size: 13,
+      color: lightColors.mutedForeground,
+    });
 
     // Yoga defaults row children to flexShrink: 0. A line limit alone does not
     // stop a long source from pushing the target beyond the content margin.
@@ -213,20 +233,37 @@ describe('PrRefsRow truncation', () => {
     const texts = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'Text'
     );
-    // Head ref, arrow, base ref — the head is first.
-    const [head, arrow, base] = texts;
-    if (!head || !arrow || !base) {
-      throw new Error('PrRefsRow did not render its three text nodes');
+    // Head ref, then the target — the head is first.
+    const [head, base] = texts;
+    if (!head || !base) {
+      throw new Error('PrRefsRow did not render both refs');
     }
     expect(head.props.className).toContain('min-w-0');
     expect(head.props.className).toContain('shrink');
     expect(head.props.numberOfLines).toBe(1);
     expect(head.props.ellipsizeMode).toBe('middle');
 
-    // The arrow and the short base ref hold their width.
-    expect(arrow.props.className).toContain('shrink-0');
+    // The short base ref holds its width.
     expect(base.props.className).toContain('shrink-0');
 
     renderer.unmount();
+  });
+});
+
+describe('formatPrCounts', () => {
+  it('keeps each sign before its number inside one isolated left-to-right run', () => {
+    // Bidi on a right-to-left screen moves a sign behind its number unless the
+    // counts are isolated, so the line read "3+ / 1-" there.
+    const line = formatPrCounts(3, 1);
+    expect(line.startsWith('\u2066')).toBe(true);
+    expect(line.endsWith('\u2069')).toBe(true);
+
+    const counts = line.slice(1, -1);
+    const added = counts.indexOf('+');
+    const removed = counts.indexOf('\u2212');
+    expect(added).toBeGreaterThanOrEqual(0);
+    expect(removed).toBeGreaterThan(added);
+    expect(counts.indexOf('3')).toBe(added + 1);
+    expect(counts.indexOf('1')).toBe(removed + 1);
   });
 });

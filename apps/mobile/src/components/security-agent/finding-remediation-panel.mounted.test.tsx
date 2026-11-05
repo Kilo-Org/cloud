@@ -21,7 +21,9 @@ import { FindingRemediationPanel } from './finding-remediation-panel';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
-const kvRows = vi.hoisted(() => ({ rows: [] as { label: string; value: unknown }[] }));
+const kvRows = vi.hoisted(() => ({
+  rows: [] as { label: string; value: unknown; valueDirection: string | undefined }[],
+}));
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   openExternalUrl: vi.fn(),
@@ -60,8 +62,12 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string; value: unknown }) => {
-    kvRows.rows.push({ label: props.label, value: props.value });
+  KvRow: (props: { label: string; value: unknown; valueDirection?: string }) => {
+    kvRows.rows.push({
+      label: props.label,
+      value: props.value,
+      valueDirection: props.valueDirection,
+    });
     return null;
   },
 }));
@@ -437,4 +443,20 @@ describe('FindingRemediationPanel stored payload tolerance', () => {
       expect(kvRows.rows.find(row => row.label === 'Started by')?.value).toBe('Unknown');
     }
   );
+
+  // The branch and model are identifiers: the row names their base direction
+  // so an RTL interface does not reorder them, while the translated origin
+  // beside them keeps the interface direction.
+  it('isolates the model slug and branch name left-to-right', () => {
+    renderPanel(analysisFixture({ remediationAttempts: [attempt] }));
+
+    for (const label of ['Model', 'Branch']) {
+      const row = kvRows.rows.find(candidate => candidate.label === label);
+      expect(row, `the panel draws the ${label} row`).toBeDefined();
+      expect(row?.valueDirection).toBe('ltr');
+    }
+    const origin = kvRows.rows.find(row => row.label === 'Started by');
+    expect(origin, 'the panel draws the origin row').toBeDefined();
+    expect(origin?.valueDirection).toBeUndefined();
+  });
 });

@@ -116,7 +116,7 @@ export default function ProviderPrReviewLayout() {
               never reach the authenticated queries and mutations below, and a
               Bitbucket personal scope gets the terminal org-only explanation
               instead of a retry that could not succeed. */}
-          <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
+          <PrReviewConnectGate platform={ref.platform} organizationId={organizationId} prRef={ref}>
             <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
               {/* Register the overview first, exactly like the GitHub layout:
                   unregistered routes sort after registered siblings, so without

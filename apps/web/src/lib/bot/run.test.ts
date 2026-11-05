@@ -3,6 +3,7 @@ const mockRunBotAgentFn = jest.fn();
 const mockCreateBotRequestFn = jest.fn();
 const mockUpdateBotRequestFn = jest.fn();
 const mockExtractAndUploadAttachmentsFn = jest.fn();
+const mockDiscardUploadedAttachmentsFn = jest.fn();
 
 function requireByAdapter(...args: unknown[]) {
   return mockRequireByAdapterFn(...args);
@@ -24,6 +25,10 @@ function extractAndUploadAttachments(...args: unknown[]) {
   return mockExtractAndUploadAttachmentsFn(...args);
 }
 
+function discardUploadedAttachments(...args: unknown[]) {
+  return mockDiscardUploadedAttachmentsFn(...args);
+}
+
 jest.mock('@/lib/bot/platforms', () => ({
   botPlatforms: { requireByAdapter },
 }));
@@ -39,6 +44,7 @@ jest.mock('@/lib/bot/request-logging', () => ({
 
 jest.mock('@/lib/bot/attachments', () => ({
   extractAndUploadAttachments,
+  discardUploadedAttachments,
 }));
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -81,7 +87,8 @@ function createBotPlatform(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockExtractAndUploadAttachmentsFn.mockResolvedValue({ files: [] });
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(undefined);
+  mockDiscardUploadedAttachmentsFn.mockResolvedValue(undefined);
   mockCreateBotRequestFn.mockResolvedValue('bot-request-1');
   mockRunBotAgentFn.mockResolvedValue({
     finalText: 'Done.',
@@ -123,5 +130,99 @@ test('an allowed repository authorization runs the agent with the triggering log
   });
   expect(mockRunBotAgentFn).toHaveBeenCalledWith(
     expect.objectContaining({ actorLogin: 'rso-dev', botRequestId: 'bot-request-1' })
+  );
+});
+
+const uploadedAttachments = {
+  attachments: { path: 'message-attachments', files: ['notes.md'] },
+  objectKeys: ['user_1/cloud-agent/message-attachments/notes.md'],
+  declinedFilenames: ['shot.png'],
+};
+
+test('a run that never starts a session discards its uploaded attachments', async () => {
+  mockRequireByAdapterFn.mockReturnValue(createBotPlatform());
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(uploadedAttachments);
+
+  await processLinkedMessage({ thread, message, platformIntegration: integration, user });
+
+  expect(mockRunBotAgentFn).toHaveBeenCalledWith(
+    expect.objectContaining({
+      attachments: uploadedAttachments.attachments,
+      declinedAttachmentFilenames: ['shot.png'],
+    })
+  );
+  expect(mockDiscardUploadedAttachmentsFn).toHaveBeenCalledWith('user_1', uploadedAttachments);
+});
+
+test('a started session keeps its uploaded attachments', async () => {
+  mockRequireByAdapterFn.mockReturnValue(createBotPlatform());
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(uploadedAttachments);
+  mockRunBotAgentFn.mockResolvedValue({
+    finalText: '',
+    startedCloudAgentSession: true,
+    collectedSteps: [],
+    responseTimeMs: 5,
+  });
+
+  await processLinkedMessage({ thread, message, platformIntegration: integration, user });
+
+  expect(mockDiscardUploadedAttachmentsFn).not.toHaveBeenCalled();
+});
+
+test('a run that throws discards the uploads the session never took', async () => {
+  mockRequireByAdapterFn.mockReturnValue(createBotPlatform());
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(uploadedAttachments);
+  mockRunBotAgentFn.mockRejectedValue(new Error('model failure'));
+
+  await processLinkedMessage({ thread, message, platformIntegration: integration, user });
+
+  expect(mockDiscardUploadedAttachmentsFn).toHaveBeenCalledWith('user_1', uploadedAttachments);
+});
+
+const messageWithAttachment = {
+  ...message,
+  attachments: [{ type: 'file', name: 'notes.md', mimeType: 'text/plain' }],
+} as unknown as Message;
+
+test('the platform attachment fetcher bounds the message uploads', async () => {
+  const fetchAttachmentUrl = jest.fn(async () => new Response('body'));
+  mockRequireByAdapterFn.mockReturnValue(
+    createBotPlatform({ createAttachmentUrlFetcher: jest.fn(async () => fetchAttachmentUrl) })
+  );
+
+  await processLinkedMessage({
+    thread,
+    message: messageWithAttachment,
+    platformIntegration: integration,
+    user,
+  });
+
+  expect(mockExtractAndUploadAttachmentsFn).toHaveBeenCalledWith(messageWithAttachment, 'user_1', {
+    fetchAttachmentUrl,
+  });
+});
+
+test('a failing platform attachment fetcher still forwards the message files', async () => {
+  mockRequireByAdapterFn.mockReturnValue(
+    createBotPlatform({
+      createAttachmentUrlFetcher: jest.fn(async () => {
+        throw new Error('no installation');
+      }),
+    })
+  );
+  mockExtractAndUploadAttachmentsFn.mockResolvedValue(uploadedAttachments);
+
+  await processLinkedMessage({
+    thread,
+    message: messageWithAttachment,
+    platformIntegration: integration,
+    user,
+  });
+
+  expect(mockExtractAndUploadAttachmentsFn).toHaveBeenCalledWith(messageWithAttachment, 'user_1', {
+    fetchAttachmentUrl: undefined,
+  });
+  expect(mockRunBotAgentFn).toHaveBeenCalledWith(
+    expect.objectContaining({ attachments: uploadedAttachments.attachments })
   );
 });

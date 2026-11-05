@@ -15,8 +15,10 @@ export function WriteToolCard({ toolPart }: WriteToolCardProps) {
   const input = state.input;
   const metadata = readFileToolMetadata(state.status === 'pending' ? undefined : state.metadata);
   const filePath =
-    metadata.filediff?.file ??
-    (typeof input.filePath === 'string' && input.filePath.trim() ? input.filePath : undefined);
+    [metadata.filediff?.file, input.filePath].find(
+      (path): path is string =>
+        typeof path === 'string' && path.trim().length > 0 && cloudAgentFileLabel(path) !== '.'
+    ) ?? metadata.filediff?.file;
   const displayFilePath = filePath ? cloudAgentFileLabel(filePath) : undefined;
   const content = typeof input.content === 'string' ? input.content : undefined;
   const patch = getUnifiedPatch(metadata.filediff?.patch);

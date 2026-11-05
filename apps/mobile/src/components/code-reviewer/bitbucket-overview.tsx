@@ -147,6 +147,7 @@ export function BitbucketOverview({
               options: models,
               value: data.modelSlug,
               variant: data.thinkingEffort ?? '',
+              acceptsVariant: true,
               onSelect: (modelSlug, variant) => {
                 save.mutate({ modelSlug, thinkingEffort: variant || null });
               },
@@ -194,7 +195,7 @@ export function BitbucketOverview({
 
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1 pr-3">
+                  <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
                     <Text variant="muted" className="text-xs">
                       {readiness.data?.workspace?.slug ?? ''}

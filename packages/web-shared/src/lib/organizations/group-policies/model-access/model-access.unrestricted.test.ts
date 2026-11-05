@@ -16,7 +16,7 @@ import type { OrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/or
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -43,6 +43,10 @@ function context(
       plan: 'teams',
       free_trial_end_at: null,
       company_domain: null,
+      directory_id: null,
+      directory_group_id: null,
+      directory_idp_id: null,
+      external_org_id: null,
     },
     defaultPolicies: [],
     groupIds: [],

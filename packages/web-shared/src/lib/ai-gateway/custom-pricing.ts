@@ -1,5 +1,5 @@
 import { captureMessage } from '@sentry/nextjs';
-import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
+import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
@@ -7,8 +7,7 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 
-type PricingTiers = CustomPricing['pricing'];
-type Pricing = PricingTiers[number]['pricing'];
+type Pricing = CustomPricingTiers[number]['pricing'];
 
 type Usage = {
   uncachedInputTokens: number;
@@ -17,7 +16,7 @@ type Usage = {
   cacheHitTokens: number;
 };
 
-function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
+function calculateCost_mUsd(usage: Usage, pricingTiers: CustomPricingTiers): number {
   if (pricingTiers[0].start_context_length !== 0) {
     throw new Error('The first pricing tier must start at context length 0');
   }
@@ -61,6 +60,14 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
   };
 }
 
+/** Model lists show the first tier, the price of a short request. */
+export function applyPricingTiers(
+  pricing: OpenRouterModel['pricing'],
+  pricingTiers: CustomPricingTiers
+): OpenRouterModel['pricing'] {
+  return applyPricing(pricing, pricingTiers[0].pricing);
+}
+
 export function applyCustomPricingToPricing(
   config: CustomPricingConfig,
   modelId: string,
@@ -68,7 +75,7 @@ export function applyCustomPricingToPricing(
 ): OpenRouterModel['pricing'] {
   const customPricing = getCustomPricing(config, modelId);
   return customPricing && !customPricing.fallbackOnly
-    ? applyPricing(pricing, customPricing.pricing[0].pricing)
+    ? applyPricingTiers(pricing, customPricing.pricing)
     : pricing;
 }
 
@@ -87,7 +94,7 @@ export function applyCustomPricingToModel(
   return {
     ...model,
     name: model.name + discountSuffix,
-    pricing: applyPricing(model.pricing, customPricing.pricing[0].pricing),
+    pricing: applyPricingTiers(model.pricing, customPricing.pricing),
   };
 }
 
@@ -98,7 +105,14 @@ export function calculateCustomCost_mUsd(
 ): number | undefined {
   const customPricing = getCustomPricing(config, modelId);
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
+  return calculateTieredCost_mUsd(customPricing.pricing, modelId, usage);
+}
 
+export function calculateTieredCost_mUsd(
+  pricingTiers: CustomPricingTiers,
+  modelId: string,
+  usage: JustTheCostsUsageStats
+): number {
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {
     captureMessage('SUSPICIOUS: negative uncached input tokens for custom pricing', {
@@ -116,7 +130,7 @@ export function calculateCustomCost_mUsd(
         cacheHitTokens: usage.cacheHitTokens,
         cacheWriteTokens: usage.cacheWriteTokens,
       },
-      customPricing.pricing
+      pricingTiers
     )
   );
 }

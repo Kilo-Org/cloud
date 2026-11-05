@@ -7,8 +7,6 @@ import {
 } from '../../shared/sandbox-status.js';
 import { createControlPlaneTerminals } from './terminals.js';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
-
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 const DIRECTORY = '/workspace/terminal';
@@ -39,17 +37,21 @@ function fakeStorage() {
   return { storage, values };
 }
 
-function metadata() {
+function metadata(overrides: { createdOnPlatform?: string; worktreeId?: string } = {}) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
       sessionId: SESSION_ID,
       userId: 'user_1',
-      createdOnPlatform: 'cloud-agent-web',
+      createdOnPlatform: overrides.createdOnPlatform ?? 'cloud-agent-web',
     },
     auth: { kiloSessionId: 'kilo_session_1' },
     agent: { mode: 'code', model: 'test-model' },
-    workspace: { sandboxId: SANDBOX_ID, sandboxProvider: 'cloudflare' },
+    workspace: {
+      sandboxId: SANDBOX_ID,
+      sandboxProvider: 'cloudflare',
+      ...(overrides.worktreeId ? { worktreeId: overrides.worktreeId } : {}),
+    },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -145,6 +147,7 @@ function fixture(
     isRouteReady?: boolean;
     getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
     sockets?: FakeSocket[];
+    metadata?: ReturnType<typeof metadata>;
   } = {}
 ) {
   const { values } = fakeStorage();
@@ -155,7 +158,7 @@ function fixture(
   const terminals = createControlPlaneTerminals({
     state: fakeState(values, overrides.sockets ?? []),
     sessionId: SESSION_ID,
-    getMetadata: () => metadata(),
+    getMetadata: () => overrides.metadata ?? metadata(),
     getDirectory: () => DIRECTORY,
     getWrapperId: async () => CURRENT_WRAPPER,
     isRouteReady: () => overrides.isRouteReady ?? true,
@@ -192,6 +195,38 @@ describe('V2 control-plane terminals projection', () => {
     ).resolves.toEqual({
       success: false,
       error: 'Terminal unavailable until the workspace is prepared',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each(['desktop', 'agent-manager'])(
+    'allows terminals for an inherited %s hosted worktree session',
+    async createdOnPlatform => {
+      const { terminals, request } = fixture({
+        metadata: metadata({
+          createdOnPlatform,
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        }),
+      });
+
+      await expect(
+        terminals.create({ operationId: '99999999-9999-4999-8999-999999999999' })
+      ).resolves.toMatchObject({ success: true });
+      expect(request).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('denies terminals for a native desktop session without a hosted worktree', async () => {
+    const { terminals, request } = fixture({
+      metadata: metadata({ createdOnPlatform: 'desktop' }),
+    });
+
+    await expect(
+      terminals.create({ operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+    ).resolves.toEqual({
+      success: false,
+      error:
+        'Terminal access denied: terminals are only available for interactive Cloud Agent sessions',
     });
     expect(request).not.toHaveBeenCalled();
   });

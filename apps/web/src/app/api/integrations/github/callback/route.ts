@@ -692,7 +692,9 @@ async function handleCoreInstallFlow(params: {
             ? 'incompatible_workflow'
             : reason === 'retryable_conflict'
               ? 'connection_temporarily_unavailable'
-              : 'installation_already_claimed';
+              : reason === 'installation_unavailable'
+                ? 'installation_unavailable'
+                : 'installation_already_claimed';
 
     if (verifiedIdentity) {
       // The verified writer admits and commits this association itself

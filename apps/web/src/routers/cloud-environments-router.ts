@@ -5,7 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { SELECTABLE_SANDBOX_ALLOCATIONS } from '@kilocode/worker-utils/sandbox-allocation';
-import { canonicalGitLabCloneUrl } from '@kilocode/worker-utils/git-url';
+import { egressModeSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -18,15 +18,19 @@ import {
   updateEnvironment,
   ENVIRONMENT_KEY_PATTERN,
   ENVIRONMENT_LIMITS,
+  environmentRepositoryEntrySchema,
   type EnvironmentCreateInput,
   type EnvironmentOwner,
+  type EnvironmentPlatform,
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
+import { assertAllocationSupportsMultiRepository } from '@/lib/cloud-agent/multi-repository-environments';
 import {
-  buildGitLabCloneUrl,
-  getGitLabInstanceUrlForOrganization,
-  getGitLabInstanceUrlForUser,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+  canonicalGitLabProjectUrl,
+  createRepositorySchema,
+  environmentRepositoryListSchema,
+  toEnvironmentRepositoryEntry,
+} from '@/lib/cloud-agent/environment-repository-input';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import { createEnvironmentBuildClient } from '@/lib/cloud-agent-next/environment-build-client';
 import {
@@ -40,6 +44,11 @@ import {
   environmentBuildRequestResultSchema,
   environmentBuildStatusSchema,
 } from '../../../../services/cloud-agent-next/src/shared/environment-build-status';
+
+// Environments store network restrictions, but auditing is a session-only option.
+const environmentEgressPolicySchema = egressPolicySchema.safeExtend({
+  egressAudit: z.never().optional(),
+});
 
 const environmentNameSchema = z.string().trim().min(1).max(ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
 const environmentKeySchema = z
@@ -83,27 +92,31 @@ const listRepositorySchema = z.discriminatedUnion('platform', [
   }),
 ]);
 
-const createRepositorySchema = z.discriminatedUnion('platform', [
-  z.object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) }),
-  z.object({ platform: z.literal('gitlab'), projectPath: z.string().min(1).max(500) }),
-  z.object({
-    platform: z.literal('bitbucket'),
-    fullName: z.string().min(1).max(500),
-    workspaceUuid: z.uuid(),
-    repositoryUuid: z.uuid(),
-  }),
-]);
-
 const environmentPlatformSchema = z.enum(['github', 'gitlab', 'bitbucket']);
 
-const environmentSummarySchema = z.object({
-  id: z.uuid(),
-  name: z.string(),
+// A response is a V1 environment (identity scalars) or a V2 environment
+// (`repositories`). The other alternative's fields are absent.
+const environmentV1IdentitySchema = {
   platform: environmentPlatformSchema,
   repoFullName: z.string(),
   gitlabCloneUrl: z.string().nullable(),
   bitbucketWorkspaceUuid: z.string().nullable(),
   bitbucketRepositoryUuid: z.string().nullable(),
+  repositories: z.undefined().optional(),
+};
+
+const environmentV2IdentitySchema = {
+  repositories: z.array(environmentRepositoryEntrySchema),
+  platform: z.undefined().optional(),
+  repoFullName: z.undefined().optional(),
+  gitlabCloneUrl: z.undefined().optional(),
+  bitbucketWorkspaceUuid: z.undefined().optional(),
+  bitbucketRepositoryUuid: z.undefined().optional(),
+};
+
+const environmentSummaryBaseSchema = {
+  id: z.uuid(),
+  name: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
   plainVarCount: z.number(),
@@ -111,16 +124,16 @@ const environmentSummarySchema = z.object({
   commandCount: z.number(),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
-});
+};
 
-const environmentResponseSchema = z.object({
+const environmentSummarySchema = z.union([
+  z.object({ ...environmentSummaryBaseSchema, ...environmentV1IdentitySchema }),
+  z.object({ ...environmentSummaryBaseSchema, ...environmentV2IdentitySchema }),
+]);
+
+const environmentResponseBaseSchema = {
   id: z.uuid(),
   name: z.string(),
-  platform: environmentPlatformSchema,
-  repoFullName: z.string(),
-  gitlabCloneUrl: z.string().nullable(),
-  bitbucketWorkspaceUuid: z.string().nullable(),
-  bitbucketRepositoryUuid: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   plainVars: z.array(
@@ -132,10 +145,18 @@ const environmentResponseSchema = z.object({
     })
   ),
   commands: z.array(z.string()),
+  startCommands: z.array(z.string()),
   secretKeys: z.array(z.string()),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
-});
+  egressMode: egressModeSchema.nullable(),
+  egressAllowlist: z.array(z.string()).nullable(),
+};
+
+const environmentResponseSchema = z.union([
+  z.object({ ...environmentResponseBaseSchema, ...environmentV1IdentitySchema }),
+  z.object({ ...environmentResponseBaseSchema, ...environmentV2IdentitySchema }),
+]);
 
 const publicKey = AGENT_ENV_VARS_PUBLIC_KEY ?? '';
 
@@ -162,19 +183,21 @@ async function environmentBuildClientFor(
 }
 
 /**
- * Rejects a sandbox the owner is not offered for the repository's platform.
- * Callers check only a newly chosen key: an unchanged saved key may be stale,
- * and sessions skip it, so it must not block an unrelated edit.
+ * Rejects a sandbox the owner is not offered for every platform the environment
+ * contains. Callers check only a newly chosen key: an unchanged saved key may be
+ * stale, and sessions skip it, so it must not block an unrelated edit.
  */
 async function assertEnvironmentAllocationOffered(
   user: User,
   headersList: Headers | undefined,
   organizationId: string | undefined,
-  platform: EnvironmentRepositoryIdentity['platform'],
+  platforms: EnvironmentPlatform[],
   allocation: string
 ): Promise<void> {
-  const capabilities = await loadSandboxCapabilities(user, headersList, organizationId, platform);
-  assertAllocationOffered(capabilities, allocation, platform);
+  for (const platform of platforms) {
+    const capabilities = await loadSandboxCapabilities(user, headersList, organizationId, platform);
+    assertAllocationOffered(capabilities, allocation, platform);
+  }
 }
 
 const environmentBuildScopeSchema = z.object({
@@ -186,21 +209,6 @@ async function requireActiveOrganization(organizationId: string): Promise<void> 
   if (!(await getOrganizationById(organizationId))) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
-}
-
-async function canonicalGitLabProjectUrl(
-  projectPath: string,
-  userId: string,
-  organizationId: string | undefined
-): Promise<string> {
-  const instanceUrl = organizationId
-    ? await getGitLabInstanceUrlForOrganization(organizationId)
-    : await getGitLabInstanceUrlForUser(userId);
-  const cloneUrl = canonicalGitLabCloneUrl(buildGitLabCloneUrl(projectPath, instanceUrl));
-  if (!cloneUrl) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid GitLab project path' });
-  }
-  return cloneUrl;
 }
 
 async function listRepositoryIdentity(
@@ -221,43 +229,6 @@ async function listRepositoryIdentity(
         platform: 'bitbucket',
         workspaceUuid: repository.workspaceUuid,
         repositoryUuid: repository.repositoryUuid,
-      };
-  }
-}
-
-async function createRepositoryIdentity(
-  repository: z.infer<typeof createRepositorySchema>,
-  userId: string,
-  organizationId: string | undefined
-): Promise<
-  Pick<
-    EnvironmentCreateInput,
-    | 'platform'
-    | 'repoFullName'
-    | 'gitlabCloneUrl'
-    | 'bitbucketWorkspaceUuid'
-    | 'bitbucketRepositoryUuid'
-  >
-> {
-  switch (repository.platform) {
-    case 'github':
-      return { platform: 'github', repoFullName: repository.fullName };
-    case 'gitlab':
-      return {
-        platform: 'gitlab',
-        repoFullName: repository.projectPath,
-        gitlabCloneUrl: await canonicalGitLabProjectUrl(
-          repository.projectPath,
-          userId,
-          organizationId
-        ),
-      };
-    case 'bitbucket':
-      return {
-        platform: 'bitbucket',
-        repoFullName: repository.fullName,
-        bitbucketWorkspaceUuid: repository.workspaceUuid,
-        bitbucketRepositoryUuid: repository.repositoryUuid,
       };
   }
 }
@@ -313,49 +284,69 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   create: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        name: environmentNameSchema,
-        repository: createRepositorySchema,
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretsSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          name: environmentNameSchema,
+          /** One repository: a V1 environment. */
+          repository: createRepositorySchema.optional(),
+          /** One or more repositories: a V2 environment. */
+          repositories: environmentRepositoryListSchema.optional(),
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretsSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          startCommands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(environmentEgressPolicySchema)
     )
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
+      if ((input.repository === undefined) === (input.repositories === undefined)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Provide either repository or repositories',
+        });
+      }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      const repository = await createRepositoryIdentity(
-        input.repository,
-        ctx.user.id,
-        input.organizationId
+      const submitted = input.repositories ?? (input.repository ? [input.repository] : []);
+      if (input.repositories) {
+        assertAllocationSupportsMultiRepository(input.sandboxAllocation);
+      }
+      const entries = await Promise.all(
+        submitted.map(repository =>
+          toEnvironmentRepositoryEntry(repository, ctx.user.id, input.organizationId)
+        )
       );
       if (input.sandboxAllocation) {
         await assertEnvironmentAllocationOffered(
           ctx.user,
           ctx.headersList,
           input.organizationId,
-          repository.platform,
+          [...new Set(entries.map(entry => entry.platform))],
           input.sandboxAllocation
         );
       }
+      const base = {
+        owner,
+        createdByUserId: ctx.user.id,
+        name: input.name,
+        plainVars: input.plainVars,
+        secrets: input.secrets,
+        commands: input.commands,
+        startCommands: input.startCommands,
+        sandboxAllocation: input.sandboxAllocation,
+        egressMode: input.egressMode,
+        egressAllowlist: input.egressAllowlist,
+      };
+      const createInput: EnvironmentCreateInput = input.repositories
+        ? { ...base, repositories: entries }
+        : { ...base, ...entries[0] };
       return db
-        .transaction(tx =>
-          createEnvironment(tx, publicKey, {
-            owner,
-            createdByUserId: ctx.user.id,
-            name: input.name,
-            ...repository,
-            plainVars: input.plainVars,
-            secrets: input.secrets,
-            commands: input.commands,
-            sandboxAllocation: input.sandboxAllocation,
-          })
-        )
+        .transaction(tx => createEnvironment(tx, publicKey, createInput))
         .catch(error => {
           if (isUniqueViolation(error)) {
             throw new TRPCError({ code: 'CONFLICT', message: DUPLICATE_ENVIRONMENT_MESSAGE });
@@ -366,15 +357,20 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   update: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        environmentId: z.uuid(),
-        name: environmentNameSchema.optional(),
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretChangesSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          environmentId: z.uuid(),
+          name: environmentNameSchema.optional(),
+          /** Replaces repositories, converting older environments when needed. */
+          repositories: environmentRepositoryListSchema.optional(),
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretChangesSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          startCommands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(environmentEgressPolicySchema)
     )
     .output(z.object({ success: z.boolean(), configurationRevision: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -382,14 +378,31 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      if (input.sandboxAllocation) {
+      const repositories = input.repositories
+        ? await Promise.all(
+            input.repositories.map(repository =>
+              toEnvironmentRepositoryEntry(repository, ctx.user.id, input.organizationId)
+            )
+          )
+        : undefined;
+      if (input.sandboxAllocation || repositories) {
         const saved = await getEnvironment(db, input.environmentId, owner);
-        if (input.sandboxAllocation !== saved.sandboxAllocation) {
+        if (saved.repositories || repositories) {
+          assertAllocationSupportsMultiRepository(
+            input.sandboxAllocation === undefined
+              ? saved.sandboxAllocation
+              : input.sandboxAllocation
+          );
+        }
+        if (input.sandboxAllocation && input.sandboxAllocation !== saved.sandboxAllocation) {
+          const platforms = (repositories ?? saved.repositories ?? [saved]).map(
+            repository => repository.platform
+          );
           await assertEnvironmentAllocationOffered(
             ctx.user,
             ctx.headersList,
             input.organizationId,
-            saved.platform,
+            [...new Set(platforms)],
             input.sandboxAllocation
           );
         }
@@ -399,10 +412,14 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           owner,
           environmentId: input.environmentId,
           name: input.name,
+          repositories,
           plainVars: input.plainVars,
           secrets: input.secrets,
           commands: input.commands,
+          startCommands: input.startCommands,
           sandboxAllocation: input.sandboxAllocation,
+          egressMode: input.egressMode,
+          egressAllowlist: input.egressAllowlist,
         })
       );
       return { success: true, configurationRevision };

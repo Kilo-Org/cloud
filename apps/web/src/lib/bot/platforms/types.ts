@@ -77,6 +77,16 @@ export type BotPlatform = {
     platformIntegration: PlatformIntegration;
     fn: () => Promise<T>;
   }): Promise<T>;
+  /**
+   * Authorization for the platform's own attachment URLs, so the bot layer can
+   * read a file body under its size cap and stop the transfer as soon as the
+   * cap is passed. Slack's private file URLs need the installation's bot token.
+   * Returns undefined, or is absent, when the adapter must fetch the body
+   * itself; the bot layer then falls back to the adapter's own fetch.
+   */
+  createAttachmentUrlFetcher?(params: {
+    platformIntegration: PlatformIntegration;
+  }): Promise<((url: string) => Promise<Response>) | undefined>;
   getConversationContext(params: {
     thread: Thread;
     triggerMessage: ContextTriggerMessage;

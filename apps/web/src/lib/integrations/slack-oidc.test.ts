@@ -92,7 +92,7 @@ describe('exchangeSlackOidcCode', () => {
 });
 
 describe('fetchSlackIdentity', () => {
-  test('reads the Slack-asserted team and user ids from userinfo', async () => {
+  test('reads the Slack-reported team and user ids from userinfo', async () => {
     mockFetch.mockResolvedValue(
       jsonResponse({ ok: true, [SLACK_TEAM_CLAIM]: 'T123', [SLACK_USER_CLAIM]: 'U123' })
     );

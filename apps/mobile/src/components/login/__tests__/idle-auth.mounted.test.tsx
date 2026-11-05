@@ -13,9 +13,12 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_LINE_GAP_CLASS,
+  INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
+  INLINE_LINK_SENTENCE_LINE_DP,
   INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
@@ -195,7 +198,7 @@ function findLink(root: I, label: string): I {
 
 /** The sentence end a legal link's accessibility label sits at. */
 function linkEdge(label: string | undefined): 'start' | 'end' {
-  return label === 'Terms' ? 'start' : 'end';
+  return label === 'Terms of Use' ? 'start' : 'end';
 }
 
 /**
@@ -927,7 +930,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Terms');
+    expect(texts(renderer.root)).toContain('Terms of Use');
     expect(texts(renderer.root)).toContain('Privacy Policy');
   });
 
@@ -936,7 +939,10 @@ describe('IdleAuth email continue copy', () => {
     const renderer = await mountIdleAuth(start);
 
     const links = linkPressables(renderer.root);
-    expect(links.map(link => link.props.accessibilityLabel)).toEqual(['Terms', 'Privacy Policy']);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual([
+      'Terms of Use',
+      'Privacy Policy',
+    ]);
 
     for (const link of links) {
       const box = boxDp(link.props.className as string);
@@ -957,10 +963,10 @@ describe('IdleAuth email continue copy', () => {
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
 
-    // The sentence's copy is unchanged: both labels still render, with the
+    // The sentence's copy is unchanged: both links still render, with the
     // connector and suffix the sentence carried before.
     expect(texts(renderer.root)).toEqual(
-      expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
+      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
     );
 
     act(() => {
@@ -997,7 +1003,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findLink(renderer.root, 'Terms');
+    const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
@@ -1027,7 +1033,7 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(wrapper.props.accessibilityRole).toBe('text');
     expect(wrapper.props.accessibilityLabel).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     expect(wrapper.props.accessibilityActions).toEqual([
       { name: 'openTerms', label: 'Terms' },
@@ -1227,7 +1233,7 @@ describe('IdleAuth layout repairs', () => {
     // tight against "Privacy Policy". The links' own px-1 padding widened every
     // boundary it touched.
     expect(legalSentence(renderer.root)).toBe(
-      'By continuing you agree to our Terms and Privacy Policy.'
+      'By continuing you agree to our Terms of Use and Privacy Policy.'
     );
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
@@ -1289,31 +1295,40 @@ describe('IdleAuth layout repairs', () => {
     }
   );
 
-  it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
+  it('cancels the inline link box height so the box never lifts the sentence line', async () => {
     // The audit floor stays on the node's own rect...
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minHeight')).toBe(28);
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'minWidth')).toBe(28);
-    // ...while the vertical cancel keeps (28 - 14) / 2 out of the text-xs row,
-    // so the legal line is no taller than the surrounding prose.
+    // ...while the vertical cancel keeps its outer at 14dp, below the 17.5dp
+    // text-sm line, so the legal row lays out on the sentence's own line and
+    // never on the box's 28dp floor.
     expect(await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')).toBe(-7);
+    const cancelDp = (await compiledNumber(INLINE_LINK_BOX_CLASS, 'marginBlock')) ?? 0;
+    expect(28 + 2 * cancelDp).toBeLessThan(INLINE_LINK_SENTENCE_LINE_DP);
   });
 
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // A link's 44pt vertical region reaches (28 - 14) / 2 + 8 = 15dp past the
-    // text-xs line it sits on. The screen's `gap-3` gutter to the Continue
-    // button above the row (and the ghost button below) is 10.5dp — 4.5dp
+    // A link's 44pt vertical region reaches (28 - 17.5) / 2 + 8 = 13.25dp past
+    // the text line it sits on. The screen's `gap-3` gutter to the Continue
+    // button above the row (and the ghost button below) is 10.5dp — 2.75dp
     // short — so the legal row carries its own margin and the free space is
     // 10.5 + 5 = 15.5dp each side. Without that clearance the region started
     // 4.5dp inside the Continue button and a tap on the button's bottom strip
     // opened the link instead of sending the code (the earlier mis-routed-tap
     // finding).
-    expect(INLINE_LINK_ROW_CLASS).toBe(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
-    const overflowDp = (MIN_TAP_TARGET_DP - 14) / 2;
+    expect(INLINE_LINK_ROW_CLASS).toBe(
+      `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
+    );
+    // A wrapped sentence line gets more than the box's per-side overflow, or
+    // the box on the next line enters the prose above it (a pt-BR gate run
+    // measured 6.9dp of that collision on the old 14dp line).
+    const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
     const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
     expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
-    expect(overflowDp).toBe(7);
+    expect(overflowDp).toBe(5.25);
 
     const row = renderer.root.find(
       n =>

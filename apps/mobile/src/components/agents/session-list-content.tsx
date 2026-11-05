@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
@@ -205,19 +206,12 @@ export function AgentSessionListContent({
   // The no-history body's next step. It opens the same composer the Agents
   // tab's "New session" action does, so an empty history never dead-ends at a
   // message.
-  const createSessionAction = (
-    <Button onPress={onCreateSession}>
-      <Text>{t('common.newSession')}</Text>
-    </Button>
-  );
+  const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
 
-  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. On return, each row re-reads the ack
-  // store via its own `useSyncExternalStore` subscription
-  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
-  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
-  // pass it as `extraData` so visible cells re-render without remounting the
-  // list — preserving scroll.
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {

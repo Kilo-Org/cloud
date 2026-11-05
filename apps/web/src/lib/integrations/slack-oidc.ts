@@ -6,14 +6,14 @@ import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { LinkAccountProofUnavailableError } from '@/lib/bot/link-account-proof';
 
-// "Sign in with Slack" (OpenID Connect) is how a browser proves which Slack
+// "Sign in with Slack" (OpenID Connect) is how a browser confirms which Slack
 // user it is signed in to Slack as. It is separate from the bot-install OAuth
 // flow: `scope=openid` only, and the token it returns is used once to read the
 // caller's own identity and then discarded. The redirect URI is the Slack
 // platform OAuth callback the app already registers, so enabling the `openid`
 // user scope in the Slack app is the only configuration this flow needs.
 //
-// Slack's userinfo response stamps the identity as
+// Slack's userinfo response reports the identity as
 // `https://slack.com/team_id` and `https://slack.com/user_id`.
 
 const SLACK_OIDC_AUTHORIZE_URL = 'https://slack.com/openid/connect/authorize';
@@ -57,10 +57,9 @@ const userInfoResponseSchema = z.object({
 });
 
 /**
- * The Sign in with Slack client credential. Both halves are required: an
- * authorization code issued to a client without a secret cannot be redeemed, so
- * a request must fail before the browser leaves the app rather than after the
- * user has completed the round trip.
+ * The Sign in with Slack client credential. Both halves are required: a token
+ * request needs both, so the link page answers with its own error instead of
+ * sending the browser to Slack and failing there.
  */
 export function requireSlackOidcClientCredentials(
   config: { clientId: string | undefined; clientSecret: string | undefined } = {
@@ -132,9 +131,8 @@ async function slackRequest(
 /**
  * Redeem the authorization code at Slack's OIDC token endpoint.
  *
- * The code was issued to our `client_id` for our registered redirect URI, so
- * the access token it yields is bound to this application and to the Slack user
- * who approved the request.
+ * The access token it yields is scoped to this application (`client_id`,
+ * registered redirect URI) and to the Slack user who approved the request.
  */
 export async function exchangeSlackOidcCode(code: string): Promise<string> {
   const { clientId, clientSecret } = requireSlackOidcClientCredentials();
@@ -166,9 +164,8 @@ export async function exchangeSlackOidcCode(code: string): Promise<string> {
 
 /**
  * Read the signed-in Slack user's identity from Slack. `user_id` and `team_id`
- * are Slack's own assertions about the token holder: they are the identity this
- * flow links, and they must match the identity the pending link token named
- * before anything is written.
+ * come from Slack's userinfo response: the flow links that identity, and the
+ * callback keeps it only when it equals the identity the pending link named.
  */
 export async function fetchSlackIdentity(accessToken: string): Promise<SlackIdentity> {
   const body = await slackRequest(

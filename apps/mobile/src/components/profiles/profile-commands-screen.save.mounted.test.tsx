@@ -14,6 +14,7 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileCommands: () => h.query,
+  useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -83,17 +85,27 @@ vi.mock('@/components/ui/form-field', async () => {
   // helpers must be loaded inside the factory.
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
+    FormField: (props: {
+      defaultValue?: string;
+      labelAccessory?: unknown;
+      onChangeText?: (value: string) => void;
+    }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      return createElement('FormField', {
-        ...props,
-        nativeText: nativeText.current,
-        onChangeText: (value: string) => {
-          nativeText.current = value;
-          props.onChangeText?.(value);
+      // The real field renders its label accessory beside the label, so the
+      // caller's row controls are children of the mocked field too.
+      return createElement(
+        'FormField',
+        {
+          ...props,
+          nativeText: nativeText.current,
+          onChangeText: (value: string) => {
+            nativeText.current = value;
+            props.onChangeText?.(value);
+          },
         },
-      });
+        props.labelAccessory as never
+      );
     },
   };
 });
@@ -109,6 +121,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen Back', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.guard.enabled = false;
     h.guard.callback = undefined;
     Object.assign(h.query, {

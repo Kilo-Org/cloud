@@ -171,6 +171,7 @@ describe('remembered question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
   });
 
@@ -189,6 +190,7 @@ describe('remembered question targets', () => {
       model: 'backend:private:1:model',
       effort: null,
       images: [],
+      failureKey: null,
     });
   });
 });

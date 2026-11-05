@@ -37,6 +37,8 @@ jobs:
       ai_gateway_secure_proxy: ${{ steps.filter_secure_proxy.outputs.ai_gateway_secure_proxy || steps.filter_secure_proxy_retry.outputs.ai_gateway_secure_proxy }}
       # The diagram host document and its browser checks, also their own pair.
       mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
+      # The session-sync account database suite, also its own pair.
+      session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
       # groups and cloud-agent-next parts it needs.
@@ -65,9 +67,6 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
-
-      - name: Check runtime publication workflow admission
-        run: pnpm --filter cloud-agent-next test:runtime-ci
 
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
@@ -100,6 +99,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -145,6 +145,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -233,6 +234,30 @@ jobs:
               - 'apps/web/package.json'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
+      - name: Detect session-sync changes
+        id: filter_session_sync
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            session_sync:
+              - 'services/session-sync/**'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect session-sync changes (retry)
+        id: filter_session_sync_retry
+        if: steps.filter_session_sync.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            session_sync:
+              - 'services/session-sync/**'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
       # Pull requests check only the workspaces a change can affect. Main
       # pushes and the merge queue pass no base, which selects every workspace.
       - name: Detect affected workspaces
@@ -276,9 +301,18 @@ jobs:
         id: workspaces
         env:
           AFFECTED: ${{ steps.affected.outputs.affected }}
+          HARNESS_SDK: ${{ steps.filter_harness.outputs.harness_sdk || steps.filter_harness_retry.outputs.harness_sdk }}
         run: |
           mapfile -t includes < <(jq -r '.test_only_dirs[] | ("--include", .)' <<< "$AFFECTED")
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile "${includes[@]}")
+          excludes=(--exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile)
+          # The dedicated harness-sdk job runs the same vitest suite through
+          # check:ci when the filter matches, so the matrix entry only repeats
+          # it. A dependency-driven selection (lockfile change, filter false)
+          # keeps calling for it.
+          if [ "$HARNESS_SDK" = "true" ]; then
+            excludes+=(--exclude packages/harness-sdk)
+          fi
+          matrix=$(scripts/changed-workspaces.sh "${excludes[@]}" "${includes[@]}")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   # The CI wiring and plugin manifest checks. No job waits for this one, so it
@@ -312,8 +346,14 @@ jobs:
       - name: Check stacked CI admission
         run: node --test scripts/stacked-ci.test.mjs
 
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
+
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
+
+      - name: Test build cache keys
+        run: node --test scripts/build-key-inputs.test.mjs
 
       - name: Test affected workspace detection
         run: node --test scripts/affected-workspaces.test.mjs
@@ -346,9 +386,64 @@ jobs:
       - name: Test meta-janitor approval gates
         run: node --test scripts/meta-janitor-approve.test.mjs
 
-  typecheck-groups:
+      # sbom.yml is only reached by a PR that changes the workflow or its test,
+      # and that path set does not trip the kilocode_backend filter that gates
+      # test-scripts. Run the SBOM wiring checks here so a PR cannot drop the
+      # push filter unnoticed.
+      - name: Test SBOM workflow wiring
+        run: node --test scripts/mobile-sbom-workflow.test.mjs
+
+  # One producer for the tRPC declarations. Both matrices used to run the
+  # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
+  # compiled the same declaration program in two 4 vCPU jobs that started
+  # together, and both raced to save the one cache key. The cache stays here;
+  # every consumer downloads the built tree instead of building it again.
+  trpc-declarations:
     needs: changes
-    if: needs.changes.outputs.typecheck_groups != '[]'
+    # Only the trpc rows consume the declarations: the typecheck group that
+    # covers the extension, and the lint group that lints it. The web and
+    # packages groups never read packages/trpc/dist, so a run that selects only
+    # them must not wait for this job.
+    if: contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Upload tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          # A hit that restored nothing must fail here, not in a consumer.
+          if-no-files-found: error
+
+  typecheck-groups:
+    needs: [changes, trpc-declarations]
+    # `always()` keeps every non-trpc group running when the producer is
+    # skipped, and makes a failed producer surface as a failed download in the
+    # trpc group instead of a quietly skipped row the aggregator would pass. A
+    # failed `changes` job keeps them skipped, because its outputs carry no
+    # group list.
+    if: always() && needs.changes.result == 'success' && needs.changes.outputs.typecheck_groups != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -383,9 +478,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
-      - name: Restore or build tRPC declarations
+      - name: Download tRPC declarations
         if: matrix.group == 'trpc'
-        uses: ./.github/actions/trpc-declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Typecheck
         env:
@@ -411,8 +509,11 @@ jobs:
           fi
 
   lint-groups:
-    needs: changes
-    if: needs.changes.outputs.lint_groups != '[]'
+    needs: [changes, trpc-declarations]
+    # `always()` so a skipped producer (a lint-rest-only run) or a failed one
+    # cannot skip every lint group; the trpc download below fails loudly. A
+    # failed `changes` job keeps them skipped.
+    if: always() && needs.changes.result == 'success' && needs.changes.outputs.lint_groups != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -440,22 +541,16 @@ jobs:
 
       # The extension sources lint against the built tRPC types. A full lint
       # also covers apps/mobile, which needs the harness SDK build too.
-      - name: Restore or build tRPC declarations
+      - name: Download tRPC declarations
         if: matrix.group == 'trpc'
-        uses: ./.github/actions/trpc-declarations
-
-      - name: Cache compiler plugins
-        if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+          name: trpc-declarations
+          path: packages/trpc/dist
 
-      - name: Build harness SDK
+      - name: Restore or build the harness SDK
         if: matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Lint
         env:
@@ -697,6 +792,9 @@ jobs:
       - name: Run Session Ingest Postgres tests
         run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
 
+      - name: Run SCIM Sync Postgres tests
+        run: NODE_ENV=development pnpm --filter cloudflare-scim-sync test:postgres
+
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
     needs: changes
@@ -738,6 +836,7 @@ jobs:
       - drizzle-check
       - harness-sdk
       - mobile-diagram-host
+      - session-sync-postgres
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}
@@ -782,11 +881,15 @@ jobs:
       - name: Cache Next.js build
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
-          path: |
-            ~/.npm
-            ${{ github.workspace }}/apps/web/.next/cache
-          # Avoid recursive source hashing after install; it can time out scanning node_modules.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          path: ${{ github.workspace }}/apps/web/.next/cache
+          # Key on the build inputs, not the commit: a cache entry is immutable,
+          # so a key that carries github.sha writes a new entry on every run for
+          # one dependency graph. The lockfile digest keeps its own segment, so
+          # the prefix restore-key below still matches this key when only a
+          # source file changed, which also reaches the sha-keyed entries left
+          # by earlier runs. The source globs stay inside the app tree, so none
+          # of them walks node_modules.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**/*', 'apps/web/*.mjs', 'apps/web/*.ts', 'apps/web/*.tsx', 'apps/web/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -832,7 +935,11 @@ jobs:
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ github.workspace }}/apps/ai-gateway/.next/cache
-          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          # Same input-keyed scheme as the web build cache: the lockfile digest
+          # is its own segment so the prefix restore-key below still matches.
+          # The job copies apps/web/.env and apps/web/.env.test into the app
+          # before building, so those files are build inputs here too.
+          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/ai-gateway/src/**/*', 'apps/ai-gateway/*.mjs', 'apps/ai-gateway/*.json', 'apps/web/.env', 'apps/web/.env.test') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-
 
@@ -980,10 +1087,6 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next check:duplication
 
-      - name: Run cloud-agent-next SDK provenance tests
-        if: matrix.part == 'other'
-        run: pnpm --filter cloud-agent-next test:sdk-provenance
-
       - name: Run the wrapper process tests
         if: matrix.part == 'wrapper-process'
         working-directory: services/cloud-agent-next/wrapper
@@ -1059,6 +1162,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The version comes from the dependency graph this install just built, so
+      # a bump to @playwright/test changes the key and downloads the matching
+      # build. No restore-keys: an older browser tree never satisfies the
+      # install and would only grow the cached entry.
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
+
       # No --with-deps: the runner image already ships the Chromium system
       # libraries, and the apt-get behind --with-deps can hang until the job
       # timeout when the fleet's apt egress degrades.
@@ -1067,6 +1184,51 @@ jobs:
 
       - name: Check the diagram host page in a browser
         run: pnpm --filter web run test:mobile-mermaid
+
+  session-sync-postgres:
+    needs: changes
+    if: needs.changes.outputs.session_sync == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 25
+        ports:
+          - 5432:5432
+
+    env:
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The exchange suite reads the real account tables. Avoid the Jest worker
+      # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
+      - name: Run session-sync account database tests
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres
 
   workspace-tests:
     needs: changes

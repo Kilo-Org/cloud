@@ -24,7 +24,11 @@ import {
   getLiveActivityEnabled,
   subscribeLiveActivityEnabled,
 } from '@/lib/glanceable/live-activity-switch';
-import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
+import {
+  getAuthenticatedGlanceableScopeKey,
+  getGlanceableSnapshotForSignedInScope,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
@@ -199,9 +203,10 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
 
   // Re-read native storage even in a live process. An old alarm can already have
   // queued this task when newer work or a privacy blank replaces its deadline.
+  // The Home-only record is adopted for the signed-in scope only.
   const beforeRestore = getStoredWidgetSnapshot();
   if (beforeRestore !== null) {
-    await restoreHomeWidgetData(beforeRestore.scopeKey);
+    await restoreHomeWidgetData(await getAuthenticatedGlanceableScopeKey());
   }
   const stored = getStoredWidgetSnapshot();
   let snapshot = stored;
@@ -217,12 +222,11 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
           getHomeWidgetDataForSnapshot(stored)
         );
   if (props === null) {
-    // Migrate the existing mirror when this installation has no native snapshot yet.
+    // Migrate the existing mirror when this installation has no native snapshot
+    // yet. The restore above already adopted the Home-only record for the
+    // signed-in scope, and the mirror record is drawn on the same scope.
     await restorePersistedGlanceable();
-    const restored = getLastGlanceableSnapshot();
-    if (restored !== null) {
-      await restoreHomeWidgetData(restored.scopeKey);
-    }
+    const restored = getGlanceableSnapshotForSignedInScope();
     if (restored !== null && getCurrentWidgetProps() === null) {
       setWidgetSnapshot(restored);
     }

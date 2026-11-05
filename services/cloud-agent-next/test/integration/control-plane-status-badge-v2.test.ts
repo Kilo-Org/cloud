@@ -23,7 +23,7 @@ import {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
@@ -68,7 +68,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/b10',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -116,7 +116,7 @@ async function injectProvider(
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -157,13 +157,13 @@ async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   return { sandboxId, sandbox };
@@ -175,7 +175,7 @@ afterEach(async () => {
 
 describe('sandbox status badge projection (B10)', () => {
   it('reports unknown when the sandbox has no owner', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const sandbox = sandboxes.getByName(sandboxId);
 
     const snapshot = SandboxStatusSnapshotSchema.parse(await sandbox.getStatusSnapshot());
@@ -189,7 +189,7 @@ describe('sandbox status badge projection (B10)', () => {
   });
 
   it('reports active while connected and sleeping after the provider is gone', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const sandbox = await injectProvider(sandboxId, provider);
     const sessionId = newSessionId();
@@ -198,7 +198,7 @@ describe('sandbox status badge projection (B10)', () => {
     await session.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kilo, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const launchEnv = provider.launchEnvs[0]!;
@@ -221,7 +221,7 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active).toMatchObject({
       status: 'active',
       detailCode: 'sandbox_ready',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
       inactivityTimeoutMs: CONTROL_PLANE_TIMERS.sandbox.idleMs,
     });
 
@@ -230,7 +230,7 @@ describe('sandbox status badge projection (B10)', () => {
     expect(stopped).toMatchObject({
       status: 'sleeping',
       detailCode: 'sandbox_stopped',
-      provider: 'Cloudflare',
+      provider: 'Cloudflare Containers',
     });
     await waitFor(async () =>
       expect(await session.getSession()).toMatchObject({ route: { state: 'unknown' } })
@@ -304,7 +304,7 @@ describe('sandbox status badge projection (B10)', () => {
 
   it('returns the Sandbox DO snapshot through the Session DO RPC', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const expected = {
@@ -350,7 +350,7 @@ describe('sandbox status badge projection (B10)', () => {
 
   it('composes the passive workspace runtime status without preparing a route', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
     const expected = {
@@ -403,7 +403,7 @@ describe('sandbox status badge projection (B10)', () => {
 describe('compute billing status metadata read (B10)', () => {
   it('exposes the metadata the billing handler reads from the session DO', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const kindaSession = kiloSessionId();
     const stub = sessions.getByName(sessionId);
     const peer = new FakeSandboxPeer();
@@ -412,7 +412,7 @@ describe('compute billing status metadata read (B10)', () => {
     await stub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kindaSession, sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     const stored = await stub.getMetadata();
@@ -420,6 +420,6 @@ describe('compute billing status metadata read (B10)', () => {
     expect(stored?.identity.userId).toBe(USER_ID);
     expect(stored?.identity.orgId).toBe(ORG_ID);
     expect(stored?.workspace?.sandboxId).toBe(sandboxId);
-    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(stored?.workspace?.sandboxProvider).toBe('cloudflare-containers');
   });
 });

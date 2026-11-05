@@ -204,7 +204,7 @@ export function useStartSecurityAnalysis(scope: string) {
           }),
         ]);
         scheduleCacheMaintenance(() => {
-          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+          void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
         });
         return;
       }
@@ -223,7 +223,7 @@ export function useStartSecurityAnalysis(scope: string) {
         }),
       ]);
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(
+        void reconcileFirstPage(
           queryClient,
           trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
         );

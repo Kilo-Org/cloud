@@ -183,8 +183,13 @@ export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domai
 // from a web deployment older than that key, can go unnoticed.
 const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
 
+// Every process parses the stored list and builds a lookup index from it, and the admin
+// editor round-trips the whole list through one save. 100k entries covers multi-megabyte
+// imported lists while keeping the payload and the in-process index bounded.
+export const MAX_BLACKLIST_DOMAINS = 100_000;
+
 export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()),
+  domains: z.array(z.string()).max(MAX_BLACKLIST_DOMAINS),
   // TLDs whose new signups are refused. Optional because configs written
   // before this field existed must keep parsing; readers fall back to the
   // deployment default in that case. An empty array means "no TLD blocked".
@@ -199,7 +204,36 @@ export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema
 export type BlacklistDomainsConfigSnapshot = {
   config: BlacklistDomainsConfig | null;
   fullReadAt: number;
+  // Entries a stored list held beyond the cap; 0 when the whole list is used.
+  droppedDomains: number;
 };
+
+export type ParsedBlacklistDomainsConfig = {
+  config: BlacklistDomainsConfig;
+  droppedDomains: number;
+};
+
+/**
+ * Parses one stored blocklist config and keeps its first MAX_BLACKLIST_DOMAINS
+ * entries, reporting how many entries it left out so the reader can surface a
+ * list that is longer than the cap.
+ */
+export function parseBlacklistDomainsConfig(value: unknown): ParsedBlacklistDomainsConfig {
+  if (value !== null && typeof value === 'object' && 'domains' in value) {
+    const { domains } = value;
+    if (Array.isArray(domains) && domains.length > MAX_BLACKLIST_DOMAINS) {
+      return {
+        config: BlacklistDomainsConfigSchema.parse({
+          ...value,
+          domains: domains.slice(0, MAX_BLACKLIST_DOMAINS),
+        }),
+        droppedDomains: domains.length - MAX_BLACKLIST_DOMAINS,
+      };
+    }
+  }
+
+  return { config: BlacklistDomainsConfigSchema.parse(value), droppedDomains: 0 };
+}
 
 /**
  * Re-reads the admin blocklist config, downloading it only when it may have changed. An imported
@@ -223,10 +257,12 @@ export async function refreshBlacklistDomainsConfig(
   }
 
   const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
-  return {
-    config: raw ? BlacklistDomainsConfigSchema.parse(JSON.parse(raw)) : null,
-    fullReadAt: now,
-  };
+  if (!raw) {
+    return { config: null, fullReadAt: now, droppedDomains: 0 };
+  }
+
+  const { config, droppedDomains } = parseBlacklistDomainsConfig(JSON.parse(raw));
+  return { config, fullReadAt: now, droppedDomains };
 }
 
 export function blacklistedDomainsFromConfig(

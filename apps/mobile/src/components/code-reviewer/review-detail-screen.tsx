@@ -3,7 +3,8 @@
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -45,6 +46,7 @@ import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { trpcErrorVariant } from '@/lib/trpc-error';
+import { useTRPC } from '@/lib/trpc';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -98,6 +100,25 @@ export function ReviewDetailScreen({
     !(isPersonal(scope) && reviewPlatform === 'bitbucket');
   const reviewConfig = useReviewConfig(scope, reviewPlatform, { enabled: configQueryEnabled });
 
+  // The in-app pull-request reader is gated on the user's own GitHub
+  // authorization, and a Code Reviewer user can own a review without one. The
+  // read is the stored status, not a GitHub call. It is enabled from the same
+  // URL-derived provider the button decides on, never the review row's column,
+  // so a row whose column disagrees with its URL still decides on one source.
+  const openPrDestination = useMemo(
+    () => resolveCodeReviewerOpenPrDestination(loadedReview?.pr_url ?? ''),
+    [loadedReview?.pr_url]
+  );
+  const needsGitHubAuthorization =
+    isPersonal(scope) &&
+    openPrDestination.kind === 'in-app' &&
+    openPrDestination.platform === 'github';
+  const trpc = useTRPC();
+  const githubAuthorization = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled: needsGitHubAuthorization,
+  });
+
   function confirmCancel(onConfirm: () => void) {
     confirm({
       title: i18n.t('codeReviewer.reviewDetail.cancelTitle'),
@@ -126,10 +147,23 @@ export function ReviewDetailScreen({
     );
   }
 
+  // One header for every state. The eyebrow is the review's repository, which
+  // only the payload knows, so its line is reserved from the first frame: the
+  // title above the body must not move when the review lands — nor when a
+  // refetch drops it back to loading, nor on the error branches that paint the
+  // same header.
+  const header = (
+    <ReviewerHeader
+      title={t('codeReviewer.reviewDetail.title')}
+      eyebrow={loadedReview?.repo_full_name}
+      reserveEyebrow
+    />
+  );
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
@@ -151,7 +185,7 @@ export function ReviewDetailScreen({
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
-          <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+          {header}
           <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           {dialog}
         </View>
@@ -159,7 +193,7 @@ export function ReviewDetailScreen({
     }
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
+        {header}
         <QueryError
           variant={trpcErrorVariant(error)}
           title={t('codeReviewer.reviewDetail.couldNotLoad')}
@@ -209,10 +243,7 @@ export function ReviewDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader
-        title={t('codeReviewer.reviewDetail.title')}
-        eyebrow={review.repo_full_name}
-      />
+      {header}
       <ReviewSpectatorSheet
         key={reviewId}
         visible={transcriptReviewId === reviewId}
@@ -225,19 +256,6 @@ export function ReviewDetailScreen({
         statusLabel={meta.label}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
-        {/* The transcript entry is the first row of the content, not a pinned band
-            above the list: a fixed trigger between the header and the scroll view
-            leaves a strip where a vertical drag never reaches the content. */}
-        <Button
-          variant="secondary"
-          accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
-          onPress={() => {
-            setTranscriptReviewId(reviewId);
-          }}
-        >
-          <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
-        </Button>
-
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">
@@ -249,7 +267,6 @@ export function ReviewDetailScreen({
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.reviewDetail.byline', {
-              repo: review.repo_full_name,
               number: review.pr_number,
               author: review.pr_author,
             })}
@@ -281,9 +298,13 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
-            <Text variant="muted" className="text-xs">
-              {t(findingsEmptyCopyKey(review.status))}
-            </Text>
+            // The empty result sits in the same card as every other section's
+            // body, so an ended review reads as a filled section, not a caption.
+            <View className="rounded-lg bg-secondary p-4">
+              <Text variant="muted" className="text-xs">
+                {t(findingsEmptyCopyKey(review.status))}
+              </Text>
+            </View>
           ) : (
             <View className="gap-2">
               {visibleFindings.map((finding, index) => (
@@ -306,11 +327,11 @@ export function ReviewDetailScreen({
         {/* Council: decision plus specialist names/votes as text. */}
         {review.council_result ? <CouncilSection councilResult={review.council_result} /> : null}
 
-        {/* Gate: check-run presence, review status, and threshold when set. */}
+        {/* Gate: check-run presence and threshold when set. The review status is
+            the conclusion above, so the card never repeats it. */}
         <GateSection
           checkRunId={review.check_run_id}
           checkRunRedacted={review.rawIdsRedacted}
-          statusLabel={meta.label}
           gateThreshold={gateThreshold}
         />
 
@@ -359,17 +380,23 @@ export function ReviewDetailScreen({
           </View>
         </View>
 
-        {/* Actions. */}
+        {/* Actions. The pull request is the screen's primary action, so it takes
+            the filled primary style; every other action stays secondary. */}
         <View className="gap-3">
           <Button
-            variant="secondary"
             onPress={() => {
-              if (isPersonal(scope)) {
-                const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
-                if (destination.kind === 'in-app') {
-                  pushOnce(destination.href);
-                  return;
-                }
+              // A github.com pull request reads in the app only with the user's
+              // own GitHub authorization; without it that route is the Connect
+              // wall, so the pull request opens in the browser instead. A
+              // pending or failed read keeps that fallback. Other providers
+              // keep their in-app route, whose own gate owns their connection.
+              if (
+                isPersonal(scope) &&
+                openPrDestination.kind === 'in-app' &&
+                (!needsGitHubAuthorization || githubAuthorization.data?.connected === true)
+              ) {
+                pushOnce(openPrDestination.href);
+                return;
               }
               void openExternalUrl(review.pr_url, {
                 label: t('common.pullRequest'),
@@ -379,6 +406,18 @@ export function ReviewDetailScreen({
             {/* i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
                 this key is the verb CTA — cs/pl/be translate the two apart. */}
             <Text>{t('common.openPullRequest')}</Text>
+          </Button>
+
+          {/* The transcript is a secondary way to read the same review, so it
+              sits beside the primary action and never above the title. */}
+          <Button
+            variant="secondary"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
+            onPress={() => {
+              setTranscriptReviewId(reviewId);
+            }}
+          >
+            <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
           </Button>
 
           {canCancel ? (

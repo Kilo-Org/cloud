@@ -23,6 +23,7 @@ import {
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
+import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
@@ -60,6 +61,11 @@ export function ModelPickerContent() {
   const closePicker = useCallback(() => {
     router.back();
   }, [router]);
+
+  // A caller that keeps no variant cannot apply an effort picked here, so the
+  // rows leave the chips out and a model tap is the whole selection. Read from
+  // the bridge rather than a prop: the slot is the picker route's only input.
+  const acceptsVariant = bridge?.acceptsVariant ?? true;
 
   useFocusEffect(
     useCallback(() => {
@@ -135,6 +141,7 @@ export function ModelPickerContent() {
   const handleSelectVariant = useCallback(
     (variant: string) => {
       selectionHaptic();
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedVariantRef.current = variant;
       setSelectedVariant(variant);
@@ -161,16 +168,20 @@ export function ModelPickerContent() {
         return;
       }
 
+      // The pick is applied: close the search keyboard with it, so the chosen
+      // row's check mark and its thinking-effort chips are visible whether or
+      // not the sheet stays open for a variant choice.
+      dismissSearchPickerKeyboard();
       selectionChangedRef.current = true;
       selectedModelRef.current = option.id;
       selectedVariantRef.current = selection.variant;
       setSelectedModel(option.id);
       setSelectedVariant(selection.variant);
-      if (option.variants.length <= 1) {
+      if (!acceptsVariant || option.variants.length <= 1) {
         closePicker();
       }
     },
-    [bridge, closePicker]
+    [acceptsVariant, bridge, closePicker]
   );
 
   // Hoisted out of the list body: the inline arrow gave the virtualized list a
@@ -198,14 +209,23 @@ export function ModelPickerContent() {
           option={item.model}
           selected={item.model.id === selectedModel}
           selectedVariant={selectedVariant}
+          acceptsVariant={acceptsVariant}
           isFavorite={item.isFavorite}
+          showProvider={item.showsProvider}
           onSelectModel={handleSelectModel}
           onSelectVariant={handleSelectVariant}
           onToggleFavorite={handleToggleFavorite}
         />
       );
     },
-    [handleSelectModel, handleSelectVariant, handleToggleFavorite, selectedModel, selectedVariant]
+    [
+      acceptsVariant,
+      handleSelectModel,
+      handleSelectVariant,
+      handleToggleFavorite,
+      selectedModel,
+      selectedVariant,
+    ]
   );
 
   if (!bridge) {
@@ -332,8 +352,7 @@ export function ModelPickerContent() {
           // callbacks are absent.
           keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
           getItemType={(item: ModelPickerRow | undefined) => item?.type}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          {...SEARCHABLE_PICKER_LIST_PROPS}
           renderItem={renderItem}
         />
       )}

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -186,6 +187,7 @@ export function PlatformOverviewScreen({
       options: models,
       value: data.modelSlug,
       variant: data.thinkingEffort ?? '',
+      acceptsVariant: true,
       onSelect: (modelSlug, variant) => {
         save.mutate({ modelSlug, thinkingEffort: variant || null });
       },
@@ -226,7 +228,7 @@ export function PlatformOverviewScreen({
             >
               {platform === 'gitlab' && hasWebhookSyncWarning && (
                 <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
-                  <View className="flex-1 pr-3">
+                  <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.webhookSetup')}</Text>
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.webhookSetupDescription')}
@@ -261,7 +263,7 @@ export function PlatformOverviewScreen({
 
               <View className="rounded-lg bg-secondary p-4">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-1 pr-3">
+                  <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
                     <Text variant="muted" className="text-xs">
                       {status.data?.integration?.accountLogin ?? ''}

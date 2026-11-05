@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  useOrganizationAvailableModels,
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
@@ -41,8 +40,12 @@ import {
   modelTrains,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
+import { normalizeProviderIconUrl } from '@/components/organizations/providers-and-models/providerIconUrl';
 import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { GatewaysTab } from '@/components/organizations/providers-and-models/GatewaysTab';
 
 type Props = {
   organizationId: string;
@@ -64,20 +67,6 @@ function EnterpriseOnlyMessage() {
 
 function formatPriceCompact(raw: string): string {
   return formatPrice(raw).replace('/1M tokens', '/1M');
-}
-
-function normalizeProviderIconUrl(rawUrl: string): string {
-  // OpenRouter provider icon URLs are sometimes returned as absolute paths (e.g. "/img/...").
-  // In that case, they should be resolved relative to https://openrouter.ai.
-  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-    return rawUrl;
-  }
-
-  if (rawUrl.startsWith('/')) {
-    return `https://openrouter.ai${rawUrl}`;
-  }
-
-  return `https://openrouter.ai/${rawUrl}`;
 }
 
 type RecommendedThenSourceIndexSortKey = {
@@ -112,16 +101,21 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const availableModels = useOrganizationAvailableModels(organizationId, {
-    enabled: organizationData?.plan === 'enterprise',
-  });
+  const trpc = useTRPC();
+  const { data: gatewaySettings } = useQuery(
+    trpc.organizations.settings.getGatewaySettings.queryOptions(
+      { organizationId },
+      { enabled: organizationData?.plan === 'enterprise' }
+    )
+  );
+  const showGatewaysTab = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,
     isLoading: isOpenRouterLoading,
   } = useOpenRouterModelsAndProviders();
 
-  const { state, actions, selectors } = useProvidersAndModelsAllowListsState({
+  const { state, actions, selectors, dispatch } = useProvidersAndModelsAllowListsState({
     openRouterModels,
     openRouterProviders,
   });
@@ -289,9 +283,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       offerings.push({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
+        byokOnly: provider.byokOnly,
         ...getOfferingPricing(
           customPricingConfig,
           getSnapshotModelVariantId(model),
@@ -321,6 +316,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     return map;
   }, [allowedModelIds, openRouterProviders]);
 
+  const byokOnlyProviderSlugs = useMemo(
+    () =>
+      new Set(
+        openRouterProviders.filter(provider => provider.byokOnly).map(provider => provider.slug)
+      ),
+    [openRouterProviders]
+  );
+
   const providerRows = useMemo((): ProviderRow[] => {
     const rows: ProviderRow[] = [];
     for (const provider of openRouterProviders) {
@@ -332,12 +335,13 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       rows.push({
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
-        providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
+        providerIconUrl: normalizeProviderIconUrl(provider.icon?.url),
         modelCount: providerModels.length,
         trains: provider.dataPolicy.training,
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
+        byokOnly: provider.byokOnly,
       });
     }
 
@@ -490,6 +494,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
+            {showGatewaysTab && <TabsTrigger value="gateways">Gateways</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -497,16 +502,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               isLoading={isLoading}
               canEdit={canEdit}
               search={state.modelSearch}
-              selectedOnly={state.modelSelectedOnly}
+              enabledOnly={state.modelSelectedOnly}
               onSearchChange={actions.setModelSearch}
-              onSelectedOnlyChange={actions.setModelSelectedOnly}
+              onEnabledOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
-              availableModelCount={
-                availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
-              }
               enabledProviderSlugs={enabledProviderSlugs}
+              byokOnlyProviderSlugs={byokOnlyProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
+              onSetModelsAllowed={(modelIds, nextAllowed) => {
+                if (canEdit) dispatch({ type: 'SET_MODELS_ALLOWED', modelIds, nextAllowed });
+              }}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>
@@ -530,6 +536,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
+              onSetProvidersEnabled={(providerSlugs, nextEnabled) => {
+                if (canEdit)
+                  dispatch({ type: 'SET_PROVIDERS_ENABLED', providerSlugs, nextEnabled });
+              }}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>
@@ -542,6 +552,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
+
+          {showGatewaysTab && (
+            <TabsContent value="gateways" className="mt-6">
+              <GatewaysTab
+                organizationId={organizationId}
+                canEdit={canEdit}
+                settings={gatewaySettings}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
         <ModelDetailsDialog

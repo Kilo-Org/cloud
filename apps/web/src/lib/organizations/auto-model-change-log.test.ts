@@ -67,6 +67,10 @@ function buildEnterpriseOrg(overrides: Partial<Organization> = {}): Organization
     plan: 'enterprise',
     free_trial_end_at: null,
     company_domain: null,
+    directory_id: null,
+    directory_group_id: null,
+    directory_idp_id: null,
+    external_org_id: null,
     ...overrides,
   } satisfies Organization;
 }

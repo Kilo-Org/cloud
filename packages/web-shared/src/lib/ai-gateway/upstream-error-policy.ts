@@ -19,6 +19,8 @@ type UpstreamErrorPolicyParams = {
  * Reports upstream errors and returns a replacement response when the upstream
  * response must not reach the client. Platform-funded 402s are hidden because
  * they concern Kilo's provider account; BYOK 402s concern the user's account.
+ * Only platform-funded 402s are captured in Sentry; other upstream HTTP failures
+ * are logged, including provider-side 5xx responses.
  */
 export async function applyUpstreamErrorPolicy(
   params: UpstreamErrorPolicyParams
@@ -33,7 +35,7 @@ export async function applyUpstreamErrorPolicy(
     errorMessage: isPlatformPaymentRequired
       ? `${providerId} returned 402 Payment Required`
       : `${providerId} returned error ${response.status}`,
-    trackInSentry: isPlatformPaymentRequired || response.status >= 500,
+    trackInSentry: isPlatformPaymentRequired,
   });
 
   return isPlatformPaymentRequired ? temporarilyUnavailableResponse() : undefined;

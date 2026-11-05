@@ -2209,17 +2209,17 @@
     "search": {
       "searching": "Na-achọ",
       "searchSessions": "Chọọ nnọkọ",
-      "searchSessionsPlaceholder": "Chọọ nnọkọ"
+      "searchSessionsPlaceholder": "Chọọ nnọkọ..."
     },
     "sessionList": {
-      "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
+      "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ",
       "couldNotRefresh": "Enweghị ike ibugharịa",
       "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị.",
       "viewHistory": "Ndekọ nnọkọ",
       "noMatches": "Enweghị nnọkọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "tryAdjustFilters": "Nwaa ịgbanwe ma ọ bụ iwepụ nzacha gị.",
-      "couldNotSearch": "Enweghị ike ịchọ nnọkọ.",
+      "couldNotSearch": "Enweghị ike ịchọ nnọkọ",
       "completedWillAppear": "Nnọkọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nnọkọ gara aga",
       "pastSessions": "Nnọkọ gara aga",
@@ -2880,7 +2880,7 @@
       "exitSession": "Pụọ na nnọkọ ahụ",
       "clearSession": "Kwụsị nnọkọ a wee malite nke ọhụrụ",
       "compactDescription": "kọmpat ọnọdụ nnọkọ ugbu a",
-      "goalDescription": "Nọgide na-arụ ọrụ maka ebumnuche nnọkọ. /goal <objective> ma ọ bụ pause, resume, clear",
+      "goalDescription": "Nọgide na-arụ ọrụ maka ebumnuche nnọkọ. /goal <objective> ma ọ bụ pause, resume, clear. Ebumnuche nwere ike ichere mkpalite edobere n'oge, ọrụ cron, ma ọ bụ usoro na-arụ ọrụ n'azụ: nchere ahụ na-akwụsị ebumnuche ahụ ruo mgbe ọ kpalitere, ma ebumnuche ahụ na-aga n'ihu site na onwe ya; /goal pause na /goal clear na-akagbu oge ndị edobere maka ya. Ọ bụrụ na ebumnuche ahụ bụ ichere itinye n'ọrụ, iwulite, ma ọ bụ ọrụ CI, hazie nchere ahụ ozugbo; ghara inyocha ebe nchekwa ahụ mbụ.",
       "initDescription": "nhazi AGENTS.md nwere nduzi",
       "resumeClaudeDescription": "bubata ndekọ nnọkọ Claude Code",
       "resumeCodexDescription": "bubata ndekọ nnọkọ OpenAI Codex",

@@ -2552,6 +2552,7 @@
       "assistantStopped": "Создавањето на одговорот е запрено.",
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
       "assistantProviderError": "Давателот врати грешка.",
+      "assistantProviderRefused": "Давателот го одби барањето и тоа не може да се повтори.",
       "assistantOutputLimit": "Одговорот го достигна ограничувањето за излез на моделот.",
       "assistantStructuredOutput": "Одговорот не се совпаѓаше со бараниот формат.",
       "assistantFailed": "Не успеа создавањето на одговорот."

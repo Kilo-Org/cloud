@@ -4329,12 +4329,12 @@ describe('SessionIngestRPC.getSessionMessages (authorized generic history)', () 
     });
   });
 
-  it('rejects invalid Kilo session IDs, missing limits with cursors, and unknown cursors', async () => {
+  it('rejects malformed Kilo session IDs, missing limits with cursors, and unknown cursors', async () => {
     const { db } = makeDbFakes([]);
     const rpc = makeRpc(db);
 
     await expect(
-      rpc.getSessionMessages({ kiloUserId: 'usr_owner', kiloSessionId: 'not-a-session' })
+      rpc.getSessionMessages({ kiloUserId: 'usr_owner', kiloSessionId: 'not a session' })
     ).rejects.toThrow();
     await expect(
       rpc.getSessionMessages({

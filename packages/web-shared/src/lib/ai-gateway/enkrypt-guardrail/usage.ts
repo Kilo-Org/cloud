@@ -37,6 +37,7 @@ export type EnkryptGuardrailCall = {
   organizationId: string;
   kiloUserId: string;
   sessionId: string | null;
+  microdollarUsageId?: string;
   apiKind: EnkryptGuardrailApiKind;
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
@@ -152,6 +153,7 @@ export async function recordEnkryptUsageLocally(
         organization_id: usageWrite.organizationId,
         kilo_user_id: usageWrite.kiloUserId,
         session_id: usageWrite.sessionId,
+        microdollar_usage_id: usageWrite.microdollarUsageId ?? null,
         api_kind_id: apiKindId,
         decision_id: decisionId,
         enkrypt_credits_cost: usageWrite.creditsCost,

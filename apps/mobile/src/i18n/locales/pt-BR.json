@@ -2011,6 +2011,7 @@
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é longa demais para o modelo.",
       "assistantProviderError": "O provedor retornou um erro.",
+      "assistantProviderRefused": "O provedor recusou esta solicitação e não é possível tentar novamente.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "Não foi possível gerar a resposta."
@@ -2457,7 +2458,7 @@
     "condenseToolCalls": "Condensar chamadas de ferramentas",
     "condenseToolCallsSubtitle": "Agrupe chamadas de ferramentas consecutivas em uma linha que você pode abrir.",
     "toolSummaryTranslation": "Traduzir resumos de ferramentas",
-    "toolSummaryTranslationSubtitle": "Envie cada resumo de ferramenta para um modelo traduzi-lo para o idioma do seu app. O original é mostrado se a tradução falhar.",
+    "toolSummaryTranslationSubtitle": "Envie cada resumo de ferramenta para um modelo traduzir para o idioma do seu app. O original é mostrado se a tradução falhar.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo não é mais oferecido. Toque em $t(common.model) para escolher outro.",
     "translateSummaries": "Traduzir resumos",
     "autoExpandThinkingInactiveSubtitle": "Não tem efeito enquanto os detalhes do raciocínio estiverem ocultos."

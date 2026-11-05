@@ -8,7 +8,7 @@ import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
 import { internal } from './internal';
-import { overloaded, rpcError, ServiceOverloaded } from './overload';
+import { isOverloaded, overloaded, rpcError, ServiceOverloaded } from './overload';
 import {
   ERROR_STATUS,
   LIMITS,
@@ -25,6 +25,8 @@ import {
 } from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, requestRoute, timed } from './metrics';
+import { live } from './live/routes';
+import { LiveTicketError } from './live/ticket';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -149,6 +151,7 @@ export const app = new Hono<AppContext>();
 app.route('/internal', internal);
 
 app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
+app.route('/v1', live);
 
 app.use('/v1/sessions/*', async (c, next) => {
   const principal = await authorize(c.req.raw, c.env);
@@ -327,6 +330,15 @@ app.get('/v1/sessions/:id/blobs/:hash', async c => {
 app.notFound(() => failure({ code: 'not_found', message: 'Route not found' }));
 
 app.onError((error, c) => {
+  if (isOverloaded(error)) {
+    return failure({
+      code: 'service_overloaded',
+      message: 'The service is temporarily overloaded',
+    });
+  }
+  if (error instanceof LiveTicketError) {
+    return json({ error: { code: error.code, message: error.message } }, error.status);
+  }
   console.error('session-sync request failed', {
     path: requestRoute(c.req.raw),
     error: error.name,

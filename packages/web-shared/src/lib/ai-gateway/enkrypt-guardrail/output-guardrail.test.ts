@@ -394,11 +394,15 @@ describe('resolveEnkryptOutputScan', () => {
     expect(resolveEnkryptOutputScan(request(), undefined)).toBeNull();
   });
 
-  it('returns the request with the resolved output guardrail config', () => {
+  it('returns the request and inference association with the resolved output guardrail config', () => {
     const settings = outputSettings(blockingPii);
-
-    expect(resolveEnkryptOutputScan(request('messages'), settings)).toEqual({
+    const associatedRequest = {
       ...request('messages'),
+      microdollarUsageId: '00000000-0000-4000-8000-000000000003',
+    };
+
+    expect(resolveEnkryptOutputScan(associatedRequest, settings)).toEqual({
+      ...associatedRequest,
       config: resolveEnkryptOutputGuardrail('org-1', settings),
     });
   });
@@ -1001,9 +1005,10 @@ describe('guardEnkryptOutput', () => {
   });
 
   describe('usage', () => {
-    it('records every call as output usage with the added latency on the final blocking call', async () => {
+    it('preserves the inference association on output retries and log-only usage with latency only on the final blocking call', async () => {
+      const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
       let blockingCalls = 0;
-      mockEnkrypt(request => {
+      const fetchSpy = mockEnkrypt(request => {
         if ('pii' in request.detectors && blockingCalls++ === 0) {
           return new Response('upstream error', { status: 500 });
         }
@@ -1012,16 +1017,38 @@ describe('guardEnkryptOutput', () => {
 
       const { client } = await guard(
         upstreamResponse(UPSTREAM_BODIES.chat_completions.sse, 'sse'),
-        outputScan(blockingPiiWithLogOnlyToxicity)
+        { ...outputScan(blockingPiiWithLogOnlyToxicity), microdollarUsageId }
       );
       expect(mockedAfter).toHaveBeenCalledTimes(1);
       await runAfterTasks();
 
       expect(await client.text()).toBe(`${KEEP_ALIVE}${UPSTREAM_BODIES.chat_completions.sse}`);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
       expect(mockedRecordUsage.mock.calls).toEqual([
-        [usageRecord({ decision: 'error', creditsCost: null, addedLatencyMs: null })],
-        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: expect.any(Number) })],
-        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: null })],
+        [
+          usageRecord({
+            microdollarUsageId,
+            decision: 'error',
+            creditsCost: null,
+            addedLatencyMs: null,
+          }),
+        ],
+        [
+          usageRecord({
+            microdollarUsageId,
+            decision: 'allowed',
+            creditsCost: 2,
+            addedLatencyMs: expect.any(Number),
+          }),
+        ],
+        [
+          usageRecord({
+            microdollarUsageId,
+            decision: 'allowed',
+            creditsCost: 2,
+            addedLatencyMs: null,
+          }),
+        ],
       ]);
     });
 

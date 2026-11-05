@@ -5,11 +5,13 @@ import type { OrganizationMode } from '@/lib/organizations/organization-modes';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<{ modes: OrganizationMode[] } | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: request.method,
+  });
   if (!success) {
     return nextResponse;
   }

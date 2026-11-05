@@ -16,10 +16,10 @@ establish a separately agreed test setup before comparing direct and queued runs
 For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
 than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
 exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
-Production retains the SFO exposure control and
-[rollout gates](eu-queues.md#production-merge-gate); production Frankfurt is
-queue-selected without an exposure control. No production change is part of this
-recipe. Keep the Worker processing mode, writer endpoint and queue
+Production queues every request in any function region,
+without a regional or exposure control; the
+[rollout gates](eu-queues.md#production-merge-gate) still apply before
+deployment. No production change is part of this recipe. Keep the Worker processing mode, writer endpoint and queue
 policy fixed.
 
 Background shadow publication has been
@@ -32,10 +32,12 @@ and report their usage IDs and categories with the run. These return null
 accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
 reuse the same event and may create duplicate deliveries after ambiguous acceptance.
-Include the retry-enabled Cloudflare publisher's 25-second elapsed budget
-(four attempts of up to five seconds plus full-jitter waits, clipped to remaining
-budget) and runtime scheduling overhead, excluding subsequent Bouncer reporting,
-in accounting completion deadlines. Non-retry HTTP publication remains one
+Include the retry-enabled Cloudflare publisher's 40-second elapsed budget
+(four attempts, a first of up to twenty seconds and later ones of up to five, plus
+full-jitter waits, clipped to remaining budget; four full attempts and the maximum
+waits fit in under 38.5 seconds, so only a runtime delay shortens a later attempt)
+and runtime scheduling overhead, excluding subsequent Bouncer reporting, in
+accounting completion deadlines. Non-retry HTTP publication remains one
 two-second attempt; Vercel queue transport is unchanged. There is no durable recovery
 for unaccepted events in this path; an ambiguous failure such as a timeout may
 still be followed by consumer persistence, so reconcile those IDs separately.

@@ -23,7 +23,7 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
 
-## AI gateway database access
+## AI gateway database and Redis access
 
 AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
 in `sfo1`, but the read-write `db` from `lib/drizzle` always connects to the
@@ -46,10 +46,9 @@ work, work after the upstream request starts, and exceptional paths may use it.
   not a committed row or debit; the writer persists idempotently by usage ID, so
   redelivery does not create a second debit. Selection changes accounting
   transport only, not inference routing or compute location.
-- Direct accounting remains for FRA deployments other than staging and
-  production `fra1`, for production FRA requests without a payer identity, and
-  for the existing SFO `recordUsageInPrimaryRegion` handoff, which falls back
-  to a local write when the handoff is unavailable. Selected queue usage falls
+- Direct accounting remains for deployments matching neither label branch
+  (staging or production) and for the existing `recordUsageInPrimaryRegion`
+  handoff, which falls back to a local write when the handoff is unavailable. Selected queue usage falls
   back to a direct write only in the two pre-publication cases where nothing was
   sent:
   missing/unparseable publisher configuration and failed lifetime registration.
@@ -57,16 +56,26 @@ work, work after the upstream request starts, and exceptional paths may use it.
   ambiguous failure, because the event may already be queued.
 - For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
+- Redis (`lib/redis`) has its primary in `fra1` and a read replica in `sfo1`:
+  reads are local, but treat writes like database writes.
 - Where correctness needs the primary on a rare path (read-after-write, a row
   lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
-The queue launch and SFO exposure controls and rollback are documented in
-[`ENVIRONMENT.md`](../../ENVIRONMENT.md) and
+The queue transport and rollback are documented in
+[`ENVIRONMENT.md`](../../ENVIRONMENT.md), where stopping new production queue
+selection means reverting the source and redeploying the gateway. Consumer and
+merge-gate details are in
 [`services/usage-ingest/README.md`](../../services/usage-ingest/README.md).
-Source defaults do not establish the deployed SFO cohort; production FRA
-selection follows the deployed source.
+Usage-accounting eligibility has no per-region or per-payer switch: any
+deployment whose labels satisfy `(VERCEL_TARGET_ENV=staging and
+VERCEL_ENV!=production) or (VERCEL_ENV=production and
+VERCEL_TARGET_ENV=production)` selects the queue. There is no region term: adding a region to a production
+gateway deployment, or adding another production caller of the usage-accounting
+path, enrols that traffic automatically, so such a change needs the same review
+as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
+truth for which function regions actually run those deployments.
 
 ## Data collection versus ZDR
 

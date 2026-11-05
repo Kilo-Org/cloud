@@ -208,6 +208,38 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview, actor: GitLabCred
   }
 }
 
+/**
+ * Cancels a review locally, then settles its ledger row and finalizes its PR
+ * gate check — but only when the guarded cancel actually changed a row.
+ *
+ * A review that reached a terminal state between the caller's status read and
+ * this write is left untouched, and then there is nothing to settle: the row's
+ * own terminal transition already settled the ledger. Reporting `false` keeps
+ * the caller from answering with a success it did not achieve.
+ */
+async function cancelReviewLocally(
+  review: CloudAgentCodeReview,
+  credentialActor: GitLabCredentialActor
+): Promise<boolean> {
+  const cancelled = await cancelCodeReview(review.id);
+  if (!cancelled) return false;
+
+  await settleCodeReviewLedgerRow({
+    reviewId: review.id,
+    status: 'cancelled',
+    terminalReason: 'user_cancelled',
+    triggerSource: review.trigger_source,
+  });
+
+  try {
+    await cancelPRGateCheck(review, credentialActor);
+  } catch (gateError) {
+    logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+  }
+
+  return true;
+}
+
 export const codeReviewRouter = createTRPCRouter({
   analytics: codeReviewAnalyticsRouter,
 
@@ -548,17 +580,8 @@ export const codeReviewRouter = createTRPCRouter({
                 status: review.status,
               }
             );
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled successfully' });
           }
@@ -570,17 +593,8 @@ export const codeReviewRouter = createTRPCRouter({
         } catch (workerError) {
           if (review.status === 'queued' && !review.session_id) {
             console.error('Worker cancel failed, updating DB directly:', workerError);
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
@@ -590,17 +604,8 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
-      await cancelCodeReview(input.reviewId);
-      await settleCodeReviewLedgerRow({
-        reviewId: input.reviewId,
-        status: 'cancelled',
-        terminalReason: review.terminal_reason,
-        triggerSource: review.trigger_source,
-      });
-      try {
-        await cancelPRGateCheck(review, credentialActor);
-      } catch (gateError) {
-        logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+      if (!(await cancelReviewLocally(review, credentialActor))) {
+        return failureResult('Code review is no longer running');
       }
 
       return successResult({ message: 'Code review cancelled successfully' });

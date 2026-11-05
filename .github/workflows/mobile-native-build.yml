@@ -62,8 +62,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The hash steps run tsx over the local dev/local scripts and let
+      # @expo/fingerprint read the Expo config from apps/mobile, so they need the
+      # root project and the mobile app, not the whole workspace. Both build jobs
+      # wait behind this one, so a filtered install here releases them sooner.
+      # The hash must stay identical to the one a build job recomputes after its
+      # recursive install, or the artifact name matches no build.
+      - name: Install root and mobile dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Compute hashes and gate the build
         id: decide

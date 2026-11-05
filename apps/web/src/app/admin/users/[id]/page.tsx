@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDashboard';
 import type { UserDetailProps } from '@/types/admin';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import {
   getPaymentStatusByUserIds,
   describePaymentMethods,
@@ -21,7 +22,6 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
-import { redirect } from 'next/navigation';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
@@ -127,9 +127,9 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
 
 export default async function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // Check authentication first
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

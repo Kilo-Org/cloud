@@ -1583,6 +1583,10 @@ describe('session detail status placement', () => {
 
 describe('session detail failed delivery retry', () => {
   it('stops showing the failed delivery once the retry is accepted', async () => {
+    // A failed row offers Retry only when the session can send; the re-send is
+    // mocked below, so the mount only has to be a writable kind.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const base = userMessage('msg-failed');
     const failed: StoredMessage = {
       info: { ...base.info, sessionID: ROOT_ID },
@@ -2006,6 +2010,110 @@ describe('session detail assistant response retry', () => {
         Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
     );
     expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+});
+
+describe('session detail stored-session retry availability', () => {
+  type AssistantInfo = Extract<StoredMessage['info'], { role: 'assistant' }>;
+  const PROMPT = 'Audit the release pipeline';
+
+  function promptRow(): StoredMessage {
+    const base = userMessage('msg-stored-prompt');
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-prompt',
+          sessionID: ROOT_ID,
+          messageID: 'msg-stored-prompt',
+          text: PROMPT,
+        }),
+      ],
+    };
+  }
+
+  function failedResponse(): StoredMessage {
+    const info: AssistantInfo = {
+      ...(assistantMessage('msg-stored-failed').info as AssistantInfo),
+      id: 'msg-stored-failed',
+      sessionID: ROOT_ID,
+      parentID: 'msg-stored-prompt',
+      error: { name: 'APIError', data: { message: 'raw provider text', isRetryable: true } },
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: 'text-msg-stored-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-stored-failed',
+          text: 'Partial answer',
+        }),
+      ],
+    };
+  }
+
+  function retryButtons(view: { renderer: ReactTestRenderer }) {
+    return view.renderer.root.findAll(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+  }
+
+  it('states the failure and offers only Continue in a new session on a read-only transcript', async () => {
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(true);
+    expect(view.store.get(view.manager.atoms.canSend)).toBe(false);
+    // The failed row keeps its copy: the reader still learns what happened.
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    expect(renderedText(view.renderer.root)).toContain('The provider returned an error.');
+    expect(retryButtons(view)).toHaveLength(0);
+    // Continue in a new session is the recovery path the read-only footer owns.
+    expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
+    const continueButton = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(typeof continueButton.props.onPress).toBe('function');
+  });
+
+  it('drops Retry while a writable session has no transport that can deliver', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    // A remote session is writable, but no CLI owner is connected, so a re-send
+    // has nowhere to go and would only produce the connection failure.
+    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
+    expect(view.store.get(view.manager.atoms.canSend)).toBe(false);
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    expect(retryButtons(view)).toHaveLength(0);
+  });
+
+  it('refuses a retry that would be tapped after the session stopped accepting sends', async () => {
+    goalMountOptions = { resolvedType: 'cloud-agent' };
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const view = await mountDetails([promptRow(), failedResponse()]);
+
+    const retry = retryButtons(view)[0];
+    if (!retry) {
+      throw new Error('Missing Retry for a session that can send');
+    }
+    const onRetryPress = retry.props.onPress as () => void;
+    const send = vi.spyOn(view.manager, 'send');
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    // The capability drops while the row is still on screen (a lost transport).
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+    });
+    await act(async () => {
+      onRetryPress();
+      await Promise.resolve();
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(clearFailedMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -4520,6 +4628,10 @@ describe('session detail duplicate failure state', () => {
   });
 
   it('states a failed delivery once: the row keeps Retry/Copy and the footer drops the generic line', async () => {
+    // Retry is offered only where the session can send; this row's subject is
+    // the single statement of the failure beside its two actions.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const view = await mountDetails([rootUserMessage('please refactor')]);
     act(() => {
       view.store.set<

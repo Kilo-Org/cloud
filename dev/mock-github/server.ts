@@ -22,6 +22,7 @@ import {
   FIXTURE_REPO,
   overviewGraphQlFixture,
   pullRequestFixture,
+  pullRequestFilesFixture,
   repoFixture,
   reviewThreadsGraphQlFixture,
 } from './fixtures';
@@ -31,6 +32,7 @@ const HOST = '127.0.0.1';
 const MERGE_MODE = process.env.MOCK_GITHUB_MERGE_MODE === 'success' ? 'success' : 'unmerged';
 
 const REPO_PATH = `/repos/${FIXTURE_OWNER}/${FIXTURE_REPO}`;
+const FILES_PAGE_SIZE = 50;
 
 function send(response: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -117,8 +119,18 @@ const server = createServer((request, response) => {
       return;
     }
 
-    if (new RegExp(`^${REPO_PATH}/pulls/(\\d+)/files$`).test(path)) {
-      send(response, 200, []);
+    const filesMatch = new RegExp(`^${REPO_PATH}/pulls/(\\d+)/files$`).exec(path);
+    if (filesMatch) {
+      const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+      const all = pullRequestFilesFixture();
+      const start = (page - 1) * FILES_PAGE_SIZE;
+      const pageFiles = all.slice(start, start + FILES_PAGE_SIZE);
+      // GitHub answers `Link: rel="next"` exactly while another page exists,
+      // and the Files tab pages on that header rather than on the page length.
+      if (start + FILES_PAGE_SIZE < all.length) {
+        response.setHeader('link', `<http://${HOST}:${PORT}${path}?page=${page + 1}>; rel="next"`);
+      }
+      send(response, 200, pageFiles);
       return;
     }
 

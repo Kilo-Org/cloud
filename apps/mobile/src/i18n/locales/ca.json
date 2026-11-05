@@ -2598,6 +2598,7 @@
       "assistantStopped": "S'ha aturat la generació de la resposta.",
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
+      "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."

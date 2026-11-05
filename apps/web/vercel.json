@@ -177,6 +177,10 @@
     {
       "path": "/api/cron/code-review-outcome-aggregate",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-byok-envelopes",
+      "schedule": "*/5 * * * *"
     }
   ],
   "build": {

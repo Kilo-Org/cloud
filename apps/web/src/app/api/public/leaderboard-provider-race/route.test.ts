@@ -232,6 +232,32 @@ describe('public custom model leaderboard usage', () => {
   );
 });
 
+describe('GET /api/public/leaderboard-model-provider-usage', () => {
+  test('beautifies the Meituan inference provider', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest
+        .mocked(snowflake.executeSnowflakeStatement)
+        .mockResolvedValue([
+          ['meituan/longcat-flash-chat', 'meituan', '0', '12000000', '10000000', '0', '100', '0'],
+        ]);
+      const { GET } = await import('../leaderboard-model-provider-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        expect.objectContaining({
+          model: 'longcat-flash-chat',
+          provider: 'Meituan LongCat',
+          sumTokens: 12_000_000,
+        }),
+      ]);
+    });
+  });
+});
+
 describe('OPTIONS /api/public/leaderboard-provider-race', () => {
   test('returns 204 with CORS headers', async () => {
     const { OPTIONS } = await import('./route');

@@ -16,7 +16,7 @@ import { TRPCProvider } from '@/lib/trpc';
 // connection that needs re-authorizing for a plain member renders the role
 // guidance. Uses the app's selected language without changing its preference.
 
-export const GATE_SURFACES = [
+const GATE_SURFACES = [
   'gate-github-error',
   'gate-gitlab-error',
   'gate-bitbucket-error',

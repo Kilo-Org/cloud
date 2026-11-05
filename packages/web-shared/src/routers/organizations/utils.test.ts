@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import {
+  ensureMemberOrganizationAccess,
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
+  requireLiveOrganizationForPlatformAdmin,
+  resolveOrganizationAccess,
 } from './utils';
 import {
   setAdminAccessSinkForTest,
@@ -13,7 +16,14 @@ import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { organization_memberships, organizations, type User } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  organization_memberships,
+  organizations,
+  support_access_grant_events,
+  support_access_grants,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -409,5 +419,601 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
+  });
+});
+
+function setSupportEnabled(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
+describe('binary support organization access', () => {
+  let events: AdminAccessEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAdminAccessSinkForTest(event => events.push(event));
+    setSupportEnabled(false);
+  });
+
+  afterEach(async () => {
+    setSupportEnabled(false);
+    setAdminAccessSinkForTest(null);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(support_access_grant_events);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(support_access_grants);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+  });
+
+  async function orgAndAdmin() {
+    const owner = await insertTestUser({ is_admin: false });
+    const organization = await createTestOrganization(
+      `support-binary-${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    const admin = await insertTestUser({ is_admin: true });
+    return { organization, admin };
+  }
+
+  async function insertGrant(params: {
+    actorKiloUserId: string;
+    organizationId: string;
+    actionClass: 'support_read' | 'support_write';
+    approverKiloUserId?: string;
+    status?: 'active' | 'expired' | 'revoked';
+  }) {
+    const now = new Date();
+    const expired = params.status === 'expired';
+    const [grant] = await db
+      .insert(support_access_grants)
+      .values({
+        actor_kilo_user_id: params.actorKiloUserId,
+        organization_id: params.organizationId,
+        action_class: params.actionClass,
+        status: params.status ?? 'active',
+        reason: 'investigating a customer report',
+        requested_duration_seconds: 1800,
+        issued_at: new Date(now.getTime() - (expired ? 60 * 60 * 1000 : 0)).toISOString(),
+        expires_at: new Date(
+          now.getTime() + (expired ? -30 * 60 * 1000 : 10 * 60 * 1000)
+        ).toISOString(),
+        approved_by_kilo_user_id: params.approverKiloUserId ?? null,
+      })
+      .returning();
+    return grant;
+  }
+
+  function readCtx(user: User): TRPCContext {
+    return {
+      user,
+      trpcPath: 'organizations.usageStats',
+      trpcType: 'query',
+    };
+  }
+
+  function failGrantLookupQueries() {
+    const originalSelect = db.select.bind(db);
+    return jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === support_access_grants) {
+                throw new Error('grant lookup failed');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+  }
+
+  test('OFF keeps the legacy owner shortcut without querying grants', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    const selectSpy = failGrantLookupQueries();
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe(
+        'owner'
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ reason: 'organization_access' });
+    expect(event).toMatchObject({ supportDecision: null });
+  });
+
+  test('OFF records the elevation before rethrowing an organization lookup failure', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    const originalSelect = db.select.bind(db);
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === organizations) {
+                const failing = {
+                  where: () => failing,
+                  limit: () => Promise.reject(new Error('organization lookup failed')),
+                };
+                return failing as never;
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toThrow(
+        'organization lookup failed'
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ reason: 'organization_access' });
+  });
+
+  test('ON denies an admin without a grant with a specific code', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+
+    await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+  });
+
+  test('ON admits an allowlisted read with a read grant', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).resolves.toBe('member');
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ supportDecision: 'support_grant' });
+  });
+
+  test('ON admits an allowlisted write only with an approved write grant', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+    const writeCtx: TRPCContext = {
+      user: admin,
+      trpcPath: 'organizations.settings.updateDefaultModel',
+      trpcType: 'mutation',
+    };
+
+    await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
+  });
+
+  test('ON denies a read grant on a write procedure', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('ON picks the write grant even when a longer read grant exists', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const approver = await insertTestUser({ is_admin: true });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: approver.id,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).resolves.toBe('admin');
+  });
+
+  test('ON denies a never-list surface with any grant', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      approverKiloUserId: (await insertTestUser({ is_admin: true })).id,
+    });
+
+    await expect(
+      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, organization.id, {
+        surface: 'rest',
+        supportKey: '/api/organizations/[id]/user-tokens',
+        requiredActionClass: 'support_write',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_not_allowlisted' }),
+    });
+  });
+
+  test('ON denies expired and revoked grants with specific codes', async () => {
+    setSupportEnabled(true);
+    const expired = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: expired.admin.id,
+      organizationId: expired.organization.id,
+      actionClass: 'support_read',
+      status: 'expired',
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(expired.admin), expired.organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_expired' }),
+    });
+
+    const revoked = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: revoked.admin.id,
+      organizationId: revoked.organization.id,
+      actionClass: 'support_read',
+      status: 'revoked',
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(revoked.admin), revoked.organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_revoked' }),
+    });
+  });
+
+  test('ON fails closed when the grant lookup fails', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const selectSpy = failGrantLookupQueries();
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toMatchObject(
+        {
+          code: 'FORBIDDEN',
+          cause: expect.objectContaining({
+            supportAccessReason: 'support_grant_lookup_failed',
+          }),
+        }
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  test('a real member keeps access in both states', async () => {
+    for (const enabled of [false, true]) {
+      setSupportEnabled(enabled);
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createTestOrganization(
+        `support-member-${crypto.randomUUID()}`,
+        owner.id,
+        0
+      );
+      await expect(ensureOrganizationAccess({ user: owner }, organization.id)).resolves.toBe(
+        'owner'
+      );
+      // eslint-disable-next-line drizzle/enforce-delete-with-where
+      await db.delete(organization_memberships);
+      // eslint-disable-next-line drizzle/enforce-delete-with-where
+      await db.delete(organizations);
+    }
+  });
+
+  test('an admin with a real membership uses the real role when ON', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'billing_manager',
+      invited_by: 'test',
+    });
+
+    await expect(
+      ensureOrganizationAccess(readCtx(admin), organization.id, ['owner'])
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'You do not have the required organizational role to access this feature',
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(admin), organization.id, ['billing_manager'])
+    ).resolves.toBe('billing_manager');
+  });
+
+  test('a superadmin can use an emergency write grant', async () => {
+    setSupportEnabled(true);
+    const { organization } = await orgAndAdmin();
+    const superadmin = await insertTestUser({ is_admin: true, is_super_admin: true });
+    const now = new Date();
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: superadmin.id,
+      organization_id: organization.id,
+      action_class: 'support_write',
+      grant_kind: 'emergency',
+      status: 'active',
+      reason: 'production incident mitigation',
+      requested_duration_seconds: 600,
+      issued_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+      review_required: true,
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: superadmin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).resolves.toBe('admin');
+  });
+
+  test('the fetch helper admits an allowlisted read when ON', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(
+        { ...readCtx(admin), trpcPath: 'codeIndexing.search' },
+        organization.id
+      )
+    ).resolves.toMatchObject({ id: organization.id });
+  });
+
+  test('ON reports not-allowlisted, not expired, when an old grant is expired', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      status: 'expired',
+    });
+
+    await expect(
+      resolveOrganizationAccess({ user: admin, trpcType: 'POST' }, organization.id, {
+        surface: 'rest',
+        supportKey: '/api/organizations/[id]/user-tokens',
+        requiredActionClass: 'support_write',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_not_allowlisted' }),
+    });
+  });
+
+  test('ON reports action-class when a write is requested with only an active read grant', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+    const past = new Date(Date.now() - 60 * 60 * 1000);
+    const approver = await insertTestUser({ is_admin: true });
+    await db.insert(support_access_grants).values({
+      actor_kilo_user_id: admin.id,
+      organization_id: organization.id,
+      action_class: 'support_write',
+      status: 'revoked',
+      approved_by_kilo_user_id: approver.id,
+      reason: 'older revoked write grant',
+      requested_duration_seconds: 600,
+      requested_at: past.toISOString(),
+      issued_at: past.toISOString(),
+      expires_at: new Date(past.getTime() + 10 * 60 * 1000).toISOString(),
+      revoked_at: past.toISOString(),
+      revoke_reason: 'older revoked write grant',
+    });
+
+    await expect(
+      ensureOrganizationAccess(
+        {
+          user: admin,
+          trpcPath: 'organizations.settings.updateDefaultModel',
+          trpcType: 'mutation',
+        },
+        organization.id
+      )
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
+    });
+  });
+
+  test('ON fails closed when the membership read fails for an admin', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const originalSelect = db.select.bind(db);
+    const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+      const builder = originalSelect(...args);
+      return new Proxy(builder, {
+        get(target, property, receiver) {
+          if (property === 'from') {
+            return (table: Parameters<typeof target.from>[0]) => {
+              if (table === organization_memberships) {
+                throw new Error('membership lookup failed');
+              }
+              return target.from(table);
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      await expect(ensureOrganizationAccess(readCtx(admin), organization.id)).rejects.toMatchObject(
+        {
+          code: 'FORBIDDEN',
+          cause: expect.objectContaining({
+            supportAccessReason: 'support_grant_lookup_failed',
+          }),
+        }
+      );
+    } finally {
+      selectSpy.mockRestore();
+    }
+  });
+
+  test('member-only never admits a grant but admits a real admin member', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+    await expect(
+      ensureMemberOrganizationAccess({ id: admin.id }, organization.id)
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'admin',
+      invited_by: 'test',
+    });
+    await expect(ensureMemberOrganizationAccess({ id: admin.id }, organization.id)).resolves.toBe(
+      'admin'
+    );
+  });
+
+  test('ON batch roles contain only real memberships', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const other = await orgAndAdmin();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: admin.id,
+      role: 'owner',
+      invited_by: 'test',
+    });
+
+    const roles = await getOrganizationsAccessRoles({ user: admin } as TRPCContext, [
+      organization.id,
+      other.organization.id,
+    ]);
+
+    expect(roles.get(organization.id)).toBe('owner');
+    expect(roles.has(other.organization.id)).toBe(false);
+  });
+
+  test('ON denies an active grant after the admin is demoted or blocked', async () => {
+    setSupportEnabled(true);
+    const demoted = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: demoted.admin.id,
+      organizationId: demoted.organization.id,
+      actionClass: 'support_read',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ is_admin: false })
+      .where(eq(kilocode_users.id, demoted.admin.id));
+    const demotedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, demoted.admin.id),
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(demotedUser!), demoted.organization.id)
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+    const blocked = await orgAndAdmin();
+    await insertGrant({
+      actorKiloUserId: blocked.admin.id,
+      organizationId: blocked.organization.id,
+      actionClass: 'support_read',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'test block' })
+      .where(eq(kilocode_users.id, blocked.admin.id));
+    const blockedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, blocked.admin.id),
+    });
+    await expect(
+      ensureOrganizationAccess(readCtx(blockedUser!), blocked.organization.id)
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_grant_required' }),
+    });
+  });
+
+  test('the fetch helper keeps the OFF owner shortcut', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(
+        { ...readCtx(admin), trpcPath: 'codeIndexing.search' },
+        organization.id
+      )
+    ).resolves.toMatchObject({ id: organization.id });
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ reason: 'organization_fetch' });
+  });
+
+  test('platform operations record no support decision', async () => {
+    const { organization, admin } = await orgAndAdmin();
+    await requireLiveOrganizationForPlatformAdmin(readCtx(admin), organization.id, ['owner']);
+    const event = events.find(event => event.kind === 'kilo_admin_elevation');
+    expect(event).toMatchObject({ reason: 'organization_access' });
+    expect(event).toMatchObject({ supportDecision: null });
   });
 });

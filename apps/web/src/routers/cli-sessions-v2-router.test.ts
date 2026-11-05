@@ -29,6 +29,11 @@ import type {
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
 
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
 const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
@@ -1860,6 +1865,26 @@ describe('cli-sessions-v2-router', () => {
 
         expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
       } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
+    it('support access removes the platform-admin cross-organization list bypass', async () => {
+      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      enableSupportAccess(true);
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
+      } finally {
+        enableSupportAccess(false);
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
       }
     });

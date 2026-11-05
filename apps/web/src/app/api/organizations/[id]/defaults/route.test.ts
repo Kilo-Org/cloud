@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   getModelIdToProviderSlugsIndex,
@@ -24,7 +24,7 @@ jest.mock(
   })
 );
 
-const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
+const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContextOrSupport);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetModelIdToProviderSlugsIndex = jest.mocked(getModelIdToProviderSlugsIndex);
 const mockedGetProviderSlugsForModel = jest.mocked(getProviderSlugsForModel);
@@ -85,6 +85,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           settings: {},
@@ -113,6 +114,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           plan: 'enterprise' as const,
@@ -144,6 +146,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           plan: 'enterprise' as const,
@@ -172,6 +175,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           plan: 'enterprise' as const,
@@ -202,6 +206,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           plan: 'enterprise' as const,
@@ -236,6 +241,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...nonMemberAdmin, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: { ...organization, settings: {} },
       },
     });
@@ -260,6 +266,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       success: true,
       data: {
         user: { ...user, role: 'owner' },
+        access: { kind: 'member', role: 'owner' },
         organization: {
           ...organization,
           plan: 'enterprise' as const,

@@ -11,6 +11,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { createOrUpdateUser } from '@/lib/user';
 
@@ -113,7 +115,6 @@ async function seedUser(): Promise<string> {
     email,
     firstName: 'Bob',
     lastName: 'Bobert',
-    idpId: `idp_${suffix}`,
   });
   createdUserIds.push(result.id);
   return result.id;
@@ -388,6 +389,40 @@ describe('upsertDirectorySubOrganization', () => {
     });
     expect(replay).toEqual({ id: parentId, created: false });
   });
+
+  test('a retry adopts a half-created group instead of adding a second one', async () => {
+    const parentId = await seedOrganization();
+
+    // `createChildOrganization` commits the row in its own transaction and then
+    // provisions a Stripe customer outside it, so a failure after the commit
+    // leaves a live child with no `directory_group_id` — invisible to the group
+    // lookup. Each retry used to add another.
+    const orphan = await createChildOrganization(`kilo-users-${suffix}`, parentId);
+    trackOrganization(orphan.id);
+    await db
+      .update(organizations)
+      .set({ directory_id: directoryId, directory_idp_id: directoryIdpId })
+      .where(eq(organizations.id, orphan.id));
+
+    const retried = await upsertDirectorySubOrganization(directoryGroupId, {
+      directoryId,
+      directoryIdpId,
+      name: `kilo-users-${suffix}`,
+    });
+
+    expect(retried.id).toBe(orphan.id);
+
+    const children = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(
+        and(eq(organizations.parent_organization_id, parentId), isNull(organizations.deleted_at))
+      );
+    expect(children).toHaveLength(1);
+
+    const [row] = await db.select().from(organizations).where(eq(organizations.id, orphan.id));
+    expect(row.directory_group_id).toBe(directoryGroupId);
+  });
 });
 
 describe('upsertDirectoryUser', () => {
@@ -411,7 +446,6 @@ describe('upsertDirectoryUser', () => {
       email,
       firstName: 'Bob',
       lastName: 'Bobert',
-      idpId: `idp_${suffix}`,
     });
 
     expect(second.id).toBe(first);
@@ -455,7 +489,6 @@ describe('upsertDirectoryUser', () => {
       email: capturedEmail,
       firstName: 'Prior',
       lastName: 'Holder',
-      idpId: `idp_${suffix}`,
     });
 
     // The same account, not a second one: the address is unique per account.
@@ -509,7 +542,6 @@ describe('upsertDirectoryUser', () => {
         email: foreignEmail,
         firstName: 'Unrelated',
         lastName: 'Person',
-        idpId: `idp_${suffix}`,
       })
     ).rejects.toThrow(DirectorySyncConflictError);
 
@@ -559,7 +591,6 @@ describe('upsertDirectoryUser', () => {
         email: unclaimedEmail,
         firstName: 'No',
         lastName: 'Policy',
-        idpId: `idp_${suffix}`,
       })
     ).rejects.toThrow(DirectorySyncConflictError);
   });
@@ -600,7 +631,6 @@ describe('upsertDirectoryUser', () => {
       email: storedEmail.toLowerCase(),
       firstName: 'Prior',
       lastName: 'Holder',
-      idpId: `idp_${suffix}`,
     });
 
     // The gate resolves the mailbox case-insensitively, so the conversion must
@@ -635,7 +665,6 @@ describe('upsertDirectoryUser', () => {
       email: sharedEmail,
       firstName: 'Shared',
       lastName: 'Person',
-      idpId: `idp_a_${suffix}`,
     });
     createdUserIds.push(first.id);
 
@@ -648,7 +677,6 @@ describe('upsertDirectoryUser', () => {
         email: sharedEmail,
         firstName: 'Shared',
         lastName: 'Person',
-        idpId: `idp_b_${suffix}`,
       })
     ).rejects.toThrow(DirectorySyncConflictError);
 
@@ -692,11 +720,129 @@ describe('upsertDirectoryUser', () => {
       email: foreignEmail,
       firstName: 'Unrelated',
       lastName: 'Person',
-      idpId: `idp_${suffix}`,
     }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
 
     expect(refusal).not.toContain(foreignEmail);
     expect(refusal).toContain(`unrelated-${suffix}.test`);
+  });
+
+  test('two directory users are never collapsed onto one account', async () => {
+    const domainA = `a-${suffix}.test`;
+    const domainB = `b-${suffix}.test`;
+    const directoryB = `directory_other_${suffix}`;
+
+    const organizationA = await seedOrganization();
+    await db
+      .update(organizations)
+      .set({ sso_domain: domainA })
+      .where(eq(organizations.id, organizationA));
+
+    const organizationB = trackOrganization(
+      (
+        await upsertDirectoryOrganization(directoryB, {
+          workOSOrganizationId: `org_other_${suffix}`,
+          name: `Other ${suffix}`,
+          capturedDomains: [domainB],
+        })
+      ).id
+    );
+    expect(organizationB).not.toBe(organizationA);
+
+    const alice = await upsertDirectoryUser(`directory_user_A_${suffix}`, {
+      directoryId,
+      email: `alice-${suffix}@${domainA}`,
+      firstName: 'Alice',
+      lastName: 'A',
+    });
+    createdUserIds.push(alice.id);
+
+    // A different person in a different directory. Keying the `workos` auth
+    // provider row on the identity provider's own group-scoped id let a shared
+    // value resolve this upsert to Alice's account — `createOrUpdateUser`
+    // matches `(provider, provider_account_id)` before it looks at the address,
+    // so neither the domain gate nor the rebind refusal ran.
+    const bob = await upsertDirectoryUser(`directory_user_B_${suffix}`, {
+      directoryId: directoryB,
+      email: `bob-${suffix}@${domainB}`,
+      firstName: 'Bob',
+      lastName: 'B',
+    });
+    createdUserIds.push(bob.id);
+
+    expect(bob.id).not.toBe(alice.id);
+
+    const [aliceRow] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, alice.id));
+    expect(aliceRow.external_id).toBe(`directory_user_A_${suffix}`);
+    expect(aliceRow.google_user_email).toBe(`alice-${suffix}@${domainA}`);
+  });
+
+  test('applies a changed name and address to a bound directory user', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
+
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: `old-${suffix}@${domain}`,
+      firstName: 'Old',
+      lastName: 'Name',
+    });
+    createdUserIds.push(created.id);
+
+    // `dsync.user.updated` maps to this route. Ignoring the payload would leave
+    // a stale address, which desynchronizes the address matching that SSO
+    // sign-in and the takeover gate both rely on.
+    const updated = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: `new-${suffix}@${domain}`,
+      firstName: 'New',
+      lastName: 'Name',
+    });
+    expect(updated.id).toBe(created.id);
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
+    expect(row.google_user_email).toBe(`new-${suffix}@${domain}`);
+    expect(row.google_user_name).toBe('New Name');
+    // The dedup and the takeover gate read these rather than `google_user_email`.
+    expect(row.normalized_email).toBe(`new-${suffix}@${domain}`);
+    expect(row.email_domain).toBe(domain);
+  });
+
+  test('refuses to move a bound user onto a domain the organization never captured', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
+
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: `holder-${suffix}@${domain}`,
+      firstName: 'Holder',
+      lastName: 'Person',
+    });
+    createdUserIds.push(created.id);
+
+    // An address change is a takeover of a new mailbox, so it runs the same gate
+    // as a first bind.
+    await expect(
+      upsertDirectoryUser(externalId, {
+        directoryId,
+        email: `holder-${suffix}@elsewhere-${suffix}.test`,
+        firstName: 'Holder',
+        lastName: 'Person',
+      })
+    ).rejects.toThrow(DirectorySyncConflictError);
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
+    expect(row.google_user_email).toBe(`holder-${suffix}@${domain}`);
   });
 });
 
@@ -731,21 +877,36 @@ describe('directory membership', () => {
     expect(replay.created).toBe(false);
   });
 
-  test('removal leaves the parent membership and writes a tombstone', async () => {
+  test('leaving one of several groups keeps the parent membership', async () => {
     const parentId = await seedOrganization();
     const childId = await seedSubOrganization();
     const userId = await seedUser();
-    await addDirectoryMembership({ directoryGroupId, externalId });
 
-    await removeDirectoryMembership({ directoryGroupId, externalId });
+    // A sibling group under the same parent, which the user stays in.
+    const siblingGroupId = `directory_group_sibling_${suffix}`;
+    const sibling = await upsertDirectorySubOrganization(siblingGroupId, {
+      directoryId,
+      directoryIdpId: `idp_group_sibling_${suffix}`,
+      name: `on-call-${suffix}`,
+    });
+    trackOrganization(sibling.id);
+
+    await addDirectoryMembership({ directoryGroupId, externalId });
+    await addDirectoryMembership({ directoryGroupId: siblingGroupId, externalId });
+
+    const result = await removeDirectoryMembership({ directoryGroupId, externalId });
 
     const remaining = await db
       .select({ organizationId: organization_memberships.organization_id })
       .from(organization_memberships)
       .where(eq(organization_memberships.kilo_user_id, userId));
 
-    // Leaving one group must not revoke access to the directory's organization.
-    expect(remaining.map(row => row.organizationId)).toEqual([parentId]);
+    // The identity provider still places this person in the enterprise through
+    // the sibling group, so the parent membership stays.
+    expect(remaining.map(row => row.organizationId).toSorted()).toEqual(
+      [parentId, sibling.id].toSorted()
+    );
+    expect(result.revokedParentMembership).toBe(false);
 
     const [tombstone] = await db
       .select()
@@ -760,6 +921,60 @@ describe('directory membership', () => {
     expect(tombstone.previous_role).toBe('member');
     // The actor is the identity provider, which has no Kilo user id.
     expect(tombstone.removed_by).toBeNull();
+  });
+
+  test('leaving the last group revokes the parent membership too', async () => {
+    const parentId = await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    const result = await removeDirectoryMembership({ directoryGroupId, externalId });
+
+    // No group remains, so the identity provider no longer asserts that this
+    // person belongs to the enterprise. Keeping the parent membership would let
+    // a user deleted from the directory retain its seats and data.
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+    expect(result.revokedParentMembership).toBe(true);
+
+    // Both removals leave a tombstone, so an ordinary SSO sign-in cannot
+    // silently restore either membership.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    expect(tombstones.map(row => row.organizationId)).toContain(parentId);
+
+    // Idempotent: a replay finds nothing left to revoke.
+    const replay = await removeDirectoryMembership({ directoryGroupId, externalId });
+    expect(replay.revokedParentMembership).toBe(false);
+  });
+
+  test('a customer-created sibling does not keep the parent membership alive', async () => {
+    const parentId = await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // A membership in a sub-organization with no directory binding is not the
+    // identity provider's statement about enterprise membership.
+    const manual = await createChildOrganization(`manual-${suffix}`, parentId);
+    trackOrganization(manual.id);
+    await addUserToOrganization(manual.id, userId, 'member');
+
+    const result = await removeDirectoryMembership({ directoryGroupId, externalId });
+
+    expect(result.revokedParentMembership).toBe(true);
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId)).toEqual([manual.id]);
   });
 
   test('a re-add clears the removal tombstone, because the directory is authoritative', async () => {
@@ -833,6 +1048,7 @@ describe('directory membership', () => {
       parentOrganizationId: null,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     });
   });
 
@@ -851,6 +1067,7 @@ describe('directory membership', () => {
       parentOrganizationId: parentId,
       kiloUserId: null,
       removed: false,
+      revokedParentMembership: false,
     });
 
     // A user leaving the directory must never be created by their own removal.

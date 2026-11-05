@@ -1,0 +1,4 @@
+ALTER TABLE "kilo_pass_org_agreements" ADD COLUMN "next_term_version_id" uuid;--> statement-breakpoint
+ALTER TABLE "kilo_pass_org_agreements" ADD COLUMN "next_term_effective_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "kilo_pass_org_agreements" ADD CONSTRAINT "kilo_pass_org_agreements_next_term_version_id_kilo_pass_org_term_versions_id_fk" FOREIGN KEY ("next_term_version_id") REFERENCES "public"."kilo_pass_org_term_versions"("id") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "kilo_pass_org_agreements" ADD CONSTRAINT "kilo_pass_org_agreements_next_term_check" CHECK (("kilo_pass_org_agreements"."next_term_version_id" IS NULL AND "kilo_pass_org_agreements"."next_term_effective_at" IS NULL) OR ("kilo_pass_org_agreements"."next_term_version_id" IS NOT NULL AND "kilo_pass_org_agreements"."next_term_effective_at" IS NOT NULL));

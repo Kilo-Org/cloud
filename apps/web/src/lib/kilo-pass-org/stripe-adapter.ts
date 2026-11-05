@@ -4,7 +4,12 @@ import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.se
 import { randomUUID } from 'node:crypto';
 import type Stripe from 'stripe';
 import { and, desc, eq, ne } from 'drizzle-orm';
-import { kilo_pass_org_agreements, organization_seats_purchases } from '@kilocode/db/schema';
+import {
+  kilo_pass_org_agreements,
+  kilo_pass_org_term_versions,
+  organization_seats_purchases,
+} from '@kilocode/db/schema';
+import { captureException } from '@sentry/nextjs';
 import {
   KiloPassOrgAgreementState,
   KiloPassOrgProcessingCondition,
@@ -14,6 +19,7 @@ import type { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kil
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import {
+  getKiloPassPriceMetadataForId,
   getKnownStripePriceIdsForKiloPass,
   getStripePriceIdForKiloPass,
 } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
@@ -74,6 +80,7 @@ import {
 import {
   activatePaidAgreement,
   bindProviderSeatAddOnItem,
+  clearPendingTierChange,
   createParentSupplement,
   createPendingAgreement,
   endAgreementAfterPassItemRemoved,
@@ -82,10 +89,13 @@ import {
 import {
   activeAndFuturePhases,
   classifyCancellationSchedule,
+  classifyTierChangeSchedule,
   isOwnedCancellationSchedule,
+  isOwnedTierChangeSchedule,
   isTerminalScheduleStatus,
   OrganizationKiloPassCheckoutScheduleError,
   ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN,
+  ORGANIZATION_KILO_PASS_TIER_CHANGE_ORIGIN,
   phaseItemPriceId,
   phaseUpdateParams,
   releaseCancellationSchedule,
@@ -95,6 +105,7 @@ import {
   subscriptionScheduleItemsWithout,
   throwUnsafeOrganizationKiloPassSchedule,
   type OrganizationKiloPassCheckoutScheduleErrorReason,
+  type ScheduleItem,
   type ScheduleReleaseResult,
 } from './cancellation-schedule';
 import {
@@ -1399,6 +1410,26 @@ async function settleOrganizationKiloPassInvoiceServiceFeeBeforeActivation(param
   }
 }
 
+/** Keeps the informational subscription tier in step after a scheduled tier change renews. */
+async function syncSubscriptionTierMetadata(
+  subscription: Stripe.Subscription,
+  recordedTier: string,
+  line: Stripe.InvoiceLineItem
+) {
+  const paidTier = getKiloPassPriceMetadataForId(line.pricing?.price_details?.price)?.tier;
+  if (!paidTier || paidTier === recordedTier) return;
+  try {
+    await stripe.subscriptions.update(subscription.id, {
+      metadata: { ...subscription.metadata, tier: paidTier },
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'kilo_pass_org_tier_change', stage: 'subscription_metadata_sync' },
+      extra: { subscriptionId: subscription.id },
+    });
+  }
+}
+
 export async function handleOrganizationKiloPassInvoicePaid(params: {
   invoice: Stripe.Invoice;
   paidSeatCount?: number;
@@ -1478,6 +1509,7 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
     paidFrom: paidPeriod.start,
     paidUntil: paidPeriod.end,
     paidSeatCount: seats,
+    paidTier: getKiloPassPriceMetadataForId(line.pricing?.price_details?.price)?.tier,
     firstWindow,
     isBridge,
     paidBridgeInterval: isBridge ? paidPeriod : undefined,
@@ -1491,6 +1523,9 @@ export async function handleOrganizationKiloPassInvoicePaid(params: {
             new Date(Math.min(params.invoice.created, paidPeriod.start.getTime() / 1000) * 1000)
           ),
   });
+  if (agreement.next_term_version_id) {
+    await syncSubscriptionTierMetadata(subscription, metadata.tier, line);
+  }
   if (
     agreement.state === KiloPassOrgAgreementState.Active &&
     agreement.processing_condition !== KiloPassOrgProcessingCondition.Manual &&
@@ -1575,7 +1610,12 @@ export async function scheduleOrganizationKiloPassCancellation(input: {
       schedule,
     });
 
-  const existing = await retrieveAttachedSchedule(subscription);
+  let existing = await retrieveAttachedSchedule(subscription);
+  // A cancellation ends the pass, so a pending tier change is released first.
+  if (existing && isOwnedTierChangeSchedule(existing)) {
+    await releaseCancellationSchedule(existing.id);
+    existing = null;
+  }
   let target: Stripe.SubscriptionSchedule;
   let activePhase: Stripe.SubscriptionSchedule.Phase | null;
   if (!existing) {
@@ -1645,6 +1685,189 @@ export async function resumeOrganizationKiloPassCancellation(input: {
   });
   if (shape.kind === 'unsafe') return unsafe(shape.reason);
   await releaseCancellationSchedule(schedule.id);
+}
+
+export class OrganizationKiloPassTierChangeError extends Error {
+  readonly reason: 'subscription_unavailable' | 'cancellation_pending' | 'unsupported_cadence';
+
+  constructor(reason: OrganizationKiloPassTierChangeError['reason']) {
+    super(`KILO_PASS_ORG_TIER_CHANGE_${reason.toUpperCase()}`);
+    this.name = 'OrganizationKiloPassTierChangeError';
+    this.reason = reason;
+  }
+}
+
+function swapPassPrice(
+  items: readonly ScheduleItem[],
+  currentPriceId: string,
+  targetPriceId: string
+): ScheduleItem[] {
+  return items.map(item =>
+    item.price === currentPriceId ? { ...item, price: targetPriceId } : item
+  );
+}
+
+/**
+ * Swaps only the pass price at the seat subscription's next renewal. The seat
+ * item, quantities, collection method (card or invoice), tax and discount
+ * settings of the active phase are carried over unchanged, so enterprise
+ * organizations billed by invoice keep their terms. Nothing is charged now.
+ */
+export async function scheduleOrganizationKiloPassTierChange(input: {
+  providerSubscriptionId: string;
+  providerSeatAddOnItemId: string;
+  agreementId: string;
+  organizationId: string;
+  targetTier: KiloPassTier;
+  cadence: KiloPassCadence;
+}): Promise<{ effectiveAt: Date }> {
+  const subscription = await stripe.subscriptions.retrieve(input.providerSubscriptionId);
+  if (subscription.status !== 'active' || subscription.ended_at) {
+    throw new OrganizationKiloPassTierChangeError('subscription_unavailable');
+  }
+  if (subscription.cancel_at_period_end) {
+    throw new OrganizationKiloPassTierChangeError('cancellation_pending');
+  }
+  const passItem = resolveOrganizationKiloPassSubscriptionItem({
+    subscription,
+    boundProviderItemId: input.providerSeatAddOnItemId,
+  });
+  if (!passItem) throw new OrganizationKiloPassTierChangeError('subscription_unavailable');
+  const currentPrice = getKiloPassPriceMetadataForId(passItem.price.id);
+  if (!currentPrice || currentPrice.cadence !== input.cadence) {
+    throw new OrganizationKiloPassTierChangeError('unsupported_cadence');
+  }
+  const period = periodForItem(paidSeatItem(subscription));
+  const periodStart = Math.floor(period.start.getTime() / 1000);
+  const periodEnd = Math.floor(period.end.getTime() / 1000);
+  const targetPriceId = getStripePriceIdForKiloPass({
+    tier: input.targetTier,
+    cadence: input.cadence,
+  });
+  const currentItems = subscriptionScheduleItems(subscription);
+  const targetItems = swapPassPrice(currentItems, passItem.price.id, targetPriceId);
+  const unsafe = (reason: string, schedule: Stripe.SubscriptionSchedule | null): never =>
+    throwUnsafeOrganizationKiloPassSchedule({
+      event: 'tier_change',
+      reason,
+      organizationId: input.organizationId,
+      subscriptionId: subscription.id,
+      schedule,
+    });
+
+  const existing = await retrieveAttachedSchedule(subscription);
+  let target: Stripe.SubscriptionSchedule;
+  let activePhase: Stripe.SubscriptionSchedule.Phase | null;
+  if (!existing) {
+    target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
+    activePhase = target.phases[0] ?? null;
+  } else {
+    const isOrphanedCreate =
+      Object.keys(existing.metadata ?? {}).length === 0 && existing.phases.length === 1;
+    if (!isOwnedTierChangeSchedule(existing) && !isOrphanedCreate) {
+      return unsafe('unowned_schedule', existing);
+    }
+    // An earlier owned change may target another tier; classify against the
+    // schedule's own last phase so replacing it is allowed.
+    const lastPhase = existing.phases[existing.phases.length - 1];
+    const previousTargetItems = lastPhase
+      ? lastPhase.items.map(item => ({
+          price: phaseItemPriceId(item),
+          quantity: item.quantity ?? 1,
+        }))
+      : targetItems;
+    const shape = classifyTierChangeSchedule({
+      schedule: existing,
+      currentItems,
+      targetItems: previousTargetItems,
+      periodEnd,
+    });
+    if (shape.kind === 'unsafe') return unsafe(shape.reason, existing);
+    target = existing;
+    activePhase = shape.activePhase;
+  }
+  await stripe.subscriptionSchedules.update(target.id, {
+    metadata: {
+      origin: ORGANIZATION_KILO_PASS_TIER_CHANGE_ORIGIN,
+      agreementId: input.agreementId,
+      targetTier: input.targetTier,
+    },
+    end_behavior: 'release',
+    phases: [
+      phaseUpdateParams(activePhase, currentItems, {
+        start_date: activePhase?.start_date ?? periodStart,
+        end_date: periodEnd,
+      }),
+      { ...phaseUpdateParams(activePhase, targetItems), proration_behavior: 'none' },
+    ],
+  });
+  return { effectiveAt: period.end };
+}
+
+/** Releases an owned tier-change schedule so the pass keeps its current tier. */
+export async function releaseOrganizationKiloPassTierChange(input: {
+  providerSubscriptionId: string;
+  organizationId: string;
+}): Promise<void> {
+  const subscription = await stripe.subscriptions.retrieve(input.providerSubscriptionId);
+  const schedule = await retrieveAttachedSchedule(subscription);
+  if (!schedule) return;
+  if (!isOwnedTierChangeSchedule(schedule)) {
+    return throwUnsafeOrganizationKiloPassSchedule({
+      event: 'tier_change',
+      reason: 'unowned_schedule',
+      organizationId: input.organizationId,
+      subscriptionId: subscription.id,
+      schedule,
+    });
+  }
+  await releaseCancellationSchedule(schedule.id);
+}
+
+/**
+ * A seat update releases the owned tier-change schedule because its phases
+ * carry stale quantities. Re-create it from the agreement's pending term; when
+ * that fails, drop the pending change so the agreement never claims a change
+ * Stripe will not make.
+ */
+export async function restoreOrganizationKiloPassTierChange(subscriptionId: string) {
+  const [agreement] = await db
+    .select({
+      agreement: kilo_pass_org_agreements,
+      nextTier: kilo_pass_org_term_versions.tier,
+    })
+    .from(kilo_pass_org_agreements)
+    .innerJoin(
+      kilo_pass_org_term_versions,
+      eq(kilo_pass_org_agreements.next_term_version_id, kilo_pass_org_term_versions.id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.provider_subscription_id, subscriptionId),
+        ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+      )
+    )
+    .limit(1);
+  if (!agreement?.agreement.provider_seat_add_on_item_id) return;
+  try {
+    await scheduleOrganizationKiloPassTierChange({
+      providerSubscriptionId: subscriptionId,
+      providerSeatAddOnItemId: agreement.agreement.provider_seat_add_on_item_id,
+      agreementId: agreement.agreement.id,
+      organizationId: agreement.agreement.parent_organization_id,
+      targetTier: agreement.nextTier as KiloPassTier,
+      cadence: agreement.agreement.cadence as KiloPassCadence,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'kilo_pass_org_tier_change', stage: 'restore_after_seat_update' },
+      extra: { agreementId: agreement.agreement.id },
+    });
+    await clearPendingTierChange({
+      agreementId: agreement.agreement.id,
+      reason: 'schedule_restore_failed',
+    });
+  }
 }
 
 async function retrieveOwnedScheduleFromEvent(

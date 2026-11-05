@@ -88,6 +88,7 @@ import {
   handleOrganizationKiloPassSubscriptionEvent,
   prepareOrganizationKiloPassSeatCapacityFee,
   resolveOrganizationKiloPassSubscriptionItem,
+  restoreOrganizationKiloPassTierChange,
   stagePreparedOrganizationKiloPassServiceFeeItem,
   type OrganizationKiloPassSeatCapacityFeeDependencies,
   type OrganizationKiloPassSeatCapacityStripe,
@@ -2747,6 +2748,17 @@ export async function handleUpdateSeatCount(
       });
     }
     return handleUpdateSeatCountRequiresActionError(error, subscriptionStripeId);
+  }
+
+  if (
+    scheduleToRelease &&
+    organizationPassItem &&
+    typeof restoreOrganizationKiloPassTierChange === 'function'
+  ) {
+    // The seat update released a pending tier change schedule; put it back with the new quantities.
+    await restoreOrganizationKiloPassTierChange(subscriptionStripeId).catch(error => {
+      captureException(error, { tags: { source: 'kilo_pass_org_tier_change_restore' } });
+    });
   }
 
   let paymentIntent: Stripe.PaymentIntent | null = null;

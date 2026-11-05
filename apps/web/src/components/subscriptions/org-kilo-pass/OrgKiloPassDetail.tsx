@@ -67,6 +67,24 @@ export function OrgKiloPassDetail({
       onError: error => toast.error(error.message || 'Could not resume the subscription.'),
     })
   );
+  const changeTier = useMutation(
+    trpc.organizations.kiloPass.changeTier.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Tier change scheduled for the next renewal.');
+        await invalidateKiloPass();
+      },
+      onError: error => toast.error(error.message || 'Could not schedule the tier change.'),
+    })
+  );
+  const cancelTierChange = useMutation(
+    trpc.organizations.kiloPass.cancelTierChange.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Scheduled tier change cancelled.');
+        await invalidateKiloPass();
+      },
+      onError: error => toast.error(error.message || 'Could not cancel the tier change.'),
+    })
+  );
   const retryRun = useMutation(
     trpc.organizations.kiloPass.retryRun.mutationOptions({
       onSuccess: async () => {
@@ -233,6 +251,19 @@ export function OrgKiloPassDetail({
       onRefreshPlan={onRefreshPlan}
       onCancelSubscription={() => cancel.mutate({ organizationId })}
       onResumeSubscription={() => resume.mutate({ organizationId })}
+      tierChange={{
+        currentTier: detail.tier,
+        availableTerms: detail.availableTierTerms,
+        blockedReason: detail.tierChangeBlockedReason ?? undefined,
+        pending: detail.pendingTierChange
+          ? {
+              terms: detail.pendingTierChange.terms,
+              effectiveAt: formatDateLabel(detail.pendingTierChange.effectiveAt),
+            }
+          : undefined,
+        onChangeTier: tier => changeTier.mutate({ organizationId, tier }),
+        onCancelPendingChange: () => cancelTierChange.mutate({ organizationId }),
+      }}
       pendingAction={
         updateAllocation.isPending
           ? isEditing
@@ -244,7 +275,11 @@ export function OrgKiloPassDetail({
               ? 'cancel'
               : resume.isPending
                 ? 'resume'
-                : null
+                : changeTier.isPending
+                  ? 'change_tier'
+                  : cancelTierChange.isPending
+                    ? 'cancel_tier_change'
+                    : null
       }
     />
   );

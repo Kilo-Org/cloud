@@ -6,6 +6,7 @@ import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN = 'kilo-pass-org-cancellation';
+export const ORGANIZATION_KILO_PASS_TIER_CHANGE_ORIGIN = 'kilo-pass-org-tier-change';
 export const SCHEDULE_REWRITE_UNSAFE = 'SCHEDULE_REWRITE_UNSAFE';
 
 type Phase = Stripe.SubscriptionSchedule.Phase;
@@ -25,7 +26,8 @@ export type OrganizationKiloPassScheduleEvent =
   | 'resume'
   | 'checkout'
   | 'seat_update'
-  | 'pass_item_removed';
+  | 'pass_item_removed'
+  | 'tier_change';
 
 export const KILO_PASS_ORG_CANCELLATION_PENDING = 'KILO_PASS_ORG_CANCELLATION_PENDING';
 
@@ -55,6 +57,10 @@ export function isTerminalScheduleStatus(status: Stripe.SubscriptionSchedule.Sta
 
 export function isOwnedCancellationSchedule(schedule: Stripe.SubscriptionSchedule): boolean {
   return schedule.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN;
+}
+
+export function isOwnedTierChangeSchedule(schedule: Stripe.SubscriptionSchedule): boolean {
+  return schedule.metadata?.origin === ORGANIZATION_KILO_PASS_TIER_CHANGE_ORIGIN;
 }
 
 function referenceId(reference: string | { id: string }): string {
@@ -182,6 +188,50 @@ export function classifyCancellationSchedule(input: {
   return { kind: 'unsafe', reason: 'unexpected_phase_sequence' };
 }
 
+export type OrganizationKiloPassTierChangeScheduleShape =
+  | { kind: 'idle'; activePhase: Phase }
+  | { kind: 'tier_change_pending'; activePhase: Phase; changePhase: Phase }
+  | { kind: 'unsafe'; reason: string };
+
+/**
+ * Classifies an owned tier-change schedule against the live subscription.
+ * Phases must keep the current items until `periodEnd` and then swap only the
+ * pass price, so a hand-edited schedule is never rewritten.
+ */
+export function classifyTierChangeSchedule(input: {
+  schedule: Stripe.SubscriptionSchedule;
+  currentItems: readonly ScheduleItem[];
+  targetItems: readonly ScheduleItem[];
+  periodEnd: number;
+}): OrganizationKiloPassTierChangeScheduleShape {
+  if (input.schedule.default_settings?.billing_cycle_anchor === 'phase_start') {
+    return { kind: 'unsafe', reason: 'default_billing_cycle_anchor' };
+  }
+  const { activePhase, futurePhases } = activeAndFuturePhases(input.schedule);
+  if (!activePhase) return { kind: 'unsafe', reason: 'no_active_phase' };
+  const labels: ('current' | 'target')[] = [];
+  for (const phase of [activePhase, ...futurePhases]) {
+    const unsupported = unsupportedPhaseSetting(phase);
+    if (unsupported) return { kind: 'unsafe', reason: unsupported };
+    if (phaseItemsMatch(phase, input.currentItems)) labels.push('current');
+    else if (phaseItemsMatch(phase, input.targetItems)) labels.push('target');
+    else return { kind: 'unsafe', reason: 'phase_items_mismatch' };
+  }
+  if (labels.every(label => label === 'current')) return { kind: 'idle', activePhase };
+  const [changePhase] = futurePhases;
+  if (
+    changePhase &&
+    futurePhases.length === 1 &&
+    labels[0] === 'current' &&
+    labels[1] === 'target'
+  ) {
+    if (activePhase.end_date !== input.periodEnd) {
+      return { kind: 'unsafe', reason: 'change_boundary_not_period_end' };
+    }
+    return { kind: 'tier_change_pending', activePhase, changePhase };
+  }
+  return { kind: 'unsafe', reason: 'unexpected_phase_sequence' };
+}
 /**
  * An omitted phase `discounts` inherits the customer's discount, so a phase
  * that explicitly has none is re-sent as Stripe's empty-string clear value.
@@ -383,6 +433,9 @@ export async function scheduleToReleaseBeforeSeatUpdate(input: {
   const { subscription, paidSeatItem, passItem } = input;
   const schedule = await retrieveAttachedSchedule(subscription);
   if (!schedule) return null;
+  // A pending tier change keeps stale item quantities after a seat update, so
+  // it is released here and re-created from the agreement afterwards.
+  if (passItem && isOwnedTierChangeSchedule(schedule)) return schedule.id;
   const owned = isOwnedCancellationSchedule(schedule);
   if (!owned && !passItem) return null;
   const organizationId = subscription.metadata?.organizationId;

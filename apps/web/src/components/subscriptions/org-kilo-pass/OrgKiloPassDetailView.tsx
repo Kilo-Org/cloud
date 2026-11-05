@@ -41,7 +41,9 @@ import type {
   OrgKiloPassCommercialState,
   OrgKiloPassCondition,
   OrgKiloPassTerms,
+  OrgKiloPassTierChange,
 } from './types';
+import { OrgKiloPassTierChangeCard } from './OrgKiloPassTierChangeCard';
 import {
   AllocationEditor,
   AllocationSummary,
@@ -51,7 +53,15 @@ import {
   SummaryValue,
 } from './view-shared';
 
-type OrgKiloPassPendingAction = 'save' | 'reset' | 'refresh' | 'cancel' | 'resume' | null;
+type OrgKiloPassPendingAction =
+  | 'save'
+  | 'reset'
+  | 'refresh'
+  | 'cancel'
+  | 'resume'
+  | 'change_tier'
+  | 'cancel_tier_change'
+  | null;
 
 function haveAssignmentChanges(
   currentAllocations: OrgKiloPassAllocation[],
@@ -106,6 +116,7 @@ export function OrgKiloPassDetailView({
   onRefreshPlan,
   onCancelSubscription,
   onResumeSubscription,
+  tierChange,
   pendingAction = null,
 }: {
   organizationId: string;
@@ -134,6 +145,7 @@ export function OrgKiloPassDetailView({
   onRefreshPlan?: () => void;
   onCancelSubscription?: () => void;
   onResumeSubscription?: () => void;
+  tierChange?: OrgKiloPassTierChange;
   /** The mutation currently in flight, if any; drives pending labels and disabled states. */
   pendingAction?: OrgKiloPassPendingAction;
 }) {
@@ -220,6 +232,19 @@ export function OrgKiloPassDetailView({
           <SummaryValue label="Covered through" value={paidThrough} icon={<Check />} />
         </CardContent>
       </Card>
+
+      {tierChange && hasCurrentIssuance && commercialState !== 'ended' ? (
+        <OrgKiloPassTierChangeCard
+          tierChange={tierChange}
+          paidThrough={paidThrough}
+          totalPasses={nextTotalPasses}
+          pendingAction={
+            pendingAction === 'change_tier' || pendingAction === 'cancel_tier_change'
+              ? pendingAction
+              : null
+          }
+        />
+      ) : null}
 
       {hasCurrentIssuance ? (
         <Card>

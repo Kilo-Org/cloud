@@ -262,6 +262,10 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
 
+- `pnpm dev:mobile:diagnostics status` names this worktree's dev server, whether the bundler is ready, and how many apps are connected to it.
+- `pnpm dev:mobile:diagnostics errors` prints what the connected app threw, with the project frame of each error. It reads the port of this worktree's dev session and refuses a dev server that serves another worktree.
+- Both use Expo's agent CLI on an explicit dev-server URL. They never start Metro or a build, and they prove no tap: `runtime:tap` and `runtime:tree` invoke props, so use `agent-device` for a touch and `agent-device metro reload` after an edit.
+
 ## Chat tab
 
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.

@@ -59,7 +59,6 @@ function toVercelEndpointModel(
 }
 
 type VercelOnlyProviderMetadata = {
-  displayName: string;
   termsOfServiceURL: string;
   privacyPolicyURL: string;
 };
@@ -68,22 +67,18 @@ type VercelOnlyProviderMetadata = {
 const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
   Object.entries({
     boundless: {
-      displayName: 'Boundless',
       termsOfServiceURL: 'https://boundless.network/terms-of-service',
       privacyPolicyURL: 'https://boundless.network/privacy-policy',
     },
     particle: {
-      displayName: 'Particle',
       termsOfServiceURL: 'https://particle.ai/legal/terms',
       privacyPolicyURL: 'https://particle.ai/legal/privacy',
     },
     runinfra: {
-      displayName: 'RunInfra',
       termsOfServiceURL: 'https://runinfra.ai/terms-of-service',
       privacyPolicyURL: 'https://runinfra.ai/privacy-policy',
     },
     runware: {
-      displayName: 'Runware',
       termsOfServiceURL: 'https://runware.ai/terms',
       privacyPolicyURL: 'https://runware.ai/privacy',
     },
@@ -92,9 +87,7 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
 
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
   const metadata = vercelOnlyProviderMetadata.get(providerId);
-  const displayName =
-    metadata?.displayName ??
-    normalizePublicInferenceProvider(providerId.replace(/[-_]+/g, ' ')).name;
+  const displayName = normalizePublicInferenceProvider(providerId).name;
   return {
     name: displayName,
     displayName,

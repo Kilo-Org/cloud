@@ -9100,6 +9100,15 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
@@ -9152,12 +9161,13 @@
       "plainvars",
       "secrets",
       "commands",
+      "startcommands",
       "sandboxallocation",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -9496,6 +9506,15 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
@@ -9548,12 +9567,13 @@
       "plainvars",
       "secrets",
       "commands",
+      "startcommands",
       "sandboxallocation",
       "egressmode",
       "egressallowlist",
       "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands sandboxAllocation egressMode egressAllowlist egressAudit"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",

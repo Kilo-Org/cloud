@@ -418,8 +418,8 @@ describe('Organization hub Kilo Pass placeholder', () => {
     const classes = skeletonClasses(renderer.root)[0] ?? '';
     const tokens = classes.split(/\s+/).filter(Boolean);
 
-    // `bg-muted` equals the `bg-secondary` row card in both palettes, so the
-    // default bar drew nothing on this screen.
+    // `skeleton-fill` matches the `bg-secondary` row card in the light palette,
+    // so the default bar drew nothing on this screen.
     expect(tokens).toContain('bg-muted-soft');
     expect(tokens).not.toContain('bg-muted');
 

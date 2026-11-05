@@ -39,6 +39,11 @@ const previousWorkerHelloSchema = z
   })
   .strict();
 
+/** A Worker that predates the startCommands capability. */
+const startCommandsPredatingWorkerHelloSchema = previousWorkerHelloSchema
+  .extend({ workspaceSnapshots: z.literal(true).optional() })
+  .strict();
+
 const legacyWorkerHelloSchema = z
   .object({
     type: z.literal('hello'),
@@ -191,6 +196,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       workspaceSnapshots: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
+      startCommands: true,
     });
   });
 });
@@ -248,17 +254,24 @@ describe('acknowledged heartbeat', () => {
   });
   it('falls back through the capability hello before the bare legacy hello', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(false);
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[0]).success).toBe(
+        false
+      );
       await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
+      expect(startCommandsPredatingWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(
+        true
+      );
+      expect(socket.frames[1]).toMatchObject({ workspaceSnapshots: true });
       await waitFor(() => socket.frames.length === 3);
-      expect(socket.frames[2]).toEqual({
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      await waitFor(() => socket.frames.length === 4);
+      expect(socket.frames[3]).toEqual({
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
-      expect(legacyWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(legacyWorkerHelloSchema.safeParse(socket.frames[3]).success).toBe(true);
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
@@ -287,18 +300,18 @@ describe('acknowledged heartbeat', () => {
 
   it('keeps prior capabilities when the peer only predates workspaceSnapshots', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      await waitFor(() => socket.frames.length === 2);
-      expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
-      expect(socket.frames[1]).toMatchObject({
+      await waitFor(() => socket.frames.length === 3);
+      expect(previousWorkerHelloSchema.safeParse(socket.frames[2]).success).toBe(true);
+      expect(socket.frames[2]).toMatchObject({
         heartbeatAck: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });
-      expect(socket.frames[1]).not.toHaveProperty('workspaceSnapshots');
+      expect(socket.frames[2]).not.toHaveProperty('workspaceSnapshots');
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
-      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(2);
+      expect(socket.frames.filter(frame => frame.type === 'hello')).toHaveLength(3);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
     });
@@ -956,6 +969,7 @@ describe('createControlPlaneConnection', () => {
         workspaceSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
+        startCommands: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

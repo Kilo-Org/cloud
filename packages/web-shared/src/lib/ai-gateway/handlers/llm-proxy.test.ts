@@ -20,7 +20,10 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import {
+  getBalanceAndOrgSettings,
+  type BalancePayer,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import {
@@ -414,6 +417,14 @@ function setUserAuth() {
     settings: undefined,
     plan: undefined,
   });
+}
+
+function payerWithBalance(balance: number): BalancePayer {
+  return {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    totalMicrodollarsAcquired: 1_000_000_000,
+    microdollarsUsed: 1_000_000_000 - balance * 1_000_000,
+  };
 }
 
 function setAnonymousAuth() {
@@ -1705,7 +1716,11 @@ describe('POST /api/v1/chat/completions request handling', () => {
   });
 
   describe('organization gateway settings', () => {
-    const vercelProvider = { ...provider, type: 'vercel' } satisfies Provider;
+    const vercelProvider = {
+      ...provider,
+      type: 'vercel',
+      apiUrl: 'https://ai-gateway.vercel.sh/v1',
+    } satisfies Provider;
 
     afterEach(() => {
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
@@ -1771,6 +1786,112 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(response.status).toBe(200);
       expect(mockedUpstreamRequest).toHaveBeenCalled();
     });
+
+    it.each([
+      ['custom', 'https://openrouter.ai/api/v1', { disable_openrouter: true }, 'OpenRouter'],
+      ['custom-public', 'https://api.openrouter.ai/v1', { disable_openrouter: true }, 'OpenRouter'],
+      [
+        'direct-byok',
+        'https://OPENROUTER.AI.:8443/api/v1',
+        { disable_openrouter: true },
+        'OpenRouter',
+      ],
+      [
+        'custom',
+        'https://ai-gateway.vercel.sh/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+      [
+        'custom-public',
+        'https://vercel.sh/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+      [
+        'direct-byok',
+        'https://other.VERCEL.SH.:8443/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+    ] as const)(
+      'rejects a %s provider targeting the disabled gateway at %s',
+      async (type, apiUrl, settings, gatewayName) => {
+        setOrganization(settings, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type, apiUrl },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error: `This request would be routed through ${gatewayName}, which your organization has disabled.`,
+          error_type: 'provider_not_allowed',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['https://api.example.com/v1', { chat_completions: 'https://openrouter.ai/api/v1' }, 403],
+      ['https://openrouter.ai/api/v1', { chat_completions: 'https://api.example.com/v1' }, 200],
+      ['https://api.example.com/v1', { messages: 'https://openrouter.ai/api/v1' }, 200],
+    ] as const)(
+      'checks the effective upstream URL for %s with overrides %j',
+      async (apiUrl, apiUrlOverrides, expectedStatus) => {
+        setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type: 'custom', apiUrl, apiUrlOverrides },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(expectedStatus);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(expectedStatus === 200 ? 1 : 0);
+      }
+    );
+
+    it.each([
+      ['https://openrouter.ai.attacker.example/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://notopenrouter.ai/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://openrouter.ai@api.example.com/v1', { disable_openrouter: true }, ['org-1']],
+      [
+        'https://ai-gateway.vercel.sh.attacker.example/v1',
+        { disable_vercel_ai_gateway: true },
+        ['org-1'],
+      ],
+      ['https://notvercel.sh/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
+      ['https://openrouter.ai/api/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
+      ['https://ai-gateway.vercel.sh/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://openrouter.ai/api/v1', {}, ['org-1']],
+      ['https://openrouter.ai/api/v1', { disable_openrouter: true }, []],
+    ] as const)(
+      'allows a custom provider at %s with settings %j and feature organizations %j',
+      async (apiUrl, settings, organizationIds) => {
+        setOrganization(settings, { gateway_settings: [...organizationIds] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type: 'custom', apiUrl },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalled();
+      }
+    );
 
     it('rejects a BYOK route through a disabled Vercel AI Gateway', async () => {
       setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-1'] });
@@ -4650,7 +4771,7 @@ describe('Enkrypt output guardrail', () => {
     fetchSpy.mockRestore();
   });
 
-  function setOrganization(settings: OrganizationSettings | undefined) {
+  function setOrganization(settings: OrganizationSettings | undefined, balance = 1000) {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -4661,9 +4782,10 @@ describe('Enkrypt output guardrail', () => {
       organizationId: 'org-1',
     });
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
+      balance,
       settings: settings && { kilo_encrypt: true, ...settings },
       plan: 'enterprise',
+      payer: payerWithBalance(balance),
     });
   }
 
@@ -4786,6 +4908,37 @@ describe('Enkrypt output guardrail', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
   });
+
+  it.each([0, -1])(
+    'rejects an output-only guardrail on a balance-exempt route at organization balance %s',
+    async balance => {
+      setOrganization(outputGuardrailSettings('block'), balance);
+      mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+      });
+      enkryptAnswers(nothingDetected);
+
+      const response = await sendRequest('chat_completions', false);
+
+      expect(response.status).toBe(402);
+      expect(await response.json()).toMatchObject({
+        error: {
+          title: 'Organization Credits Required',
+          balance,
+        },
+        error_type: 'usage_limit_exceeded',
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedRecordEnkryptUsage).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     {
@@ -5361,7 +5514,7 @@ describe('Enkrypt input guardrail', () => {
     fetchSpy.mockRestore();
   });
 
-  function setOrganization(settings: OrganizationSettings | undefined) {
+  function setOrganization(settings: OrganizationSettings | undefined, balance = 1000) {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -5372,9 +5525,10 @@ describe('Enkrypt input guardrail', () => {
       organizationId: 'org-1',
     });
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
+      balance,
       settings: settings && { kilo_encrypt: true, ...settings },
       plan: 'enterprise',
+      payer: payerWithBalance(balance),
     });
   }
 
@@ -5401,6 +5555,93 @@ describe('Enkrypt input guardrail', () => {
     summary: { injection_attack: 1, pii: 0 },
     result_message: 'Potential prompt injection detected.',
   };
+
+  it.each([
+    { balance: 0, route: 'paid' },
+    { balance: -1, route: 'paid' },
+    { balance: 0, route: 'free' },
+    { balance: 0, route: 'byok' },
+    { balance: 0, route: 'skipBalanceCheck' },
+  ])(
+    'rejects an input guardrail at organization balance $balance on a $route route',
+    async ({ balance, route }) => {
+      setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, balance);
+      mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        provider,
+        userByok: route === 'byok' ? [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }] : null,
+        isFree: route === 'free',
+        bypassAccessCheck: false,
+        skipBalanceCheck: route === 'skipBalanceCheck',
+      });
+      enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(route === 'free' ? 'test/free-model:free' : undefined))
+      );
+
+      expect(response.status).toBe(402);
+      expect(await response.json()).toMatchObject({
+        error: { title: 'Organization Credits Required', balance },
+        error_type: 'usage_limit_exceeded',
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(recordEnkryptUsage).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns a retryable rejection before scanning while an organization top-up is in flight', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 0);
+    mockedIsAutoTopUpInFlight.mockResolvedValue(true);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect(await response.json()).toMatchObject({ error_type: 'top_up_in_progress' });
+    expect(mockedIsAutoTopUpInFlight).toHaveBeenCalledWith({
+      userId: 'user-123',
+      organizationId: 'org-1',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('scans and sends a free-model request when the organization is funded', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 0.000001);
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('test/free-model:free')));
+
+    expect(response.status).toBe(200);
+    expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles a late organization-policy failure after rejecting an unfunded organization', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 0);
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    const policy = Promise.withResolvers<never>();
+    jest.mocked(getOrganizationGroupPolicyContext).mockReturnValueOnce(policy.promise);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+    policy.reject(new Error('Organization policy lookup failed'));
+    await Promise.resolve();
+
+    expect(response.status).toBe(402);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 
   it('makes no Enkrypt call for an organization without the guardrail', async () => {
     setOrganization({ enkrypt: { input_guardrail: { enabled: false } } });

@@ -1943,6 +1943,7 @@
       "assistantStopped": "La génération de la réponse a été interrompue.",
       "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
       "assistantProviderError": "Le fournisseur a renvoyé une erreur.",
+      "assistantProviderRefused": "Le fournisseur a refusé cette requête et aucune nouvelle tentative n'est possible.",
       "assistantOutputLimit": "La réponse a atteint la limite de sortie du modèle.",
       "assistantStructuredOutput": "La réponse ne correspondait pas au format requis.",
       "assistantFailed": "La génération de la réponse a échoué."

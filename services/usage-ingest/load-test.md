@@ -32,9 +32,10 @@ and report their usage IDs and categories with the run. These return null
 accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
 reuse the same event and may create duplicate deliveries after ambiguous acceptance.
-Include the retry-enabled Cloudflare publisher's 25-second elapsed budget
-(four attempts, a first of up to ten seconds and later ones of up to five, plus
-full-jitter waits, clipped to remaining budget, so a later attempt can be shorter)
+Include the retry-enabled Cloudflare publisher's 40-second elapsed budget
+(four attempts, a first of up to twenty seconds and later ones of up to five, plus
+full-jitter waits, clipped to remaining budget; four full attempts and the maximum
+waits fit in under 38.5 seconds, so only a runtime delay shortens a later attempt)
 and runtime scheduling overhead, excluding subsequent Bouncer reporting, in
 accounting completion deadlines. Non-retry HTTP publication remains one
 two-second attempt; Vercel queue transport is unchanged. There is no durable recovery

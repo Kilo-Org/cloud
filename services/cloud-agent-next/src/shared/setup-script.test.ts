@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setupCommandsSchema as admissionSchema } from '@kilocode/cloud-agent-profile/setup-script';
-import { setupCommandsSchema } from './setup-script.js';
+import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 
 describe('standalone wrapper setup script contract', () => {
   it.each([
@@ -14,5 +14,15 @@ describe('standalone wrapper setup script contract', () => {
     expect(setupCommandsSchema.safeParse(scripts).success).toBe(
       admissionSchema.safeParse(scripts).success
     );
+  });
+
+  it.each([
+    { count: 0, valid: true },
+    { count: 20, valid: true },
+    { count: -1, valid: false },
+    { count: 21, valid: false },
+    { count: 1.5, valid: false },
+  ])('validates an environment setup command count of $count', ({ count, valid }) => {
+    expect(environmentSetupCommandCountSchema.safeParse(count).success).toBe(valid);
   });
 });

@@ -332,6 +332,85 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
+  describe('with start commands', () => {
+    const setupRun = (calls: unknown[][]) => calls.map(call => call[0]);
+
+    it('runs only the start commands in a workspace restored from the environment snapshot', async () => {
+      await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
+      const restored = manager('alloc-restored');
+      await restored.prepared.prepare(
+        spec({
+          sessionId: 'ses_b',
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
+
+      expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+      expect(setupRun(restored.runSetup.mock.calls)).toEqual(['serve']);
+      expect(restored.frames).toContainEqual(
+        expect.objectContaining({
+          type: 'session.progress',
+          step: 'setup',
+          detail: 'Setup already ran in the environment snapshot',
+        })
+      );
+    });
+
+    it.each([
+      { count: 1, setup: ['install', 'inline extra'], expected: ['inline extra', 'serve'] },
+      { count: 0, setup: ['inline extra'], expected: ['inline extra', 'serve'] },
+      {
+        count: undefined,
+        setup: ['install', 'inline extra'],
+        expected: ['install', 'inline extra', 'serve'],
+      },
+    ])(
+      'preserves session setup when the environment command count is $count',
+      async ({ count, setup, expected }) => {
+        await manager('alloc-image').prepared.prepare(spec({ setupCommands: ['older install'] }));
+        const restored = manager('alloc-restored');
+        await restored.prepared.prepare(
+          spec({
+            sessionId: 'ses_b',
+            setupCommands: [...setup],
+            environmentSetupCommandCount: count,
+            startCommands: ['serve'],
+          })
+        );
+
+        expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+        expect(setupRun(restored.runSetup.mock.calls)).toEqual([...expected]);
+      }
+    );
+
+    it('runs setup and start commands after a fresh clone', async () => {
+      const fresh = manager('alloc-image');
+      await fresh.prepared.prepare(
+        spec({
+          setupCommands: ['install'],
+          environmentSetupCommandCount: 1,
+          startCommands: ['serve'],
+        })
+      );
+
+      expect(ready(fresh.frames)).toMatchObject({ workspace: 'cloned' });
+      expect(setupRun(fresh.runSetup.mock.calls)).toEqual(['install', 'serve']);
+    });
+
+    it('runs neither for a workspace this allocation already prepared', async () => {
+      await manager('alloc-image').prepared.prepare(spec());
+      const sibling = manager('alloc-image');
+      await sibling.prepared.prepare(
+        spec({ sessionId: 'ses_b', setupCommands: ['install'], startCommands: ['serve'] })
+      );
+
+      expect(ready(sibling.frames)).toMatchObject({ workspace: 'same' });
+      expect(sibling.runSetup).not.toHaveBeenCalled();
+    });
+  });
+
   it('retains local workspace state', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
@@ -422,6 +501,22 @@ describe('restoring a private workspace disk snapshot', () => {
     expect(
       restored.gitCalls.some(args => ['clone', 'fetch', 'checkout', 'branch'].includes(args[0]!))
     ).toBe(false);
+  });
+
+  it('runs only the start commands, because no process survives the restored snapshot', async () => {
+    await manager('alloc-source').prepared.prepare(workspaceSpec());
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(
+      workspaceSpec({
+        branch: 'main',
+        workspaceSnapshot: provenance(),
+        setupCommands: ['must not replay'],
+        startCommands: ['serve'],
+      })
+    );
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect((restored.runSetup.mock.calls as unknown[][]).map(call => call[0])).toEqual(['serve']);
   });
 
   it('restores every repository of a workspace without replaying checkout or setup', async () => {

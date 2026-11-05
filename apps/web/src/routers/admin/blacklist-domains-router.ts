@@ -17,7 +17,7 @@ import {
 } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
@@ -132,7 +132,8 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   stats: adminProcedure.query(async () => {
     const domains = await getBlacklistedDomains();
 
-    const emailHostCounts = await countUsersByEmailHost(db);
+    // Read-only admin report: the grouped aggregate stays off the primary pool.
+    const emailHostCounts = await countUsersByEmailHost(readDb);
 
     return computeBlacklistStats(domains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT);
   }),

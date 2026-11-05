@@ -471,7 +471,7 @@ const complete = (position: number) => ({
   messages: [{ id: 'm', role: 'assistant', content: [{ type: 'text', text: 'done' }], seq: 1 }],
 });
 
-test('attach without a runner retries an incomplete snapshot within a bound', async () => {
+test('attach to an idle connected runner retries an incomplete snapshot within a bound', async () => {
   snapshot.mockResolvedValueOnce(incomplete(5)).mockResolvedValueOnce(complete(6));
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -479,7 +479,7 @@ test('attach without a runner retries an incomplete snapshot within a bound', as
     state = value;
   });
   await flush();
-  connectedSocket().frame('hello', hello(false), 3);
+  connectedSocket().frame('hello', hello(true), 3);
   await flush();
   await jest.advanceTimersByTimeAsync(250);
   await flush();
@@ -494,8 +494,9 @@ test('attach without a runner retries an incomplete snapshot within a bound', as
   connection.close();
 });
 
-test('attach during a run defers snapshot recovery until runner state is idle', async () => {
-  snapshot.mockResolvedValueOnce(incomplete(5)).mockResolvedValueOnce(complete(6));
+test('recovery runs beside live events and reapplies frames newer than its snapshot', async () => {
+  snapshot.mockResolvedValueOnce(incomplete(5));
+  let release: (value: NativeSnapshot) => void = () => {};
   const { client } = fixture();
   let state: NativeSessionState | undefined;
   const connection = client.connectSession('ses_a', value => {
@@ -505,26 +506,28 @@ test('attach during a run defers snapshot recovery until runner state is idle', 
   const socket = connectedSocket();
   socket.frame('hello', hello(true), 3);
   await flush();
-  socket.frame(
-    'session.text.delta',
-    { syncPosition: 5, data: { data: { assistantMessageID: 'm', ordinal: 0, delta: 'live' } } },
-    4,
-    'events'
-  );
+  const delta = (seq: number, syncPosition: number, text: string) =>
+    socket.frame(
+      'session.text.delta',
+      { syncPosition, data: { data: { assistantMessageID: 'm', ordinal: 0, delta: text } } },
+      seq,
+      'events'
+    );
+  delta(4, 5, 'live');
   await flush();
   expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'live' }]);
-  expect(snapshot).toHaveBeenCalledTimes(1);
-  socket.frame(
-    'remote.state',
-    { syncPosition: 6, running: false, pending: { permissions: [], questions: [] } },
-    5,
-    'events'
+  snapshot.mockReturnValueOnce(
+    new Promise<NativeSnapshot>(resolve => {
+      release = resolve;
+    })
   );
-  await flush();
   await jest.advanceTimersByTimeAsync(250);
-  await flush();
   expect(snapshot).toHaveBeenCalledTimes(2);
-  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'done' }]);
+  delta(5, 7, ' more');
+  await flush();
+  release(complete(6));
+  await flush();
+  expect(state?.messages[0]?.content).toEqual([{ type: 'text', text: 'done more' }]);
   connection.close();
 });
 

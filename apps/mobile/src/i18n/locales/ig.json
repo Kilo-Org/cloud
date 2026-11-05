@@ -234,7 +234,7 @@
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
     "reviews": "Nyocha",
     "couldNotLoadOrganization": "Enweghị ike ibudata ụlọ ọrụ.",
-    "couldNotLoadOrganizationDescription": "Ntọala ụlọ ọrụ na ndị nnọchi anya agaghị adị ruo mgbe nke a budatara.",
+    "couldNotLoadOrganizationDescription": "Ntọala Òtù na nke onye nnọchi anya agaghị adị ruo mgbe nke a budatara.",
     "linkedAccounts": "Akaụntụ ejikọrọ",
     "couldNotLoadAccounts": "Enweghị ike ibudata akaụntụ.",
     "app": "Ngwa",
@@ -244,7 +244,7 @@
     "privacyChoices": "Nhọrọ nzuzo",
     "deleteAccount": "Hichapụ akaụntụ",
     "confirmationCode": "Koodu nkwenye",
-    "confirmationCodePlaceholder": "koodu nwere ọnụọgụ 6",
+    "confirmationCodePlaceholder": "koodu nke ọnụọgụ isii",
     "confirmDeletion": "Kwado ihichapụ ahụ",
     "credits": "Ego ojiji",
     "failedToLoadBalance": "Enweghị ike ibudata ego fọdụrụ. Pịa ka ị nwaa ọzọ.",
@@ -296,7 +296,7 @@
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
     "hideThinking": "Zoo nkọwa echiche",
-    "hideThinkingSubtitle": "Eg osi echiche onye nnọchi anya na ibe nnọkọ.",
+    "hideThinkingSubtitle": "Zoo echiche onye nnọchi anya na ibe nnọkọ.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
     "keepScreenOnSubtitle": "Hapụ ihuenyo ka ọ na-enwu mgbe nnọkọ na-arụ ọrụ.",
     "appearance": "Ọdịdị",
@@ -311,7 +311,7 @@
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
     "returnSendsMessageSubtitle": "Mgbe agbanyụrụ ya, igodo nloghachi na-etinye ahịrị ọhụrụ n'ebe ide ozi ndị nnọchi anya.",
     "biometricUnlock": "Mepee mkpọchi site na njirimara ahụ",
-    "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
+    "biometricUnlockSubtitle": "Mepee mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -911,7 +911,7 @@
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
       "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ọrụ KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
-      "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ịdọ aka na ntị ego.",
+      "balanceAlertsUnavailable": "Sonye na Ụlọ ọrụ iji nweta Ọkwa gbasara ego fọdụrụ.",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
       "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
@@ -3039,7 +3039,7 @@
     "scroll": "Pịgharịa"
   },
   "offline": {
-    "noInternet": "Enweghị njikọ ịntanetị.",
+    "noInternet": "Enweghị njikọ ịntanetị",
     "internetRestored": "Eweghachitere njikọ ịntanetị"
   },
   "queryError": {
@@ -3058,7 +3058,7 @@
   },
   "picker": {
     "optionsExpired": "Oge nhọrọ agwụla",
-    "optionsExpiredDescription": "Laghachi azụ wee mepee ihe ịhọrọ a ọzọ site n'ihuenyo gara aga."
+    "optionsExpiredDescription": "Laghachi azụ wee mepee ihe nhọrọ a ọzọ site n'ihuenyo gara aga."
   },
   "sessionRow": {
     "needsInput": "CHỌRỌ NZAGHACHI",

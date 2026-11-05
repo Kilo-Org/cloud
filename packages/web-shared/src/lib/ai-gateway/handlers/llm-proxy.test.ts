@@ -11,7 +11,6 @@ import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   JWT_TOKEN_VERSION,
   validateAuthorizationHeader,
@@ -21,7 +20,10 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import {
+  getBalanceAndOrgSettings,
+  type BalancePayer,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import {
@@ -413,6 +415,14 @@ function setUserAuth() {
     settings: undefined,
     plan: undefined,
   });
+}
+
+function payerWithBalance(balance: number): BalancePayer {
+  return {
+    createdAt: '2026-01-01T00:00:00.000Z',
+    totalMicrodollarsAcquired: 1_000_000_000,
+    microdollarsUsed: 1_000_000_000 - balance * 1_000_000,
+  };
 }
 
 function setAnonymousAuth() {
@@ -4643,11 +4653,7 @@ describe('Enkrypt output guardrail', () => {
       balance,
       settings: settings && { kilo_encrypt: true, ...settings },
       plan: 'enterprise',
-      payer: {
-        createdAt: '2026-01-01T00:00:00.000Z',
-        totalMicrodollarsAcquired: 1_000_000_000,
-        microdollarsUsed: 1_000_000_000 - balance * 1_000_000,
-      },
+      payer: payerWithBalance(balance),
     });
   }
 
@@ -4793,7 +4799,6 @@ describe('Enkrypt output guardrail', () => {
         error: {
           title: 'Organization Credits Required',
           balance,
-          buyCreditsUrl: `${APP_URL}/organizations/org-1`,
         },
         error_type: 'usage_limit_exceeded',
       });
@@ -5363,7 +5368,6 @@ describe('Enkrypt input guardrail', () => {
     });
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
-    mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
@@ -5378,11 +5382,7 @@ describe('Enkrypt input guardrail', () => {
     fetchSpy.mockRestore();
   });
 
-  function setOrganization(
-    settings: OrganizationSettings | undefined,
-    organizationBalance = 1000,
-    memberBalance = organizationBalance
-  ) {
+  function setOrganization(settings: OrganizationSettings | undefined, balance = 1000) {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -5393,15 +5393,10 @@ describe('Enkrypt input guardrail', () => {
       organizationId: 'org-1',
     });
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: memberBalance,
+      balance,
       settings: settings && { kilo_encrypt: true, ...settings },
       plan: 'enterprise',
-      balanceLimitedByUserAllowance: memberBalance < organizationBalance,
-      payer: {
-        createdAt: '2026-01-01T00:00:00.000Z',
-        totalMicrodollarsAcquired: 1_000_000_000,
-        microdollarsUsed: 1_000_000_000 - organizationBalance * 1_000_000,
-      },
+      payer: payerWithBalance(balance),
     });
   }
 
@@ -5456,13 +5451,7 @@ describe('Enkrypt input guardrail', () => {
 
       expect(response.status).toBe(402);
       expect(await response.json()).toMatchObject({
-        error: {
-          title: 'Organization Credits Required',
-          message:
-            'Your organization needs credits to run Enkrypt guardrails, including on free models and BYOK requests. Ask an organization owner to add credits.',
-          balance,
-          buyCreditsUrl: `${APP_URL}/organizations/org-1`,
-        },
+        error: { title: 'Organization Credits Required', balance },
         error_type: 'usage_limit_exceeded',
       });
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -5488,17 +5477,23 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects an unfunded organization even when every detector is log-only', async () => {
-    const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.enabled = false;
-    setOrganization({ enkrypt: { input_guardrail: { enabled: true, detectors } } }, 0);
-    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+  it('scans and sends a free-model request when the organization is funded', async () => {
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 0.000001);
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('test/free-model:free')));
 
-    expect(response.status).toBe(402);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it('handles a late organization-policy failure after rejecting an unfunded organization', async () => {
@@ -5514,35 +5509,6 @@ describe('Enkrypt input guardrail', () => {
     expect(response.status).toBe(402);
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('permits scanning with a strictly positive organization balance', async () => {
-    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 0.000001);
-    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
-
-    expect(response.status).toBe(200);
-    expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-  });
-
-  it('uses organization funds rather than a free-model member allowance for scan admission', async () => {
-    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } }, 1, 0);
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
-    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('test/free-model:free')));
-
-    expect(response.status).toBe(200);
-    expect(enkryptRequestBodies()).toEqual(kiloDefaultScans('hello'));
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it('makes no Enkrypt call for an organization without the guardrail', async () => {

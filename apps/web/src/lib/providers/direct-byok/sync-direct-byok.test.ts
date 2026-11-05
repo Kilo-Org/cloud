@@ -423,6 +423,7 @@ describe('syncDirectByokModels database snapshots', () => {
   let chutesModels: Array<{ id: string }>;
   let fetchAvailableModels: () => Promise<Response>;
   let availableModelsRedirect: Response | null;
+  let modelsDevCatalogHasNvidia: boolean;
 
   beforeEach(async () => {
     await db
@@ -439,6 +440,7 @@ describe('syncDirectByokModels database snapshots', () => {
     chutesModelsDevModels = {};
     chutesModels = [];
     availableModelsRedirect = null;
+    modelsDevCatalogHasNvidia = true;
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
@@ -446,7 +448,7 @@ describe('syncDirectByokModels database snapshots', () => {
         return Response.json({
           openrouter: { models: openRouterModels },
           chutes: { models: chutesModelsDevModels },
-          nvidia: { models: providerModels },
+          ...(modelsDevCatalogHasNvidia ? { nvidia: { models: providerModels } } : {}),
           'alibaba-token-plan': { models: {} },
           edenai: { models: {} },
           'zai-coding-plan': { models: {} },
@@ -688,6 +690,25 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(counts[providerId]).toBe(1);
     expect(snapshot.models.map(model => model.id)).toStrictEqual(['nvidia/after-redirect']);
     expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
+  });
+
+  test('keeps the stored list when the catalog lacks the provider entry', async () => {
+    await syncDirectByokModels();
+    await backdateSnapshot();
+    const previousSnapshot = await readSnapshot();
+    modelsDevCatalogHasNvidia = false;
+    chutesModels = [{ id: 'chutes/refreshed' }];
+
+    const { direct_byok_model_counts: counts, failed_provider_ids } = await syncDirectByokModels();
+
+    expect(failed_provider_ids).toStrictEqual([providerId]);
+    expect(counts[providerId]).toBeUndefined();
+    expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+    const [chutes] = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, 'chutes-byok'));
+    expect(chutes.models.map(model => model.id)).toStrictEqual(['chutes/refreshed']);
   });
 
   test('fails the run on an unexpected provider error instead of recording a skip', async () => {

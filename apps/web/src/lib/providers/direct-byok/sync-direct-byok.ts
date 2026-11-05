@@ -165,11 +165,11 @@ function getModelsDevEntry(
 ) {
   const catalogKey = getModelsDevId(providerId);
   if (!catalogKey) {
-    throw new Error(`${providerId} has no models.dev ID`);
+    throw new ModelListFetchError(`${providerId} has no models.dev ID`);
   }
   const entry = catalog[catalogKey];
   if (!entry) {
-    throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+    throw new ModelListFetchError(`models.dev catalog missing ${catalogKey} entry`);
   }
   return entry;
 }

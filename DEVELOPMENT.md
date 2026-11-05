@@ -359,7 +359,7 @@ Keep optional analytics off and avoid billing surfaces; the seed creates no Stri
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |
 | `pnpm format:changed` | Format only files changed since `main` |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts |
+| `pnpm validate` | Run the root typecheck, lint, and test scripts, then the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |

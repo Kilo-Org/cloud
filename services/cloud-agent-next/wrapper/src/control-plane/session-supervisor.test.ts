@@ -23,12 +23,16 @@ function fixture() {
     done: ReturnType<typeof Promise.withResolvers<void>>;
   }> = [];
   const recovery: string[] = [];
+  const confirmations: Promise<boolean>[] = [];
   const supervisor = createSessionSupervisor({
     nativeRuntimeId: 'runtime-1',
     directory: '/workspace',
     timers: { noProgressMs: 20 * MINUTE, turnHardCapMs: 120 * MINUTE },
     now: () => now,
-    onDeadline: (identity, reason, retry) => failures.push({ identity, reason, retry }),
+    onDeadline: (identity, reason, retry, stopped) => {
+      failures.push({ identity, reason, retry });
+      confirmations.push(stopped);
+    },
     interrupt: (identity, reason, signal) => {
       const done = Promise.withResolvers<void>();
       interruptions.push({ identity, reason, signal, done });
@@ -89,6 +93,7 @@ function fixture() {
     failures,
     interruptions,
     recovery,
+    confirmations,
     advance(ms: number) {
       now += ms;
     },
@@ -107,6 +112,38 @@ function observation(
 }
 
 describe('native session supervision', () => {
+  it('confirms cancellation only after the execution and descendants are retired', async () => {
+    const f = fixture();
+    f.open();
+    f.open('child', 'root');
+    f.advance(120 * MINUTE);
+    f.supervisor.tick();
+    let confirmed = false;
+    const result = f.confirmations[0].then(stopped => {
+      confirmed = true;
+      expect(f.supervisor.state('root')).toBeUndefined();
+      expect(f.supervisor.state('child')).toBeUndefined();
+      return stopped;
+    });
+    await Promise.resolve();
+    expect(confirmed).toBe(false);
+    await f.confirmed();
+    expect(await result).toBe(true);
+  });
+
+  it.each(['unconfirmed', 'disposed'] as const)(
+    'does not confirm cancellation when %s',
+    async reason => {
+      const f = fixture();
+      f.open();
+      f.advance(120 * MINUTE);
+      f.supervisor.tick();
+      if (reason === 'disposed') f.supervisor.dispose();
+      else f.interruptions[0].done.reject(new Error('abort failed'));
+      expect(await f.confirmations[0]).toBe(false);
+    }
+  );
+
   for (const runningTool of [false, true]) {
     it(`interrupts at 20 minutes with runningTool=${runningTool}, never a tick early`, async () => {
       const f = fixture();

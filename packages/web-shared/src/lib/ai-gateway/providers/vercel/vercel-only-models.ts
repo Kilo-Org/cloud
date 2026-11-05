@@ -1,14 +1,20 @@
-import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import {
+  ReasoningEffortSchema,
+  type ReasoningOption,
+  type StoredModel,
+} from '@kilocode/db/schema-types';
+import { captureException } from '@sentry/nextjs';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
   extractVercelInferenceProviderIdsFromModel,
   getVercelModelsMetadataFromDatabase,
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenCodeSettingsForReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import {
-  getOpenCodeSettingsForReasoningOptions,
-  toReasoningOptions,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+  effortOptions,
+  REASONING_TOGGLE,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import {
   getVercelModelIdOverrides,
   mapResolvedModelIdToVercel,
@@ -17,49 +23,27 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProvidersExcludingIgnored } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
+import {
+  getVercelCatalog,
+  type VercelCatalog,
+  type VercelCatalogModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 export type VercelOnlyModel = {
   /** The OpenRouter-style ID that routes to the Vercel model. */
   id: string;
   storedModel: StoredModel;
-  inputModalities: string[];
-  outputModalities: string[];
-  /** The largest context of its endpoints. */
-  contextLength: number;
-  /** The first endpoint's prices; Vercel lists the provider it routes to by default first. */
-  pricing: NonNullable<Endpoint['pricing']>;
+  catalog: VercelCatalogModel;
 };
 
-/** The listing fields of a stored Vercel chat model, or null when they are incomplete. */
-function describeChatModel(id: string, storedModel: StoredModel): VercelOnlyModel | null {
-  const { architecture, endpoints } = storedModel;
-  const pricing = endpoints[0]?.pricing;
-  const contextLength = Math.max(0, ...endpoints.map(endpoint => endpoint.context_length ?? 0));
-  if (
-    storedModel.type !== 'language' ||
-    !architecture?.output_modalities.includes('text') ||
-    !pricing ||
-    contextLength === 0
-  ) {
-    return null;
-  }
-  return {
-    id,
-    storedModel,
-    inputModalities: architecture.input_modalities ?? ['text'],
-    outputModalities: architecture.output_modalities,
-    contextLength,
-    pricing,
-  };
-}
+type VercelOnlyCandidate = Pick<VercelOnlyModel, 'id' | 'storedModel'>;
 
 /**
- * The Vercel chat models that no OpenRouter model routes to, under the
- * OpenRouter-style IDs that route back to them. Only models in the stored Vercel metadata count,
- * because routing checks that list.
+ * The stored Vercel language models that no OpenRouter model routes to, under the OpenRouter-style
+ * IDs that route back to them. Routing checks the stored metadata, so only those models count.
  */
-export function findVercelOnlyModels({
+function findVercelOnlyCandidates({
   openRouterModelIds,
   vercelMetadata,
   overrides,
@@ -67,17 +51,40 @@ export function findVercelOnlyModels({
   openRouterModelIds: Iterable<string>;
   vercelMetadata: StoredModelMap;
   overrides: VercelModelIdOverrides;
-}): VercelOnlyModel[] {
+}): VercelOnlyCandidate[] {
   const coveredVercelModelIds = new Set(
     [...openRouterModelIds].map(id => mapResolvedModelIdToVercel(id, overrides))
   );
   return Object.values(vercelMetadata).flatMap(storedModel => {
-    if (coveredVercelModelIds.has(storedModel.id)) return [];
+    if (storedModel.type !== 'language' || coveredVercelModelIds.has(storedModel.id)) return [];
     const id = mapVercelModelIdToOpenRouter(storedModel.id, overrides);
     // The proxy lowercases requested model IDs before routing.
-    if (!id || id !== id.toLowerCase()) return [];
-    return describeChatModel(id, storedModel) ?? [];
+    return id && id === id.toLowerCase() ? [{ id, storedModel }] : [];
   });
+}
+
+/** Pairs candidates with their entries in Vercel's model list, which only has chat models. */
+function withCatalog(
+  candidates: readonly VercelOnlyCandidate[],
+  vercelCatalog: VercelCatalog
+): VercelOnlyModel[] {
+  return candidates.flatMap(candidate => {
+    const catalog = vercelCatalog.get(candidate.storedModel.id);
+    return catalog ? [{ ...candidate, catalog }] : [];
+  });
+}
+
+/**
+ * The Vercel chat models that no OpenRouter model routes to, under the OpenRouter-style IDs that
+ * route back to them.
+ */
+export function findVercelOnlyModels({
+  vercelCatalog,
+  ...params
+}: Parameters<typeof findVercelOnlyCandidates>[0] & {
+  vercelCatalog: VercelCatalog;
+}): VercelOnlyModel[] {
+  return withCatalog(findVercelOnlyCandidates(params), vercelCatalog);
 }
 
 function getModelPrefix(modelId: string): string | undefined {
@@ -108,35 +115,57 @@ export function getVercelOnlyModelName(
   return vendorName ? `${vendorName}: ${storedModel.name}` : storedModel.name;
 }
 
+/**
+ * Vercel's reasoning options in models.dev format. A token budget can only switch reasoning on or
+ * off there. Undefined when none translate, because an empty list means reasoning is always on.
+ */
+function toReasoningOptions(
+  vercelOptions: VercelCatalogModel['reasoning_options'] = []
+): ReasoningOption[] | undefined {
+  const hasToggle = vercelOptions.some(
+    option => option.type === 'toggle' || option.type === 'budget_tokens'
+  );
+  const efforts = vercelOptions.flatMap(option => {
+    const values = (option.type === 'effort' ? (option.values ?? []) : []).flatMap(
+      value => ReasoningEffortSchema.safeParse(value).data ?? []
+    );
+    return values.length > 0 ? effortOptions(...values) : [];
+  });
+  const options = [...(hasToggle ? REASONING_TOGGLE : []), ...efforts];
+  return options.length > 0 ? options : undefined;
+}
+
 function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRouterModel {
-  const { id, storedModel, pricing, contextLength } = model;
-  const reasoningOptions = toReasoningOptions(id, storedModel.reasoning);
-  const supportedParameters = [
-    ...new Set(storedModel.endpoints.flatMap(endpoint => endpoint.supported_parameters ?? [])),
-  ];
+  const { id, catalog } = model;
+  const { pricing } = catalog;
+  const reasoningOptions = toReasoningOptions(catalog.reasoning_options);
   return {
     id,
     name,
-    created: storedModel.released ?? storedModel.created ?? 0,
-    description: storedModel.description ?? '',
+    // Vercel's `created` is when Vercel added the model, often a shared backfill date.
+    created: catalog.released ?? catalog.created,
+    description: catalog.description,
     architecture: {
-      input_modalities: model.inputModalities,
-      output_modalities: model.outputModalities,
+      input_modalities: catalog.modalities.input,
+      output_modalities: catalog.modalities.output,
       tokenizer: 'Other',
     },
     top_provider: {
       is_moderated: false,
-      context_length: contextLength,
-      max_completion_tokens: storedModel.endpoints[0]?.max_completion_tokens,
+      context_length: catalog.context_window,
+      max_completion_tokens: catalog.max_tokens,
     },
     pricing: {
-      prompt: pricing.prompt,
-      completion: pricing.completion,
+      prompt: pricing.input,
+      completion: pricing.output,
       ...(pricing.input_cache_read && { input_cache_read: pricing.input_cache_read }),
       ...(pricing.input_cache_write && { input_cache_write: pricing.input_cache_write }),
     },
-    context_length: contextLength,
-    supported_parameters: supportedParameters.length > 0 ? supportedParameters : undefined,
+    context_length: catalog.context_window,
+    supported_parameters: catalog.supported_parameters,
+    expiration_date: catalog.deprecated_at
+      ? new Date(catalog.deprecated_at).toISOString().slice(0, 10)
+      : undefined,
     opencode: reasoningOptions && getOpenCodeSettingsForReasoningOptions(id, reasoningOptions),
   };
 }
@@ -145,7 +174,7 @@ function toVercelOnlyCatalogModel(model: VercelOnlyModel, name: string): OpenRou
  * Whether a Vercel provider remains after the providers Kilo always excludes outside non-trial
  * enterprise organizations.
  */
-function hasRoutableProvider({ id, storedModel }: VercelOnlyModel) {
+function hasRoutableProvider({ id, storedModel }: VercelOnlyCandidate) {
   return (
     getVercelInferenceProvidersExcludingIgnored(
       getIgnoredProviders(id, false),
@@ -173,16 +202,30 @@ export async function getVercelOnlyCatalogModels({
   ]);
   if (!routingConfig.vercelEnabled) return [];
 
-  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
-  return findVercelOnlyModels({
+  const candidates = findVercelOnlyCandidates({
     openRouterModelIds: [
       ...openRouterModels.map(model => model.id),
       ...Object.keys(openRouterMetadata),
     ],
     vercelMetadata,
     overrides,
-  })
-    .filter(model => !routingConfig.vercelOptOutModels.has(model.id) && hasRoutableProvider(model))
+  }).filter(
+    candidate =>
+      !routingConfig.vercelOptOutModels.has(candidate.id) && hasRoutableProvider(candidate)
+  );
+  if (candidates.length === 0) return [];
+
+  let vercelCatalog: VercelCatalog;
+  try {
+    vercelCatalog = await getVercelCatalog();
+  } catch (error) {
+    // The OpenRouter models stay listed while Vercel's model list is unavailable.
+    captureException(error, { tags: { source: 'vercel_only_models' } });
+    return [];
+  }
+
+  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
+  return withCatalog(candidates, vercelCatalog)
     .map(model => toVercelOnlyCatalogModel(model, getVercelOnlyModelName(model, vendorNames)))
     .sort((a, b) => b.created - a.created);
 }

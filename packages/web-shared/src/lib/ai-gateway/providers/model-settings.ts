@@ -7,7 +7,6 @@ import type {
   OpenCodePrompt,
   OpenCodeSettings,
   ReasoningOption,
-  StoredModel,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
@@ -26,14 +25,7 @@ export async function getOpenRouterReasoningOptions(
   model: string
 ): Promise<ReasoningOption[] | undefined> {
   const models = await getOpenRouterModelsMetadataFromDatabase();
-  return toReasoningOptions(model, (models[model] ?? models[normalizeModelId(model)])?.reasoning);
-}
-
-/** Reasoning options from a gateway's stored `reasoning` metadata, in OpenRouter's format. */
-export function toReasoningOptions(
-  model: string,
-  reasoning: StoredModel['reasoning']
-): ReasoningOption[] | undefined {
+  const reasoning = (models[model] ?? models[normalizeModelId(model)])?.reasoning;
   if (!reasoning) {
     return undefined;
   }

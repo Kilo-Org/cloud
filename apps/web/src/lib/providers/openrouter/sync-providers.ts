@@ -33,6 +33,10 @@ import {
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
 import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
+import {
+  getVercelCatalog,
+  type VercelCatalog,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-catalog';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import {
@@ -94,18 +98,8 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
             `Fetching model endpoints for ${gateway.type}/${model.id} failed: ${endpointsResponse.status}`
           );
         }
-        const { endpoints, ...endpointsModel } = EndpointsSchema.parse(
-          await endpointsResponse.json()
-        ).data;
-        // Vercel's model list omits the architecture and reasoning its endpoints response has.
-        const { reasoning, ...modelMetadata } = {
-          ...model,
-          description: model.description ?? endpointsModel.description,
-          created: model.created ?? endpointsModel.created,
-          released: model.released ?? endpointsModel.released,
-          architecture: model.architecture ?? endpointsModel.architecture,
-          reasoning: model.reasoning ?? endpointsModel.reasoning,
-        };
+        const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
+        const { reasoning, ...modelMetadata } = model;
         result[model.id] = {
           ...modelMetadata,
           ...(reasoning && {
@@ -116,7 +110,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
               }),
             },
           }),
-          endpoints,
+          endpoints: endpoints.data.endpoints,
         };
       })
     )
@@ -171,6 +165,7 @@ async function syncProviders(params: {
   openRouterModels: Record<string, StoredModel>;
   openRouterCatalogModels: CatalogModel[];
   vercelModels: Record<string, StoredModel>;
+  vercelCatalog: VercelCatalog;
   vercelModelIdOverrides: VercelModelIdOverrides;
   customLlms: CustomLlm[];
 }) {
@@ -179,6 +174,7 @@ async function syncProviders(params: {
     openRouterModels,
     openRouterCatalogModels,
     vercelModels,
+    vercelCatalog,
     vercelModelIdOverrides,
     customLlms,
   } = params;
@@ -218,6 +214,7 @@ async function syncProviders(params: {
 
   injectVercelModels({
     vercelModels,
+    vercelCatalog,
     openRouterCatalogModels,
     openRouterModelIds: [
       ...Object.keys(openRouterModels),
@@ -448,7 +445,10 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const openRouterCatalog = await getRawOpenRouterModels();
+  const [openRouterCatalog, vercelCatalog] = await Promise.all([
+    getRawOpenRouterModels(),
+    getVercelCatalog(),
+  ]);
 
   const generatedVercelModelIdOverrides = await generateVercelModelIdOverrides(
     openrouter_data,
@@ -468,6 +468,7 @@ export async function syncAndStoreProviders() {
     openRouterModels: openrouter_data,
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels: vercel_data,
+    vercelCatalog,
     vercelModelIdOverrides,
     customLlms: await fetchCustomLlmsFromDatabase(),
   });

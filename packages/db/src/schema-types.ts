@@ -3209,29 +3209,7 @@ export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
 
 // --- StoredModel ---
 
-const ModelDescriptionSchema = z.object({
-  description: z.string().optional().catch(undefined),
-  /** Seconds since the epoch. Vercel sets it to when it added the model, often a backfill date. */
-  created: z.number().optional().catch(undefined),
-  /** Seconds since the epoch; only Vercel AI Gateway sets the release date. */
-  released: z.number().optional().catch(undefined),
-  architecture: z
-    .object({
-      input_modalities: z.array(z.string()).optional().catch(undefined),
-      output_modalities: z.array(z.string()),
-    })
-    .optional()
-    .catch(undefined),
-  reasoning: z
-    .object({
-      mandatory: z.boolean().default(false),
-      supported_efforts: z.array(ReasoningEffortSchema).optional(),
-    })
-    .optional()
-    .catch(undefined),
-});
-
-export const ModelSchema = ModelDescriptionSchema.extend({
+export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
@@ -3252,6 +3230,19 @@ export const ModelSchema = ModelDescriptionSchema.extend({
   alias_target: z
     .object({
       slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
+    })
+    .optional()
+    .catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean(),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
     })
     .optional()
     .catch(undefined),
@@ -3276,8 +3267,6 @@ export const EndpointSchema = z.object({
       discount: z.number().optional(),
     })
     .optional(),
-  max_completion_tokens: z.number().nullable().optional().catch(undefined),
-  supported_parameters: z.array(z.string()).optional().catch(undefined),
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
@@ -3285,9 +3274,8 @@ export const EndpointSchema = z.object({
 
 export type Endpoint = z.infer<typeof EndpointSchema>;
 
-/** Both gateways describe the model again next to its endpoints, in OpenRouter's format. */
 export const EndpointsSchema = z.object({
-  data: ModelDescriptionSchema.extend({ endpoints: z.array(EndpointSchema) }),
+  data: z.object({ endpoints: z.array(EndpointSchema) }),
 });
 
 export const StoredModelSchema = ModelSchema.and(

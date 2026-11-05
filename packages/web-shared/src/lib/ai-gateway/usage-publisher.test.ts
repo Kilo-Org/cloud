@@ -11,6 +11,7 @@ import {
   USAGE_ENQUEUE_MAX_ATTEMPTS,
   USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
   USAGE_ENQUEUE_RETRY_BUDGET_MS,
+  USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
 } from './usage-publisher';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
@@ -327,7 +328,7 @@ describe('enqueueUsage transient retries', () => {
       }
       expect(mockFetch.mock.calls[0][1]?.signal).not.toBe(mockFetch.mock.calls[1][1]?.signal);
       expect(timeouts.mock.calls).toEqual([
-        [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+        [USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS],
         [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
       ]);
       expect(warn.mock.calls).toEqual([
@@ -635,7 +636,7 @@ describe('enqueueUsage transient retries', () => {
         );
       }
     },
-    10_000
+    20_000
   );
 
   test('exhausts four real HTTP timeouts within the bounded attempt/backoff budget', async () => {
@@ -655,8 +656,10 @@ describe('enqueueUsage transient retries', () => {
         reason: 'timeout',
       });
       const elapsed = performance.now() - start;
+      // The first timeout is longer and the last attempt is shortened by the budget, so the
+      // four-attempt cap does not promise four full per-attempt windows.
       expect(elapsed).toBeGreaterThanOrEqual(
-        USAGE_ENQUEUE_RETRY_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS
+        USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS + USAGE_ENQUEUE_RETRY_TIMEOUT_MS * 2
       );
       expect(elapsed).toBeLessThan(USAGE_ENQUEUE_RETRY_BUDGET_MS + 1_000);
       expect(requests).toBe(USAGE_ENQUEUE_MAX_ATTEMPTS);
@@ -681,6 +684,43 @@ describe('enqueueUsage transient retries', () => {
 });
 
 describe('bounded CF confirmation policy', () => {
+  test('accepts a first confirmation after eight seconds with one fetch and no retry', async () => {
+    let requests = 0;
+    const publisher = createServer((request, response) => {
+      requests++;
+      request.resume();
+      request.on('end', () => {
+        setTimeout(() => {
+          if (response.destroyed) return;
+          response.writeHead(202);
+          response.end();
+        }, 8_000);
+      });
+    });
+    try {
+      await new Promise<void>(resolve => publisher.listen(0, '127.0.0.1', resolve));
+      const address = publisher.address();
+      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+      mockFetch.mockImplementation(nativeFetch);
+      const start = performance.now();
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'accepted',
+      });
+      const elapsed = performance.now() - start;
+      expect(elapsed).toBeGreaterThanOrEqual(8_000);
+      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+      expect(requests).toBe(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      publisher.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        publisher.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }, 30_000);
+
   test('waits beyond the single-attempt window for the first confirmation', async () => {
     jest.useFakeTimers();
     const confirmationMs = USAGE_ENQUEUE_TIMEOUT_MS + 1_000;
@@ -717,7 +757,7 @@ describe('bounded CF confirmation policy', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     await jest.advanceTimersByTimeAsync(confirmationMs - USAGE_ENQUEUE_TIMEOUT_MS);
     expect(await result).toEqual({ kind: 'accepted' });
-    expect(timeouts.mock.calls).toEqual([[5_000]]);
+    expect(timeouts.mock.calls).toEqual([[USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS]]);
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -739,7 +779,7 @@ describe('bounded CF confirmation policy', () => {
     );
   });
 
-  test('four full confirmation timeouts plus near-maximum jitter stay within 25 seconds', async () => {
+  test('confirmation timeouts plus near-maximum jitter stay within 25 seconds', async () => {
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0.999);
     jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
@@ -759,8 +799,9 @@ describe('bounded CF confirmation policy', () => {
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
     expect(mockFetch).toHaveBeenCalledTimes(4);
+    // 10 s + backoff + 5 s + backoff + 5 s + backoff leaves only a short fourth attempt.
     expect(performance.now()).toBeGreaterThanOrEqual(20_000);
-    expect(performance.now()).toBeLessThanOrEqual(25_000);
+    expect(performance.now()).toBeLessThanOrEqual(USAGE_ENQUEUE_RETRY_BUDGET_MS);
     expect(warn).toHaveBeenLastCalledWith(
       'usage enqueue unavailable',
       expect.objectContaining({ duplicate_possible: true })
@@ -780,8 +821,115 @@ describe('bounded CF confirmation policy', () => {
     const result = enqueueUsage(payload, { retryTransientFailures: true });
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'accepted' });
-    expect(timeouts.mock.calls).toEqual([[5_000], [1_750]]);
+    expect(timeouts.mock.calls).toEqual([[USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS], [1_750]]);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('a never-answering first attempt still spends its full ten seconds before retrying', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+    mockFetch
+      .mockImplementationOnce(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('synthetic timeout')), {
+              once: true,
+            });
+          })
+      )
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.advanceTimersByTimeAsync(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS - 500);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(timeouts.mock.calls).toEqual([
+      [USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenLastCalledWith('usage enqueue retrying', {
+      usageId: payload.core.id,
+      execution_region: 'unknown',
+      reason: 'timeout',
+      attempt: 1,
+      duplicate_possible: true,
+    });
+  });
+
+  test('a fourth attempt shortened by the budget still classifies its timeout', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.999);
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+    mockFetch.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('synthetic timeout')), {
+            once: true,
+          });
+        })
+    );
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
+    expect(timeouts.mock.calls).toHaveLength(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    const [first, ...later] = timeouts.mock.calls.map(([ms]) => ms);
+    expect(first).toBe(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+    for (const clipped of later.slice(0, -1)) expect(clipped).toBe(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+    expect(later.at(-1)).toBeLessThan(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+    expect(later.at(-1)).toBeGreaterThan(0);
+    expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    expect(performance.now()).toBeLessThanOrEqual(USAGE_ENQUEUE_RETRY_BUDGET_MS);
+  });
+
+  test('fast failures keep the four-attempt cap without starting a fifth', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockResolvedValue(new Response(null, { status: 503 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'http_503' });
+    expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(
+      warn.mock.calls.filter(([message]) => message === 'usage enqueue retrying')
+    ).toHaveLength(USAGE_ENQUEUE_MAX_ATTEMPTS - 1);
+    expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
+      usageId: payload.core.id,
+      execution_region: 'unknown',
+      kind: 'unavailable',
+      reason: 'http_503',
+      duplicate_possible: true,
+    });
+  });
+
+  test('a response after the budget is spent starts no further attempt', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const sleeps = jest.spyOn(globalThis, 'setTimeout');
+    mockFetch.mockImplementationOnce(async () => {
+      jest.advanceTimersByTime(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
+      jest.advanceTimersByTime(USAGE_ENQUEUE_RETRY_BUDGET_MS);
+      return new Response(null, { status: 503 });
+    });
+    expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+      kind: 'unavailable',
+      reason: 'http_503',
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(sleeps).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+    expectUnavailableWarning('http_503', true);
   });
 
   test('clips sleep to the remaining budget and sends nothing after exhaustion', async () => {

@@ -68,9 +68,6 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      - name: Check runtime publication workflow admission
-        run: pnpm --filter cloud-agent-next test:runtime-ci
-
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -304,9 +301,18 @@ jobs:
         id: workspaces
         env:
           AFFECTED: ${{ steps.affected.outputs.affected }}
+          HARNESS_SDK: ${{ steps.filter_harness.outputs.harness_sdk || steps.filter_harness_retry.outputs.harness_sdk }}
         run: |
           mapfile -t includes < <(jq -r '.test_only_dirs[] | ("--include", .)' <<< "$AFFECTED")
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile "${includes[@]}")
+          excludes=(--exclude services/cloud-agent-next --exclude apps/web --exclude apps/mobile)
+          # The dedicated harness-sdk job runs the same vitest suite through
+          # check:ci when the filter matches, so the matrix entry only repeats
+          # it. A dependency-driven selection (lockfile change, filter false)
+          # keeps calling for it.
+          if [ "$HARNESS_SDK" = "true" ]; then
+            excludes+=(--exclude packages/harness-sdk)
+          fi
+          matrix=$(scripts/changed-workspaces.sh "${excludes[@]}" "${includes[@]}")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   # The CI wiring and plugin manifest checks. No job waits for this one, so it
@@ -340,8 +346,14 @@ jobs:
       - name: Check stacked CI admission
         run: node --test scripts/stacked-ci.test.mjs
 
+      - name: Check runtime publication workflow admission
+        run: pnpm --filter cloud-agent-next test:runtime-ci
+
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
+
+      - name: Test build cache keys
+        run: node --test scripts/build-key-inputs.test.mjs
 
       - name: Test affected workspace detection
         run: node --test scripts/affected-workspaces.test.mjs
@@ -812,9 +824,7 @@ jobs:
       - name: Cache Next.js build
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
-          path: |
-            ~/.npm
-            ${{ github.workspace }}/apps/web/.next/cache
+          path: ${{ github.workspace }}/apps/web/.next/cache
           # Avoid recursive source hashing after install; it can time out scanning node_modules.
           key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |

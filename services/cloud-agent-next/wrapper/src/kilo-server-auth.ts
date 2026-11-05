@@ -28,11 +28,11 @@ const KILO_SERVER_USERNAME = 'kilo';
  * ports in the sandbox, so an unauthenticated Kilo API there would let a
  * browser act on Kilo directly and bypass the control plane.
  */
-export function createKiloServerCredential(): KiloServerCredential {
+export function createKiloServerCredential(username = KILO_SERVER_USERNAME): KiloServerCredential {
   const password = randomBytes(32).toString('base64url');
   return {
-    env: { KILO_SERVER_USERNAME, KILO_SERVER_PASSWORD: password },
-    authorization: `Basic ${Buffer.from(`${KILO_SERVER_USERNAME}:${password}`).toString('base64')}`,
+    env: { KILO_SERVER_USERNAME: username, KILO_SERVER_PASSWORD: password },
+    authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
   };
 }
 

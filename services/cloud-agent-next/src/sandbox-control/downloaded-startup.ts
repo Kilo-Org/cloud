@@ -1,4 +1,5 @@
 import { resolveSecret } from '../auth.js';
+import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { Env } from '../types.js';
 import { ProviderCreationError, type ProviderStartupCommand } from './provider.js';
 import { loadRuntimeRelease } from './runtime-release-loader.js';
@@ -6,6 +7,7 @@ import { mintRuntimeArtifactGrant } from './runtime-artifact-grant.js';
 import { renderRuntimeBootstrap } from './runtime-bootstrap.js';
 import {
   runtimeArtifactForRole,
+  runtimeReleaseHarness,
   RUNTIME_ARTIFACT_HTTP_PREFIX,
   serializeRuntimeRelease,
 } from './runtime-release.js';
@@ -17,8 +19,12 @@ export async function downloadedStartup(input: {
   allocationId: string;
   deadlineAt: number;
   mainProcess?: 'environment-builder';
+  /** The sandbox's stored harness. A release for another harness is a configuration error. */
+  harness?: RuntimeHarness;
 }): Promise<ProviderStartupCommand> {
   const release = await loadRuntimeRelease(input.descriptor, input.env.RUNTIME_RELEASE_BUCKET);
+  if (runtimeReleaseHarness(release) !== (input.harness ?? 'kilo'))
+    throw new ProviderCreationError('invalid_configuration');
   const secret = await resolveSecret(input.env.NEXTAUTH_SECRET);
   if (!secret) throw new Error('Runtime signing unavailable');
   const grant = mintRuntimeArtifactGrant(

@@ -7,3 +7,6 @@ wrapper/dist/
 kilocode-cli.tgz
 
 wrangler.runtime-generated.json
+wrangler.kilo2-local.json
+Dockerfile.kilo2-containers
+kilo2-runtime/kilo2

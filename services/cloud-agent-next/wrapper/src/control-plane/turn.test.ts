@@ -7,6 +7,8 @@ import type {
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS } from '../condense-on-complete.js';
+import type { Harness } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { runtimeKey } from './prepare.js';
@@ -143,7 +145,11 @@ function createFakeClient(onDispatch: (id: string) => void = () => undefined) {
       probeImpl?.(...args) ?? Promise.resolve(null),
   } as unknown as WrapperKiloClient;
   return {
-    client,
+    client: createKiloHarness({
+      client,
+      server: { url: 'http://127.0.0.1:1' },
+      directory: DIRECTORY,
+    }),
     prompts,
     summaries,
     commands,
@@ -251,7 +257,7 @@ function createHarness(
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
   const envs = new Map<string, Record<string, string>>();
-  const retiredClients = new WeakSet<WrapperKiloClient>();
+  const retiredClients = new WeakSet<Harness>();
   const timeouts: Array<{ handler: () => void; ms: number; cancelled: boolean }> = [];
   const states = new Map<string, ReturnType<TurnKiloRuntime['sessionState']>>();
   let clock = 0;
@@ -2868,15 +2874,32 @@ describe('GitHub review publication recovery', () => {
         botUserId: '123',
       },
     });
-  const publication = (output: string, sessionID = KILO_SESSION) =>
+  // Kilo reports the assistant message before its parts.
+  const assistantMessage = (sessionID = KILO_SESSION) =>
+    kiloEvent('message.updated', {
+      info: { sessionID, id: 'msg_assistant', role: 'assistant' },
+    });
+  const publicationPart = (state: Record<string, unknown>, sessionID = KILO_SESSION) =>
     kiloEvent('message.part.updated', {
       sessionID,
       part: {
+        id: 'prt_publication',
+        messageID: 'msg_assistant',
+        sessionID,
         type: 'tool',
+        callID: 'call_publication',
         tool: 'code_review_publish_review_summary',
-        state: { status: 'completed', output },
+        state,
       },
     });
+  const publish = (
+    manager: { observeKiloEvent(event: KiloFeedEvent): void },
+    output: string,
+    sessionID = KILO_SESSION
+  ) => {
+    manager.observeKiloEvent(assistantMessage(sessionID));
+    manager.observeKiloEvent(publicationPart({ status: 'completed', output }, sessionID));
+  };
 
   it('recovers a missing publication once before finalization, keeping the admitted message identity', async () => {
     const h = createHarness();
@@ -2891,7 +2914,7 @@ describe('GitHub review publication recovery', () => {
     expect(h.client(spec).prompts[1].prompt).toContain('code_review_publish_review_summary');
     expect(h.client(spec).prompts[1].messageId).toMatch(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
     expect(h.client(spec).prompts[1].model).toEqual(h.client(spec).prompts[0].model);
-    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}'));
+    publish(h.manager, '{"verified":true,"commentId":99}');
     h.manager.observeKiloEvent(
       kiloEvent('session.status', {
         sessionID: KILO_SESSION,
@@ -2913,7 +2936,7 @@ describe('GitHub review publication recovery', () => {
     h.registerRoute(spec);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}'));
+    publish(h.manager, '{"verified":true,"commentId":99}');
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(h.client(spec).prompts).toHaveLength(1);
@@ -2984,15 +3007,9 @@ describe('GitHub review publication recovery', () => {
       h.registerRoute(spec);
       h.manager.submit(SESSION_ID, promptPayload('m1'));
       await settle();
+      h.manager.observeKiloEvent(assistantMessage());
       h.manager.observeKiloEvent(
-        kiloEvent('message.part.updated', {
-          sessionID: KILO_SESSION,
-          part: {
-            type: 'tool',
-            tool: 'code_review_publish_review_summary',
-            state: { status: 'error', error: `${code}: publication unavailable` },
-          },
-        })
+        publicationPart({ status: 'error', error: `${code}: publication unavailable` })
       );
       h.manager.observeKiloEvent(completedKiloTurn());
       await settle();
@@ -3007,10 +3024,10 @@ describe('GitHub review publication recovery', () => {
     h.registerRoute(spec);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    h.manager.observeKiloEvent(publication('{"verified":false}'));
+    publish(h.manager, '{"verified":false}');
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
-    h.manager.observeKiloEvent(publication('{"verified":false}'));
+    publish(h.manager, '{"verified":false}');
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(h.client(spec).prompts).toHaveLength(2);
@@ -3026,7 +3043,7 @@ describe('GitHub review publication recovery', () => {
     h.manager.observeKiloEvent(
       kiloEvent('session.created', { info: { id: 'ses_child', parentID: KILO_SESSION } })
     );
-    h.manager.observeKiloEvent(publication('{"verified":true,"commentId":99}', 'ses_child'));
+    publish(h.manager, '{"verified":true,"commentId":99}', 'ses_child');
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(h.client(spec).prompts).toHaveLength(2);
@@ -3039,9 +3056,11 @@ describe('GitHub review publication recovery', () => {
     h.registerRoute(spec);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
+    h.manager.observeKiloEvent(assistantMessage());
     h.manager.observeKiloEvent(
       kiloEvent('message.part.delta', {
         sessionID: KILO_SESSION,
+        messageID: 'msg_assistant',
         partID: 'text1',
         delta: 'The model reached its output limit. ',
       })
@@ -3049,6 +3068,7 @@ describe('GitHub review publication recovery', () => {
     h.manager.observeKiloEvent(
       kiloEvent('message.part.delta', {
         sessionID: KILO_SESSION,
+        messageID: 'msg_assistant',
         partID: 'text1',
         delta: 'No actionable output was produced.',
       })

@@ -10,13 +10,13 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -256,9 +256,7 @@ export function NewSessionConfigureForm({
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? (
-          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
-        ) : null}
+        {planRefusal !== null ? <NewSessionPlanRefusal message={planRefusal} /> : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

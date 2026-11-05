@@ -164,6 +164,7 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
+import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
@@ -274,6 +275,7 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -642,6 +644,11 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
+  recordWatchwoodSignupShadow({
+    operationId,
+    provider: args.provider,
+    assessment: trackingContext?.watchwood,
+  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.

@@ -52,6 +52,27 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Uptime probe
+
+`UPTIME_PROBE_SECRET` is a dedicated server-only credential for `GET /api/up`. `[SECRET]`
+The caller must send `Authorization: Bearer <configured value>`; an unset or empty value
+answers `401` with `{ "database": false, "recentAIActivity": false }`, and the endpoint
+accepts no other credential, including request parameters. Every response, including the
+`401`, carries `Cache-Control: no-store`. Each running instance shares one evaluation of
+the probe across authorized callers for 60 seconds, and simultaneous requests share one
+evaluation, so the endpoint performs at most one database read per instance per minute
+whatever the caller's request rate.
+
+Order the cutover so no poll lands on an unauthenticated endpoint: first run
+`pnpm web:env set UPTIME_PROBE_SECRET` and supply a newly generated value, then add the
+`Authorization: Bearer` header to the external monitor, then deploy the application. Verify
+the monitor after the deployment. Only one configured secret is accepted; deployment and
+monitor configuration must agree.
+
+Keep the credential out of tracked defaults. For local probing, generate a separate value
+with `openssl rand -base64 32` and set it in the local environment; ordinary local startup
+does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -110,6 +131,9 @@ ordinary local startup does not require this credential.
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Cloudflare Turnstile public site key; used in `apps/web/src/components/auth/sign-in/TurnstileView.tsx`. [PUBLIC]
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key; used in test files. `[SECRET]`
 - `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. Jest's global setup (`apps/web/src/tests/setup/globalSetup.ts`) defaults it to `true`; keep it out of tracked dotenv files so `pnpm web:env set` can set it. Takes effect on redeploy. [SERVER]
+- `WATCHWOOD_SHADOW_ENABLED` - Exact `true` enables advisory Watchwood checks during web signup. Unset or other values disable collection. [SERVER]
+- `WATCHWOOD_ORG_ID` - OpenAI organization for the browser SDK and the server key. Required for shadow collection. [SERVER]
+- `WATCHWOOD_API_KEY` - Dedicated OpenAI key for that organization, authorized for Watchwood account checks. Required for shadow collection. `[SECRET]`
 - `NEXT_PUBLIC_STYTCH_PROJECT_ENV` - Stytch public project environment identifier; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN` - Stytch public token for client SDKs; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `STYTCH_PROJECT_ID` - Stytch project ID for secret-side SDK calls. `[SECRET]`

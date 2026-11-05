@@ -18,6 +18,10 @@ jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
   default: () => ({ capture() {} }),
 }));
+jest.mock('next-auth', () => ({
+  ...jest.requireActual<object>('next-auth'),
+  getServerSession: async () => null,
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -37,6 +41,7 @@ import {
   extractUsageContextInfo,
   toInsertableDbUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { resolveGatewayCaller } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { enqueueUsage } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 
 const organizationId = '12345678-1234-4234-8234-123456789abc';
@@ -121,18 +126,23 @@ afterEach(() => {
 async function authenticateThenPublish(
   header: string | undefined,
   signedOrganization?: string,
-  validToken = true
+  validToken = true,
+  allowAnonymous = false,
+  extraClaims: Record<string, unknown> = {},
+  extraHeaders: Record<string, string> = {}
 ) {
   const token = jwt.sign(
-    { kiloUserId: user.id, version: 3, organizationId: signedOrganization },
+    { ...extraClaims, kiloUserId: user.id, version: 3, organizationId: signedOrganization },
     validToken ? 'synthetic-auth-secret' : 'wrong-synthetic-secret',
     { algorithm: 'HS256', expiresIn: 60 }
   );
-  const headers = new Headers({ Authorization: `Bearer ${token}` });
+  const headers = new Headers({ ...extraHeaders, Authorization: `Bearer ${token}` });
   if (header !== undefined) headers.set(ORGANIZATION_ID_HEADER, header);
   const auth = await getUserFromAuth({ adminOnly: false, requestHeaders: headers });
-  if (auth.authFailedResponse) return { auth, publication: undefined };
+  const caller = resolveGatewayCaller(auth, { allowAnonymous, ipAddress: '192.0.2.1' });
+  if (caller.kind === 'rejected') return { auth, caller, publication: undefined };
   provider();
+  if (caller.kind === 'anonymous') return { auth, caller, publication: undefined };
   const record = await toInsertableDbUsageRecord(
     {
       cost_mUsd: 123,
@@ -155,14 +165,14 @@ async function authenticateThenPublish(
       cancelled: false,
       status_code: 200,
     },
-    extractUsageContextInfo({ ...context, organizationId: auth.organizationId })
+    extractUsageContextInfo({ ...context, organizationId: caller.organizationId })
   );
   const publication = await enqueueUsage({
     ...record,
     prior_microdollar_usage: 0,
     posthog_distinct_id: null,
   });
-  return { auth, publication };
+  return { auth, caller, publication };
 }
 
 test.each(['', ' ', 'not-an-organization-id'])(
@@ -259,5 +269,99 @@ test('ingress still rejects a malformed organization identity without enqueueing
     { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-secret', USAGE_INGEST_QUEUE: { send } }
   );
   expect(response.status).toBe(400);
+  expect(send).not.toHaveBeenCalled();
+});
+
+// These are the actual caller-admission options used by the two free-capable handlers.
+test.each([
+  { route: 'llm-proxy free', allowAnonymous: true },
+  { route: 'llm-proxy paid', allowAnonymous: true },
+  { route: 'embeddings free', allowAnonymous: true },
+  { route: 'embeddings paid', allowAnonymous: false },
+])('preserves the empty-organization 400 at $route admission', async ({ allowAnonymous }) => {
+  const result = await authenticateThenPublish('', undefined, true, allowAnonymous);
+  expect(result.caller.kind).toBe('rejected');
+  if (result.caller.kind !== 'rejected') return;
+  expect(result.caller.response.status).toBe(400);
+  expect(result.caller.response === result.auth.authFailedResponse).toBe(true);
+  await expect(result.caller.response.json()).resolves.toEqual({
+    success: false,
+    error: 'Invalid organization ID format',
+  });
+  expect(provider).not.toHaveBeenCalled();
+  expect(globalThis.fetch).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+});
+
+test('unrelated nonempty malformed organization context retains baseline anonymous policy', async () => {
+  const result = await authenticateThenPublish('not-a-uuid', undefined, true, true);
+  expect(result.auth.authFailedResponse?.status).toBe(400);
+  expect(result.caller.kind).toBe('anonymous');
+});
+
+test('blocked-user failures retain baseline anonymous policy', async () => {
+  jest.mocked(findUserById).mockResolvedValue({ ...user, blocked_reason: 'synthetic-block' });
+  const result = await authenticateThenPublish('', undefined, true, true);
+  expect(result.auth.authFailedResponse?.status).toBe(403);
+  expect(result.caller.kind).toBe('anonymous');
+});
+
+test('claim and header names cannot forge the internal rejection discriminator', async () => {
+  const result = await authenticateThenPublish(
+    undefined,
+    undefined,
+    true,
+    true,
+    { rejectionReason: 'empty_organization_context', credentialsRejected: false },
+    { rejectionReason: 'empty_organization_context', credentialsRejected: 'false' }
+  );
+  expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.caller.kind).toBe('signed-in');
+  expect(result.publication).toEqual({ kind: 'accepted' });
+});
+
+test.each([undefined, '', organizationId])(
+  'empty signed context cannot downgrade during anonymous-capable admission: %j',
+  async header => {
+    const result = await authenticateThenPublish(header, '', true, true);
+    expect(result.caller.kind).toBe('rejected');
+    if (result.caller.kind !== 'rejected') return;
+    expect(result.caller.response.status).toBe(400);
+    expect(provider).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  }
+);
+
+test('a supplied whitespace signed context retains the nonempty-invalid baseline policy', async () => {
+  const result = await authenticateThenPublish(organizationId, ' ', true, true);
+  expect(result.auth.authFailedResponse?.status).toBe(400);
+  expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.caller.kind).toBe('anonymous');
+});
+
+test('missing credentials retain anonymous access only when admission allows it', async () => {
+  const auth = await getUserFromAuth({ adminOnly: false, requestHeaders: new Headers() });
+  expect(auth).not.toHaveProperty('rejectionReason');
+  expect(resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: '192.0.2.1' }).kind).toBe(
+    'anonymous'
+  );
+  const paid = resolveGatewayCaller(auth, { allowAnonymous: false });
+  expect(paid.kind).toBe('rejected');
+  if (paid.kind === 'rejected') expect(paid.response.status).toBe(401);
+});
+
+test('forged rejection metadata cannot change invalid credential handling', async () => {
+  const result = await authenticateThenPublish(
+    undefined,
+    undefined,
+    false,
+    true,
+    { rejectionReason: 'empty_organization_context', credentialsRejected: false },
+    { rejectionReason: 'empty_organization_context' }
+  );
+  expect(result.auth).not.toHaveProperty('rejectionReason');
+  expect(result.caller.kind).toBe('rejected');
+  if (result.caller.kind === 'rejected') expect(result.caller.response.status).toBe(401);
+  expect(provider).not.toHaveBeenCalled();
   expect(send).not.toHaveBeenCalled();
 });

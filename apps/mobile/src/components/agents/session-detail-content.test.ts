@@ -4413,7 +4413,10 @@ describe('session detail read-only composer', () => {
     // placeholder's place in the same slot.
     const list = view.renderer.root.findByType(SessionMessageList);
     act(() => {
-      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(ROOT_ID, true);
+      (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
+        ROOT_ID,
+        true
+      );
     });
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
     expect(renderedTextOutsideSheet(view.renderer.root)).toContain(

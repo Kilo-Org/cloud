@@ -1413,6 +1413,9 @@ export function credentialSourceFromMetadata(
   const repository = credentialRepositoryFromMetadata(metadata.repository);
   return {
     userId,
+    ...(metadata.workspace?.worktreeId === undefined
+      ? {}
+      : { workspaceId: metadata.workspace.worktreeId }),
     kiloSessionId,
     kiloToken,
     ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),

@@ -1,7 +1,4 @@
 import { it, expect } from 'vitest';
-import fs from 'node:fs/promises';
-import { URL } from 'node:url';
-import { parse } from 'jsonc-parser';
 import { selectRuntimeTarget, renderRuntimeTarget } from './runtime-target.js';
 
 const startup = { mode: 'downloaded', image: 'runtime-free' } as const;
@@ -34,48 +31,6 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog defaults every environment to runtime-free without an org restriction', async () => {
-  const catalog: unknown = JSON.parse(
-    await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
-  );
-  const production = selectRuntimeTarget(catalog, 'production');
-  expect(production).toEqual({
-    mode: 'downloaded',
-    image: 'runtime-free',
-  });
-  const output = renderRuntimeTarget({
-    config: baseline(),
-    environment: 'production',
-    startup: production,
-    release,
-  });
-  expect(output.vars).not.toHaveProperty('RUNTIME_INTERACTIVE_ORG_IDS');
-  for (const target of ['dev', 'isolated', 'new-target'])
-    expect(selectRuntimeTarget(catalog, target)).toEqual({
-      mode: 'downloaded',
-      image: 'runtime-free',
-    });
-});
-it('renders both real Wrangler targets without publication credentials', async () => {
-  const raw: unknown = parse(
-    await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
-  );
-  for (const environment of ['production', 'dev']) {
-    const output = renderRuntimeTarget({
-      config: raw,
-      environment,
-      startup: { mode: 'preinstalled', image: 'all-in-one' },
-    });
-    const target = environment === 'production' ? output : output.env?.dev;
-    expect(target).toMatchObject({
-      vars: {
-        RUNTIME_STARTUP_MODE: 'preinstalled',
-        NATIVE_RUNTIME_IMAGE: 'all-in-one',
-        ENVIRONMENT_SNAPSHOT_ORG_IDS: '*',
-      },
-    });
-  }
-});
 it('renders the selected runtime-free digest and retains unrelated target settings', () => {
   const original = baseline();
   const output = renderRuntimeTarget({

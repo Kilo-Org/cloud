@@ -576,8 +576,8 @@ export type Env = {
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
   ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_USER_IDS?: string;
+  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
+  WORKSPACE_SNAPSHOT_USER_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

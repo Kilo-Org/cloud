@@ -409,8 +409,8 @@ describe('sessionStatusErrorMessage', () => {
     // Both SDK status strings for a failed delivery reach the delivery copy:
     // session-manager's exhaustion indicator and the cloud status written for
     // `cloud.message.failed` (also the normalizer's fallback).
-    ['Message failed to deliver', 'Failed to deliver'],
-    ['Message delivery failed', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
+    ['Message delivery failed', 'Message not sent'],
   ] as const)('maps %s to typed copy', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -423,7 +423,7 @@ describe('sessionStatusErrorMessage', () => {
     ['session-stopped', 'Session stopped', 'Session stopped'],
     ['session-terminated', 'Session terminated', 'The response failed.'],
     ['failed-to-stop-execution', 'Failed to stop execution', 'Failed to stop execution'],
-    ['message-delivery-failed', 'Message failed to deliver', 'Failed to deliver'],
+    ['message-delivery-failed', 'Message failed to deliver', 'Message not sent'],
     ['commit-failed', 'Commit failed', 'Commit failed'],
     [
       'not-authorized',
@@ -473,7 +473,7 @@ describe('sessionStatusErrorMessage', () => {
     ['Agent connection lost', 'The response failed.'],
     ['Session terminated', 'The response failed.'],
     ['Failed to stop execution', 'The response failed.'],
-    ['Message failed to deliver', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
   ] as const)('keeps the code-less fallback for %s', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -539,7 +539,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     kind: 'delivery',
     side: 'user',
     titleKey: 'agentChat.messageFailure.deliveryTitle',
-    title: 'Failed to deliver',
+    title: 'Message not sent',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
@@ -631,7 +631,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   it('suppresses the SDK delivery line the agent-execution row states as a response failure', () => {
     // `normalizer.ts` writes `Message delivery failed` as the status indicator
     // for an execution failure with no error text, while the row renders the
-    // assistant-failure title. The footer's "Failed to deliver" would restate
+    // assistant-failure title. The footer's delivery line would restate
     // the same failed run.
     expect(
       statusIndicatorDuplicatesMessageFailure({

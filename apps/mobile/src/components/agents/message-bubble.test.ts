@@ -297,7 +297,7 @@ describe('MessageBubble failure footer', () => {
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
     expect(
       findText(tree, t => t === 'We could not deliver this message after several attempts.')
     ).toBe(true);
@@ -401,7 +401,7 @@ describe('MessageBubble failure footer', () => {
       });
 
       expect(findElementByTypeFn(tree, MockBubble)).toBeNull();
-      expect(findText(tree, text => text === 'Failed to deliver')).toBe(true);
+      expect(findText(tree, text => text === 'Message not sent')).toBe(true);
       expect(
         findElementByType(tree, 'Button', props => props.accessibilityLabel === 'Retry')
       ).not.toBeNull();
@@ -465,7 +465,7 @@ describe('MessageBubble failure footer', () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-nohandler'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
     });
-    expect(findText(tree, t => t === 'Failed to deliver')).toBe(false);
+    expect(findText(tree, t => t === 'Message not sent')).toBe(false);
   });
 
   it('names the failure row on the title text without grouping the CTA buttons', async () => {
@@ -486,9 +486,9 @@ describe('MessageBubble failure footer', () => {
     expect(footer?.props.accessibilityLabel).toBeUndefined();
 
     // The row name lives on the title Text, which still announces the row.
-    const title = findElementByLabel(tree, 'Failed to deliver. Retry available.');
+    const title = findElementByLabel(tree, 'Message not sent. Retry available.');
     expect(title).not.toBeNull();
-    expect(title?.props.children).toBe('Failed to deliver');
+    expect(title?.props.children).toBe('Message not sent');
   });
 
   it('names a German failure row with one full stop, keeping the title line as translated', async () => {

@@ -221,13 +221,18 @@ function MessageBubbleImpl({
     const fileParts = parts.filter(part => isFilePart(part));
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
+    // A message the transport gave up on is drawn as failed, so the bubble and
+    // the status under it read as one item rather than a normal message with a
+    // stray note beside it. An execution failure leaves the bubble whole: the
+    // message arrived, and only the response failed.
+    const undelivered = failureFooter !== null && trailingFailure;
 
     return (
       <View>
         <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
           <View className="items-end gap-1">
             {message.parts.some(partRendersContent) ? (
-              <Bubble side="user">
+              <Bubble side="user" className={undelivered ? 'opacity-60' : undefined}>
                 <InMessageBubbleContext.Provider value>
                   {userTextContent ? (
                     <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />

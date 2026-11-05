@@ -69,10 +69,10 @@ describe('selectMessageFailure', () => {
   describe('delivery', () => {
     it('maps every delivery reason to fixed copy and never emits raw error text', () => {
       const cases = [
-        { reason: 'interrupted', title: 'Failed to deliver', detail: 'You stopped this message.' },
+        { reason: 'interrupted', title: 'Message not sent', detail: 'You stopped this message.' },
         {
           reason: 'exhausted',
-          title: 'Failed to deliver',
+          title: 'Message not sent',
           detail: 'We could not deliver this message after several attempts.',
         },
       ] as const;

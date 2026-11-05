@@ -102,8 +102,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-terminal-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-terminal-failure-fixture';
     }
-    if (/(?:^|\/)dev\/transcript-delivery-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/transcript-delivery-failure-fixture';
+    if (/(?:^|\/)dev\/transcript-execution-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-execution-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-undelivered-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-undelivered-fixture';
     }
     // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
     // arms one and opens the fixture route, or clears it without navigating.

@@ -116,7 +116,7 @@ const terminalMessages = [...turns, failedAnswer(false)];
  * chat screen restores a failure as `null`, so this state cannot be opened by a
  * link afterwards; the fixture is how the design gate measures it in each cell.
  */
-const deliveryFailureMessages = asMessages({
+const executionFailureMessages = asMessages({
   sessionId: SESSION,
   asked: 'And what time is it in Lisbon?',
   askedImages: [],
@@ -125,9 +125,26 @@ const deliveryFailureMessages = asMessages({
   turns: [...transcriptTurns],
 });
 
-const DELIVERY_FAILURE = { status: 'failed', error: '', reason: 'execution' } as const;
+const EXECUTION_FAILURE = { status: 'failed', error: '', reason: 'execution' } as const;
+
+/**
+ * The message the transport gave up on after several attempts. It never
+ * reached the agent, so the failure belongs to the message's own column rather
+ * than the response's; the SDK stores it on a queued row of the transcript.
+ */
+const UNDELIVERED_FAILURE = {
+  status: 'failed',
+  error: 'Delivery exhausted after several attempts',
+  reason: 'exhausted',
+} as const;
 
 const askedId = askedMessageId(SESSION);
+
+/** The transcript row a failed delivery rides on, and the copy the row states. */
+const failedRowByFailure = {
+  execution: { id: askedId, deliveryState: EXECUTION_FAILURE },
+  undelivered: { id: 'hello-there', deliveryState: UNDELIVERED_FAILURE },
+} as const;
 
 /** The fixture never sends a retry; the row only needs the handler to draw its action. */
 const ignoreRetry = (): void => undefined;
@@ -136,12 +153,13 @@ const ignoreRetry = (): void => undefined;
 const ignoreCopy = (): void => undefined;
 
 /** The failure the fixture draws: the retryable answer, the terminal one, or the asked question's. */
-type FixtureFailure = 'retryable' | 'terminal' | 'delivery';
+type FixtureFailure = 'retryable' | 'terminal' | 'execution' | 'undelivered';
 
 const MESSAGES_BY_FAILURE = {
   retryable: retryableMessages,
   terminal: terminalMessages,
-  delivery: deliveryFailureMessages,
+  execution: executionFailureMessages,
+  undelivered: turns,
 } satisfies Record<FixtureFailure, readonly StoredMessage[]>;
 
 export function TranscriptStyleFixture({
@@ -149,6 +167,8 @@ export function TranscriptStyleFixture({
 }: Readonly<{ failure?: FixtureFailure }> = {}) {
   const { t } = useTranslation();
   const messages = MESSAGES_BY_FAILURE[failure];
+  const failedRow =
+    failure === 'execution' || failure === 'undelivered' ? failedRowByFailure[failure] : undefined;
 
   return (
     <View className="flex-1 bg-background">
@@ -174,8 +194,8 @@ export function TranscriptStyleFixture({
             key={message.info.id}
             message={message}
             onRetryMessage={ignoreRetry}
-            {...(failure === 'delivery' && message.info.id === askedId
-              ? { deliveryState: DELIVERY_FAILURE, onCopyToComposer: ignoreCopy }
+            {...(failedRow !== undefined && message.info.id === failedRow.id
+              ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
               : {})}
           />
         ))}

@@ -281,7 +281,7 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   }
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts) while the SDK's status indicator for it is the
-  // delivery-failed line ("Message delivery failed" -> "Failed to deliver",
+  // delivery-failed line ("Message delivery failed" -> "Message not sent",
   // normalizer.ts). The row already states that failed run, so the delivery
   // line would restate it.
   if (

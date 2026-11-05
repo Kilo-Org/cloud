@@ -2621,7 +2621,7 @@
       "failedToRender": "Failed to render content"
     },
     "messageFailure": {
-      "deliveryTitle": "Failed to deliver",
+      "deliveryTitle": "Message not sent",
       "deliveryInterrupted": "You stopped this message.",
       "deliveryExhausted": "We could not deliver this message after several attempts.",
       "deliveryExecution": "The agent could not run this message.",

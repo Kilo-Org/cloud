@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
@@ -150,6 +151,8 @@ export function NewSessionPrompt({
   frameHeight,
   keyboardClosedFrameHeight,
   cardTop = 0,
+  lineCount = NEW_SESSION_PROMPT_DEFAULT_LINES,
+  keyboardClosedLineCount = lineCount,
   onStartSession,
   isCloneEntry = false,
   autoFocusOnMount = true,
@@ -204,16 +207,15 @@ export function NewSessionPrompt({
   const fit = {
     cardTop,
     cardChromeHeight,
-    preferredMinHeight: resolveNewSessionPromptHeight(
-      promptLineHeight,
-      NEW_SESSION_PROMPT_DEFAULT_LINES
-    ),
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, lineCount),
     lineHeight: promptLineHeight,
-    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+    preferredLines: lineCount,
   };
   const promptHeight = resolveNewSessionPromptMinHeight({ ...fit, frameHeight: frameHeight ?? 0 });
   const closedPromptHeight = resolveNewSessionPromptMinHeight({
     ...fit,
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, keyboardClosedLineCount),
+    preferredLines: keyboardClosedLineCount,
     frameHeight: keyboardClosedFrameHeight ?? frameHeight ?? 0,
   });
   const keyboardProgress = useKeyboardMotionProgress();
@@ -257,6 +259,10 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     textAlignVertical: 'top',
   } satisfies TextStyle;
+  // The one-line floor is shorter than the touch target. The slop makes the
+  // field's whole height reachable without taking room from the sections under
+  // the card, which the short window has none of.
+  const promptHitSlopDp = Math.max(0, (TOUCH_TARGET_DP - promptHeight) / 2);
 
   // Publish the counter only when the value the card renders changes: the
   // count stays hidden until the draft nears the limit, and republishing the
@@ -507,6 +513,11 @@ export function NewSessionPrompt({
             ]}
             onChangeText={handlePromptChange}
             onSelectionChange={handlePromptSelectionChange}
+            hitSlop={
+              promptHitSlopDp > 0
+                ? { top: promptHitSlopDp, right: 0, bottom: promptHitSlopDp, left: 0 }
+                : undefined
+            }
             onContentSizeChange={event => {
               const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
               setContentHeight(current => (current === next ? current : next));

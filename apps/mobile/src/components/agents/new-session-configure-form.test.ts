@@ -11,8 +11,8 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
@@ -430,9 +430,8 @@ describe('NewSessionConfigureForm', () => {
     // A three-line explanation in the pinned footer shrinks the scroll frame
     // and cuts the launch folder on a compact screen, so the body carries it.
     const scrollBody = findElement(element, 'ScrollView');
-    expect(findElementByComponent(scrollBody, AccessibleStatus)).toMatchObject({
+    expect(findElementByComponent(scrollBody, NewSessionPlanRefusal)).toMatchObject({
       message: 'The organization trial has ended.',
-      tone: 'error',
     });
     // The footer keeps only the start-blocked reason (its own component): the
     // refusal must not take height from the form a second time. The pinned
@@ -443,7 +442,7 @@ describe('NewSessionConfigureForm', () => {
     expect(lift).not.toBeNull();
     expect(footer).toBeDefined();
     expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
-    expect(findElementByComponent(footer, AccessibleStatus)).toBeNull();
+    expect(findElementByComponent(footer, NewSessionPlanRefusal)).toBeNull();
   });
 
   // ── Case 1: Cloud, selector shown ──

@@ -14,20 +14,24 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
+import {
+  resolveNewSessionFormFrameHeight,
+  resolveNewSessionPromptLineCount,
+} from '@/components/agents/new-session-prompt-fit';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
-import { resolveNewSessionFormFrameHeight } from '@/components/agents/new-session-prompt-fit';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
@@ -171,7 +175,7 @@ export function NewSessionConfigureForm({
   const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  const keyboardHeight = useKeyboardState(state => state.height);
+  const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
   const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
   const [footerHeight, setFooterHeight] = useState(0);
   const frame = {
@@ -195,6 +199,20 @@ export function NewSessionConfigureForm({
   // connected yet — the target is the computer either way.
   const isRemote = runOnInstance !== null || pendingComputer === true;
   const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
+  // The composer keeps its three-line floor wherever the form's first screenful
+  // still holds the repository picker under it, and takes one line where it
+  // cannot. The window decides, not the measured frame, so the card cannot
+  // reflow after the first layout; with the keyboard up the frame owns the fit.
+  const promptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
+  const keyboardClosedPromptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible: false,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
@@ -261,6 +279,8 @@ export function NewSessionConfigureForm({
           frameHeight={frameHeight}
           keyboardClosedFrameHeight={keyboardClosedFrameHeight}
           cardTop={composerTop}
+          lineCount={promptLineCount}
+          keyboardClosedLineCount={keyboardClosedPromptLineCount}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
           autoFocusOnMount={autoFocusPrompt}
@@ -273,9 +293,7 @@ export function NewSessionConfigureForm({
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? (
-          <AccessibleStatus message={planRefusal} tone="error" className="mt-5 text-sm" />
-        ) : null}
+        {planRefusal !== null ? <NewSessionPlanRefusal message={planRefusal} /> : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

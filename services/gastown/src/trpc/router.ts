@@ -38,6 +38,7 @@ import {
   RpcMergeQueueDataOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
+import { emitWorkerAdminDecision } from '../middleware/worker-admin.middleware';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
@@ -114,6 +115,45 @@ function listAccessibleOrgIds(memberships: JwtOrgMembership[]): string[] {
   return memberships.filter(m => m.role !== 'billing_manager').map(m => m.orgId);
 }
 
+type WorkerAdminTargetInput = {
+  kind: 'town' | 'user' | 'wasteland' | 'service';
+  id: string;
+};
+
+async function decideWorkerAdmin(ctx: TRPCContext, target: WorkerAdminTargetInput) {
+  return ctx.workerAdmin.decide(`trpc:${ctx.procedurePath}`, target);
+}
+
+function reportWorkerAdminDecision(
+  ctx: TRPCContext,
+  target: WorkerAdminTargetInput,
+  decision: Awaited<ReturnType<typeof decideWorkerAdmin>>
+): void {
+  if (!ctx.workerAdmin.takeDecisionReport(`trpc:${ctx.procedurePath}`, target)) return;
+  emitWorkerAdminDecision(ctx.env, decision, {
+    action: `trpc:${ctx.procedurePath}`,
+    userId: ctx.userId || null,
+    townId: target.kind === 'town' ? target.id : null,
+    jti: decision.allowed ? decision.jti : null,
+    delivery: 'trpc',
+  });
+}
+
+async function workerAdminAllows(
+  ctx: TRPCContext,
+  target: WorkerAdminTargetInput
+): Promise<boolean> {
+  const decision = await decideWorkerAdmin(ctx, target);
+  reportWorkerAdminDecision(ctx, target, decision);
+  if (!decision.allowed && decision.status === 503) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Admin capability validation unavailable',
+    });
+  }
+  return decision.allowed;
+}
+
 /**
  * Common interface for the rig/town management methods shared by
  * GastownUserDO and GastownOrgDO stubs. Used to abstract over
@@ -161,7 +201,7 @@ async function resolveTownOwnership(
   ctx: TRPCContext,
   townId: string
 ): Promise<TownOwnershipResult> {
-  const { userId, isAdmin, orgMemberships: memberships } = ctx;
+  const { userId, orgMemberships: memberships } = ctx;
 
   // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
@@ -169,7 +209,9 @@ async function resolveTownOwnership(
   if (personalTown) {
     if (personalTown.owner_user_id !== userId) {
       // Admin bypass: allow access without ownership
-      if (isAdmin) return { type: 'admin' };
+      if (await workerAdminAllows(ctx, { kind: 'town', id: townId })) {
+        return { type: 'admin' };
+      }
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
     }
     return { type: 'user', stub: userStub, town: personalTown };
@@ -190,7 +232,9 @@ async function resolveTownOwnership(
     const membership = getOrgMembership(memberships, config.organization_id);
     if (!membership || membership.role === 'billing_manager') {
       // Admin bypass: allow access without org membership
-      if (isAdmin) return { type: 'admin' };
+      if (await workerAdminAllows(ctx, { kind: 'town', id: townId })) {
+        return { type: 'admin' };
+      }
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
     }
     return {
@@ -201,7 +245,9 @@ async function resolveTownOwnership(
   }
 
   // No owner found — admins can still access the town for debugging
-  if (isAdmin) return { type: 'admin' };
+  if (await workerAdminAllows(ctx, { kind: 'town', id: townId })) {
+    return { type: 'admin' };
+  }
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
 }
 
@@ -283,7 +329,7 @@ async function verifyTownOwnership(env: Env, ctx: TRPCContext, townId: string) {
  * their DO.
  */
 async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, townIdHint?: string) {
-  const { userId, isAdmin, orgMemberships: memberships } = ctx;
+  const { userId, orgMemberships: memberships } = ctx;
 
   // Fast path: personal rig lookup
   const userStub = getGastownUserStub(env, userId);
@@ -302,7 +348,15 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
 
   // Admin bypass: resolve the real owner from TownDO config so we can
   // look up the rig in their DO.
-  if (isAdmin && townIdHint) {
+  const adminTarget = townIdHint ? { kind: 'town' as const, id: townIdHint } : null;
+  const adminDecision = adminTarget ? await decideWorkerAdmin(ctx, adminTarget) : null;
+  if (adminDecision && !adminDecision.allowed && adminDecision.status === 503) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Admin capability validation unavailable',
+    });
+  }
+  if (townIdHint && adminTarget && adminDecision?.allowed) {
     const townStub = getTownDOStub(env, townIdHint);
     let config;
     try {
@@ -311,15 +365,31 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
     }
 
-    if (config.owner_type === 'org' && config.organization_id) {
-      const orgStub = getGastownOrgStub(env, config.organization_id);
-      const orgRig = await orgStub.getRigAsync(rigId);
-      if (orgRig) return orgRig;
-    } else if (config.owner_user_id) {
-      const ownerStub = getGastownUserStub(env, config.owner_user_id);
-      const ownerRig = await ownerStub.getRigAsync(rigId);
-      if (ownerRig) return ownerRig;
+    const ownerRig =
+      config.owner_type === 'org' && config.organization_id
+        ? await getGastownOrgStub(env, config.organization_id).getRigAsync(rigId)
+        : config.owner_user_id
+          ? await getGastownUserStub(env, config.owner_user_id).getRigAsync(rigId)
+          : null;
+    if (ownerRig) {
+      // The bypass names one town; a rig from another town of the same owner
+      // must not become reachable through it.
+      if (ownerRig.town_id !== townIdHint) {
+        reportWorkerAdminDecision(ctx, adminTarget, {
+          allowed: false,
+          source: adminDecision.source,
+          status: 403,
+          reason: 'target_mismatch',
+        });
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
+      }
+      reportWorkerAdminDecision(ctx, adminTarget, adminDecision);
+      return ownerRig;
     }
+  }
+
+  if (adminTarget && adminDecision && !adminDecision.allowed) {
+    reportWorkerAdminDecision(ctx, adminTarget, adminDecision);
   }
 
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
@@ -407,7 +477,6 @@ export const gastownRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      if (!ctx.isAdmin) return { isAdminViewing: false, ownerUserId: null, ownerOrgId: null };
       const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'admin') {
         // Admin is viewing a town they don't own — resolve the real owner
@@ -425,16 +494,6 @@ export const gastownRouter = router({
   deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      // Admins cannot delete towns — they should use admin intervention endpoints
-      if (ctx.isAdmin) {
-        const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
-        if (ownership.type === 'admin') {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admins cannot delete towns they do not own',
-          });
-        }
-      }
       const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'org') {
         const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);

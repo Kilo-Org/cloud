@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natív távelérési demó",
+    "sessionsEmpty": "Még nincsenek natív munkamenetek",
+    "hosts": "Online gazdagépek",
+    "hostsEmpty": "Nincsenek online gazdagépek",
+    "directory": "Munkakönyvtár",
+    "createSession": "Natív munkamenet létrehozása",
+    "queueIfOffline": "Prompt várólistára helyezése, ha a gazdagép offline",
+    "prompt": "Prompt vagy /command",
+    "localClear": "Helyi nézet törlése",
+    "abort": "Kör megszakítása",
+    "failed": "A natív távoli művelet sikertelen",
+    "creationUnknown": "A létrehozás eredménye ismeretlen. Újrapróbálás előtt frissítse a munkameneteket.",
+    "commandFailed": "A futtató parancsa sikertelen",
+    "invalidReply": "Érvénytelen válasz a futtatótól",
+    "unsafeCommand": "Használja a /compact, /new, /skill, /models, /agents vagy /clear (csak helyben) parancsot.",
+    "status": "Kapcsolat: {{connection}} · Futtató: {{runner}}",
+    "presenceStatus": "Gazdagépek: {{connection}}",
+    "commandStatus": "Parancs kézbesítése: {{status}}",
+    "delivered": "Kézbesítve",
+    "expired": "Lejárt"
+  },
   "common": {
     "cancel": "Mégse",
     "done": "Kész",

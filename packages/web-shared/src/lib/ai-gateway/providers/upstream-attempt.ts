@@ -132,12 +132,11 @@ export async function sendUpstreamAttempt({
 
   if (providerContext.provider.type === OPENAI_CHATGPT_PROVIDER_ID) {
     const owner = providerContext.provider.chatGptOwner;
-    await syncChatGptUsageLimit(result.response, owner);
-    await recordChatGptNotEligible(
-      result.response,
-      owner,
-      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER]
-    );
+    // The token that served this request names the connection the report
+    // belongs to; a reconnect during the request replaces it.
+    const accessToken = extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER];
+    await syncChatGptUsageLimit(result.response, owner, accessToken);
+    await recordChatGptNotEligible(result.response, owner, accessToken);
   }
 
   return {
@@ -160,23 +159,27 @@ export async function sendUpstreamAttempt({
  * that a person applied a reset in ChatGPT. The clear runs after the response,
  * so it never adds latency to a request that worked.
  *
- * The owner is the connection the provider named, so the record lands on the
- * exact row that served the request: the organization's shared-services
- * connection for a service run, and the caller's own row otherwise. Both
- * directions are best-effort: a database failure must never change the
- * request's outcome, which is the upstream response the caller already has.
+ * The owner is the connection the provider named, and the token is the
+ * credential that served this request: together they name the exact row the
+ * report belongs to. A reconnect that replaced the credential while the request
+ * was in flight owns a different connection, and the write is skipped, so the
+ * fresh connection never shows a limit it did not report. A request without a
+ * delegated token names no connection at all. Both directions are best-effort: a
+ * database failure must never change the request's outcome, which is the
+ * upstream response the caller already has.
  */
 async function syncChatGptUsageLimit(
   response: Response,
-  owner: OpenAiChatGptOwner | undefined
+  owner: OpenAiChatGptOwner | undefined,
+  accessToken: string | undefined
 ): Promise<void> {
-  if (!owner) return;
+  if (!owner || !accessToken) return;
 
   if (response.status < 400) {
     try {
       after(async () => {
         try {
-          await clearOpenAiChatGptUsageLimit(owner);
+          await clearOpenAiChatGptUsageLimit(owner, accessToken);
         } catch {
           // Best-effort, exactly like the record path below.
         }
@@ -193,7 +196,7 @@ async function syncChatGptUsageLimit(
   try {
     const limit = readChatGptUsageLimit(response.status, await response.clone().json());
     if (!limit) return;
-    await recordOpenAiChatGptUsageLimit(owner, limit);
+    await recordOpenAiChatGptUsageLimit(owner, accessToken, limit);
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }

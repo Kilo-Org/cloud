@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "నేటివ్ రిమోట్ డెమో",
+    "sessionsEmpty": "ఇంకా నేటివ్ సెషన్‌లు లేవు",
+    "hosts": "ఆన్‌లైన్ హోస్ట్‌లు",
+    "hostsEmpty": "ఆన్‌లైన్ హోస్ట్‌లు లేవు",
+    "directory": "వర్కింగ్ డైరెక్టరీ",
+    "createSession": "నేటివ్ సెషన్‌ను సృష్టించండి",
+    "queueIfOffline": "హోస్ట్ ఆఫ్‌లైన్‌లో ఉంటే ప్రాంప్ట్‌ను క్యూలో ఉంచండి",
+    "prompt": "ప్రాంప్ట్ లేదా /command",
+    "localClear": "లోకల్ వీక్షణను క్లియర్ చేయండి",
+    "abort": "టర్న్‌ను ఆపండి",
+    "failed": "నేటివ్ రిమోట్ చర్య విఫలమైంది",
+    "creationUnknown": "సెషన్ సృష్టించబడిందో లేదో తెలియదు. మళ్లీ ప్రయత్నించే ముందు సెషన్‌లను రిఫ్రెష్ చేయండి.",
+    "commandFailed": "రన్నర్ కమాండ్ విఫలమైంది",
+    "invalidReply": "చెల్లని రన్నర్ ప్రతిస్పందన",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents లేదా /clear (లోకల్‌గా మాత్రమే) ఉపయోగించండి.",
+    "status": "కనెక్షన్: {{connection}} · రన్నర్: {{runner}}",
+    "presenceStatus": "హోస్ట్‌లు: {{connection}}",
+    "commandStatus": "కమాండ్ డెలివరీ: {{status}}",
+    "delivered": "చేరింది",
+    "expired": "గడువు ముగిసింది"
+  },
   "common": {
     "cancel": "రద్దు చేయండి",
     "done": "పూర్తయింది",

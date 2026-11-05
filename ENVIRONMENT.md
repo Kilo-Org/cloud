@@ -18,6 +18,10 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Admin MFA step-up
+
+- `ADMIN_STEP_UP_ENABLED` - Binary kill switch for session-bound MFA step-up. the literal string `true` enforces step-up (any other value, including `TRUE`, is off) on admin tRPC procedures, specialized admin procedures, `adminOnly` REST routes, and the admin layout; unset or any other value disables it and leaves admin behavior unchanged. Admin enrollment freshness and other independent security fixes apply regardless. [SERVER]
+
 ### Code review health monitor
 
 `CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
@@ -51,6 +55,27 @@ secret is accepted; deployment and monitor configuration must agree.
 Keep credentials out of tracked defaults. For local monitor development, generate
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
+
+### Uptime probe
+
+`UPTIME_PROBE_SECRET` is a dedicated server-only credential for `GET /api/up`. `[SECRET]`
+The caller must send `Authorization: Bearer <configured value>`; an unset or empty value
+answers `401` with `{ "database": false, "recentAIActivity": false }`, and the endpoint
+accepts no other credential, including request parameters. Every response, including the
+`401`, carries `Cache-Control: no-store`. Each running instance shares one evaluation of
+the probe across authorized callers for 60 seconds, and simultaneous requests share one
+evaluation, so the endpoint performs at most one database read per instance per minute
+whatever the caller's request rate.
+
+Order the cutover so no poll lands on an unauthenticated endpoint: first run
+`pnpm web:env set UPTIME_PROBE_SECRET` and supply a newly generated value, then add the
+`Authorization: Bearer` header to the external monitor, then deploy the application. Verify
+the monitor after the deployment. Only one configured secret is accepted; deployment and
+monitor configuration must agree.
+
+Keep the credential out of tracked defaults. For local probing, generate a separate value
+with `openssl rand -base64 32` and set it in the local environment; ordinary local startup
+does not require this credential.
 
 ### Configuration & Constant URLs
 
@@ -110,6 +135,9 @@ ordinary local startup does not require this credential.
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Cloudflare Turnstile public site key; used in `apps/web/src/components/auth/sign-in/TurnstileView.tsx`. [PUBLIC]
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key; used in test files. `[SECRET]`
 - `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. Jest's global setup (`apps/web/src/tests/setup/globalSetup.ts`) defaults it to `true`; keep it out of tracked dotenv files so `pnpm web:env set` can set it. Takes effect on redeploy. [SERVER]
+- `WATCHWOOD_SHADOW_ENABLED` - Exact `true` enables advisory Watchwood checks during web signup. Unset or other values disable collection. [SERVER]
+- `WATCHWOOD_ORG_ID` - OpenAI organization for the browser SDK and the server key. Required for shadow collection. [SERVER]
+- `WATCHWOOD_API_KEY` - Dedicated OpenAI key for that organization, authorized for Watchwood account checks. Required for shadow collection. `[SECRET]`
 - `NEXT_PUBLIC_STYTCH_PROJECT_ENV` - Stytch public project environment identifier; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN` - Stytch public token for client SDKs; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `STYTCH_PROJECT_ID` - Stytch project ID for secret-side SDK calls. `[SECRET]`
@@ -131,6 +159,11 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Cloud Agent Next request control and workflow control tokens; requires the master and exact `true`. [SERVER]
 - `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
 - `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
+- `WORKER_ADMIN_LEGACY_CLAIM_ISSUANCE` - `on` by default. Controls whether `/api/gastown/token`, `/api/wasteland/token`, Wasteland server resolution, and the admin Gastown REST client still put `isAdmin` on the ordinary Worker identity token. Set to `off` only during the legacy drain; Workers independently cap any legacy `isAdmin` claim at one hour and reject dateless claims. [SERVER]
+- `WORKER_ADMIN_CAPABILITY_ISSUANCE` - Default off; requires exact `on`. Enables minting short-lived ES256 Worker admin capabilities from a browser session endpoint. Must stay off until session-bound MFA step-up (PR2) is live; the interim actor adapter always fails closed. [SERVER]
+- `WORKER_ADMIN_CAPABILITY_PRIVATE_JWK` - `[SECRET]` ES256 private JWK (with `kid`) used to sign Worker admin capabilities. Never commit a private key; rotate by publishing a new `kid` before signing with it. [SECRET]
+- `WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS` - Worker-side JSON JWKS (`{"keys":[...]}`) of public capability keys, including retired keys during rotation. [SERVER]
+- `LEGACY_ADMIN_CLAIM_MODE` - Worker-side `honor` (default), `observe`, or `reject`. `honor` keeps legacy `isAdmin` support access; `observe` grants but emits `observe_would_deny`; `reject` stops granting legacy admin. Applies to both Gastown and Wasteland. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
@@ -314,6 +347,7 @@ admission responses within the same slot and deadline.
 - `AUTO_ROUTING_DECISION_SECRET` - HMAC secret the AI gateway uses to verify `x-kilo-auto-decision` custom router decisions signed by the auto-routing worker (ADR 0005). Must match the worker's `AUTO_ROUTING_DECISION_SECRET` Secrets Store binding. When unset, the gateway answers requests that carry the header with HTTP 503. `[SECRET]`
 - `USER_DATA_EXPORT_WORKER_URL` - Internal user data export Worker URL. Production: `https://user-data-export.kilosessions.ai`; local development is generated by `dev:env`. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
+- `NEXT_PUBLIC_SESSION_SYNC_URL` - Optional native-v2 remote demo relay URL. Defaults to `https://session-sync.kiloapps.io`; set `http://localhost:8817` for the isolated local session-sync Worker. The client-only `native-remote-web` PostHog flag hides `/native-remote` when off; it never changes server authorization. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
@@ -572,6 +606,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
+- `EXPO_PUBLIC_SESSION_SYNC_URL` - Optional native-v2 remote mobile demo relay URL, inlined into the JS bundle. Production builds default to `https://session-sync.kiloapps.io`; non-production builds require an explicit isolated Worker URL (for example, `http://localhost:8817`). The client-only `native-remote-mobile` flag (minimum app version `1.0.15`, default off) gates both the Profile entry and `/native-remote`. It does not change server authorization. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `KILO_CHAT_URL` - Base URL for Kilo Chat in the mobile app. Bundled into the binary. [PUBLIC]

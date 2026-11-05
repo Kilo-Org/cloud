@@ -143,7 +143,7 @@ import {
   gastownAccessMiddleware,
   gastownRouteAccessMiddleware,
 } from './middleware/gastown-access.middleware';
-import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
+import { resolveWorkerAdminMiddleware } from './middleware/worker-admin.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
@@ -291,7 +291,7 @@ const corsMiddleware = cors({
     const allowed = ['https://app.kilo.ai', 'https://kilo.ai'];
     return allowed.includes(origin) ? origin : '';
   },
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Kilo-Worker-Capability'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   exposeHeaders: ['Content-Length'],
   maxAge: 3600,
@@ -885,14 +885,15 @@ app.post('/api/towns/:townId/container-events', async c => {
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
+app.use('/api/users/*', resolveWorkerAdminMiddleware);
 app.use('/api/users/*', gastownRouteAccessMiddleware);
 app.use('/api/users/:userId/*', userAuthMiddleware);
 // Town routes: kilo auth + Gastown access + admin audit + town ownership check (supports both personal and org-owned towns).
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 const townRouteAuthMiddleware = every(
   kiloAuthMiddleware,
+  resolveWorkerAdminMiddleware,
   gastownRouteAccessMiddleware,
-  adminAuditMiddleware,
   townAuthMiddleware
 );
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
@@ -913,6 +914,7 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
+app.use('/api/orgs/:orgId/*', resolveWorkerAdminMiddleware);
 app.use('/api/orgs/:orgId/*', gastownRouteAccessMiddleware);
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
   orgAuthMiddleware(c, next)
@@ -1314,6 +1316,7 @@ app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', c =>
 // connects here instead of going through the Next.js proxy layer.
 
 app.use('/trpc/*', kiloAuthMiddleware);
+app.use('/trpc/*', resolveWorkerAdminMiddleware);
 app.use(
   '/trpc/*',
   trpcServer({
@@ -1323,7 +1326,7 @@ app.use(
       env: c.env,
       executionCtx: c.executionCtx,
       userId: c.get('kiloUserId') ?? '',
-      isAdmin: c.get('kiloIsAdmin') ?? false,
+      workerAdmin: c.get('workerAdmin'),
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
       gastownAccess: c.get('kiloGastownAccess') ?? false,
       orgMemberships: c.get('kiloOrgMemberships') ?? [],

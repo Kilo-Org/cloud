@@ -83,14 +83,21 @@ jobs:
             echo "mobile=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # One harness SDK build per run. The four suites below read
-  # packages/harness-sdk/dist: the shard jobs import it at run time, and the
-  # type-aware checks resolve its declarations. Building it inside each job made
-  # a cache miss pay the typia compile once per job, because the shards start
-  # together and actions/cache saves at the end of a job, so no job can hit
-  # another's save. The action still runs here, so its cache serves a later run
-  # with the same inputs, and the required `test` job needs this one, so a
-  # failed build fails the gate instead of leaving the suites skipped.
+  # One harness SDK build per run, and one tRPC declaration build per run. The
+  # four suites below read packages/harness-sdk/dist: the shard jobs import it
+  # at run time, and the type-aware checks resolve its declarations. Building it
+  # inside each job made a cache miss pay the typia compile once per job,
+  # because the shards start together and actions/cache saves at the end of a
+  # job, so no job can hit another's save. The action still runs here, so its
+  # cache serves a later run with the same inputs, and the required `test` job
+  # needs this one, so a failed build fails the gate instead of leaving the
+  # suites skipped.
+  #
+  # The tRPC declarations move here for the same reason: typecheck and lint both
+  # need packages/trpc/dist, they start together, and both used to run the
+  # action, so on a cache miss they compiled the same declaration program twice
+  # and raced to save the one key (the loser logged "Unable to reserve cache").
+  # Here the build happens once and both checks download the tree.
   prepare:
     needs: mobile-changes
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -127,6 +134,19 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      # Same directory-root rule as the harness SDK artifact above.
+      - name: Upload the tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          # A cache hit that restored nothing must fail here, not in a consumer.
+          if-no-files-found: error
+
   typecheck:
     needs: [mobile-changes, prepare]
     if: needs.mobile-changes.outputs.mobile == 'true'
@@ -149,8 +169,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
-        uses: ./.github/actions/trpc-declarations
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Download the harness SDK build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -188,8 +211,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
-        uses: ./.github/actions/trpc-declarations
+      - name: Download the tRPC declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
       - name: Download the harness SDK build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8

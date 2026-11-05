@@ -50,8 +50,11 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
+      # that package, so the database workspace and the root project are enough.
+      # Widen this filter when a step in this job imports another workspace.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
       - name: Check staging DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts

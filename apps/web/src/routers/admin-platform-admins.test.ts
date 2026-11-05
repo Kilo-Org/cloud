@@ -3,6 +3,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   kilocode_users,
+  support_access_grants,
   passkey_credentials,
   session_step_up_proofs,
   user_admin_notes,
@@ -10,6 +11,7 @@ import {
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
@@ -635,6 +637,41 @@ describe('admin.users.setAdminPermissions', () => {
       'Granted API request log export access.',
       'Revoked API request log export access.',
     ]);
+  });
+
+  test('revoking platform admin access revokes open support grants', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({ is_super_admin: false });
+    const owner = await insertTestUser({ is_admin: false });
+    const organization = await createTestOrganization(
+      `support-admin-revoke-${crypto.randomUUID()}`,
+      owner.id,
+      0
+    );
+    const now = new Date();
+    const [grant] = await db
+      .insert(support_access_grants)
+      .values({
+        actor_kilo_user_id: target.id,
+        organization_id: organization.id,
+        action_class: 'support_read',
+        reason: 'investigating a customer report',
+        requested_duration_seconds: 1800,
+        status: 'active',
+        issued_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+      })
+      .returning();
+
+    const caller = await createCallerForUser(superadmin.id);
+    await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false });
+
+    const updated = await getUser(target.id);
+    expect(updated.is_admin).toBe(false);
+    const revoked = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(revoked?.status).toBe('revoked');
   });
 
   test('rejects targets that are not platform admins', async () => {

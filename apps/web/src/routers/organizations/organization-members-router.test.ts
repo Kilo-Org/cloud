@@ -12,6 +12,7 @@ import {
   organization_invitations,
   organizations,
   external_side_effect_outbox,
+  support_access_grants,
   type User,
   type Organization,
 } from '@kilocode/db/schema';
@@ -21,6 +22,11 @@ import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client
 import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
+
+function enableSupportAccess(enabled: boolean) {
+  if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
+  else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
@@ -265,6 +271,24 @@ describe('organizations members trpc router', () => {
         action: 'organization.member.remove',
         metadata: { previousRole: 'admin', heldRoles: ['admin'] },
       });
+    });
+
+    it('enforce applies the real role and rejects admin self-removal', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Enforced Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      enableSupportAccess(true);
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.remove({
+            organizationId: organization.id,
+            memberId: kiloAdmin.id,
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        enableSupportAccess(false);
+      }
     });
 
     it('does not record writes by members acting within their own role', async () => {
@@ -636,6 +660,129 @@ describe('organizations members trpc router', () => {
         await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
       }
     }
+
+    it('enforce denies an admin with no parent membership', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Child Members', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      enableSupportAccess(true);
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: memberUser.id,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        enableSupportAccess(false);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('enforce uses a real billing-manager role for an admin', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Billing Child', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'billing_manager');
+      enableSupportAccess(true);
+      try {
+        const result = await (
+          await createCallerForUser(kiloAdmin.id)
+        ).organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [child.id],
+        });
+        expect(result.added).toEqual([child.id]);
+      } finally {
+        enableSupportAccess(false);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('enforce uses a real admin role for an admin', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Admin Child', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      await addUserToOrganization(testOrganization.id, kiloAdmin.id, 'admin');
+      enableSupportAccess(true);
+      try {
+        const caller = await createCallerForUser(kiloAdmin.id);
+        const input = { organizationId: testOrganization.id, memberId: target.id };
+        await expect(
+          caller.organizations.members.setChildMemberships({
+            ...input,
+            childOrganizationIds: [child.id],
+          })
+        ).resolves.toEqual({ success: true, added: [child.id], removed: [] });
+        await expect(
+          caller.organizations.members.setChildMemberships({ ...input, childOrganizationIds: [] })
+        ).resolves.toEqual({ success: true, added: [], removed: [child.id] });
+
+        const audits = await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.actor_id, kiloAdmin.id),
+              eq(admin_action_audit_logs.target_id, testOrganization.id),
+              eq(admin_action_audit_logs.action, 'organization.child_memberships.set')
+            )
+          );
+        expect(audits).toEqual([]);
+      } finally {
+        enableSupportAccess(false);
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('enforce denies a support write grant without a qualifying parent role', async () => {
+      const childOwner = await insertTestUser({ is_admin: false });
+      const target = await insertTestUser({ is_admin: false });
+      const child = await createChildOrganization('Enforced Support Child', childOwner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      const approver = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(testOrganization.id, target.id, 'member');
+      const now = new Date();
+      await db.insert(support_access_grants).values({
+        actor_kilo_user_id: kiloAdmin.id,
+        organization_id: testOrganization.id,
+        action_class: 'support_write',
+        status: 'active',
+        reason: 'investigating a customer report',
+        approved_by_kilo_user_id: approver.id,
+        decided_at: now.toISOString(),
+        requested_duration_seconds: 900,
+        issued_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+      });
+      enableSupportAccess(true);
+      try {
+        await expect(
+          (await createCallerForUser(kiloAdmin.id)).organizations.members.setChildMemberships({
+            organizationId: testOrganization.id,
+            memberId: target.id,
+            childOrganizationIds: [child.id],
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        const membership = await db.query.organization_memberships.findFirst({
+          where: and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, target.id)
+          ),
+        });
+        expect(membership).toBeUndefined();
+      } finally {
+        enableSupportAccess(false);
+        await db
+          .delete(support_access_grants)
+          .where(eq(support_access_grants.actor_kilo_user_id, kiloAdmin.id));
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
 
     it('allows parent owners to assign parent members to child organizations', async () => {
       const childOwner = await insertTestUser({

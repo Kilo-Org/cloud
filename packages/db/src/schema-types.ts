@@ -937,6 +937,13 @@ export const AdminActionAuditAction = z.enum([
   'credit_campaign.create',
   'credit_campaign.update',
   'credit_campaign.set_active',
+  'support_access.request',
+  'support_access.approve',
+  'support_access.deny',
+  'support_access.cancel',
+  'support_access.revoke',
+  'support_access.emergency_issue',
+  'support_access.review',
   'service_fee.rollback_refund',
   'service_fee.rollback_reconcile',
 ]);

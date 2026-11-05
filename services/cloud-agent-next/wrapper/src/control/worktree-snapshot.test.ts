@@ -75,6 +75,33 @@ function signal(): AbortSignal {
   return AbortSignal.timeout(60_000);
 }
 
+async function countGitCommands<T>(
+  run: () => Promise<T>
+): Promise<{ result: T; commands: number }> {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-git-count-'));
+  const callsPath = path.join(directory, 'calls');
+  const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  const shim = path.join(directory, 'git');
+  await fs.writeFile(
+    shim,
+    `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(callsPath)}\nexec ${JSON.stringify(realGit)} "$@"\n`
+  );
+  await fs.chmod(shim, 0o755);
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${directory}:${previousPath ?? ''}`;
+  try {
+    const result = await run();
+    const calls = await fs.readFile(callsPath, 'utf8');
+    return {
+      result,
+      commands: calls.split('\n').filter(line => line.length > 0).length,
+    };
+  } finally {
+    process.env.PATH = previousPath;
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+}
+
 async function capture(work: string, worktreeId = 'worktree_test') {
   return captureWorktreeSnapshotWithLimits(
     { directory: work, worktreeId, signal: signal() },
@@ -909,6 +936,69 @@ describe('worktree snapshot capture', () => {
     }
   }, 120_000);
 
+  it('captures and restores 3000 small files from a fresh clone with bounded git commands', async () => {
+    const fixture = await createFixture('snapshot-many-small-');
+    const fileCount = 3000;
+    try {
+      const directory = path.join(fixture.work, 'small');
+      await fs.mkdir(directory);
+      for (let index = 0; index < fileCount; index += 1) {
+        await fs.writeFile(
+          path.join(directory, `${String(index).padStart(4, '0')}.txt`),
+          `file ${index}\n`
+        );
+      }
+
+      const captureStartedAt = Date.now();
+      const captured = await countGitCommands(() => capture(fixture.work));
+      const captureElapsed = Date.now() - captureStartedAt;
+      const snapshot = captured.result;
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.partial).toBe(false);
+        expect(snapshot.manifest.omitted).toEqual([]);
+        expect(snapshot.manifest.deleted).toEqual([]);
+        expect(captured.commands).toBeLessThanOrEqual(10);
+
+        git(fixture.work, ['add', '-A']);
+        git(fixture.work, ['commit', '-m', 'push small files']);
+        git(fixture.work, ['push', 'origin', 'main']);
+        const target = await clone(fixture, 'target');
+
+        const restoreStartedAt = Date.now();
+        const restored = await countGitCommands(() =>
+          applyWorktreeSnapshot({
+            directory: target,
+            worktreeId: 'worktree_test',
+            archivePath: snapshot.archivePath,
+            signal: signal(),
+          })
+        );
+        const restoreElapsed = Date.now() - restoreStartedAt;
+        expect(restored.result).toEqual({
+          applied: 0,
+          omitted: 0,
+          conflicts: [],
+          partial: false,
+        });
+        expect(restored.commands).toBeLessThanOrEqual(8);
+        expect(restored.commands * 100).toBeLessThan(fileCount);
+        expect(await fs.readFile(path.join(target, 'small', '0000.txt'), 'utf8')).toBe('file 0\n');
+        expect(await fs.readFile(path.join(target, 'small', '2999.txt'), 'utf8')).toBe(
+          'file 2999\n'
+        );
+        console.info(
+          `worktree snapshot many-small benchmark files=${fileCount} bytes=${snapshot.size} captureMs=${captureElapsed} captureGitCommands=${captured.commands} restoreMs=${restoreElapsed} restoreGitCommands=${restored.commands}`
+        );
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  }, 180_000);
+
   it('refuses unsafe or over-limit recovery payloads instead of dropping them', async () => {
     const fixture = await createFixture('snapshot-recovery-unsafe-');
     try {
@@ -1509,6 +1599,64 @@ describe('worktree snapshot apply', () => {
             () => false
           )
         ).toBe(false);
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('records a conflict when upstream replaces a captured file with a directory', async () => {
+    const fixture = await createFixture('snapshot-upstream-file-to-dir-');
+    try {
+      await fs.writeFile(path.join(fixture.work, 'cfg'), 'base file\n');
+      git(fixture.work, ['add', 'cfg']);
+      git(fixture.work, ['commit', '-m', 'base file']);
+      git(fixture.work, ['push', 'origin', 'main']);
+      await fs.writeFile(path.join(fixture.work, 'cfg'), 'snapshot file\n');
+
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        const upstream = await clone(fixture, 'upstream');
+        git(upstream, ['rm', 'cfg']);
+        await fs.mkdir(path.join(upstream, 'cfg'));
+        await fs.writeFile(path.join(upstream, 'cfg', 'a.txt'), 'upstream directory\n');
+        git(upstream, ['add', '-A']);
+        git(upstream, ['commit', '-m', 'replace file with directory']);
+        git(upstream, ['push', 'origin', 'main']);
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({
+          applied: 0,
+          omitted: 0,
+          conflicts: ['cfg'],
+          partial: false,
+        });
+        expect((await fs.lstat(path.join(target, 'cfg'))).isDirectory()).toBe(true);
+        expect(await fs.readFile(path.join(target, 'cfg', 'a.txt'), 'utf8')).toBe(
+          'upstream directory\n'
+        );
+        expect(
+          await fs.readFile(
+            path.join(
+              target,
+              '.git',
+              'kilo-recovered',
+              sanitizedTimestamp(snapshot.manifest.capturedAt),
+              'cfg'
+            ),
+            'utf8'
+          )
+        ).toBe('snapshot file\n');
       } finally {
         await snapshot.cleanup();
       }

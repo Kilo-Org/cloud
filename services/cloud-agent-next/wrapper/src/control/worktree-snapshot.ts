@@ -165,10 +165,11 @@ type ExtractedSnapshot = {
 
 type GitResult = {
   stdout: string;
-  stdoutBytes: Buffer;
   exitCode: number;
   truncated: boolean;
 };
+
+type ChangedPath = { status: 'deleted' } | { status: 'present'; mode: number; objectId: string };
 
 type ArchiveMember =
   | { kind: 'manifest' }
@@ -237,7 +238,7 @@ async function runGit(
   env: NodeJS.ProcessEnv,
   signal: AbortSignal,
   clock: Clock,
-  options: { allow?: number[]; raw?: boolean; maxOutputBytes?: number } = {}
+  options: { allow?: number[] } = {}
 ): Promise<GitResult> {
   const allow = options.allow ?? [0];
   const result = await git([...GIT_PREFIX, ...args], {
@@ -247,8 +248,7 @@ async function runGit(
     signal,
     timeoutMs: clock.remaining(),
     terminationGraceMs: 250,
-    maxOutputBytes: options.maxOutputBytes ?? MAX_GIT_OUTPUT_BYTES,
-    ...(options.raw ? { rawOutput: true } : {}),
+    maxOutputBytes: MAX_GIT_OUTPUT_BYTES,
   });
   signal.throwIfAborted();
   if (result.terminationReason !== undefined) {
@@ -259,7 +259,6 @@ async function runGit(
   }
   return {
     stdout: result.stdout,
-    stdoutBytes: result.stdoutBytes ?? Buffer.alloc(0),
     exitCode: result.exitCode,
     truncated: result.stdoutTruncated === true || result.stderrTruncated === true,
   };
@@ -1476,71 +1475,59 @@ async function changedPaths(
   env: NodeJS.ProcessEnv,
   signal: AbortSignal,
   clock: Clock
-): Promise<Set<string>> {
+): Promise<Map<string, ChangedPath>> {
   const result = await runGit(
     root,
-    ['diff', '--name-only', '--no-renames', '-z', base, head, '--'],
+    [
+      'diff',
+      '--raw',
+      '--no-abbrev',
+      '--no-renames',
+      '--no-ext-diff',
+      '--ignore-submodules=none',
+      '-z',
+      base,
+      head,
+      '--',
+    ],
     env,
     signal,
     clock
   );
   if (result.truncated) throw new Error('git diff output exceeded the apply limit');
-  return new Set(parseNulRecords(result.stdout));
+  const records = parseNulRecords(result.stdout);
+  if (records.length % 2 !== 0) throw new Error('git diff returned an incomplete record');
+
+  const changed = new Map<string, ChangedPath>();
+  for (let index = 0; index < records.length; index += 2) {
+    const meta = records[index];
+    const path = records[index + 1];
+    const fields = meta.startsWith(':') ? meta.slice(1).split(' ') : [];
+    const [, newMode, , newObjectId, status] = fields;
+    if (!path || fields.length !== 5 || status?.length !== 1) {
+      throw new Error('git diff returned an invalid record');
+    }
+    if (status === 'D') {
+      changed.set(path, { status: 'deleted' });
+      continue;
+    }
+    if (!newMode || newMode === '000000' || !newObjectId || !COMMIT_PATTERN.test(newObjectId)) {
+      throw new Error('git diff returned an invalid record');
+    }
+    changed.set(path, {
+      status: 'present',
+      mode: Number.parseInt(newMode, 8),
+      objectId: newObjectId,
+    });
+  }
+  return changed;
 }
 
-async function headFileBytes(
-  root: string,
-  head: string,
-  path: string,
-  maxBytes: number,
-  env: NodeJS.ProcessEnv,
-  signal: AbortSignal,
-  clock: Clock
-): Promise<Buffer | undefined> {
-  const result = await runGit(root, ['show', `${head}:${path}`], env, signal, clock, {
-    allow: [0, 128],
-    raw: true,
-    maxOutputBytes: maxBytes,
-  });
-  if (result.exitCode !== 0 || result.truncated) return undefined;
-  return result.stdoutBytes;
-}
-
-async function headPathExists(
-  root: string,
-  head: string,
-  path: string,
-  env: NodeJS.ProcessEnv,
-  signal: AbortSignal,
-  clock: Clock
-): Promise<boolean> {
-  const result = await runGit(root, ['cat-file', '-e', `${head}:${path}`], env, signal, clock, {
-    allow: [0, 1, 128],
-  });
-  return result.exitCode === 0;
-}
-
-async function headFileMode(
-  root: string,
-  head: string,
-  path: string,
-  env: NodeJS.ProcessEnv,
-  signal: AbortSignal,
-  clock: Clock
-): Promise<number | undefined> {
-  const result = await runGit(
-    root,
-    ['ls-tree', '-z', '--full-tree', head, '--', path],
-    env,
-    signal,
-    clock,
-    { allow: [0, 128] }
-  );
-  if (result.exitCode !== 0 || result.truncated) return undefined;
-  const [record] = result.stdout.split('\0');
-  const match = record === undefined ? null : /^([0-7]{6}) [a-z]+ [0-9a-f]+\t/.exec(record);
-  if (!match) return undefined;
-  return Number.parseInt(match[1], 8);
+function gitBlobObjectId(bytes: Buffer, objectId: string): string {
+  const hash = createHash(objectId.length === 64 ? 'sha256' : 'sha1');
+  hash.update(`blob ${bytes.length}\0`, 'utf8');
+  hash.update(bytes);
+  return hash.digest('hex');
 }
 
 function snapshotModeMatchesHead(mode: number | undefined, snapshotMode: number): boolean {
@@ -1826,7 +1813,7 @@ async function applyExtracted(
   const changed =
     !allConflict && head && head !== manifest.base
       ? await changedPaths(root, manifest.base, head, env, signal, clock)
-      : new Set<string>();
+      : new Map<string, ChangedPath>();
   const conflicts = new Set<string>();
   let applied = 0;
 
@@ -1852,8 +1839,8 @@ async function applyExtracted(
   for (const path of deletedPaths) {
     clock.remaining();
     let conflict = allConflict;
-    if (!allConflict && head && changed.has(path)) {
-      conflict = await headPathExists(root, head, path, env, signal, clock);
+    if (!allConflict && head && changed.get(path)?.status === 'present') {
+      conflict = true;
     }
     if (conflict) {
       conflicts.add(path);
@@ -1870,17 +1857,16 @@ async function applyExtracted(
   for (const file of orderedFiles) {
     clock.remaining();
     let conflict = allConflict;
-    if (!allConflict && head && changed.has(file.path)) {
-      const current = await headFileBytes(root, head, file.path, file.size + 1, env, signal, clock);
-      if (!current) {
+    if (!allConflict && head) {
+      const change = changed.get(file.path);
+      if (change?.status === 'deleted') {
         conflict = true;
-      } else {
-        const snapshot = await readExtractedFileBytes(file);
-        if (!current.equals(snapshot)) {
+      } else if (change) {
+        if (!snapshotModeMatchesHead(change.mode, file.mode)) {
           conflict = true;
         } else {
-          const headMode = await headFileMode(root, head, file.path, env, signal, clock);
-          if (!snapshotModeMatchesHead(headMode, file.mode)) {
+          const snapshot = await readExtractedFileBytes(file);
+          if (gitBlobObjectId(snapshot, change.objectId) !== change.objectId) {
             conflict = true;
           } else if (await workingFileMatchesSnapshot(root, file, snapshot)) {
             continue;

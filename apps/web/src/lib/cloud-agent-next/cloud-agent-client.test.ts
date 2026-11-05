@@ -125,21 +125,75 @@ describe('CloudAgentNextClient review message results', () => {
     mockCreateTRPCClient.mockReturnValueOnce({ getMessageResult: { query } });
   });
 
-  it('returns only admission metadata without assistant text or diagnostics', async () => {
+  it('returns terminal assistant text and timestamps', async () => {
+    query.mockResolvedValue({
+      ...input,
+      status: 'completed',
+      createdAt: 1,
+      queuedAt: 2,
+      acceptedAt: 3,
+      terminalAt: 4,
+      completionSource: 'assistant_message_event',
+      gateResult: 'pass',
+      assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
+    });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
+      ...input,
+      status: 'completed',
+      createdAt: 1,
+      queuedAt: 2,
+      acceptedAt: 3,
+      terminalAt: 4,
+      completionSource: 'assistant_message_event',
+      gateResult: 'pass',
+      assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('tolerates a newer Worker field without dropping the known result', async () => {
+    query.mockResolvedValue({
+      ...input,
+      status: 'completed',
+      createdAt: 1,
+      assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
+      futureLifecycleField: 'added by a newer Worker',
+    });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
+      ...input,
+      status: 'completed',
+      createdAt: 1,
+      assistant: { messageId: 'msg_abcdef123456ABCDEF123456', text: 'terminal text' },
+    });
+  });
+
+  it('preserves a terminal failure without stripping it to status', async () => {
     query.mockResolvedValue({
       ...input,
       status: 'failed',
-      acceptedAt: 1,
+      createdAt: 1,
       terminalAt: 2,
-      failure: { message: 'private diagnostic' },
-      assistant: { text: 'source code' },
+      completionSource: 'wrapper_failure',
+      failure: {
+        code: 'workspace_setup_failed',
+        subtype: 'git_clone_timeout',
+        message: 'safe failure',
+        retryable: true,
+      },
     });
     await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
       ...input,
       status: 'failed',
-      acceptedAt: 1,
+      createdAt: 1,
+      terminalAt: 2,
+      completionSource: 'wrapper_failure',
+      failure: {
+        code: 'workspace_setup_failed',
+        subtype: 'git_clone_timeout',
+        message: 'safe failure',
+        retryable: true,
+      },
     });
-    expect(query).toHaveBeenCalledWith(input);
   });
 
   it('distinguishes the exact message-not-found response from missing sessions', async () => {
@@ -184,6 +238,144 @@ describe('CloudAgentNextClient review message results', () => {
   it('rejects unrecognized lifecycle state instead of confirming admission', async () => {
     query.mockResolvedValue({ ...input, status: 'not-admitted' });
     await expect(new CloudAgentNextClient('token').getMessageResult(input)).rejects.toThrow();
+  });
+});
+
+describe('CloudAgentNextClient getEgressAudit', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    cursor: 6,
+    limit: 10,
+  };
+  const query =
+    jest.fn<(request: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
+  const audit = {
+    records: [
+      {
+        id: 7,
+        requestId: '12345678-1234-4234-9234-123456789abc',
+        allocationRef: 'allocation:1',
+        timestamp: '2026-10-15T12:00:00.000Z',
+        method: 'GET',
+        hostname: 'example.com',
+        protocol: 'https:',
+        port: 443,
+        decision: 'allowed',
+      },
+    ],
+    nextCursor: 7,
+  };
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ getEgressAudit: { query } });
+  });
+
+  it.each([audit, { records: [], nextCursor: null }])(
+    'validates audit pages and forwards session pagination unchanged',
+    async output => {
+      query.mockResolvedValue(output);
+      await expect(new CloudAgentNextClient('token').getEgressAudit(input)).resolves.toEqual(
+        output
+      );
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledWith(input);
+    }
+  );
+
+  it.each([
+    { records: [] },
+    { records: [], nextCursor: -1 },
+    { records: [{ ...audit.records[0], decision: 'unknown' }], nextCursor: null },
+    { records: [{ ...audit.records[0], hostname: 'example.com/private' }], nextCursor: null },
+    { records: Array.from({ length: 101 }, () => audit.records[0]), nextCursor: null },
+  ])('rejects invalid audit responses: %j', async output => {
+    query.mockResolvedValue(output);
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toThrow();
+  });
+
+  it('strips fields outside the public audit response', async () => {
+    query.mockResolvedValue({
+      ...audit,
+      sandboxId: 'private-sandbox',
+      records: audit.records.map(record => ({ ...record, url: 'https://example.com/private' })),
+    });
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).resolves.toEqual(audit);
+  });
+
+  it.each([
+    { code: 'UNAUTHORIZED', httpStatus: 401 },
+    { code: 'FORBIDDEN', httpStatus: 403 },
+    { code: 'PRECONDITION_FAILED', httpStatus: 412 },
+  ])('preserves Worker $code denials', async data => {
+    query.mockRejectedValue(
+      new TRPCClientError('Audit unavailable', {
+        result: { error: { message: 'Audit unavailable', code: -32003, data } },
+      })
+    );
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toMatchObject({
+      code: data.code,
+      message: 'Audit unavailable',
+    });
+  });
+
+  it('propagates transport failures without turning them into an empty audit page', async () => {
+    const failure = new Error('connection lost');
+    query.mockRejectedValue(failure);
+    await expect(new CloudAgentNextClient('token').getEgressAudit(input)).rejects.toBe(failure);
+  });
+});
+
+describe('CloudAgentNextClient listChildSessions', () => {
+  const input = {
+    limit: 20,
+    cursor: '12345678-1234-4234-9234-123456789abc',
+    organizationId: '87654321-4321-4321-8321-cba987654321',
+  };
+  const query =
+    jest.fn<(request: typeof input) => Promise<CloudAgentClientModule.ListChildSessionsOutput>>();
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ listChildSessions: { query } });
+  });
+
+  it('forwards the page request and returns every child field', async () => {
+    query.mockResolvedValue({
+      sessions: [
+        {
+          cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+          initialMessageId: 'msg_123456789abc123456789ABCDE',
+          worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc',
+        },
+        { cloudAgentSessionId: 'workspace_22345678-1234-4234-9234-123456789abc' },
+      ],
+      nextCursor: '22345678-1234-4234-9234-123456789abc',
+    });
+    await expect(new CloudAgentNextClient('token').listChildSessions(input)).resolves.toEqual({
+      sessions: [
+        {
+          cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+          initialMessageId: 'msg_123456789abc123456789ABCDE',
+          worktreeId: 'worktree_12345678-1234-4234-9234-123456789abc',
+        },
+        { cloudAgentSessionId: 'workspace_22345678-1234-4234-9234-123456789abc' },
+      ],
+      nextCursor: '22345678-1234-4234-9234-123456789abc',
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('reports the Worker error instead of inventing an empty page', async () => {
+    const failure = new TRPCClientError('Cloud Agent authority denied');
+    query.mockRejectedValueOnce(failure);
+    await expect(new CloudAgentNextClient('token').listChildSessions(input)).rejects.toBe(failure);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      failure,
+      expect.objectContaining({
+        tags: { source: 'cloud-agent-next-client', endpoint: 'listChildSessions' },
+      })
+    );
   });
 });
 
@@ -596,7 +788,7 @@ describe('CloudAgentNextClient sandbox selection', () => {
       getSandboxSelectionOptions: {
         query: jest.fn(async () => ({
           enabled: true,
-          options: [{ allocation: 'cloudflare-single', available: true }],
+          options: [{ allocation: 'cloudflare-containers-standard-3', available: true }],
         })),
       },
     });
@@ -604,7 +796,7 @@ describe('CloudAgentNextClient sandbox selection', () => {
       new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({ kilocodeOrganizationId })
     ).resolves.toEqual({
       enabled: true,
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') }],
     });
   });
 
@@ -685,6 +877,10 @@ describe('CloudAgentNextClient sandbox selection', () => {
     { egressMode: 'allowlist' as const },
     { egressMode: 'allowlist' as const, egressAllowlist: [] },
     { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
+    { egressAudit: false },
+    { egressMode: 'unrestricted' as const, egressAudit: false },
+    { egressMode: 'allowlist' as const, egressAudit: true },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'], egressAudit: true },
   ])('forwards prepare egress policy unchanged: %j', async policy => {
     const input: PrepareSessionInput = {
       githubRepo: 'acme/repo',

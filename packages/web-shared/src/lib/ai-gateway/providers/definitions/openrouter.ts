@@ -3,7 +3,7 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 export const OPENROUTER = {
-  id: 'openrouter',
+  type: 'openrouter',
   apiUrl: 'https://openrouter.ai/api/v1',
   apiUrlOverrides: {},
   disableUrlSuffix: false,

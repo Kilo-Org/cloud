@@ -24,6 +24,7 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
+import { isRedundantAgentSlug } from '@kilocode/app-shared/agent-profile';
 import type { AgentConfig, PermissionRule } from '@kilocode/db/schema-types';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
@@ -146,7 +147,9 @@ function AgentRow({
           <div className="flex flex-wrap items-center gap-2">
             <Bot className="text-muted-foreground h-4 w-4" />
             <span className="text-sm font-medium">{agent.name}</span>
-            <code className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{agent.slug}</code>
+            {isRedundantAgentSlug(agent.name, agent.slug) ? null : (
+              <code className="bg-muted rounded px-2 py-0.5 font-mono text-xs">{agent.slug}</code>
+            )}
             <span className="text-muted-foreground text-xs uppercase tracking-wide">
               {visibility}
             </span>

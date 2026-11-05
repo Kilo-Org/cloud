@@ -7,6 +7,7 @@ import {
 
 export default {
   id: 'chutes-byok',
+  openrouter_inference_provider_id: 'chutes',
   models_dev_id: 'chutes',
   ...apiKeyUpstream({
     apiUrl: 'https://llm.chutes.ai/v1',

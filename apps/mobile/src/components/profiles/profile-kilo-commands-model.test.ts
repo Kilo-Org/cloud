@@ -124,6 +124,22 @@ describe('validateKiloCommandForm', () => {
     expect(validateKiloCommandForm(formState({ name: 'review' }))).toBe('name-conflict');
   });
 
+  it('refuses a name another command of the profile already uses', () => {
+    expect(
+      validateKiloCommandForm(formState({ name: ' release-notes ' }), ['deploy', 'release-notes'])
+    ).toBe('duplicate-name');
+  });
+
+  it('accepts a name no other command of the profile uses', () => {
+    expect(validateKiloCommandForm(formState({ name: 'release-notes' }), ['deploy'])).toBeNull();
+  });
+
+  it('reports the built-in reservation before a profile duplicate', () => {
+    expect(validateKiloCommandForm(formState({ name: 'review' }), ['review'])).toBe(
+      'name-conflict'
+    );
+  });
+
   it('accepts a valid command', () => {
     expect(validateKiloCommandForm(formState())).toBeNull();
   });

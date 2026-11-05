@@ -416,6 +416,115 @@ describe('computeDecision', () => {
       switchReason: null,
     });
   });
+  describe('cheapest mode', () => {
+    const route = 'implementation/code_generation';
+    const withRoute = (candidates: RankedCandidate[]): RoutingTable => ({
+      ...table,
+      routes: { ...table.routes, [route]: candidates },
+    });
+    const candidate = (
+      model: string,
+      accuracy: number,
+      avgCostUsd: number,
+      meetsThreshold: boolean
+    ): RankedCandidate => ({ model, accuracy, avgCostUsd, meetsThreshold });
+
+    it('picks the lowest-cost candidate that meets the threshold, skipping cheaper failures', () => {
+      const cheapestTable = withRoute([
+        candidate('value/chat', 0.9, 0.01, true),
+        candidate('thrifty/chat', 0.75, 0.004, true),
+        candidate('failing/chat', 0.5, 0.001, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'thrifty/chat',
+        sticky: false,
+      });
+    });
+
+    it('ranks by estimated request cost when present, breaking ties by accuracy', () => {
+      const cheapestTable = withRoute([
+        { ...candidate('low-avg/chat', 0.8, 0.001, true), estimatedRequestCostUsd: 0.05 },
+        { ...candidate('high-avg/chat', 0.8, 0.5, true), estimatedRequestCostUsd: 0.02 },
+        { ...candidate('tie-better/chat', 0.9, 0.5, true), estimatedRequestCostUsd: 0.02 },
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'tie-better/chat',
+      });
+    });
+
+    it('falls back to the most accurate candidate when none meets the threshold', () => {
+      const cheapestTable = withRoute([
+        candidate('cheap-weak/chat', 0.4, 0.001, false),
+        candidate('best-weak/chat', 0.6, 0.02, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({
+        model: 'best-weak/chat',
+      });
+    });
+
+    it('keeps a passing incumbent unless switching is cost-worthwhile', () => {
+      const cheapestTable = withRoute([
+        candidate('fresh/chat', 0.8, 0.002, true),
+        candidate('incumbent/chat', 0.8, 0.005, true),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'incumbent/chat', sticky: true });
+      const pricey = withRoute([
+        candidate('fresh/chat', 0.8, 0.002, true),
+        candidate('incumbent/chat', 0.8, 0.02, true),
+      ]);
+      expect(
+        computeDecision(classification, pricey, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'fresh/chat', sticky: false, switchReason: 'cost' });
+    });
+
+    it('ejects an incumbent below the strict threshold despite a small accuracy gap', () => {
+      const cheapestTable = withRoute([
+        candidate('passing/chat', 0.7, 0.01, true),
+        candidate('incumbent/chat', 0.69, 0.009, false),
+      ]);
+      expect(
+        computeDecision(classification, cheapestTable, inc('incumbent/chat'), new Set(), 'cheapest')
+      ).toMatchObject({ model: 'passing/chat', sticky: false, switchReason: 'threshold' });
+    });
+
+    it('keeps the cheapest passing variant instead of applying a complexity override', () => {
+      const cheapestTable: RoutingTable = {
+        ...withRoute([
+          { ...candidate('variant/chat', 0.8, 0.002, true), variant: 'low' },
+          { ...candidate('variant/chat', 0.6, 0.02, false), variant: 'high' },
+        ]),
+        effortByComplexity: { [route]: { 'variant/chat': { low: 'high' } } },
+      };
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest')
+      ).toMatchObject({ model: 'variant/chat', variant: 'low' });
+    });
+
+    it('reuses the best-accuracy safety override for low-confidence classification', () => {
+      const cheapestTable: RoutingTable = {
+        ...withRoute([
+          candidate('cheap/chat', 0.7, 0.002, true),
+          { ...candidate('accurate/chat', 0.9, 0.02, true), variant: 'high' },
+          { ...candidate('accurate/chat', 0.85, 0.01, true), variant: 'low' },
+        ]),
+        lowConfidenceThreshold: 0.8,
+        effortByComplexity: { [route]: { 'accurate/chat': { low: 'low' } } },
+      };
+      expect(
+        computeDecision(classification, cheapestTable, null, new Set(), 'cheapest', {
+          confidence: 0.5,
+        })
+      ).toMatchObject({ model: 'accurate/chat', variant: 'low' });
+    });
+  });
   describe('low-confidence fallback', () => {
     const configuredTable: RoutingTable = { ...table, lowConfidenceThreshold: 0.8 };
 

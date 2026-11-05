@@ -1,4 +1,5 @@
 import { normalizePackageIdentifier, type McpPackageEcosystem } from './mcp-identity';
+import { packageVersionHint } from './package-version-hint';
 
 export type LauncherParseResult =
   | {
@@ -10,6 +11,7 @@ export type LauncherParseResult =
   | { eligible: false; reason: string };
 
 const NPM_SPEC = /^(@[^/@:\s]+\/[^/@:\s]+|[^/@:\s]+)(?:@(.+))?$/;
+const NPM_VERSION_OR_TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 const PYPI_SPEC =
   /^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[A-Za-z0-9,._-]+\])?(?:(?:==|>=|@)([0-9][^\s,;]*)|@latest)?$/;
 
@@ -19,20 +21,46 @@ function ineligible(reason: string): LauncherParseResult {
   return { eligible: false, reason };
 }
 
-function versionHint(version: string | undefined): string | null {
-  return version !== undefined && /^[0-9]/.test(version) ? version : null;
+const NPM_RELEASE = /^v*(?:\d+|[xX*])(?:\.(?:\d+|[xX*])){0,2}$/;
+const NPM_THREE_PART_RELEASE = /^v*(?:\d+|[xX*])\.(?:\d+|[xX*])\.(?:\d+|[xX*])$/;
+const NPM_FULL_VERSION = /^v*\d+\.\d+\.\d+$/;
+const NPM_RELEASE_TAIL =
+  /^(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+// npm reads a release such as `1`, `1.2`, `x`, `1.x` or `1.x.0` as a range over versions and
+// refuses to use one as a dist-tag name; only a full three-part version names one release. A
+// wildcard anywhere else, as in `release.x`, leaves an ordinary tag, so the release has to be
+// version-shaped here. semver takes a prerelease or build tail only after a full three-part
+// release, so `1.2.x+build` is a range while `1.x+build` and `release.x+build` are tags.
+function isNpmRange(suffix: string): boolean {
+  const separator = suffix.search(/[-+]/);
+  const release = separator === -1 ? suffix : suffix.slice(0, separator);
+  if (!NPM_RELEASE.test(release)) return false;
+  if (
+    separator !== -1 &&
+    !(NPM_THREE_PART_RELEASE.test(release) && NPM_RELEASE_TAIL.test(suffix.slice(separator)))
+  ) {
+    return false;
+  }
+  return /[xX*]/.test(release) || !NPM_FULL_VERSION.test(release);
 }
 
 function parseNpmSpec(spec: string): LauncherParseResult {
   const match = NPM_SPEC.exec(spec);
   if (!match) return ineligible('The package isn’t a plain npm package name.');
+  const suffix = match[2];
+  if (suffix !== undefined && (!NPM_VERSION_OR_TAG.test(suffix) || isNpmRange(suffix))) {
+    return ineligible(
+      'The package can only be pinned to one version or a dist-tag, such as 1.2.3 or latest.'
+    );
+  }
   const identifier = normalizePackageIdentifier('npm', match[1]);
   if (!identifier.ok) return ineligible(identifier.reason);
   return {
     eligible: true,
     ecosystem: 'npm',
     identifier: identifier.value,
-    versionHint: versionHint(match[2]),
+    versionHint: packageVersionHint('npm', suffix),
   };
 }
 
@@ -45,7 +73,7 @@ function parsePypiSpec(spec: string): LauncherParseResult {
     eligible: true,
     ecosystem: 'pypi',
     identifier: identifier.value,
-    versionHint: versionHint(match[2]),
+    versionHint: packageVersionHint('pypi', match[2]),
   };
 }
 

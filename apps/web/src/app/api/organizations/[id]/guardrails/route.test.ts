@@ -77,6 +77,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcp: { enforcement: 'off', allowedServers: [] },
       skill: { enabled: false, scanBeforeUse: false },
     });
@@ -103,6 +104,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       inputScan: { enabled: true, scanToolResults: false },
+      outputScan: { enabled: false, buffersResponses: false },
       mcp: {
         enforcement: 'enforce',
         allowedServers: [

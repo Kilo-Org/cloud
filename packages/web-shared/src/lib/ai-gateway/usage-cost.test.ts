@@ -1,5 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
-import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
+import type {
+  CustomPricing,
+  CustomPricingConfig,
+  CustomPricingTiers,
+} from '@kilocode/db/schema-types';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
@@ -21,6 +25,7 @@ const makeContext = (
   provider: 'openrouter',
   is_free: false,
   user_byok: false,
+  custom_llm_pricing: null,
   ...overrides,
 });
 
@@ -143,6 +148,76 @@ describe('applyUsagePricing', () => {
       expect(usage.market_cost).toBe(900_000);
     }
   );
+
+  describe('custom LLM pricing', () => {
+    const customLlmPricing: CustomPricingTiers = [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 2,
+          completion_per_million: 8,
+          input_cache_read_per_million: 0.5,
+          input_cache_write_per_million: null,
+        },
+      },
+      {
+        start_context_length: 200_000,
+        pricing: {
+          prompt_per_million: 4,
+          completion_per_million: 16,
+          input_cache_read_per_million: 1,
+          input_cache_write_per_million: null,
+        },
+      },
+    ];
+
+    test('bills the tier reached by the input tokens instead of the upstream cost', () => {
+      const usage = makeUsage({
+        cost_mUsd: 700,
+        inputTokens: 100_000,
+        cacheHitTokens: 40_000,
+        cacheWriteTokens: 10_000,
+        outputTokens: 10_000,
+      });
+
+      applyUsagePricing(
+        usage,
+        makeContext({ provider: 'custom', custom_llm_pricing: customLlmPricing }),
+        TEST_CUSTOM_PRICING_CONFIG
+      );
+
+      expect(usage.cost_mUsd).toBe(50_000 * 2 + 10_000 * 2 + 40_000 * 0.5 + 10_000 * 8);
+      expect(usage.market_cost).toBe(700);
+    });
+
+    test('bills a later tier once the input reaches its start', () => {
+      const usage = makeUsage({ cost_mUsd: 0, inputTokens: 250_000, outputTokens: 1000 });
+
+      applyUsagePricing(
+        usage,
+        makeContext({ provider: 'custom', custom_llm_pricing: customLlmPricing }),
+        TEST_CUSTOM_PRICING_CONFIG
+      );
+
+      expect(usage.cost_mUsd).toBe(250_000 * 4 + 1000 * 16);
+    });
+
+    test('takes precedence over a custom pricing entry for the same model', () => {
+      const usage = makeUsage({ inputTokens: 1_000_000, outputTokens: 0 });
+
+      applyUsagePricing(
+        usage,
+        makeContext({
+          requested_model: 'google/gemini-3.8-flash',
+          provider: 'custom',
+          custom_llm_pricing: customLlmPricing,
+        }),
+        TEST_CUSTOM_PRICING_CONFIG
+      );
+
+      expect(usage.cost_mUsd).toBe(4_000_000);
+    });
+  });
 
   test('zeroes free custom-priced usage without replacing its upstream market cost', () => {
     const usage = makeUsage({ cacheDiscount_mUsd: 12_345 });

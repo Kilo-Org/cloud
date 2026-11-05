@@ -739,6 +739,7 @@ describe('refreshGlanceableSnapshot', () => {
     // would put Approve back on the surface the user already actioned, and
     // discarding it after selection left a second waiting session unrecorded.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
+      context: { userId: 'user_1', organizationId: null },
       skipWaitingAskSessionId: 'ses_1',
       // The refresh awaits the binding itself and redraws; its publisher is
       // thrown away, so it must not leave a listener behind.
@@ -762,6 +763,7 @@ describe('refreshGlanceableSnapshot', () => {
     // The row of a retryable failure is not stale: the retry has to re-select
     // the same session, so the refresh passes no skip at all.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
+      context: { userId: 'user_1', organizationId: null },
       skipWaitingAskSessionId: undefined,
       redrawOnAskBound: false,
     });

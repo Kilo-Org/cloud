@@ -33,7 +33,7 @@ describe('platform routing mode contracts', () => {
     ownerType => {
       const owner = { ownerType, ownerId: 'owner-1' };
       expect(AutoRoutingModeOwnerQuerySchema.parse(owner)).toEqual(owner);
-      for (const mode of ['cost_per_accuracy', 'best_accuracy', null] as const) {
+      for (const mode of ['cost_per_accuracy', 'best_accuracy', 'cheapest', null] as const) {
         expect(UpdateAutoRoutingModeRequestSchema.parse({ ...owner, mode })).toEqual({
           ...owner,
           mode,

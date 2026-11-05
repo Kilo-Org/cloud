@@ -15,6 +15,7 @@ jobs:
     # fork-triggerable path.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:

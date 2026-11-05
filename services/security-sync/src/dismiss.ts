@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db/client';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import {
   github_app_installations,
   kilocode_users,
@@ -227,7 +228,9 @@ export async function processSecurityFindingDismissal(params: {
         .where(
           and(
             eq(platform_integrations.platform, 'github'),
-            eq(platform_integrations.github_connection_role, 'workflow'),
+            params.message.owner.organizationId
+              ? organizationWorkflowGitHubConnectionSql()
+              : eq(platform_integrations.github_connection_role, 'workflow'),
             eq(platform_integrations.integration_type, 'app'),
             eq(platform_integrations.integration_status, 'active'),
             isNull(platform_integrations.suspended_at),

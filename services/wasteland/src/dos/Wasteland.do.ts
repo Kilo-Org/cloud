@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import * as configOps from './wasteland/config';
 import * as memberOps from './wasteland/members';
 import * as credentialOps from './wasteland/credentials';
+import type { WastelandCredentialResult } from './wasteland/credentials';
 import * as townOps from './wasteland/towns';
 import { wasteland_config, WastelandConfigRecord } from '../db/tables/wasteland-config.table';
 import { query } from '../util/query.util';
@@ -44,14 +45,7 @@ export type UpdateWastelandConfigInput = {
   status?: 'active' | 'deleted';
 };
 
-export type WastelandCredentialResult = {
-  user_id: string;
-  encrypted_token: string;
-  dolthub_org: string;
-  rig_handle: string | null;
-  is_upstream_admin: boolean;
-  connected_at: string;
-};
+export type { WastelandCredentialResult } from './wasteland/credentials';
 
 export type ConnectedTownResult = {
   town_id: string;
@@ -141,6 +135,7 @@ export class WastelandDO extends DurableObject<Env> {
     encryptedToken: string;
     dolthubOrg: string;
     rigHandle?: string;
+    provenOrg?: string;
     isUpstreamAdmin?: boolean;
   }): Promise<WastelandCredentialResult> {
     const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
@@ -149,6 +144,7 @@ export class WastelandDO extends DurableObject<Env> {
       encryptedToken: input.encryptedToken,
       dolthubOrg: input.dolthubOrg,
       rigHandle: input.rigHandle,
+      provenOrg: input.provenOrg,
       isUpstreamAdmin: input.isUpstreamAdmin,
     });
   }

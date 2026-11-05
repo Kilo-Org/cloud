@@ -229,6 +229,7 @@ export type MessageDeliveryState =
     };
 
 export type SessionCommit = {
+  repository?: string | undefined;
   commitHash: string;
   commitMessage: string;
   messageId: string;
@@ -342,10 +343,6 @@ export type SessionSnapshotPage = {
   preparationAttempts?: readonly PreparationAttempt[];
 };
 
-/**
- * A caller-cached transcript page plus the rows the transcript draws from
- * service state, so a cached repaint matches the live transcript's layout.
- */
 export type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
   repository: string;
@@ -353,17 +350,24 @@ export type SessionConfig = {
   model: string;
   providerID?: string | null | undefined;
   variant?: string | null | undefined;
-  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  /** Installed custom agents, including picker visibility and model overrides. */
   runtimeAgents?:
     | Array<{
         slug: string;
         name: string;
+        mode?: 'primary' | 'subagent' | 'all' | undefined;
+        hidden?: boolean | undefined;
+        disable?: boolean | undefined;
         model?: string | undefined;
         variant?: string | undefined;
       }>
     | undefined;
 };
 
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
 export type CachedSessionSnapshotPage = SessionSnapshotPage & {
   commits?: readonly SessionCommit[];
   /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */

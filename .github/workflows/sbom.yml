@@ -11,6 +11,12 @@ name: SBOM
 on:
   push:
     branches: [main]
+    # syft reads only pnpm-lock.yaml (see the header), so a push that changes
+    # nothing but sources would regenerate a byte-identical dependency SBOM
+    # under a new <sha> name.
+    paths:
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/sbom.yml'
   schedule:
     # Weekly (Mondays 04:00 UTC) — regenerate against the unchanged lockfile.
     # Sets up future vulnerability re-scans against newly disclosed CVEs.

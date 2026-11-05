@@ -217,6 +217,7 @@ export class WlClient {
         ownerEmail: input.ownerEmail,
         version: input.version,
         forkTimeoutMs: input.forkTimeoutMs,
+        orgProven: input.orgProven === true,
         sleep: input.sleep,
         fetch: this.#config.fetch,
         hooks: this.#hooks,

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { deliverCallbackJob } from './delivery.js';
+import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
+import { classifyCallbackError, deliverCallbackJob } from './delivery.js';
 import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 
 const mockPayload: ExecutionCallbackPayload = {
@@ -8,6 +9,25 @@ const mockPayload: ExecutionCallbackPayload = {
   messageId: 'msg_test123',
   status: 'completed',
 };
+
+describe('classifyCallbackError', () => {
+  it('fails a parent authority denial without retrying', () => {
+    expect(
+      classifyCallbackError(
+        new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED),
+        mockPayload,
+        1,
+        'Parent workspace callback unavailable'
+      )
+    ).toMatchObject({ type: 'failed' });
+  });
+
+  it('retries an unclassified error', () => {
+    expect(
+      classifyCallbackError(new Error('transport'), mockPayload, 1, 'Callback unavailable')
+    ).toMatchObject({ type: 'retry' });
+  });
+});
 
 describe('deliverCallbackJob', () => {
   const originalFetch = globalThis.fetch;

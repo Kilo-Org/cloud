@@ -9,6 +9,7 @@
       "lowBalance": "Me aro ki tō toenga",
       "spendAlert": "Me aro ki tō whakapaunga",
       "securityFinding": "Me aro ki tētahi kitenga haumaru",
+      "securityUpdate": "He whakahoutanga tā tētahi whakamātautau haumaru",
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Me aro ki tētahi kitenga haumaru"
+      "body": "He whakahoutanga tā tētahi whakamātautau haumaru"
     }
   },
   "instanceLifecycle": {

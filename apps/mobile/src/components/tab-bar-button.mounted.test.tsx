@@ -99,6 +99,14 @@ describe('TabBarButton tab switch gate', () => {
     expect(onPressIn).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards the entry's selected state to the pressable", () => {
+    const selected = renderButton({ 'aria-selected': true });
+    expect((selected.props as { 'aria-selected'?: boolean })['aria-selected']).toBe(true);
+
+    const plain = renderButton({});
+    expect((plain.props as { 'aria-selected'?: boolean })['aria-selected']).toBeUndefined();
+  });
+
   it('leaves the gate closed before the entry is touched', () => {
     renderButton({ onPressIn: vi.fn<() => void>() });
 

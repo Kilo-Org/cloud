@@ -43,13 +43,13 @@ function resolveRouting(
 }
 
 export function buildDirectProvider(
-  id: 'custom',
+  type: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
 ): Provider {
   return {
-    id,
+    type,
     ...resolveRouting(upstream, auth),
     apiUrlOverrides: {},
     disableUrlSuffix: upstream.disable_url_suffix ?? false,
@@ -57,6 +57,7 @@ export function buildDirectProvider(
     responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
       const body = context.request.body as Record<string, unknown>;
+      const promptCacheKey = body.prompt_cache_key;
       if (upstream.remove_from_body) {
         for (const key of upstream.remove_from_body) {
           delete body[key];
@@ -65,6 +66,18 @@ export function buildDirectProvider(
       Object.assign(body, upstream.extra_body ?? {});
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
+      }
+      if (
+        upstream.prompt_cache_key_as_mt_user_id &&
+        typeof promptCacheKey === 'string' &&
+        /^[\t\x20-\x7e\x80-\xff]+$/.test(promptCacheKey)
+      ) {
+        for (const key of Object.keys(context.extraHeaders)) {
+          if (key.toLowerCase() === 'mt-user-id') {
+            delete context.extraHeaders[key];
+          }
+        }
+        context.extraHeaders['Mt-User-Id'] = promptCacheKey;
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

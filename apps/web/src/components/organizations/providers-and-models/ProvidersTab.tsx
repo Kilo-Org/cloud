@@ -7,7 +7,11 @@ import { LockableContainer } from '@/components/organizations/LockableContainer'
 import { CollapsibleFilterSection } from '@/components/models/CollapsibleFilterSection';
 import { CollapsibleCheckboxFilter } from '@/components/models/CollapsibleCheckboxFilter';
 import { Info } from 'lucide-react';
-import { ProviderPolicyTag } from '@/components/organizations/providers-and-models/PolicyPills';
+import {
+  BYOK_ONLY_DESCRIPTION,
+  ByokOnlyTag,
+  ProviderPolicyTag,
+} from '@/components/organizations/providers-and-models/PolicyPills';
 import type { ProviderRow } from '@/components/organizations/providers-and-models/providersAndModels.types';
 import type { ProviderPolicyFilter } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 
@@ -40,6 +44,7 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange,
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
+  onSetProvidersEnabled,
   onOpenProviderDetails,
   scope = 'organization',
   showDetails = true,
@@ -61,22 +66,33 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange: (value: ProviderPolicyFilter) => void;
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
+  onSetProvidersEnabled: (providerSlugs: string[], nextEnabled: boolean) => void;
   onOpenProviderDetails: (providerSlug: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
 }) {
+  const providersToEnable = filteredProviderRows
+    .filter(row => !row.unavailableReason && !enabledProviderSlugs.has(row.providerSlug))
+    .map(row => row.providerSlug);
+  const providersToDisable = filteredProviderRows
+    .filter(row => enabledProviderSlugs.has(row.providerSlug))
+    .map(row => row.providerSlug);
+
   return (
     <div className="flex flex-col gap-y-4">
       <div className="text-muted-foreground space-y-1 text-sm">
         <p>
           {scope === 'organization'
             ? 'Enable which providers organization members can use.'
-            : 'Grant models offered by selected providers through this policy.'}
+            : 'Grant models offered by enabled providers through this policy.'}
         </p>
         <p>
           Provider policy badges and filters reflect provider defaults. Training and prompt
           retention policies can differ for individual models.
         </p>
+        {filteredProviderRows.some(row => row.byokOnly) ? (
+          <p>BYOK only: {BYOK_ONLY_DESCRIPTION}</p>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -85,20 +101,6 @@ export function ProvidersTab({
         </div>
       ) : (
         <LockableContainer>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex-1">
-              <Input
-                value={search}
-                onChange={e => onSearchChange(e.target.value)}
-                placeholder="Search providers…"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={enabledOnly} onCheckedChange={onEnabledOnlyChange} />
-              {scope === 'group' ? 'Selected' : 'Enabled'}
-            </label>
-          </div>
-
           <div className="flex flex-col gap-4 lg:flex-row">
             <div className="shrink-0 lg:w-80">
               <div className="rounded-lg border p-4">
@@ -147,14 +149,46 @@ export function ProvidersTab({
 
             <div className="min-w-0 flex-1">
               <div className="rounded-lg border">
-                <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
+                <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                   <div className="text-sm font-medium">Providers</div>
                   <div className="text-muted-foreground text-xs">
-                    {enabledProviderSlugs.size} {scope === 'group' ? 'selected' : 'enabled'} •{' '}
-                    {filteredProviderRows.length} shown
+                    {enabledProviderSlugs.size} enabled • {filteredProviderRows.length} shown
                   </div>
                 </div>
 
+                <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+                  <Input
+                    value={search}
+                    onChange={e => onSearchChange(e.target.value)}
+                    placeholder="Search providers…"
+                    aria-label="Search providers"
+                    className="min-w-40 flex-1"
+                  />
+                  <label className="flex shrink-0 items-center gap-2 text-sm">
+                    <Checkbox checked={enabledOnly} onCheckedChange={onEnabledOnlyChange} />
+                    Show enabled only
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canEdit || providersToEnable.length === 0}
+                      onClick={() => onSetProvidersEnabled(providersToEnable, true)}
+                    >
+                      Enable all shown ({providersToEnable.length})
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canEdit || providersToDisable.length === 0}
+                      onClick={() => onSetProvidersEnabled(providersToDisable, false)}
+                    >
+                      Disable all shown ({providersToDisable.length})
+                    </Button>
+                  </div>
+                </div>
                 <div className="max-h-[560px] overflow-y-auto">
                   {filteredProviderRows.map(row => {
                     const checked = enabledProviderSlugs.has(row.providerSlug);
@@ -184,6 +218,7 @@ export function ProvidersTab({
                                 <img
                                   src={row.providerIconUrl}
                                   alt=""
+                                  referrerPolicy="no-referrer"
                                   className="h-5 w-5 object-contain"
                                 />
                               ) : null}
@@ -193,6 +228,7 @@ export function ProvidersTab({
                                 <div className="min-w-0 truncate text-sm font-medium">
                                   {row.providerDisplayName}
                                 </div>
+                                <ByokOnlyTag value={row.byokOnly} />
                                 <ProviderPolicyTag value={row.trains} variant="trains" />
                                 <ProviderPolicyTag
                                   value={row.retainsPrompts}
@@ -238,12 +274,7 @@ export function ProvidersTab({
 
                             <span>
                               Offers {row.modelCount} {modelLabel}
-                              {enabledModelCount > 0 ? (
-                                <>
-                                  {' '}
-                                  • {enabledModelCount} {scope === 'group' ? 'selected' : 'enabled'}
-                                </>
-                              ) : null}
+                              {enabledModelCount > 0 ? <> • {enabledModelCount} enabled</> : null}
                             </span>
                           </div>
                         </div>

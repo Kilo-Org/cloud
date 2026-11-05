@@ -11,8 +11,13 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { encryptGitLabOAuthCredentials } from './credential-encryption';
-import { mutateGitLabMetadataInTransaction } from './metadata-mutation';
+import {
+  mutateGitLabMetadataInTransaction,
+  readGitLabMetadataInTransaction,
+} from './metadata-mutation';
+import { retireProjectCredentialsForReplacedAccount } from './project-credential-lifecycle';
 import { isDefaultGitLabInstanceUrl, normalizeGitLabInstanceUrl } from './instance-url';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type StoreGitLabOAuthIntegrationInput = {
   owner: Owner;
@@ -31,6 +36,7 @@ export type StoreGitLabOAuthIntegrationInput = {
 export type StoreGitLabOAuthIntegrationResult = {
   integrationId: string;
   instanceChanged: boolean;
+  accountChanged: boolean;
 };
 
 function ownerCondition(owner: Owner) {
@@ -72,6 +78,10 @@ export async function storeGitLabOAuthIntegration(
   const integrationId = existing?.id ?? randomUUID();
   const credentialId = randomUUID();
   const credentialVersion = 1;
+  // The caller fetched `repositories` in this request, so a stored list is a
+  // current snapshot. A null list means the fetch did not complete, which must
+  // stay unsynced so the next repository read retries it.
+  const repositoriesSyncedAt = input.repositories === null ? null : new Date().toISOString();
   const encrypted = encryptGitLabOAuthCredentials({
     credentialId,
     integrationId,
@@ -86,38 +96,53 @@ export async function storeGitLabOAuthIntegration(
 
   if (existing) {
     let changedInstance = false;
+    let changedAccount = false;
+    let previousAccountId: string | null = null;
     await db.transaction(async tx => {
-      await mutateGitLabMetadataInTransaction(tx, integrationId, currentMetadata => {
-        const currentInstanceUrl = readOptionalMetadataString(
-          currentMetadata,
-          'gitlab_instance_url'
-        );
-        const currentWebhookSecret = readOptionalMetadataString(currentMetadata, 'webhook_secret');
-        changedInstance = instanceUrlChanged(currentInstanceUrl, input.providerBaseUrl);
+      const currentMetadata = await readGitLabMetadataInTransaction(tx, integrationId);
+      const [currentIntegration] = await tx
+        .select({
+          platform_account_id: platform_integrations.platform_account_id,
+          platform_installation_id: platform_integrations.platform_installation_id,
+        })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integrationId))
+        .limit(1);
+      previousAccountId =
+        currentIntegration?.platform_account_id ??
+        currentIntegration?.platform_installation_id ??
+        null;
+      const currentInstanceUrl = readOptionalMetadataString(currentMetadata, 'gitlab_instance_url');
+      const currentWebhookSecret = readOptionalMetadataString(currentMetadata, 'webhook_secret');
+      changedInstance = instanceUrlChanged(currentInstanceUrl, input.providerBaseUrl);
+      changedAccount =
+        !changedInstance &&
+        previousAccountId !== null &&
+        previousAccountId !== input.providerUser.id;
 
-        return {
-          set: {
-            webhook_secret: changedInstance
-              ? generateWebhookSecret()
-              : (currentWebhookSecret ?? generateWebhookSecret()),
-            auth_type: 'oauth',
-            ...(isDefaultGitLabInstanceUrl(input.providerBaseUrl)
-              ? {}
-              : { gitlab_instance_url: input.providerBaseUrl }),
-            ...(input.oauthClientId && input.oauthClientSecret
-              ? { client_id: input.oauthClientId }
-              : {}),
-          },
-          delete: [
-            'access_token',
-            'refresh_token',
-            'token_expires_at',
-            'client_secret',
-            ...(isDefaultGitLabInstanceUrl(input.providerBaseUrl) ? ['gitlab_instance_url'] : []),
-            ...(input.oauthClientId && input.oauthClientSecret ? [] : ['client_id']),
-            ...(changedInstance ? ['configured_webhooks', 'project_tokens'] : []),
-          ],
-        };
+      await mutateGitLabMetadataInTransaction(tx, integrationId, {
+        set: {
+          webhook_secret: changedInstance
+            ? generateWebhookSecret()
+            : (currentWebhookSecret ?? generateWebhookSecret()),
+          auth_type: 'oauth',
+          ...(isDefaultGitLabInstanceUrl(input.providerBaseUrl)
+            ? {}
+            : { gitlab_instance_url: input.providerBaseUrl }),
+          ...(input.oauthClientId && input.oauthClientSecret
+            ? { client_id: input.oauthClientId }
+            : {}),
+        },
+        delete: [
+          'access_token',
+          'refresh_token',
+          'token_expires_at',
+          'client_secret',
+          ...(isDefaultGitLabInstanceUrl(input.providerBaseUrl) ? ['gitlab_instance_url'] : []),
+          ...(input.oauthClientId && input.oauthClientSecret ? [] : ['client_id']),
+          ...(changedInstance ? ['configured_webhooks'] : []),
+          ...(changedInstance || changedAccount ? ['project_tokens'] : []),
+        ],
       });
 
       await tx
@@ -130,6 +155,7 @@ export async function storeGitLabOAuthIntegration(
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
           repositories: input.repositories,
+          repositories_synced_at: repositoriesSyncedAt,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, integrationId));
@@ -181,7 +207,26 @@ export async function storeGitLabOAuthIntegration(
       });
     });
 
-    return { integrationId, instanceChanged: changedInstance };
+    if (changedAccount) {
+      const retirement = await retireProjectCredentialsForReplacedAccount({
+        integrationId,
+        userToken: input.accessToken,
+        instanceUrl: input.providerBaseUrl,
+        currentAccountId: input.providerUser.id,
+      });
+      logExceptInTest(
+        '[storeGitLabOAuthIntegration] Replaced GitLab account — retired project credentials',
+        {
+          integrationId,
+          previousAccountId,
+          currentAccountId: input.providerUser.id,
+          retired: retirement.retired,
+          retained: retirement.retained,
+        }
+      );
+    }
+
+    return { integrationId, instanceChanged: changedInstance, accountChanged: changedAccount };
   }
 
   const metadata: Record<string, unknown> = {
@@ -210,6 +255,7 @@ export async function storeGitLabOAuthIntegration(
       repository_access: 'all',
       integration_status: INTEGRATION_STATUS.ACTIVE,
       repositories: input.repositories,
+      repositories_synced_at: repositoriesSyncedAt,
       metadata,
       installed_at: new Date().toISOString(),
     });
@@ -228,5 +274,5 @@ export async function storeGitLabOAuthIntegration(
     });
   });
 
-  return { integrationId, instanceChanged: false };
+  return { integrationId, instanceChanged: false, accountChanged: false };
 }

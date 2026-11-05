@@ -9,12 +9,14 @@ import { getSavedWorktreeFileState, selectSavedWorktreeFile } from './worktree-f
 import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 export function useWorktreeFile({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
   path,
   scope,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -23,6 +25,7 @@ export function useWorktreeFile({
 }) {
   const trpcClient = useRawTRPCClient();
   const { saved } = useSavedWorktreeChanges({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,
@@ -34,7 +37,7 @@ export function useWorktreeFile({
   const selectedScope = selectedEntry?.scope ?? scope;
   const input = { cloudAgentSessionId, path, scope: selectedScope, expectedRevision };
   const file = useQuery({
-    queryKey: getWorktreeFileQueryKey({ ...input, organizationId, worktreeId }),
+    queryKey: getWorktreeFileQueryKey({ ...input, userId, organizationId, worktreeId }),
     queryFn: ({ signal }) =>
       organizationId
         ? trpcClient.organizations.cloudAgentNext.getWorktreeFile.query(
@@ -59,6 +62,7 @@ export function useWorktreeFile({
     fileError: file.isError,
   });
   const identity = JSON.stringify([
+    userId,
     organizationId ?? null,
     cloudAgentSessionId,
     path,

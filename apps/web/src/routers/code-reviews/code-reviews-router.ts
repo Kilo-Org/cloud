@@ -734,6 +734,16 @@ export const codeReviewRouter = createTRPCRouter({
         // Try to dispatch the review
         await tryDispatchPendingReviews(owner);
 
+        // Dispatch owns the retry from here: a worker that refuses the job marks
+        // the review failed again. Returning success would report a retry that
+        // never started, and the caller would show the queued state for it.
+        const retriedReview = await getCodeReviewById(input.reviewId);
+        if (retriedReview?.status === 'failed') {
+          return failureResult(
+            retriedReview.error_message ?? 'The code review retry did not start'
+          );
+        }
+
         return successResult({ message: 'Code review retriggered successfully' });
       } catch (error) {
         if (error instanceof TRPCError) {

@@ -3,7 +3,7 @@ import type { User } from '@kilocode/db/schema';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 
@@ -13,9 +13,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { name: 'primary' },
   readDb: { name: 'replica' },
@@ -49,7 +52,7 @@ function decide(decision: { allowed: boolean; eligibleProviderRoutes?: ReadonlyS
 describe('checkDirectProviderAccess', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsFreeModel.mockReturnValue(false);
     mockedGetBalance.mockResolvedValue({ balance: 10, plan: 'teams', payer, settings: undefined });
     decide({ allowed: true });
   });
@@ -69,7 +72,7 @@ describe('checkDirectProviderAccess', () => {
   });
 
   it('omits usage funding for free models', async () => {
-    mockedIsFreeModel.mockResolvedValue(true);
+    mockedIsFreeModel.mockReturnValue(true);
     await checkDirectProviderAccess(params({ organizationId: undefined }));
     expect(mockedGetBalance.mock.calls).toEqual([[undefined, user, readDb, undefined]]);
   });

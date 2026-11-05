@@ -5,7 +5,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { captureException } from '@sentry/nextjs';
-import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
+import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications/schemas';
 import {
   dispatchAgentBriefingPush,
   dispatchLowBalancePush,

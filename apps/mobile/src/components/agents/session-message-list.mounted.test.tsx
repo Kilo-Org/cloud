@@ -52,6 +52,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/agents/session-pagination-header', () => ({
   SessionPaginationHeader: () => null,
 }));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: 'SessionSkeletonMessages',
+}));
 
 const baseProps = {
   sessionId: 'session-1',
@@ -160,6 +163,120 @@ describe('SessionMessageList', () => {
   it('mounts rows well ahead of the viewport during a fast fling', () => {
     mountList();
     expect(flashListProps.current?.drawDistance).toBe(2000);
+  });
+});
+
+describe('SessionMessageList open settle', () => {
+  function skeletonCount(renderer: TestRenderer.ReactTestRenderer): number {
+    return renderer.root.findAll(node => Object.is(node.type, 'SessionSkeletonMessages')).length;
+  }
+
+  function fireContentSize(height: number): void {
+    const handler = flashListProps.current?.onContentSizeChange as
+      | ((width: number, height: number) => void)
+      | undefined;
+    act(() => {
+      handler?.(400, height);
+    });
+  }
+
+  function fireLayout(height: number): void {
+    const handler = flashListProps.current?.onLayout as
+      | ((event: { nativeEvent: { layout: { height: number } } }) => void)
+      | undefined;
+    act(() => {
+      handler?.({ nativeEvent: { layout: { height } } });
+    });
+  }
+
+  it('keeps the loading skeleton over the rows until they stop measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    // Content taller than the viewport: the list still has to settle.
+    fireLayout(655);
+    fireContentSize(790);
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals a short transcript after the quiet window, not on its first height', () => {
+    vi.useFakeTimers();
+    const renderer = mountList();
+    fireLayout(655);
+    fireContentSize(500);
+
+    // A height that fits may still be a measurement in progress.
+    expect(skeletonCount(renderer)).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('does not reveal before the list has measured anything', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+
+    // A slow first measurement must not let the quiet window run out first.
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('settles again for a session the mounted list switches to', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+    fireContentSize(790);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+
+    // The Chat tab follows a conversation that moved onto a new session: the
+    // same list now paints different rows, without a new layout (the frame did
+    // not change), so only the content size arrives.
+    rerenderList(renderer, { sessionId: 'session-2', items: ['n1', 'n2', 'n3'] });
+    expect(skeletonCount(renderer)).toBe(1);
+
+    fireContentSize(810);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
+  });
+
+  it('reveals the rows even if the content never stops measuring', () => {
+    vi.useFakeTimers();
+    const renderer = mountList({ items: ['m1', 'm2', 'm3'] });
+    fireLayout(655);
+
+    for (let elapsed = 0; elapsed < 1400; elapsed += 100) {
+      fireContentSize(800 + elapsed);
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(skeletonCount(renderer)).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(skeletonCount(renderer)).toBe(0);
   });
 });
 

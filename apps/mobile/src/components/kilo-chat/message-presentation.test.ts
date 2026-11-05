@@ -16,7 +16,6 @@ import {
   getReplyPreviewText,
   getVisibleEditableAttachmentBlocks,
   isMessageEdited,
-  isMessageTextSelectionEnabled,
   messageRendersBubble,
   resolveMessageAuthorLabel,
 } from './message-presentation';
@@ -201,12 +200,6 @@ describe('getReplyPreviewText', () => {
 describe('getDeliveryFailureLabel', () => {
   it('returns a visible failure label for failed delivery messages', () => {
     expect(getDeliveryFailureLabel(message({ deliveryFailed: true }))).toBe('Not delivered');
-  });
-});
-
-describe('isMessageTextSelectionEnabled', () => {
-  it('disables native text selection for chat messages', () => {
-    expect(isMessageTextSelectionEnabled()).toBe(false);
   });
 });
 

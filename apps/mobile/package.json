@@ -18,6 +18,7 @@
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
+    "reusables": "cli",
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
     "check:plurals": "node ../../tools/i18n/check-plurals.mjs --source-only",
@@ -145,6 +146,7 @@
   },
   "devDependencies": {
     "@expo/plist": "0.10.1",
+    "@react-native-reusables/cli": "0.7.1",
     "@sentry/cli": "catalog:",
     "@types/react": "~19.3.0",
     "@typescript/native-preview": "catalog:",

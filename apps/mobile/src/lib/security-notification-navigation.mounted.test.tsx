@@ -2,7 +2,7 @@ import { Children, createElement, isValidElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type PushData } from '@kilocode/notifications';
+import { type PushData } from '@kilocode/notifications/schemas';
 
 import SecurityAgentScopeLayout, {
   unstable_settings,
@@ -41,6 +41,7 @@ vi.mock('@/components/app-screen-layout', () => ({
 }));
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useSheetHeaderTopClearance: () => 0,
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',
     sheetAllowedDetents: [0.5, 1],

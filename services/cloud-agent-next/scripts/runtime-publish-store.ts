@@ -29,11 +29,23 @@ export function remoteArtifactStore(options: {
     region: 'auto',
   });
   const request = options.request ?? fetch;
-  const send = async (key: string, method: string, bytes?: Uint8Array, contentType?: string) => {
+  /**
+   * The handler consumes the response inside the retry loop, so a timeout or reset while a
+   * payload body is streaming is retried like a failed request. Errors thrown by the handler
+   * itself are definitive answers and are not retried.
+   */
+  const send = async <T>(
+    key: string,
+    method: string,
+    handle: (response: Response) => Promise<T>,
+    bytes?: Uint8Array,
+    contentType?: string
+  ): Promise<T> => {
     if (!/^runtime-artifacts\/v1\/[a-z0-9/._-]+$/.test(key) || key.includes('..')) {
       throw new Error('invalid runtime artifact key');
     }
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const timeoutMs = isPayloadKey(key) ? 5 * 60_000 : 60_000;
+    for (let attempt = 1; ; attempt += 1) {
       try {
         const signed = await signer.sign(
           `https://${options.accountId}.r2.cloudflarestorage.com/${options.bucket}/${key}`,
@@ -50,77 +62,103 @@ export function remoteArtifactStore(options: {
               : {}),
           }
         );
-        const response = await request(signed, { signal: AbortSignal.timeout(60_000) });
-        if (response.status === 429 || response.status >= 500) {
-          await response.body?.cancel();
-          if (attempt < 2) continue;
-        }
-        return response;
-      } catch {
-        if (attempt === 2) throw new Error(`runtime store ${method} request failed`);
+        const response = await request(signed, { signal: AbortSignal.timeout(timeoutMs) });
+        if ((response.status !== 429 && response.status < 500) || attempt >= STORE_ATTEMPTS)
+          return await handle(response);
+        await response.body?.cancel();
+      } catch (error) {
+        if (!isTransportError(error)) throw error;
+        if (attempt >= STORE_ATTEMPTS)
+          throw new Error(`runtime store ${method} ${key} failed after ${attempt} attempts`, {
+            cause: error,
+          });
       }
+      await new Promise(resolve => setTimeout(resolve, attempt * 1_000));
     }
-    throw new Error(`runtime store ${method} retry limit reached`);
   };
   return {
     async putIfAbsent(key, bytes, contentType) {
-      const existing = await send(key, 'HEAD');
-      if (existing.ok) return false;
-      if (existing.status !== 404)
-        throw new Error(`runtime store HEAD failed (${existing.status})`);
-      const response = await send(key, 'PUT', bytes, contentType);
-      await response.body?.cancel();
-      if (response.status === 412) return false;
-      if (!response.ok) throw new Error(`runtime store PUT failed (${response.status})`);
+      const existing = await send(key, 'HEAD', async response => {
+        await response.body?.cancel();
+        return response.status;
+      });
+      if (existing >= 200 && existing < 300) return false;
+      if (existing !== 404) throw new Error(`runtime store HEAD failed (${existing})`);
+      const status = await send(
+        key,
+        'PUT',
+        async response => {
+          await response.body?.cancel();
+          return response.status;
+        },
+        bytes,
+        contentType
+      );
+      if (status === 412) return false;
+      if (status < 200 || status >= 300) throw new Error(`runtime store PUT failed (${status})`);
       return true;
     },
-    async getBytes(key) {
-      const response = await send(key, 'GET');
-      if (response.status === 404) {
-        if (response.body) {
-          const result = await readBoundedStream(response.body as ReadableStream<Uint8Array>, 4096);
-          if (!result.ok) throw new Error('Runtime store error response exceeds its byte cap');
-          const body = new TextDecoder().decode(result.bytes);
-          if (/<Code>\s*NoSuchBucket\s*<\/Code>/.test(body))
-            throw new Error('Runtime publication bucket does not exist');
+    getBytes(key) {
+      return send(key, 'GET', async response => {
+        if (response.status === 404) {
+          if (response.body) {
+            const result = await readBoundedStream(
+              response.body as ReadableStream<Uint8Array>,
+              4096
+            );
+            if (!result.ok) throw new Error('Runtime store error response exceeds its byte cap');
+            const body = new TextDecoder().decode(result.bytes);
+            if (/<Code>\s*NoSuchBucket\s*<\/Code>/.test(body))
+              throw new Error('Runtime publication bucket does not exist');
+          }
+          return null;
         }
-        return null;
-      }
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new Error(`runtime store GET failed (${response.status})`);
-      }
-      if (!response.body) throw new Error('runtime store returned no object body');
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      const cap = key.includes('/objects/')
-        ? RUNTIME_HARD_MAX_TRANSFER_BYTES
-        : RUNTIME_DESCRIPTOR_MAX_BYTES;
-      try {
-        for (;;) {
-          const result = await reader.read();
-          if (result.done) break;
-          const chunk: unknown = result.value;
-          if (!(chunk instanceof Uint8Array))
-            throw new Error('runtime store returned a non-binary chunk');
-          size += chunk.byteLength;
-          if (size > cap) throw new Error('runtime store object exceeds its byte cap');
-          chunks.push(chunk);
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new Error(`runtime store GET failed (${response.status})`);
         }
-      } finally {
-        await reader.cancel();
-      }
-      const bytes = new Uint8Array(size);
-      let offset = 0;
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-      return bytes;
+        if (!response.body) throw new Error('runtime store returned no object body');
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        const cap = isPayloadKey(key)
+          ? RUNTIME_HARD_MAX_TRANSFER_BYTES
+          : RUNTIME_DESCRIPTOR_MAX_BYTES;
+        try {
+          for (;;) {
+            const result = await reader.read();
+            if (result.done) break;
+            const chunk: unknown = result.value;
+            if (!(chunk instanceof Uint8Array))
+              throw new Error('runtime store returned a non-binary chunk');
+            size += chunk.byteLength;
+            if (size > cap) throw new Error('runtime store object exceeds its byte cap');
+            chunks.push(chunk);
+          }
+        } finally {
+          await reader.cancel().catch(() => undefined);
+        }
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        return bytes;
+      });
     },
   };
 }
+
+const STORE_ATTEMPTS = 3;
+
+/** Payload objects and cached source tarballs are large; descriptors and handoffs are small. */
+const isPayloadKey = (key: string) => key.includes('/objects/') || key.includes('/sources/');
+
+/** Network failures, resets and timeouts, including those raised while reading a body. */
+const isTransportError = (error: unknown) =>
+  error instanceof TypeError ||
+  (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError'));
 
 /** Use the same private bucket API and persistence as local Wrangler development. */
 export async function localR2ArtifactStore(packageRoot: string) {

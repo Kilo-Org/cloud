@@ -11,8 +11,9 @@ import { createRequire } from 'node:module';
 import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
+import type { SetPageTitle } from '@/components/SetPageTitle';
 import type { WorktreeChangesView } from './WorktreeChanges';
-import type { ConversationMessages } from './ConversationMessages';
+import type { ConversationMessages } from './assistant-ui/test-renderers';
 import type { StoredMessage, StoredSession } from './types';
 import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
 import type { useWorktreeReview } from './useWorktreeReview';
@@ -43,6 +44,15 @@ let mockReviewDialog: ComponentProps<typeof WorktreeReviewDialog>;
 let mockChanges: ComponentProps<typeof WorktreeChangesView>;
 let mockConversation: ComponentProps<typeof ConversationMessages>;
 let mockAtomValues: Record<string, unknown>;
+let mockPageTitle: ComponentProps<typeof SetPageTitle>;
+let mockParentSession:
+  | { session_id: string; title: string | null; organization_id: string | null }
+  | undefined;
+const mockSkipToken = Symbol('skip');
+const mockParentQuery = jest.fn();
+const mockParentQueryOptions = jest.fn((input: unknown) => ({
+  queryKey: [['worktreeParent'], input],
+}));
 const mockClosedPtys: string[] = [];
 const mockChats = [
   {
@@ -72,7 +82,10 @@ const mockGetWithRuntimeState = { queryOptions: (input: unknown) => input };
 const mockTrpc = {
   cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
   organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
-  cliSessionsV2: { getWithRuntimeState: mockGetWithRuntimeState },
+  cliSessionsV2: {
+    getWithRuntimeState: mockGetWithRuntimeState,
+    worktreeParent: { queryOptions: mockParentQueryOptions },
+  },
 };
 
 jest.mock('jotai', () => ({
@@ -86,11 +99,27 @@ jest.mock('next/navigation', () => ({
       ...(mockAtParam ? { at: mockAtParam } : {}),
     }),
 }));
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: ComponentProps<'a'>) => createElement('a', props, children),
+}));
 jest.mock('@tanstack/react-query', () => ({
+  skipToken: mockSkipToken,
+  queryOptions: (options: unknown) => options,
   useMutation: () => ({ mutateAsync: jest.fn() }),
+  useQuery: (options: { queryKey: unknown[] }) => {
+    mockParentQuery(options);
+    return { data: options.queryKey[1] === mockSkipToken ? undefined : mockParentSession };
+  },
   useQueryClient: () => mockQueryClient,
 }));
-jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => mockTrpc,
+  useRawTRPCClient: () => ({ cliSessionsV2: { worktreeParent: { query: jest.fn() } } }),
+}));
+jest.mock('./useSavedWorktreeChanges', () => ({
+  useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
+}));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
@@ -225,24 +254,46 @@ jest.mock('./WorktreeFilePane', () => ({
       'data-file-scope': scope,
     }),
 }));
-jest.mock('./ChatInput', () => ({
-  ChatInput: (props: Record<string, unknown>) => {
+jest.mock('./assistant-ui/CloudComposer', () => ({
+  CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
     return createElement('input', { 'data-composer': true });
   },
 }));
-jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: (props: ComponentProps<typeof ConversationMessages>) => {
-    mockConversation = props;
-    return createElement('section', { 'data-conversation': true });
+jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
+  CloudChatRuntimeProvider: ({
+    projection,
+    children,
+  }: {
+    projection: {
+      messages: StoredMessage[];
+      commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
+    };
+    children: ReactNode;
+  }) => {
+    mockConversation = {
+      ...projection,
+      staticMessages: projection.messages,
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+    };
+    return children;
   },
 }));
+jest.mock('./assistant-ui/CloudThread', () => ({
+  CloudThread: () => createElement('section', { 'data-conversation': true }),
+}));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
-jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
 jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
 jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
-jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
+jest.mock('@/components/SetPageTitle', () => ({
+  SetPageTitle: (props: ComponentProps<typeof SetPageTitle>) => {
+    mockPageTitle = props;
+    return props.subtitle ?? null;
+  },
+}));
 jest.mock('./QuestionContext', () => ({
   QuestionContextProvider: ({ children }: { children: ReactNode }) => children,
 }));
@@ -432,6 +483,9 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockWorktreeId = 'worktree_shared';
     mockClosedPtys.length = 0;
     mockQueryClient.query.mockReset();
+    mockParentSession = undefined;
+    mockParentQuery.mockClear();
+    mockParentQueryOptions.mockClear();
     mockAtomValues = {
       sessionId: 'workspace_recent',
       fetchedSessionData: {
@@ -458,9 +512,83 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     dom.cleanup();
   });
 
-  function render(props: ComponentProps<typeof CloudChatPageComponent> = {}) {
-    act(() => root.render(createElement(CloudChatPage, { currentUserId: 'owner', ...props })));
+  function render(props: Partial<ComponentProps<typeof CloudChatPageComponent>> = {}) {
+    const { currentUserId = 'owner', ...rest } = props;
+    act(() => root.render(createElement(CloudChatPage, { ...rest, currentUserId })));
   }
+
+  it('preserves parent navigation across sibling, terminal, and worktree-only views', () => {
+    mockParentSession = {
+      session_id: 'ses_parent',
+      title: 'Investigate login failures',
+      organization_id: null,
+    };
+    render();
+    const queryKey = mockParentQuery.mock.lastCall?.[0].queryKey;
+    const parentLink = () =>
+      dom.container.querySelector<HTMLAnchorElement>('[aria-label^="View parent session:"]');
+    expect(parentLink()?.getAttribute('href')).toBe('/cloud/chat?sessionId=ses_parent');
+
+    mockSessionId = 'ses_historical';
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual(queryKey);
+    expect(parentLink()?.textContent).toContain('Investigate login failures');
+
+    resolveSession('worktree_shared');
+    openTerminal();
+    expect(parentLink()?.getAttribute('href')).toBe('/cloud/chat?sessionId=ses_parent');
+
+    mockSessionId = null;
+    render();
+    expect(mockPageTitle.title).toBe('Worktree');
+    expect(parentLink()).not.toBeNull();
+  });
+
+  it('partitions parent lookup by worktree, organization, and user without stale placeholders', () => {
+    mockParentSession = { session_id: 'ses_parent', title: 'Parent', organization_id: null };
+    render();
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual([
+      ['worktreeParent', 'owner'],
+      { worktreeId: 'worktree_shared', organizationId: null },
+    ]);
+
+    mockWorktreeId = 'worktree_other';
+    mockParentSession = undefined;
+    render({ currentUserId: 'other-owner', organizationId: 'other-org' });
+    expect(mockParentQuery.mock.lastCall?.[0].queryKey).toEqual([
+      ['worktreeParent', 'other-owner'],
+      { worktreeId: 'worktree_other', organizationId: 'other-org' },
+    ]);
+    expect(mockParentQuery.mock.lastCall?.[0]).not.toHaveProperty('placeholderData');
+    expect(dom.container.querySelector('[aria-label^="View parent session:"]')).toBeNull();
+  });
+
+  it('skips parent lookups outside a worktree', () => {
+    mockWorktreeId = null;
+    render();
+    expect(mockParentQueryOptions).toHaveBeenLastCalledWith(mockSkipToken);
+    expect(mockParentQuery.mock.lastCall?.[0].staleTime).toBe(60_000);
+    expect(mockPageTitle.subtitle).toBeNull();
+  });
+
+  it('keeps the composer and its owner mounted through read-only conversation switches', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    mockSessionId = 'ses_history';
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.closest('[hidden]')).not.toBeNull();
+    mockSessionId = 'ses_writable_b';
+    mockAtomValues.isReadOnly = false;
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    mockSessionId = 'ses_recent';
+    render();
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+  });
 
   function openTerminal() {
     act(() => mockTabs.onCreateTerminal());

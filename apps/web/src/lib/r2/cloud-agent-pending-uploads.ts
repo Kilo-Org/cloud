@@ -25,8 +25,10 @@ export type AdmitPendingUploadParams = {
 };
 
 /**
- * Admit a presigned upload into the pending-upload ledger and return the
- * admitted object key. Runs in one transaction: take the per-user advisory
+ * Admit an upload into the pending-upload ledger and return the admitted
+ * object key. The presigned composer path admits before signing, and the Kilo
+ * Bot path admits before its own write, so both share one per-account ceiling
+ * and one reaper. Runs in one transaction: take the per-user advisory
  * lock, count live pending rows per message and per account, reject at either
  * bound, reject oversized uploads, then admit a pending row with a 24-hour
  * lease.

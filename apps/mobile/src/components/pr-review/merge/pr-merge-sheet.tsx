@@ -23,7 +23,10 @@ import {
   defaultMergeMethodOptionFor,
   mergeMethodOptionsFor,
 } from '@/components/pr-review/merge/pr-merge-icons';
-import { MergeSheetFormBody } from '@/components/pr-review/merge/pr-merge-sheet-parts';
+import {
+  MergeSheetFormBody,
+  MergeSheetFormSkeleton,
+} from '@/components/pr-review/merge/pr-merge-sheet-parts';
 import { PrMergeProviderBody } from '@/components/pr-review/merge/pr-merge-provider-body';
 import { usePrMergeDraft } from '@/components/pr-review/merge/use-pr-merge-draft';
 import { usePrMergeSubmit } from '@/components/pr-review/merge/use-pr-merge-submit';
@@ -197,7 +200,13 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
               onDismiss={handleCancel}
             />
           </PrMergeProviderBody>
-        ) : null}
+        ) : (
+          <MergeSheetFormSkeleton
+            methodOptions={methodOptions}
+            showTitle={prRef?.platform !== 'bitbucket'}
+            showDeleteBranchToggle={showDeleteBranchToggle}
+          />
+        )}
       </ScrollView>
       {dialog}
     </>

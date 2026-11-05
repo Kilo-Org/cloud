@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
-import type { GatewayRequest } from './providers/openrouter/types';
+import type { GatewayRequest, VercelProviderConfig } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -20,12 +21,17 @@ jest.mock('next/server', () => ({
 const mockedLogMicrodollarUsage = jest.fn(
   async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
 );
+const mockedProcessTokenData = jest.fn(
+  async (_stats: MicrodollarUsageStats | null, _ctx: MicrodollarUsageContext) => {}
+);
 jest.mock('./processUsage', () => ({
   ...(jest.requireActual('./processUsage') as Record<string, unknown>),
   logMicrodollarUsageAndReportToBouncer: (
     stats: MicrodollarUsageStats,
     ctx: MicrodollarUsageContext
   ) => mockedLogMicrodollarUsage(stats, ctx),
+  processTokenData: (stats: MicrodollarUsageStats | null, ctx: MicrodollarUsageContext) =>
+    mockedProcessTokenData(stats, ctx),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -41,18 +47,16 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-import {
   captureProxyError,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
+  countAndStoreTranscriptionUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
+  extractInferenceRegion,
   getOrganizationProviderPrivacy,
   getOutputHeaders,
   lastUserPromptText,
@@ -68,8 +72,6 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
-
-useKiloExclusiveModel();
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -99,6 +101,23 @@ describe('getOutputHeaders', () => {
       expect(headers.get('cache-control')).toBe('no-cache, no-transform');
     }
   );
+});
+
+describe('extractInferenceRegion', () => {
+  const body = (gateway?: VercelProviderConfig['gateway']) =>
+    ({ model: 'anthropic/claude-haiku-4.5', messages: [], providerOptions: { gateway } }) as never;
+
+  it('returns the pinned zone', () => {
+    expect(
+      extractInferenceRegion(body({ inferenceRegion: { scope: 'zone', geoRegion: 'eu' } }))
+    ).toBe('eu');
+  });
+
+  it('returns null for global or unset regions', () => {
+    expect(extractInferenceRegion(body({ inferenceRegion: { scope: 'global' } }))).toBeNull();
+    expect(extractInferenceRegion(body({}))).toBeNull();
+    expect(extractInferenceRegion({ model: 'x', messages: [] } as never)).toBeNull();
+  });
 });
 
 describe('extractReasoningSetting', () => {
@@ -555,6 +574,7 @@ describe('countAndStoreFimUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -622,20 +642,94 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(325);
   });
 
-  it('reports a JSON response it cannot parse instead of rejecting', async () => {
+  it('reports a malformed successful response instead of rejecting', async () => {
     jest.mocked(captureException).mockClear();
-    const response = new Response(JSON.stringify({ error: { message: 'rate limited' } }), {
-      status: 429,
-    });
+    const response = new Response('not JSON');
 
-    countAndStoreFimUsage(response, makeUsageContext({ status_code: 429 }), undefined);
+    countAndStoreFimUsage(response, makeUsageContext(), undefined);
     await waitForUsageWrite();
 
-    expect(captureException).toHaveBeenCalledWith(expect.any(TypeError), {
+    expect(captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
       tags: { source: 'fim_usage_processing' },
-      extra: { statusCode: 429 },
+      extra: { statusCode: 200 },
     });
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { error: { code: 429, message: 'rate limited' }, userByok: false, captured: false },
+    { error: { code: 503, message: 'overloaded' }, userByok: false, captured: false },
+    { error: { type: 'server_error', message: 'failed' }, userByok: false, captured: false },
+    { error: { code: 401, message: 'invalid key' }, userByok: false, captured: true },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: false, captured: true },
+    { error: { code: 401, message: 'invalid key' }, userByok: true, captured: false },
+    { error: { type: 'billing_error', message: 'no credit' }, userByok: true, captured: false },
+  ])('filters upstream FIM stream errors: %j', async ({ error, userByok, captured }) => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      countAndStoreFimUsage(
+        new Response(`data: ${JSON.stringify({ error })}\n\ndata: [DONE]\n\n`),
+        makeUsageContext({ isStreaming: true, user_byok: userByok }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      expect(captureException).toHaveBeenCalledTimes(captured ? 1 : 0);
+      expect(warn).toHaveBeenCalledTimes(captured ? 0 : 1);
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: error.code ?? 200 }),
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('preserves partial usage when an upstream FIM stream fails', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        'data: {"id":"fim-partial","model":"mercury-edit-2","choices":[{"text":"partial"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n' +
+          'data: {"error":{"code":503,"message":"overloaded"}}\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        messageId: 'fim-partial',
+        responseContent: 'partial',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cost_mUsd: 325,
+        status_code: 503,
+      }),
+      expect.anything()
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a successful FIM stream without usage', async () => {
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response('data: {"model":"mercury-edit-2","choices":[]}\n\n'),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No usage info in FIM stream',
+      expect.anything()
+    );
   });
 
   describe('response timing', () => {
@@ -734,6 +828,96 @@ describe('countAndStoreFimUsage', () => {
   });
 });
 
+describe.each<{
+  apiKind: MicrodollarUsageContext['api_kind'];
+  countUsage: typeof countAndStoreFimUsage;
+}>([
+  { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
+  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
+  { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
+  { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
+])('$apiKind upstream error accounting', ({ apiKind, countUsage }) => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it.each([400, 401, 402, 403, 429, 502])(
+    'does not re-report HTTP %i error bodies',
+    async status => {
+      const context = {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        provider: 'inception',
+        status_code: status,
+      } satisfies MicrodollarUsageContext;
+
+      for (const body of [
+        JSON.stringify({ error: { message: 'rejected' } }),
+        '',
+        '<html>error</html>',
+      ]) {
+        countUsage(new Response(body, { status }), context, undefined);
+        await waitForUsageWrite();
+      }
+
+      const storeUsage =
+        apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+      expect(storeUsage).toHaveBeenCalledTimes(3);
+      expect(storeUsage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: status }),
+        context
+      );
+      expect(captureException).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['missing', 'unreadable'])('does not re-report a %s HTTP error body', async kind => {
+    const body =
+      kind === 'missing'
+        ? null
+        : new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error(new Error('upstream disconnected'));
+            },
+          });
+    countUsage(
+      new Response(body, { status: 429 }),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 429,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('still reports a malformed successful response', async () => {
+    countUsage(
+      new Response('not JSON'),
+      {
+        ...createMockUsageContext('user-id', 'user@example.com', 0),
+        api_kind: apiKind,
+        status_code: 200,
+      },
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('SUSPICIOUS:'),
+      expect.anything()
+    );
+  });
+});
+
 describe('countAndStoreEditUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -767,6 +951,7 @@ describe('countAndStoreEditUsage', () => {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -1150,6 +1335,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
 describe('captureProxyError', () => {
   beforeEach(() => {
     mockedErrorExceptInTest.mockClear();
+    jest.mocked(captureMessage).mockClear();
+    jest.mocked(captureException).mockClear();
   });
 
   async function capturedErrorData() {
@@ -1163,6 +1350,40 @@ describe('captureProxyError', () => {
     expect(mockedErrorExceptInTest).toHaveBeenCalledTimes(1);
     return mockedErrorExceptInTest.mock.calls[0][1] as Record<string, unknown>;
   }
+
+  it.each(
+    [500, 502, 503, 504].flatMap(status =>
+      [false, true].map(isUserByok => ({ status, isUserByok }))
+    )
+  )(
+    'keeps upstream $status diagnostics in logs without Sentry events with BYOK=$isUserByok',
+    async ({ status, isUserByok }) => {
+      const response = Response.json({ error: 'upstream unavailable' }, { status });
+      const replacement = await applyUpstreamErrorPolicy({
+        response,
+        providerId: 'openrouter',
+        isUserByok,
+        user: { id: 'user-1' },
+        request: { model: 'vendor/model' },
+        organizationId: undefined,
+        model: 'vendor/model',
+      });
+
+      expect(await capturedErrorData()).toMatchObject({
+        status,
+        model: 'vendor/model',
+        first4kOfResponse: '{"error":"upstream unavailable"}',
+      });
+      expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
+        `openrouter returned error ${status}`,
+        expect.anything()
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+      expect(replacement).toBeUndefined();
+      expect(await response.json()).toEqual({ error: 'upstream unavailable' });
+    }
+  );
 
   it('logs the gateway model, BYOK providers, and request field names', async () => {
     await captureProxyError({
@@ -1230,7 +1451,7 @@ describe('makeErrorReadable', () => {
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
-      providerId: 'openrouter',
+      provider: 'openrouter',
       requestedModel: 'anything',
       request,
       response,
@@ -1252,7 +1473,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-4.5',
       request,
       response,
@@ -1276,7 +1497,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-4.5',
       request,
       response,
@@ -1293,7 +1514,7 @@ describe('makeErrorReadable', () => {
     const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response,
@@ -1314,7 +1535,7 @@ describe('makeErrorReadable', () => {
     const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response,
@@ -1331,7 +1552,7 @@ describe('makeErrorReadable', () => {
 
   it.each([
     {
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       userByokProviderIds: ['opencode-go'],
       body: {
         error: { type: 'server_error', message: 'A synthetic region setting blocks this model.' },
@@ -1339,7 +1560,7 @@ describe('makeErrorReadable', () => {
       expectedMessage: 'A synthetic region setting blocks this model.',
     },
     {
-      providerId: 'vercel',
+      provider: 'vercel',
       userByokProviderIds: ['anthropic'],
       body: {
         error: {
@@ -1351,36 +1572,33 @@ describe('makeErrorReadable', () => {
       expectedMessage: 'Synthetic provider account configuration needs attention.',
     },
     {
-      providerId: 'vercel',
+      provider: 'vercel',
       userByokProviderIds: [],
       body: { message: 'Synthetic request option is unsupported.' },
       expectedMessage: 'Synthetic request option is unsupported.',
     },
-  ] as const)(
-    'marks a $providerId BYOK 400 without forwarding upstream metadata',
-    async fixture => {
-      const result = await makeErrorReadable({
-        providerId: fixture.providerId,
-        requestedModel: 'synthetic-model',
-        request,
-        response: Response.json(fixture.body, { status: 400 }),
-        userByokProviderIds: [...fixture.userByokProviderIds],
-      });
+  ] as const)('marks a $provider BYOK 400 without forwarding upstream metadata', async fixture => {
+    const result = await makeErrorReadable({
+      provider: fixture.provider,
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(fixture.body, { status: 400 }),
+      userByokProviderIds: [...fixture.userByokProviderIds],
+    });
 
-      expect(result?.status).toBe(400);
-      await expect(result?.json()).resolves.toEqual({
-        error: `[BYOK] ${fixture.expectedMessage}`,
-        error_type: 'byok_error',
-        message: `[BYOK] ${fixture.expectedMessage}`,
-      });
-    }
-  );
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      error: `[BYOK] ${fixture.expectedMessage}`,
+      error_type: 'byok_error',
+      message: `[BYOK] ${fixture.expectedMessage}`,
+    });
+  });
 
   it.each([400, 404, 405, 408, 409, 422, 499])(
     'preserves the upstream status for a generic BYOK %i',
     async status => {
       const result = await makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         response: Response.json({}, { status }),
@@ -1403,7 +1621,7 @@ describe('makeErrorReadable', () => {
       error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
     };
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(body, { status: 400 }),
@@ -1428,7 +1646,7 @@ describe('makeErrorReadable', () => {
     'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
     async (status, providerIds) => {
       const options = {
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         userByokProviderIds: [...providerIds],
@@ -1457,7 +1675,7 @@ describe('makeErrorReadable', () => {
 
   it('appends the provider explanation to a specific BYOK 401 message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/glm-5.3-flash',
       request,
       response: Response.json(
@@ -1486,7 +1704,7 @@ describe('makeErrorReadable', () => {
 
   it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/mimo-v2.5',
       request,
       response: Response.json(
@@ -1507,7 +1725,7 @@ describe('makeErrorReadable', () => {
 
   it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(
@@ -1531,7 +1749,7 @@ describe('makeErrorReadable', () => {
       for (const userByokProviderIds of status === 400 ? [null] : [null, ['anthropic'] as const]) {
         await expect(
           makeErrorReadable({
-            providerId: 'vercel',
+            provider: 'vercel',
             requestedModel: 'synthetic-model',
             request,
             response: Response.json(
@@ -1547,7 +1765,7 @@ describe('makeErrorReadable', () => {
 
   it('removes control characters and bounds generic BYOK provider text', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'synthetic-model',
       request,
       response: Response.json(
@@ -1569,7 +1787,7 @@ describe('makeErrorReadable', () => {
     'falls back to fixed BYOK text for an unusable provider body: %s',
     async body => {
       const result = await makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'synthetic-model',
         request,
         response: new Response(body, { status: 400 }),
@@ -1593,7 +1811,7 @@ describe('makeErrorReadable', () => {
     [429, ['anthropic']],
   ] as const)('treats a non-null provider set as user BYOK for status %i', async (status, ids) => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response: Response.json({}, { status }),
@@ -1607,7 +1825,7 @@ describe('makeErrorReadable', () => {
 
   it('names the model in a generic BYOK permission error', async () => {
     const result = await makeErrorReadable({
-      providerId: 'vercel',
+      provider: 'vercel',
       requestedModel: 'anthropic/claude-sonnet-5',
       request,
       response: Response.json({}, { status: 403 }),
@@ -1625,7 +1843,7 @@ describe('makeErrorReadable', () => {
 
   it('mentions OpenCode Go opt-in requirements on a BYOK permission error', async () => {
     const result = await makeErrorReadable({
-      providerId: 'direct-byok',
+      provider: 'direct-byok',
       requestedModel: 'opencode-go/mimo-v2.5',
       request,
       response: Response.json({ model: 'mimo-v2.5' }, { status: 403 }),
@@ -1644,7 +1862,7 @@ describe('makeErrorReadable', () => {
   it('does not use generic BYOK errors for a null provider set', async () => {
     await expect(
       makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'anthropic/claude-sonnet-5',
         request,
         response: Response.json({}, { status: 401 }),
@@ -1669,7 +1887,7 @@ describe('makeErrorReadable', () => {
       );
 
       const result = await makeErrorReadable({
-        providerId: 'openrouter',
+        provider: 'openrouter',
         requestedModel: 'qwen/qwen3.7-plus',
         request,
         response,
@@ -1702,7 +1920,7 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'openrouter',
+      provider: 'openrouter',
       requestedModel: 'qwen/qwen3.7-plus',
       request,
       response,
@@ -1730,7 +1948,7 @@ describe('makeErrorReadable', () => {
 
     await expect(
       makeErrorReadable({
-        providerId: 'vercel',
+        provider: 'vercel',
         requestedModel: 'anything',
         request,
         response,
@@ -1756,7 +1974,7 @@ describe('makeErrorReadable', () => {
     for (const response of responses) {
       await expect(
         makeErrorReadable({
-          providerId: 'openrouter',
+          provider: 'openrouter',
           requestedModel: 'anything',
           request,
           response,
@@ -1773,25 +1991,8 @@ describe('makeErrorReadable', () => {
     );
 
     const result = await makeErrorReadable({
-      providerId: 'custom',
+      provider: 'custom',
       requestedModel: 'kilo-internal/custom-endpoint',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
-
-    expect(result).toBeUndefined();
-  });
-
-  it('does not redact errors for Kilo-exclusive models', async () => {
-    const response = Response.json(
-      { error: { message: 'Upstream vendor error' } },
-      { status: 502 }
-    );
-
-    const result = await makeErrorReadable({
-      providerId: 'openrouter',
-      requestedModel: kiloExclusiveModelFixture.public_id,
       request,
       response,
       userByokProviderIds: null,

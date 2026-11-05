@@ -9,24 +9,20 @@ may reduce peak pressure while taking longer to finish the same work.
 
 ## Select each path
 
-With the gateway queue-selection change installed, configure the intended staging
-gateway deployment as follows. Keep the Worker in processing mode with the same
-writer endpoint and queue policy for both runs.
+Staging selects queued accounting under the environment guards below and has no
+direct-accounting selector. This recipe does not provide a direct baseline;
+establish a separately agreed test setup before comparing direct and queued runs.
 
-For both Cloudflare/direct runs, keep `USAGE_QUEUE_TRANSPORT` unset or set to
-`cloudflare`. Setting `USAGE_QUEUE_ONLY_ENABLED=false` alone does not disable the
-[staging Vercel queue prototype](../../packages/usage-queue/README.md).
+For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
+than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
+exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
+Production retains the SFO exposure and allowlist controls and
+[rollout gates](eu-queues.md#production-merge-gate); production Frankfurt is
+queue-selected without an exposure control. No production change is part of this
+recipe. Keep the Worker processing mode, writer endpoint and queue
+policy fixed.
 
-| Gateway setting | Direct baseline | Queued run |
-|---|---|---|
-| `USAGE_QUEUE_ONLY_ENABLED` | `false` | `true` |
-
-Apply server environment settings through the gateway deployment. Queue-only is
-enabled by the existing staging controls for this recipe; production SFO selection
-uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
-`USAGE_QUEUE_SFO_USER_IDS` controls and [rollout gates](eu-queues.md#production-merge-gate),
-and is not activated here. Disabling queue-only
-keeps new events on direct accounting. Background shadow publication has been
+Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before
 switching a consumer to processing. After attempting publication, queue-only never falls back to a gateway billing
 writer. Missing publisher configuration and failed lifetime registration retain
@@ -109,7 +105,7 @@ Consumer `usage_ingest_processing` events additionally expose:
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
   to settle. Production uses batch size 6, two writer slots
-  and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
+  and invocation cap 225 (up to 450 concurrent writer calls). Its deployment and activation are subject to the
   [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
   does not activate it. An ACK follows a matching recorded/duplicate writer response only.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.
@@ -120,10 +116,10 @@ Record the deployed batch size, processing parallelism, invocation cap and mode
 with each run. Staging cap 200 with parallelism 2 allows at most 400 concurrent
 writer calls; parallelism 1 allows at most 200 and does not restore a batch-1
 baseline. Changing these Worker variables/config settings requires redeployment.
-Timeout 0 does not guarantee two-message batches. With main's diagnostics enabled
-(`USAGE_INGEST_DIAGNOSTICS=all` in staging), the shared handler-entry timestamp
-measures invocation entry, while `queue_wait_ms` still measures age at each
-message's own processing start; keep those boundaries separate.
+Timeout 0 does not guarantee two-message batches. Diagnostics are always on, so
+the shared handler-entry timestamp measures invocation entry, while
+`queue_wait_ms` still measures age at each message's own processing start; keep
+those boundaries separate.
 
 Use the queue's backlog and DLQ monitoring to observe growth, exhaustion and drain
 time. A quiet database alongside an increasing backlog is not equivalent throughput.

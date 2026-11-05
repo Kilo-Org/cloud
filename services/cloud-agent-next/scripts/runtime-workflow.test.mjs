@@ -50,8 +50,15 @@ test('write credentials follow admission and checkout uses its exact SHA', async
   assert.equal(catalog.if, "github.event_name == 'workflow_run'");
   assert.equal(catalog.env.SOURCE_SHA, '${{ steps.admit.outputs.source_sha }}');
   assert.equal(catalog.run, 'node services/cloud-agent-next/scripts/runtime-publication-need.mjs');
+  assert.equal(
+    workflow['run-name'],
+    'Publish Cloud Agent runtime ${{ github.event.workflow_run.head_sha || inputs.source_sha }}'
+  );
   const steps = workflow.jobs.publish.steps;
   assert.equal(steps[0].with.ref, '${{ needs.admit.outputs.source_sha }}');
+  const install = steps.find(step => step.run?.startsWith('pnpm install'));
+  assert.match(install.run, /--filter 'cloud-agent-next\.\.\.'/);
+  assert.match(install.run, /--filter '@kilocode\/cloud-agent-wrapper\.\.\.'/);
   const publish = steps.find(
     step => step.name === 'Publish verified runtime and exact-SHA handoff'
   );
@@ -72,6 +79,7 @@ test('both Worker deployment paths verify runtime before custom build and Wrangl
     assert.ok(prepare >= 0 && prepare < deploy);
     assert.match(steps[prepare].if, /== 'services\/cloud-agent-next'/);
     assert.equal(steps[prepare].env.SOURCE_SHA, '${{ inputs.source_sha || github.sha }}');
+    assert.equal(steps[prepare].env.GITHUB_TOKEN, '${{ github.token }}');
     assert.match(steps[deploy].with.command, /steps.runtime.outputs.command/);
     assert.match(steps[deploy].with.preCommands, /predeploy/);
     assert.equal(

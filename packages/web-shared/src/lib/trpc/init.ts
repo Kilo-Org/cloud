@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import {
+  cloudAgentAuthorityProcedureKind,
+  cloudAgentAuthorityProcedures,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -122,19 +124,6 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-/**
- * Marker class used to attach an upstream API error code to a TRPCError so the
- * error-formatter can surface it to the client in `err.data.upstreamCode`.
- *
- * Usage:
- *   throw new TRPCError({
- *     code: 'CONFLICT',
- *     message: 'Config was modified',
- *     cause: new UpstreamApiError('etag_mismatch'),
- *   });
- *
- * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
- */
 const t = initTRPC.context<TRPCContext>().create({
   errorFormatter: trpcErrorFormatter,
 });
@@ -232,8 +221,14 @@ const cloudAgentAuthorityMiddleware = t.middleware(
   async ({ ctx, path, type, getRawInput, next }) => {
     if (ctx.cloudAgentAuthority === undefined) return next();
     try {
-      if (type !== 'mutation' || ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
+      if (ctx.cloudAgentAuthority.ownerId !== ctx.user.id) {
         throw new Error('Invalid scoped caller');
+      }
+      if (!cloudAgentAuthorityProcedures(ctx.cloudAgentAuthority).includes(path)) {
+        throw new Error('Cloud Agent authority does not permit this procedure');
+      }
+      if (cloudAgentAuthorityProcedureKind(path) !== type) {
+        throw new Error('Cloud Agent authority procedure kind mismatch');
       }
       validateCloudAgentAuthorityRequest(ctx.cloudAgentAuthority, path, await getRawInput());
     } catch {

@@ -11,6 +11,7 @@ jobs:
     # canonical repo needs this automation.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
     permissions:
       issues: write
       pull-requests: write

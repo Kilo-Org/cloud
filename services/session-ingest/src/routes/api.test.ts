@@ -3838,6 +3838,56 @@ describe('api routes', () => {
       );
     });
 
+    it('non-generated placeholder does not clobber a real title', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: 'Generated Title' })]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.update).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('non-generated placeholder cannot win against a concurrently committed real title', async () => {
+      // The select still sees the placeholder, but a real title commits before
+      // this UPDATE; the write predicate must refuse rather than clobber it.
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: defaultTitle })]);
+      fns.updateResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.updateWhere).toHaveBeenCalled();
+      const whereArg = fns.updateWhere.mock.calls[0]?.[0] as SQL | undefined;
+      expect(whereArg).toBeInstanceOf(SQL);
+      const compiled = new PgDialect().sqlToQuery(whereArg!);
+      expect(compiled.sql).toMatch(/"title"\s+is\s+null/i);
+      expect(compiled.sql).toContain('~');
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
     it('preserves existing updated_at on title writes', async () => {
       const { db, fns } = makeDbFakes();
       vi.mocked(getWorkerDb).mockReturnValue(db);

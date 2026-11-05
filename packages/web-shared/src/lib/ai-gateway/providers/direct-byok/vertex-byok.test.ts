@@ -200,7 +200,7 @@ describe('vertexByok definition', () => {
   ): TransformRequestContext {
     return {
       provider: {
-        id: 'direct-byok',
+        type: 'direct-byok',
         apiUrl: 'https://aiplatform.googleapis.com/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,

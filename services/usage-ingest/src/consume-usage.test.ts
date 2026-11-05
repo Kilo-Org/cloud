@@ -48,6 +48,94 @@ afterEach(() => {
 });
 
 describe('usage consumer', () => {
+  it('captures handler entry and slot wait for a later mixed-batch message', async () => {
+    const { fetch, processingLogs } = setup();
+    let monotonic = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonic);
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const held = Promise.withResolvers<Response>();
+    fetch.mockReturnValueOnce(held.promise).mockImplementationOnce(async () => {
+      monotonic = 1400;
+      return new Response(null, { status: 429 });
+    });
+    const later = { ...usage, core: { ...usage.core, id: '4f2504e0-4f89-11d3-9a0c-0305e82c3302' } };
+    const messages = [message(), { ...message(later), id: 'queue-2', attempts: 3 }];
+    messages.forEach(msg => {
+      msg.timestamp = new Date(9_000);
+    });
+    let finished = false;
+    const work = Promise.resolve(worker.queue(batch(messages), env)).then(
+      () => {
+        finished = true;
+      },
+      error => {
+        finished = true;
+        return error;
+      }
+    );
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(finished).toBe(false);
+    monotonic = 1350;
+    wall.mockReturnValue(10_200);
+    held.resolve(acknowledgement());
+    expect(await work).toMatchObject({ message: 'Usage writer overloaded (HTTP 429/503)' });
+    expect(messages[0].ack).toHaveBeenCalledOnce();
+    expect(messages[1].retry).toHaveBeenCalledOnce();
+    expect(
+      processingLogs().find(
+        log => log.event === 'usage_ingest_processing' && log.usage_id === later.core.id
+      )
+    ).toMatchObject({
+      queue_message_id: 'queue-2',
+      delivery_attempts: 3,
+      handler_entry_queue_age_ms: 1000,
+      slot_wait_ms: 1250,
+      queue_wait_ms: 1200,
+      writer_duration_ms: 50,
+    });
+  });
+
+  it('adds phase fields only to sampled or slow outcomes', async () => {
+    const { fetch, processingLogs } = setup();
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    fetch.mockResolvedValue(acknowledgement());
+    const sampled = { ...message(), id: 'queue-92', timestamp: new Date(10_000) };
+    const other = { ...message(), id: 'queue-1', timestamp: new Date(10_000) };
+    await worker.queue(batch([sampled, other]), env);
+    const logs = processingLogs().filter(log => log.event === 'usage_ingest_processing');
+    expect(logs[0]).toMatchObject({ handler_entry_queue_age_ms: 0, slot_wait_ms: 0 });
+    expect(logs[1]).not.toHaveProperty('handler_entry_queue_age_ms');
+    expect(logs[1]).not.toHaveProperty('slot_wait_ms');
+  });
+
+  it('selects a slow queue wait even when its components are below the threshold', async () => {
+    const { fetch, processingLogs } = setup();
+    let monotonic = 100;
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonic);
+    const wall = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const held = Promise.withResolvers<Response>();
+    fetch.mockReturnValueOnce(held.promise).mockResolvedValueOnce(acknowledgement());
+    const messages = [message(), message()];
+    messages.forEach(msg => {
+      msg.timestamp = new Date(9_400);
+    });
+    const work = worker.queue(batch(messages), env);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    monotonic = 600;
+    wall.mockReturnValue(10_600);
+    held.resolve(acknowledgement());
+    await work;
+    expect(
+      processingLogs().filter(log => log.event === 'usage_ingest_processing')[1]
+    ).toMatchObject({
+      handler_entry_queue_age_ms: 600,
+      slot_wait_ms: 500,
+      queue_wait_ms: 1200,
+      writer_duration_ms: 0,
+    });
+  });
+
   it('waits for each validated acknowledgement before ACK and the next write', async () => {
     const { fetch, logs, processingLogs } = setup();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
@@ -69,7 +157,7 @@ describe('usage consumer', () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(messages[0].ack).not.toHaveBeenCalled();
     expect(messages[1].ack).not.toHaveBeenCalled();
-    expect(processingLogs()).toEqual([]);
+    expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([]);
     expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual(usage);
     clock.mockReturnValue(375);
     vi.spyOn(Date, 'now').mockReturnValue(timestamp + 2275);
@@ -84,11 +172,14 @@ describe('usage consumer', () => {
     await work;
     expect(messages[1].ack).toHaveBeenCalledExactlyOnceWith();
     expect(messages.every(msg => msg.retry.mock.calls.length === 0)).toBe(true);
-    expect(processingLogs()).toEqual([
+    expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([
       {
         level: 'info',
         event: 'usage_ingest_processing',
         queue: 'usage',
+        batch_id: expect.any(String),
+        batch_size: 2,
+        handler_entry_at_ms: timestamp + 2000,
         outcome: 'recorded',
         queue_action: 'ack',
         usage_id: usage.core.id,
@@ -102,6 +193,9 @@ describe('usage consumer', () => {
         level: 'info',
         event: 'usage_ingest_processing',
         queue: 'usage',
+        batch_id: expect.any(String),
+        batch_size: 2,
+        handler_entry_at_ms: timestamp + 2000,
         outcome: 'duplicate',
         queue_action: 'ack',
         usage_id: secondEvent.core.id,
@@ -115,8 +209,11 @@ describe('usage consumer', () => {
     expect(logs[0]).not.toHaveBeenCalled();
     expect(logs[2]).not.toHaveBeenCalled();
     const outcomeLogOrders = logs[1].mock.calls.flatMap(([value], index) =>
-      String(value).startsWith('{') ? [logs[1].mock.invocationCallOrder[index]] : []
+      String(value).startsWith('{') && JSON.parse(String(value)).event === 'usage_ingest_processing'
+        ? [logs[1].mock.invocationCallOrder[index]]
+        : []
     );
+    expect(outcomeLogOrders).toHaveLength(2);
     messages.forEach((msg, index) =>
       expect(outcomeLogOrders[index]).toBeLessThan(msg.ack.mock.invocationCallOrder[0])
     );
@@ -141,17 +238,21 @@ describe('usage consumer', () => {
       expect(msg.ack).not.toHaveBeenCalled();
       expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
       expect(fetch).not.toHaveBeenCalled();
-      expect(processingLogs()).toEqual([
+      const outcomes = processingLogs().filter(log => log.event === 'usage_ingest_processing');
+      expect(outcomes).toEqual([
         expect.objectContaining({
           level: 'warn',
+          batch_id: expect.any(String),
+          batch_size: 1,
+          handler_entry_at_ms: expect.any(Number),
           queue_action: 'retry',
           reason: failure === 'invalid' ? 'invalid_event' : 'missing_config',
         }),
       ]);
-      expect(processingLogs()[0]).not.toHaveProperty('writer_duration_ms');
+      expect(outcomes[0]).not.toHaveProperty('writer_duration_ms');
       if (failure === 'invalid') {
-        expect(processingLogs()[0]).not.toHaveProperty('usage_id');
-        expect(processingLogs()[0]).not.toHaveProperty('event_age_ms');
+        expect(outcomes[0]).not.toHaveProperty('usage_id');
+        expect(outcomes[0]).not.toHaveProperty('event_age_ms');
       }
       expect(JSON.stringify(logs.flatMap(log => log.mock.calls))).not.toContain(
         'sensitive-invalid-id'
@@ -164,6 +265,7 @@ describe('usage consumer', () => {
     async failure => {
       const { fetch, logs, processingLogs } = setup();
       vi.spyOn(performance, 'now')
+        .mockReturnValueOnce(0)
         .mockReturnValueOnce(0)
         .mockReturnValueOnce(0)
         .mockReturnValueOnce(100)
@@ -195,11 +297,14 @@ describe('usage consumer', () => {
       expect(msg.ack).not.toHaveBeenCalled();
       expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(processingLogs()).toEqual([
+      expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([
         {
           level: 'warn',
           event: 'usage_ingest_processing',
           queue: 'usage',
+          batch_id: expect.any(String),
+          batch_size: 1,
+          handler_entry_at_ms: expect.any(Number),
           outcome: 'unavailable',
           reason: expect.any(String),
           queue_action: 'retry',
@@ -214,7 +319,9 @@ describe('usage consumer', () => {
         },
       ]);
       expect(logs[0]).not.toHaveBeenCalled();
-      expect(logs[1]).not.toHaveBeenCalled();
+      expect(logs[1]).toHaveBeenCalledOnce();
+      for (const [value] of logs[1].mock.calls)
+        expect(JSON.parse(String(value)).event).toBe('usage_ingest_handler_entry');
       expect(logs[2].mock.invocationCallOrder.at(-1)).toBeLessThan(
         msg.retry.mock.invocationCallOrder[0]
       );
@@ -263,7 +370,11 @@ describe('usage consumer', () => {
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
         events
       );
-      expect(processingLogs().find(log => log.usage_id === events[1].core.id)).toMatchObject({
+      expect(
+        processingLogs().find(
+          log => log.event === 'usage_ingest_processing' && log.usage_id === events[1].core.id
+        )
+      ).toMatchObject({
         reason: 'http_error',
         queue_action: 'retry',
         writer_status: status,
@@ -272,7 +383,9 @@ describe('usage consumer', () => {
       });
       for (const index of [0, 2, 3]) {
         expect(
-          processingLogs().find(log => log.usage_id === events[index].core.id)
+          processingLogs().find(
+            log => log.event === 'usage_ingest_processing' && log.usage_id === events[index].core.id
+          )
         ).not.toHaveProperty('invocation_failure');
       }
       const serialized = JSON.stringify(logs.flatMap(log => log.mock.calls));
@@ -299,9 +412,10 @@ describe('usage consumer', () => {
       expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
       expect(msg.ack).not.toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(processingLogs()[0]).toMatchObject({ reason: 'http_error', queue_action: 'retry' });
-      expect(processingLogs()[0]).not.toHaveProperty('invocation_failure');
-      expect(processingLogs()[0]).not.toHaveProperty('writer_status');
+      const [outcome] = processingLogs().filter(log => log.event === 'usage_ingest_processing');
+      expect(outcome).toMatchObject({ reason: 'http_error', queue_action: 'retry' });
+      expect(outcome).not.toHaveProperty('invocation_failure');
+      expect(outcome).not.toHaveProperty('writer_status');
     }
   );
 
@@ -310,36 +424,30 @@ describe('usage consumer', () => {
     vi.spyOn(Date, 'now').mockReturnValue(0);
     fetch.mockResolvedValue(acknowledgement());
     await worker.queue(batch([message()]), env);
-    expect(processingLogs()[0].event_age_ms).toBe(0);
+    expect(processingLogs().find(log => log.event === 'usage_ingest_processing').event_age_ms).toBe(
+      0
+    );
   });
 
-  it.each(
-    [undefined, 'all'].flatMap(diagnostics =>
-      ['1', '2'].map(parallelism => ({ diagnostics, parallelism }))
-    )
-  )(
-    'keeps ACKs on logging failure with diagnostics $diagnostics and parallelism $parallelism',
-    async ({ diagnostics, parallelism }) => {
-      const { fetch, logs } = setup();
-      fetch.mockImplementation(async () => acknowledgement());
-      logs[1].mockImplementation(value => {
-        if (String(value).startsWith('{')) throw new Error('synthetic logging failure');
-      });
-      const messages = [message(), message()];
-      await expect(
-        worker.queue(batch(messages), {
-          ...env,
-          USAGE_INGEST_DIAGNOSTICS: diagnostics,
-          USAGE_INGEST_PARALLELISM: parallelism,
-        })
-      ).resolves.toBeUndefined();
-      expect(fetch).toHaveBeenCalledTimes(2);
-      for (const msg of messages) {
-        expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
-        expect(msg.retry).not.toHaveBeenCalled();
-      }
+  it.each(['1', '2'])('keeps ACKs on logging failure with parallelism %s', async parallelism => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    logs[1].mockImplementation(value => {
+      if (String(value).startsWith('{')) throw new Error('synthetic logging failure');
+    });
+    const messages = [message(), message()];
+    await expect(
+      worker.queue(batch(messages), {
+        ...env,
+        USAGE_INGEST_PARALLELISM: parallelism,
+      })
+    ).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const msg of messages) {
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.retry).not.toHaveBeenCalled();
     }
-  );
+  });
 });
 
 describe('bounded parallel usage processing', () => {
@@ -371,74 +479,67 @@ describe('bounded parallel usage processing', () => {
     }
   );
 
-  it.each([undefined, 'all'])(
-    'caps outstanding writes at two with diagnostics %s and out-of-order completion',
-    async diagnostics => {
-      const { fetch, processingLogs } = setup();
-      const now = vi.spyOn(Date, 'now').mockReturnValue(10_000);
-      const inputEvents = events(5);
-      const responses = inputEvents.map(() => Promise.withResolvers<Response>());
-      let active = 0;
-      let peak = 0;
-      fetch.mockImplementation(() => {
-        const index = fetch.mock.calls.length - 1;
-        peak = Math.max(peak, ++active);
-        return responses[index].promise.finally(() => active--);
-      });
-      const messages = inputEvents.map(event => message(event));
-      const input = batch(messages);
-      let finished = false;
-      const work = Promise.resolve(
-        worker.queue(input, { ...parallelEnv, USAGE_INGEST_DIAGNOSTICS: diagnostics })
-      ).then(() => {
-        finished = true;
-      });
-      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-      expect(messages.every(msg => msg.ack.mock.calls.length === 0)).toBe(true);
-      // Leave the first writer pending while the other slot drains later messages.
-      for (const index of [1, 2, 3, 4]) {
-        now.mockReturnValue(10_000 + index * 1000);
-        responses[index].resolve(
-          acknowledgement(index === 1 ? 'duplicate' : 'recorded', inputEvents[index].core.id)
-        );
-        await vi.waitFor(() => expect(messages[index].ack).toHaveBeenCalledExactlyOnceWith());
-        expect(fetch).toHaveBeenCalledTimes(Math.min(index + 2, 5));
-        expect(messages[0].ack).not.toHaveBeenCalled();
-        expect(finished).toBe(false);
-      }
-      responses[0].resolve(acknowledgement('recorded', inputEvents[0].core.id));
-      await work;
-      expect(peak).toBe(2);
-      expect(active).toBe(0);
-      expect(finished).toBe(true);
-      for (const msg of messages) {
-        expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
-        expect(msg.retry).not.toHaveBeenCalled();
-      }
-      const entries = processingLogs().filter(log => log.event === 'usage_ingest_handler_entry');
-      const outcomes = processingLogs().filter(log => log.event === 'usage_ingest_processing');
-      expect(entries).toHaveLength(diagnostics === 'all' ? 5 : 0);
-      expect(outcomes).toHaveLength(5);
-      if (diagnostics === 'all') {
-        expect(new Set(entries.map(log => log.batch_id)).size).toBe(1);
-        expect(entries[0].batch_id).toEqual(expect.any(String));
-        expect(entries.map(log => log.handler_entry_at_ms)).toEqual(Array(5).fill(10_000));
-        expect(entries.map(log => log.message_start_at_ms)).toEqual([
-          10_000, 10_000, 11_000, 12_000, 13_000,
-        ]);
-        for (const log of [...entries, ...outcomes]) {
-          expect(log).toMatchObject({
-            queue: input.queue,
-            batch_id: entries[0].batch_id,
-            batch_size: 5,
-            handler_entry_at_ms: 10_000,
-          });
-        }
-      }
-      expect(input.ackAll).not.toHaveBeenCalled();
-      expect(input.retryAll).not.toHaveBeenCalled();
+  it('caps outstanding writes at two with out-of-order completion', async () => {
+    const { fetch, processingLogs } = setup();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const inputEvents = events(5);
+    const responses = inputEvents.map(() => Promise.withResolvers<Response>());
+    let active = 0;
+    let peak = 0;
+    fetch.mockImplementation(() => {
+      const index = fetch.mock.calls.length - 1;
+      peak = Math.max(peak, ++active);
+      return responses[index].promise.finally(() => active--);
+    });
+    const messages = inputEvents.map(event => message(event));
+    const input = batch(messages);
+    let finished = false;
+    const work = Promise.resolve(worker.queue(input, parallelEnv)).then(() => {
+      finished = true;
+    });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(messages.every(msg => msg.ack.mock.calls.length === 0)).toBe(true);
+    // Leave the first writer pending while the other slot drains later messages.
+    for (const index of [1, 2, 3, 4]) {
+      now.mockReturnValue(10_000 + index * 1000);
+      responses[index].resolve(
+        acknowledgement(index === 1 ? 'duplicate' : 'recorded', inputEvents[index].core.id)
+      );
+      await vi.waitFor(() => expect(messages[index].ack).toHaveBeenCalledExactlyOnceWith());
+      expect(fetch).toHaveBeenCalledTimes(Math.min(index + 2, 5));
+      expect(messages[0].ack).not.toHaveBeenCalled();
+      expect(finished).toBe(false);
     }
-  );
+    responses[0].resolve(acknowledgement('recorded', inputEvents[0].core.id));
+    await work;
+    expect(peak).toBe(2);
+    expect(active).toBe(0);
+    expect(finished).toBe(true);
+    for (const msg of messages) {
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.retry).not.toHaveBeenCalled();
+    }
+    const entries = processingLogs().filter(log => log.event === 'usage_ingest_handler_entry');
+    const outcomes = processingLogs().filter(log => log.event === 'usage_ingest_processing');
+    expect(entries).toHaveLength(5);
+    expect(outcomes).toHaveLength(5);
+    expect(new Set(entries.map(log => log.batch_id)).size).toBe(1);
+    expect(entries[0].batch_id).toEqual(expect.any(String));
+    expect(entries.map(log => log.handler_entry_at_ms)).toEqual(Array(5).fill(10_000));
+    expect(entries.map(log => log.message_start_at_ms)).toEqual([
+      10_000, 10_000, 11_000, 12_000, 13_000,
+    ]);
+    for (const log of [...entries, ...outcomes]) {
+      expect(log).toMatchObject({
+        queue: input.queue,
+        batch_id: entries[0].batch_id,
+        batch_size: 5,
+        handler_entry_at_ms: 10_000,
+      });
+    }
+    expect(input.ackAll).not.toHaveBeenCalled();
+    expect(input.retryAll).not.toHaveBeenCalled();
+  });
 
   it.each([429, 503])(
     'waits for all dispositions before rejecting concurrent HTTP %s overload',
@@ -480,7 +581,9 @@ describe('bounded parallel usage processing', () => {
         expect(messages[index].retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
         expect(messages[index].ack).not.toHaveBeenCalled();
       }
-      expect(processingLogs()).toHaveLength(5);
+      expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toHaveLength(
+        5
+      );
       expect(processingLogs().filter(log => log.invocation_failure)).toEqual([
         expect.objectContaining({ writer_status: status, invocation_failure: 'writer_overloaded' }),
       ]);
@@ -546,14 +649,10 @@ describe('bounded parallel usage processing', () => {
 
 describe('overload with simultaneous unexpected processing or disposition failure', () => {
   it.each(
-    [undefined, 'all'].flatMap(diagnostics =>
-      [429, 503].flatMap(status =>
-        ['processing', 'disposition'].map(origin => ({ diagnostics, status, origin }))
-      )
-    )
+    [429, 503].flatMap(status => ['processing', 'disposition'].map(origin => ({ status, origin })))
   )(
-    'retains HTTP $status and the first $origin error with diagnostics $diagnostics after all items settle',
-    async ({ diagnostics, status, origin }) => {
+    'retains HTTP $status and the first $origin error after all items settle',
+    async ({ status, origin }) => {
       const { fetch } = setup();
       const inputEvents = Array.from({ length: 4 }, (_, index) => ({
         ...usage,
@@ -592,7 +691,6 @@ describe('overload with simultaneous unexpected processing or disposition failur
         worker.queue(input, {
           ...env,
           USAGE_INGEST_PARALLELISM: '2',
-          USAGE_INGEST_DIAGNOSTICS: diagnostics,
         })
       ).then(
         () => {
@@ -631,38 +729,34 @@ describe('overload with simultaneous unexpected processing or disposition failur
     }
   );
 
-  it.each([undefined, 'all'])(
-    'propagates the original unexpected error without overload with diagnostics %s',
-    async diagnostics => {
-      const { fetch } = setup();
-      fetch.mockImplementation(async () => acknowledgement());
-      const unexpected = new Error('synthetic processing failure');
-      const messages = [message(), message(), message()];
-      Object.defineProperty(messages[1], 'timestamp', {
-        get() {
-          throw unexpected;
-        },
-      });
-      const input = batch(messages);
-      const failure = await Promise.resolve(
-        worker.queue(input, {
-          ...env,
-          USAGE_INGEST_PARALLELISM: '2',
-          USAGE_INGEST_DIAGNOSTICS: diagnostics,
-        })
-      ).catch(error => error);
-      expect(failure).toBe(unexpected);
-      expect(messages[1].retry).toHaveBeenCalledExactlyOnceWith();
-      expect(messages[1].ack).not.toHaveBeenCalled();
-      for (const index of [0, 2]) {
-        expect(messages[index].ack).toHaveBeenCalledExactlyOnceWith();
-        expect(messages[index].retry).not.toHaveBeenCalled();
-      }
-      expect(fetch).toHaveBeenCalledTimes(2);
-      expect(input.ackAll).not.toHaveBeenCalled();
-      expect(input.retryAll).not.toHaveBeenCalled();
+  it('propagates the original unexpected error without overload', async () => {
+    const { fetch } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    const unexpected = new Error('synthetic processing failure');
+    const messages = [message(), message(), message()];
+    Object.defineProperty(messages[1], 'timestamp', {
+      get() {
+        throw unexpected;
+      },
+    });
+    const input = batch(messages);
+    const failure = await Promise.resolve(
+      worker.queue(input, {
+        ...env,
+        USAGE_INGEST_PARALLELISM: '2',
+      })
+    ).catch(error => error);
+    expect(failure).toBe(unexpected);
+    expect(messages[1].retry).toHaveBeenCalledExactlyOnceWith();
+    expect(messages[1].ack).not.toHaveBeenCalled();
+    for (const index of [0, 2]) {
+      expect(messages[index].ack).toHaveBeenCalledExactlyOnceWith();
+      expect(messages[index].retry).not.toHaveBeenCalled();
     }
-  );
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(input.ackAll).not.toHaveBeenCalled();
+    expect(input.retryAll).not.toHaveBeenCalled();
+  });
 });
 
 describe('native retry classification and launch budget', () => {
@@ -732,12 +826,20 @@ describe('native retry classification and launch budget', () => {
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
         inputEvents
       );
-      expect(processingLogs().find(log => log.usage_id === inputEvents[2].core.id)).toMatchObject({
+      expect(
+        processingLogs().find(
+          log => log.event === 'usage_ingest_processing' && log.usage_id === inputEvents[2].core.id
+        )
+      ).toMatchObject({
         retry_class: 'admission',
         admission_reason: 'pool_busy',
         retry_delay_seconds: 4,
       });
-      expect(processingLogs().find(log => log.usage_id === inputEvents[5].core.id)).toMatchObject({
+      expect(
+        processingLogs().find(
+          log => log.event === 'usage_ingest_processing' && log.usage_id === inputEvents[5].core.id
+        )
+      ).toMatchObject({
         reason: failure === 'timeout' ? 'timeout' : 'invalid_response',
         retry_class: 'conservative',
       });

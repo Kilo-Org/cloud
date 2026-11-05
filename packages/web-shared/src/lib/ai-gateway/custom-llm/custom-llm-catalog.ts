@@ -1,8 +1,8 @@
 import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
 
 export type CustomLlm = {
@@ -22,18 +22,28 @@ export function isPublicCustomLlm(
 }
 
 /**
- * A custom LLM may be created with a Kilo-exclusive model's id ahead of that
- * model's removal. Until then the Kilo-exclusive model takes precedence, so the
- * custom LLM stays out of routing, model lists, and every other lookup.
+ * A row that fails the definition schema is dropped from the catalog, which
+ * removes an admin-configured model, so it reports through the same channel as a
+ * failed read: an error log every time, and a Sentry event at most once per row
+ * per report window, because the catalog refreshes every minute and a stored
+ * definition does not fix itself.
  */
+function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
+  console.error('Failed to parse custom llm definition', publicId, error);
+  // The claim map is shared with BYOK decrypt failures, whose keys are row ids, so
+  // the key is namespaced (public ids cannot contain `:`).
+  if (!claimFailureReport(`custom-llm:${publicId}`, Date.now())) return;
+  captureException(error, {
+    tags: { source: 'custom_llm_catalog' },
+    extra: { public_id: publicId },
+  });
+}
+
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
-    if (isKiloExclusiveModel(row.public_id.toLowerCase())) {
-      return [];
-    }
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
-      console.log('Failed to parse custom llm definition', row.public_id, parsed.error);
+      reportUnparseableCustomLlm(row.public_id, parsed.error);
       return [];
     }
     return [

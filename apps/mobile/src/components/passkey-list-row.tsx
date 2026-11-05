@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { KeyRound, Pencil, Trash2 } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { formatDate } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp } from '@/lib/utils';
@@ -32,7 +34,7 @@ export function PasskeyListRow({
 
   return (
     <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <KeyRound size={18} color={colors.secondaryForeground} />
+      <IconTile icon={KeyRound} tint={NEUTRAL_TINT} />
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium" numberOfLines={1}>
           {name && name.length > 0 ? name : t('profile.passkeyDefaultName')}

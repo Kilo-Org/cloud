@@ -178,7 +178,6 @@ export function generatePromoCreditCategoriesMarkdown(
     }
   }
 
-  // Generate markdown content
   const markdownContent = [
     '# Promotional Credit Categories',
     '',

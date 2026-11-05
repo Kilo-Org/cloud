@@ -9,6 +9,7 @@ import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { buildContextLengthByModelId } from '@/components/cloud-agent-next/model-context-lengths';
+import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
@@ -36,7 +37,9 @@ export function useOrganizationModels(
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
     organizationId,
-    enabled
+    enabled,
+    'member',
+    { staleTime: CLOUD_AGENT_METADATA_STALE_TIME, gcTime: CLOUD_AGENT_METADATA_STALE_TIME }
   );
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);

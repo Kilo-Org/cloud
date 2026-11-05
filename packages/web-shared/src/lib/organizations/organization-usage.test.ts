@@ -983,6 +983,36 @@ describe('Organization Usage Functions', () => {
       expect(result.balance).toBe(-0.000001); // -1 microdollar = -0.000001 USD (0 - 1)
     });
 
+    test('should return a real zero daily usage as 0, not null', async () => {
+      const owner = await insertTestUser();
+      const zeroUsageMember = await insertTestUser();
+      const noUsageRowMember = await insertTestUser();
+
+      const organization = await createTestOrganization('Test Org', owner.id, 100000, {}, false);
+      await addUserToOrganization(organization.id, zeroUsageMember.id, 'member');
+      await addUserToOrganization(organization.id, noUsageRowMember.id, 'member');
+
+      await updateOrganizationUserLimit(organization.id, zeroUsageMember.id, 5); // $5.00 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: zeroUsageMember.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 0, // Row exists, nothing spent
+      });
+
+      const members = await getOrganizationMembers(organization.id);
+      const zeroUsage = members.find(m => m.status === 'active' && m.id === zeroUsageMember.id);
+      const noUsageRow = members.find(m => m.status === 'active' && m.id === noUsageRowMember.id);
+
+      // A row with exactly 0 must reach the consumer as 0 so it can render
+      // "$0.00 / $5.00"; only a missing row is unknown.
+      expect(zeroUsage?.dailyUsageLimitUsd).toBe(5);
+      expect(zeroUsage?.currentDailyUsageUsd).toBe(0);
+      expect(noUsageRow?.currentDailyUsageUsd).toBeNull();
+    });
+
     test('should handle null limit (unlimited) correctly', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 100000);

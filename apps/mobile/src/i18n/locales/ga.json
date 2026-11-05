@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Taispeántas cianrialaithe CLI v2",
+    "sessionsEmpty": "Níl aon seisiúin CLI v2 ann fós",
+    "hosts": "Óstaigh ar líne",
+    "hostsEmpty": "Níl aon óstaigh ar líne",
+    "directory": "Comhadlann oibre",
+    "createSession": "Cruthaigh seisiún CLI v2",
+    "queueIfOffline": "Cuir an leid sa scuaine má tá an t-óstach as líne",
+    "prompt": "Leid nó /command",
+    "localClear": "Glan an t-amharc áitiúil",
+    "abort": "Tobscoir den seal",
+    "failed": "Theip ar ghníomh cianrialaithe CLI v2",
+    "creationUnknown": "Ní fios ar éirigh leis an gcruthú. Athnuaigh na seisiúin sula dtriailfidh tú arís.",
+    "commandFailed": "Theip ar ordú an phróisis CLI",
+    "invalidReply": "Freagra neamhbhailí ón bpróiseas CLI",
+    "unsafeCommand": "Úsáid /compact, /new, /skill, /models, /agents nó /clear (go háitiúil amháin).",
+    "status": "Nasc: {{connection}} · Próiseas CLI: {{runner}}",
+    "presenceStatus": "Óstaigh: {{connection}}",
+    "commandStatus": "Seachadadh an ordaithe: {{status}}",
+    "delivered": "Seachadta",
+    "expired": "Imithe in éag"
+  },
   "common": {
     "cancel": "Cealaigh",
     "done": "Déanta",

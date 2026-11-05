@@ -90,7 +90,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
       - name: Verify (typecheck, lint, format, unit tests)
+        env:
+          KILO_TYPECHECK_TRPC_BUILT: '1'
         run: pnpm --filter kilo-extension verify
 
   # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).

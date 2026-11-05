@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo rheoli o bell CLI v2",
+    "sessionsEmpty": "Dim sesiynau CLI v2 eto",
+    "hosts": "Gwesteiwyr ar-lein",
+    "hostsEmpty": "Dim gwesteiwyr ar-lein",
+    "directory": "Cyfeiriadur gweithio",
+    "createSession": "Creu sesiwn CLI v2",
+    "queueIfOffline": "Rhoi'r anogiad mewn ciw os yw'r gwesteiwr all-lein",
+    "prompt": "Anogiad neu /command",
+    "localClear": "Clirio'r wedd leol",
+    "abort": "Atal y tro",
+    "failed": "Methodd gweithred rheoli o bell CLI v2",
+    "creationUnknown": "Nid yw canlyniad y creu yn hysbys. Adnewyddwch y sesiynau cyn ceisio eto.",
+    "commandFailed": "Methodd gorchymyn y rhedydd",
+    "invalidReply": "Ymateb annilys gan y rhedydd",
+    "unsafeCommand": "Defnyddiwch /compact, /new, /skill, /models, /agents neu /clear (yn lleol yn unig).",
+    "status": "Cysylltiad: {{connection}} · Rhedydd: {{runner}}",
+    "presenceStatus": "Gwesteiwyr: {{connection}}",
+    "commandStatus": "Danfon y gorchymyn: {{status}}",
+    "delivered": "Wedi'i ddanfon",
+    "expired": "Wedi dod i ben"
+  },
   "common": {
     "cancel": "Canslo",
     "done": "Gorffen",

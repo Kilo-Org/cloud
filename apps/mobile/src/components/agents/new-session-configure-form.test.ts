@@ -54,6 +54,8 @@ const keyboardSubscribers = vi.hoisted(() => ({
   show: null as (() => void) | null,
   hide: null as (() => void) | null,
 }));
+// The base cell's window; a case can swap in a short one.
+const windowSize = vi.hoisted(() => ({ width: 411, height: 891 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The profile row and the environment row render the reanimated `Skeleton`
@@ -87,6 +89,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ ...windowSize, scale: 1, fontScale: 1 }),
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -1138,5 +1141,24 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
     // The mocked useState holds the initial measurement (0) and never setStates.
     expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
+  });
+
+  // ── Case 16: a short window lowers the prompt's floor ──
+  it("asks the prompt for one line on a window too short for the form's first screenful", async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    windowSize.width = 360;
+    windowSize.height = 640;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+      // Start needs a repository, so the picker below the card must stay on the
+      // first screenful of the 360x640 compact cell.
+      expect(findElementByType(element, 'NewSessionPrompt')?.lineCount).toBe(1);
+    } finally {
+      windowSize.width = 411;
+      windowSize.height = 891;
+    }
   });
 });

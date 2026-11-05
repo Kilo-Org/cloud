@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "নেটিভ রিমোট ডেমো",
+    "sessionsEmpty": "এখনও কোনো নেটিভ সেশন নেই",
+    "hosts": "অনলাইন হোস্ট",
+    "hostsEmpty": "কোনো হোস্ট অনলাইনে নেই",
+    "directory": "কাজের ডিরেক্টরি",
+    "createSession": "নেটিভ সেশন তৈরি করুন",
+    "queueIfOffline": "হোস্ট অফলাইনে থাকলে প্রম্পট সারিতে রাখুন",
+    "prompt": "প্রম্পট বা /command",
+    "localClear": "স্থানীয় ভিউ পরিষ্কার করুন",
+    "abort": "টার্ন বাতিল করুন",
+    "failed": "নেটিভ রিমোট অ্যাকশন ব্যর্থ হয়েছে",
+    "creationUnknown": "তৈরি হয়েছে কি না জানা যায়নি। আবার চেষ্টা করার আগে সেশনগুলো রিফ্রেশ করুন।",
+    "commandFailed": "রানার কমান্ড ব্যর্থ হয়েছে",
+    "invalidReply": "রানারের উত্তর অবৈধ",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents বা /clear (শুধু স্থানীয় ভিউ) ব্যবহার করুন।",
+    "status": "সংযোগ: {{connection}} · রানার: {{runner}}",
+    "presenceStatus": "হোস্ট: {{connection}}",
+    "commandStatus": "কমান্ড ডেলিভারি: {{status}}",
+    "delivered": "পৌঁছেছে",
+    "expired": "মেয়াদ শেষ"
+  },
   "common": {
     "cancel": "বাতিল করুন",
     "done": "সম্পন্ন",

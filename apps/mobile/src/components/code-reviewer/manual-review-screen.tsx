@@ -35,9 +35,11 @@ import {
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
+import { MANUAL_REVIEW_PLATFORMS, type ManualReviewPlatform } from './manual-review-platform';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
 import { ManualReviewSkeleton } from './manual-review-skeleton';
 import { connectNoticeKey } from './connect-notice-key';
@@ -45,8 +47,6 @@ import { manualReviewStartFailure } from './manual-review-start-error';
 import { ManualReviewStartFeedback } from './manual-review-start-feedback';
 import { MANUAL_REVIEW_START_DEADLINE_MS, useDeadlineWatchedStart } from './deadline-watched-start';
 
-const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
-type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
 type ModelChoice = { modelSlug: string; thinkingEffort: string | null };
 
 const URL_PLACEHOLDER = {
@@ -263,8 +263,8 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     // A permission/not-found error can't be fixed by retrying — show the
     // permanent variant with no retry instead of a misleading "try again".
     const statusErrorCode =
-      (githubStatus.error as { data?: { code?: string } } | null)?.data?.code ??
-      (gitlabStatus.error as { data?: { code?: string } } | null)?.data?.code;
+      readTrpcErrorField(githubStatus.error, 'code') ??
+      readTrpcErrorField(gitlabStatus.error, 'code');
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
@@ -358,7 +358,6 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('common.platform')}
             </Text>
             <ManualReviewPlatformPicker
-              isLoading={statusesLoading}
               platform={platform}
               isConnected={isConnected}
               onSelect={option => {

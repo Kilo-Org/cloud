@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,7 +104,7 @@ export function UserAdminCreditGrant({
           creditKind === 'promotional' && expiryHours ? parseFloat(expiryHours) : undefined,
       };
 
-      const response = await fetch('/admin/api/users/add-credit', {
+      const response = await adminFetch('/admin/api/users/add-credit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),

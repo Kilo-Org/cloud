@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Дэма натыўнага дыстанцыйнага кіравання",
+    "sessionsEmpty": "Натыўных сеансаў пакуль няма",
+    "hosts": "Хосты ў сетцы",
+    "hostsEmpty": "Няма хостаў у сетцы",
+    "directory": "Працоўны каталог",
+    "createSession": "Стварыць натыўны сеанс",
+    "queueIfOffline": "Дадаваць запыт у чаргу, калі хост па-за сеткай",
+    "prompt": "Запыт або /command",
+    "localClear": "Ачысціць лакальны выгляд",
+    "abort": "Перапыніць ход",
+    "failed": "Не ўдалося выканаць дзеянне натыўнага дыстанцыйнага кіравання",
+    "creationUnknown": "Вынік стварэння невядомы. Абнавіце спіс сеансаў перад паўторнай спробай.",
+    "commandFailed": "Не ўдалося выканаць каманду працэсу CLI",
+    "invalidReply": "Некарэктны адказ працэсу CLI",
+    "unsafeCommand": "Выкарыстоўвайце /compact, /new, /skill, /models, /agents або /clear (толькі лакальна).",
+    "status": "Злучэнне: {{connection}} · Працэс CLI: {{runner}}",
+    "presenceStatus": "Хосты: {{connection}}",
+    "commandStatus": "Дастаўка каманды: {{status}}",
+    "delivered": "Дастаўлена",
+    "expired": "Тэрмін дзеяння скончыўся"
+  },
   "common": {
     "cancel": "Адмяніць",
     "done": "Гатова",

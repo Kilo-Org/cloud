@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native алсын демо",
+    "sessionsEmpty": "Native сесс хараахан алга",
+    "hosts": "Онлайн хостууд",
+    "hostsEmpty": "Онлайн хост алга",
+    "directory": "Ажлын хавтас",
+    "createSession": "Native сесс үүсгэх",
+    "queueIfOffline": "Хост офлайн бол промптыг дараалалд оруулах",
+    "prompt": "Промпт эсвэл /command",
+    "localClear": "Локал харагдацыг цэвэрлэх",
+    "abort": "Ээлжийг зогсоох",
+    "failed": "Native алсын үйлдэл амжилтгүй боллоо",
+    "creationUnknown": "Үүсгэлтийн үр дүн тодорхойгүй. Дахин оролдохоосоо өмнө сессүүдийг сэргээнэ үү.",
+    "commandFailed": "Ажиллуулагчийн команд амжилтгүй боллоо",
+    "invalidReply": "Ажиллуулагчийн хариу буруу байна",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents эсвэл /clear (зөвхөн локалаар) ашиглана уу.",
+    "status": "Холболт: {{connection}} · Ажиллуулагч: {{runner}}",
+    "presenceStatus": "Хостууд: {{connection}}",
+    "commandStatus": "Командын хүргэлт: {{status}}",
+    "delivered": "Хүргэгдсэн",
+    "expired": "Хугацаа нь дууссан"
+  },
   "common": {
     "cancel": "Цуцлах",
     "done": "Болсон",

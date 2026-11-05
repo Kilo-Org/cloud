@@ -7,18 +7,26 @@ import {
   getBlockedSignupTlds,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
+import {
+  parseBlacklistDomainsConfig,
+  type ParsedBlacklistDomainsConfig,
+} from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
 } from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
+import {
+  BLACKLIST_STATS_ROW_LIMIT,
+  computeBlacklistStats,
+  countUsersByEmailHost,
+} from '@/lib/abuse/blacklist-domain-stats';
 
 const SuspiciousDomainsInputSchema = z
   .object({
@@ -26,34 +34,32 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-// The admin table renders one row per entry. An imported blocklist can hold
-// tens of thousands of entries, so the procedure returns only the domains that
-// actually caught users, ordered by count.
-const STATS_ROW_LIMIT = 200;
-
-async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
+async function readConfigOrThrow(): Promise<ParsedBlacklistDomainsConfig> {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
-  return BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+  if (!raw) return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
+  return parseBlacklistDomainsConfig(JSON.parse(raw));
 }
 
-async function readConfig(): Promise<BlacklistDomainsConfig> {
+async function readConfig(): Promise<ParsedBlacklistDomainsConfig> {
   try {
     return await readConfigOrThrow();
   } catch {
-    return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+    return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
   }
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    const config = await readConfig();
+    const { config, droppedDomains } = await readConfig();
     return {
       ...config,
       // The editor always shows an editable list: the stored one, or the
       // effective fallback (env or built-in) when the stored config predates
       // the field.
       blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
+      // Entries the stored list held beyond MAX_BLACKLIST_DOMAINS. Nonzero means
+      // the editor shows a prefix of the stored list.
+      dropped_domains: droppedDomains,
     };
   }),
 
@@ -69,7 +75,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // the automatic run in that case and let the manual backfill handle it.
     let previous: BlacklistDomainsConfig | null = null;
     try {
-      previous = await readConfigOrThrow();
+      previous = (await readConfigOrThrow()).config;
     } catch (error) {
       captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
     }
@@ -126,18 +132,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
   stats: adminProcedure.query(async () => {
     const domains = await getBlacklistedDomains();
 
-    // One grouped query against the indexed email_domain column rather than
-    // an N+1 LIKE scan of google_user_email per blacklist entry.
-    const emailDomainCounts = await db
-      .select({
-        email_domain: kilocode_users.email_domain,
-        count: count(),
-      })
-      .from(kilocode_users)
-      .where(isNotNull(kilocode_users.email_domain))
-      .groupBy(kilocode_users.email_domain);
+    // Read-only admin report: the grouped aggregate stays off the primary pool.
+    const emailHostCounts = await countUsersByEmailHost(readDb);
 
-    return computeBlacklistStats(domains, emailDomainCounts, STATS_ROW_LIMIT);
+    return computeBlacklistStats(domains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT);
   }),
 
   suspicious: adminProcedure.input(SuspiciousDomainsInputSchema).query(async ({ input }) => {
@@ -191,57 +189,4 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
 export function isDomainOnBlacklist(domain: string, normalizedBlacklist: string[]): boolean {
   const lower = domain.toLowerCase();
   return normalizedBlacklist.some(entry => lower === entry || lower.endsWith('.' + entry));
-}
-
-export type EmailDomainCount = { email_domain: string | null; count: number };
-
-export type BlacklistStats = {
-  domains: { domain: string; blockedCount: number }[];
-  totalDomains: number;
-  totalBlockedUsers: number;
-};
-
-/**
- * Aggregates per-email_domain counts into per-blacklist-entry blocked counts.
- *
- * Walks each email_domain once and credits every blacklist entry that is one of
- * its label-boundary suffixes. The entry-major alternative (test every entry
- * against every group) is quadratic and does not survive a large imported list.
- *
- * `limit` caps the returned rows after sorting; `totalDomains` and
- * `totalBlockedUsers` still describe the whole list so the caller can say what
- * it is not showing.
- */
-export function computeBlacklistStats(
-  blacklistedDomains: string[],
-  emailDomainCounts: readonly EmailDomainCount[],
-  limit?: number
-): BlacklistStats {
-  const lookup = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
-  const counts = new Map<string, number>();
-
-  for (const row of emailDomainCounts) {
-    if (row.email_domain === null) continue;
-
-    const labels = row.email_domain.toLowerCase().split('.');
-    for (let i = 0; i < labels.length; i++) {
-      const candidate = labels.slice(i).join('.');
-      if (!lookup.has(candidate)) continue;
-
-      counts.set(candidate, (counts.get(candidate) ?? 0) + row.count);
-    }
-  }
-
-  const domainCounts = blacklistedDomains.map(domain => ({
-    domain,
-    blockedCount: counts.get(domain.toLowerCase()) ?? 0,
-  }));
-
-  domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
-
-  return {
-    domains: limit === undefined ? domainCounts : domainCounts.slice(0, limit),
-    totalDomains: blacklistedDomains.length,
-    totalBlockedUsers: domainCounts.reduce((sum, d) => sum + d.blockedCount, 0),
-  };
 }

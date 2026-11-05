@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo de control la distanță prin protocol nativ",
+    "sessionsEmpty": "Încă nu există sesiuni native",
+    "hosts": "Gazde online",
+    "hostsEmpty": "Nicio gazdă online",
+    "directory": "Director de lucru",
+    "createSession": "Creează o sesiune nativă",
+    "queueIfOffline": "Pune promptul în coadă dacă gazda este offline",
+    "prompt": "Prompt sau /command",
+    "localClear": "Golește vizualizarea locală",
+    "abort": "Întrerupe runda",
+    "failed": "Acțiunea de control la distanță prin protocol nativ a eșuat",
+    "creationUnknown": "Rezultatul creării este necunoscut. Reîmprospătează sesiunile înainte de a reîncerca.",
+    "commandFailed": "Comanda procesului de execuție a eșuat",
+    "invalidReply": "Răspuns nevalid de la procesul de execuție",
+    "unsafeCommand": "Folosește /compact, /new, /skill, /models, /agents sau /clear (doar local).",
+    "status": "Conexiune: {{connection}} · Proces de execuție: {{runner}}",
+    "presenceStatus": "Gazde: {{connection}}",
+    "commandStatus": "Livrarea comenzii: {{status}}",
+    "delivered": "Livrat",
+    "expired": "Expirat"
+  },
   "common": {
     "cancel": "Anulează",
     "done": "Gata",

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "原生远程演示",
+    "sessionsEmpty": "暂无原生会话",
+    "hosts": "在线主机",
+    "hostsEmpty": "暂无在线主机",
+    "directory": "工作目录",
+    "createSession": "新建原生会话",
+    "queueIfOffline": "主机离线时将提示词加入队列",
+    "prompt": "提示词或 /command",
+    "localClear": "清空本地视图",
+    "abort": "中止当前轮次",
+    "failed": "原生远程操作失败",
+    "creationUnknown": "创建结果未知。请刷新会话列表后再重试。",
+    "commandFailed": "执行器命令失败",
+    "invalidReply": "执行器响应无效",
+    "unsafeCommand": "请使用 /compact、/new、/skill、/models、/agents 或 /clear（仅清空本地视图）。",
+    "status": "连接：{{connection}} · 执行器：{{runner}}",
+    "presenceStatus": "主机：{{connection}}",
+    "commandStatus": "命令送达状态：{{status}}",
+    "delivered": "已送达",
+    "expired": "已过期"
+  },
   "common": {
     "cancel": "取消",
     "done": "完成",

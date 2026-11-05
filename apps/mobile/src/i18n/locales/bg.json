@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Демо за нативно дистанционно управление",
+    "sessionsEmpty": "Все още няма нативни сесии",
+    "hosts": "Хостове на линия",
+    "hostsEmpty": "Няма хостове на линия",
+    "directory": "Работна директория",
+    "createSession": "Създай нативна сесия",
+    "queueIfOffline": "Постави подканата на опашка, ако хостът е офлайн",
+    "prompt": "Подкана или /command",
+    "localClear": "Изчисти локалния изглед",
+    "abort": "Прекъсни хода",
+    "failed": "Неуспешно нативно дистанционно действие",
+    "creationUnknown": "Резултатът от създаването е неизвестен. Опресни сесиите, преди да опиташ отново.",
+    "commandFailed": "Командата към CLI процеса е неуспешна",
+    "invalidReply": "Невалиден отговор от CLI процеса",
+    "unsafeCommand": "Използвай /compact, /new, /skill, /models, /agents или /clear (само локално).",
+    "status": "Връзка: {{connection}} · CLI процес: {{runner}}",
+    "presenceStatus": "Хостове: {{connection}}",
+    "commandStatus": "Доставка на командата: {{status}}",
+    "delivered": "Доставено",
+    "expired": "Изтекло"
+  },
   "common": {
     "cancel": "Откажи",
     "done": "Готово",

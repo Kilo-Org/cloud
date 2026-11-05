@@ -62,6 +62,13 @@ export type NewSessionPromptProps = {
    * the preferred floor.
    */
   cardTop?: number;
+  /**
+   * The lines the input reserves when the frame has room, from
+   * `resolveNewSessionPromptLineCount`. A window too short for the form's first
+   * screenful takes one line, so the repository picker under it stays visible.
+   * Omitted keeps the shared three-line floor.
+   */
+  lineCount?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
   /**

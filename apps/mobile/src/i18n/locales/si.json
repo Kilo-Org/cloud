@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native දුරස්ථ ආදර්ශනය",
+    "sessionsEmpty": "තවම Native සැසි නැත",
+    "hosts": "සබැඳි හෝස්ට්",
+    "hostsEmpty": "සබැඳි හෝස්ට් නැත",
+    "directory": "වැඩ කරන නාමාවලිය",
+    "createSession": "Native සැසියක් සාදන්න",
+    "queueIfOffline": "හෝස්ට් නොබැඳි නම් ප්‍රොම්ප්ට් එක පෝලිමට එක් කරන්න",
+    "prompt": "ප්‍රොම්ප්ට් හෝ /command",
+    "localClear": "දේශීය දසුන හිස් කරන්න",
+    "abort": "වාරය නවත්වන්න",
+    "failed": "Native දුරස්ථ ක්‍රියාව අසාර්ථක විය",
+    "creationUnknown": "සැසිය සෑදුණාදැයි නොදනී. නැවත උත්සාහ කිරීමට පෙර සැසි නැවුම් කරන්න.",
+    "commandFailed": "රනර් විධානය අසාර්ථක විය",
+    "invalidReply": "වලංගු නොවන රනර් පිළිතුරක්",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents හෝ /clear (දේශීයව පමණි) භාවිත කරන්න.",
+    "status": "සම්බන්ධතාව: {{connection}} · රනර්: {{runner}}",
+    "presenceStatus": "හෝස්ට්: {{connection}}",
+    "commandStatus": "විධානය යැවීම: {{status}}",
+    "delivered": "ලැබී ඇත",
+    "expired": "කල් ඉකුත් වී ඇත"
+  },
   "common": {
     "cancel": "අවලංගු කරන්න",
     "done": "අවසන්",

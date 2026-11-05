@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Ukážka natívneho vzdialeného ovládania",
+    "sessionsEmpty": "Zatiaľ žiadne natívne relácie",
+    "hosts": "Hostitelia online",
+    "hostsEmpty": "Žiadni hostitelia online",
+    "directory": "Pracovný adresár",
+    "createSession": "Vytvoriť natívnu reláciu",
+    "queueIfOffline": "Zaradiť zadanie do poradia, ak je hostiteľ offline",
+    "prompt": "Zadanie alebo /command",
+    "localClear": "Vymazať lokálne zobrazenie",
+    "abort": "Prerušiť ťah",
+    "failed": "Natívna vzdialená akcia zlyhala",
+    "creationUnknown": "Výsledok vytvorenia nie je známy. Pred ďalším pokusom obnovte zoznam relácií.",
+    "commandFailed": "Príkaz pre proces CLI zlyhal",
+    "invalidReply": "Neplatná odpoveď procesu CLI",
+    "unsafeCommand": "Použite /compact, /new, /skill, /models, /agents alebo /clear (iba lokálne).",
+    "status": "Pripojenie: {{connection}} · Proces CLI: {{runner}}",
+    "presenceStatus": "Hostitelia: {{connection}}",
+    "commandStatus": "Doručenie príkazu: {{status}}",
+    "delivered": "Doručené",
+    "expired": "Platnosť vypršala"
+  },
   "common": {
     "cancel": "Zrušiť",
     "done": "Hotovo",

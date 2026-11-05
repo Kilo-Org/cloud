@@ -43,7 +43,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ResponseBody | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: request.method,
+  });
   if (!success) {
     return nextResponse;
   }

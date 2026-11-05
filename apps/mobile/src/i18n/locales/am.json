@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "የNative የርቀት መቆጣጠሪያ ማሳያ",
+    "sessionsEmpty": "እስካሁን የNative ክፍለ ጊዜዎች የሉም",
+    "hosts": "በመስመር ላይ ያሉ አስተናጋጆች",
+    "hostsEmpty": "በመስመር ላይ ያሉ አስተናጋጆች የሉም",
+    "directory": "የሥራ ማውጫ",
+    "createSession": "የNative ክፍለ ጊዜ ፍጠር",
+    "queueIfOffline": "አስተናጋጁ ከመስመር ውጭ ከሆነ ጥያቄውን ወረፋ አስይዝ",
+    "prompt": "ጥያቄ ወይም /command",
+    "localClear": "የአካባቢ እይታን አጽዳ",
+    "abort": "ዙሩን አቋርጥ",
+    "failed": "የNative የርቀት እርምጃ አልተሳካም",
+    "creationUnknown": "ክፍለ ጊዜው መፈጠሩ አልታወቀም። እንደገና ከመሞከርዎ በፊት የክፍለ ጊዜዎችን ዝርዝር ያድሱ።",
+    "commandFailed": "የአስኬጁ ትዕዛዝ አልተሳካም",
+    "invalidReply": "ልክ ያልሆነ የአስኬጅ ምላሽ",
+    "unsafeCommand": "/compact፣ /new፣ /skill፣ /models፣ /agents ወይም /clear (በአካባቢ ብቻ) ይጠቀሙ።",
+    "status": "ግንኙነት፦ {{connection}} · አስኬጅ፦ {{runner}}",
+    "presenceStatus": "አስተናጋጆች፦ {{connection}}",
+    "commandStatus": "የትዕዛዝ መድረስ፦ {{status}}",
+    "delivered": "ደርሷል",
+    "expired": "ጊዜው አልፏል"
+  },
   "common": {
     "cancel": "ተው",
     "done": "ጨርስ",

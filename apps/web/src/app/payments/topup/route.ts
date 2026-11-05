@@ -78,7 +78,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   let accountCreatedAt: Date | string = currentUser.created_at;
   let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
-    const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
+    const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES, {
+      requestMethod: request.method,
+    });
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }

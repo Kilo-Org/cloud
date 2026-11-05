@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Native အဝေးထိန်း သရုပ်ပြ",
+    "sessionsEmpty": "Native ဆက်ရှင်များ မရှိသေးပါ",
+    "hosts": "အွန်လိုင်းရှိ ဟို့စ်များ",
+    "hostsEmpty": "အွန်လိုင်းရှိ ဟို့စ်များ မရှိပါ",
+    "directory": "အလုပ်လုပ်မည့် ဖိုင်တွဲ",
+    "createSession": "Native ဆက်ရှင် ဖန်တီးပါ",
+    "queueIfOffline": "ဟို့စ် အော့ဖ်လိုင်းဖြစ်နေလျှင် ညွှန်ကြားချက်ကို တန်းစီထားပါ",
+    "prompt": "ညွှန်ကြားချက် သို့မဟုတ် /command",
+    "localClear": "ဤစက်ပေါ်ရှိ မြင်ကွင်းကို ရှင်းပါ",
+    "abort": "အလှည့်ကို ရပ်ဆိုင်းပါ",
+    "failed": "Native အဝေးထိန်း လုပ်ဆောင်ချက် မအောင်မြင်ပါ",
+    "creationUnknown": "ဖန်တီးမှု ရလဒ်ကို မသိရပါ။ ထပ်မကြိုးစားမီ ဆက်ရှင်များကို ပြန်ရယူပါ။",
+    "commandFailed": "Runner အမိန့် မအောင်မြင်ပါ",
+    "invalidReply": "မမှန်ကန်သော Runner တုံ့ပြန်ချက်",
+    "unsafeCommand": "/compact၊ /new၊ /skill၊ /models၊ /agents သို့မဟုတ် /clear (ဤစက်ပေါ်တွင်သာ) ကို သုံးပါ။",
+    "status": "ချိတ်ဆက်မှု: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "ဟို့စ်များ: {{connection}}",
+    "commandStatus": "အမိန့် ပေးပို့မှု: {{status}}",
+    "delivered": "ပေးပို့ပြီး",
+    "expired": "သက်တမ်းကုန်ပြီ"
+  },
   "common": {
     "cancel": "ပယ်ဖျက်ပါ",
     "done": "ပြီးပါပြီ",

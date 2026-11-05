@@ -199,7 +199,7 @@ export function SessionRow({
   const row = (
     <View
       className={cn(
-        'relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3',
+        'relative flex-row items-center gap-3 py-[13px] pl-[18px] pr-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}

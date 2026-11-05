@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Onyesho la udhibiti wa mbali wa CLI native",
+    "sessionsEmpty": "Bado hakuna vikao vya CLI native",
+    "hosts": "Vizio vilivyo mtandaoni",
+    "hostsEmpty": "Hakuna vizio vilivyo mtandaoni",
+    "directory": "Saraka ya kazi",
+    "createSession": "Unda kikao cha CLI native",
+    "queueIfOffline": "Weka agizo kwenye foleni ikiwa kizio hakiko mtandaoni",
+    "prompt": "Agizo au /command",
+    "localClear": "Futa mwonekano wa ndani tu",
+    "abort": "Katisha zamu",
+    "failed": "Kitendo cha udhibiti wa mbali wa CLI native kimeshindwa",
+    "creationUnknown": "Matokeo ya uundaji hayajulikani. Onyesha upya vikao kabla ya kujaribu tena.",
+    "commandFailed": "Amri ya kiendeshi imeshindwa",
+    "invalidReply": "Jibu la kiendeshi si halali",
+    "unsafeCommand": "Tumia /compact, /new, /skill, /models, /agents au /clear (ndani tu).",
+    "status": "Muunganisho: {{connection}} · Kiendeshi: {{runner}}",
+    "presenceStatus": "Vizio: {{connection}}",
+    "commandStatus": "Uwasilishaji wa amri: {{status}}",
+    "delivered": "Imewasilishwa",
+    "expired": "Muda wake umeisha"
+  },
   "common": {
     "cancel": "Ghairi",
     "done": "Nimemaliza",

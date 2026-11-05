@@ -38,10 +38,10 @@ All paths are relative to `services/cloud-agent-next/` unless they start with
 | Byte path | Wrapper → Worker HTTP route → R2 binding | `WORKER_URL` is already on the native egress allowlist; direct R2 hosts are not |
 | Transport | Generalize the existing log upload channel | Already has scoped grants, size checks, and idempotent writes |
 | Bytes through the DO | Never | 8 MiB control outbox, single-threaded DO shared by all sibling chats |
-| Control-socket changes | None | No new frames, no `hello` capability negotiation |
+| Control-socket changes | One small request pair for grant renewal | No file data or artifact operations on the socket |
 | Index owner | Sandbox DO SQLite | Keyed by stable `sandboxId`; one sandbox serves exactly one workspace |
 | Stale-wrapper fence | Current `allocationId` + `wrapperId` in `AllocationState` | Existing state; do not add a new epoch |
-| Grant lifetime | Artifact scope bound to DO liveness, not a short expiry | Wrappers can outlive four hours (12-hour turns, unbounded allocations) |
+| Grant lifetime | Short-lived; the wrapper renews it from the Sandbox DO | Wrappers can outlive four hours (12-hour turns, unbounded allocations); also fixes log uploads |
 | Replacement sandboxes | No manual restore; rely on workspace tail snapshots | Avoids a second restore mechanism; R2 keeps the user-facing copy either way |
 | Safety without restore | Baseline on first scan; publish only observed changes | An empty or stale folder can never delete or overwrite newer R2 state |
 | Durability point | Turn-end flush | Idle stop destroys compute without a `shutdown` frame |
@@ -93,7 +93,7 @@ Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
   connection (`connection.ts`) generates its own random `wrapperId`.
 - There is no cap on allocation lifetime, and the grant is fixed at launch, so
   log uploads from a wrapper older than four hours already fail with `401`. The
-  12-hour turn work makes this common (see Section 8).
+  12-hour turn work makes this common; renewal (item 3) fixes it.
 
 ### Changes
 
@@ -102,29 +102,43 @@ Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
      `identity`, `scopes: ('logs' | 'workspace_artifacts')[]`, `iat`, `exp`.
    - Keep the current strict validation (signature, audience, clock skew,
      maximum header length).
-   - Validate age per scope:
-     - `logs`: `now - iat` within `CONTROL_LOG_GRANT_SECONDS`, as today. The log
-       route does not consult the DO, so it keeps a short window.
-     - `workspace_artifacts`: no age window beyond `exp`, because every artifact
-       route asks the Sandbox DO whether this exact allocation and wrapper are
-       connected. A grant is useless once its wrapper is replaced or stopped.
-   - Set `exp` long enough for any wrapper (for example 30 days).
+    - Keep the short lifetime (`SANDBOX_TRANSFER_GRANT_SECONDS`, four hours) for
+     every scope. Renewal (item 3) removes the need for long-lived grants.
    - Accept the old `control_log_upload` grant on log routes only, until older
      wrapper releases age out.
-2. **Minting.** Mint the grant on every wrapper launch, independent of whether
-   diagnostics are enabled. Include `workspace_artifacts` when the feature is
-   enabled for the session.
-3. **Env names.** Add `SANDBOX_TRANSFER_URL` (base:
+2. **Minting.** Extract minting into one Sandbox DO helper used at launch
+   (`wrapperLaunchEnv`, which already holds the signing secret) and at renewal.
+   Mint on every wrapper launch, independent of whether diagnostics are enabled.
+   Include `workspace_artifacts` when the feature is enabled for the session.
+3. **Renewal over the control connection.** The wrapper asks the Sandbox DO for
+   a fresh grant instead of relying on the launch-time one.
+   - Add a wrapper-to-DO request pair, `transfer.grant` / `transfer.grant.result`
+     (`{ requestId }` → `{ requestId, grant, expiresAt }` or an error), modeled on
+     `history.page` / `history.result` (`history-requests.ts`,
+     `history-pages.ts`). Handle it off the serial queue like `history.page`.
+   - The DO answers only when `connectionMatches` holds for the sending socket,
+     and mints for the identity it already knows: `sandboxId`, the current
+     `allocationId`, and `AllocationState.wrapperId`. The wrapper cannot choose
+     the identity or scopes.
+   - Gate it with a `transferGrants` capability in `hello`, following the
+     `startCommands` pattern. Older wrappers or DOs keep the launch-time grant.
+   - The wrapper's transfer client renews at half the grant's lifetime, and once
+     immediately on a `401`. It renews only while connected; uploads after a
+     disconnect use the last grant until it expires, which keeps the final log
+     upload working.
+   - Renewal fixes the existing problem of log uploads stopping after four
+     hours, which the 12-hour turn work would otherwise make common.
+4. **Env names.** Add `SANDBOX_TRANSFER_URL` (base:
    `${WORKER_URL}/sandbox-transfer/<sandboxId>/<allocationId>/<wrapperInstanceId>`)
    and `SANDBOX_TRANSFER_GRANT`. Keep emitting the `CONTROL_LOG_*` names for
    older wrappers during rollout. Update the allowlists in
    `runtime-bootstrap.ts` and `shared/runtime-environment.ts`.
-4. **One wrapper identity.** Pass `CONTROL_WRAPPER_INSTANCE_ID` into
+5. **One wrapper identity.** Pass `CONTROL_WRAPPER_INSTANCE_ID` into
    `createControlPlaneConnection({ wrapperId })` so the grant and the `hello`
    frame name the same wrapper. The Sandbox DO can then compare a transfer's
    `wrapperInstanceId` with `AllocationState.wrapperId`. Keep the random
    fallback when the env value is absent.
-5. **Worker route helpers.** Move `authorizeIdentity`, `declaredLength`,
+6. **Worker route helpers.** Move `authorizeIdentity`, `declaredLength`,
    `mediaType`, and `readBoundedBytes` into
    `src/sandbox-control/sandbox-transfer-http.ts`.
    - `authorizeTransfer(c, scope)` validates the grant, path identity, and scope.
@@ -133,14 +147,15 @@ Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
      `request.body` to `R2Bucket.put` with the `sha256` option, so R2 rejects a
      mismatched body. The body is never buffered.
    - Log routes keep their buffered, JSON-validated path.
-6. **Wrapper client.** Add `wrapper/src/control/sandbox-transfer-client.ts`.
-   - Holds the base URL and grant.
+7. **Wrapper client.** Add `wrapper/src/control/sandbox-transfer-client.ts`.
+   - Holds the base URL and the current grant, swapping in renewed grants from
+     item 3.
    - Provides `put` and `delete` with `redirect: 'error'`, abort signals,
      per-request timeouts, and bounded retry with jittered backoff on network
      errors, 429, and 5xx.
    - Returns a classified result (`ok`, `rejected` with status, `unavailable`).
    - The log uploader and diagnostics migrate to it with no behavior change.
-7. **Routes.** Register `/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/logs/...`
+8. **Routes.** Register `/sandbox-transfer/:sandboxId/:allocationId/:wrapperInstanceId/logs/...`
    with identical behavior to today, and keep `/sandbox-logs/...` as an alias.
 
 Main integration:
@@ -149,6 +164,11 @@ Main integration:
 - `src/sandbox-control/log-routes.ts`
 - New `src/sandbox-control/sandbox-transfer-http.ts`
 - `src/sandbox-control/wrapper-launch-env.ts`
+- `src/shared/control-plane-protocol.ts` (`transfer.grant` frames, `hello`
+  capability)
+- `src/control-plane/sandbox/sandbox-do.ts` and a new
+  `src/control-plane/sandbox/transfer-grants.ts` handler, modeled on
+  `history-pages.ts`
 - `src/sandbox-control/runtime-bootstrap.ts`
 - `src/shared/runtime-environment.ts`
 - `src/shared/control-diagnostics.ts`
@@ -157,6 +177,8 @@ Main integration:
 - `wrapper/src/control/file-log-uploader.ts`
 - `wrapper/src/control/diagnostics.ts`
 - `wrapper/src/control-plane/connection.ts`
+- New `wrapper/src/control-plane/transfer-grant-requests.ts`, modeled on
+  `history-requests.ts`
 - `wrapper/src/control-plane/main.ts`
 
 ## 2. Storage And Ownership
@@ -249,8 +271,8 @@ All RPCs take the grant identity and first check that
 `AllocationState.kind === 'connected'`, `allocationId` matches, and `wrapperId`
 equals `wrapperInstanceId`. A mismatch returns `stale` and the route responds
 `409`. The upload is stateless, so this check runs at commit time, not only at
-upload start. This liveness check is also what makes the long-lived artifact
-grant safe (Section 1).
+upload start. A still-valid grant held by a replaced wrapper is therefore
+rejected for artifacts even before it expires.
 
 ```ts
 reserveWorkspaceArtifactUpload(identity, { relativePath, sizeBytes }): Promise<
@@ -381,7 +403,8 @@ Run a scan every `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS`, never overlapping:
 - Files over the per-file cap, paths over the limits, and files that would
   exceed the quota are skipped with a diagnostic. They are retried only when
   they change.
-- `409` (stale) stops the synchronizer. `401` pauses it with a diagnostic.
+- `409` (stale) stops the synchronizer. `401` triggers one grant renewal and a
+  retry; a second `401` pauses it with a diagnostic until the next renewal.
   `503` and network errors back off and retry on the next scan.
 
 ### Idle behavior
@@ -598,20 +621,26 @@ Main integration:
   telemetry shows no older wrappers.
 - Deploy order: Worker and DO (routes, schema, RPCs, secrets) before the wrapper
   release that uses them, then the UI.
-- Coordinate with the 12-hour turn work: log uploads still stop after four hours
-  under this plan, because the log route does not consult the DO. Fixing that
-  (renewal, or a DO liveness check on log routes) belongs to the 12-hour work,
-  and should reuse the generalized grant from Section 1.
+- Coordinate with the 12-hour turn work: grant renewal (Section 1, item 3) also
+  keeps log uploads working past four hours. Whichever change lands first should
+  own the renewal request pair; the other reuses it.
+- Grant renewal needs both a new DO (frame handler) and a new wrapper
+  (`transferGrants` capability); mixed versions fall back to the launch-time
+  grant.
 
 ## 9. Verify
 
 ### Unit and integration tests
 
 - **Transfer channel:** existing log and diagnostic tests pass unchanged; scopes
-  are not interchangeable; a `logs` grant older than four hours is rejected
-  while an older `workspace_artifacts` grant still works for the connected
-  wrapper; a grant for a replaced allocation or wrapper is rejected; old grants
-  work only on log routes.
+  are not interchangeable; a grant for a replaced allocation or wrapper is
+  rejected on artifact routes; old grants work only on log routes.
+- **Grant renewal:** the DO mints only for a socket that passes
+  `connectionMatches`, with the identity and scopes it already holds; the
+  wrapper renews at half-life and on `401`; renewal stops while disconnected and
+  the last grant still serves the final log upload; logs and artifacts keep
+  uploading past four hours; peers without the `transferGrants` capability keep
+  the launch-time grant.
 - **Routes:** missing or oversized `Content-Length`, hash mismatch, quota, invalid
   paths, stale wrapper at commit, idempotent repeat commit, late delete with a
   stale hash, uncommitted objects swept.
@@ -674,7 +703,7 @@ Run focused formatting, type checks, and tests for
 | Question | Answer |
 |---|---|
 | Can a sandbox host more than one workspace? | No. One `/artifacts` and one index per sandbox |
-| Can a wrapper outlive the four-hour grant? | Yes (12-hour turns, no allocation cap). Artifact scope relies on DO liveness instead of a short expiry |
+| Can a wrapper outlive the four-hour grant? | Yes (12-hour turns, no allocation cap). The wrapper renews short-lived grants from the Sandbox DO over the control connection |
 | Download path | Presigned R2 GET |
 | Restore on replacement | None. Rely on workspace tail snapshots; baseline rule protects R2 |
 
@@ -686,8 +715,9 @@ Run focused formatting, type checks, and tests for
 
 ## Implementation Order
 
-1. Generalize the transfer channel: grant scopes and per-scope age rules, shared
-   wrapper identity, route helpers, wrapper client. No behavior change for logs.
+1. Generalize the transfer channel: grant scopes, DO-minted grant renewal,
+   shared wrapper identity, route helpers, wrapper client. Logs behave as today,
+   except that they keep uploading past four hours.
 2. Artifact bucket, credentials, index schema and migration, DO RPCs, transfer
    routes.
 3. Wrapper synchronizer with baseline state, and the turn-end flush.

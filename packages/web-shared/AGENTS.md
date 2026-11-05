@@ -56,6 +56,8 @@ work, work after the upstream request starts, and exceptional paths may use it.
   ambiguous failure, because the event may already be queued.
 - For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
+- Redis (`lib/redis`) has its primary in `fra1` and a read replica in `sfo1`:
+  reads are local, but treat writes like database writes.
 - Where correctness needs the primary on a rare path (read-after-write, a row
   lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
@@ -74,14 +76,6 @@ gateway deployment, or adding another production caller of the usage-accounting
 path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
-
-The same rule applies to `redisClient` from `lib/redis`: Redis is not in
-`sfo1`, so each command from an `sfo1` instance is a transatlantic round trip.
-Do not add Redis reads or writes before the upstream inference request starts;
-prefer an in-process cache or `readDb`, and defer writes with `after()`. Async
-work, work after the upstream request starts, and exceptional paths may use it.
-A Redis cache in front of a slower remote call, such as the BYOK data-key cache
-in front of KMS, is also allowed; comment why.
 
 ## Data collection versus ZDR
 

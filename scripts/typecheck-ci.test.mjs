@@ -307,7 +307,7 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
 
 function runTypecheck(
   t,
-  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '' } = {}
+  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -333,6 +333,10 @@ if (name === 'git') {
   else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
   else if (args.includes('*.ts') && changes.includes('cloud-agent-next')) console.log('services/cloud-agent-next/src/shared/protocol.ts');
   else if (args.includes('*.ts')) console.log('apps/extension/package.json');
+} else if (name === 'pnpm' && args[0] === 'ls') {
+  appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
+  const selected = process.env.SELECTED.split(',').filter(Boolean);
+  console.log(JSON.stringify(selected.map(entry => ({ name: entry }))));
 } else if (name === 'pnpm' && args[0] === '-r') {
   appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
   const result = spawnSync('sh', ['-c', process.env.EXTENSION_TYPECHECK], { stdio: 'inherit' });
@@ -362,6 +366,7 @@ if (name === 'git') {
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
+        SELECTED: selected,
         BUILD_EXIT: String(buildExit),
         CHECK_EXIT: String(checkExit),
         COMMAND_LOG: log,
@@ -427,15 +432,32 @@ test('a failed root tRPC build stops the typecheck', t => {
 
 // The wrapper compiles the service's own shared sources (its tsconfig includes
 // ../src/shared), which a package filter does not follow. A changes-only run
-// selects the wrapper through its own filter, once.
-test('a changes-only run selects the wrapper when the service changes', t => {
-  const result = runTypecheck(t, { root: true, changes: 'cloud-agent-next' });
+// selects the wrapper whenever the service lands in the selection, once.
+test('a changes-only run selects the wrapper when the service is selected', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'cloud-agent-next',
+    selected: 'cloud-agent-next',
+  });
   assert.equal(result.status, 0);
   assert.deepEqual(
     result.commands.filter(command => command.startsWith('pnpm -r')),
     [
       `pnpm -r --filter cloud-agent-next... --filter @kilocode/cloud-agent-wrapper ${workspaceFilters} run typecheck`,
     ]
+  );
+});
+
+test('a changes-only run leaves the wrapper out when the service is not selected', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'cloud-agent-next',
+    selected: '@kilocode/worker-utils',
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command.startsWith('pnpm -r')),
+    [`pnpm -r --filter cloud-agent-next... ${workspaceFilters} run typecheck`]
   );
 });
 

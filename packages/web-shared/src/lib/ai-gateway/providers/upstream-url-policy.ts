@@ -32,6 +32,14 @@ const DNS_LOOKUP_ATTEMPTS = 2;
 const DNS_RETRY_DELAY_MS = 100;
 const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const publicHostnameExpiresAt = new Map<string, number>();
+/**
+ * Resolutions in flight, keyed by normalized hostname. A validation reuses the
+ * entry for its host while that resolution is pending, and the entry is removed
+ * when the resolution settles so the next validation resolves again. The
+ * resolution is not tied to any one caller: each caller applies its own signal
+ * and deadline to the returned promise.
+ */
+const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -88,6 +96,30 @@ function cachePublicHostname(hostname: string, now: number): void {
 }
 
 /**
+ * Returns the resolution already in flight for `hostname`, or starts one and
+ * records it until it settles. Every validation of the same host awaits that
+ * one resolution; each caller applies its own signal and deadline to the
+ * promise it receives.
+ */
+function resolveSharedHostAddresses(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses
+): Promise<string[]> {
+  const pending = inFlightHostnameResolutions.get(hostname);
+  if (pending) return pending;
+
+  const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
+  inFlightHostnameResolutions.set(hostname, resolution);
+  const forget = () => {
+    if (inFlightHostnameResolutions.get(hostname) === resolution) {
+      inFlightHostnameResolutions.delete(hostname);
+    }
+  };
+  void resolution.then(forget, forget);
+  return resolution;
+}
+
+/**
  * Settles with `promise`, or rejects with the abort reason as soon as `signal`
  * aborts. `dns.lookup` cannot be cancelled, so a stalled getaddrinfo keeps its
  * thread-pool slot, but the request no longer waits for it.
@@ -106,6 +138,9 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
  * attempt has its own deadline, and a resolver that does not answer within it
  * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
  * disconnect or the request budget) rejects at once with its reason.
+ *
+ * Both attempts resolve through `resolveSharedHostAddresses`, so they start a
+ * system lookup only when no other validation already awaits one for the host.
  */
 async function resolveWithRetry(
   hostname: string,
@@ -121,7 +156,7 @@ async function resolveWithRetry(
     const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
     try {
       const addresses = await untilAborted(
-        resolveHostAddresses(hostname),
+        resolveSharedHostAddresses(hostname, resolveHostAddresses),
         signal ? AbortSignal.any([signal, deadline]) : deadline
       );
       if (addresses.length > 0) return addresses;
@@ -139,6 +174,7 @@ async function resolveWithRetry(
 
 export function clearUpstreamUrlPolicyCache(): void {
   publicHostnameExpiresAt.clear();
+  inFlightHostnameResolutions.clear();
 }
 
 /**

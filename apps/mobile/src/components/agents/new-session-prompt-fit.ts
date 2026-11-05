@@ -52,19 +52,21 @@ export function resolveComposerTopFadeHeight({
 }
 
 /**
- * Tallest window that still holds the form's whole first screenful, in points.
+ * Shortest window that still shows the form's whole first screenful at the
+ * preferred floor, in points.
  *
  * Measured on the design gate's compact cell — 360x640 dp at the default
  * density, text size and font scale — where the form's viewport ended at
  * 524.57 points and the repository picker's bottom edge at 568.38: the header
- * and the pinned Start footer take the other 115.43 of the 640. One three-line
+ * and the pinned Start footer take the other 115.43 of the 640. The three-line
  * floor therefore needs 683.81 points of window to show the whole trigger,
- * which is 44.19 points tall and gets 48 back from one line.
+ * which is 44.19 points tall and gets 48 back from one line. A shorter window
+ * does not hold it and takes the one-line floor.
  *
  * A height rule, not a portrait rule: a landscape phone is short too and takes
  * the one-line floor, and only a taller window keeps the preferred floor.
  */
-const NEW_SESSION_FIRST_SCREENFUL_MAX_WINDOW_HEIGHT = 684;
+const NEW_SESSION_FIRST_SCREENFUL_MIN_WINDOW_HEIGHT = 684;
 
 /** The smallest floor the fit allows, in lines. */
 const NEW_SESSION_SHORT_WINDOW_LINES = 1;
@@ -105,7 +107,7 @@ export function resolveNewSessionPromptLineCount({
   if (keyboardVisible || !Number.isFinite(windowHeight) || windowHeight <= 0) {
     return preferredLines;
   }
-  return windowHeight < NEW_SESSION_FIRST_SCREENFUL_MAX_WINDOW_HEIGHT
+  return windowHeight < NEW_SESSION_FIRST_SCREENFUL_MIN_WINDOW_HEIGHT
     ? NEW_SESSION_SHORT_WINDOW_LINES
     : preferredLines;
 }

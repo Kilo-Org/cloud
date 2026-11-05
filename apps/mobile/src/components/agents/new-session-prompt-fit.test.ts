@@ -222,7 +222,7 @@ describe('resolveNewSessionPromptLineCount', () => {
     expect(returned).toBeGreaterThan(OVERFLOW_BELOW_THE_FOLD);
   });
 
-  it('keeps the preferred floor from the window that holds the whole form', () => {
+  it('keeps the preferred floor from the shortest window that holds the whole form', () => {
     expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 683 })).toBe(1);
     expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 684 })).toBe(
       PREFERRED_LINES

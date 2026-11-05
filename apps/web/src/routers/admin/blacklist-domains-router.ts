@@ -7,7 +7,10 @@ import {
   getBlockedSignupTlds,
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { parseBlacklistDomainsConfig } from '@kilocode/worker-utils/account-access';
+import {
+  parseBlacklistDomainsConfig,
+  type ParsedBlacklistDomainsConfig,
+} from '@kilocode/worker-utils/account-access';
 import {
   BLACKLIST_DOMAINS_REDIS_KEY,
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
@@ -31,29 +34,32 @@ const SuspiciousDomainsInputSchema = z
   })
   .optional();
 
-async function readConfigOrThrow(): Promise<BlacklistDomainsConfig> {
+async function readConfigOrThrow(): Promise<ParsedBlacklistDomainsConfig> {
   const raw = await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY);
-  if (!raw) return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+  if (!raw) return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
   return parseBlacklistDomainsConfig(JSON.parse(raw));
 }
 
-async function readConfig(): Promise<BlacklistDomainsConfig> {
+async function readConfig(): Promise<ParsedBlacklistDomainsConfig> {
   try {
     return await readConfigOrThrow();
   } catch {
-    return DEFAULT_BLACKLIST_DOMAINS_CONFIG;
+    return { config: DEFAULT_BLACKLIST_DOMAINS_CONFIG, droppedDomains: 0 };
   }
 }
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    const config = await readConfig();
+    const { config, droppedDomains } = await readConfig();
     return {
       ...config,
       // The editor always shows an editable list: the stored one, or the
       // effective fallback (env or built-in) when the stored config predates
       // the field.
       blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
+      // Entries the stored list held beyond MAX_BLACKLIST_DOMAINS. Nonzero means
+      // the editor shows a prefix of the stored list.
+      dropped_domains: droppedDomains,
     };
   }),
 
@@ -69,7 +75,7 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // the automatic run in that case and let the manual backfill handle it.
     let previous: BlacklistDomainsConfig | null = null;
     try {
-      previous = await readConfigOrThrow();
+      previous = (await readConfigOrThrow()).config;
     } catch (error) {
       captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
     }

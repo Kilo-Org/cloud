@@ -82,6 +82,11 @@ async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
       snapshot,
       Date.now()
     );
+    if (snapshot.droppedDomains > 0) {
+      errorExceptInTest('[blacklist-domains] Stored domain list is longer than the cap:', {
+        droppedDomains: snapshot.droppedDomains,
+      });
+    }
     return snapshot;
   } catch (error) {
     errorExceptInTest('[blacklist-domains] Failed to read the blacklisted domains:', error);

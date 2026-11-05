@@ -166,6 +166,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
       config: null,
       fullReadAt: 0,
+      droppedDomains: 0,
     });
 
     const config = blocklistConfig({ domains: ['spam.com'], updated_at: 't1' });
@@ -173,6 +174,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, null, 0)).toEqual({
       config,
       fullReadAt: 0,
+      droppedDomains: 0,
     });
   });
 
@@ -202,6 +204,7 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(await refreshBlacklistDomainsConfig(redis.get, first, 60_000)).toEqual({
       config: changed,
       fullReadAt: 60_000,
+      droppedDomains: 0,
     });
   });
 
@@ -265,14 +268,18 @@ describe('parseBlacklistDomainsConfig', () => {
       blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 50) })
     );
 
-    expect(parsed.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
-    expect(parsed.domains[0]).toBe('bulk-0.example');
-    expect(parsed.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
+    expect(parsed.config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(parsed.config.domains[0]).toBe('bulk-0.example');
+    expect(parsed.config.domains.at(-1)).toBe(`bulk-${MAX_BLACKLIST_DOMAINS - 1}.example`);
+    expect(parsed.droppedDomains).toBe(50);
   });
 
   it('keeps every entry of a stored list within the cap', () => {
     const stored = blocklistConfig({ domains: ['spam.example', 'junk.example'] });
 
-    expect(parseBlacklistDomainsConfig(stored).domains).toEqual(['spam.example', 'junk.example']);
+    expect(parseBlacklistDomainsConfig(stored)).toEqual({
+      config: stored,
+      droppedDomains: 0,
+    });
   });
 });

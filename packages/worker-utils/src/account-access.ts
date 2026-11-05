@@ -204,25 +204,35 @@ export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema
 export type BlacklistDomainsConfigSnapshot = {
   config: BlacklistDomainsConfig | null;
   fullReadAt: number;
+  // Entries a stored list held beyond the cap; 0 when the whole list is used.
+  droppedDomains: number;
+};
+
+export type ParsedBlacklistDomainsConfig = {
+  config: BlacklistDomainsConfig;
+  droppedDomains: number;
 };
 
 /**
- * Parses one stored blocklist config. A stored list longer than the cap keeps
- * its first MAX_BLACKLIST_DOMAINS entries instead of failing to parse, so a
- * config written before the cap existed still enforces a bounded list.
+ * Parses one stored blocklist config and keeps its first MAX_BLACKLIST_DOMAINS
+ * entries, reporting how many entries it left out so the reader can surface a
+ * list that is longer than the cap.
  */
-export function parseBlacklistDomainsConfig(value: unknown): BlacklistDomainsConfig {
+export function parseBlacklistDomainsConfig(value: unknown): ParsedBlacklistDomainsConfig {
   if (value !== null && typeof value === 'object' && 'domains' in value) {
     const { domains } = value;
     if (Array.isArray(domains) && domains.length > MAX_BLACKLIST_DOMAINS) {
-      return BlacklistDomainsConfigSchema.parse({
-        ...value,
-        domains: domains.slice(0, MAX_BLACKLIST_DOMAINS),
-      });
+      return {
+        config: BlacklistDomainsConfigSchema.parse({
+          ...value,
+          domains: domains.slice(0, MAX_BLACKLIST_DOMAINS),
+        }),
+        droppedDomains: domains.length - MAX_BLACKLIST_DOMAINS,
+      };
     }
   }
 
-  return BlacklistDomainsConfigSchema.parse(value);
+  return { config: BlacklistDomainsConfigSchema.parse(value), droppedDomains: 0 };
 }
 
 /**
@@ -247,10 +257,12 @@ export async function refreshBlacklistDomainsConfig(
   }
 
   const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
-  return {
-    config: raw ? parseBlacklistDomainsConfig(JSON.parse(raw)) : null,
-    fullReadAt: now,
-  };
+  if (!raw) {
+    return { config: null, fullReadAt: now, droppedDomains: 0 };
+  }
+
+  const { config, droppedDomains } = parseBlacklistDomainsConfig(JSON.parse(raw));
+  return { config, fullReadAt: now, droppedDomains };
 }
 
 export function blacklistedDomainsFromConfig(

@@ -124,6 +124,14 @@ function EditTab() {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {data && data.dropped_domains > 0 && (
+          <p className="text-destructive flex items-center gap-2 text-xs">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            The stored list has {data.dropped_domains.toLocaleString()} more entries than the{' '}
+            {domainCount.toLocaleString()} shown here. Those entries are not shown or enforced, and
+            saving keeps the list above.
+          </p>
+        )}
         <Textarea
           placeholder={'example.com\nspam.org\nmalicious.net'}
           value={inputValue}

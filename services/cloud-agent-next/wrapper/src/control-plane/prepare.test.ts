@@ -4453,7 +4453,6 @@ describe('worktree snapshot preparation lifecycle', () => {
     ['empty', { found: true, applied: 0, omitted: 0, conflicts: [], partial: false }],
     ['partial', { found: true, applied: 2, omitted: 1, conflicts: [], partial: true }],
     ['conflicting', { found: true, applied: 1, omitted: 0, conflicts: ['a.txt', 'b.txt'] }],
-    ['invalid', { found: true, invalid: true }],
   ])(
     'treats a found %s snapshot as authoritative over legacy recovery and ingest',
     async (_name, snapshot) => {
@@ -4490,6 +4489,54 @@ describe('worktree snapshot preparation lifecycle', () => {
       expect(snapshots.registerCalls).toHaveLength(1);
     }
   );
+
+  it('falls back to legacy worktree recovery when the snapshot is unreadable', async () => {
+    const snapshots = createSnapshotFake({ restore: async () => ({ found: true, invalid: true }) });
+    let legacyCalls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+      recoverWorktree: async () => {
+        legacyCalls += 1;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(
+      worktreeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: legacyRecovery,
+      })
+    );
+
+    expect(legacyCalls).toBe(1);
+    expect(harness.stamp()?.snapshotRecovery).toBeUndefined();
+    expect(
+      harness.frames.some(
+        frame =>
+          frame.type === 'session.progress' &&
+          frame.detail === 'Saved worktree snapshot could not be read; trying older saved changes'
+      )
+    ).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('keeps ingest restoration when an unreadable snapshot has no legacy recovery', async () => {
+    const snapshots = createSnapshotFake({ restore: async () => ({ found: true, invalid: true }) });
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(
+      worktreeSpec({ git: { url: 'https://github.com/acme/repo.git' } })
+    );
+
+    expect(harness.stamp()?.snapshotRecovery).toBeUndefined();
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+  });
 
   it('falls back to legacy worktree recovery unchanged when the snapshot is missing', async () => {
     const snapshots = createSnapshotFake({ restore: async () => ({ found: false }) });

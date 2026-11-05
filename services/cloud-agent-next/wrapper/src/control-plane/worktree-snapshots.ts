@@ -697,6 +697,8 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
                 enqueue(state);
               }
             }, RETRY_MS);
+          } else if (state.uploadBlocked === undefined) {
+            requestCapture(state.directory);
           }
         } else if (state.trailing) {
           state.trailing = false;
@@ -824,7 +826,11 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     const worktreeIds = [...new Set([...states.values()].map(state => state.worktreeId))];
     if (worktreeIds.length === 0) return;
     const times = jwtTimes(grant);
-    if (times?.exp !== undefined && times.exp * 1000 <= clock.now()) return;
+    if (times?.exp !== undefined && times.exp * 1000 <= clock.now()) {
+      renewalStopped = true;
+      log('worktree snapshot grant expired; captures resume after the wrapper relaunches');
+      return;
+    }
 
     renewing = true;
     const abort = new AbortController();

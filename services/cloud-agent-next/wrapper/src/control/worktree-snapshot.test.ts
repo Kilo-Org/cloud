@@ -374,6 +374,99 @@ describe('worktree snapshot capture', () => {
     }
   });
 
+  it('uses the merge base when the tracking ref is ahead of HEAD', async () => {
+    const fixture = await createFixture('snapshot-ahead-');
+    const other = await clone(fixture, 'other');
+    try {
+      const head = git(fixture.work, ['rev-parse', 'HEAD']);
+      await fs.writeFile(path.join(other, 'upstream.txt'), 'upstream\n');
+      await fs.writeFile(path.join(other, 'tracked.txt'), 'upstream edit\n');
+      git(other, ['add', '.']);
+      git(other, ['commit', '-m', 'upstream']);
+      git(other, ['push', 'origin', 'main']);
+      git(fixture.work, ['fetch', 'origin']);
+      await fs.writeFile(path.join(fixture.work, 'local.txt'), 'local\n');
+
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.base).toBe(head);
+        expect(snapshot.manifest.deleted).toEqual([]);
+        expect(snapshot.manifest.omitted).toEqual([]);
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result).toEqual({ applied: 1, omitted: 0, conflicts: [], partial: false });
+        expect(await fs.readFile(path.join(target, 'local.txt'), 'utf8')).toBe('local\n');
+        expect(await fs.readFile(path.join(target, 'upstream.txt'), 'utf8')).toBe('upstream\n');
+        expect(await fs.readFile(path.join(target, 'tracked.txt'), 'utf8')).toBe('upstream edit\n');
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('captures unmerged paths and lists changed gitlinks as omitted submodules', async () => {
+    const fixture = await createFixture('snapshot-unmerged-');
+    try {
+      const submoduleCommit = git(fixture.work, ['rev-parse', 'HEAD']);
+      git(fixture.work, [
+        'update-index',
+        '--add',
+        '--cacheinfo',
+        `160000,${submoduleCommit},vendor/lib`,
+      ]);
+      git(fixture.work, ['commit', '-m', 'gitlink']);
+      git(fixture.work, ['push', 'origin', 'main']);
+
+      git(fixture.work, ['checkout', '-b', 'side']);
+      await fs.writeFile(path.join(fixture.work, 'tracked.txt'), 'side\n');
+      git(fixture.work, ['commit', '-m', 'side', '--', 'tracked.txt']);
+      const sideCommit = git(fixture.work, ['rev-parse', 'HEAD']);
+      git(fixture.work, ['checkout', 'main']);
+      await fs.writeFile(path.join(fixture.work, 'tracked.txt'), 'main\n');
+      git(fixture.work, ['commit', '-m', 'main', '--', 'tracked.txt']);
+      expect(() =>
+        execFileSync('git', ['merge', 'side'], { cwd: fixture.work, env: GIT_ENV, stdio: 'ignore' })
+      ).toThrow();
+      git(fixture.work, ['update-index', '--cacheinfo', `160000,${sideCommit},vendor/lib`]);
+
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        expect(snapshot.manifest.omitted).toContainEqual({
+          path: 'vendor/lib',
+          reason: 'submodule',
+        });
+        expect(snapshot.manifest.deleted).not.toContain('vendor/lib');
+        expect(snapshot.manifest.deleted).not.toContain('tracked.txt');
+
+        const target = await clone(fixture, 'target');
+        const result = await applyWorktreeSnapshot({
+          directory: target,
+          worktreeId: 'worktree_test',
+          archivePath: snapshot.archivePath,
+          signal: signal(),
+        });
+        expect(result.conflicts).toEqual([]);
+        expect(await fs.readFile(path.join(target, 'tracked.txt'), 'utf8')).toContain('<<<<<<<');
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
   it('omits files over the per-file and total byte caps and respects the file count cap', async () => {
     const fixture = await createFixture('snapshot-caps-');
     try {
@@ -1043,6 +1136,10 @@ describe('worktree snapshot apply', () => {
           ])
         ),
         gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ version: 2 }))])),
+        gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ capturedAt: '..' }))])),
+        gzipSync(
+          tarArchive([tarEntry('snapshot.json', manifestBytes({ capturedAt: 'not-a-time' }))])
+        ),
         Buffer.from('not a gzip stream'),
       ];
 

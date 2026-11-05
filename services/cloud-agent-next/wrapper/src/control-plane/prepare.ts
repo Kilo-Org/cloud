@@ -1412,14 +1412,21 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                     recoveryController.signal
                   );
                   recoveryController.signal.throwIfAborted();
-                  if (snapshot.found) {
+                  if (snapshot.found && snapshot.invalid) {
+                    log(
+                      `worktree snapshot unreadable session=${sessionId}; using fallback recovery`
+                    );
+                    emitProgress(
+                      sessionId,
+                      'restore',
+                      'Saved worktree snapshot could not be read; trying older saved changes'
+                    );
+                  } else if (snapshot.found) {
                     const conflicts = snapshot.conflicts ?? [];
                     emitProgress(
                       sessionId,
                       'restore',
-                      snapshot.invalid
-                        ? 'Saved worktree snapshot could not be read; continuing without saved changes'
-                        : `Restored ${snapshot.applied ?? 0} worktree changes; omitted ${snapshot.omitted ?? 0}; conflicts ${conflicts.length}${snapshot.partial ? ' (partial snapshot)' : ''}${conflicts.length ? `. Conflicting paths saved under .git/kilo-recovered/: ${conflicts.slice(0, 20).join(', ')}` : ''}`
+                      `Restored ${snapshot.applied ?? 0} worktree changes; omitted ${snapshot.omitted ?? 0}; conflicts ${conflicts.length}${snapshot.partial ? ' (partial snapshot)' : ''}${conflicts.length ? `. Conflicting paths saved under .git/kilo-recovered/: ${conflicts.slice(0, 20).join(', ')}` : ''}`
                     );
                     return { applied: true, snapshotRecovery: true as const };
                   }

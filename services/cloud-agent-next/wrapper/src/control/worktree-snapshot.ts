@@ -169,6 +169,13 @@ type GitResult = {
 
 type ArchiveMember = { kind: 'manifest' } | { kind: 'file'; path: string };
 
+type CapturePaths = {
+  tracked: string[];
+  untracked: string[];
+  deleted: string[];
+  submodules: string[];
+};
+
 const GIT_PREFIX = [
   '--no-pager',
   '--no-optional-locks',
@@ -179,6 +186,8 @@ const GIT_PREFIX = [
 ];
 
 const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const GITLINK_MODE = '160000';
 
 function compareStrings(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -463,10 +472,19 @@ async function collectCapturePaths(
   env: NodeJS.ProcessEnv,
   signal: AbortSignal,
   clock: Clock
-): Promise<{ tracked: string[]; untracked: string[]; deleted: string[] }> {
+): Promise<CapturePaths> {
   const diff = await runGit(
     root,
-    ['diff', '--name-status', '--no-renames', '--ignore-submodules=all', '-z', base, '--'],
+    [
+      'diff',
+      '--raw',
+      '--no-renames',
+      '--no-ext-diff',
+      '--ignore-submodules=none',
+      '-z',
+      base,
+      '--',
+    ],
     env,
     signal,
     clock
@@ -477,12 +495,24 @@ async function collectCapturePaths(
 
   const tracked: string[] = [];
   const deleted: string[] = [];
+  const submodules: string[] = [];
   const deletedSet = new Set<string>();
   const seen = new Set<string>();
   for (let index = 0; index < records.length; index += 2) {
-    const status = records[index];
+    const meta = records[index];
     const path = records[index + 1];
-    if (!path || status.length !== 1) throw new Error('git diff returned an invalid record');
+    const fields = meta.startsWith(':') ? meta.slice(1).split(' ') : [];
+    const [oldMode, newMode, , , status] = fields;
+    if (!path || fields.length !== 5 || status?.length !== 1) {
+      throw new Error('git diff returned an invalid record');
+    }
+    if (oldMode === GITLINK_MODE || newMode === GITLINK_MODE) {
+      if (!seen.has(path)) {
+        seen.add(path);
+        submodules.push(path);
+      }
+      continue;
+    }
     if (status === 'D') {
       if (!deletedSet.has(path)) {
         deletedSet.add(path);
@@ -492,7 +522,7 @@ async function collectCapturePaths(
     }
     if (seen.has(path)) continue;
     seen.add(path);
-    if (status === 'A' || status === 'M' || status === 'T') tracked.push(path);
+    if (status === 'A' || status === 'M' || status === 'T' || status === 'U') tracked.push(path);
     else throw new Error(`git diff returned unsupported status ${status}`);
   }
 
@@ -513,7 +543,8 @@ async function collectCapturePaths(
   tracked.sort(compareStrings);
   untracked.sort(compareStrings);
   deleted.sort(compareStrings);
-  return { tracked, untracked, deleted };
+  submodules.sort(compareStrings);
+  return { tracked, untracked, deleted, submodules };
 }
 
 function tarFileEntryBytes(name: string, mode: number, size: number): number {
@@ -560,7 +591,7 @@ async function captureFilesAndManifest(
   worktreeId: string,
   branch: string | null,
   base: string,
-  paths: { tracked: string[]; untracked: string[]; deleted: string[] },
+  paths: CapturePaths,
   limits: WorktreeSnapshotLimits,
   clock: Clock
 ): Promise<{ manifest: WorktreeSnapshotManifest; files: CapturedFile[] }> {
@@ -576,6 +607,8 @@ async function captureFilesAndManifest(
       omitted.push({ path: path.slice(0, 4096), reason });
     }
   }
+
+  for (const path of paths.submodules) omit(path, 'submodule');
 
   const ordered = [...paths.tracked, ...paths.untracked];
   const candidatePaths = new Set<string>();
@@ -763,8 +796,19 @@ export async function captureWorktreeSnapshotWithLimits(
       clock,
       { allow: [0, 1] }
     );
-    const candidate = remote.stdout.trim();
-    if (remote.exitCode === 0 && COMMIT_PATTERN.test(candidate)) base = candidate;
+    const remoteCommit = remote.stdout.trim();
+    if (remote.exitCode === 0 && COMMIT_PATTERN.test(remoteCommit)) {
+      const mergeBase = await runGit(
+        root,
+        ['merge-base', 'HEAD', remoteCommit],
+        gitEnv,
+        signal,
+        clock,
+        { allow: [0, 1, 128] }
+      );
+      const candidate = mergeBase.stdout.trim();
+      if (mergeBase.exitCode === 0 && COMMIT_PATTERN.test(candidate)) base = candidate;
+    }
   }
 
   if (!base) {
@@ -981,10 +1025,11 @@ function parseManifest(bytes: Buffer): WorktreeSnapshotManifest {
   if (typeof parsed.base !== 'string' || !COMMIT_PATTERN.test(parsed.base)) {
     throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid base commit');
   }
-  if (typeof parsed.capturedAt !== 'string' || parsed.capturedAt.length === 0) {
-    throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid capture time');
-  }
-  if (parsed.capturedAt.length > 128) {
+  if (
+    typeof parsed.capturedAt !== 'string' ||
+    !CAPTURED_AT_PATTERN.test(parsed.capturedAt) ||
+    !Number.isFinite(Date.parse(parsed.capturedAt))
+  ) {
     throw new InvalidWorktreeSnapshotError('snapshot manifest has an invalid capture time');
   }
   if (typeof parsed.partial !== 'boolean') {

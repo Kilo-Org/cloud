@@ -60,7 +60,8 @@ Not saved:
 - Commit messages and history. Unpushed commits come back as uncommitted changes, and
   the next auto-commit commits them again.
 - The staged-versus-unstaged distinction.
-- Ignored files, such as build output and `.env`.
+- Untracked ignored files, such as build output and `.env`. A tracked or force-added
+  file is saved even when `.gitignore` matches it, because Git reports it as changed.
 - Symlinks and submodules. These are listed as omitted.
 - Local branches, stashes and merge or rebase state.
 
@@ -78,22 +79,30 @@ Run Git as the existing producer does, with `--no-optional-locks` and
 
 ```sh
 branch=$(git symbolic-ref --short -q HEAD)
-base=$(git rev-parse --verify -q "refs/remotes/origin/$branch") \
+base=$(git merge-base HEAD "refs/remotes/origin/$branch") \
   || base=$(git merge-base HEAD refs/remotes/origin/HEAD)
-git diff --name-status --no-renames --ignore-submodules=all -z "$base" --
+git diff --raw --no-renames --no-ext-diff --ignore-submodules=none -z "$base" --
 git ls-files --others --exclude-standard -z
 ```
 
 - Use `refs/remotes/origin/<branch>`, not `@{upstream}`. A never-pushed branch is
   created without an upstream (`checkout -b <branch>` in `prepare.ts`), and an upstream
   can be repointed.
+- The base is the merge base of `HEAD` and that ref, as in the existing producer. A
+  tracking ref that a fetch moved ahead of `HEAD` would otherwise record upstream work
+  as local deletions and reverts.
 - `git push` updates the local remote-tracking ref, so pushed work drops out of the next
   snapshot without a fetch. Capture never fetches; a stale ref only makes the snapshot
   larger.
 - Detached HEAD uses the merge-base fallback. If neither ref resolves, as with no
   remote, do not capture; log it.
-- Paths with status `D` go in the deletion list. Every other path that is a regular
-  file goes in the archive. Anything else is omitted with a reason.
+- Paths with status `D` go in the deletion list. Unmerged paths (`U`) are saved as
+  modified files, conflict markers included. Every other path that is a regular file
+  goes in the archive. Gitlinks (mode `160000`) are omitted as submodules, and anything
+  else is omitted with a reason.
+- A path removed from the index but still on disk is reported both as `D` and as
+  untracked. The file on disk wins: it goes in the archive and not in the deletion
+  list.
 
 The archive is a gzipped tar written to a temporary file, never held whole in memory:
 
@@ -142,7 +151,7 @@ plan.
     sandbox.
 - **Start after restore.** A worktree starts capturing only after its route is ready
   and its restore step has settled. A capture therefore cannot overwrite a snapshot
-  that was not restored yet.
+  that was not read yet. An unreadable snapshot is replaced deliberately (see Restore).
 - **Never blocking.** Stop, turn completion and shutdown never wait for a capture.
   There is no shutdown flush.
 - **Bounds.** Git work and archiving get 20 seconds; the upload gets 60 seconds. A
@@ -184,15 +193,24 @@ periodic scan.
   A dying or partitioned old sandbox is refused as soon as a new allocation exists. The
   remaining window is one upload authorized just before the switch that finishes after
   it. The new sandbox restores first and captures only after its first tool or turn, so
-  an overlap needs a stalled upload.
+  an overlap needs a stalled upload. After the write, the route rechecks only the
+  tombstone, not the allocation: the object has already been replaced, so deleting it
+  would lose the newer snapshot as well. This window is accepted. Closing it needs a
+  per-allocation generation in the object key or a conditional write.
 - **Deletion.** `deleteWorktreeResources` in `src/control-plane/sandbox/sandbox-do.ts`
   deletes the object next to `worktreeChanges.purge(worktreeId)`. The tombstone refuses
   later uploads.
-- **Retention.** An R2 lifecycle rule deletes objects 30 days after their last upload,
-  matching the provider's 30-day unused disk-snapshot retention.
-  - This also bounds an existing leak: deleting a worktree's last chat only releases the
-    route and never purges (`release()` in `sandbox-do.ts`).
-  - A worktree resumed after 30 idle days falls back to today's behavior.
+- **Retention.** An R2 lifecycle rule deletes objects 30 days after their last upload.
+  - This clock is not the provider's 30-day unused disk-snapshot retention, which a
+    restore refreshes. A capture whose content is unchanged skips the upload, and a
+    restore does not rewrite the object, so a worktree restored repeatedly without file
+    changes still loses its object 30 days after its last content change.
+  - The rule bounds only the R2 objects. Deleting a worktree's last chat releases the
+    route without purging (`release()` in `sandbox-do.ts`), so the saved recovery
+    records in Sandbox DO storage remain. Purging them on last-route release is a
+    separate follow-up.
+  - A worktree resumed after 30 days without content changes falls back to today's
+    behavior.
 - **Logging.** Log metadata only: sizes, counts, digests and durations. Never log file
   contents or grants.
 
@@ -208,8 +226,13 @@ the legacy recovery:
    - On 404 (no snapshot, or reads disabled), run today's recovery unchanged.
    - If it still fails, fail preparation with a specific retryable error. Continuing
      would let the next capture overwrite the saved snapshot. The next message retries.
-   - On a digest mismatch, unreadable archive or unknown version, report that saved
-     changes could not be restored and continue. Captures resume.
+   - On a digest mismatch, unreadable archive or unknown version, report that the
+     snapshot could not be read and fall back to today's recovery: legacy recovery,
+     then session-ingest file replay. The workspace is not marked as snapshot-recovered.
+     Captures resume and the next capture replaces the unreadable object. Failing
+     preparation instead would block the session on every retry for a corrupt object.
+     A snapshot version is introduced by deploying readers before writers, so an older
+     wrapper does not meet a newer format in normal rollout.
 3. **Validate before extracting.**
    - List the members. Accept only `snapshot.json` and regular `files/...` entries.
    - Apply the existing path checks from `wrapper/src/control-plane/worktree-recovery.ts`.
@@ -230,7 +253,7 @@ the legacy recovery:
      message.
 5. **Write.** Write files with their mode and the current time, and delete listed paths
    that exist. Snapshot bytes win over files that setup modified.
-6. **Authority.** A snapshot that exists is authoritative even when empty, partial or
+6. **Authority.** A readable snapshot is authoritative even when empty, partial or
    conflicting. Set `localRecoveryApplied` so neither legacy recovery nor
    session-ingest file replay runs. Transcript import is unaffected. Report omitted and
    conflicting counts in one progress message.

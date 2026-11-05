@@ -60,9 +60,12 @@ describe('control wrapper launch environment', () => {
   });
 
   it('emits no diagnostic grants for an invalid worker origin', () => {
+    const credentialedOrigin = new URL('https://worker.example.com');
+    credentialedOrigin.username = 'user';
+    credentialedOrigin.password = 'fixture';
     const env = buildControlWrapperLaunchEnv({
       ...input,
-      workerUrl: 'https://user:pass@worker.example.com',
+      workerUrl: credentialedOrigin.toString(),
       worktreeSnapshotWrites: true,
     });
     expect(env.CONTROL_LOG_UPLOAD_URL).toBeUndefined();

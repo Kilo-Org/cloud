@@ -689,6 +689,91 @@ describe('worktree snapshot scheduler', () => {
       await rm(archive.directory, { recursive: true, force: true });
     }
   });
+
+  it('keeps the recapture when renewal succeeds while the failed capture cleans up', async () => {
+    const archive = await temporaryArchive(Buffer.from('slow cleanup upload'));
+    const fake = createFakeClock(22_000_000);
+    const renewed = identityGrant(22_001, 9_000_000);
+    let captures = 0;
+    let puts = 0;
+    let renewals = 0;
+    let releaseCleanup: (() => void) | undefined;
+    const { fetch } = createFetch(call => {
+      if (call.init.method === 'PUT') {
+        puts += 1;
+        return new Response(null, { status: puts === 1 ? 401 : 204 });
+      }
+      renewals += 1;
+      return Response.json({ grant: renewed });
+    });
+    const snapshots = createSnapshots({
+      url: BASE_URL,
+      grant: grant(22_000, 9_000_000),
+      clock: fake.clock,
+      capture: async () => {
+        captures += 1;
+        const first = captures === 1;
+        return captureWith({
+          path: archive.path,
+          size: archive.size,
+          contentDigest: 'e'.repeat(64),
+          cleanup: first
+            ? () =>
+                new Promise<void>(resolve => {
+                  releaseCleanup = resolve;
+                })
+            : undefined,
+        });
+      },
+      fetch,
+    });
+    try {
+      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => renewals === 1 && releaseCleanup !== undefined);
+      await fake.settle();
+      releaseCleanup?.();
+      await fake.settle();
+      await fake.advance(1_000);
+      await waitFor(() => puts === 2);
+      expect(captures).toBe(2);
+    } finally {
+      snapshots.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('logs and stops renewal when the grant has already expired', async () => {
+    const archive = await temporaryArchive(Buffer.from('expired grant upload'));
+    const fake = createFakeClock(30_000_000);
+    const logs: string[] = [];
+    let posts = 0;
+    const { fetch } = createFetch(call => {
+      if (call.init.method === 'POST') posts += 1;
+      return new Response(null, { status: call.init.method === 'PUT' ? 401 : 204 });
+    });
+    const snapshots = createSnapshots({
+      url: BASE_URL,
+      grant: grant(20_000, 29_000),
+      clock: fake.clock,
+      capture: async () =>
+        captureWith({ path: archive.path, size: archive.size, contentDigest: 'c'.repeat(64) }),
+      fetch,
+      log: message => logs.push(message),
+    });
+    try {
+      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      snapshots.requestCapture(DIRECTORY);
+      await fake.advance(1_000);
+      await waitFor(() => logs.some(message => message.includes('grant expired')));
+      await fake.advance(60_000);
+      expect(posts).toBe(0);
+    } finally {
+      snapshots.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('worktree snapshot grant renewal', () => {

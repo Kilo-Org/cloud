@@ -23,6 +23,7 @@ import {
   registerWorktreeSnapshotRoutes,
   WORKTREE_SNAPSHOT_ROUTE_PREFIX,
 } from '../../src/sandbox-control/worktree-snapshot-routes.js';
+import { WORKTREE_SNAPSHOT_MAX_BYTES } from '../../src/shared/worktree-snapshot.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -533,6 +534,143 @@ describe('worktree snapshot routes on the Workers runtime', () => {
     await runStaleUploadRace(true);
   });
 
+  it('publishes a held upload after allocation replacement when no newer publication intervenes', async () => {
+    const input = ids();
+    const { sandbox } = await seed('connected', input);
+    const key = worktreeSnapshotObjectKey(input.worktreeId);
+    const gated = gatedSnapshotBucket(bucket);
+    const bytes = new TextEncoder().encode('held-allocation-state');
+    const gate = gated.gateNextPut();
+
+    const upload = app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': await sha256Hex(bytes),
+        },
+        body: bytes,
+      },
+      appEnv(gated.bucket)
+    );
+
+    await gate.started;
+    await runInDurableObject(sandbox, async (_instance, doState) => {
+      const db = drizzle(doState.storage, { logger: false });
+      db.update(allocationTable)
+        .set({ allocation_id: crypto.randomUUID() })
+        .where(eq(allocationTable.id, 'current'))
+        .run();
+    });
+    gate.release();
+
+    expect((await upload).status).toBe(204);
+    expect(await objectBytes(key)).toEqual(bytes);
+
+    const get = await app().request(
+      path(input),
+      { method: 'GET', headers: { Authorization: `Bearer ${launchToken(input)}` } },
+      appEnv(gated.bucket)
+    );
+    expect(get.status).toBe(403);
+  });
+
+  it('leaves the last good checkpoint when the body is shorter than Content-Length', async () => {
+    const input = ids();
+    await seed('connected', input);
+    const key = worktreeSnapshotObjectKey(input.worktreeId);
+    const lastGood = new TextEncoder().encode('last-good-state');
+    await bucket.put(key, lastGood);
+    const bytes = new TextEncoder().encode('short-state');
+
+    const response = await app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(bytes.byteLength + 1),
+          'x-kilo-sha256': await sha256Hex(bytes),
+        },
+        body: bytes,
+      },
+      appEnv()
+    );
+
+    expect(response.status).toBe(400);
+    expect(await objectBytes(key)).toEqual(lastGood);
+  });
+
+  it('leaves the last good checkpoint when the digest does not match', async () => {
+    const input = ids();
+    await seed('connected', input);
+    const key = worktreeSnapshotObjectKey(input.worktreeId);
+    const lastGood = new TextEncoder().encode('last-good-state');
+    await bucket.put(key, lastGood);
+    const bytes = crypto.getRandomValues(new Uint8Array(1024));
+
+    const response = await app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': '0'.repeat(64),
+        },
+        body: bytes,
+      },
+      appEnv()
+    );
+
+    expect(response.status).toBe(400);
+    expect(await objectBytes(key)).toEqual(lastGood);
+  });
+
+  it('leaves the last good checkpoint when a lying Content-Length hides a body over the cap', async () => {
+    const input = ids();
+    await seed('connected', input);
+    const key = worktreeSnapshotObjectKey(input.worktreeId);
+    const lastGood = new TextEncoder().encode('last-good-state');
+    await bucket.put(key, lastGood);
+
+    const declaredLength = 1024;
+    const digest = await sha256Hex(new Uint8Array(declaredLength));
+    const chunkSize = 1024 * 1024;
+    const totalChunks = Math.ceil(WORKTREE_SNAPSHOT_MAX_BYTES / chunkSize) + 1;
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= totalChunks) {
+          controller.close();
+          return;
+        }
+        pulled += 1;
+        controller.enqueue(new Uint8Array(chunkSize));
+      },
+    });
+
+    const response = await app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(declaredLength),
+          'x-kilo-sha256': digest,
+        },
+        body,
+      },
+      appEnv()
+    );
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThan(totalChunks);
+    expect(await objectBytes(key)).toEqual(lastGood);
+  });
+
   it('deletes the snapshot and writes a tombstone with the worktree', async () => {
     const input = ids();
     const { sandbox } = await seed('stopped', input);
@@ -582,6 +720,65 @@ describe('worktree snapshot routes on the Workers runtime', () => {
     );
     expect(put.status).toBe(403);
     expect(await bucket.head(worktreeSnapshotObjectKey(input.worktreeId))).toBeNull();
+
+    const get = await app().request(
+      path(input),
+      { method: 'GET', headers: { Authorization: `Bearer ${launchToken(input)}` } },
+      appEnv()
+    );
+    expect(get.status).toBe(403);
+  });
+
+  it('deletes an upload that completes while the worktree deletion is in flight', async () => {
+    const input = ids();
+    const { sandbox } = await seed('connected', input);
+    const key = worktreeSnapshotObjectKey(input.worktreeId);
+    const gated = gatedSnapshotBucket(bucket);
+    const bytes = new TextEncoder().encode('racing-deletion-state');
+    const gate = gated.gateNextPut();
+
+    const upload = app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': await sha256Hex(bytes),
+        },
+        body: bytes,
+      },
+      appEnv(gated.bucket)
+    );
+
+    await gate.started;
+    await runInDurableObject(sandbox, async (_instance, doState) => {
+      const db = drizzle(doState.storage, { logger: false });
+      db.update(allocationTable)
+        .set({ state: 'stopped', connection_id: null })
+        .where(eq(allocationTable.id, 'current'))
+        .run();
+    });
+    await sandbox.deleteWorktreeResources({
+      worktreeId: input.worktreeId,
+      kiloUserId: 'user_snapshot',
+      location: { sandboxId: input.sandboxId, provider: 'cloudflare' },
+      sessionIds: [input.kiloSessionId],
+    });
+    gate.release();
+
+    expect((await upload).status).toBe(403);
+    expect(await bucket.head(key)).toBeNull();
+    await expect(
+      sandbox.isWorktreeSnapshotTombstoned({ worktreeId: input.worktreeId })
+    ).resolves.toBe(true);
+
+    const get = await app().request(
+      path(input),
+      { method: 'GET', headers: { Authorization: `Bearer ${launchToken(input)}` } },
+      appEnv(gated.bucket)
+    );
+    expect(get.status).toBe(403);
   });
 
   it('keeps the tombstone and unrelated queue operations available while a delete is held', async () => {

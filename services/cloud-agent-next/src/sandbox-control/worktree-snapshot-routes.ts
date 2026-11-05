@@ -103,6 +103,40 @@ function digestFromObject(object: R2Object): string | undefined {
   return [...new Uint8Array(checksum)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function isDigestError(error: unknown): boolean {
+  return error instanceof Error && /sha256|checksum|digest/i.test(error.message);
+}
+
+function fixedLengthBody(body: ReadableStream<Uint8Array>, length: number) {
+  let received = 0;
+  let sourceEnded = false;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      received += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+    flush() {
+      sourceEnded = true;
+    },
+  });
+  const fixed = new FixedLengthStream(length);
+  const readable = fixed.readable;
+  const settled = body
+    .pipeThrough(counter)
+    .pipeTo(fixed.writable)
+    .then(
+      () => 'ok' as const,
+      () => 'failed' as const
+    );
+  return {
+    readable,
+    settled,
+    received: () => received,
+    sourceEnded: () => sourceEnded,
+    abort: () => readable.cancel().catch(() => undefined),
+  };
+}
+
 async function discardIfCurrent(bucket: R2Bucket, key: string, etag: string): Promise<boolean> {
   const current = await bucket.head(key);
   if (!current || current.etag !== etag) return false;
@@ -130,7 +164,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
     const encoding = c.req.header('Content-Encoding');
     if (encoding && encoding !== 'identity') return c.text('Unsupported encoding', 415);
 
-    const body = c.req.raw.body;
+    const body: ReadableStream<Uint8Array> | null = c.req.raw.body;
     if (!body) return c.text('Missing request body', 400);
     const bucket = c.env.WORKTREE_SNAPSHOTS_BUCKET;
     if (!bucket) return c.text('Worktree snapshot storage unavailable', 503);
@@ -154,18 +188,43 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
     }
     if (!reauthorized) return c.text('Forbidden', 403);
 
-    let stored: R2Object | null;
+    const streamed = fixedLengthBody(body, length);
+
+    let stored: R2Object | null = null;
+    let putError: unknown;
     try {
-      stored = await bucket.put(key, body, {
+      stored = await bucket.put(key, streamed.readable, {
         sha256: digest,
         httpMetadata: { contentType: OBJECT_CONTENT_TYPE },
         customMetadata: { sha256: digest },
         onlyIf: precondition,
       });
     } catch (error) {
-      if (error instanceof Error && /sha256|checksum|digest/i.test(error.message)) {
-        return c.text('Digest mismatch', 400);
-      }
+      putError = error;
+    }
+
+    if (putError !== undefined || stored === null) {
+      await streamed.abort();
+    }
+    const pumped = await streamed.settled;
+    const received = streamed.received();
+    const overflow = received > length;
+    const underflow = streamed.sourceEnded() && received < length;
+
+    if (overflow || underflow) {
+      logger
+        .withFields({
+          event: 'worktree_snapshot_upload_length_mismatch',
+          sandboxId: authorized.sandboxId,
+          worktreeId: authorized.worktreeId,
+          declaredLength: length,
+          received,
+        })
+        .warn('Worktree snapshot upload length mismatch');
+      return c.text(overflow ? 'Body too large' : 'Body length mismatch', overflow ? 413 : 400);
+    }
+    if (putError !== undefined) {
+      if (isDigestError(putError)) return c.text('Digest mismatch', 400);
       logger
         .withFields({
           event: 'worktree_snapshot_upload_failed',
@@ -175,19 +234,16 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
         .warn('Worktree snapshot upload failed');
       return c.text('Worktree snapshot storage unavailable', 503);
     }
-    if (!stored) return c.text('Snapshot upload conflict', 409);
-
-    if (stored.size > WORKTREE_SNAPSHOT_MAX_BYTES) {
-      await discardIfCurrent(bucket, key, stored.etag).catch(() => {
-        logger
-          .withFields({
-            event: 'worktree_snapshot_discard_failed',
-            sandboxId: authorized.sandboxId,
-            worktreeId: authorized.worktreeId,
-          })
-          .warn('Worktree snapshot oversized upload discard failed');
-      });
-      return c.text('Body too large', 413);
+    if (stored === null) return c.text('Snapshot upload conflict', 409);
+    if (pumped === 'failed') {
+      logger
+        .withFields({
+          event: 'worktree_snapshot_upload_pipe_failed',
+          sandboxId: authorized.sandboxId,
+          worktreeId: authorized.worktreeId,
+        })
+        .warn('Worktree snapshot upload body failed after storage write');
+      return c.text('Worktree snapshot upload failed', 400);
     }
 
     let tombstoned: boolean;

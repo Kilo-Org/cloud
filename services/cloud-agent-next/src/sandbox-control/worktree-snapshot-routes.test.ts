@@ -10,6 +10,32 @@ import {
   WORKTREE_SNAPSHOT_ROUTE_PREFIX,
 } from './worktree-snapshot-routes.js';
 
+class NodeFixedLengthStream extends TransformStream<Uint8Array, Uint8Array> {
+  constructor(expectedLength: number) {
+    let received = 0;
+    super({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > expectedLength) {
+          controller.error(new Error('FixedLengthStream received too many bytes'));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+      flush(controller) {
+        if (received !== expectedLength) {
+          controller.error(new Error('FixedLengthStream received too few bytes'));
+        }
+      },
+    });
+  }
+}
+
+const fixedLengthGlobal = globalThis as unknown as {
+  FixedLengthStream?: new (length: number) => TransformStream<Uint8Array, Uint8Array>;
+};
+fixedLengthGlobal.FixedLengthStream ??= NodeFixedLengthStream;
+
 const secret = 'worktree-snapshot-route-test-secret';
 const rawCredential = 'a'.repeat(64);
 const identity = {
@@ -47,7 +73,13 @@ function path(): string {
 
 function createBucket() {
   return {
-    put: vi.fn().mockResolvedValue({ etag: 'etag-1' }),
+    put: vi.fn(async (_key: string, body: ReadableStream, options?: R2PutOptions) => {
+      const bytes = new Uint8Array(await new Response(body).arrayBuffer());
+      if (typeof options?.sha256 === 'string' && digest(bytes) !== options.sha256) {
+        throw new Error('sha256 checksum mismatch');
+      }
+      return { etag: 'etag-1', size: bytes.byteLength };
+    }),
     get: vi.fn().mockResolvedValue(null),
     head: vi.fn().mockResolvedValue(null),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -74,7 +106,6 @@ function createConditionalBucket() {
       started();
       await gate;
     }
-    const bytes = new Uint8Array(await new Response(body).arrayBuffer());
     const onlyIf = options?.onlyIf;
     const allowed =
       onlyIf !== undefined &&
@@ -83,6 +114,10 @@ function createConditionalBucket() {
         ? object?.etag === onlyIf.etagMatches
         : onlyIf.etagDoesNotMatch === '*' && object === null);
     if (!allowed) return null;
+    const bytes = new Uint8Array(await new Response(body).arrayBuffer());
+    if (typeof options?.sha256 === 'string' && digest(bytes) !== options.sha256) {
+      throw new Error('sha256 checksum mismatch');
+    }
     object = { etag: `etag-${++sequence}`, bytes };
     return { etag: object.etag, size: bytes.byteLength };
   });
@@ -431,18 +466,43 @@ describe('worktree snapshot PUT route', () => {
     expect(bucket.delete).toHaveBeenCalledWith(worktreeSnapshotObjectKey(worktreeId));
   });
 
-  it('discards a stored object larger than the cap despite a small declared length', async () => {
-    const { env, bucket, isWorktreeSnapshotTombstoned } = createEnv();
-    bucket.head.mockResolvedValueOnce(null).mockResolvedValueOnce({ etag: 'etag-1' });
-    bucket.put.mockResolvedValueOnce({ etag: 'etag-1', size: 64 * 1024 * 1024 + 1 });
-    const bytes = new TextEncoder().encode('snapshot');
+  it('rejects a body shorter than Content-Length without replacing the last good checkpoint', async () => {
+    const conditional = createConditionalBucket();
+    const { env } = createEnv({ WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket });
+    const lastGood = new TextEncoder().encode('last-good');
+    conditional.seedObject(lastGood);
+    const bytes = new TextEncoder().encode('short');
     const response = await app().request(
       path(),
       {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token()}`,
-          'Content-Length': String(bytes.byteLength),
+          'Content-Length': String(bytes.byteLength + 1),
+          'x-kilo-sha256': digest(bytes),
+        },
+        body: bytes,
+      },
+      requestEnv(env)
+    );
+    expect(response.status).toBe(400);
+    expect(conditional.storedBytes()).toEqual(lastGood);
+    expect(conditional.bucket.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects a body longer than Content-Length without replacing the last good checkpoint', async () => {
+    const conditional = createConditionalBucket();
+    const { env } = createEnv({ WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket });
+    const lastGood = new TextEncoder().encode('last-good');
+    conditional.seedObject(lastGood);
+    const bytes = new TextEncoder().encode('longer-than-declared');
+    const response = await app().request(
+      path(),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          'Content-Length': String(bytes.byteLength - 1),
           'x-kilo-sha256': digest(bytes),
         },
         body: bytes,
@@ -450,8 +510,50 @@ describe('worktree snapshot PUT route', () => {
       requestEnv(env)
     );
     expect(response.status).toBe(413);
-    expect(bucket.delete).toHaveBeenCalledWith(worktreeSnapshotObjectKey(worktreeId));
-    expect(isWorktreeSnapshotTombstoned).not.toHaveBeenCalled();
+    expect(conditional.storedBytes()).toEqual(lastGood);
+    expect(conditional.bucket.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects a checksum mismatch without replacing the last good checkpoint', async () => {
+    const conditional = createConditionalBucket();
+    const { env } = createEnv({ WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket });
+    const lastGood = new TextEncoder().encode('last-good');
+    conditional.seedObject(lastGood);
+    const bytes = new TextEncoder().encode('new-state');
+    const response = await app().request(
+      path(),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': '0'.repeat(64),
+        },
+        body: bytes,
+      },
+      requestEnv(env)
+    );
+    expect(response.status).toBe(400);
+    expect(conditional.storedBytes()).toEqual(lastGood);
+  });
+
+  it('publishes a held upload after authority changes following the pre-stream check', async () => {
+    const conditional = createConditionalBucket();
+    const { env, authorizeWorktreeSnapshot } = createEnv({
+      WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket,
+    });
+    const bytes = new TextEncoder().encode('held-state');
+    const server = app();
+    const gate = conditional.gateNextPut();
+
+    const upload = server.request(path(), putRequest(identity, bytes), requestEnv(env));
+    await gate.started;
+    authorizeWorktreeSnapshot.mockResolvedValue(false);
+    gate.release();
+
+    expect((await upload).status).toBe(204);
+    expect(conditional.storedBytes()).toEqual(bytes);
+    expect(authorizeWorktreeSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it('does not re-check authority after the conditional write', async () => {
@@ -478,26 +580,21 @@ describe('worktree snapshot PUT route', () => {
     expect(bucket.delete).not.toHaveBeenCalled();
   });
 
-  it('leaves a newer upload alone when the worktree is tombstoned after the upload', async () => {
-    const { env, bucket, isWorktreeSnapshotTombstoned } = createEnv();
-    isWorktreeSnapshotTombstoned.mockResolvedValueOnce(true);
-    bucket.head.mockResolvedValueOnce(null).mockResolvedValueOnce({ etag: 'etag-newer' });
-    const bytes = new TextEncoder().encode('snapshot');
-    const response = await app().request(
-      path(),
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token()}`,
-          'Content-Length': String(bytes.byteLength),
-          'x-kilo-sha256': digest(bytes),
-        },
-        body: bytes,
-      },
-      requestEnv(env)
-    );
+  it('does not let tombstone cleanup delete a newer publication', async () => {
+    const conditional = createConditionalBucket();
+    const { env, isWorktreeSnapshotTombstoned } = createEnv({
+      WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket,
+    });
+    const ourBytes = new TextEncoder().encode('our-state');
+    const newerBytes = new TextEncoder().encode('newer-state');
+    isWorktreeSnapshotTombstoned.mockImplementationOnce(async () => {
+      conditional.seedObject(newerBytes);
+      return true;
+    });
+    const response = await app().request(path(), putRequest(identity, ourBytes), requestEnv(env));
     expect(response.status).toBe(403);
-    expect(bucket.delete).not.toHaveBeenCalled();
+    expect(conditional.storedBytes()).toEqual(newerBytes);
+    expect(conditional.bucket.delete).not.toHaveBeenCalled();
   });
 
   it('rejects a stale allocation at the final authority check without writing', async () => {
@@ -705,6 +802,19 @@ describe('worktree snapshot GET route', () => {
   it('refuses a stale allocation, missing route, or tombstone from the DO', async () => {
     const { env, bucket, authorizeWorktreeSnapshot } = createEnv();
     authorizeWorktreeSnapshot.mockResolvedValueOnce(false);
+    const response = await app().request(
+      path(),
+      { method: 'GET', headers: { Authorization: `Bearer ${token()}` } },
+      requestEnv(env)
+    );
+    expect(response.status).toBe(403);
+    expect(bucket.get).not.toHaveBeenCalled();
+  });
+
+  it('rejects a tombstoned worktree even when a stored object remains', async () => {
+    const { env, bucket, authorizeWorktreeSnapshot } = createEnv();
+    authorizeWorktreeSnapshot.mockResolvedValueOnce(false);
+    bucket.get.mockResolvedValueOnce(objectBody());
     const response = await app().request(
       path(),
       { method: 'GET', headers: { Authorization: `Bearer ${token()}` } },

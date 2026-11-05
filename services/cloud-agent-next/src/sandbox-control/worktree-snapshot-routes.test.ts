@@ -346,6 +346,57 @@ describe('worktree snapshot PUT route', () => {
     expect(response.status).toBe(503);
   });
 
+  it.each([
+    ['conflict', 409],
+    ['storage failure', 503],
+  ] as const)(
+    'cancels a locked upload body on %s',
+    async (failure, status) => {
+      const cancel = vi.fn();
+      const bytes = new Uint8Array(32 * 1024);
+      const source = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.enqueue(bytes);
+          controller.enqueue(bytes);
+        },
+        cancel,
+      });
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      const bucket = {
+        ...createBucket(),
+        put: vi.fn(async (_key: string, body: ReadableStream<Uint8Array>) => {
+          reader = body.getReader();
+          await reader.read();
+          if (failure === 'storage failure') throw new Error('r2 unavailable');
+          return null;
+        }),
+      };
+      const { env } = createEnv({ WORKTREE_SNAPSHOTS_BUCKET: bucket });
+      try {
+        const response = await app().request(
+          path(),
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token()}`,
+              'Content-Length': String(1024 * 1024),
+              'x-kilo-sha256': digest(bytes),
+            },
+            body: source,
+            duplex: 'half',
+          } as RequestInit,
+          requestEnv(env)
+        );
+        expect(response.status).toBe(status);
+        await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+      } finally {
+        reader?.releaseLock();
+      }
+    },
+    1000
+  );
+
   it('rejects non-identity content encoding', async () => {
     const { env } = createEnv();
     const bytes = new TextEncoder().encode('snapshot');

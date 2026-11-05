@@ -108,32 +108,42 @@ function isDigestError(error: unknown): boolean {
 }
 
 function fixedLengthBody(body: ReadableStream<Uint8Array>, length: number) {
+  const controller = new AbortController();
+  const reader = body.getReader();
   let received = 0;
   let sourceEnded = false;
-  const counter = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      received += chunk.byteLength;
-      controller.enqueue(chunk);
+  const source = new ReadableStream<Uint8Array>({
+    async pull(output) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        sourceEnded = true;
+        output.close();
+      } else {
+        received += chunk.value.byteLength;
+        output.enqueue(chunk.value);
+      }
     },
-    flush() {
-      sourceEnded = true;
-    },
+    cancel: reason => reader.cancel(reason),
   });
   const fixed = new FixedLengthStream(length);
   const readable = fixed.readable;
-  const settled = body
-    .pipeThrough(counter)
-    .pipeTo(fixed.writable)
+  const settled = source
+    .pipeTo(fixed.writable, { signal: controller.signal })
     .then(
       () => 'ok' as const,
       () => 'failed' as const
-    );
+    )
+    .finally(() => reader.releaseLock());
   return {
     readable,
     settled,
     received: () => received,
     sourceEnded: () => sourceEnded,
-    abort: () => readable.cancel().catch(() => undefined),
+    abort: async () => {
+      controller.abort();
+      await reader.cancel().catch(() => undefined);
+      await readable.cancel().catch(() => undefined);
+    },
   };
 }
 

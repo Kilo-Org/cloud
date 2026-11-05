@@ -6,6 +6,7 @@
 // loading), and the later-page failure footer (rows kept + Retry). The query layer
 // is mocked so each state is driven directly through the screen JSX.
 
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,20 +71,52 @@ vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
   useRouteForegroundRefresh: vi.fn(),
 }));
 
+// The account provider as the screen sees it: the selection, and a writer whose
+// identity changes with that selection (`organization-context.tsx` memoizes it
+// on `state.organizationId`), which is what re-runs an effect keyed on it.
+const account = vi.hoisted(() => {
+  const setters = new Map<string | null, ReturnType<typeof vi.fn>>();
+  return {
+    organizationId: 'org-1' as string | null,
+    written: [] as (string | null)[],
+    setterFor(organizationId: string | null) {
+      const existing = setters.get(organizationId);
+      if (existing) {
+        return existing;
+      }
+      const created = vi.fn((next: string | null) => {
+        account.written.push(next);
+      });
+      setters.set(organizationId, created);
+      return created;
+    },
+    reset() {
+      setters.clear();
+      account.written = [];
+      account.organizationId = 'org-1';
+    },
+  };
+});
+
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
-    organizationId: 'org-1',
+    organizationId: account.organizationId,
     isLoaded: true,
-    setOrganizationId: vi.fn(),
+    setOrganizationId: account.setterFor(account.organizationId),
   }),
+}));
+
+const deepLink = vi.hoisted(() => ({
+  shouldPersistOverride: false,
+  effectiveOrganizationId: 'org-1',
 }));
 
 vi.mock('@/lib/org-deep-link', () => ({
   reconcileOrgDeepLink: () => ({
-    effectiveOrganizationId: 'org-1',
+    effectiveOrganizationId: deepLink.effectiveOrganizationId,
     validatedOrg: undefined,
     queryOrganizationId: 'org-1',
-    shouldPersistOverride: false,
+    shouldPersistOverride: deepLink.shouldPersistOverride,
     isResolving: false,
   }),
 }));
@@ -220,6 +253,9 @@ beforeEach(() => {
   pageHook.hasMore = false;
   queryErrors.errors = [];
   buttons.rendered = [];
+  account.reset();
+  deepLink.shouldPersistOverride = false;
+  deepLink.effectiveOrganizationId = 'org-1';
 });
 
 describe('OrganizationCreditActivityScreen loading', () => {
@@ -426,5 +462,37 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     expect(texts).toContain('Older credit activity is available.');
     expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+});
+
+describe('OrganizationCreditActivityScreen deep-linked organization', () => {
+  it('writes the linked organization once and never reverts a later account switch', async () => {
+    deepLink.shouldPersistOverride = true;
+    deepLink.effectiveOrganizationId = 'org-b';
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(OrganizationCreditActivityScreen)
+    );
+
+    expect(account.written).toEqual(['org-b']);
+
+    // Another screen switches the account. The writer's identity changes with
+    // the selection, so an effect re-keyed on it would write the param back and
+    // revert the switch. The re-render keeps the same tree, so the screen's own
+    // state survives it.
+    await act(() => {
+      account.organizationId = 'org-c';
+    });
+    await act(() => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(OrganizationCreditActivityScreen)
+        )
+      );
+    });
+
+    expect(account.written).toEqual(['org-b']);
+    unmount();
   });
 });

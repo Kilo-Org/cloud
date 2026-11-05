@@ -69,6 +69,32 @@ package manifests before running repository JavaScript or package scripts. Load
 | UI and product design | `DESIGN.md`, relevant app `AGENTS.md`; for `apps/web`, the `kilo-design-cloud` skill synced from `Kilo-Org/kilo-design` |
 | Contribution and PR workflow | `CONTRIBUTING.md` and relevant Git or PR skill |
 
+## Durable Object Automatic Retries
+
+- Read [Cloudflare's automatic retry contract](https://developers.cloudflare.com/durable-objects/best-practices/automatic-retries/) before changing Durable Object calls.
+- Prefer runtime retries through namespace-created stubs over application replay.
+- The runtime retries eligible transport failures without executing an unmarked method twice.
+- Default limits are five total attempts and a ten-second retry window, with exponential backoff and jitter.
+- The initial attempt is not cancelled by that window.
+- Mark safe prototype methods with `retryable()` from `cloudflare:durable-objects`, usually in a static class block.
+- Prove whole-method idempotency before marking: include return values, external effects, alarms, timestamps, and concurrent calls.
+- Do not mark claims, counters, one-time tickets, generated identifiers, or mixed mutation and WebSocket `fetch()` handlers.
+- A deduplicated write is not sufficient when replay changes a return flag that controls downstream effects.
+- A read name is not proof: some reads charge quotas, sweep connections, or update heartbeats.
+- Check upstream transport effects: even a controller GET can wake a stopped machine through an HTTPS proxy.
+- Marks belong to functions; overrides, bound copies, and wrappers need their own review.
+- Streams, RPC capabilities, pipelining, and stubs received through RPC prevent automatic retries.
+- Do not buffer large streams merely to make them retryable.
+- The runtime does not retry application exceptions, HTTP error responses, or overloaded objects.
+- Configure stub limits with `get()` or `getByName()` options: `{ retry: { maxRetries, timeoutMs } }`.
+- `maxRetries` accepts zero through ten; `timeoutMs` accepts five hundred through sixty thousand milliseconds.
+- A retry window is not a caller deadline; preserve explicit deadlines and cancellation for bounded operations.
+- `withDORetry` defaults to one application attempt and retains deadline handling.
+- Use explicit application replay only for audited idempotent contracts; each application attempt can multiply runtime attempts.
+- Never replay overloaded errors, including errors that also carry `retryable: true`.
+- Use official generated runtime declarations; do not add handwritten module declarations or casts for new platform APIs.
+- See `docs/do-automatic-retries.md` for the object inventory, method decisions, and verification constraints.
+
 ## Vercel Function Regions
 
 Our functions only ever run in these regions, regardless of what request metadata

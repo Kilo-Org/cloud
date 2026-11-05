@@ -9,6 +9,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import type { KiloClawEnv } from '../../types';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../../db';
 import type { OpenclawFileWriteValidation } from '../gateway-controller-types';
@@ -243,6 +244,18 @@ function formatJsonLogString(value: string): string {
 }
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getRoutingTarget,
+      this.prototype.getProviderMetadata,
+      this.prototype.getGmailOidcEmail,
+      this.prototype.getConfig,
+      this.prototype.listVolumeSnapshots,
+      this.prototype.listCandidateVolumes
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
 

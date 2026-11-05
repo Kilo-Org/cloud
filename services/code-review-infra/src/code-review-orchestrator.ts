@@ -5,6 +5,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
@@ -455,7 +456,11 @@ function classifyCloudAgentNextFreshSessionRetry(
  * Persists review state in storage and maintains connection to cloud agent.
  */
 export class CodeReviewOrchestrator extends DurableObject<Env> {
-  /** In-memory cache of current review state */
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.status, this.prototype.getStatus);
+    /* oxlint-enable typescript/unbound-method */
+  } /** In-memory cache of current review state */
   private state!: CodeReview;
 
   /** Shared typed client for cloud-agent-next tRPC endpoints */

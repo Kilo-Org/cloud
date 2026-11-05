@@ -23,6 +23,7 @@ export default defineConfig({
     name: 'unit',
     globals: true,
     environment: 'node',
+    setupFiles: ['./test/setup-durable-object-retries.ts'],
     include: ['src/**/*.test.ts', 'scripts/**/*.test.ts', 'test/unit/**/*.test.ts'],
     exclude: ['test/integration/**/*.test.ts'],
     coverage: {

@@ -14,6 +14,7 @@ import {
   runtimeSpecForContract,
 } from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
 import { admitScmRequest } from '../../scm-broker/admission.js';
 import {
@@ -694,6 +695,23 @@ function terminalRequestFrame(
 }
 
 export class SandboxControlV2 extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getSnapshotValidatorStatus,
+      this.prototype.getAllocationState,
+      this.prototype.getStatusSnapshot,
+      this.prototype.getWorkspaceBillingProjection,
+      this.prototype.getProviderRuntime,
+      this.prototype.status,
+      this.prototype.getWrapperId,
+      this.prototype.previewTarget,
+      this.prototype.getRuntimeCredentialProxyFence,
+      this.prototype.getAcceptedHandleIssuerLocator
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
+
   readonly sandboxId: string;
   private readonly db: ReturnType<typeof drizzle>;
   private readonly initialized: Promise<void>;

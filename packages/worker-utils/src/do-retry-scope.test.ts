@@ -13,6 +13,7 @@ describe('withDORetry scopes', () => {
       'scoped_operation',
       {
         ...DEFAULT_DO_RETRY_CONFIG,
+        maxAttempts: 3,
         scope: { deadlineAt: Date.now() + 100 },
       },
       { warn: () => undefined, error: () => undefined }

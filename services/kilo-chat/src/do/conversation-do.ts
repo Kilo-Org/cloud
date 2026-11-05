@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import {
   attachmentInitRequestSchema,
   buildReplyToMessageSnapshot,
@@ -311,6 +312,21 @@ export type RemoveReactionResult =
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getInfo,
+      this.prototype.isMember,
+      this.prototype.getMessage,
+      this.prototype.getLatestNonDeletedMessageId,
+      this.prototype.resolveMarkRead,
+      this.prototype.listMessages,
+      this.prototype.listMessagesIfMember,
+      this.prototype.setTyping,
+      this.prototype.getAttachmentForRead
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
   private nextUlid = monotonicFactory();
   private keyPrefix: string;

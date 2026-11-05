@@ -13,3 +13,5 @@ export class DurableObject<Env = unknown> {
 export class WorkerEntrypoint<Env = unknown> {
   constructor(_ctx: unknown, _env: Env) {}
 }
+
+export function retryable(..._methods: unknown[]): void {}

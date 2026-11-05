@@ -152,7 +152,7 @@ describe('native image forwarding', () => {
 });
 
 describe('cloudflare-containers creation causes', () => {
-  it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
+  it('does not replay shadow billing configuration after a runtime transport failure', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
     const failed = {
       isBillingBlocked: vi.fn().mockResolvedValue(false),
@@ -172,16 +172,15 @@ describe('cloudflare-containers creation causes', () => {
 
     await expect(
       provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
-    ).resolves.toMatchObject({ providerRef: expect.any(String) });
+    ).rejects.toBe(error);
 
-    expect(resolveHandle).toHaveBeenCalledTimes(3);
+    expect(resolveHandle).toHaveBeenCalledTimes(2);
     expect(failed.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling).toHaveBeenCalledOnce();
-    expect(recovered.configureBilling.mock.calls[0]).toEqual(failed.configureBilling.mock.calls[0]);
+    expect(recovered.configureBilling).not.toHaveBeenCalled();
   });
 
   it.each([
-    { flags: { retryable: true }, attempts: 3 },
+    { flags: { retryable: true }, attempts: 1 },
     { flags: { retryable: false }, attempts: 1 },
     { flags: { overloaded: true }, attempts: 1 },
   ])(

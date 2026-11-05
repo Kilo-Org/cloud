@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, isNull, and, inArray } from 'drizzle-orm';
@@ -84,6 +85,15 @@ function rowToReservation(
  * and backfills a registry entry.
  */
 export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.listProvisionReservations,
+      this.prototype.resolveDoKey,
+      this.prototype.findInstancesForUser
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db: DrizzleSqliteDODatabase;
   private ownerKey: string | null = null;
   private migrated = false;

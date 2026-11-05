@@ -31,6 +31,42 @@ describe('TriggerDO', () => {
   const testUserNamespace = `user/${testUserId}`;
   const testOrgNamespace = `org/${testOrgId}`;
 
+  it('repeats retryable reads without changing configuration, requests, or alarms', async () => {
+    const triggerId = 'retryable-reads';
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(triggerId));
+    await stub.configure(testUserNamespace, triggerId, {
+      promptTemplate: 'test',
+      activationMode: 'scheduled',
+      cronExpression: '0 * * * *',
+    });
+    const before = await runInDurableObject(stub, async (_instance, state) => ({
+      config: await state.storage.get('config'),
+      alarm: await state.storage.getAlarm(),
+      requests: drizzle(state.storage).select().from(requests).all(),
+      trigger: drizzle(state.storage).select().from(triggerConfig).all(),
+    }));
+    const firstConfig = await stub.getConfig();
+    const firstResponse = await stub.getConfigForResponse();
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await stub.isActive()).toBe(true);
+      expect(await stub.exists()).toBe(true);
+      expect(await stub.getConfig()).toEqual(firstConfig);
+      expect(await stub.getConfigForResponse()).toEqual(firstResponse);
+      expect(await stub.getAuthConfig()).toBeNull();
+      expect(await stub.listRequests()).toEqual({ requests: [] });
+      expect(await stub.getRequest('missing')).toBeNull();
+    }
+
+    const after = await runInDurableObject(stub, async (_instance, state) => ({
+      config: await state.storage.get('config'),
+      alarm: await state.storage.getAlarm(),
+      requests: drizzle(state.storage).select().from(requests).all(),
+      trigger: drizzle(state.storage).select().from(triggerConfig).all(),
+    }));
+    expect(after).toEqual(before);
+  });
+
   describe('configure', () => {
     it.each(['webhook', 'scheduled'] as const)(
       'persists immutable creator identity in SQLite, responses and KV for %s triggers',

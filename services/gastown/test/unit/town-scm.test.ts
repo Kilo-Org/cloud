@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkPRStatus, resolveGitHubToken } from '../../src/dos/town/town-scm';
-import { getGastownUserStub } from '../../src/dos/GastownUser.do';
-import { getGastownOrgStub } from '../../src/dos/GastownOrg.do';
 import { TownConfigSchema, type TownConfig } from '../../src/types';
 
 const creationRecords = vi.hoisted(() => ({
@@ -102,13 +100,12 @@ describe('resolveGitHubToken priority chain', () => {
   });
 
   describe.each([
-    { name: 'personal', owner: { owner_user_id: OWNER_USER_ID }, stub: getGastownUserStub },
+    { name: 'personal', owner: { owner_user_id: OWNER_USER_ID } },
     {
       name: 'org',
       owner: { owner_type: 'org' as const, organization_id: OWNER_ORG_ID },
-      stub: getGastownOrgStub,
     },
-  ])('$name owner lookup failures', ({ owner, stub }) => {
+  ])('$name owner lookup failures', ({ owner }) => {
     function context(requests: IntegrationTokenRequest[]) {
       return {
         env: fakeEnv({ requests }),
@@ -122,33 +119,21 @@ describe('resolveGitHubToken priority chain', () => {
       };
     }
 
-    it('recovers with a fresh stub after a retryable error', async () => {
-      creationRecords.failures.push(Object.assign(new Error('DO reset'), { retryable: true }));
-      const requests: IntegrationTokenRequest[] = [];
-      await expect(resolveGitHubToken(context(requests))).resolves.toMatchObject({
-        ok: true,
-        token: FRESH_INSTALLATION_TOKEN,
-      });
-      expect(stub).toHaveBeenCalledTimes(2);
-      expect(requests).toHaveLength(1);
-    });
-
-    it.each([
-      { retryable: true, attempts: 3 },
-      { retryable: false, attempts: 1 },
-    ])('returns a poll error after $attempts attempts', async ({ retryable, attempts }) => {
-      const error = Object.assign(new Error('Owner lookup unavailable'), { retryable });
-      creationRecords.failures.push(error, error, error);
-      const requests: IntegrationTokenRequest[] = [];
-      await expect(
-        checkPRStatus(context(requests), 'https://github.com/owner/repo/pull/1')
-      ).resolves.toEqual({
-        ok: false,
-        error: { kind: 'owner_lookup_failed', provider: 'github' },
-      });
-      expect(stub).toHaveBeenCalledTimes(attempts);
-      expect(requests).toEqual([]);
-    });
+    it.each([true, false])(
+      'returns an owner lookup error without issuing credentials when retryable=%s',
+      async retryable => {
+        const error = Object.assign(new Error('Owner lookup unavailable'), { retryable });
+        creationRecords.failures.push(error);
+        const requests: IntegrationTokenRequest[] = [];
+        await expect(
+          checkPRStatus(context(requests), 'https://github.com/owner/repo/pull/1')
+        ).resolves.toEqual({
+          ok: false,
+          error: { kind: 'owner_lookup_failed', provider: 'github' },
+        });
+        expect(requests).toEqual([]);
+      }
+    );
   });
 
   it('prefers github_cli_pat over everything else', async () => {

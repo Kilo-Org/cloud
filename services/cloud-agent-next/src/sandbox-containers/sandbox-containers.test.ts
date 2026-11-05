@@ -2440,7 +2440,7 @@ describe('SandboxContainers observe', () => {
     ];
 
     for (const combo of combos) {
-      const { instance, container } = setup({
+      const { instance, container, readRecord } = setup({
         record: combo.record,
         attachContainer: combo.attachContainer,
       });
@@ -2453,6 +2453,10 @@ describe('SandboxContainers observe', () => {
         state: combo.record.state,
         currentAllocationRef: combo.record.allocationRef,
       });
+      await expect(instance.observe(REF_A)).resolves.toEqual(observed);
+      await expect(instance.isContainerRunning()).resolves.toBe(combo.running);
+      await expect(instance.isContainerRunning()).resolves.toBe(combo.running);
+      expect(readRecord()).toEqual(combo.record);
       expect(container.startCalls).toHaveLength(0);
       expect(container.execCalls).toHaveLength(0);
       expect(container.destroyCalls).toBe(0);

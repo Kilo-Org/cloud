@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
@@ -205,6 +206,16 @@ export class KiloMcpOAuthStore
   extends DurableObject<Env>
   implements OAuthStoreApi, RefreshReuseStore, ProtectedRequestsApi, AuthenticatorEnrollmentApi
 {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getPendingAuthorization,
+      this.prototype.peekProtectedRequest,
+      this.prototype.getRefreshToken
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
+
   private readonly db: DrizzleSqliteDODatabase;
 
   constructor(ctx: DurableObjectState, env: Env) {

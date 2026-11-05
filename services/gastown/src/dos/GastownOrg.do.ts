@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { createTableOrgTowns, org_towns, OrgTownRecord } from '../db/tables/org-towns.table';
 import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
@@ -21,6 +22,15 @@ const WATCHDOG_INTERVAL_MS = 5 * 60_000;
  * by the org.
  */
 export class GastownOrgDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getTownAsync);
+    retryable(this.prototype.listTowns);
+    retryable(this.prototype.getRigAsync);
+    retryable(this.prototype.listRigs);
+    retryable(this.prototype.ping);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
 
@@ -65,15 +75,15 @@ export class GastownOrgDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${org_towns} (
-          ${org_towns.columns.id},
-          ${org_towns.columns.name},
-          ${org_towns.columns.owner_org_id},
-          ${org_towns.columns.created_by_user_id},
-          ${org_towns.columns.created_at},
-          ${org_towns.columns.updated_at}
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${org_towns} (
+        ${org_towns.columns.id},
+        ${org_towns.columns.name},
+        ${org_towns.columns.owner_org_id},
+        ${org_towns.columns.created_by_user_id},
+        ${org_towns.columns.created_at},
+        ${org_towns.columns.updated_at}
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `,
       [id, input.name, input.owner_org_id, input.created_by_user_id, timestamp, timestamp]
     );
 
@@ -141,17 +151,17 @@ export class GastownOrgDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${user_rigs} (
-          ${user_rigs.columns.id},
-          ${user_rigs.columns.town_id},
-          ${user_rigs.columns.name},
-          ${user_rigs.columns.git_url},
-          ${user_rigs.columns.default_branch},
-          ${user_rigs.columns.platform_integration_id},
-          ${user_rigs.columns.created_at},
-          ${user_rigs.columns.updated_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${user_rigs} (
+        ${user_rigs.columns.id},
+        ${user_rigs.columns.town_id},
+        ${user_rigs.columns.name},
+        ${user_rigs.columns.git_url},
+        ${user_rigs.columns.default_branch},
+        ${user_rigs.columns.platform_integration_id},
+        ${user_rigs.columns.created_at},
+        ${user_rigs.columns.updated_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
       [
         id,
         input.town_id,
@@ -191,10 +201,10 @@ export class GastownOrgDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${user_rigs}
-          WHERE ${user_rigs.columns.town_id} = ?
-          ORDER BY ${user_rigs.columns.created_at} DESC
-        `,
+        SELECT * FROM ${user_rigs}
+        WHERE ${user_rigs.columns.town_id} = ?
+        ORDER BY ${user_rigs.columns.created_at} DESC
+      `,
         [townId]
       ),
     ];

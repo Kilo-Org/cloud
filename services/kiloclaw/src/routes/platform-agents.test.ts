@@ -335,22 +335,17 @@ describe('platform agent config routes', () => {
     expect(deleteAgent).toHaveBeenCalledTimes(1);
   });
 
-  it('still auto-retries reads (listAgents) on a retryable DO error', async () => {
-    vi.useFakeTimers();
-    try {
-      const listAgents = vi
-        .fn()
-        .mockRejectedValueOnce(retryableError('DO transient'))
-        .mockResolvedValueOnce({ etag: 'e1', defaults: DEFAULTS_SUMMARY, agents: [] });
+  it('surfaces an exhausted native retry error without returning fabricated agent data', async () => {
+    const listAgents = vi
+      .fn()
+      .mockRejectedValueOnce(retryableError('DO transient internal detail'))
+      .mockResolvedValueOnce({ etag: 'e1', defaults: DEFAULTS_SUMMARY, agents: [] });
+    const response = await platform.request('/agents?userId=user-1', {}, baseEnv({ listAgents }));
 
-      const requestPromise = platform.request('/agents?userId=user-1', {}, baseEnv({ listAgents }));
-      await vi.runAllTimersAsync();
-      const response = await requestPromise;
-
-      expect(response.status).toBe(200);
-      expect(listAgents).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(response.status).toBe(500);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).not.toContain('DO transient internal detail');
+    expect(body).not.toHaveProperty('agents');
+    expect(listAgents).toHaveBeenCalledTimes(1);
   });
 });

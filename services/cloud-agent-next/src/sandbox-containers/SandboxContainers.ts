@@ -7,6 +7,7 @@ import {
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
@@ -261,6 +262,20 @@ function stopPath(
 }
 
 export class SandboxContainers extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.observe,
+      this.prototype.getEgressAudit,
+      this.prototype.getState,
+      this.prototype.isBillingBlocked,
+      this.prototype.isContainerRunning,
+      this.prototype.getBillingRuntimeStatus,
+      this.prototype.currentImage,
+      this.prototype.readCapture
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private queue: Promise<unknown> = Promise.resolve();
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;

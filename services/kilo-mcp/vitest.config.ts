@@ -11,6 +11,10 @@ const cloudflareWorkersStub = new URL(
   './src/test-support/cloudflare-workers-stub.ts',
   import.meta.url
 ).pathname;
+const cloudflareDurableObjectsStub = new URL(
+  './src/test-support/cloudflare-durable-objects-stub.ts',
+  import.meta.url
+).pathname;
 
 /** Serve `.sql` imports as raw text so tests run the real DO migrations. */
 function rawSql(): Plugin {
@@ -31,6 +35,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'cloudflare:workers': cloudflareWorkersStub,
+      'cloudflare:durable-objects': cloudflareDurableObjectsStub,
     },
   },
   test: {

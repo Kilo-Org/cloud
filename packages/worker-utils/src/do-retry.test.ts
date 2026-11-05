@@ -6,6 +6,8 @@ const mockLogger = {
   error: vi.fn(),
 };
 
+const retryConfig = { maxAttempts: 3, baseBackoffMs: 100, maxBackoffMs: 5000 };
+
 // Track delay values passed to setTimeout while resolving immediately
 const recordedDelays: number[] = [];
 let originalSetTimeout: typeof globalThis.setTimeout;
@@ -25,6 +27,49 @@ describe('withDORetry', () => {
   afterEach(() => {
     vi.stubGlobal('setTimeout', originalSetTimeout);
     vi.restoreAllMocks();
+  });
+
+  describe('runtime-first defaults', () => {
+    it('does not repeat an increment after its acknowledgement is lost', async () => {
+      const transportError = Object.assign(new Error('Reply lost after increment'), {
+        retryable: true,
+      });
+      let count = 0;
+      const operation = vi.fn(async () => {
+        count++;
+        throw transportError;
+      });
+      const getStub = vi.fn(() => ({}));
+
+      await expect(
+        withDORetry(getStub, operation, 'increment', undefined, mockLogger)
+      ).rejects.toBe(transportError);
+
+      expect(count).toBe(1);
+      expect(operation).toHaveBeenCalledOnce();
+      expect(getStub).toHaveBeenCalledOnce();
+      expect(recordedDelays).toHaveLength(0);
+    });
+
+    it('does not turn a successful claim into a rejected replay after a lost reply', async () => {
+      const transportError = Object.assign(new Error('Reply lost after claim'), {
+        retryable: true,
+      });
+      let claimed = false;
+      const operation = vi.fn(async () => {
+        if (claimed) return false;
+        claimed = true;
+        throw transportError;
+      });
+
+      await expect(withDORetry(() => ({}), operation, 'claim', undefined, mockLogger)).rejects.toBe(
+        transportError
+      );
+
+      expect(claimed).toBe(true);
+      expect(operation).toHaveBeenCalledOnce();
+      expect(recordedDelays).toHaveLength(0);
+    });
   });
 
   describe('successful operations', () => {
@@ -61,7 +106,7 @@ describe('withDORetry', () => {
         getStub,
         (stub: typeof mockStub1) => stub.getMetadata() as Promise<{ id: string }>,
         'getMetadata',
-        undefined,
+        retryConfig,
         mockLogger
       );
 
@@ -84,7 +129,7 @@ describe('withDORetry', () => {
         getStub,
         (stub: typeof mockStub1) => stub.update() as Promise<undefined>,
         'update',
-        undefined,
+        retryConfig,
         mockLogger
       );
 
@@ -108,7 +153,7 @@ describe('withDORetry', () => {
         getStub,
         (stub: typeof mockStub1) => stub.op() as Promise<string>,
         'op',
-        undefined,
+        retryConfig,
         mockLogger
       );
 
@@ -138,7 +183,7 @@ describe('withDORetry', () => {
             getStub,
             (stub: typeof mockStub) => stub.op() as Promise<string>,
             'op',
-            undefined,
+            retryConfig,
             mockLogger
           )
         ).rejects.toThrow(message);
@@ -163,11 +208,30 @@ describe('withDORetry', () => {
         getStub,
         (stub: typeof mockStub1) => stub.op() as Promise<string>,
         'op',
-        undefined,
+        retryConfig,
         mockLogger
       );
 
       expect(getStub).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not amplify overload even when explicit retries are enabled', async () => {
+      const error = Object.assign(new Error('Overloaded'), {
+        retryable: true,
+        overloaded: true,
+      });
+      const operation = vi.fn(async () => {
+        throw error;
+      });
+      const getStub = vi.fn(() => ({}));
+
+      await expect(
+        withDORetry(getStub, operation, 'overloaded', retryConfig, mockLogger)
+      ).rejects.toBe(error);
+
+      expect(operation).toHaveBeenCalledOnce();
+      expect(getStub).toHaveBeenCalledOnce();
+      expect(recordedDelays).toHaveLength(0);
     });
   });
 
@@ -182,7 +246,7 @@ describe('withDORetry', () => {
           getStub,
           (stub: typeof mockStub) => stub.op() as Promise<string>,
           'op',
-          undefined,
+          retryConfig,
           mockLogger
         )
       ).rejects.toThrow('Validation failed: invalid data');
@@ -201,7 +265,7 @@ describe('withDORetry', () => {
           getStub,
           (stub: typeof mockStub) => stub.op() as Promise<string>,
           'op',
-          undefined,
+          retryConfig,
           mockLogger
         )
       ).rejects.toThrow('Permanent failure');
@@ -218,7 +282,7 @@ describe('withDORetry', () => {
           getStub,
           (stub: typeof mockStub) => stub.op() as Promise<string>,
           'op',
-          undefined,
+          retryConfig,
           mockLogger
         )
       ).rejects.toThrow('string error');
@@ -238,12 +302,11 @@ describe('withDORetry', () => {
           getStub,
           (stub: typeof mockStub) => stub.op() as Promise<string>,
           'op',
-          undefined,
+          retryConfig,
           mockLogger
         )
       ).rejects.toThrow('Persistent transient error');
 
-      // Default is 3 attempts
       expect(getStub).toHaveBeenCalledTimes(3);
       expect(recordedDelays).toHaveLength(2); // 2 waits between 3 attempts
     });
@@ -359,7 +422,7 @@ describe('withDORetry', () => {
           getStub,
           (stub: typeof mockStub) => stub.op() as Promise<string>,
           'myOp',
-          undefined,
+          retryConfig,
           mockLogger
         )
       ).rejects.toThrow();

@@ -6,6 +6,7 @@ import {
   type WebhookBodyIssue,
 } from '@kilocode/worker-utils/webhook-body-validation';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { and, eq, inArray, ne, notInArray, sql, desc } from 'drizzle-orm';
@@ -144,6 +145,19 @@ type UpdateConfigInput = {
 };
 
 export class TriggerDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.isActive,
+      this.prototype.exists,
+      this.prototype.getConfig,
+      this.prototype.getConfigForResponse,
+      this.prototype.getAuthConfig,
+      this.prototype.listRequests,
+      this.prototype.getRequest
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -666,14 +680,14 @@ export class TriggerDO extends DurableObject<Env> {
 
     // Delete overflow rows, preserving in-progress requests
     this.db.run(sql`
-      DELETE FROM ${requestsTable}
-      WHERE ${requestsTable.id} IN (
-        SELECT ${requestsTable.id} FROM ${requestsTable}
-        WHERE ${requestsTable.process_status} NOT IN ('inprogress')
-        ORDER BY ${requestsTable.created_at} DESC
-        LIMIT -1 OFFSET ${MAX_REQUESTS}
-      )
-    `);
+    DELETE FROM ${requestsTable}
+    WHERE ${requestsTable.id} IN (
+      SELECT ${requestsTable.id} FROM ${requestsTable}
+      WHERE ${requestsTable.process_status} NOT IN ('inprogress')
+      ORDER BY ${requestsTable.created_at} DESC
+      LIMIT -1 OFFSET ${MAX_REQUESTS}
+    )
+  `);
 
     const message: WebhookDeliveryMessage = {
       namespace: config.namespace,

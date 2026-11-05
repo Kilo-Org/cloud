@@ -83,7 +83,9 @@ function getRequestBodyStream(request: Request): ReadableStream<Uint8Array> {
   });
 }
 
-function getOptionalExecutionContext(c: Context<ApiContext>): ExecutionContext | undefined {
+function getOptionalExecutionContext(
+  c: Context<ApiContext>
+): Pick<ExecutionContext, 'waitUntil'> | undefined {
   try {
     return c.executionCtx;
   } catch (error) {

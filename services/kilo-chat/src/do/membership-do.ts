@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -39,6 +40,11 @@ export type MarkReadAtLeastResult = {
 };
 
 export class MembershipDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.listConversations);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
 
   constructor(ctx: DurableObjectState, env: Env) {

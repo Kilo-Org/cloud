@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { WorkOS, type Event } from '@workos-inc/node';
 
 import type { PollResult, ScimSyncDOStatus } from '../types';
@@ -14,7 +15,11 @@ import {
 import { logger } from '../util/logger';
 
 export class ScimSyncDO extends DurableObject<Env> {
-  /**
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getStatus);
+    /* oxlint-enable typescript/unbound-method */
+  } /**
    * Arms the poll loop unless it is already armed. Idempotent, because the cron
    * watchdog calls it every five minutes and must never disturb a live alarm.
    */

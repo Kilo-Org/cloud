@@ -294,6 +294,28 @@ describe('CodeReviewOrchestrator recovery', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('repeats retryable status reads without writing state, alarms, or external calls', async () => {
+    const stub = getReviewStub();
+    const review = codeReview({ status: 'running', sessionId: 'existing-session' });
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('state', review);
+      await state.storage.setAlarm(Date.now() + 60_000);
+    });
+    const alarm = await storedAlarm(stub);
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+    const status = await stub.getStatus();
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await stub.getStatus()).toEqual(status);
+      expect(await stub.status()).toEqual(status);
+    }
+
+    expect(await storedReview(stub)).toEqual(review);
+    expect(await storedAlarm(stub)).toBe(alarm);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('start arms a fallback alarm for a queued review', async () => {
     const stub = getReviewStub();
 

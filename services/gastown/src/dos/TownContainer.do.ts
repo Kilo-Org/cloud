@@ -1,4 +1,5 @@
 import { Container } from '@cloudflare/containers';
+import { retryable } from 'cloudflare:durable-objects';
 import { ContainerUsageAdmissionError, type HeartbeatAck } from '@kilocode/container-usage';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
 import {
@@ -47,6 +48,11 @@ const ACCESS_REVOKED_KEY = 'container:accessRevoked';
  * over that WebSocket in real-time.
  */
 export class TownContainerDO extends Container<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getRegistry);
+    /* oxlint-enable typescript/unbound-method */
+  }
   defaultPort = 8080;
   sleepAfter = '10m';
 

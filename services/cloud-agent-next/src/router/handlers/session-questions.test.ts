@@ -127,7 +127,7 @@ describe('answerQuestion', () => {
     vi.clearAllMocks();
   });
 
-  it('resolves a fresh control-plane stub for each retry of the answer RPC', async () => {
+  it('does not replay an answer after the runtime surfaces an ambiguous failure', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     const firstAnswer = vi.fn().mockRejectedValueOnce(
       Object.assign(new Error('retryable answer failure'), {
@@ -137,8 +137,6 @@ describe('answerQuestion', () => {
     const secondAnswer = vi.fn().mockResolvedValue('sent');
     const sandboxSessions = {
       idFromName: vi.fn((name: string) => name),
-      // A distinct stub per resolution, so the retry can only succeed through a
-      // freshly built stub rather than the failed one.
       get: vi
         .fn()
         .mockReturnValueOnce({ answer: firstAnswer })
@@ -157,16 +155,16 @@ describe('answerQuestion', () => {
 
     await expect(
       caller.answerQuestion({ sessionId: SESSION_ID, questionId: 'q_1', answers: [['yes']] })
-    ).resolves.toEqual({ success: true });
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
 
     expect(fetchSessionMetadataMock).toHaveBeenCalledWith(
       expect.objectContaining({ SANDBOX_SESSION: sandboxSessions }),
       'user_owner',
       SESSION_ID
     );
-    expect(sandboxSessions.get).toHaveBeenCalledTimes(2);
+    expect(sandboxSessions.get).toHaveBeenCalledTimes(1);
     expect(firstAnswer).toHaveBeenCalledTimes(1);
-    expect(secondAnswer).toHaveBeenCalledTimes(1);
+    expect(secondAnswer).not.toHaveBeenCalled();
   });
 
   it('rejects a legacy session before reading metadata or resolving its DO', async () => {

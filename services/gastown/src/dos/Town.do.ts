@@ -7,6 +7,7 @@
  * AgentDOs to stay within the 10GB DO SQLite limit.
  */
 
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import * as Sentry from '@sentry/cloudflare';
 import { z } from 'zod';
@@ -237,6 +238,43 @@ const ESCALATION_JOIN = /* sql */ `
 `;
 
 export class TownDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getDashboardContext);
+    retryable(this.prototype.isDraining);
+    retryable(this.prototype.getDrainNonce);
+    retryable(this.prototype.getDrainStartedAt);
+    retryable(this.prototype.listRigs);
+    retryable(this.prototype.getRigAsync);
+    retryable(this.prototype.getWastelandConnection);
+    retryable(this.prototype.getRigConfig);
+    retryable(this.prototype.getBeadAsync);
+    retryable(this.prototype.listBeads);
+    retryable(this.prototype.listBeadEvents);
+    retryable(this.prototype.getAgentAsync);
+    retryable(this.prototype.getAgentByIdentity);
+    retryable(this.prototype.listAgents);
+    retryable(this.prototype.getHookedBead);
+    retryable(this.prototype.getAgentEvents);
+    retryable(this.prototype.reconstructConversation);
+    retryable(this.prototype.readCheckpoint);
+    retryable(this.prototype.getPendingNudges);
+    retryable(this.prototype.getMoleculeCurrentStep);
+    retryable(this.prototype.getMergeQueueData);
+    retryable(this.prototype.getMayorAgentId);
+    retryable(this.prototype.getMayorStatus);
+    retryable(this.prototype.listConvoys);
+    retryable(this.prototype.listConvoysDetailed);
+    retryable(this.prototype.getConvoyStatus);
+    retryable(this.prototype.listEscalations);
+    retryable(this.prototype.debugListWastelandBeads);
+    retryable(this.prototype.debugBeadSummary);
+    retryable(this.prototype.debugPendingNudges);
+    retryable(this.prototype.debugGetBead);
+    retryable(this.prototype.debugAgentMetadata);
+    retryable(this.prototype.debugTownEvents);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
   private _ownerUserId: string | undefined;
@@ -431,11 +469,11 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${beads}
-          WHERE json_extract(${beads.metadata}, '$.wasteland.wasteland_id') = ?
-            AND json_extract(${beads.metadata}, '$.wasteland.item_id') = ?
-          ORDER BY ${beads.created_at} ASC
-        `,
+        SELECT * FROM ${beads}
+        WHERE json_extract(${beads.metadata}, '$.wasteland.wasteland_id') = ?
+          AND json_extract(${beads.metadata}, '$.wasteland.item_id') = ?
+        ORDER BY ${beads.created_at} ASC
+      `,
         [input.wastelandId, input.itemId]
       ),
     ]);
@@ -1616,10 +1654,10 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${convoy_metadata.total_beads}
-          FROM ${convoy_metadata}
-          WHERE ${convoy_metadata.bead_id} = ?
-        `,
+        SELECT ${convoy_metadata.total_beads}
+        FROM ${convoy_metadata}
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
         [convoyId]
       ),
     ];
@@ -1643,10 +1681,10 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${convoy_metadata.total_beads}
-          FROM ${convoy_metadata}
-          WHERE ${convoy_metadata.bead_id} = ?
-        `,
+        SELECT ${convoy_metadata.total_beads}
+        FROM ${convoy_metadata}
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
         [convoyId]
       ),
     ];
@@ -1676,11 +1714,11 @@ export class TownDO extends DurableObject<Env> {
         query(
           this.sql,
           /* sql */ `
-            UPDATE ${beads}
-            SET ${beads.columns.dispatch_attempts} = 0,
-                ${beads.columns.last_dispatch_attempt_at} = NULL
-            WHERE ${beads.bead_id} = ?
-          `,
+          UPDATE ${beads}
+          SET ${beads.columns.dispatch_attempts} = 0,
+              ${beads.columns.last_dispatch_attempt_at} = NULL
+          WHERE ${beads.bead_id} = ?
+        `,
           [hookedBeadId]
         );
       }
@@ -1703,10 +1741,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agent_metadata}
-        SET ${agent_metadata.columns.dispatch_attempts} = 0
-        WHERE ${agent_metadata.bead_id} = ?
-      `,
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.dispatch_attempts} = 0
+      WHERE ${agent_metadata.bead_id} = ?
+    `,
       [agentId]
     );
 
@@ -1729,10 +1767,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agent_metadata}
-        SET ${agent_metadata.columns.dispatch_attempts} = 0
-        WHERE ${agent_metadata.bead_id} = ?
-      `,
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.dispatch_attempts} = 0
+      WHERE ${agent_metadata.bead_id} = ?
+    `,
       [agentId]
     );
 
@@ -1743,11 +1781,11 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.dispatch_attempts} = 0,
-              ${beads.columns.last_dispatch_attempt_at} = NULL
-          WHERE ${beads.bead_id} = ?
-        `,
+        UPDATE ${beads}
+        SET ${beads.columns.dispatch_attempts} = 0,
+            ${beads.columns.last_dispatch_attempt_at} = NULL
+        WHERE ${beads.bead_id} = ?
+      `,
         [hookedBeadId]
       );
     }
@@ -1793,10 +1831,10 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
+        UPDATE ${beads}
+        SET ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
         [now(), convoyId]
       );
     }
@@ -2000,11 +2038,11 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agent_metadata}
-        SET ${agent_metadata.columns.dispatch_attempts} = ?,
-            ${agent_metadata.columns.last_activity_at} = COALESCE(?, ${agent_metadata.columns.last_activity_at})
-        WHERE ${agent_metadata.bead_id} = ?
-      `,
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.dispatch_attempts} = ?,
+          ${agent_metadata.columns.last_activity_at} = COALESCE(?, ${agent_metadata.columns.last_activity_at})
+      WHERE ${agent_metadata.bead_id} = ?
+    `,
       [attempts, lastActivityAt ?? null, agentId]
     );
   }
@@ -2050,16 +2088,16 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${agent_nudges} (
-          ${agent_nudges.columns.nudge_id},
-          ${agent_nudges.columns.agent_bead_id},
-          ${agent_nudges.columns.message},
-          ${agent_nudges.columns.mode},
-          ${agent_nudges.columns.priority},
-          ${agent_nudges.columns.source},
-          ${agent_nudges.columns.expires_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${agent_nudges} (
+        ${agent_nudges.columns.nudge_id},
+        ${agent_nudges.columns.agent_bead_id},
+        ${agent_nudges.columns.message},
+        ${agent_nudges.columns.mode},
+        ${agent_nudges.columns.priority},
+        ${agent_nudges.columns.source},
+        ${agent_nudges.columns.expires_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
       [nudgeId, agentId, message, mode, priority, source, expiresAt]
     );
 
@@ -2073,10 +2111,10 @@ export class TownDO extends DurableObject<Env> {
         query(
           this.sql,
           /* sql */ `
-            UPDATE ${agent_nudges}
-            SET ${agent_nudges.columns.delivered_at} = datetime('now')
-            WHERE ${agent_nudges.nudge_id} = ?
-          `,
+          UPDATE ${agent_nudges}
+          SET ${agent_nudges.columns.delivered_at} = datetime('now')
+          WHERE ${agent_nudges.nudge_id} = ?
+        `,
           [nudgeId]
         );
         console.log(`${TOWN_LOG} queueNudge: immediate nudge delivered to agent=${agentId}`);
@@ -2107,20 +2145,20 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT
-            ${agent_nudges.nudge_id},
-            ${agent_nudges.message},
-            ${agent_nudges.mode},
-            ${agent_nudges.priority},
-            ${agent_nudges.source}
-          FROM ${agent_nudges}
-          WHERE ${agent_nudges.agent_bead_id} = ?
-            AND ${agent_nudges.delivered_at} IS NULL
-            AND (${agent_nudges.expires_at} IS NULL OR ${agent_nudges.expires_at} > datetime('now'))
-          ORDER BY
-            CASE ${agent_nudges.priority} WHEN 'urgent' THEN 0 ELSE 1 END ASC,
-            ${agent_nudges.created_at} ASC
-        `,
+        SELECT
+          ${agent_nudges.nudge_id},
+          ${agent_nudges.message},
+          ${agent_nudges.mode},
+          ${agent_nudges.priority},
+          ${agent_nudges.source}
+        FROM ${agent_nudges}
+        WHERE ${agent_nudges.agent_bead_id} = ?
+          AND ${agent_nudges.delivered_at} IS NULL
+          AND (${agent_nudges.expires_at} IS NULL OR ${agent_nudges.expires_at} > datetime('now'))
+        ORDER BY
+          CASE ${agent_nudges.priority} WHEN 'urgent' THEN 0 ELSE 1 END ASC,
+          ${agent_nudges.created_at} ASC
+      `,
         [agentId]
       ),
     ];
@@ -2141,10 +2179,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${agent_nudges}
-        SET ${agent_nudges.columns.delivered_at} = datetime('now')
-        WHERE ${agent_nudges.nudge_id} = ?
-      `,
+      UPDATE ${agent_nudges}
+      SET ${agent_nudges.columns.delivered_at} = datetime('now')
+      WHERE ${agent_nudges.nudge_id} = ?
+    `,
       [nudgeId]
     );
   }
@@ -2158,13 +2196,13 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          UPDATE ${agent_nudges}
-          SET ${agent_nudges.columns.delivered_at} = datetime('now')
-          WHERE ${agent_nudges.expires_at} IS NOT NULL
-            AND ${agent_nudges.expires_at} < datetime('now')
-            AND ${agent_nudges.delivered_at} IS NULL
-          RETURNING ${agent_nudges.nudge_id}
-        `,
+        UPDATE ${agent_nudges}
+        SET ${agent_nudges.columns.delivered_at} = datetime('now')
+        WHERE ${agent_nudges.expires_at} IS NOT NULL
+          AND ${agent_nudges.expires_at} < datetime('now')
+          AND ${agent_nudges.delivered_at} IS NULL
+        RETURNING ${agent_nudges.nudge_id}
+      `,
         []
       ),
     ];
@@ -2466,11 +2504,11 @@ export class TownDO extends DurableObject<Env> {
               query(
                 this.sql,
                 /* sql */ `
-                  UPDATE ${agent_metadata}
-                  SET ${agent_metadata.columns.status} = 'idle',
-                      ${agent_metadata.columns.last_activity_at} = ?
-                  WHERE ${agent_metadata.bead_id} = ?
-                `,
+                UPDATE ${agent_metadata}
+                SET ${agent_metadata.columns.status} = 'idle',
+                    ${agent_metadata.columns.last_activity_at} = ?
+                WHERE ${agent_metadata.bead_id} = ?
+              `,
                 [activityAt, targetAgentId]
               );
             }
@@ -2481,10 +2519,10 @@ export class TownDO extends DurableObject<Env> {
               query(
                 this.sql,
                 /* sql */ `
-                  UPDATE ${beads}
-                  SET ${beads.columns.last_dispatch_attempt_at} = ?
-                  WHERE ${beads.bead_id} = ?
-                `,
+                UPDATE ${beads}
+                SET ${beads.columns.last_dispatch_attempt_at} = ?
+                WHERE ${beads.bead_id} = ?
+              `,
                 [now(), restartBeadId]
               );
             }
@@ -2576,14 +2614,14 @@ export class TownDO extends DurableObject<Env> {
               query(
                 this.sql,
                 /* sql */ `
-                  UPDATE ${beads}
-                  SET ${beads.columns.assignee_agent_bead_id} = NULL,
-                      ${beads.columns.status} = 'open',
-                      ${beads.columns.updated_at} = ?
-                  WHERE ${beads.bead_id} = ?
-                    AND ${beads.status} != 'closed'
-                    AND ${beads.status} != 'failed'
-                `,
+                UPDATE ${beads}
+                SET ${beads.columns.assignee_agent_bead_id} = NULL,
+                    ${beads.columns.status} = 'open',
+                    ${beads.columns.updated_at} = ?
+                WHERE ${beads.bead_id} = ?
+                  AND ${beads.status} != 'closed'
+                  AND ${beads.status} != 'failed'
+              `,
                 [now(), beadToReassign]
               );
             }
@@ -2602,18 +2640,18 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.status} = 'closed',
-            ${beads.columns.closed_at} = ?,
-            ${beads.columns.updated_at} = ?,
-            ${beads.columns.metadata} = json_set(
-              COALESCE(${beads.metadata}, '{}'),
-              '$.resolution_action', ?,
-              '$.resolution_notes', ?,
-              '$.resolved_by', ?
-            )
-        WHERE ${beads.bead_id} = ?
-      `,
+      UPDATE ${beads}
+      SET ${beads.columns.status} = 'closed',
+          ${beads.columns.closed_at} = ?,
+          ${beads.columns.updated_at} = ?,
+          ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.metadata}, '{}'),
+            '$.resolution_action', ?,
+            '$.resolution_notes', ?,
+            '$.resolved_by', ?
+          )
+      WHERE ${beads.bead_id} = ?
+    `,
       [
         timestamp,
         timestamp,
@@ -3378,15 +3416,15 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${beads} (
-          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
-          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
-          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
-          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
-          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
-          ${beads.columns.closed_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${beads} (
+        ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+        ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+        ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+        ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+        ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+        ${beads.columns.closed_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
       [
         convoyId,
         'convoy',
@@ -3411,12 +3449,12 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${convoy_metadata} (
-          ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
-          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
-          ${convoy_metadata.columns.merge_mode}
-        ) VALUES (?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${convoy_metadata} (
+        ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
+        ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
+        ${convoy_metadata.columns.merge_mode}
+      ) VALUES (?, ?, ?, ?, ?)
+    `,
       [convoyId, parsed.beads.length, 0, null, convoyMergeMode]
     );
 
@@ -3424,12 +3462,12 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          INSERT INTO ${bead_dependencies} (
-            ${bead_dependencies.columns.bead_id},
-            ${bead_dependencies.columns.depends_on_bead_id},
-            ${bead_dependencies.columns.dependency_type}
-          ) VALUES (?, ?, ?)
-        `,
+        INSERT INTO ${bead_dependencies} (
+          ${bead_dependencies.columns.bead_id},
+          ${bead_dependencies.columns.depends_on_bead_id},
+          ${bead_dependencies.columns.dependency_type}
+        ) VALUES (?, ?, ?)
+      `,
         [bead.bead_id, convoyId, 'tracks']
       );
     }
@@ -3449,12 +3487,12 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT COUNT(1) AS count FROM ${bead_dependencies}
-          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
-          WHERE ${bead_dependencies.depends_on_bead_id} = ?
-            AND ${bead_dependencies.dependency_type} = 'tracks'
-            AND ${beads.status} = 'closed'
-        `,
+        SELECT COUNT(1) AS count FROM ${bead_dependencies}
+        INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+          AND ${beads.status} = 'closed'
+      `,
         [input.convoyId]
       ),
     ];
@@ -3463,10 +3501,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${convoy_metadata}
-        SET ${convoy_metadata.columns.closed_beads} = ?
-        WHERE ${convoy_metadata.bead_id} = ?
-      `,
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.closed_beads} = ?
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
       [closedCount, input.convoyId]
     );
 
@@ -3479,19 +3517,19 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = 'closed', ${beads.columns.closed_at} = ?, ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
+        UPDATE ${beads}
+        SET ${beads.columns.status} = 'closed', ${beads.columns.closed_at} = ?, ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
         [timestamp, timestamp, input.convoyId]
       );
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${convoy_metadata}
-          SET ${convoy_metadata.columns.landed_at} = ?
-          WHERE ${convoy_metadata.bead_id} = ?
-        `,
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.landed_at} = ?
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
         [timestamp, input.convoyId]
       );
       this.emitEvent({
@@ -3518,12 +3556,12 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.bead_id}, ${beads.status}, ${beads.assignee_agent_bead_id}
-          FROM ${bead_dependencies}
-          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
-          WHERE ${bead_dependencies.depends_on_bead_id} = ?
-            AND ${bead_dependencies.dependency_type} = 'tracks'
-        `,
+        SELECT ${beads.bead_id}, ${beads.status}, ${beads.assignee_agent_bead_id}
+        FROM ${bead_dependencies}
+        INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
         [convoyId]
       ),
     ];
@@ -3559,22 +3597,22 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.status} = 'closed',
-              ${beads.columns.closed_at} = ?,
-              ${beads.columns.updated_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
+        UPDATE ${beads}
+        SET ${beads.columns.status} = 'closed',
+            ${beads.columns.closed_at} = ?,
+            ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
         [timestamp, timestamp, convoyId]
       );
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${convoy_metadata}
-          SET ${convoy_metadata.columns.closed_beads} = ${convoy_metadata.columns.total_beads},
-              ${convoy_metadata.columns.landed_at} = ?
-          WHERE ${convoy_metadata.bead_id} = ?
-        `,
+        UPDATE ${convoy_metadata}
+        SET ${convoy_metadata.columns.closed_beads} = ${convoy_metadata.columns.total_beads},
+            ${convoy_metadata.columns.landed_at} = ?
+        WHERE ${convoy_metadata.bead_id} = ?
+      `,
         [timestamp, convoyId]
       );
     }
@@ -3672,15 +3710,15 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${beads} (
-          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
-          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
-          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
-          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
-          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
-          ${beads.columns.closed_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${beads} (
+        ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+        ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+        ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+        ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+        ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+        ${beads.columns.closed_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
       [
         convoyId,
         'convoy',
@@ -3708,13 +3746,13 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${convoy_metadata} (
-          ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
-          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
-          ${convoy_metadata.columns.feature_branch}, ${convoy_metadata.columns.merge_mode},
-          ${convoy_metadata.columns.staged}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${convoy_metadata} (
+        ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
+        ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
+        ${convoy_metadata.columns.feature_branch}, ${convoy_metadata.columns.merge_mode},
+        ${convoy_metadata.columns.staged}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
       [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
@@ -3768,12 +3806,12 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          INSERT INTO ${bead_dependencies} (
-            ${bead_dependencies.columns.bead_id},
-            ${bead_dependencies.columns.depends_on_bead_id},
-            ${bead_dependencies.columns.dependency_type}
-          ) VALUES (?, ?, ?)
-        `,
+        INSERT INTO ${bead_dependencies} (
+          ${bead_dependencies.columns.bead_id},
+          ${bead_dependencies.columns.depends_on_bead_id},
+          ${bead_dependencies.columns.dependency_type}
+        ) VALUES (?, ?, ?)
+      `,
         [createdBead.bead_id, convoyId, 'tracks']
       );
     }
@@ -3786,12 +3824,12 @@ export class TownDO extends DurableObject<Env> {
         query(
           this.sql,
           /* sql */ `
-            INSERT OR IGNORE INTO ${bead_dependencies} (
-              ${bead_dependencies.columns.bead_id},
-              ${bead_dependencies.columns.depends_on_bead_id},
-              ${bead_dependencies.columns.dependency_type}
-            ) VALUES (?, ?, ?)
-          `,
+          INSERT OR IGNORE INTO ${bead_dependencies} (
+            ${bead_dependencies.columns.bead_id},
+            ${bead_dependencies.columns.depends_on_bead_id},
+            ${bead_dependencies.columns.dependency_type}
+          ) VALUES (?, ?, ?)
+        `,
           [beadIds[i], beadIds[depIdx], 'blocks']
         );
       }
@@ -3850,11 +3888,11 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${bead_dependencies.bead_id}
-          FROM ${bead_dependencies}
-          WHERE ${bead_dependencies.depends_on_bead_id} = ?
-            AND ${bead_dependencies.dependency_type} = 'tracks'
-        `,
+        SELECT ${bead_dependencies.bead_id}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
         [convoyId]
       ),
     ];
@@ -3878,10 +3916,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${convoy_metadata}
-        SET ${convoy_metadata.columns.staged} = 0
-        WHERE ${convoy_metadata.bead_id} = ?
-      `,
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.staged} = 0
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
       [convoyId]
     );
 
@@ -3909,8 +3947,8 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `${CONVOY_JOIN}
-          WHERE ${beads.status} != 'closed'
-          ORDER BY ${beads.created_at} DESC`,
+        WHERE ${beads.status} != 'closed'
+        ORDER BY ${beads.created_at} DESC`,
         []
       ),
     ];
@@ -3976,18 +4014,18 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.bead_id}, ${beads.title}, ${beads.status},
-                 ${beads.rig_id},
-                 ${beads.assignee_agent_bead_id},
-                 agent_beads.${beads.columns.title} AS assignee_agent_name
-          FROM ${bead_dependencies}
-          INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
-          LEFT JOIN ${beads} AS agent_beads
-            ON ${beads.assignee_agent_bead_id} = agent_beads.${beads.columns.bead_id}
-          WHERE ${bead_dependencies.depends_on_bead_id} = ?
-            AND ${bead_dependencies.dependency_type} = 'tracks'
-          ORDER BY ${beads.created_at} ASC
-        `,
+        SELECT ${beads.bead_id}, ${beads.title}, ${beads.status},
+               ${beads.rig_id},
+               ${beads.assignee_agent_bead_id},
+               agent_beads.${beads.columns.title} AS assignee_agent_name
+        FROM ${bead_dependencies}
+        INNER JOIN ${beads} ON ${bead_dependencies.bead_id} = ${beads.bead_id}
+        LEFT JOIN ${beads} AS agent_beads
+          ON ${beads.assignee_agent_bead_id} = agent_beads.${beads.columns.bead_id}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+        ORDER BY ${beads.created_at} ASC
+      `,
         [convoyId]
       ),
     ];
@@ -4021,10 +4059,10 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        UPDATE ${escalation_metadata}
-        SET ${escalation_metadata.columns.acknowledged} = 1, ${escalation_metadata.columns.acknowledged_at} = ?
-        WHERE ${escalation_metadata.bead_id} = ? AND ${escalation_metadata.acknowledged} = 0
-      `,
+      UPDATE ${escalation_metadata}
+      SET ${escalation_metadata.columns.acknowledged} = 1, ${escalation_metadata.columns.acknowledged_at} = ?
+      WHERE ${escalation_metadata.bead_id} = ? AND ${escalation_metadata.acknowledged} = 0
+    `,
       [now(), escalationId]
     );
     // Acknowledging an escalation also closes it — the mayor has seen
@@ -4095,15 +4133,15 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${beads} (
-          ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
-          ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
-          ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
-          ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
-          ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
-          ${beads.columns.closed_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${beads} (
+        ${beads.columns.bead_id}, ${beads.columns.type}, ${beads.columns.status},
+        ${beads.columns.title}, ${beads.columns.body}, ${beads.columns.rig_id},
+        ${beads.columns.parent_bead_id}, ${beads.columns.assignee_agent_bead_id},
+        ${beads.columns.priority}, ${beads.columns.labels}, ${beads.columns.metadata},
+        ${beads.columns.created_by}, ${beads.columns.created_at}, ${beads.columns.updated_at},
+        ${beads.columns.closed_at}
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
       [
         beadId,
         'escalation',
@@ -4127,12 +4165,12 @@ export class TownDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${escalation_metadata} (
-          ${escalation_metadata.columns.bead_id}, ${escalation_metadata.columns.severity},
-          ${escalation_metadata.columns.category}, ${escalation_metadata.columns.acknowledged},
-          ${escalation_metadata.columns.re_escalation_count}, ${escalation_metadata.columns.acknowledged_at}
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `,
+      INSERT INTO ${escalation_metadata} (
+        ${escalation_metadata.columns.bead_id}, ${escalation_metadata.columns.severity},
+        ${escalation_metadata.columns.category}, ${escalation_metadata.columns.acknowledged},
+        ${escalation_metadata.columns.re_escalation_count}, ${escalation_metadata.columns.acknowledged_at}
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `,
       [beadId, input.severity, input.category ?? null, 0, 0, null]
     );
 
@@ -4307,10 +4345,10 @@ export class TownDO extends DurableObject<Env> {
           ...query(
             this.sql,
             /* sql */ `
-            SELECT ${agent_metadata.bead_id}
-            FROM ${agent_metadata}
-            WHERE ${agent_metadata.status} IN ('working', 'stalled')
-          `,
+          SELECT ${agent_metadata.bead_id}
+          FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} IN ('working', 'stalled')
+        `,
             []
           ),
         ]);
@@ -4861,16 +4899,16 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.bead_id} FROM ${beads}
-          WHERE ${beads.type} = 'issue'
-            AND ${beads.labels} LIKE ?
-            AND ${beads.created_by} = 'patrol'
-            AND (
-              ${beads.status} IN ('open', 'in_progress')
-              OR (${beads.status} = 'failed' AND ${beads.updated_at} > ?)
-            )
-          LIMIT 1
-        `,
+        SELECT ${beads.bead_id} FROM ${beads}
+        WHERE ${beads.type} = 'issue'
+          AND ${beads.labels} LIKE ?
+          AND ${beads.created_by} = 'patrol'
+          AND (
+            ${beads.status} IN ('open', 'in_progress')
+            OR (${beads.status} = 'failed' AND ${beads.updated_at} > ?)
+          )
+        LIMIT 1
+      `,
         [triageBatchLike, cooldownCutoff]
       ),
     ];
@@ -5051,11 +5089,11 @@ export class TownDO extends DurableObject<Env> {
       query(
         this.sql,
         /* sql */ `
-          UPDATE ${escalation_metadata}
-          SET ${escalation_metadata.columns.severity} = ?,
-              ${escalation_metadata.columns.re_escalation_count} = ${escalation_metadata.columns.re_escalation_count} + 1
-          WHERE ${escalation_metadata.bead_id} = ?
-        `,
+        UPDATE ${escalation_metadata}
+        SET ${escalation_metadata.columns.severity} = ?,
+            ${escalation_metadata.columns.re_escalation_count} = ${escalation_metadata.columns.re_escalation_count} + 1
+        WHERE ${escalation_metadata.bead_id} = ?
+      `,
         [newSeverity, esc.id]
       );
 
@@ -5423,10 +5461,10 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agent_metadata.status} AS status, COUNT(*) AS cnt
-          FROM ${agent_metadata}
-          GROUP BY ${agent_metadata.status}
-        `,
+        SELECT ${agent_metadata.status} AS status, COUNT(*) AS cnt
+        FROM ${agent_metadata}
+        GROUP BY ${agent_metadata.status}
+      `,
         []
       ),
     ];
@@ -5442,11 +5480,11 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.status} AS status, COUNT(*) AS cnt
-          FROM ${beads}
-          WHERE ${beads.type} NOT IN ('agent', 'message')
-          GROUP BY ${beads.status}
-        `,
+        SELECT ${beads.status} AS status, COUNT(*) AS cnt
+        FROM ${beads}
+        WHERE ${beads.type} NOT IN ('agent', 'message')
+        GROUP BY ${beads.status}
+      `,
         []
       ),
     ];
@@ -5474,14 +5512,14 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT
-            SUM(CASE WHEN ${beads.title} = 'GUPP_CHECK' THEN 1 ELSE 0 END) AS warnings,
-            SUM(CASE WHEN ${beads.title} = 'GUPP_ESCALATION' THEN 1 ELSE 0 END) AS escalations
-          FROM ${beads}
-          WHERE ${beads.type} = 'message'
-            AND ${beads.title} IN ('GUPP_CHECK', 'GUPP_ESCALATION')
-            AND ${beads.status} = 'open'
-        `,
+        SELECT
+          SUM(CASE WHEN ${beads.title} = 'GUPP_CHECK' THEN 1 ELSE 0 END) AS warnings,
+          SUM(CASE WHEN ${beads.title} = 'GUPP_ESCALATION' THEN 1 ELSE 0 END) AS escalations
+        FROM ${beads}
+        WHERE ${beads.type} = 'message'
+          AND ${beads.title} IN ('GUPP_CHECK', 'GUPP_ESCALATION')
+          AND ${beads.status} = 'open'
+      `,
         []
       ),
     ];
@@ -5499,14 +5537,14 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `
-            SELECT COUNT(*) AS cnt FROM ${agent_metadata}
-            WHERE ${agent_metadata.status} = 'idle'
-              AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
-              AND (
-                ${agent_metadata.last_activity_at} IS NULL
-                OR ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
-              )
-          `,
+          SELECT COUNT(*) AS cnt FROM ${agent_metadata}
+          WHERE ${agent_metadata.status} = 'idle'
+            AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
+            AND (
+              ${agent_metadata.last_activity_at} IS NULL
+              OR ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 minutes')
+            )
+        `,
           []
         ),
       ][0]?.cnt ?? 0
@@ -5516,13 +5554,13 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT be.created_at, be.event_type, be.new_value, be.agent_id, be.bead_id,
-                 b.${beads.columns.title} AS bead_title
-          FROM bead_events AS be
-          LEFT JOIN ${beads} AS b ON be.bead_id = b.${beads.columns.bead_id}
-          ORDER BY be.created_at DESC
-          LIMIT 20
-        `,
+        SELECT be.created_at, be.event_type, be.new_value, be.agent_id, be.bead_id,
+               b.${beads.columns.title} AS bead_title
+        FROM bead_events AS be
+        LEFT JOIN ${beads} AS b ON be.bead_id = b.${beads.columns.bead_id}
+        ORDER BY be.created_at DESC
+        LIMIT 20
+      `,
         []
       ),
     ];
@@ -5599,15 +5637,15 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `
-            SELECT ${town_events.event_id}, ${town_events.event_type},
-                   ${town_events.agent_id}, ${town_events.bead_id},
-                   ${town_events.payload}, ${town_events.created_at},
-                   ${town_events.processed_at}
-            FROM ${town_events}
-            WHERE ${town_events.created_at} >= ?
-              AND ${town_events.created_at} <= ?
-            ORDER BY ${town_events.created_at} ASC
-          `,
+          SELECT ${town_events.event_id}, ${town_events.event_type},
+                 ${town_events.agent_id}, ${town_events.bead_id},
+                 ${town_events.payload}, ${town_events.created_at},
+                 ${town_events.processed_at}
+          FROM ${town_events}
+          WHERE ${town_events.created_at} >= ?
+            AND ${town_events.created_at} <= ?
+          ORDER BY ${town_events.created_at} ASC
+        `,
           [from, to]
         ),
       ]);
@@ -5625,14 +5663,14 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `
-            SELECT ${agent_metadata.bead_id},
-                   ${agent_metadata.role},
-                   ${agent_metadata.status},
-                   ${agent_metadata.current_hook_bead_id},
-                   ${agent_metadata.dispatch_attempts},
-                   ${agent_metadata.last_activity_at}
-            FROM ${agent_metadata}
-          `,
+          SELECT ${agent_metadata.bead_id},
+                 ${agent_metadata.role},
+                 ${agent_metadata.status},
+                 ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.dispatch_attempts},
+                 ${agent_metadata.last_activity_at}
+          FROM ${agent_metadata}
+        `,
           []
         ),
       ];
@@ -5641,17 +5679,17 @@ export class TownDO extends DurableObject<Env> {
         ...query(
           this.sql,
           /* sql */ `
-            SELECT ${beads.bead_id},
-                   ${beads.type},
-                   ${beads.status},
-                   ${beads.title},
-                   ${beads.assignee_agent_bead_id},
-                   ${beads.updated_at}
-            FROM ${beads}
-            WHERE ${beads.status} NOT IN ('closed', 'failed')
-              AND ${beads.type} != 'agent'
-            ORDER BY ${beads.type}, ${beads.status}
-          `,
+          SELECT ${beads.bead_id},
+                 ${beads.type},
+                 ${beads.status},
+                 ${beads.title},
+                 ${beads.assignee_agent_bead_id},
+                 ${beads.updated_at}
+          FROM ${beads}
+          WHERE ${beads.status} NOT IN ('closed', 'failed')
+            AND ${beads.type} != 'agent'
+          ORDER BY ${beads.type}, ${beads.status}
+        `,
           []
         ),
       ];
@@ -5731,10 +5769,10 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${beads}
-          WHERE json_extract(${beads.metadata}, '$.wasteland') IS NOT NULL
-          ORDER BY ${beads.created_at} DESC
-        `,
+        SELECT * FROM ${beads}
+        WHERE json_extract(${beads.metadata}, '$.wasteland') IS NOT NULL
+        ORDER BY ${beads.created_at} DESC
+      `,
         []
       ),
     ];
@@ -5746,21 +5784,21 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${beads.bead_id},
-                 ${beads.type},
-                 ${beads.status},
-                 ${beads.title},
-                 ${beads.assignee_agent_bead_id},
-                 ${beads.rig_id},
-                 ${beads.created_by},
-                 ${beads.labels},
-                 ${beads.metadata},
-                 ${beads.updated_at}
-          FROM ${beads}
-          WHERE ${beads.status} NOT IN ('closed', 'failed')
-            AND ${beads.type} != 'agent'
-          ORDER BY ${beads.type}, ${beads.status}
-        `,
+        SELECT ${beads.bead_id},
+               ${beads.type},
+               ${beads.status},
+               ${beads.title},
+               ${beads.assignee_agent_bead_id},
+               ${beads.rig_id},
+               ${beads.created_by},
+               ${beads.labels},
+               ${beads.metadata},
+               ${beads.updated_at}
+        FROM ${beads}
+        WHERE ${beads.status} NOT IN ('closed', 'failed')
+          AND ${beads.type} != 'agent'
+        ORDER BY ${beads.type}, ${beads.status}
+      `,
         []
       ),
     ];
@@ -5771,20 +5809,20 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agent_nudges.nudge_id},
-                 ${agent_nudges.agent_bead_id},
-                 ${agent_nudges.message},
-                 ${agent_nudges.mode},
-                 ${agent_nudges.priority},
-                 ${agent_nudges.source},
-                 ${agent_nudges.created_at},
-                 ${agent_nudges.delivered_at},
-                 ${agent_nudges.expires_at}
-          FROM ${agent_nudges}
-          WHERE ${agent_nudges.delivered_at} IS NULL
-          ORDER BY ${agent_nudges.created_at} DESC
-          LIMIT 20
-        `,
+        SELECT ${agent_nudges.nudge_id},
+               ${agent_nudges.agent_bead_id},
+               ${agent_nudges.message},
+               ${agent_nudges.mode},
+               ${agent_nudges.priority},
+               ${agent_nudges.source},
+               ${agent_nudges.created_at},
+               ${agent_nudges.delivered_at},
+               ${agent_nudges.expires_at}
+        FROM ${agent_nudges}
+        WHERE ${agent_nudges.delivered_at} IS NULL
+        ORDER BY ${agent_nudges.created_at} DESC
+        LIMIT 20
+      `,
         []
       ),
     ];
@@ -5799,13 +5837,13 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${bead_dependencies.bead_id},
-                 ${bead_dependencies.depends_on_bead_id},
-                 ${bead_dependencies.dependency_type}
-          FROM ${bead_dependencies}
-          WHERE ${bead_dependencies.bead_id} = ?
-             OR ${bead_dependencies.depends_on_bead_id} = ?
-        `,
+        SELECT ${bead_dependencies.bead_id},
+               ${bead_dependencies.depends_on_bead_id},
+               ${bead_dependencies.dependency_type}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+           OR ${bead_dependencies.depends_on_bead_id} = ?
+      `,
         [beadId, beadId]
       ),
     ];
@@ -5818,14 +5856,14 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${agent_metadata.bead_id},
-                 ${agent_metadata.role},
-                 ${agent_metadata.status},
-                 ${agent_metadata.current_hook_bead_id},
-                 ${agent_metadata.dispatch_attempts},
-                 ${agent_metadata.last_activity_at}
-          FROM ${agent_metadata}
-        `,
+        SELECT ${agent_metadata.bead_id},
+               ${agent_metadata.role},
+               ${agent_metadata.status},
+               ${agent_metadata.current_hook_bead_id},
+               ${agent_metadata.dispatch_attempts},
+               ${agent_metadata.last_activity_at}
+        FROM ${agent_metadata}
+      `,
         []
       ),
     ];
@@ -5836,14 +5874,14 @@ export class TownDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT ${town_events.event_id},
-                 ${town_events.event_type},
-                 ${town_events.agent_id},
-                 ${town_events.bead_id},
-                 ${town_events.processed_at}
-          FROM ${town_events}
-          ORDER BY ${town_events.created_at} ASC
-        `,
+        SELECT ${town_events.event_id},
+               ${town_events.event_type},
+               ${town_events.agent_id},
+               ${town_events.bead_id},
+               ${town_events.processed_at}
+        FROM ${town_events}
+        ORDER BY ${town_events.created_at} ASC
+      `,
         []
       ),
     ];

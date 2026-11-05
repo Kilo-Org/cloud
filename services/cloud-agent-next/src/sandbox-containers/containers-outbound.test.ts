@@ -179,6 +179,21 @@ describe('ContainersOutbound egress enforcement', () => {
     ]);
   });
 
+  it('fails closed without replaying an overloaded audit write', async () => {
+    const { worker, recordEgressRequest, get } = auditFixture();
+    recordEgressRequest.mockRejectedValue(
+      Object.assign(new Error('Overloaded'), { retryable: true, overloaded: true })
+    );
+
+    const response = await worker.fetch(new Request('https://example.com/'));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe('Egress audit unavailable');
+    expect(recordEgressRequest).toHaveBeenCalledOnce();
+    expect(get).toHaveBeenCalledOnce();
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
   it('keeps the same request identity and obtains a fresh physical DO stub on retry', async () => {
     const { worker, recordEgressRequest, get } = auditFixture();
     recordEgressRequest.mockRejectedValueOnce(

@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import {
   getSessionShareExpiresAt,
@@ -546,6 +547,20 @@ async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
 }
 
 export class SessionIngestDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.readKiloSdkSessionSnapshot,
+      this.prototype.readKiloSdkMessages,
+      this.prototype.readSessionDiff,
+      this.prototype.isEmpty,
+      this.prototype.isDeleted,
+      this.prototype.exportCloneBatch,
+      this.prototype.hasMessageItem,
+      this.prototype.inspectCloneStage
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db: DrizzleSqliteDODatabase;
   private readonly activeR2Writes = new Set<Promise<unknown>>();
   private cleanupOperation: Promise<void> | undefined;
@@ -1349,19 +1364,19 @@ export class SessionIngestDO extends DurableObject<Env> {
             ingested_at: ingestItems.ingested_at,
             item_id: ingestItems.item_id,
             item_data: sql<string>`CASE
-              WHEN ${ingestItems.item_data_r2_key} IS NOT NULL
-                OR length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES} THEN ''
-              WHEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
-                THEN ${ingestItems.item_data}
-              ELSE ''
-            END`,
+            WHEN ${ingestItems.item_data_r2_key} IS NOT NULL
+              OR length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES} THEN ''
+            WHEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+              THEN ${ingestItems.item_data}
+            ELSE ''
+          END`,
             item_data_r2_key: ingestItems.item_data_r2_key,
             oversized_inline: sql<number>`CASE
-              WHEN ${ingestItems.item_data_r2_key} IS NULL
-                AND length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}
-                THEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
-              ELSE 0
-            END`,
+            WHEN ${ingestItems.item_data_r2_key} IS NULL
+              AND length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}
+              THEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+            ELSE 0
+          END`,
           })
           .from(ingestItems)
           .where(

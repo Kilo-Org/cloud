@@ -488,26 +488,27 @@ describe('preview proxy denials that never reach the resolver or stub', () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
-  it('retries a retryable resolver error and proxies once it succeeds', async () => {
+  it('maps an exhausted runtime resolver retry to 503 without application replay', async () => {
     const { deps, resolvePreviewTarget, getSessionStub, fetchUpstream } = fixture();
     resolvePreviewTarget.mockRejectedValueOnce(
       Object.assign(new Error('DO reset'), { retryable: true })
     );
     const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
-    expect(response.status).toBe(200);
-    expect(resolvePreviewTarget).toHaveBeenCalledTimes(2);
-    expect(getSessionStub).toHaveBeenCalledTimes(2);
-    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(resolvePreviewTarget).toHaveBeenCalledTimes(1);
+    expect(getSessionStub).toHaveBeenCalledTimes(1);
+    expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
-  it('answers 503 once retryable resolver errors exhaust the retries', async () => {
+  it('answers 503 when the runtime surfaces a retryable resolver failure', async () => {
     const { deps, resolvePreviewTarget, fetchUpstream } = fixture();
     resolvePreviewTarget.mockRejectedValue(
       Object.assign(new Error('DO reset'), { retryable: true })
     );
     const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
     expect(response.status).toBe(503);
-    expect(resolvePreviewTarget).toHaveBeenCalledTimes(3);
+    expect(resolvePreviewTarget).toHaveBeenCalledTimes(1);
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 

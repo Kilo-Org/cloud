@@ -6,6 +6,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 
 type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
@@ -21,6 +22,11 @@ function parseStoredMode(raw: unknown): AutoRoutingMode | null {
 const MODE_STORAGE_KEY = 'mode';
 
 export class AutoRoutingModeConfigDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getMode);
+    /* oxlint-enable typescript/unbound-method */
+  }
   async getMode(): Promise<AutoRoutingMode | null> {
     return parseStoredMode(await this.ctx.storage.get(MODE_STORAGE_KEY));
   }

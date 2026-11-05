@@ -21,6 +21,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { z } from 'zod';
 import type { KiloClawEnv } from '../types';
 import * as apps from '../fly/apps';
@@ -55,6 +56,11 @@ const ENV_KEY_SECRET_NAME = 'KILOCLAW_ENV_KEY';
 // -- DO --
 
 export class KiloClawApp extends DurableObject<KiloClawEnv> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getEnvKey, this.prototype.getAppName, this.prototype.getDiagnostics);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private loaded = false;
   private userId: string | null = null;
   private flyAppName: string | null = null;

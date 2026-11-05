@@ -8,6 +8,7 @@ import {
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { USAGE_WRITER_TIMEOUT_MS } from '@kilocode/worker-utils/usage-writer-client';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import * as z from 'zod';
 import { writeClassifierUsage } from './classifier-usage';
 
@@ -61,6 +62,11 @@ export function clearClassificationHotCache(): void {
 }
 
 export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.readConversationState);
+    /* oxlint-enable typescript/unbound-method */
+  }
   async readConversationState(classificationKey: string): Promise<StoredConversationState> {
     const entries = await this.ctx.storage.get<StoredEntry>([
       classificationKey,

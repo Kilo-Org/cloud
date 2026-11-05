@@ -1,4 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
+import { vi } from 'vitest';
+
+vi.mock('cloudflare:durable-objects', () => ({ retryable: vi.fn() }));
 
 // Polyfill crypto.subtle.timingSafeEqual for Vitest (Node environment).
 // This API is available natively in Cloudflare Workers but not in Node.js.

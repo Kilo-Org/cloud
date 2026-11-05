@@ -6,6 +6,7 @@
  * parses is produced by the code under test.
  */
 jest.mock('cloudflare:workers', () => ({ DurableObject: class {} }), { virtual: true });
+jest.mock('cloudflare:durable-objects', () => ({ retryable: jest.fn() }), { virtual: true });
 jest.mock('../drizzle/migrations', () => ({
   default: { journal: { entries: [] }, migrations: {} },
 }));

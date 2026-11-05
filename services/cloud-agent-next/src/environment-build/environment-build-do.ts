@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { isEnvironmentSnapshotsEnabled } from './enrollment.js';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -81,6 +82,11 @@ function billingSubject(owner: EnvironmentReference['owner']) {
 }
 
 export class EnvironmentBuild extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.status, this.prototype.logs);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private readonly db: DrizzleSqliteDODatabase;
   private readonly store: BuildStore;
   private readonly initialized: Promise<void>;

@@ -11,6 +11,9 @@ export default defineConfig({
       'cloudflare:workers': fileURLToPath(
         new URL('./src/test-support/cloudflare-workers.ts', import.meta.url)
       ),
+      'cloudflare:durable-objects': fileURLToPath(
+        new URL('./src/test-support/cloudflare-workers.ts', import.meta.url)
+      ),
     },
   },
   test: {

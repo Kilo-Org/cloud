@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -41,6 +42,11 @@ export type PutBotStatusInput = BotStatusRequest;
 export type PutConversationStatusInput = ConversationStatusRequest & { conversationId: string };
 
 export class SandboxStatusDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getBotStatus, this.prototype.getConversationStatus);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
 
   constructor(ctx: DurableObjectState, env: Env) {

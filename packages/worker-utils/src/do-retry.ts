@@ -18,27 +18,18 @@ export type DORetryConfig = {
 };
 
 export const DEFAULT_DO_RETRY_CONFIG: DORetryConfig = {
-  maxAttempts: 3,
+  maxAttempts: 1,
   baseBackoffMs: 100,
   maxBackoffMs: 5000,
 };
 
-type RetryableError = Error & { retryable?: boolean };
-
-/**
- * Check if an error is retryable based on Cloudflare's .retryable property.
- *
- * Per Cloudflare docs: JavaScript Errors with .retryable set to true are
- * suggested to be retried for idempotent operations.
- *
- * We only check the documented .retryable property, not error message strings,
- * as message formats are undocumented and could change.
- *
- * Note: errors with .overloaded === true are NOT retried — only .retryable matters.
- */
 function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return (error as RetryableError).retryable === true;
+  return (
+    'retryable' in error &&
+    error.retryable === true &&
+    !('overloaded' in error && error.overloaded === true)
+  );
 }
 
 /**
@@ -131,10 +122,11 @@ type DORetryLogger = {
 };
 
 /**
- * Execute a Durable Object operation with retry logic.
+ * Execute a Durable Object operation once by default, retaining deadline and logging support.
  *
- * Creates a fresh stub for each retry attempt as recommended by Cloudflare,
- * since certain errors can break the stub.
+ * The runtime owns transport retries and duplicate-delivery protection. Application retries
+ * create new requests, so maxAttempts > 1 is only safe for a fully idempotent operation.
+ * Explicit retries create a fresh stub per attempt because errors can break a stub.
  *
  * @param getStub - Function that returns a fresh DurableObjectStub
  * @param operation - Function that performs the DO operation using the stub

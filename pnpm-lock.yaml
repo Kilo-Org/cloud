@@ -16,8 +16,8 @@ catalogs:
       specifier: 0.10.3
       version: 0.10.3
     '@cloudflare/workers-types':
-      specifier: 4.20260605.1
-      version: 4.20260605.1
+      specifier: 5.20261104.1
+      version: 5.20261104.1
     '@octokit/auth-app':
       specifier: 8.2.0
       version: 8.2.0
@@ -94,8 +94,8 @@ catalogs:
       specifier: 1.0.0
       version: 1.0.0
     wrangler:
-      specifier: 4.135.0
-      version: 4.135.0
+      specifier: 4.158.0
+      version: 4.158.0
     zod:
       specifier: 4.6.7
       version: 4.6.7
@@ -108,6 +108,7 @@ catalogs:
       version: 5.0.5
 
 overrides:
+  workerd: 1.20261104.1
   pg: 8.23.1
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
@@ -254,7 +255,7 @@ importers:
         version: 1.0.20
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eslint-plugin-zod-utils:
         specifier: 1.0.11
         version: 1.0.11(eslint@9.39.4(jiti@2.7.0))(typescript@7.0.2)
@@ -311,7 +312,7 @@ importers:
         version: 1.9.1
       '@sentry/nextjs':
         specifier: 11.7.0
-        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       next:
         specifier: 16.4.2
         version: 16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -611,7 +612,7 @@ importers:
         version: 2.1.1
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -1195,7 +1196,7 @@ importers:
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@sentry/nextjs':
         specifier: 11.7.0
-        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@simplewebauthn/browser':
         specifier: 14.0.0
         version: 14.0.0
@@ -1309,7 +1310,7 @@ importers:
         version: 14.25.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       emoji-mart:
         specifier: 5.6.0
         version: 5.6.0
@@ -1583,7 +1584,7 @@ importers:
         version: link:../worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -1685,7 +1686,7 @@ importers:
         version: link:../usage-contracts
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -1759,7 +1760,7 @@ importers:
         version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -1955,7 +1956,7 @@ importers:
         version: 11.0.0
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       stripe:
         specifier: 'catalog:'
         version: 23.0.0(patch_hash=24ec61befefef8ca01f7210393a805eeb572ef1b3dd66b4e2188e3aa4c8a9cae)(@types/node@24.12.4)
@@ -1974,7 +1975,7 @@ importers:
         version: link:../encryption
       '@sentry/nextjs':
         specifier: 11.7.0
-        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2111,7 +2112,7 @@ importers:
         version: 2.6.1(@opentelemetry/api@1.9.1)
       '@sentry/nextjs':
         specifier: 11.7.0
-        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+        version: 11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@slack/types':
         specifier: 2.21.1
         version: 2.21.1
@@ -2144,7 +2145,7 @@ importers:
         version: 1.11.20
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       eventsource-parser:
         specifier: 3.0.8
         version: 3.0.8
@@ -2281,7 +2282,7 @@ importers:
         version: 1.0.20
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2312,7 +2313,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2346,7 +2347,7 @@ importers:
         version: 7.0.2
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/auto-routing:
     dependencies:
@@ -2364,7 +2365,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2374,7 +2375,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2389,7 +2390,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/auto-routing-benchmark:
     dependencies:
@@ -2407,7 +2408,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2417,7 +2418,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2438,7 +2439,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/cloud-agent-next:
     dependencies:
@@ -2471,7 +2472,7 @@ importers:
         version: 11.19.0(typescript@7.0.2)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2496,7 +2497,7 @@ importers:
         version: 0.3.7
       '@cloudflare/vitest-pool-workers':
         specifier: 0.18.6
-        version: 0.18.6(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.18.6(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@kilocode/sdk':
         specifier: 7.8.17
         version: 7.8.17
@@ -2532,7 +2533,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       ws:
         specifier: 8.21.0
         version: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -2576,10 +2577,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2594,7 +2595,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/container-usage-meter:
     dependencies:
@@ -2606,11 +2607,11 @@ importers:
         version: link:../../packages/db
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2628,7 +2629,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/event-service:
     dependencies:
@@ -2643,7 +2644,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2656,7 +2657,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2671,7 +2672,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gastown:
     dependencies:
@@ -2692,13 +2693,13 @@ importers:
         version: link:../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: 9.47.1
-        version: 9.47.1(@cloudflare/workers-types@4.20260605.1)
+        version: 9.47.1(@cloudflare/workers-types@5.20261104.1)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.19.0(typescript@7.0.2)
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2720,10 +2721,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@sentry/cli':
         specifier: 'catalog:'
         version: 3.8.0
@@ -2744,7 +2745,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gastown/container:
     dependencies:
@@ -2793,7 +2794,7 @@ importers:
         version: 22.0.1
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -2812,7 +2813,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/gmail-push:
     dependencies:
@@ -2828,7 +2829,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
@@ -2840,7 +2841,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kilo-chat:
     dependencies:
@@ -2870,7 +2871,7 @@ importers:
         version: 0.5.4
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -2892,7 +2893,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@types/content-disposition':
         specifier: 0.5.9
         version: 0.5.9
@@ -2913,7 +2914,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kilo-mcp:
     dependencies:
@@ -2925,14 +2926,14 @@ importers:
         version: 0.10.3
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2953,7 +2954,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kilo-ops:
     dependencies:
@@ -2969,7 +2970,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2978,7 +2979,7 @@ importers:
         version: 7.0.2
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw:
     dependencies:
@@ -3008,7 +3009,7 @@ importers:
         version: 0.9.5
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3039,7 +3040,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw-billing:
     dependencies:
@@ -3057,7 +3058,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       jose:
         specifier: 'catalog:'
         version: 6.2.12
@@ -3082,7 +3083,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw-inbound-email:
     dependencies:
@@ -3091,7 +3092,7 @@ importers:
         version: link:../../packages/db
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       node-html-markdown:
         specifier: 2.0.0
         version: 2.0.0
@@ -3110,7 +3111,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/kiloclaw/controller:
     dependencies:
@@ -3206,7 +3207,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/model-eval-ingest:
     dependencies:
@@ -3221,7 +3222,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3240,7 +3241,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/notifications:
     dependencies:
@@ -3264,7 +3265,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       expo-server-sdk:
         specifier: 6.1.0
         version: 6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b)
@@ -3280,7 +3281,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3298,7 +3299,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/o11y:
     dependencies:
@@ -3307,7 +3308,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3317,7 +3318,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3335,7 +3336,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/scim-sync:
     dependencies:
@@ -3351,7 +3352,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3366,7 +3367,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/security-auto-analysis:
     dependencies:
@@ -3381,7 +3382,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       workers-tagged-logger:
         specifier: 'catalog:'
         version: 1.0.0
@@ -3403,7 +3404,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/security-sync:
     dependencies:
@@ -3418,7 +3419,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3440,7 +3441,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/session-ingest:
     dependencies:
@@ -3467,7 +3468,7 @@ importers:
         version: 0.0.22
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3480,10 +3481,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3501,7 +3502,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/session-sync:
     dependencies:
@@ -3513,7 +3514,7 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3526,10 +3527,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3550,7 +3551,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/usage-ingest:
     dependencies:
@@ -3566,7 +3567,7 @@ importers:
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3578,7 +3579,7 @@ importers:
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/user-data-export:
     dependencies:
@@ -3593,17 +3594,17 @@ importers:
         version: link:../../packages/worker-utils
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3618,7 +3619,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/wasteland:
     dependencies:
@@ -3633,7 +3634,7 @@ importers:
         version: link:../../packages/worker-utils
       '@sentry/cloudflare':
         specifier: 9.47.1
-        version: 9.47.1(@cloudflare/workers-types@4.20260605.1)
+        version: 9.47.1(@cloudflare/workers-types@5.20261104.1)
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.19.0(typescript@7.0.2)
@@ -3652,10 +3653,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@sentry/cli':
         specifier: 'catalog:'
         version: 3.8.0
@@ -3673,7 +3674,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
   services/webhook-agent-ingest:
     dependencies:
@@ -3694,7 +3695,7 @@ importers:
         version: 10.0.1
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
+        version: 0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)
       hono:
         specifier: 4.13.13
         version: 4.13.13
@@ -3707,10 +3708,10 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
-        version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+        version: 0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
       '@cloudflare/workers-types':
         specifier: 'catalog:'
-        version: 4.20260605.1
+        version: 5.20261104.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3731,7 +3732,7 @@ importers:
         version: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
       wrangler:
         specifier: 'catalog:'
-        version: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        version: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
 packages:
 
@@ -4893,7 +4894,16 @@ packages:
     resolution: {integrity: sha512-ECxObrMfyTl5bhQf/lZCXwo5G6xX9IAUo+nDMKK4SZ8m4Jvvxp52vilxyySSWh2YTZz8+HQ07qGH/2rEom1vDw==}
     peerDependencies:
       unenv: 2.0.0-rc.24
-      workerd: '>1.20260305.0 <2.0.0-0'
+      workerd: 1.20261104.1
+    peerDependenciesMeta:
+      workerd:
+        optional: true
+
+  '@cloudflare/unenv-preset@2.16.2':
+    resolution: {integrity: sha512-JBP1+Z7ZSNG/d4mRP+y8VC5dka3tZVMLEZRvS+rzQ4DGV1EoxRFQckcJTTkXbHSQiTj0DtNI01Zwb/V2fX0mvQ==}
+    peerDependencies:
+      unenv: 2.0.0-rc.24
+      workerd: 1.20261104.1
     peerDependenciesMeta:
       workerd:
         optional: true
@@ -4914,92 +4924,32 @@ packages:
       '@vitest/snapshot': ^4.1.0
       vitest: ^4.1.0
 
-  '@cloudflare/workerd-darwin-64@1.20260603.1':
-    resolution: {integrity: sha512-cEXDWu6V3ZrpmwWkM4OJE9AeXjdAgOY5rh8EHhcBVCuP5rxnzUbPzLtrVOHx0UUUAcCrFq0Xsa6mZKL1VUZsKQ==}
+  '@cloudflare/workerd-darwin-64@1.20261104.1':
+    resolution: {integrity: sha512-5Bl+P1HT1/Ezk7Yrhyd+QkJ4VC/3naO0L3so/AkpgdaAHG3bmUmcCJBAtwH7O4JdVt8SMfm6EV89seiPpdjHJQ==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [darwin]
 
-  '@cloudflare/workerd-darwin-64@1.20260714.1':
-    resolution: {integrity: sha512-ZWXqAN8G7Cx9hMRQuk+59ziJhR3j1F4iO+Qs8aHdfKZ3Dq5Yi/57xvkJTgCGBnW1YU/L78r8f6HEy51bwbTpNw==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@cloudflare/workerd-darwin-64@1.20260918.1':
-    resolution: {integrity: sha512-H5Em6Wd0jjxaloYh2rp+WLBl2eWbkk7nSP1svGt6K1RSv/rNVqmKdpjZPJTBSavOmeYGa88qvtOWwS+33OHTqQ==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@cloudflare/workerd-darwin-arm64@1.20260603.1':
-    resolution: {integrity: sha512-uBPK4LaWJNbbCYwPnUAehlHbbVulhVZPZsdcAhBPfZhHb3QAuAEPAQepO/P67R3V6Cni4YGx1fLbL8A5wwoaNA==}
+  '@cloudflare/workerd-darwin-arm64@1.20261104.1':
+    resolution: {integrity: sha512-2fM+0klAjspAQ3Jl0iw0gVyGpNnkvPiZ50WHigPLhWQRiS+zhabFXVR07zz1RaPGkJHrMjEpWoEfjjm8nU5IOg==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [darwin]
 
-  '@cloudflare/workerd-darwin-arm64@1.20260714.1':
-    resolution: {integrity: sha512-tueWxWC3wyCbMG6zRAxsMXX0YLgrRWbiAPYFQ2uJ7dUH8G+5E7UTWaQS9B1HdJ0bpKFW1NWxhs1o2noKVFSUYg==}
-    engines: {node: '>=16'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@cloudflare/workerd-darwin-arm64@1.20260918.1':
-    resolution: {integrity: sha512-CR9JRZEQo93fNgBVF4Df2H2/VYO4n7rxSseSwCVv3bJQEb0huADUSCj2FK4ipxar8ToOEB4wawyw0vJo5U/rQQ==}
-    engines: {node: '>=16'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@cloudflare/workerd-linux-64@1.20260603.1':
-    resolution: {integrity: sha512-ht9l6/8Tk7Rp6kA4S9oFZ4X8u0VjnnFdmU/6B3fnABYKREYTKh2RdOqXqXxcp5eNJseireKnWik/hQOPK1CutQ==}
+  '@cloudflare/workerd-linux-64@1.20261104.1':
+    resolution: {integrity: sha512-VgpZIOooZHjSxjEZIJ1hkyt/jTfL3KeavkWCc0x7xxVu9zgkplaJF78Iv6CzoCTamQXyZeBaRQHS2bbAc70Vgg==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [linux]
 
-  '@cloudflare/workerd-linux-64@1.20260714.1':
-    resolution: {integrity: sha512-1VChTZRb0l0F7R4e1G5RtLKV4oFi6x+rQgxh2+yu887j3l/3TLgatuv1L8/5zhc9gKEhATTxOh0e52Rtd9dDWQ==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [linux]
-
-  '@cloudflare/workerd-linux-64@1.20260918.1':
-    resolution: {integrity: sha512-UQ2nnY3qpXLzQ80frmWO+8HvtqyWaQILe8QYZwpemdjT+sqwCz4Dz+0/WVkFco0v/04kIIqikVeLTY/7gEhmkw==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [linux]
-
-  '@cloudflare/workerd-linux-arm64@1.20260603.1':
-    resolution: {integrity: sha512-LJZ6x00rAjSrobV4m0ZW0TpH5ilBbKcWBzlH+y+KOUsIE/CpTuhAzKV43TbSnFLRX5+jrWKiz2v0hO91lPXy6A==}
+  '@cloudflare/workerd-linux-arm64@1.20261104.1':
+    resolution: {integrity: sha512-uEBJJHh2SbeQauRGrad7tIFIrpUQ5LUqZX40l7IKwYd0yeemvsno8f57w34Bx/pPpaSsNYVcV5oNFVbv+v/BOw==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [linux]
 
-  '@cloudflare/workerd-linux-arm64@1.20260714.1':
-    resolution: {integrity: sha512-rMm3G+NirG2UdgHIRDdF1asNC6FqgIzZzkRG+VDhhDGcVxAQwvrMT1E38BivEvHr3G04MB4AfhcOczX0+GtRkQ==}
-    engines: {node: '>=16'}
-    cpu: [arm64]
-    os: [linux]
-
-  '@cloudflare/workerd-linux-arm64@1.20260918.1':
-    resolution: {integrity: sha512-4rib51MaLNWweUIUxM/Xj558M5QmyZoBSf0ffv+lYah5VTrvwnez3XGxX72pElnBKHROvAPOi5msQ5Ts8JSI0A==}
-    engines: {node: '>=16'}
-    cpu: [arm64]
-    os: [linux]
-
-  '@cloudflare/workerd-windows-64@1.20260603.1':
-    resolution: {integrity: sha512-DvwqkXMAJRPoDN4PxapAwhlz/6ouD+6R1ttbAEK3cWD/QBvFF5STx7Ds/9Irf+rBly3np3uHWkeX+wZnNFEuzA==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [win32]
-
-  '@cloudflare/workerd-windows-64@1.20260714.1':
-    resolution: {integrity: sha512-cGqnU3Hg2YZS/k3SAqrMp1DjpdsyFde72tWltdl6ZT9+SFz/Zrk/8gyTU1TcxC4YApXeNVH5TyU5cOGPgUJ0pg==}
-    engines: {node: '>=16'}
-    cpu: [x64]
-    os: [win32]
-
-  '@cloudflare/workerd-windows-64@1.20260918.1':
-    resolution: {integrity: sha512-sATrMx5ShYYgmgUGrcTmvsFSJBFuN95NEkX3xwb1qk8w1A6h5N11sea7yN2IeibwPyPmXKjWNjXOno0hZAM71Q==}
+  '@cloudflare/workerd-windows-64@1.20261104.1':
+    resolution: {integrity: sha512-b/fnEU1leVm8UrI2EHQ4MSrK2vmnWdR1jefRyEUDZe3ucpKY0PWi4bVxWh5niZdlL0MIc4C5tXNXTlAMZpKDdA==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
@@ -5007,8 +4957,8 @@ packages:
   '@cloudflare/workers-oauth-provider@0.10.3':
     resolution: {integrity: sha512-25ufMONJir9PllqVpK4GwOOoSFgpYm3+bM6NBedj7ufMCIfNf5jk4OI0LPuTJBaJgLl2lGCLqFqEPJXcSuPopQ==}
 
-  '@cloudflare/workers-types@4.20260605.1':
-    resolution: {integrity: sha512-9YJaGPQwuQYFHoElVhJP40ZmUO/Z2OiBon58sKpHjgwq5btC/B2BZLC45AQ14k+1I+hjcY2z2t2R6uUxU9AqwQ==}
+  '@cloudflare/workers-types@5.20261104.1':
+    resolution: {integrity: sha512-XSPcK88JXnW/oC82wuXvaP7vgyk2myydugbgOd/RcLKwqkwW0cP09Ozp9ItACa4IAZ7uKtMIfxZpUTXajYVd1Q==}
 
   '@codemirror/autocomplete@6.20.1':
     resolution: {integrity: sha512-1cvg3Vz1dSSToCNlJfRA2WSI4ht3K+WplO0UMOgmUYPivCyy2oueZY6Lx7M9wThm7SDUBViRmuT+OG/i8+ON9A==}
@@ -18628,8 +18578,8 @@ packages:
     engines: {node: '>=22.0.0'}
     hasBin: true
 
-  miniflare@5.20260918.0-alpha:
-    resolution: {integrity: sha512-vyIes7yW/OTzHtz4GhcBCTohZfqk2eQNiIkngZ07VRA5Qu24aNgW/TrFwlPkMLMjWDQ8R4JJBBHR/KX+liSDtg==}
+  miniflare@5.20261104.0-beta:
+    resolution: {integrity: sha512-pYZ2n85+FYUb7s0oIVcQxO63/+wgaknm+A/kQjctJqshvHPJs3UtnzaIZ7xrrHMOk8atD7yAfauf6G9VAv7Upg==}
     engines: {node: '>=22.0.0'}
 
   minimalistic-assert@1.0.1:
@@ -22454,18 +22404,8 @@ packages:
   wordwrap@1.0.0:
     resolution: {integrity: sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q==}
 
-  workerd@1.20260603.1:
-    resolution: {integrity: sha512-NPcbhI1++CS+fnELyXtsIR52en+5kwr/OrKeiQeYXGy10HxmPdsQBv9N+DU7hJIOOmBHhOGAAsoGDjyiQ2YCaA==}
-    engines: {node: '>=16'}
-    hasBin: true
-
-  workerd@1.20260714.1:
-    resolution: {integrity: sha512-oIbQzfdyl9UQUnG6XLegcSq0Mgt/7WKDbFOoqGgOWCS+/fhyGB460uKEgdAQQ9RHCO/ttcNCX/KiMIQzdoeu3Q==}
-    engines: {node: '>=16'}
-    hasBin: true
-
-  workerd@1.20260918.1:
-    resolution: {integrity: sha512-NsjfQlBNQ0iEniv/STOy4zbp8s5k60PzL1Ter02Eg44arbDhHtf6UOs03E31XDRmmBFxSIkAZuCyld3RKH1wqA==}
+  workerd@1.20261104.1:
+    resolution: {integrity: sha512-JuiKY9k/4V4UE2xsupaTvZ1SF6o2a8sg+/zfq/DaSDwvH+o7t2ZEFuIWNEnryfeFdP47/tz/p828Kvl4ptPlrA==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -22482,12 +22422,12 @@ packages:
       '@cloudflare/workers-types':
         optional: true
 
-  wrangler@4.135.0:
-    resolution: {integrity: sha512-WrNBQSfIG6YcILJcodYr5ty8vgkzGsV8YX+kfd+uZ5/Bd8cUW0GnUIRKAVfn5kYKqh1m/BPcji9h1d7mE8euFw==}
+  wrangler@4.158.0:
+    resolution: {integrity: sha512-qZdTxIOU8smBVTHzTJVwHiPZB2lJ9+Js79fqKK05l+AbU5hXLWLUHO6oO1vni5G4hjYQTSBAHoGHtSocWPG0FA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
-      '@cloudflare/workers-types': ^5.20260918.1
+      '@cloudflare/workers-types': ^5.20261104.1
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
@@ -24518,25 +24458,19 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)':
+  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20261104.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
 
-  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260714.1)':
+  '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261104.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
-      workerd: 1.20260714.1
+      workerd: 1.20261104.1
 
-  '@cloudflare/unenv-preset@2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260918.1)':
-    dependencies:
-      unenv: 2.0.0-rc.24
-    optionalDependencies:
-      workerd: 1.20260918.1
-
-  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
+  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
     dependencies:
       '@vitest/runner': 4.1.12
       '@vitest/snapshot': 4.1.12
@@ -24544,7 +24478,7 @@ snapshots:
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
-      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      wrangler: 4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -24552,7 +24486,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
+  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
     dependencies:
       '@vitest/runner': 4.1.12
       '@vitest/snapshot': 4.1.12
@@ -24560,7 +24494,7 @@ snapshots:
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
-      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      wrangler: 4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -24568,7 +24502,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
+  '@cloudflare/vitest-pool-workers@0.16.13(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
     dependencies:
       '@vitest/runner': 4.1.12
       '@vitest/snapshot': 4.1.12
@@ -24576,7 +24510,7 @@ snapshots:
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
-      wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      wrangler: 4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -24584,7 +24518,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/vitest-pool-workers@0.18.6(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
+  '@cloudflare/vitest-pool-workers@0.18.6(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.12)':
     dependencies:
       '@vitest/runner': 4.1.12
       '@vitest/snapshot': 4.1.12
@@ -24592,7 +24526,7 @@ snapshots:
       esbuild: 0.28.1
       miniflare: 4.20260714.0(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
-      wrangler: 4.112.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      wrangler: 4.112.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -24600,54 +24534,24 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/workerd-darwin-64@1.20260603.1':
+  '@cloudflare/workerd-darwin-64@1.20261104.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-64@1.20260714.1':
+  '@cloudflare/workerd-darwin-arm64@1.20261104.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-64@1.20260918.1':
+  '@cloudflare/workerd-linux-64@1.20261104.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-arm64@1.20260603.1':
+  '@cloudflare/workerd-linux-arm64@1.20261104.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-arm64@1.20260714.1':
-    optional: true
-
-  '@cloudflare/workerd-darwin-arm64@1.20260918.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-64@1.20260603.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-64@1.20260714.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-64@1.20260918.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-arm64@1.20260603.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-arm64@1.20260714.1':
-    optional: true
-
-  '@cloudflare/workerd-linux-arm64@1.20260918.1':
-    optional: true
-
-  '@cloudflare/workerd-windows-64@1.20260603.1':
-    optional: true
-
-  '@cloudflare/workerd-windows-64@1.20260714.1':
-    optional: true
-
-  '@cloudflare/workerd-windows-64@1.20260918.1':
+  '@cloudflare/workerd-windows-64@1.20261104.1':
     optional: true
 
   '@cloudflare/workers-oauth-provider@0.10.3': {}
 
-  '@cloudflare/workers-types@4.20260605.1': {}
+  '@cloudflare/workers-types@5.20261104.1': {}
 
   '@codemirror/autocomplete@6.20.1':
     dependencies:
@@ -31602,7 +31506,7 @@ snapshots:
       '@sentry/cli-win32-i686': 3.8.0
       '@sentry/cli-win32-x64': 3.8.0
 
-  '@sentry/cloudflare@11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@sentry/cloudflare@11.7.0(@cloudflare/workers-types@5.20261104.1)(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@sentry/conventions': 0.27.0
@@ -31611,15 +31515,15 @@ snapshots:
       '@sentry/server-utils': 11.7.0
       magic-string: 0.30.21
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
-      wrangler: 4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@cloudflare/workers-types': 5.20261104.1
+      wrangler: 4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
-  '@sentry/cloudflare@9.47.1(@cloudflare/workers-types@4.20260605.1)':
+  '@sentry/cloudflare@9.47.1(@cloudflare/workers-types@5.20261104.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@sentry/core': 9.47.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
 
   '@sentry/conventions@0.16.0': {}
 
@@ -31655,13 +31559,13 @@ snapshots:
     dependencies:
       '@sentry/core': 11.7.0
 
-  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.64.7)
       '@sentry/browser-utils': 11.7.0
       '@sentry/bundler-plugins': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
-      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@5.20261104.1)(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
       '@sentry/node': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
@@ -31681,13 +31585,13 @@ snapshots:
       - webpack
       - wrangler
 
-  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@4.20260605.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
+  '@sentry/nextjs@11.7.0(@babel/core@7.29.7)(@cloudflare/workers-types@5.20261104.1)(next@16.4.2(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4)(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.64.7)
       '@sentry/browser-utils': 11.7.0
       '@sentry/bundler-plugins': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4)
-      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@4.20260605.1)(wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@sentry/cloudflare': 11.7.0(@cloudflare/workers-types@5.20261104.1)(wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6))
       '@sentry/conventions': 0.27.0
       '@sentry/core': 11.7.0
       '@sentry/node': 11.7.0(@babel/core@7.29.7)(rollup@4.64.7)(webpack@5.105.4)
@@ -36454,9 +36358,9 @@ snapshots:
       esbuild: 0.28.2
       tsx: 4.23.15
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
@@ -36465,9 +36369,9 @@ snapshots:
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
@@ -36476,9 +36380,9 @@ snapshots:
       kysely: 0.29.2
       pg: 8.23.1
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@5.20261104.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1):
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.23.1
       '@upstash/redis': 1.38.0
@@ -41595,7 +41499,7 @@ snapshots:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@22.19.19)
       undici: 7.30.1
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41608,7 +41512,7 @@ snapshots:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.12.4)
       undici: 7.30.1
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41621,7 +41525,7 @@ snapshots:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@25.5.2)
       undici: 7.30.1
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41634,7 +41538,7 @@ snapshots:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.12.4)
       undici: 7.30.1
-      workerd: 1.20260714.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41642,12 +41546,12 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  miniflare@5.20260918.0-alpha(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  miniflare@5.20261104.0-beta(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@22.19.19)
       undici: 7.30.1
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41655,12 +41559,12 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  miniflare@5.20260918.0-alpha(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  miniflare@5.20261104.0-beta(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@24.12.4)
       undici: 7.30.1
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -41668,12 +41572,12 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  miniflare@5.20260918.0-alpha(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  miniflare@5.20261104.0-beta(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@25.5.2)
       undici: 7.30.1
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -46879,29 +46783,13 @@ snapshots:
 
   wordwrap@1.0.0: {}
 
-  workerd@1.20260603.1:
+  workerd@1.20261104.1:
     optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260603.1
-      '@cloudflare/workerd-darwin-arm64': 1.20260603.1
-      '@cloudflare/workerd-linux-64': 1.20260603.1
-      '@cloudflare/workerd-linux-arm64': 1.20260603.1
-      '@cloudflare/workerd-windows-64': 1.20260603.1
-
-  workerd@1.20260714.1:
-    optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260714.1
-      '@cloudflare/workerd-darwin-arm64': 1.20260714.1
-      '@cloudflare/workerd-linux-64': 1.20260714.1
-      '@cloudflare/workerd-linux-arm64': 1.20260714.1
-      '@cloudflare/workerd-windows-64': 1.20260714.1
-
-  workerd@1.20260918.1:
-    optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260918.1
-      '@cloudflare/workerd-darwin-arm64': 1.20260918.1
-      '@cloudflare/workerd-linux-64': 1.20260918.1
-      '@cloudflare/workerd-linux-arm64': 1.20260918.1
-      '@cloudflare/workerd-windows-64': 1.20260918.1
+      '@cloudflare/workerd-darwin-64': 1.20261104.1
+      '@cloudflare/workerd-darwin-arm64': 1.20261104.1
+      '@cloudflare/workerd-linux-64': 1.20261104.1
+      '@cloudflare/workerd-linux-arm64': 1.20261104.1
+      '@cloudflare/workerd-windows-64': 1.20261104.1
 
   workers-tagged-logger@1.0.0:
     dependencies:
@@ -46909,126 +46797,129 @@ snapshots:
     optionalDependencies:
       hono: 4.13.13
 
-  wrangler@4.112.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.112.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260714.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
       miniflare: 4.20260714.0(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260714.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260918.1)
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
+      '@cspotcode/source-map-support': 0.8.1
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
-      miniflare: 5.20260918.0-alpha(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      miniflare: 5.20261104.0-beta(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260918.1)
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
+      '@cspotcode/source-map-support': 0.8.1
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
-      miniflare: 5.20260918.0-alpha(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      miniflare: 5.20261104.0-beta(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.135.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.158.0(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260918.1)
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
+      '@cspotcode/source-map-support': 0.8.1
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
-      miniflare: 5.20260918.0-alpha(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      miniflare: 5.20261104.0-beta(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260918.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@22.19.19)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@24.12.4)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
       - utf-8-validate
 
-  wrangler@4.98.0(@cloudflare/workers-types@4.20260605.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  wrangler@4.98.0(@cloudflare/workers-types@5.20261104.1)(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20260603.1)
+      '@cloudflare/unenv-preset': 2.16.1(unenv@2.0.0-rc.24)(workerd@1.20261104.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.2
       miniflare: 4.20260603.0(@types/node@25.5.2)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       path-to-regexp: 8.4.2
       unenv: 2.0.0-rc.24
-      workerd: 1.20260603.1
+      workerd: 1.20261104.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260605.1
+      '@cloudflare/workers-types': 5.20261104.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'

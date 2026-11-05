@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import * as registryOps from './wasteland-registry/registry-ops';
 import { getWastelandDOStub } from './Wasteland.do';
 import type { WastelandRegistryRecord } from '../db/tables/wasteland-registry.table';
@@ -24,6 +25,17 @@ const LOG = '[WastelandRegistry.do]';
  * extra round-trip per UUID-keyed procedure call.
  */
 export class WastelandRegistryDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.listByUser,
+      this.prototype.listByOrg,
+      this.prototype.listAll,
+      this.prototype.countAll,
+      this.prototype.findByOwnerRepo
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
 

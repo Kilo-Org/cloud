@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { and, eq, gt, lte } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -21,6 +22,11 @@ export type CachedSessionAccess = {
  * Keyed by kiloUserId (one instance per user).
  */
 export class SessionAccessCacheDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getAccess, this.prototype.has);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db: DrizzleSqliteDODatabase;
 
   constructor(state: DurableObjectState, env: Env) {

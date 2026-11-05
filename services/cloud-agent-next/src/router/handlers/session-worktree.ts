@@ -1045,31 +1045,12 @@ async function registerWorktreeSession(
     cloudAgentSessionId: progress.cloudAgentSessionId,
     kiloSessionId: progress.kiloSessionId,
   };
-  let registrationAttempted = false;
   let response: unknown;
 
   try {
     response = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
       async stub => {
-        if (registrationAttempted) {
-          const existing = await stub.getMetadata();
-          if (existing) {
-            assertRegisteredMetadata(existing, source, progress);
-            await assertDestinationRuntimeAuthorizationActive(
-              ctx,
-              progress.cloudAgentSessionId,
-              preissuedRuntimeAuthorization !== undefined
-            );
-            logControlDiagnostic('worktree_chat_reconciliation', {
-              ...diagnostic,
-              result: 'registration_recovered',
-              durationMs: Date.now() - startedAt,
-            });
-            return { success: true };
-          }
-        }
-        registrationAttempted = true;
         if (preissuedRuntimeAuthorization === undefined) {
           await assertNewDestinationRuntimeIsolation(ctx);
         }

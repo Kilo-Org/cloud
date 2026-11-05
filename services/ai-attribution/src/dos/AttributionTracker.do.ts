@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, and, sql, desc } from 'drizzle-orm';
@@ -100,6 +101,15 @@ function matchesTarget(
 }
 
 export class AttributionTrackerDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getLinesAddedByHash,
+      this.prototype.getAttributionEvents,
+      this.prototype.getDebugData
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db: DrizzleSqliteDODatabase;
 
   constructor(ctx: DurableObjectState, env: Env) {

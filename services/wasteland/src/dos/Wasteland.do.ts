@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import * as configOps from './wasteland/config';
 import * as memberOps from './wasteland/members';
 import * as credentialOps from './wasteland/credentials';
@@ -55,6 +56,18 @@ export type ConnectedTownResult = {
 };
 
 export class WastelandDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getConfig,
+      this.prototype.listMembers,
+      this.prototype.getMember,
+      this.prototype.getCredential,
+      this.prototype.listConnectedTowns,
+      this.prototype.listConnectedTownsForUser
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private sql: SqlStorage;
   private wastelandId: string | null = null;
 

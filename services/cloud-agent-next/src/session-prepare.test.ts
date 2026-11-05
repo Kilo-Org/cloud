@@ -1587,7 +1587,7 @@ describe('prepareSession endpoint', () => {
     expect(deleteCliSessionMock).toHaveBeenCalled();
   });
 
-  it('retries idempotent registration without compensating an unknown committed state', async () => {
+  it('retains ownership after an ambiguous registration failure without application replay', async () => {
     const retryableError = Object.assign(new Error('registration response lost'), {
       retryable: true,
     });
@@ -1605,7 +1605,7 @@ describe('prepareSession endpoint', () => {
       })
     ).rejects.toThrow('registration response lost');
 
-    expect(registerSessionFromMetadata).toHaveBeenCalledTimes(3);
+    expect(registerSessionFromMetadata).toHaveBeenCalledTimes(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
   });
 

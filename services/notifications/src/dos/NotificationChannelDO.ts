@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
@@ -62,7 +63,11 @@ const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS = 30_000;
 
 export class NotificationChannelDO extends DurableObject<Env> {
-  // In-flight claims by idempotency key. The DO serializes turns, but a turn
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.listNonZeroBuckets);
+    /* oxlint-enable typescript/unbound-method */
+  } // In-flight claims by idempotency key. The DO serializes turns, but a turn
   // yields the isolate on every external `await` (presence RPC, Expo send), so a
   // concurrent replay of the same key can interleave: it would read the storage
   // `pending` marker the first attempt left before its send, treat it as a

@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import type { Env } from '../types.js';
 
 /**
@@ -48,7 +49,11 @@ function recordKey(index: number): string {
 }
 
 export class E2eCallbackSink extends DurableObject<Env> {
-  /** Record the owning user and arm the TTL alarm. */
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.read);
+    /* oxlint-enable typescript/unbound-method */
+  } /** Record the owning user and arm the TTL alarm. */
   async register(ownerUserId: string, ttlMs: number): Promise<void> {
     const now = Date.now();
     await this.ctx.storage.put<CallbackSinkMeta>(META_KEY, {

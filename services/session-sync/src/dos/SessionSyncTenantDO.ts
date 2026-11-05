@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -37,6 +38,11 @@ function configured(value: string | undefined, fallback: number): number {
 
 /** Serializes tenant admission; the personal tenant also owns its creator's erasure index. */
 export class SessionSyncTenantDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.listCreatedSessions);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
 
   constructor(ctx: DurableObjectState, env: Env) {

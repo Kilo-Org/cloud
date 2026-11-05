@@ -3511,7 +3511,7 @@ describe('api routes', () => {
     });
   });
 
-  it('POST /user/web-ticket retries a retryable Durable Object error', async () => {
+  it('POST /user/web-ticket surfaces an exhausted native error without reissuing the ticket', async () => {
     const reset = Object.assign(new Error('Durable Object reset because its code was updated.'), {
       retryable: true,
     });
@@ -3525,9 +3525,8 @@ describe('api routes', () => {
       env
     );
 
-    expect(res.status).toBe(200);
-    expect(mint).toHaveBeenCalledTimes(2);
-    expect(env.CONNECTION_TICKET_DO.newUniqueId).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(500);
+    expect(mint).toHaveBeenCalledTimes(1);
   });
 
   describe('GET /instances/active', () => {

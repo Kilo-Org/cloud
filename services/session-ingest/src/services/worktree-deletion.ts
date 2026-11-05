@@ -719,7 +719,7 @@ export async function canDestroyWorktreeSandbox(
 export async function completeWorktreeDeletion(
   env: Env,
   params: CloudAgentWorktreeDeletionParams,
-  executionContext?: ExecutionContext
+  executionContext?: Pick<ExecutionContext, 'waitUntil'>
 ): Promise<{ success: true; deletedSessionIds: string[] }> {
   return deletionDiagnostic('complete', params, async timing => {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);

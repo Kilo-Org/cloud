@@ -426,16 +426,8 @@ beforeEach(() => {
     })
   );
   withDORetryMock.mockImplementation(
-    async (getStub: () => unknown, operation: (stub: unknown) => Promise<unknown>) => {
-      try {
-        return await operation(getStub());
-      } catch (error) {
-        if (error instanceof Error && 'retryable' in error && error.retryable === true) {
-          return operation(getStub());
-        }
-        throw error;
-      }
-    }
+    async (getStub: () => unknown, operation: (stub: unknown) => Promise<unknown>) =>
+      operation(getStub())
   );
 });
 
@@ -1671,7 +1663,7 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     }
   );
 
-  it('reads committed metadata before retrying a retryable registration transport failure', async () => {
+  it('retains committed ownership for reconciliation after an ambiguous registration failure', async () => {
     const { caller, input, metadata, destinationStub } = fixture();
     const transportError = Object.assign(new Error('retryable transport failure'), {
       retryable: true,
@@ -1679,15 +1671,11 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     destinationStub.registerSessionFromMetadata.mockRejectedValueOnce(transportError);
     destinationStub.getMetadata.mockResolvedValueOnce(destinationMetadata(metadata));
 
-    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
-      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
-      kiloSessionId: DESTINATION_KILO_SESSION_ID,
-      worktreeId: WORKTREE_ID,
-    });
-    expect(destinationStub.getMetadata).toHaveBeenCalledTimes(1);
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('retryable transport failure');
+    expect(destinationStub.getMetadata).not.toHaveBeenCalled();
     expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
     expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
-    expect(markReconcilePendingMock).not.toHaveBeenCalled();
+    expect(markReconcilePendingMock).toHaveBeenCalled();
   });
 
   it('resumes the recorded IDs when ownership exists but destination metadata is absent', async () => {
@@ -1803,7 +1791,7 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
   });
 
-  describe.each(['transport retry', 'reconciliation'] as const)('%s BYOC inheritance', path => {
+  describe('reconciliation BYOC inheritance', () => {
     it.each([
       undefined,
       { kind: 'vercel', source: { kind: 'platform' } },
@@ -1831,29 +1819,19 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
       const destination = destinationMetadata(metadata);
       destination.workspace = { ...destination.workspace, sandboxProviderBinding };
       destinationStub.getMetadata.mockResolvedValueOnce(destination);
-      if (path === 'transport retry') {
-        destinationStub.registerSessionFromMetadata.mockRejectedValueOnce(
-          Object.assign(new Error('registration outcome unknown'), { retryable: true })
-        );
-      } else {
-        admitOperationMock.mockResolvedValueOnce({
-          admission: 'duplicate_reconcile_pending',
-          row: ledgerRow({
-            organization_id: ORGANIZATION_ID,
-            status: 'reconcile_pending',
-            canonical_result: await progressFor(input),
-          }),
-        });
-      }
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'reconcile_pending',
+          canonical_result: await progressFor(input),
+        }),
+      });
 
       await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
 
-      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(
-        path === 'transport retry' ? 1 : 0
-      );
-      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(
-        path === 'transport retry' ? 1 : 0
-      );
+      expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+      expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
       expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
     });

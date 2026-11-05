@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import { clientMessageSchema, MAX_CONTEXTS } from '@kilocode/event-service';
 import { configureDevLogging, logger, withLogTags } from '../util/logger';
@@ -12,6 +13,11 @@ const ZOMBIE_CLOSE_CODE = 4002;
 type SerializedState = { contexts: string[]; seq: number; acked: number; ackReceived: boolean };
 
 export class UserSessionDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.hasContext);
+    /* oxlint-enable typescript/unbound-method */
+  }
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));

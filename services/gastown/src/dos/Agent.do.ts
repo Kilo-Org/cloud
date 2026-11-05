@@ -7,6 +7,7 @@
  * here for backfill when joining a stream late.
  */
 
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 import {
   rig_agent_events,
@@ -20,6 +21,13 @@ import { reconstructConversation, formatTranscriptForPrompt } from './town/conve
 const AGENT_DO_LOG = '[Agent.do]';
 
 export class AgentDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.getEvents);
+    retryable(this.prototype.reconstructConversation);
+    retryable(this.prototype.ping);
+    /* oxlint-enable typescript/unbound-method */
+  }
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
 
@@ -57,13 +65,13 @@ export class AgentDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        INSERT INTO ${rig_agent_events} (
-          ${rig_agent_events.columns.agent_id},
-          ${rig_agent_events.columns.event_type},
-          ${rig_agent_events.columns.data},
-          ${rig_agent_events.columns.created_at}
-        ) VALUES (?, ?, ?, ?)
-      `,
+      INSERT INTO ${rig_agent_events} (
+        ${rig_agent_events.columns.agent_id},
+        ${rig_agent_events.columns.event_type},
+        ${rig_agent_events.columns.data},
+        ${rig_agent_events.columns.created_at}
+      ) VALUES (?, ?, ?, ?)
+    `,
       [this.ctx.id.name ?? '', eventType, dataStr, timestamp]
     );
 
@@ -75,13 +83,13 @@ export class AgentDO extends DurableObject<Env> {
     query(
       this.sql,
       /* sql */ `
-        DELETE FROM ${rig_agent_events}
-        WHERE ${rig_agent_events.columns.id} NOT IN (
-          SELECT ${rig_agent_events.columns.id} FROM ${rig_agent_events}
-          ORDER BY ${rig_agent_events.columns.id} DESC
-          LIMIT 10000
-        )
-      `,
+      DELETE FROM ${rig_agent_events}
+      WHERE ${rig_agent_events.columns.id} NOT IN (
+        SELECT ${rig_agent_events.columns.id} FROM ${rig_agent_events}
+        ORDER BY ${rig_agent_events.columns.id} DESC
+        LIMIT 10000
+      )
+    `,
       []
     );
 
@@ -97,11 +105,11 @@ export class AgentDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${rig_agent_events}
-          WHERE ${rig_agent_events.columns.id} > ?
-          ORDER BY ${rig_agent_events.columns.id} ASC
-          LIMIT ?
-        `,
+        SELECT * FROM ${rig_agent_events}
+        WHERE ${rig_agent_events.columns.id} > ?
+        ORDER BY ${rig_agent_events.columns.id} ASC
+        LIMIT ?
+      `,
         [afterId, limit]
       ),
     ];
@@ -122,10 +130,10 @@ export class AgentDO extends DurableObject<Env> {
       ...query(
         this.sql,
         /* sql */ `
-          SELECT * FROM ${rig_agent_events}
-          ORDER BY ${rig_agent_events.columns.id} ASC
-          LIMIT 10000
-        `,
+        SELECT * FROM ${rig_agent_events}
+        ORDER BY ${rig_agent_events.columns.id} ASC
+        LIMIT 10000
+      `,
         []
       ),
     ];

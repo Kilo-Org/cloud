@@ -1,5 +1,6 @@
 import { environmentReferenceSchema } from '../../environment-build/reference.js';
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import {
@@ -618,6 +619,23 @@ function unavailableStatusSnapshot(): SandboxStatusSnapshot {
 }
 
 export class SandboxSessionV2 extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.getMetadata,
+      this.prototype.assertCloudAgentManagementAuthority,
+      this.prototype.listCloudAgentChildSessions,
+      this.prototype.getRuntimeProxyDelegationExpiresAt,
+      this.prototype.getPendingInteractions,
+      this.prototype.getSandboxStatus,
+      this.prototype.getWorkspaceRuntimeStatus,
+      this.prototype.getPreparationAttempts,
+      this.prototype.getMessageResult,
+      this.prototype.getRuntimeAuthorizationStatus,
+      this.prototype.resolvePreviewTarget
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   readonly sessionId: SessionId;
   private readonly db: DrizzleSqliteDODatabase;
   private readonly eventQueries: SessionEventQueries;

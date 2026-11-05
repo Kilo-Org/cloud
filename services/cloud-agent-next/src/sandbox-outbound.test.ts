@@ -1574,7 +1574,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
 
       expect(response.status).toBe(502);
       expect(await response.text()).toBe('SCM authorization unavailable');
-      expect(getByName).toHaveBeenCalledTimes(failure === 'retry-exhausted' ? 3 : 1);
+      expect(getByName).toHaveBeenCalledTimes(1);
       for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
       expect(forward).not.toHaveBeenCalled();
       const logs = serializedLogCalls();
@@ -1584,7 +1584,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
     }
   );
 
-  it('retries resolution using a fresh stub without duplicating broker redemption', async () => {
+  it('does not replay credential resolution after a runtime transport failure', async () => {
     const { env, resolveCredential, getByName, redemptions, forward } = fixture();
     const credential = createControlPlaneCredential('sbx_1', 'github');
     vi.stubGlobal('scheduler', { wait: vi.fn().mockResolvedValue(undefined) });
@@ -1599,11 +1599,11 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
       env
     );
 
-    expect(response.status).toBe(200);
-    expect(getByName).toHaveBeenCalledTimes(2);
-    expect(resolveCredential).toHaveBeenCalledTimes(2);
-    expect(redemptions.github).toHaveBeenCalledOnce();
-    expect(forward).toHaveBeenCalledOnce();
+    expect(response.status).toBe(502);
+    expect(getByName).toHaveBeenCalledTimes(1);
+    expect(resolveCredential).toHaveBeenCalledTimes(1);
+    expect(redemptions.github).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
     expect(serializedLogCalls()).not.toContain(credential);
   });
 

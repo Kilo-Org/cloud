@@ -149,7 +149,7 @@ This pattern blocks API endpoints from running for external contributors who don
 
 ### Runtime Guidelines
 
-- Durable Object calls should be retried using `withDORetry` (this service's logger-bound wrapper is `src/utils/do-retry.ts`). See the `durable-objects` skill (`references/repo-conventions.md`) for the shared `withDORetry` pattern used across services.
+- Let the runtime retry Durable Object transport failures. `withDORetry` (`src/utils/do-retry.ts`) defaults to one application attempt and retains deadline scopes and logging. Set `maxAttempts > 1` only when the complete operation, including return values and side effects, is idempotent; an application retry has a new request identity. Mark only audited safe prototype methods with `retryable` from `cloudflare:durable-objects`; leave mixed `fetch`, streams, WebSockets, and non-idempotent operations unmarked.
 - Execute commands inside a session context (use `session.exec(...)`, not `sandbox.exec(...)`)
 
 ### Testing Standards

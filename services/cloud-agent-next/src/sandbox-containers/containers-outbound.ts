@@ -51,6 +51,7 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
             } catch (error) {
               throw Object.assign(new Error('Egress audit persistence failed'), {
                 retryable: error instanceof Error && Reflect.get(error, 'retryable') === true,
+                overloaded: error instanceof Error && Reflect.get(error, 'overloaded') === true,
               });
             }
           },

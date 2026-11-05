@@ -13,7 +13,7 @@ catalog:
   # authorization/token server to. Pinned exactly; adopted with the KV binding
   # and zod schemas in the same change.
   '@cloudflare/workers-oauth-provider': 0.10.3
-  '@cloudflare/workers-types': 4.20260605.1
+  '@cloudflare/workers-types': 5.20261104.1
   # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
   # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
   # the Workers runtime forbids. Pinned exactly.
@@ -53,7 +53,7 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
-  wrangler: 4.135.0
+  wrangler: 4.158.0
   zod: 4.6.7
 
 catalogs:
@@ -108,7 +108,19 @@ minimumReleaseAgeExclude:
   # the pair moves before the window.
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
+  # These releases provide the Durable Object automatic retry API.
+  - '@cloudflare/workers-types@5.20261104.1'
+  - wrangler@4.158.0
+  - workerd@1.20261104.1
+  - '@cloudflare/workerd-linux-64@1.20261104.1'
+  - '@cloudflare/workerd-darwin-64@1.20261104.1'
+  - '@cloudflare/workerd-windows-64@1.20261104.1'
+  - '@cloudflare/workerd-linux-arm64@1.20261104.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20261104.1'
+  - miniflare@5.20261104.0-beta
 overrides:
+  # The Workers test pool must execute retryable() with the same runtime as Wrangler.
+  workerd: 1.20261104.1
   # One pg client in the tree: drizzle-orm's optional peers include pg, so two
   # pg versions split drizzle-orm into two packages and their SQL types stop
   # being assignable to each other across workspace imports.

@@ -4,6 +4,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
+      'cloudflare:durable-objects': resolve(
+        import.meta.dirname,
+        'src/test-support/cloudflare-durable-objects-stub.ts'
+      ),
       'cloudflare:workers': resolve(
         import.meta.dirname,
         'src/test-support/cloudflare-workers-stub.ts'

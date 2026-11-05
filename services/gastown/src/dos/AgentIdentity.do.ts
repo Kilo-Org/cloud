@@ -1,3 +1,4 @@
+import { retryable } from 'cloudflare:durable-objects';
 import { DurableObject } from 'cloudflare:workers';
 
 /**
@@ -6,6 +7,11 @@ import { DurableObject } from 'cloudflare:workers';
  * Exported here so the wrangler migration can register it.
  */
 export class AgentIdentityDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(this.prototype.ping);
+    /* oxlint-enable typescript/unbound-method */
+  }
   async ping(): Promise<string> {
     return 'pong';
   }

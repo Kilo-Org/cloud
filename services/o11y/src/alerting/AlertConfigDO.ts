@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { retryable } from 'cloudflare:durable-objects';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq } from 'drizzle-orm';
@@ -29,6 +30,16 @@ function rowToTtfbConfig(row: typeof ttfbAlertConfig.$inferSelect): TtfbAlerting
 }
 
 export class AlertConfigDO extends DurableObject<Env> {
+  static {
+    /* oxlint-disable typescript/unbound-method -- Cloudflare marks original prototype functions without invoking them. */
+    retryable(
+      this.prototype.list,
+      this.prototype.get,
+      this.prototype.listTtfb,
+      this.prototype.getTtfb
+    );
+    /* oxlint-enable typescript/unbound-method */
+  }
   private db;
 
   constructor(ctx: DurableObjectState, env: Env) {

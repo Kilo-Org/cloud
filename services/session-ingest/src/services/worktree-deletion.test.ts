@@ -497,12 +497,10 @@ function database(rootCount = 1, descendantCount = 0) {
   mocks.cache.mockReturnValue({ deleteSession: async () => undefined });
   const notifications: { kiloUserId: string; event: SessionEventPayload }[] = [];
   const pendingNotifications: Promise<unknown>[] = [];
-  const executionContext: ExecutionContext = {
+  const executionContext: Pick<ExecutionContext, 'waitUntil'> = {
     waitUntil: promise => {
       pendingNotifications.push(promise);
     },
-    passThroughOnException: () => undefined,
-    props: {},
   };
   mocks.connection.mockImplementation((_env: Env, { kiloUserId }: { kiloUserId: string }) => ({
     clearSession: async () => undefined,

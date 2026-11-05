@@ -23,7 +23,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0 },
+  USAGE_QUEUE_SFO_CONFIG: { enabled: false },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));

@@ -3017,8 +3017,8 @@
     "appStorePage": "ibe ụlọ ahịa ngwa"
   },
   "home": {
-    "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ.",
-    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu.",
+    "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ",
+    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
@@ -3121,10 +3121,10 @@
   },
   "kiloPass": {
     "title": "Kilo Pass",
-    "unavailable": "Kilo Pass adịghị.",
+    "unavailable": "Enweghị ike ibudata Kilo Pass.",
     "couldNotLoad": "Enweghị ike ibudata Kilo Pass. Nwaa ọzọ.",
     "retryLoading": "Nwaa ibudata Kilo Pass ọzọ",
-    "productsUnavailable": "Ngwaahịa App Store adịghị.",
+    "productsUnavailable": "Ngwaahịa App Store adịghị",
     "completingPurchase": "Na-emecha ịzụrụ ihe",
     "subscriptionLoading": "Na-ebudata ndenye aha Kilo Pass",
     "retryHint": "Na-anwale ịnweta ọnọdụ Kilo Pass ọzọ.",
@@ -3142,15 +3142,15 @@
     "purchaseFailed": "Enweghị ike imecha ịzụrụ ihe.",
     "couldNotConnectToAppStore": "Enweghị ike ijikọ na App Store. Lelee njikọ gị wee nwaa ọzọ.",
     "purchaseMissingSignedTransaction": "Ịzụrụ ihe na App Store agụnyeghị JWS azụmahịa a bịanyere aka na ya.",
-    "couldNotConnectToPlay": "Enweghị ike ịjikọọ na Google Play. Lelee njikọ gị wee nwaa ọzọ.",
+    "couldNotConnectToPlay": "Enweghị ike ijikọ na Google Play. Lelee njikọ gị wee nwaa ọzọ.",
     "productsUnavailablePlay": "Ngwaahịa Google Play adịghị",
-    "purchaseDifferentAccountPlay": "Ịzụrụ Google Play a ejikọghị na akaụntụ Kilo gị. Banye na Akaụntụ Google e ji zụọ ya, wee nwaa ọzọ.",
+    "purchaseDifferentAccountPlay": "Ịzụrụ Google Play a ejikọghị na akaụntụ Kilo gị. Banye na akaụntụ Google e ji zụọ ya, wee nwaa ọzọ.",
     "purchaseMissingPurchaseToken": "Ịzụrụ Google Play agụnyeghị token ịzụrụ."
   },
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Tupu anyị amalite",
-    "summaryTitle": "Mmasị ikesi data",
+    "summaryTitle": "Mmasị ịkekọrịta data",
     "introDescription": "Kilo na-ezigara ndị na-enye ọrụ AI ozi gị ka ha mepụta nzaghachi. Ihe ndị a na-egosi data a na-ekekọrịta na ndị na-anata ya.",
     "required": "Ihe achọrọ iji Kilo",
     "promptsTitle": "Ihe ị na-ede na mkparịta ụka gị",
@@ -3203,7 +3203,7 @@
     "aiProvidersWhat": "Ihe ị na-ede, ndekọ mkparịta ụka gị, na faịlụ ọ bụla ị na-etinye.",
     "aiProvidersWhy": "Iji mepụta nzaghachi AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, na ndị na-enye ọrụ ndị ọzọ ị na-ahọrọ maka arịrịọ ọ bụla.",
-    "gatewayWhat": "ID akaụntụ, nkọwa data arịrịọ, ojiji tokin, yana prompts na ndekọ olu nke ngwa a na-eziga site na ya.",
+    "gatewayWhat": "ID akaụntụ, nkọwa data arịrịọ, ojiji tokin, yana ihe ị na-ede na ndekọ olu nke ngwa a na-eziga site na ya.",
     "viaGateway": "Site na Kilo Gateway",
     "gatewayWhy": "Nyocha njirimara, iziga arịrịọ n'ebe kwesịrị ekwesị, ime ka ndekọ ịgba ụgwọ kwekọọ.",
     "gatewayWho": "Kilo (kilo.ai).",
@@ -3213,7 +3213,7 @@
     "productAnalyticsWhat": "Ihe omume ngwa (imepe ngwa, ihuenyo e lere, ojiji njirimara), ụdị ngwaọrụ, ụdị ngwa.",
     "productAnalyticsWhy": "Tụọ arụmọrụ ngwa ma ghọta otú e si eji njirimara ya.",
     "productAnalyticsWho": "PostHog.",
-    "errorScreenshotsWhat": "Foto ihuenyo mgbe njehie mere na ndekọ nnọkọ ole na ole a họọrọ, nke e kpuchiri ederede na onyonyo dị na ha.",
+    "errorScreenshotsWhat": "Foto ihuenyo e kpuchiri ederede na onyonyo mgbe njehie mere, na ndekọ e kpuchiri ederede na onyonyo nke nnọkọ ole na ole a họọrọ.",
     "errorScreenshotsWhy": "Hụ ihe ngwa gosiri mgbe ihe mebiri.",
     "performanceProfilingTitle": "Ịmepụta profaịlụ arụmọrụ",
     "performanceProfilingWhat": "Profaịlụ CPU site na nnọkọ ole na ole a họọrọ, gụnyere aha ọrụ na usoro oku.",
@@ -3466,7 +3466,7 @@
     "newestSession": "Kacha ọhụrụ: {{title}}",
     "noneWaiting": "Ọ dịghị onye nnọchi anya na-eche",
     "newAgent": "Onye nnọchi anya ọhụrụ",
-    "approving": "Na-akwado...",
+    "approving": "Na-akwado…",
     "couldNotApprove": "Enweghị ike ịkwado",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
@@ -3480,7 +3480,7 @@
     "nextRun": "Oge ọrụ ọzọ",
     "waitingForYou": "Na-eche gị",
     "nextScheduled": "Ihe ahaziri na-esote",
-    "answerNeeded": "Chọrọ azịza",
+    "answerNeeded": "Achọrọ azịza",
     "waitingToRetry": "Na-eche ịnwale ọzọ",
     "step": {
       "editing": "Na-edezi",
@@ -3499,7 +3499,7 @@
       "provider": "Kwụsịrị: njehie onye na-eweta",
       "tool": "Kwụsịrị: njehie ngwaọrụ",
       "cancelled": "Kwụsịrị: kagburu",
-      "other": "KWỤSỊRỊ"
+      "other": "Kwụsịrị"
     }
   },
   "transcriptionModel": {

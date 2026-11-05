@@ -38,6 +38,7 @@ import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createHistoryRequests } from './history-requests.js';
+import { createControlPlaneExecRequests } from './exec-requests.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   parseAgentSandboxProvider,
@@ -187,6 +188,7 @@ export function createControlPlaneSessionHost(options: {
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
   isWorkspaceBusy?(): boolean;
+  isExecuting?: () => boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
@@ -205,7 +207,11 @@ export function createControlPlaneSessionHost(options: {
     runtimes,
     turns: manager,
     getHeartbeat: () => ({
-      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      active:
+        options.isPreparing() ||
+        (options.isExecuting?.() ?? false) ||
+        runtimes.needsCompute() ||
+        manager.hasPendingWork(),
       workspaceBusy: options.isWorkspaceBusy?.() ?? false,
       degraded: runtimes.suspected(),
     }),
@@ -226,6 +232,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
   historyRequests?: { current?: ReturnType<typeof createHistoryRequests> };
+  execRequests: { current?: ReturnType<typeof createControlPlaneExecRequests> };
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -289,6 +296,7 @@ export function createControlPlaneFrameDispatcher(
         void deps.turns.current?.answer(frame.sessionId, frame.reply);
         return;
       case 'session.release':
+        deps.execRequests.current?.cancelSession(frame.sessionId);
         deps.turns.current?.release(frame.sessionId);
         deps.preparation.current?.release(frame.sessionId);
         void deps.terminals.current?.forgetSession(frame.sessionId);
@@ -299,6 +307,7 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'worktree.prepareDeletion':
       case 'worktree.delete':
+        deps.execRequests.current?.cancelDirectory(frame.payload.directory);
         void (
           deps.turns.current?.cancelInterruptedFinalizations(frame.payload.directory) ??
           Promise.resolve()
@@ -309,6 +318,9 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'history.result':
         deps.historyRequests?.current?.handle(frame);
+        return;
+      case 'exec.request':
+        void deps.execRequests.current?.handle(frame);
         return;
       case 'terminal.create':
       case 'terminal.resize':
@@ -375,6 +387,7 @@ export async function runControlPlaneWrapper(
   const timers = resolveControlPlaneTimers(env);
   // Keep the tool/workload cgroup placement for the Kilo server chain.
   const workload = initializeControlWorkload({ env, report: diagnostics.onDiagnostic });
+  const spawnSetup = createSetupSpawn(workload);
   // The connection's shutdown callback needs the lifecycle that owns the same
   // connection, so route it through a holder assigned after construction.
   const shutdownRef: { current?: (reason: string | undefined) => void } = {};
@@ -402,6 +415,9 @@ export async function runControlPlaneWrapper(
   } = {};
   // Wrapper-initiated Cloud history reads answer over the same connection.
   const historyRequestsRef: { current?: ReturnType<typeof createHistoryRequests> } = {};
+  const execRequestsRef: {
+    current?: ReturnType<typeof createControlPlaneExecRequests>;
+  } = {};
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const host = createControlPlaneSessionHost({
     runtime: {
@@ -419,6 +435,7 @@ export async function runControlPlaneWrapper(
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
     isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
+    isExecuting: () => execRequestsRef.current?.hasActive() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -438,6 +455,7 @@ export async function runControlPlaneWrapper(
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
       historyRequests: historyRequestsRef,
+      execRequests: execRequestsRef,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
@@ -479,7 +497,7 @@ export async function runControlPlaneWrapper(
     readHistoryPage: request => historyRequests.readPage(request),
     log: logToFile,
     inheritedEnv: env,
-    spawnSetup: createSetupSpawn(workload),
+    spawnSetup,
   });
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),
@@ -505,6 +523,11 @@ export async function runControlPlaneWrapper(
     preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
     clientFor: key => liveRuntimeClient(runtimes.get(key))?.reads ?? null,
     log: logToFile,
+  });
+  execRequestsRef.current = createControlPlaneExecRequests({
+    emit: frame => connection.send(frame),
+    preparedRoute: sessionId => preparationRef.current?.preparedExecRoute(sessionId) ?? null,
+    spawn: spawnSetup,
   });
   const nativeStatus = createNativeStatusReporter({
     enabled: projector.enabled,
@@ -553,6 +576,7 @@ export async function runControlPlaneWrapper(
     log: logToFile,
     stop: async () => {
       nativeStatus.stop();
+      await execRequestsRef.current?.cancelAll();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
       await runtimes.shutdown();

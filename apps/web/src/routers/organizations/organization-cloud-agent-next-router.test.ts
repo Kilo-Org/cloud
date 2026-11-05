@@ -115,6 +115,7 @@ const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>()
 const mockGetEgressAudit =
   jest.fn<(input: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
 const mockGetSessionMessagesPage = jest.fn<CloudAgentNextClient['getSessionMessagesPage']>();
+const mockExecCommand = jest.fn<CloudAgentNextClient['execCommand']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -142,6 +143,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getMessageResult: mockGetMessageResult,
   getEgressAudit: mockGetEgressAudit,
   getSessionMessagesPage: mockGetSessionMessagesPage,
+  execCommand: mockExecCommand,
   getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
@@ -371,6 +373,13 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     expectedWorktreeId?: `worktree_${string}`;
     messageId: string;
   }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
+  execCommand: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    expectedWorktreeId?: `worktree_${string}`;
+    command: string;
+    timeoutSeconds?: number;
+  }) => ReturnType<CloudAgentNextClient['execCommand']>;
   sendMessage: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
@@ -1090,6 +1099,135 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
       expect(mockSendMessage).not.toHaveBeenCalled();
       expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('execCommand', () => {
+    function call(
+      user: User,
+      overrides: {
+        organizationId?: string;
+        cloudAgentSessionId?: string;
+        expectedWorktreeId?: `worktree_${string}`;
+        timeoutSeconds?: number;
+      } = {}
+    ) {
+      const caller = createCaller({ user });
+      return caller.execCommand({
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+        expectedWorktreeId: worktreeId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+        ...overrides,
+      });
+    }
+
+    beforeEach(() => {
+      mockExecCommand.mockResolvedValue({
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 3,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        stdout: 'hello',
+        stderr: '',
+      });
+    });
+
+    it('checks the exact worktree and keeps its guard out of the Worker payload', async () => {
+      await expect(call(owner)).resolves.toMatchObject({ exitCode: 0, stdout: 'hello' });
+      expect(mockExecCommand).toHaveBeenCalledWith({
+        cloudAgentSessionId: orgSessionId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+      });
+      expect(mockExecCommand.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+    });
+
+    it('defaults the timeout to 30 seconds', async () => {
+      const caller = createCaller({ user: owner });
+      await caller.execCommand({
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+        expectedWorktreeId: worktreeId,
+        command: 'printf hello',
+      });
+      expect(mockExecCommand).toHaveBeenCalledWith({
+        cloudAgentSessionId: orgSessionId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+      });
+    });
+
+    it('rejects the wrong worktree before any Worker call', async () => {
+      await expect(
+        call(owner, { expectedWorktreeId: 'worktree_22345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('requires the same owner and exact organization', async () => {
+      await expect(call(otherMember)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, { organizationId: otherOrganization.id })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(call(owner, { cloudAgentSessionId: personalSessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed members despite a stale owner row', async () => {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, owner.id)
+          )
+        );
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleted organizations', async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('bounds the command and timeout', async () => {
+      const caller = createCaller({ user: owner });
+      await expect(
+        caller.execCommand({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+          expectedWorktreeId: worktreeId,
+          command: '',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.execCommand({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+          expectedWorktreeId: worktreeId,
+          command: 'a'.repeat(10_001),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.execCommand({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+          expectedWorktreeId: worktreeId,
+          command: 'printf hello',
+          timeoutSeconds: 61,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockExecCommand).not.toHaveBeenCalled();
     });
   });
 

@@ -6223,6 +6223,49 @@
     ],
     "searchBlob": "cloudAgentNext.createWorktreeChat Create a new chat session backed by a git worktree for a cloud agent. cloudagentnext createworktreechat sourcekilosessionid operationkey kilosessionid sourceKiloSessionId operationKey kiloSessionId"
   },
+  "cloudAgentNext.execCommand": {
+    "path": "cloudAgentNext.execCommand",
+    "kind": "mutation",
+    "summary": "Run a non-interactive shell command (bash -c) in a Cloud Agent session's worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "command"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "execcommand",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "command",
+      "timeoutseconds"
+    ],
+    "searchBlob": "cloudAgentNext.execCommand Run a non-interactive shell command (bash -c) in a Cloud Agent session's worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. cloudagentnext execcommand cloudagentsessionid expectedworktreeid command timeoutseconds cloudAgentSessionId expectedWorktreeId command timeoutSeconds"
+  },
   "cloudAgentNext.getAttachmentDownloadUrl": {
     "path": "cloudAgentNext.getAttachmentDownloadUrl",
     "kind": "mutation",
@@ -17462,6 +17505,57 @@
       "kilosessionid"
     ],
     "searchBlob": "organizations.cloudAgentNext.createWorktreeChat Create a worktree-based chat from an existing cloud agent session. Use to branch a session into a new worktree. organizations cloudagentnext createworktreechat organizationid sourcekilosessionid operationkey kilosessionid organizationId sourceKiloSessionId operationKey kiloSessionId"
+  },
+  "organizations.cloudAgentNext.execCommand": {
+    "path": "organizations.cloudAgentNext.execCommand",
+    "kind": "mutation",
+    "summary": "Run a non-interactive shell command (bash -c) in an organization's Cloud Agent session worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. Requires the organizationId that owns the session.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "command"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "execcommand",
+      "organizationid",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "command",
+      "timeoutseconds"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.execCommand Run a non-interactive shell command (bash -c) in an organization's Cloud Agent session worktree and return exit code, stdout and stderr (last ~6 KiB of each). The session must have a running sandbox and be idle when the call starts; it never wakes a sleeping sandbox and refuses if a message is running when it starts (a message started meanwhile may run concurrently), timing out after timeoutSeconds (max 60). Inspect the workspace before retrying if the outcome is reported unknown or the command was interrupted. Requires the organizationId that owns the session. organizations cloudagentnext execcommand organizationid cloudagentsessionid expectedworktreeid command timeoutseconds organizationId cloudAgentSessionId expectedWorktreeId command timeoutSeconds"
   },
   "organizations.cloudAgentNext.getAttachmentUploadUrl": {
     "path": "organizations.cloudAgentNext.getAttachmentUploadUrl",

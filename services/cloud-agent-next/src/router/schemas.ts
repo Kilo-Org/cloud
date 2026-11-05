@@ -38,6 +38,10 @@ import { SessionMessageCompletionSourceSchema } from '../session/session-message
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
 import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
 import { GetEgressAuditInputSchema } from '../shared/egress-audit.js';
+import {
+  controlPlaneExecPayloadSchema,
+  controlPlaneExecResultSchema,
+} from '../shared/control-plane-protocol.js';
 
 export { GetEgressAuditResponseSchema as GetEgressAuditOutput } from '../shared/egress-audit.js';
 export type { GetEgressAuditResponse } from '../shared/egress-audit.js';
@@ -1378,6 +1382,18 @@ export const GetMessageResultOutput = z
   });
 
 export type GetMessageResultResponse = z.infer<typeof GetMessageResultOutput>;
+
+export const ExecCommandInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to run in'),
+    command: controlPlaneExecPayloadSchema.shape.command.describe(
+      'Non-interactive shell command to run in the workspace'
+    ),
+    timeoutSeconds: z.number().int().min(1).max(60).default(30),
+  })
+  .strict();
+
+export const ExecCommandOutput = controlPlaneExecResultSchema;
 
 /**
  * Compatibility response schema for public send/V2 endpoints.

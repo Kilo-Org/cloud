@@ -39,6 +39,8 @@ import {
   baseGetMessageResultNextOutputSchema,
   baseListChildSessionsNextSchema,
   baseListChildSessionsNextOutputSchema,
+  baseExecCommandNextSchema,
+  baseExecCommandNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
@@ -461,6 +463,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await client.getMessageResult({
         cloudAgentSessionId: input.cloudAgentSessionId,
         messageId: input.messageId,
+      });
+    }),
+
+  execCommand: baseProcedure
+    .input(baseExecCommandNextSchema)
+    .output(baseExecCommandNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.execCommand({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        command: input.command,
+        timeoutSeconds: input.timeoutSeconds,
       });
     }),
 

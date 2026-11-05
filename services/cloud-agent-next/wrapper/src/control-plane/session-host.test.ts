@@ -20,6 +20,7 @@ async function settle() {
 async function hostFixture(turn: Pick<TurnManagerDeps, 'runAutoCommit'> = {}) {
   let now = Date.now();
   let preparing = false;
+  let executing = false;
   let abortReply: () => Promise<boolean> = async () => true;
   let summaryReply: () => Promise<boolean> = async () => true;
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -144,6 +145,7 @@ async function hostFixture(turn: Pick<TurnManagerDeps, 'runAutoCommit'> = {}) {
     },
     isPreparing: () => preparing,
     isWorkspaceBusy: () => terminals.hasActivePty(),
+    isExecuting: () => executing,
   });
   const terminals = createControlPlaneTerminals({
     controlUrl: server.url.toString(),
@@ -198,6 +200,9 @@ async function hostFixture(turn: Pick<TurnManagerDeps, 'runAutoCommit'> = {}) {
     prepare(value: boolean) {
       preparing = value;
     },
+    execute(value: boolean) {
+      executing = value;
+    },
     async dispose() {
       host.turns.shutdown();
       terminals.shutdown();
@@ -218,6 +223,21 @@ describe('production session host composition', () => {
       f.prepare(true);
       expect(f.host.getHeartbeat().active).toBe(true);
       f.prepare(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('keeps a running exec command active without native compute or pending work', async () => {
+    const f = await hostFixture();
+    try {
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      f.execute(true);
+      expect(f.host.getHeartbeat().active).toBe(true);
+      f.execute(false);
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.dispose();
@@ -814,6 +834,7 @@ describe('production session host composition', () => {
             },
           },
           kiloRequests: {},
+          execRequests: {},
           send: () => undefined,
           log: () => undefined,
         });

@@ -449,6 +449,7 @@ export function createControlPlaneConnection(
           redactsNamedSecrets: true,
           installsSkillsSh: true,
           startCommands: true,
+          execCommand: true,
         })
       )
         return;

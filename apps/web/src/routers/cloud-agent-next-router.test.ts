@@ -105,6 +105,7 @@ const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>()
 const mockGetEgressAudit =
   jest.fn<(input: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
 const mockGetSessionMessagesPage = jest.fn<CloudAgentNextClient['getSessionMessagesPage']>();
+const mockExecCommand = jest.fn<CloudAgentNextClient['execCommand']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -140,6 +141,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getMessageResult: mockGetMessageResult,
   getEgressAudit: mockGetEgressAudit,
   getSessionMessagesPage: mockGetSessionMessagesPage,
+  execCommand: mockExecCommand,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -299,6 +301,12 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     expectedWorktreeId?: `worktree_${string}`;
     messageId: string;
   }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
+  execCommand: (input: {
+    cloudAgentSessionId: string;
+    expectedWorktreeId?: `worktree_${string}`;
+    command: string;
+    timeoutSeconds?: number;
+  }) => ReturnType<CloudAgentNextClient['execCommand']>;
   sendMessage: (input: {
     cloudAgentSessionId: string;
     expectedWorktreeId?: `worktree_${string}`;
@@ -661,6 +669,93 @@ describe('cloudAgentNextRouter worktree changes access', () => {
       );
       expect(mockSendMessage).not.toHaveBeenCalled();
       expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('execCommand', () => {
+    function call(
+      user: User,
+      overrides: {
+        cloudAgentSessionId?: string;
+        expectedWorktreeId?: `worktree_${string}`;
+        command?: string;
+        timeoutSeconds?: number;
+      } = {}
+    ) {
+      const caller = createCaller({ user });
+      return caller.execCommand({
+        cloudAgentSessionId: personalSessionId,
+        expectedWorktreeId: worktreeId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+        ...overrides,
+      });
+    }
+
+    beforeEach(() => {
+      mockExecCommand.mockResolvedValue({
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 3,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        stdout: 'hello',
+        stderr: '',
+      });
+    });
+
+    it('checks the exact worktree and keeps its guard out of the Worker payload', async () => {
+      await expect(call(owner)).resolves.toMatchObject({ exitCode: 0, stdout: 'hello' });
+      expect(mockExecCommand).toHaveBeenCalledWith({
+        cloudAgentSessionId: personalSessionId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+      });
+      expect(mockExecCommand.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+    });
+
+    it('defaults the timeout to 30 seconds', async () => {
+      const caller = createCaller({ user: owner });
+      await caller.execCommand({
+        cloudAgentSessionId: personalSessionId,
+        expectedWorktreeId: worktreeId,
+        command: 'printf hello',
+      });
+      expect(mockExecCommand).toHaveBeenCalledWith({
+        cloudAgentSessionId: personalSessionId,
+        command: 'printf hello',
+        timeoutSeconds: 30,
+      });
+    });
+
+    it('rejects the wrong worktree before any Worker call', async () => {
+      await expect(
+        call(owner, { expectedWorktreeId: 'worktree_22345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('denies other owners, cross-organization targets, and legacy references', async () => {
+      await expect(call(otherUser)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, { cloudAgentSessionId: orgSessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(
+        call(owner, { cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockExecCommand).not.toHaveBeenCalled();
+    });
+
+    it('bounds the command and timeout', async () => {
+      await expect(call(owner, { command: '' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(call(owner, { command: 'a'.repeat(10_001) })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      await expect(call(owner, { timeoutSeconds: 61 })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      expect(mockExecCommand).not.toHaveBeenCalled();
     });
   });
 

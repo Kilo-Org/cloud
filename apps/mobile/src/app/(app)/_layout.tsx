@@ -9,6 +9,7 @@ import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mou
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
+import { ScreenErrorBoundary } from '@/components/screen-error-boundary';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
@@ -116,6 +117,12 @@ export const unstable_settings = {
   // return to. `/` itself resolves straight to this anchor: it seeds the tab
   // navigator, so the group needs no `index` redirect of its own.
   anchor: '(tabs)',
+  // A throw while a route screen of this stack renders degrades to that
+  // screen's own retryable state instead of replacing the app: expo-router
+  // wraps each screen in this boundary inside its navigator, so the header, the
+  // back stack and every other screen survive. Nested layouts inherit it; the
+  // tab stacks opt out (`(tabs)/_layout.tsx`) and keep their own boundary.
+  screenErrorBoundary: ScreenErrorBoundary,
 };
 
 export default function AppLayout() {

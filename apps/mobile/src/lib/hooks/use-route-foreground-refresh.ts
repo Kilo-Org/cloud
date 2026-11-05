@@ -3,6 +3,8 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { setRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
+
 /**
  * Invalidates the given tRPC path-prefix query keys when the route regains
  * foreground freshness:
@@ -25,6 +27,16 @@ export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[
   // render, and a changing useFocusEffect callback would re-run on every render.
   const queryKeysRef = useRef(queryKeys);
   queryKeysRef.current = queryKeys;
+
+  // The same keys are this route's render-recovery scope: when a screen of the
+  // route throws while rendering one of these payloads, the recovery fallback
+  // refetches them before remounting, so the throw is not replayed against the
+  // cache. Recorded during render, not in an effect, because the screen that
+  // needs it can throw on its first render (a persisted, poisoned cache) and
+  // would then never commit the effect. The write is an idempotent entry in a
+  // WeakMap keyed by this route's navigation object, derived only from the
+  // hook's arguments, and the boundary reads it back for the same object.
+  setRouteRecoveryScope(navigation, queryKeys);
 
   const firstFocusRef = useRef(true);
 

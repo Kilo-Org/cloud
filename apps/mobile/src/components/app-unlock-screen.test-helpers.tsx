@@ -357,6 +357,11 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// `(app)/_layout` names this boundary in `unstable_settings`; the harness only
+// needs the module to load, not the fallback's own providers.
+vi.mock('@/components/screen-error-boundary', () => ({
+  ScreenErrorBoundary: 'ScreenErrorBoundary',
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));

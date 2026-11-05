@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { getRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
 
 const invalidateQueries = vi.hoisted(() => vi.fn());
 
@@ -55,10 +56,15 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   };
 });
 
+// One object for the whole test file, like the navigators hand a route: the
+// recovery registry keys on this identity, so a fresh object per call would hide
+// what the screen boundary reads back.
+const navigation = { isFocused: () => focusState.isFocused };
+
 vi.mock('expo-router', () => ({
   // `isFocused()` is a live call, so a test can blur the route without
   // rerendering the probe - the frozen-tab case.
-  useNavigation: () => ({ isFocused: () => focusState.isFocused }),
+  useNavigation: () => navigation,
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
   },
@@ -191,6 +197,14 @@ describe('useRouteForegroundRefresh mounted', () => {
     });
 
     expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('records the listed keys as the route recovery scope before the first commit', async () => {
+    await renderProbe(KEYS);
+
+    // The screen boundary reads this back to refetch before it remounts a route
+    // that threw, so it must be there even for a screen that never commits.
+    expect(getRouteRecoveryScope(navigation)).toEqual(KEYS);
   });
 
   it('invalidates the keys on a later focus regain', async () => {

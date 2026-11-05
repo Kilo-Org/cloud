@@ -11,6 +11,38 @@ public final class KiloAppActionsModule: Module {
     KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
     return KiloAppActionBridge.shared.drainParkedPayloads()
   }
+
+  /// Replaces the session entity catalog. True means the stored bytes changed,
+  /// so the caller can tell a real update from a run that re-published the same
+  /// titles.
+  @JS
+  func replaceSessionCatalog(entries: [KiloSessionCatalogRecord]) -> Bool {
+    KiloSessionCatalogStore.replace(entries.map(\.entry))
+  }
+
+  /// Wipes the session entity catalog. True means there was something to wipe.
+  @JS
+  func clearSessionCatalog() -> Bool {
+    KiloSessionCatalogStore.clear()
+  }
+
+  /// Publishes the session the app is showing, or clears it. `nil` means no
+  /// session is visible.
+  @JS
+  func setVisibleSession(sessionId: String?) async {
+    await KiloVisibleSession.publish(sessionId)
+  }
+}
+
+/// One catalog entry, in the shape `src/lib/app-actions/native-bridge.ts`
+/// sends. Mirrors `KiloSessionCatalogEntry`, which owns the stored shape.
+struct KiloSessionCatalogRecord: Record {
+  @Field var id: String = ""
+  @Field var title: String = ""
+
+  var entry: KiloSessionCatalogEntry {
+    KiloSessionCatalogEntry(id: id, title: title)
+  }
 }
 
 /// The module was used without a live runtime, so nothing can be registered.

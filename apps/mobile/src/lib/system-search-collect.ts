@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
 import { getRecentPrsForIndex } from '@/lib/pr-review/recent-prs';
 import { dedupeBy } from '@/lib/query/dedupe-by-id';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import {
   activeSessionSearchDocument,
   findingSearchDocument,
@@ -131,7 +132,28 @@ type RowDecoder<TRow> = {
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
   observedSources: Set<string>;
+  /**
+   * The named sessions this run could see, newest first, for the App Intents
+   * entity catalog.
+   *
+   * The Siri and Shortcuts picker offers the same rows the index carries, but
+   * keyed by session id instead of by the route the index opens, because an
+   * intent names a session and the app's own pipeline builds the destination.
+   * The list is deduped and capped; `KiloSessionCatalogStore` applies the same
+   * bound on the device.
+   */
+  sessions: SessionCatalogEntry[];
 };
+
+/** One session the App Intents entity catalog can offer, keyed by session id. */
+export type SessionCatalogEntry = { id: string; title: string };
+
+/**
+ * How many sessions the catalog keeps. The collector is newest first, so the
+ * cap drops the oldest titles — the ones least likely to be spoken. The native
+ * store carries the same bound.
+ */
+export const SESSION_CATALOG_MAX_ENTRIES = 50;
 
 /**
  * One query's collected documents, memoized against the payload identity that
@@ -144,6 +166,7 @@ type QueryCollectionMemo = {
   status: Query['state']['status'];
   maxPages: unknown;
   documents: SystemSearchDocument[];
+  sessions: SessionCatalogEntry[];
   observedSource: string | null;
 };
 
@@ -159,6 +182,7 @@ export async function collectSystemSearchDocuments(
   queryClient: QueryClient
 ): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
+  const sessions: SessionCatalogEntry[] = [];
   const observedSources = new Set<string>();
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
@@ -167,6 +191,7 @@ export async function collectSystemSearchDocuments(
     seen.add(queryHash);
     const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
+    sessions.push(...collected.sessions);
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
     // the findings capacity probe fetches `limit: 1` under `listFindings`, a
@@ -190,7 +215,11 @@ export async function collectSystemSearchDocuments(
   for (const source of recents.observedSources) {
     observedSources.add(source);
   }
-  return { documents: dedupeBy(documents, document => document.id), observedSources };
+  return {
+    documents: dedupeBy(documents, document => document.id),
+    observedSources,
+    sessions: dedupeBy(sessions, session => session.id).slice(0, SESSION_CATALOG_MAX_ENTRIES),
+  };
 }
 
 /** The query memo belonging to one client, created on first use. */
@@ -232,6 +261,7 @@ function collectOrReuse(
     status: query.state.status,
     maxPages: query.options.maxPages,
     documents: collected.documents,
+    sessions: collected.sessions,
     observedSource: collected.observedSource,
   });
   return collected;
@@ -247,10 +277,12 @@ function collectOrReuse(
  */
 type QueryDocuments = {
   documents: SystemSearchDocument[];
+  /** The named sessions this query enumerates, for the intent catalog. */
+  sessions: SessionCatalogEntry[];
   observedSource: string | null;
 };
 
-const NOT_ENUMERATED: QueryDocuments = { documents: [], observedSource: null };
+const NOT_ENUMERATED: QueryDocuments = { documents: [], sessions: [], observedSource: null };
 
 /** The keys whose presence narrows a source list to a subset of its scope. */
 const SESSION_NARROWING_KEYS = ['createdOnPlatform', 'gitUrl'] as const;
@@ -300,10 +332,10 @@ function documentsFromQuery(query: Query): QueryDocuments {
     const pages = parsed.data.pages.map(page => ({
       cliSessions: decodedRows(page.cliSessions, storedSessionRowSchema),
     }));
+    const rows = collectUnfilteredPages(pages);
     return {
-      documents: collectUnfilteredPages(pages).flatMap(row =>
-        presentOrEmpty(storedSessionSearchDocument(row))
-      ),
+      documents: rows.flatMap(row => presentOrEmpty(storedSessionSearchDocument(row))),
+      sessions: namedSessions(rows.map(row => ({ id: row.session_id, title: row.title }))),
       observedSource: sessionObservedSource(query),
     };
   }
@@ -315,10 +347,10 @@ function documentsFromQuery(query: Query): QueryDocuments {
     // The live list enumerates only currently running sessions, a subset of
     // the stored history that already carries every session, so it contributes
     // documents but never authorises a removal.
+    const rows = decodedRows(parsed.data.sessions, activeSessionRowSchema);
     return {
-      documents: decodedRows(parsed.data.sessions, activeSessionRowSchema).flatMap(row =>
-        presentOrEmpty(activeSessionSearchDocument(row))
-      ),
+      documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
+      sessions: namedSessions(rows.map(row => ({ id: row.id, title: row.title }))),
       observedSource: null,
     };
   }
@@ -336,6 +368,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
       documents: parsed.data.pages
         .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
         .map(row => inboxPrSearchDocument(row, systemSearchSourceKey('pullRequests', 'github'))),
+      sessions: [],
       observedSource: isDefaultInput
         ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'), cursorHasMore)
         : null,
@@ -362,6 +395,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
             providerInboxSourceScope(row.ref.platform, organizationId)
           )
         ),
+      sessions: [],
       observedSource:
         provider === null
           ? null
@@ -395,6 +429,7 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
     documents: parsed.data.pages
       .flatMap(page => decodedRows(page.findings, findingRowSchema))
       .map(row => findingSearchDocument(row, scope)),
+    sessions: [],
     observedSource: filtered
       ? null
       : untrimmedSource(query, systemSearchSourceKey('findings', scope), findingsHasMore),
@@ -572,6 +607,23 @@ async function recentPrDocuments(): Promise<{
     documents: recents.map(entry => recentPrSearchDocument(entry)),
     observedSources: recentPrSourceScopes(),
   };
+}
+
+/**
+ * The catalog entries for one page of session rows.
+ *
+ * Only the rows a person could recognise are offered, so a title-less session
+ * and the backend's `New session - <ISO>` placeholder stay out of the picker.
+ * `sessionDisplayTitle` owns that rule, which is what keeps the picker and the
+ * search index offering the same names.
+ */
+function namedSessions(
+  rows: readonly { id: string; title: string | null | undefined }[]
+): SessionCatalogEntry[] {
+  return rows.flatMap(row => {
+    const title = sessionDisplayTitle(row.title);
+    return title === undefined ? [] : [{ id: row.id, title }];
+  });
 }
 
 function presentOrEmpty(document: SystemSearchDocument | null): SystemSearchDocument[] {

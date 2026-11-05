@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as RecentPrsModule from '@/lib/pr-review/recent-prs';
-import { collectSystemSearchDocuments } from './system-search-collect';
+import { collectSystemSearchDocuments, SESSION_CATALOG_MAX_ENTRIES } from './system-search-collect';
 import {
   planSystemSearchUpdate,
   providerInboxSourceScope,
@@ -262,6 +262,7 @@ describe('collectSystemSearchDocuments', () => {
   it('collects no documents from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
+      sessions: [],
       observedSources: new Set(RECENTS_SOURCES),
     });
   });
@@ -706,5 +707,81 @@ describe('collectSystemSearchDocuments', () => {
 
     expect(second.documents[0]).not.toBe(first.documents[0]);
     expect(second.documents).toEqual(first.documents);
+  });
+});
+
+describe('collectSystemSearchDocuments session catalog', () => {
+  beforeEach(() => {
+    recentPrs.getRecentPrsForIndex.mockReset();
+    recentPrs.getRecentPrsForIndex.mockResolvedValue([]);
+  });
+
+  it('offers each named session once, keyed by session id', async () => {
+    // The stored list and the live list both carry sessions, and the second
+    // stored page repeats one: the picker must see one entry per session, and
+    // it must be keyed by the id an intent opens, not by the route the search
+    // index names.
+    const client = new QueryClient();
+    seed(client);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-1', title: 'Fix login bug' },
+      { id: 'live-1', title: 'Watch the deploy' },
+    ]);
+  });
+
+  it('keeps the backend placeholder and a blank title out of the picker', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            { session_id: 'fresh', title: 'New session - 2026-01-01T00:00:00.000Z' },
+            { session_id: 'blank', title: '   ' },
+            { session_id: 'named', title: '  Deploy review  ' },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([{ id: 'named', title: 'Deploy review' }]);
+  });
+
+  it('keeps the newest titles and drops the rest past the cap', async () => {
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: Array.from({ length: SESSION_CATALOG_MAX_ENTRIES + 5 }, (_, index) => ({
+            session_id: `sess-${index}`,
+            title: `Session ${index}`,
+          })),
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toHaveLength(SESSION_CATALOG_MAX_ENTRIES);
+    expect(sessions[0]).toEqual({ id: 'sess-0', title: 'Session 0' });
+    expect(sessions.at(-1)).toEqual({
+      id: `sess-${SESSION_CATALOG_MAX_ENTRIES - 1}`,
+      title: `Session ${SESSION_CATALOG_MAX_ENTRIES - 1}`,
+    });
+  });
+
+  it('carries no catalog for a cache that holds no session rows', async () => {
+    const client = new QueryClient();
+    client.setQueryData(INBOX_KEY, inbox);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([]);
   });
 });

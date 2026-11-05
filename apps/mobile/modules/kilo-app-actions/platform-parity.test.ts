@@ -51,6 +51,9 @@ const IOS_SOURCES: readonly NamedSource[] = [
   ['KiloAppIntents.swift', intentsSource],
   ['KiloAppActionBridge.swift', bridgeSource],
   ['KiloAppActionsModule.swift', iosModuleSource],
+  ['KiloSessionEntity.swift', readSource(`${IOS_DIRECTORY}KiloSessionEntity.swift`)],
+  ['KiloSessionCatalog.swift', readSource(`${IOS_DIRECTORY}KiloSessionCatalog.swift`)],
+  ['KiloVisibleSession.swift', readSource(`${IOS_DIRECTORY}KiloVisibleSession.swift`)],
 ];
 
 const ANDROID_SOURCES: readonly NamedSource[] = [
@@ -210,11 +213,27 @@ describe('the same four actions on both platforms', () => {
 });
 
 describe('the same native identifiers on both platforms', () => {
-  it('declares one App Intent per action id, and no fifth', () => {
+  /**
+   * The intents that are not one of the four contract actions, and why each is
+   * iOS-only. `OpenNamedSessionIntent` is the additive session picker the owner
+   * asked for: it opens the same `open-session` target through the same
+   * `KiloAppActionTarget.open`, adds no slug and no payload, and leaves the
+   * four existing intents — and every shortcut saved against them — untouched.
+   * Android keeps its four exported entry points; its assistant surface is not
+   * part of that change.
+   */
+  const IOS_ONLY_INTENTS = ['OpenNamedSessionIntent'];
+
+  it('declares one App Intent per action id, plus the iOS-only session picker', () => {
     for (const id of APP_ACTION_IDS) {
       expect(intentsSource, `${id} has no App Intent`).toContain(`struct ${id}Intent: AppIntent {`);
     }
-    expect(intentsSource.match(/: AppIntent \{/g)).toHaveLength(APP_ACTION_IDS.length);
+    for (const name of IOS_ONLY_INTENTS) {
+      expect(intentsSource, `${name} is not declared`).toContain(`struct ${name}: AppIntent {`);
+    }
+    expect(intentsSource.match(/: AppIntent \{/g)).toHaveLength(
+      APP_ACTION_IDS.length + IOS_ONLY_INTENTS.length
+    );
   });
 
   it('lists exactly one AppShortcut per action in the AppShortcutsProvider', () => {

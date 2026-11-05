@@ -85,6 +85,7 @@ import {
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { SessionTasksChip, SessionTasksRow } from '@/components/agents/session-tasks-indicator';
+import { VisibleSessionPublisher } from '@/components/agents/visible-session-publisher';
 import { selectSessionTodoSummary } from '@/components/agents/session-todo-summary';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
@@ -2418,6 +2419,7 @@ export function SessionDetailContent({
             </Animated.View>
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+          <VisibleSessionPublisher sessionId={sessionId} />
 
           {/* The trailing bottom-chrome spacer below reserves the navigation-bar
               inset outside this view. The native lift measures the keyboard

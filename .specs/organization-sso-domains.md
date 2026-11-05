@@ -45,8 +45,9 @@ login from those domains failed at the final authority check.
 
 This spec lets a Direct SSO organization own a set of SSO domains. Every domain
 in the set is authoritative to that organization in the same way the single
-domain was. Platform administrators manage the set; the set can be reconciled
-against WorkOS on demand.
+domain was. The set is not edited by hand: an administrator synchronizes it
+from the organization's WorkOS configuration, and the organization's owners
+are notified of every change.
 
 ## Rules
 
@@ -84,6 +85,14 @@ against WorkOS on demand.
 4. If any domain in an organization's set is claimed by another non-deleted
    organization, resolution for that domain MUST fail closed as ambiguous.
    It MUST NOT change the resolution of the organization's other domains.
+5. An Effective SSO policy MUST expose its complete domain set. It MUST NOT
+   expose a single domain as if it were the policy's domain. Every consumer
+   that decides whether a user is a Same-domain user MUST do so by testing
+   membership in the complete set, through one shared rule, so that adding a
+   domain cannot leave a consumer comparing against only one of them. A
+   consumer that cannot evaluate the full set MUST fail closed.
+6. Interfaces that display an organization's SSO domain MUST show the
+   complete set, including for SSO child organizations inheriting it.
 
 ### Authentication
 
@@ -103,86 +112,95 @@ against WorkOS on demand.
 
 ### Domain Management
 
-1. Only authorized organization administrators and platform administrators MAY
-   add or remove SSO domains, subject to the same access rules as the existing
-   SSO domain controls.
-2. Adding a domain MUST be rejected when the target organization is an SSO
-   child organization, when the domain is invalid, or when the domain belongs
-   to another non-deleted organization.
-3. Removing a domain MUST NOT delete or alter users, memberships, or sessions.
-   After removal, users on that domain are no longer subject to the
-   organization's SSO policy.
-4. Removing the last domain MUST leave the organization without SSO policy.
-   It MUST be an explicit action and MUST be audited like removing SSO today.
-5. Every add and remove MUST be audited with actor, organization, and domain.
-   Audit entries MUST NOT include tokens, cookies, credentials, or
-   authentication headers.
+1. An organization's SSO domain set MUST change only by synchronizing it with
+   the organization's WorkOS organization. The system MUST NOT accept a
+   free-form domain from an administrator, and MUST NOT offer a way to add or
+   remove an individual domain independently of WorkOS.
+2. Only authorized organization administrators and platform administrators MAY
+   synchronize an organization's SSO domains, subject to the same access rules
+   as the existing SSO controls.
+3. Synchronization MUST be initiated by an administrator. The system MUST NOT
+   synchronize automatically, including on sign-in, on any user-initiated
+   request, on a schedule, or in response to WorkOS events, and MUST NOT
+   change enforcement because WorkOS changed. Drift is surfaced (see
+   WorkOS Synchronization) but never applied without an administrator action.
+4. Synchronization MUST be rejected when the target organization is an SSO
+   child organization.
+5. Synchronization MUST NOT delete or alter users, memberships, or sessions.
+6. Every domain added or removed MUST be audited with actor, organization, and
+   domain, noting that it came from synchronization. Audit entries MUST NOT
+   include tokens, cookies, credentials, or authentication headers.
 
-### WorkOS Reconciliation
+### WorkOS Synchronization
 
-1. An authorized administrator MAY request a reconciliation of an
-   organization's SSO domain set from its WorkOS organization.
-2. Reconciliation MUST consider only WorkOS-verified domains. Pending,
-   failed, or unverified WorkOS domains MUST NOT be added.
-3. Reconciliation MUST apply the same ownership rules as a manual add. A
-   verified domain that another organization owns MUST be skipped and
-   reported, and MUST NOT block other domains.
-4. Reconciliation MUST only add domains. It MUST NOT remove a domain from the
-   set, including a domain that WorkOS no longer lists.
-5. Reconciliation MUST report, per domain, whether it was added, already
-   present, or skipped with a reason. A reconciliation with no changes MUST NOT
-   write audit entries.
-6. Each added domain MUST be audited as an add, with the audit message noting
-   that it came from reconciliation.
-7. Administrators MUST be able to see Drift: a WorkOS-verified domain absent
-   from the set, or an SSO domain absent from WorkOS's verified list. Showing
-   Drift MUST NOT change enforcement.
-8. Reconciliation MUST NOT run automatically as a side effect of sign-in or
-   any user-initiated request.
+1. Synchronization makes the SSO domain set equal to the set of WorkOS-verified
+   domains of the organization's WorkOS organization, subject to the rules
+   below. It both adds and removes domains.
+2. Only WorkOS-verified domains count. Pending, failed, or unverified WorkOS
+   domains MUST NOT be added, and a domain that is no longer verified in WorkOS
+   MUST be removed.
+3. Additions MUST apply the same ownership rules as Domain Set Ownership. A
+   verified domain that another non-deleted organization owns MUST be skipped
+   and reported, and MUST NOT block other domains.
+4. Before applying, the system MUST show the administrator exactly which
+   domains will be added and which removed, and MUST apply nothing until the
+   administrator confirms.
+5. The administrator confirmation MUST state that adding a domain requires
+   existing users on it to use SSO, and that removing a domain releases them
+   from the organization's SSO requirement.
+6. A synchronization that would leave the set empty (removing SSO policy
+   altogether, for example because WorkOS lists no verified domains) MUST
+   require an additional explicit confirmation.
+7. Applying a synchronization MUST be atomic: either every confirmed addition
+   and removal takes effect, or none does. The domains to apply MUST be
+   re-validated against current WorkOS and Kilo state at apply time.
+8. The system MUST report, per domain, whether it was added, removed, already
+   in sync, or skipped with a reason. A synchronization with no changes MUST
+   NOT write audit entries or send notifications.
+9. Administrators MUST be able to see Drift (a WorkOS-verified domain absent
+   from the set, or an SSO domain not verified in WorkOS) without applying it.
+   Showing Drift MUST NOT change enforcement.
+10. When WorkOS cannot be reached, or its organization is missing or
+    ambiguous, synchronization MUST fail without modifying the set.
+
+### Notifications
+
+1. When a synchronization adds or removes at least one domain, the system MUST
+   send a notification email to every owner of the organization. This applies
+   even when the change was made by a platform administrator.
+2. The email MUST list the domains added and removed and state the effect on
+   users (SSO now required, or no longer required, for those domains). It MUST
+   NOT include tokens, credentials, or authentication links.
+3. A single synchronization MUST produce at most one email per owner.
+4. Notifications MUST be sent only after the change commits. A failure to
+   send MUST NOT roll back the change and MUST be reported for operational
+   attention.
 
 ### Policy Transitions
 
-1. Adding a domain extends enforcement to existing users on that domain, so it
-   is a policy transition under organization-sso.md Policy Transitions.
-   Enforcement MUST take effect at authentication and authorization boundaries
-   and MUST NOT eagerly invalidate existing sessions or API tokens.
-2. The administrative interface SHOULD tell the administrator, before an add
-   commits, that existing users on the domain will be required to use SSO.
-3. Existing ordinary invitations to Same-domain users of a newly added domain
+1. Adding a domain extends enforcement to existing users on that domain, and
+   removing one releases them, so both are policy transitions under
+   organization-sso.md Policy Transitions. Changes MUST take effect at
+   authentication and authorization boundaries and MUST NOT eagerly
+   invalidate existing sessions or API tokens.
+2. Existing ordinary invitations to Same-domain users of a newly added domain
    MUST NOT remain usable, consistent with organization-sso.md Policy
    Transitions rule 3.
 
 ## Error Handling
 
-1. When a domain add conflicts with another organization, the system MUST
-   reject it without revealing details of the other organization.
+1. When a domain to add conflicts with another organization, the system MUST
+   skip it without revealing details of the other organization.
 2. When a domain is claimed by more than one live organization, the system
    MUST fail closed for that domain and report it for platform-administrator
    attention.
-3. When WorkOS cannot be reached during reconciliation, the system MUST report
-   the failure and MUST NOT modify the SSO domain set.
+3. When WorkOS cannot be reached during synchronization, the system MUST
+   report the failure and MUST NOT modify the SSO domain set.
 
 ## Not Yet Implemented
 
 The following reflect intended behavior that is not yet enforced in the
 current codebase:
 
-1. The whole of this spec. Today an organization owns at most one SSO domain.
-2. Automatic notification of organization owners when a domain is added.
-
-## Open Questions
-
-1. **Automatic drift handling.** Should additions from WorkOS ever apply
-   without an administrator action (for example by polling the WorkOS Events
-   API for `organization_domain.*` events, as scim-sync already does for
-   directory events)? This spec requires manual, add-only reconciliation plus
-   visible Drift. Automatic apply would make a WorkOS-side change silently
-   enforce SSO on existing Kilo users, and automatic removal would silently
-   release enforcement.
-2. **Domain verification at add time.** Should a manual add require that the
-   domain is already WorkOS-verified? Requiring it removes the case where a
-   domain is enforced in Kilo but cannot authenticate in WorkOS (an SSO error
-   for every user on that domain). Not requiring it lets Kilo claim a domain
-   before DNS verification finishes.
-3. **Notification on add.** Whether owners of the organization, or only the
-   acting administrator, are told that SSO now applies to a new domain.
+1. The whole of this spec. Today an organization owns at most one SSO domain,
+   set by hand by an administrator.

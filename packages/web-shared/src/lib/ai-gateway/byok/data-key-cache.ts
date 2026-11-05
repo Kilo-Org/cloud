@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
-import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { byokDataKeyRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 

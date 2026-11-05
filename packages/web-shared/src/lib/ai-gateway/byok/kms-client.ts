@@ -5,6 +5,7 @@ import {
   evictCachedByokDataKey,
   getCachedByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -18,13 +19,6 @@ const KMS_TOTAL_BUDGET_MS = 8000;
 /** A retry is worth issuing only with a slice of budget this large left: a shorter one can
  * only abort and would replace the specific error of the attempt before it with a timeout. */
 const KMS_MIN_ATTEMPT_BUDGET_MS = 500;
-
-export type ByokKmsContext = {
-  key_id: string;
-  owner_type: 'user' | 'organization';
-  owner_id: string;
-  provider_id: string;
-};
 
 type ByokKmsClientConfig = {
   url: string;

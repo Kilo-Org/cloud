@@ -24,8 +24,8 @@ import {
   encryptByokWithDataKey,
   getByokKmsClientConfig,
   KMS_MAX_ATTEMPTS,
-  type ByokKmsContext,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_DATA_KEY_CACHE_TTL_SECONDS } from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
 

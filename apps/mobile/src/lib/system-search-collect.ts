@@ -153,7 +153,7 @@ export type SessionCatalogEntry = { id: string; title: string };
  * cap drops the oldest titles — the ones least likely to be spoken. The native
  * store carries the same bound.
  */
-export const SESSION_CATALOG_MAX_ENTRIES = 50;
+const SESSION_CATALOG_MAX_ENTRIES = 50;
 
 /**
  * One query's collected documents, memoized against the payload identity that

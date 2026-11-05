@@ -278,7 +278,8 @@ describe('the session entity catalog', () => {
 
   it('keeps the catalog to the same bound the collector applies', () => {
     expect(catalog).toContain('static let maxEntries = 50');
-    expect(collectorSource).toContain('export const SESSION_CATALOG_MAX_ENTRIES = 50;');
+    expect(collectorSource).toContain('const SESSION_CATALOG_MAX_ENTRIES = 50;');
+    expect(collectorSource).toContain('.slice(0, SESSION_CATALOG_MAX_ENTRIES)');
   });
 
   it('names the functions and the entries key the JS bridge uses', () => {

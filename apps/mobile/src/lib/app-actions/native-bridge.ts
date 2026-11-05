@@ -48,17 +48,12 @@ type KiloAppActionsModule = InstanceType<typeof NativeModule> & {
 };
 
 /** One session the App Intents entity catalog offers. Mirrors the Swift record. */
-export type NativeSessionCatalogEntry = { id: string; title: string };
+type NativeSessionCatalogEntry = { id: string; title: string };
 
 const nativeModule = requireOptionalNativeModule<KiloAppActionsModule>('KiloAppActions');
 
 /** Whether this binary has the native app-action surface built in. */
 export const isNativeAppActionsAvailable = nativeModule !== null;
-
-/** Whether this binary can offer sessions to Siri and Shortcuts at all. */
-export const isNativeSessionCatalogAvailable =
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- boundary: a development client built before the catalog shipped has no method at all, so the shape is the only thing to test
-  typeof nativeModule?.replaceSessionCatalog === 'function';
 
 /**
  * Replaces the whole entity catalog. True means the device stored a different

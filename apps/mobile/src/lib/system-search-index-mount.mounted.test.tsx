@@ -17,9 +17,7 @@ vi.mock('@/lib/app-unlock-context', () => ({ useAppUnlock: unlock.useAppUnlock }
 
 const nativeSearch = vi.hoisted(() => ({
   applySystemSearchUpdate: vi.fn(async () => undefined),
-  indexedSystemSearchFingerprints: vi.fn<() => Promise<Record<string, string>>>(
-    async () => ({})
-  ),
+  indexedSystemSearchFingerprints: vi.fn<() => Promise<Record<string, string>>>(async () => ({})),
 }));
 
 vi.mock('@/lib/native-system-search', () => ({

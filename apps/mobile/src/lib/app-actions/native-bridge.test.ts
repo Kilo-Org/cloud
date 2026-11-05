@@ -99,16 +99,15 @@ describe('the session catalog bridge', () => {
     const bridge = await import('./native-bridge');
 
     expect(bridge.isNativeAppActionsAvailable).toBe(true);
-    expect(bridge.isNativeSessionCatalogAvailable).toBe(false);
-    await expect(bridge.replaceNativeSessionCatalog([{ id: 'sess-1', title: 'Fix' }])).resolves
-      .toBe(false);
+    await expect(
+      bridge.replaceNativeSessionCatalog([{ id: 'sess-1', title: 'Fix' }])
+    ).resolves.toBe(false);
     await expect(bridge.clearNativeSessionCatalog()).resolves.toBe(false);
     await expect(bridge.setNativeVisibleSession('sess-1')).resolves.toBeUndefined();
   });
 
   it('publishes the whole list, and reports only a real change as changed', async () => {
     const bridge = await import('./native-bridge');
-    expect(bridge.isNativeSessionCatalogAvailable).toBe(true);
 
     native.replaceSessionCatalog.mockResolvedValueOnce(true);
     await expect(

@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as RecentPrsModule from '@/lib/pr-review/recent-prs';
-import { collectSystemSearchDocuments, SESSION_CATALOG_MAX_ENTRIES } from './system-search-collect';
+import { collectSystemSearchDocuments } from './system-search-collect';
 import {
   planSystemSearchUpdate,
   providerInboxSourceScope,
@@ -757,7 +757,7 @@ describe('collectSystemSearchDocuments session catalog', () => {
     client.setQueryData(SESSION_LIST_KEY, {
       pages: [
         {
-          cliSessions: Array.from({ length: SESSION_CATALOG_MAX_ENTRIES + 5 }, (_, index) => ({
+          cliSessions: Array.from({ length: 55 }, (_, index) => ({
             session_id: `sess-${index}`,
             title: `Session ${index}`,
           })),
@@ -768,12 +768,9 @@ describe('collectSystemSearchDocuments session catalog', () => {
 
     const { sessions } = await collectSystemSearchDocuments(client);
 
-    expect(sessions).toHaveLength(SESSION_CATALOG_MAX_ENTRIES);
+    expect(sessions).toHaveLength(50);
     expect(sessions[0]).toEqual({ id: 'sess-0', title: 'Session 0' });
-    expect(sessions.at(-1)).toEqual({
-      id: `sess-${SESSION_CATALOG_MAX_ENTRIES - 1}`,
-      title: `Session ${SESSION_CATALOG_MAX_ENTRIES - 1}`,
-    });
+    expect(sessions.at(-1)).toEqual({ id: 'sess-49', title: 'Session 49' });
   });
 
   it('carries no catalog for a cache that holds no session rows', async () => {

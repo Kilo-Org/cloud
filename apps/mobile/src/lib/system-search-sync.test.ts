@@ -79,7 +79,8 @@ function createBridge(options: { available?: boolean; failFirstApply?: boolean }
   // list replaces the previous one, and the call reports whether the bytes
   // changed.
   let catalog: { id: string; title: string }[] = [];
-  const replaceSessions = vi.fn<(entries: readonly { id: string; title: string }[]) => Promise<boolean>>();
+  const replaceSessions =
+    vi.fn<(entries: readonly { id: string; title: string }[]) => Promise<boolean>>();
   replaceSessions.mockImplementation(async entries => {
     const next = entries.map(entry => ({ id: entry.id, title: entry.title }));
     const changed = JSON.stringify(next) !== JSON.stringify(catalog);

@@ -840,6 +840,13 @@ the legacy profile restrictions.
   wrapper does not send `completed` for that earlier close. Each finalization step has one timeout that
   covers the whole step. A finalization timeout or failure never aborts the Kilo session, so it
   cannot cancel a newer prompt.
+- Native deadline failures are reported immediately. When the interrupted batch opted into
+  auto-commit, the wrapper then waits for confirmed cancellation and an idle root before committing
+  and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
+  a three-minute budget, keeps the heartbeat active, and parks later prompts without consuming their
+  delivery deadline. Stop, session release, wrapper shutdown and worktree deletion cancel it.
+  Cancellation failure or a root that is still running skips cleanup with a warning; abrupt sandbox
+  loss cannot guarantee a commit or push. Cleanup never changes the failed outcome.
 
 ### Kilo supervision
 

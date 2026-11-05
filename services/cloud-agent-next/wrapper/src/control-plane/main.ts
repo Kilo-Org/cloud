@@ -185,8 +185,8 @@ export function createControlPlaneSessionHost(options: {
     ...options.runtime,
     onEvent: event => turns?.observeKiloEvent(event),
     onActivityChange: key => turns?.refreshActivity(key),
-    onDeadline: (identity, reason, retry, key) =>
-      turns?.onNativeDeadline(identity, reason, retry, key),
+    onDeadline: (identity, reason, retry, key, stopped) =>
+      turns?.onNativeDeadline(identity, reason, retry, key, stopped),
     onRestart: info => turns?.onRuntimeRestart(info),
     onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
     onMemoryHold: info => turns?.onRuntimeMemoryHold(info),
@@ -290,7 +290,10 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'worktree.prepareDeletion':
       case 'worktree.delete':
-        void deps.worktreeDeletion.current?.handle(frame);
+        void (
+          deps.turns.current?.cancelInterruptedFinalizations(frame.payload.directory) ??
+          Promise.resolve()
+        ).then(() => deps.worktreeDeletion.current?.handle(frame));
         return;
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
@@ -467,7 +470,10 @@ export async function runControlPlaneWrapper(
       runtimes
         .runtimesForDirectory(directory)
         .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
-    retireDirectory: directory => runtimes.retireDirectory(directory),
+    retireDirectory: async directory => {
+      await turnsRef.current?.cancelInterruptedFinalizations(directory);
+      await runtimes.retireDirectory(directory);
+    },
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
     onDiagnostic: diagnostics.onDiagnostic,

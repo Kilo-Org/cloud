@@ -114,6 +114,7 @@ import {
   beginWorktreeDeletion,
   recordWorktreeCleanup,
   completeWorktreeDeletion,
+  deleteWorktreeContent,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
@@ -257,6 +258,14 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
   async completeCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
     return completeWorktreeDeletion(
+      this.env,
+      cloudAgentWorktreeDeletionSchema.parse(params),
+      this.ctx
+    );
+  }
+
+  async deleteCloudAgentWorktreeContent(params: CloudAgentWorktreeDeletionParams) {
+    return deleteWorktreeContent(
       this.env,
       cloudAgentWorktreeDeletionSchema.parse(params),
       this.ctx

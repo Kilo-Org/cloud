@@ -873,6 +873,7 @@ const GetByCloudAgentSessionIdInputSchema = z.object({
 
 const DeleteSessionInputSchema = z.object({
   session_id: sessionIdField,
+  operationKey: z.uuid().optional(),
 });
 
 const RenameSessionInputSchema = z.object({
@@ -1351,8 +1352,14 @@ export const cliSessionsV2Router = createTRPCRouter({
     ),
 
   deleteWorktree: baseProcedure
-    .input(WorktreeInputSchema)
-    .output(z.object({ success: z.literal(true), deletedSessionIds: z.array(z.string()) }))
+    .input(WorktreeInputSchema.extend({ onlyIfSoleSessionId: sessionIdField.optional() }))
+    .output(
+      z.object({
+        success: z.literal(true),
+        deletedSessionIds: z.array(z.string()),
+        cleanup: z.enum(['complete', 'pending']).default('complete'),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const client = createCloudAgentNextClient(
         (
@@ -1366,6 +1373,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       try {
         return await client.deleteWorktree({
           worktreeId: input.worktreeId,
+          ...(input.onlyIfSoleSessionId ? { onlyIfSoleSessionId: input.onlyIfSoleSessionId } : {}),
           ...(input.organizationId === null
             ? {}
             : { kilocodeOrganizationId: input.organizationId }),
@@ -2407,15 +2415,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       return { associatedPr: formatAssociatedPr(verifiedSessionPr, persisted) };
     }),
 
-  /**
-   * Delete a V2 session.
-   *
-   * Cleans up the cloud-agent-next DO/sandbox if applicable, then delegates
-   * all DB deletion and ingest DO/cache cleanup to the session-ingest worker.
-   */
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
+    let cleanup: 'complete' | 'pending' = 'complete';
 
     const hostedCloudSessionId =
       session.cloud_agent_session_id !== null &&
@@ -2433,20 +2436,32 @@ export const cliSessionsV2Router = createTRPCRouter({
         })
       ).token;
       const client = createCloudAgentNextClient(authToken);
-      let alreadyGone = false;
       try {
-        await client.deleteHostedWorkspaceSession({
+        const result = await client.deleteHostedWorkspaceSession({
           workspaceId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
           sessionId: hostedCloudSessionId,
-          operationKey: randomUUID(),
+          operationKey: input.operationKey ?? randomUUID(),
         });
+        return { success: true, session_id, cleanup: result.cleanup ?? 'complete' };
       } catch (err) {
-        if (isSessionConflictError(err)) {
-          const message =
-            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
-              ? WORKSPACE_REQUIRES_ROOT_SESSION
-              : 'session_deletion_conflict';
-          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        const code = sessionTrpcErrorCode(err);
+        if (
+          code === 'CONFLICT' ||
+          code === 'FORBIDDEN' ||
+          code === 'UNAUTHORIZED' ||
+          code === 'PRECONDITION_FAILED' ||
+          code === 'BAD_REQUEST'
+        ) {
+          throw new TRPCError({
+            code,
+            message:
+              err instanceof Error && err.message === WORKSPACE_REQUIRES_ROOT_SESSION
+                ? WORKSPACE_REQUIRES_ROOT_SESSION
+                : err instanceof Error
+                  ? err.message
+                  : 'session_deletion_conflict',
+            cause: err,
+          });
         }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
@@ -2463,12 +2478,11 @@ export const cliSessionsV2Router = createTRPCRouter({
             cause: err,
           });
         }
-        alreadyGone = true;
       }
-      if (!alreadyGone) return { success: true, session_id };
-    }
-
-    if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
+    } else if (
+      session.cloud_agent_session_id &&
+      SESSION_ID_RE.test(session.cloud_agent_session_id)
+    ) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
           headers: ctx.headersList,
@@ -2490,6 +2504,19 @@ export const cliSessionsV2Router = createTRPCRouter({
               : 'session_deletion_conflict';
           throw new TRPCError({ code: 'CONFLICT', message, cause: err });
         }
+        const code = sessionTrpcErrorCode(err);
+        if (
+          code === 'FORBIDDEN' ||
+          code === 'UNAUTHORIZED' ||
+          code === 'PRECONDITION_FAILED' ||
+          code === 'BAD_REQUEST'
+        ) {
+          throw new TRPCError({
+            code,
+            message: err instanceof Error ? err.message : 'Session access denied',
+            cause: err,
+          });
+        }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
             tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },
@@ -2498,11 +2525,7 @@ export const cliSessionsV2Router = createTRPCRouter({
               cloud_agent_session_id: session.cloud_agent_session_id,
             },
           });
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to clean up cloud-agent session',
-            cause: err,
-          });
+          cleanup = 'pending';
         }
         // Session not found in cloud-agent DO — already gone, continue with DB cleanup.
       }
@@ -2512,7 +2535,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     // to the session-ingest worker.
     await deleteSessionIngest(session_id, ctx.user.id);
 
-    return { success: true, session_id };
+    return { success: true, session_id, cleanup };
   }),
 
   /**

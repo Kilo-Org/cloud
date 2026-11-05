@@ -32,7 +32,10 @@ import {
   cloudSessionMessagesPageInputSchema,
   cloudSessionMessagesPageWireSchema,
 } from '@kilocode/cloud-agent-sdk/schemas';
-import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  WORKTREE_MEMBERSHIP_CHANGED,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
   getWorktreeFileOutputSchema,
@@ -246,11 +249,13 @@ export type CreateWorktreeChatOutput = {
 export type DeleteWorktreeInput = {
   worktreeId: CloudAgentWorktreeId;
   kilocodeOrganizationId?: string;
+  onlyIfSoleSessionId?: string;
 };
 
 const deleteWorktreeOutputSchema = z.object({
   success: z.literal(true),
   deletedSessionIds: z.array(z.string()),
+  cleanup: z.enum(['complete', 'pending']).default('complete'),
 });
 
 export type DeleteWorktreeOutput = z.infer<typeof deleteWorktreeOutputSchema>;
@@ -627,11 +632,12 @@ type CloudAgentNextTRPCClient = {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
   deleteHostedWorkspaceSession: {
-    mutate: (input: {
+    mutate: (input: { workspaceId: string; sessionId: string; operationKey: string }) => Promise<{
+      success: true;
       workspaceId: string;
       sessionId: string;
-      operationKey: string;
-    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>;
+      cleanup: 'complete' | 'pending';
+    }>;
   };
   deleteWorktree: {
     mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
@@ -805,6 +811,14 @@ export class CloudAgentNextClient {
           error.shape?.data?.code === 'NOT_FOUND' ||
           error.data?.code === 'CONFLICT' ||
           error.shape?.data?.code === 'CONFLICT' ||
+          error.data?.code === 'FORBIDDEN' ||
+          error.shape?.data?.code === 'FORBIDDEN' ||
+          error.data?.code === 'UNAUTHORIZED' ||
+          error.shape?.data?.code === 'UNAUTHORIZED' ||
+          error.data?.code === 'PRECONDITION_FAILED' ||
+          error.shape?.data?.code === 'PRECONDITION_FAILED' ||
+          error.data?.code === 'BAD_REQUEST' ||
+          error.shape?.data?.code === 'BAD_REQUEST' ||
           error.data?.httpStatus === 404 ||
           error.shape?.data?.httpStatus === 404)
       ) {
@@ -824,7 +838,12 @@ export class CloudAgentNextClient {
     workspaceId: string;
     sessionId: string;
     operationKey: string;
-  }): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+  }): Promise<{
+    success: true;
+    workspaceId: string;
+    sessionId: string;
+    cleanup: 'complete' | 'pending';
+  }> {
     return this.client.deleteHostedWorkspaceSession.mutate(input);
   }
 
@@ -832,6 +851,13 @@ export class CloudAgentNextClient {
     try {
       return deleteWorktreeOutputSchema.parse(await this.client.deleteWorktree.mutate(input));
     } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        error.message === WORKTREE_MEMBERSHIP_CHANGED &&
+        (error.data?.code === 'CONFLICT' || error.shape?.data?.code === 'CONFLICT')
+      ) {
+        throw error;
+      }
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'deleteWorktree' },
         extra: { worktreeId: input.worktreeId },

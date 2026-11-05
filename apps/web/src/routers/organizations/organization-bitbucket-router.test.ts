@@ -32,6 +32,7 @@ import {
   createCodeReviewAttempt,
   updateCodeReviewStatus,
 } from '@/lib/code-reviews/db/code-reviews';
+import { generateBotUserId } from '@/lib/bot-users/types';
 
 const mockFetchBitbucketRepositoriesFromTokenService =
   jest.fn<(kiloUserId: string, organizationId: string) => Promise<BitbucketRepositoryListResult>>();
@@ -516,7 +517,7 @@ describe('organization Bitbucket router', () => {
     );
     expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).toHaveBeenCalledWith(
       expect.objectContaining({
-        managerUserId: owner.id,
+        managerUserId: generateBotUserId(organization.id, 'code-review'),
         organizationId: organization.id,
         workspace: {
           integrationId: integration.id,

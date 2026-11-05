@@ -7,11 +7,11 @@ import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
+import { BalanceRow } from '@/components/credits/credits-balance-row';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -318,56 +318,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View
-          className={cn(
-            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
-            // A stacked card ends on the Add credits button, whose own line
-            // sits inside a 38.5 dp pill. `pb-3` gives that pill more room under
-            // it than the card's 7 dp top padding gives the amount above it, so
-            // the bottom edge does not read as tighter than the top.
-            stackBalance ? 'items-stretch pb-3' : 'flex-row items-center'
-          )}
-        >
-          <Animated.View
-            className={cn('min-w-0', stackBalance ? 'gap-1' : 'flex-1 flex-row items-center gap-1')}
-            layout={LinearTransition.duration(200)}
-          >
-            {/* Row 1 holds the amount, and the toggle on a stacked card. Its
-                48 dp box carries `-my-[10px]`, so it reaches its touch target
-                without adding height: the row ends at the amount's own line and
-                the note below keeps the wide cells' 3.4 dp gap. On a wide card
-                the toggle is the row's sibling and the note stays in the
-                amount's column. */}
-            <View
-              className={cn(
-                'min-w-0',
-                // `flex-1` is the row's width share only while this View is the
-                // column's child on a wide card. On a stacked card this View is
-                // the amount row inside the column, where `flex-1` sets a 0
-                // vertical basis and the row measured 0 dp tall on the first
-                // layout pass (Android compact cell, 2026-11-03); the card's
-                // `items-stretch` already gives it the full width.
-                stackBalance ? 'flex-row items-center gap-1' : 'flex-1 gap-1'
-              )}
-            >
-              <View className={cn('min-w-0', stackBalance && 'flex-1')}>{amountLine}</View>
-              {stackBalance ? (
-                <View className="shrink-0 -my-[10px]">{visibilityToggle}</View>
-              ) : (
-                expirySlot
-              )}
-            </View>
-            {stackBalance ? expirySlot : visibilityToggle}
-          </Animated.View>
-          {/* The purchase action keeps the card's trailing end in both
-              layouts: the trailing column on a wide card, its own row below
-              the note on a stacked one. */}
-          {addCreditsAction !== null && (
-            <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-              {addCreditsAction}
-            </View>
-          )}
-        </View>
+        <BalanceRow
+          stackBalance={stackBalance}
+          amountLine={amountLine}
+          visibilityToggle={visibilityToggle}
+          expirySlot={expirySlot}
+          addCreditsAction={addCreditsAction}
+        />
       )}
       {selectedOrgId != null &&
         canManageOrgBilling &&

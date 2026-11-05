@@ -77,10 +77,15 @@ export function KiloPassSubscriptionCard({
     void presentationQuery.refetch();
   };
 
+  // The card wears the profile rows' beige surface with the honey row tint on
+  // its tile. On the white `bg-card` surface the one row the reader cannot act
+  // on drew more attention than every actionable row beside it (e2 design
+  // review, 2026-11-05).
+  //
   // The card body's one row: icon tile + text block + an optional trailing
   // label, stacked when a narrow window cannot fit the fixed siblings.
   const iconTile = (
-    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
+    <View className="h-10 w-10 shrink-0 items-center justify-center rounded-md border border-row-honey-tile-border bg-row-honey-tile-bg">
       <KiloPassIcon size={19} color={colors[rowTint('honey').hueThemeKey]} />
     </View>
   );
@@ -115,7 +120,7 @@ export function KiloPassSubscriptionCard({
         <View
           accessibilityLabel={t('kiloPass.subscriptionLoading')}
           accessibilityState={{ busy: true }}
-          className="rounded-lg border border-border bg-card p-3"
+          className="rounded-lg border border-border bg-secondary p-3"
         >
           {cardBody(
             // Bars the height of the loaded title and description lines, clamped
@@ -139,7 +144,7 @@ export function KiloPassSubscriptionCard({
             actionLabel: contentState.actionLabel,
           })}
           accessibilityRole="button"
-          className="rounded-lg border border-border bg-card p-3 active:opacity-80"
+          className="rounded-lg border border-border bg-secondary p-3 active:opacity-80"
           onPress={handleRetryPress}
         >
           {cardBody(
@@ -163,7 +168,7 @@ export function KiloPassSubscriptionCard({
             getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
           }
           accessibilityRole="button"
-          className="rounded-lg border border-border bg-card p-3 active:opacity-80"
+          className="rounded-lg border border-border bg-secondary p-3 active:opacity-80"
           onPress={handlePress}
         >
           {cardBody(

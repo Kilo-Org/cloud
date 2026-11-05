@@ -1112,12 +1112,12 @@ describe('CreditsCard balance row', () => {
     );
   }
 
-  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
+  /** The amount row of the stacked layout: the amount, the toggle and the purchase action. */
   function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
     return renderer.root.find(
       node =>
         Object.is(node.type, 'View') &&
-        String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
+        String(node.props.className) === 'min-w-0 flex-row flex-wrap items-center gap-1'
     );
   }
 
@@ -1167,21 +1167,22 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])('gives the note its own row under the amount on %s', async (_name, width) => {
+  ])('keeps the toggle and the purchase action on the amount row on %s', async (_name, width) => {
     const { renderer, unmount } = await mountAtCardWidth(width);
 
     const classes = balanceClasses(renderer);
     expect(classes).toContain('items-stretch');
     expect(classes).not.toContain('flex-row');
-    // Row 1 is the amount and the toggle; the note follows it at the card's
-    // full width and the purchase action takes the row below the note, so the
-    // amount keeps the tight gap under it that the wide cells show.
+    // Row 1 is the amount, the toggle and the purchase action. Only the note
+    // takes a row of its own, under the balance.
     const row = amountRow(renderer);
+    expect(renders(row, '$12.34')).toBe(true);
+    // The toggle is an icon control: its label, not a text child, names it.
+    expect(row.findAll(node => node.props.accessibilityLabel === 'Hide balance')).toHaveLength(1);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(true);
     expect(renders(row, 'No expiring credits.')).toBe(false);
-    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
     const card = cardBox(renderer);
     expect(renders(card, 'No expiring credits.')).toBe(true);
-    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
     unmount();
   });
 });

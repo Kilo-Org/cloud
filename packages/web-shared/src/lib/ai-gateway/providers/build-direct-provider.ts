@@ -77,7 +77,7 @@ export function buildDirectProvider(
             delete context.extraHeaders[key];
           }
         }
-        context.extraHeaders['Mt-User-Id'] = promptCacheKey;
+        context.extraHeaders['Mt-User-Id'] = 'kilo:' + promptCacheKey;
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

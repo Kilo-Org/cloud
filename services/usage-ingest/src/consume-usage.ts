@@ -18,6 +18,98 @@ function sampleDelivery(messageId: string, attempts: number): boolean {
 
 type Diagnostics = { batch_size: number; handler_entry_at_ms: number };
 
+type BatchDispositions = {
+  ackCalled: number;
+  ackFailed: number;
+  retryCalled: number;
+  retryFailed: number;
+  processingFailed: number;
+};
+
+const DELIVERY_ATTEMPT_BUCKETS = 6;
+
+function deliveryAttemptBucket(attempts: unknown): number | undefined {
+  return typeof attempts === 'number' && Number.isSafeInteger(attempts) && attempts >= 1
+    ? Math.min(attempts, DELIVERY_ATTEMPT_BUCKETS)
+    : undefined;
+}
+
+type BatchSummary = {
+  batch_size: number;
+  messages_started_n: number;
+  processing_exception_n: number;
+  ack_called_n: number;
+  ack_exception_n: number;
+  retry_called_n: number;
+  retry_exception_n: number;
+  overloaded: boolean;
+  invocation_result: 'return' | 'overload_throw' | 'exception_throw';
+  earliest_message_timestamp_ms?: number;
+  latest_message_timestamp_ms?: number;
+  delivery_attempts_unknown_n: number;
+  delivery_attempt_1_n: number;
+  delivery_attempt_2_n: number;
+  delivery_attempt_3_n: number;
+  delivery_attempt_4_n: number;
+  delivery_attempt_5_n: number;
+  delivery_attempt_6_plus_n: number;
+};
+
+function batchSummary(
+  batch: MessageBatch<unknown>,
+  dispositions: BatchDispositions,
+  overloaded: boolean,
+  invocationResult: BatchSummary['invocation_result']
+): BatchSummary {
+  let earliest: number | undefined;
+  let latest: number | undefined;
+  const attemptCounts = Array<number>(DELIVERY_ATTEMPT_BUCKETS + 1).fill(0);
+  let unknownAttempts = 0;
+  for (const message of batch.messages) {
+    let timestamp: number | undefined;
+    try {
+      const time = message.timestamp.getTime();
+      if (Number.isFinite(time)) timestamp = time;
+    } catch {
+      timestamp = undefined;
+    }
+    if (timestamp !== undefined) {
+      earliest = earliest === undefined ? timestamp : Math.min(earliest, timestamp);
+      latest = latest === undefined ? timestamp : Math.max(latest, timestamp);
+    }
+    let attempts: unknown;
+    try {
+      attempts = message.attempts;
+    } catch {
+      attempts = undefined;
+    }
+    const bucket = deliveryAttemptBucket(attempts);
+    if (bucket === undefined) unknownAttempts++;
+    else attemptCounts[bucket]++;
+  }
+  const messagesStarted = dispositions.ackCalled + dispositions.retryCalled;
+  return {
+    batch_size: batch.messages.length,
+    messages_started_n: messagesStarted,
+    processing_exception_n: dispositions.processingFailed,
+    ack_called_n: dispositions.ackCalled,
+    ack_exception_n: dispositions.ackFailed,
+    retry_called_n: dispositions.retryCalled,
+    retry_exception_n: dispositions.retryFailed,
+    overloaded,
+    invocation_result: invocationResult,
+    ...(earliest === undefined ? {} : { earliest_message_timestamp_ms: earliest }),
+    ...(latest === undefined ? {} : { latest_message_timestamp_ms: latest }),
+    delivery_attempts_unknown_n: unknownAttempts,
+    delivery_attempt_1_n: attemptCounts[1],
+    delivery_attempt_2_n: attemptCounts[2],
+    delivery_attempt_3_n: attemptCounts[3],
+    delivery_attempt_4_n: attemptCounts[4],
+    delivery_attempt_5_n: attemptCounts[5],
+    delivery_attempt_6_plus_n: attemptCounts[6],
+  };
+}
+
 function diagnosticFields(entryAtMs: number, batch: MessageBatch<unknown>): Diagnostics {
   return { batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs };
 }
@@ -39,6 +131,13 @@ async function processQueue(
   let nextIndex = 0;
   let writerOverloaded = false;
   const unexpectedErrors: unknown[] = [];
+  const dispositions: BatchDispositions = {
+    ackCalled: 0,
+    ackFailed: 0,
+    retryCalled: 0,
+    retryFailed: 0,
+    processingFailed: 0,
+  };
   async function runSlot(): Promise<void> {
     while (nextIndex < batch.messages.length) {
       const message = batch.messages[nextIndex++];
@@ -60,15 +159,24 @@ async function processQueue(
         writerOverloaded ||= result.overloaded;
       } catch (error) {
         unexpectedErrors.push(error);
+        dispositions.processingFailed++;
       }
       // Keep disposition calls outside the processing catch: never retry an ACKed message.
       try {
-        if (acknowledged) message.ack();
-        else if (retryDelaySeconds !== undefined)
+        if (acknowledged) {
+          dispositions.ackCalled++;
+          message.ack();
+        } else if (retryDelaySeconds !== undefined) {
+          dispositions.retryCalled++;
           message.retry({ delaySeconds: retryDelaySeconds });
-        else message.retry();
+        } else {
+          dispositions.retryCalled++;
+          message.retry();
+        }
       } catch (error) {
         unexpectedErrors.push(error);
+        if (acknowledged) dispositions.ackFailed++;
+        else dispositions.retryFailed++;
       }
     }
   }
@@ -77,13 +185,39 @@ async function processQueue(
     Array.from({ length: Math.min(parallelism, batch.messages.length) }, () => runSlot())
   );
   // Explicit ACKs/retries survive rejection; wait for every slot before failing the invocation.
-  if (writerOverloaded)
+  if (writerOverloaded) {
+    logBatchSummary(() => summaryFields(batch, batchId, dispositions, true, 'overload_throw'));
     throw new Error(
       'Usage writer overloaded (HTTP 429/503)' +
         (unexpectedErrors.length > 0 ? `; unexpected errors: ${unexpectedErrors.length}` : ''),
       unexpectedErrors.length > 0 ? { cause: unexpectedErrors[0] } : undefined
     );
-  if (unexpectedErrors.length > 0) throw unexpectedErrors[0];
+  }
+  if (unexpectedErrors.length > 0) {
+    logBatchSummary(() => summaryFields(batch, batchId, dispositions, false, 'exception_throw'));
+    throw unexpectedErrors[0];
+  }
+  logBatchSummary(() => summaryFields(batch, batchId, dispositions, false, 'return'));
+}
+
+function summaryFields(
+  batch: MessageBatch<unknown>,
+  batchId: string,
+  dispositions: BatchDispositions,
+  overloaded: boolean,
+  invocationResult: BatchSummary['invocation_result']
+): object {
+  return {
+    event: 'usage_ingest_batch_dispositions',
+    queue: batch.queue,
+    batch_id: batchId,
+    ...batchSummary(batch, dispositions, overloaded, invocationResult),
+  };
+}
+
+// Local actions only: an ACK call is not proof Cloudflare registered the acknowledgement.
+function logBatchSummary(fields: () => object): void {
+  logSafely('info', fields);
 }
 
 async function processMessage(

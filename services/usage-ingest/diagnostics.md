@@ -27,6 +27,7 @@ or an explicit Workers Logs sampling configuration.
 | `usage_ingest_enqueue_observation_unregistered` | `warn` with the validated `usage_id` only, when `ExecutionContext.waitUntil` throws while registering the observation; no exception text |
 | `usage_ingest_handler_entry` | `queue`, local invocation `batch_id`, actual `batch_size`, handler entry and per-message start epochs, queue message ID/timestamp, attempts, validated usage ID/event timestamp, optional batch backlog sample; emitted before that message's writer call |
 | `usage_ingest_processing` | Existing per-message writer duration/outcome/disposition plus `queue`, the same batch identity and handler entry |
+| `usage_ingest_batch_dispositions` | One summary per invocation, always `info`, emitted after every message has settled and before any invocation throw: `queue`, the same `batch_id`, actual `batch_size`, `messages_started_n` (messages that reached an ACK or retry call), `processing_exception_n`, `ack_called_n`, `ack_exception_n`, `retry_called_n`, `retry_exception_n`, `overloaded`, `invocation_result` (`return`, `overload_throw` or `exception_throw`), `earliest_message_timestamp_ms` / `latest_message_timestamp_ms` (epoch ms, present only when at least one finite message timestamp exists) and fixed delivery-attempt buckets `delivery_attempt_1_n` … `delivery_attempt_5_n`, `delivery_attempt_6_plus_n`, `delivery_attempts_unknown_n` |
 
 Times ending `_at_ms` and `message_timestamp_ms` are epoch milliseconds. Elapsed
 send/writer durations use `performance.now()`. `batch_id` is local
@@ -37,6 +38,20 @@ message ID, attempts and batch identity when joining.
 
 No user ID, prompt, payload, credentials, cookies, URL or exception text is logged
 by these diagnostics.
+
+The batch summary describes local actions, not delivery confirmation. `ack_called_n`
+and `retry_called_n` count the disposition call being made; `ack_exception_n` and
+`retry_exception_n` count calls where that method threw. A disposition call is not
+proof Cloudflare received or registered it, and a `return` invocation result still
+relies on Cloudflare's documented successful-return acknowledgement. Queues remain
+at-least-once and may deliver a message more than once regardless of an explicit
+ACK. The summary carries no queue message IDs, usage IDs, payloads, headers or
+exception text, and never changes an ACK, retry, overload decision or thrown error;
+a summary formatting or log-sink failure is swallowed like every other diagnostic.
+An empty batch emits one summary with `batch_size: 0`. Volume is one event per
+invocation, not per message, so do not build a per-message trail from it. It is
+written at invocation exit and is not a crash-safe record: a platform termination
+before that point can lose it.
 
 Send results and batch metadata are optional runtime boundaries: absent or invalid
 fields are omitted. `oldestMessageTimestamp` is accepted only as a finite `Date`,

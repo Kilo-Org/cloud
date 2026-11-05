@@ -200,6 +200,22 @@ it('reports workerd overload and per-item decisions', async () => {
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
     }
     expect(calls).toHaveLength(41);
+    // Each full-batch summary must agree with the dispositions workerd itself recorded,
+    // including the three invocations that end by throwing the overload error.
+    const fullBatchSummaries = logs.flatMap(entry => {
+      const message = (entry as { message?: unknown }).message;
+      if (typeof message !== 'string' || !message.startsWith('{')) return [];
+      const event = JSON.parse(message);
+      return event.event === 'usage_ingest_batch_dispositions' && event.batch_size === 6
+        ? [[event.ack_called_n, event.retry_called_n, event.invocation_result]]
+        : [];
+    });
+    expect(fullBatchSummaries).toEqual([
+      [6, 0, 'return'],
+      [4, 2, 'overload_throw'],
+      [4, 2, 'overload_throw'],
+      [4, 2, 'overload_throw'],
+    ]);
     const serialized = JSON.stringify(logs);
     expect(serialized).toContain('usage_ingest_handler_entry');
     expect(serialized).toContain('batch_id');

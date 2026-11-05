@@ -319,9 +319,11 @@ describe('usage consumer', () => {
         },
       ]);
       expect(logs[0]).not.toHaveBeenCalled();
-      expect(logs[1]).toHaveBeenCalledOnce();
-      for (const [value] of logs[1].mock.calls)
-        expect(JSON.parse(String(value)).event).toBe('usage_ingest_handler_entry');
+      const infoEvents = logs[1].mock.calls.map(([value]) => JSON.parse(String(value)));
+      expect(infoEvents.map(event => event.event)).toEqual([
+        'usage_ingest_handler_entry',
+        'usage_ingest_batch_dispositions',
+      ]);
       expect(logs[2].mock.invocationCallOrder.at(-1)).toBeLessThan(
         msg.retry.mock.invocationCallOrder[0]
       );
@@ -917,5 +919,555 @@ describe('native retry classification and launch budget', () => {
       expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
       expect(msg.retry).not.toHaveBeenCalled();
     }
+  });
+});
+
+function emittedEvents(logs: ReturnType<typeof setup>['logs']) {
+  return logs.flatMap(log =>
+    log.mock.calls.flatMap(([value]) => {
+      if (typeof value !== 'string' || !value.startsWith('{')) return [];
+      try {
+        return [JSON.parse(value)];
+      } catch {
+        return [];
+      }
+    })
+  );
+}
+
+describe('batch disposition summary', () => {
+  const summaryEvents = (logs: ReturnType<typeof setup>['logs']) =>
+    emittedEvents(logs).filter(log => log.event === 'usage_ingest_batch_dispositions');
+  const summary = (logs: ReturnType<typeof setup>['logs']) => {
+    const events = summaryEvents(logs);
+    expect(events).toHaveLength(1);
+    return events[0];
+  };
+  const summaryLogOrder = (logs: ReturnType<typeof setup>['logs']) =>
+    logs.flatMap(log =>
+      log.mock.calls.flatMap(([value], index) => {
+        if (typeof value !== 'string' || !value.startsWith('{')) return [];
+        const parsed = JSON.parse(value);
+        return parsed.event === 'usage_ingest_batch_dispositions'
+          ? [log.mock.invocationCallOrder[index]]
+          : [];
+      })
+    );
+
+  it('summarizes an all-recorded batch once after every ACK, without message identity', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    const messages = [message(), message()];
+    messages.forEach(msg => {
+      msg.timestamp = new Date(5_000);
+    });
+    await worker.queue(batch(messages), env);
+    expect(messages.every(msg => msg.ack.mock.calls.length === 1)).toBe(true);
+    expect(summary(logs)).toEqual({
+      level: 'info',
+      event: 'usage_ingest_batch_dispositions',
+      queue: 'usage',
+      batch_id: expect.any(String),
+      batch_size: 2,
+      messages_started_n: 2,
+      processing_exception_n: 0,
+      ack_called_n: 2,
+      ack_exception_n: 0,
+      retry_called_n: 0,
+      retry_exception_n: 0,
+      overloaded: false,
+      invocation_result: 'return',
+      earliest_message_timestamp_ms: 5_000,
+      latest_message_timestamp_ms: 5_000,
+      delivery_attempts_unknown_n: 0,
+      delivery_attempt_1_n: 2,
+      delivery_attempt_2_n: 0,
+      delivery_attempt_3_n: 0,
+      delivery_attempt_4_n: 0,
+      delivery_attempt_5_n: 0,
+      delivery_attempt_6_plus_n: 0,
+    });
+    expect(summary(logs).batch_id).toBe(
+      emittedEvents(logs).find(log => log.event === 'usage_ingest_processing').batch_id
+    );
+    expect(Object.keys(summary(logs)).toSorted()).toEqual(
+      [
+        'ack_called_n',
+        'ack_exception_n',
+        'batch_id',
+        'batch_size',
+        'delivery_attempt_1_n',
+        'delivery_attempt_2_n',
+        'delivery_attempt_3_n',
+        'delivery_attempt_4_n',
+        'delivery_attempt_5_n',
+        'delivery_attempt_6_plus_n',
+        'delivery_attempts_unknown_n',
+        'earliest_message_timestamp_ms',
+        'event',
+        'invocation_result',
+        'latest_message_timestamp_ms',
+        'level',
+        'messages_started_n',
+        'overloaded',
+        'processing_exception_n',
+        'queue',
+        'retry_called_n',
+        'retry_exception_n',
+      ].toSorted()
+    );
+    const summaryOrder = summaryLogOrder(logs)[0];
+    for (const msg of messages)
+      expect(summaryOrder).toBeGreaterThan(msg.ack.mock.invocationCallOrder[0]);
+    const serialized = JSON.stringify(summary(logs));
+    for (const msg of messages) expect(serialized).not.toContain(msg.id);
+    for (const sensitive of [usage.core.id, usage.core.kilo_user_id, writerSecret])
+      expect(serialized).not.toContain(sensitive);
+  });
+
+  it('records all-duplicate redeliveries at attempt 2 as ACK calls', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement('duplicate'));
+    const messages = [message(), message(), message()];
+    messages.forEach(msg => {
+      msg.attempts = 2;
+      msg.timestamp = new Date(7_000);
+    });
+    await worker.queue(batch(messages), env);
+    expect(messages.every(msg => msg.ack.mock.calls.length === 1)).toBe(true);
+    expect(messages.every(msg => msg.retry.mock.calls.length === 0)).toBe(true);
+    expect(summary(logs)).toMatchObject({
+      batch_size: 3,
+      messages_started_n: 3,
+      ack_called_n: 3,
+      retry_called_n: 0,
+      overloaded: false,
+      invocation_result: 'return',
+      delivery_attempt_1_n: 0,
+      delivery_attempt_2_n: 3,
+    });
+  });
+
+  it.each([429, 503])(
+    'logs the mixed HTTP %s outcome after dispositions and before the overload throw',
+    async status => {
+      const { fetch, logs } = setup();
+      fetch
+        .mockResolvedValueOnce(acknowledgement())
+        .mockResolvedValueOnce(new Response(null, { status }))
+        .mockResolvedValueOnce(acknowledgement('duplicate'))
+        .mockResolvedValueOnce(new Response(null, { status: 400 }));
+      const messages = [message(), message(), message(), message()];
+      const failure = await worker.queue(batch(messages), env).catch(error => error);
+      expect(failure.message).toBe('Usage writer overloaded (HTTP 429/503)');
+      expect(messages.map(msg => msg.ack.mock.calls.length)).toEqual([1, 0, 1, 0]);
+      expect(messages.map(msg => msg.retry.mock.calls.length)).toEqual([0, 1, 0, 1]);
+      const [summaryOrder] = summaryLogOrder(logs);
+      const summaryEvent = summary(logs);
+      expect(summaryEvent).toMatchObject({
+        batch_size: 4,
+        messages_started_n: 4,
+        processing_exception_n: 0,
+        ack_called_n: 2,
+        ack_exception_n: 0,
+        retry_called_n: 2,
+        retry_exception_n: 0,
+        overloaded: true,
+        invocation_result: 'overload_throw',
+      });
+      for (const msg of messages) {
+        const dispositionOrder = [
+          ...msg.ack.mock.invocationCallOrder,
+          ...msg.retry.mock.invocationCallOrder,
+        ];
+        expect(summaryOrder).toBeGreaterThan(dispositionOrder[0]);
+      }
+    }
+  );
+
+  it.each([429, 503])(
+    'logs the mixed HTTP %s outcome through the parallel slots before the overload throw',
+    async status => {
+      const { fetch, logs } = setup();
+      fetch
+        .mockResolvedValueOnce(acknowledgement())
+        .mockResolvedValueOnce(new Response(null, { status }))
+        .mockResolvedValueOnce(new Response(null, { status: 400 }));
+      const messages = [message(), message(), message()];
+      const input = batch(messages);
+      await expect(worker.queue(input, { ...env, USAGE_INGEST_PARALLELISM: '2' })).rejects.toThrow(
+        'Usage writer overloaded'
+      );
+      expect(messages.map(msg => msg.ack.mock.calls.length)).toEqual([1, 0, 0]);
+      expect(messages.map(msg => msg.retry.mock.calls.length)).toEqual([0, 1, 1]);
+      expect(input.ackAll).not.toHaveBeenCalled();
+      expect(input.retryAll).not.toHaveBeenCalled();
+      expect(summary(logs)).toMatchObject({
+        batch_size: 3,
+        ack_called_n: 1,
+        retry_called_n: 2,
+        overloaded: true,
+        invocation_result: 'overload_throw',
+      });
+    }
+  );
+
+  it.each([
+    ['mismatched', 'invalid_response'],
+    ['timeout', 'timeout'],
+    ['malformed', 'invalid_response'],
+  ] as const)('counts a settled %s write as a retry call and a return', async (failure, reason) => {
+    const { fetch, logs } = setup();
+    if (failure === 'timeout') {
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort());
+      fetch.mockRejectedValue(new Error('synthetic transport failure'));
+    } else
+      fetch.mockResolvedValue(
+        failure === 'malformed'
+          ? Response.json({ secret: writerSecret })
+          : acknowledgement('recorded', 'wrong-id')
+      );
+    const msg = message();
+    await expect(worker.queue(batch([msg]), env)).resolves.toBeUndefined();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(emittedEvents(logs).find(log => log.event === 'usage_ingest_processing')).toMatchObject({
+      reason,
+    });
+    expect(summary(logs)).toMatchObject({
+      messages_started_n: 1,
+      ack_called_n: 0,
+      retry_called_n: 1,
+      processing_exception_n: 0,
+      overloaded: false,
+      invocation_result: 'return',
+    });
+  });
+
+  it.each([
+    ['invalid', 'invalid_event'],
+    ['missing_url', 'missing_config'],
+  ] as const)('counts an %s payload as a retry call', async (failure, reason) => {
+    const { fetch, logs } = setup();
+    const msg = message(failure === 'invalid' ? { core: { id: 'sensitive-invalid-id' } } : usage);
+    await worker.queue(batch([msg]), {
+      ...env,
+      ...(failure === 'missing_url' ? { USAGE_WRITER_URL: undefined } : {}),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(emittedEvents(logs).find(log => log.event === 'usage_ingest_processing')).toMatchObject({
+      reason,
+    });
+    expect(summary(logs)).toMatchObject({
+      messages_started_n: 1,
+      ack_called_n: 0,
+      retry_called_n: 1,
+      processing_exception_n: 0,
+      invocation_result: 'return',
+    });
+    expect(JSON.stringify(summary(logs))).not.toContain('sensitive-invalid-id');
+  });
+
+  it('summarizes an empty batch explicitly without any dispositions', async () => {
+    const { fetch, logs } = setup();
+    await worker.queue(batch([]), { ...env, USAGE_INGEST_PARALLELISM: '2' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(summary(logs)).toEqual({
+      level: 'info',
+      event: 'usage_ingest_batch_dispositions',
+      queue: 'usage',
+      batch_id: expect.any(String),
+      batch_size: 0,
+      messages_started_n: 0,
+      processing_exception_n: 0,
+      ack_called_n: 0,
+      ack_exception_n: 0,
+      retry_called_n: 0,
+      retry_exception_n: 0,
+      overloaded: false,
+      invocation_result: 'return',
+      delivery_attempts_unknown_n: 0,
+      delivery_attempt_1_n: 0,
+      delivery_attempt_2_n: 0,
+      delivery_attempt_3_n: 0,
+      delivery_attempt_4_n: 0,
+      delivery_attempt_5_n: 0,
+      delivery_attempt_6_plus_n: 0,
+    });
+  });
+
+  it('summarizes a partial batch where one message throws and later messages continue', async () => {
+    const { fetch, logs } = setup();
+    const events = ['41', '42', '43'].map(suffix => ({
+      ...usage,
+      core: { ...usage.core, id: `4f2504e0-4f89-41d3-9a0c-0305e82c33${suffix}` },
+    }));
+    const messages = events.map(item => message(item));
+    fetch.mockImplementation(async (_url, options) => {
+      const id = JSON.parse(options?.body as string).core.id;
+      return id === events[1].core.id
+        ? Response.json({ secret: 'sensitive-response' })
+        : acknowledgement('recorded', id);
+    });
+    const failure = new Error('synthetic retry failure');
+    messages[1].retry.mockImplementation(() => {
+      throw failure;
+    });
+    const input = batch(messages);
+    const propagated = await Promise.resolve(
+      worker.queue(input, { ...env, USAGE_INGEST_PARALLELISM: '2' })
+    ).catch(error => error);
+    expect(messages.map(msg => msg.ack.mock.calls.length)).toEqual([1, 0, 1]);
+    expect(messages.map(msg => msg.retry.mock.calls.length)).toEqual([0, 1, 0]);
+    expect(propagated).toBe(failure);
+    expect(messages[0].ack).toHaveBeenCalledExactlyOnceWith();
+    expect(messages[1].retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(messages[1].ack).not.toHaveBeenCalled();
+    expect(messages[2].ack).toHaveBeenCalledExactlyOnceWith();
+    expect(input.ackAll).not.toHaveBeenCalled();
+    expect(input.retryAll).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(summary(logs)).toMatchObject({
+      batch_size: 3,
+      messages_started_n: 3,
+      processing_exception_n: 0,
+      ack_called_n: 2,
+      ack_exception_n: 0,
+      retry_called_n: 1,
+      retry_exception_n: 1,
+      overloaded: false,
+      invocation_result: 'exception_throw',
+      delivery_attempts_unknown_n: 0,
+      delivery_attempt_1_n: 3,
+    });
+    const serialized = JSON.stringify(summary(logs));
+    expect(serialized).not.toContain('sensitive-response');
+    expect(serialized).not.toContain('synthetic retry failure');
+  });
+
+  it('rethrows the original ACK error and labels the invocation as an exception throw', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    const failure = new Error('ack failed');
+    const messages = [message(), message()];
+    messages[0].ack.mockImplementation(() => {
+      throw failure;
+    });
+    const propagated = await Promise.resolve(
+      worker.queue(batch(messages), { ...env, USAGE_INGEST_PARALLELISM: '2' })
+    ).catch(error => error);
+    expect(propagated).toBe(failure);
+    expect(messages[0].ack).toHaveBeenCalledExactlyOnceWith();
+    expect(messages[0].retry).not.toHaveBeenCalled();
+    expect(messages[1].ack).toHaveBeenCalledExactlyOnceWith();
+    expect(summary(logs)).toMatchObject({
+      ack_called_n: 2,
+      ack_exception_n: 1,
+      retry_called_n: 0,
+      overloaded: false,
+      invocation_result: 'exception_throw',
+    });
+  });
+
+  it('rethrows the original retry error and counts the retry call and its exception', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockResolvedValue(new Response(null, { status: 500 }));
+    const failure = new Error('retry failed');
+    const msg = message();
+    msg.retry.mockImplementation(() => {
+      throw failure;
+    });
+    const propagated = await worker.queue(batch([msg]), env).catch(error => error);
+    expect(propagated).toBe(failure);
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(summary(logs)).toMatchObject({
+      ack_called_n: 0,
+      ack_exception_n: 0,
+      retry_called_n: 1,
+      retry_exception_n: 1,
+      overloaded: false,
+      invocation_result: 'exception_throw',
+    });
+  });
+
+  it('counts a throwing fallback retry after a processing exception', async () => {
+    const { fetch, logs } = setup();
+    const failure = new Error('synthetic processing failure');
+    const retryFailure = new Error('synthetic fallback retry failure');
+    const msg = message();
+    Object.defineProperty(msg, 'timestamp', {
+      get() {
+        throw failure;
+      },
+    });
+    msg.retry.mockImplementation(() => {
+      throw retryFailure;
+    });
+    const propagated = await worker.queue(batch([msg]), env).catch(error => error);
+    expect(propagated).toBe(failure);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith();
+    expect(summary(logs)).toMatchObject({
+      batch_size: 1,
+      messages_started_n: 1,
+      processing_exception_n: 1,
+      ack_called_n: 0,
+      ack_exception_n: 0,
+      retry_called_n: 1,
+      retry_exception_n: 1,
+      overloaded: false,
+      invocation_result: 'exception_throw',
+    });
+    expect(JSON.stringify(summary(logs))).not.toContain('synthetic');
+  });
+
+  it.each([429, 503])(
+    'retains HTTP %s as the original failure when a summary-independent ACK throws',
+    async status => {
+      const { fetch, logs } = setup();
+      fetch
+        .mockResolvedValueOnce(acknowledgement())
+        .mockResolvedValueOnce(new Response(null, { status }));
+      const failure = new Error('ack failed');
+      const messages = [message(), message()];
+      messages[0].ack.mockImplementation(() => {
+        throw failure;
+      });
+      const propagated = await worker.queue(batch(messages), env).catch(error => error);
+      expect(propagated.message).toBe(
+        'Usage writer overloaded (HTTP 429/503); unexpected errors: 1'
+      );
+      expect(propagated.cause).toBe(failure);
+      expect(messages[1].retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+      expect(summary(logs)).toMatchObject({
+        ack_called_n: 1,
+        ack_exception_n: 1,
+        retry_called_n: 1,
+        overloaded: true,
+        invocation_result: 'overload_throw',
+      });
+    }
+  );
+
+  it.each(['return', 'overload_throw', 'exception_throw'] as const)(
+    'keeps the original %s outcome when the summary log sink throws',
+    async outcome => {
+      const { fetch, logs } = setup();
+      const observed = logs.map(log => {
+        const calls: unknown[][] = [];
+        log.mockImplementation((value: unknown) => {
+          calls.push([value]);
+          if (String(value).startsWith('{')) throw new Error('synthetic logging failure');
+        });
+        return calls;
+      });
+      fetch.mockImplementation(async () =>
+        outcome === 'return' ? acknowledgement() : new Response(null, { status: 429 })
+      );
+      const messages = [message(), message()];
+      const result = await Promise.resolve(
+        worker.queue(batch(messages), { ...env, USAGE_INGEST_PARALLELISM: '2' })
+      ).then(
+        () => undefined,
+        error => error
+      );
+      if (outcome === 'return') expect(result).toBeUndefined();
+      else expect(result).toMatchObject({ message: 'Usage writer overloaded (HTTP 429/503)' });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      for (const msg of messages) {
+        if (outcome === 'return') expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+        else expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+      }
+      const summaryAttempts = observed
+        .flat()
+        .filter(value =>
+          String(value).startsWith('{"level":"info","event":"usage_ingest_batch_dispositions"')
+        );
+      expect(summaryAttempts).toHaveLength(1);
+    }
+  );
+
+  it('does not let a throwing message timestamp change delivery or the summary', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    const messages = [message(), message()];
+    messages[0].timestamp = new Date(1_000);
+    messages[1].timestamp = new Date(9_000);
+    messages[1].ack.mockImplementation(() => {
+      Object.defineProperty(messages[1], 'timestamp', {
+        get() {
+          throw new Error('synthetic timestamp failure');
+        },
+      });
+    });
+    await worker.queue(batch(messages), env);
+    for (const msg of messages) expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+    for (const msg of messages) expect(msg.retry).not.toHaveBeenCalled();
+    expect(summary(logs)).toMatchObject({
+      batch_size: 2,
+      ack_called_n: 2,
+      earliest_message_timestamp_ms: 1_000,
+      delivery_attempts_unknown_n: 0,
+      delivery_attempt_1_n: 2,
+    });
+  });
+
+  it('omits malformed timestamps and buckets attempts without unbounded keys', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    const messages = Array.from({ length: 6 }, () => message());
+    messages.forEach((msg, index) => {
+      msg.attempts = [1, 2, 3, 4, 100, 0][index];
+    });
+    messages[0].timestamp = new Date(Number.NaN);
+    messages[1].timestamp = new Date(1_000);
+    messages[2].timestamp = new Date(2_000);
+    messages[3].timestamp = new Date(3_000);
+    messages[4].timestamp = new Date(Number.POSITIVE_INFINITY);
+    messages[5].timestamp = new Date(Number.NaN);
+    messages[5].ack.mockImplementation(() => {
+      Object.defineProperty(messages[5], 'attempts', {
+        get() {
+          throw new Error('synthetic attempts failure');
+        },
+      });
+    });
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    await worker.queue(batch(messages), env);
+    const summaryEvent = summary(logs);
+    expect(summaryEvent).toMatchObject({
+      batch_size: 6,
+      ack_called_n: 6,
+      earliest_message_timestamp_ms: 1_000,
+      latest_message_timestamp_ms: 3_000,
+      delivery_attempt_1_n: 1,
+      delivery_attempt_2_n: 1,
+      delivery_attempt_3_n: 1,
+      delivery_attempt_4_n: 1,
+      delivery_attempt_5_n: 0,
+      delivery_attempt_6_plus_n: 1,
+      delivery_attempts_unknown_n: 1,
+    });
+    const bucketed = Object.entries(summaryEvent)
+      .filter(([key]) => /^delivery_attempts?_.*_n$/.test(key))
+      .reduce((total, [, count]) => total + (count as number), 0);
+    expect(bucketed).toBe(summaryEvent.batch_size);
+  });
+
+  it('keeps one summary per invocation and a distinct batch identity across batches', async () => {
+    const { fetch, logs } = setup();
+    fetch.mockImplementation(async () => acknowledgement());
+    await worker.queue(batch([message()]), env);
+    await worker.queue(batch([message(), message()]), env);
+    const first = summaryEvents(logs);
+    expect(first).toHaveLength(2);
+    expect(first[0].batch_id).not.toBe(first[1].batch_id);
+    expect(first.map(event => event.batch_size)).toEqual([1, 2]);
+    expect(first.map(event => event.ack_called_n)).toEqual([1, 2]);
+    expect(first.map(event => event.invocation_result)).toEqual(['return', 'return']);
   });
 });

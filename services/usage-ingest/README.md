@@ -82,8 +82,9 @@ invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
 writer URLs, or exception details are included in these logs.
 
 Publisher and consumer delivery diagnostics (`usage_ingest_enqueue_start`,
-`usage_ingest_enqueue`, `usage_ingest_handler_entry`, and the batch identity on
-`usage_ingest_processing`) are always emitted; see
+`usage_ingest_enqueue`, `usage_ingest_handler_entry`, the batch identity on
+`usage_ingest_processing`, and one `usage_ingest_batch_dispositions` summary per
+invocation) are always emitted; see
 [queue delivery diagnostics](diagnostics.md). The best-effort completion observation
 (`usage_ingest_enqueue_observed`) is described next.
 

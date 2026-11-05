@@ -83,11 +83,12 @@ it.each([undefined, 'staging'])(
       ).toEqual([]);
       await setTimeout(100);
       release.resolve();
-      const processingLogs = () =>
+      const events = (name: string) =>
         server
           .getLogs()
-          .filter(log => log.message.includes('usage_ingest_processing'))
+          .filter(log => log.message.includes(`"event":"${name}"`))
           .map(log => JSON.parse(log.message));
+      const processingLogs = () => events('usage_ingest_processing');
       await vi.waitFor(
         () => expect(processingLogs().map(log => log.outcome)).toEqual(['recorded']),
         { timeout: 10_000 }
@@ -123,6 +124,23 @@ it.each([undefined, 'staging'])(
         expect(log.event_age_ms).toBeGreaterThanOrEqual(0);
       }
       expect(processingLogs()[0].writer_duration_ms).toBeGreaterThanOrEqual(100);
+      const summaries = events('usage_ingest_batch_dispositions');
+      expect(summaries).toHaveLength(2);
+      for (const summaryLog of summaries) {
+        expect(summaryLog).toMatchObject({
+          level: 'info',
+          batch_size: 1,
+          messages_started_n: 1,
+          ack_called_n: 1,
+          retry_called_n: 0,
+          ack_exception_n: 0,
+          overloaded: false,
+          invocation_result: 'return',
+          delivery_attempt_1_n: 1,
+        });
+        const summaryIndex = summaries.indexOf(summaryLog);
+        expect(summaryLog.batch_id).toBe(processingLogs()[summaryIndex].batch_id);
+      }
       for (const sensitive of [
         'local-publisher',
         'local-writer',

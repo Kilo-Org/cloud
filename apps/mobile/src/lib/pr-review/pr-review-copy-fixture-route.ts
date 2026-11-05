@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 
-// Development-only entry for the PR-review copy surfaces
-// (`kiloapp:///dev/pr-review-copy-fixture/<surface>`).
+// Development-only entry for the PR-review copy surfaces, reached through the
+// app's own link scheme and the dev fixture prefix below.
 //
 // It navigates itself and reports the link as handled, the way the GitLab
 // instance fixture does: a link that returns a route to the resolver is

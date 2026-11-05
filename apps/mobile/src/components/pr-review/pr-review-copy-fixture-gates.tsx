@@ -88,7 +88,9 @@ function createFixtureClient(surface: PrReviewGateFixtureSurface) {
   return createTRPCClient<MobileRouter>({
     links: [
       httpLink({
-        url: 'http://pr-review-gate-fixture.invalid/api/trpc',
+        // The fixture never reaches the network: the fetch below answers every
+        // read, so this marker only names which client answered it.
+        url: 'review-gate-fixture-trpc',
         fetch: async (input, init) => {
           await Promise.resolve();
           const url = input instanceof Request ? input.url : input.toString();

@@ -464,9 +464,36 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
-  it('renders the account section above the run-target block', async () => {
+  it('keeps the run-target block while every provider asks to be connected', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    // The first-run form with no Git provider connected: the repository section
+    // renders its connect cards, and the run target must stay next to them so a
+    // Cloud Agent pick can still be switched back to a connected computer.
+    const connectGroups: RepositoryGroup[] = [
+      { key: 'github', status: 'connect', repositories: [] },
+      { key: 'gitlab', status: 'connect', repositories: [] },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      groups: connectGroups,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toMatchObject({
+      groups: connectGroups,
+    });
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      disabled: false,
+    });
+  });
+
+  it('renders the account section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),

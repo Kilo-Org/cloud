@@ -105,7 +105,9 @@ export function createFixtureClient(surface: string | undefined) {
   return createTRPCClient<MobileRouter>({
     links: [
       httpLink({
-        url: 'http://pr-review-fixture.invalid/api/trpc',
+        // The fixture never reaches the network: the fetch below answers every
+        // read, so this marker only names which client answered it.
+        url: 'review-copy-fixture-trpc',
         fetch: async (input, init) => {
           await Promise.resolve();
           const url = input instanceof Request ? input.url : input.toString();

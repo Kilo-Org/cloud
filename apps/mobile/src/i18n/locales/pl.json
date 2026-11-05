@@ -189,6 +189,7 @@
     "resendCode": "Wyślij kod ponownie",
     "termsPrefix": "Kontynuując, akceptujesz nasze ",
     "terms": "Warunki",
+    "termsInSentence": "Warunki",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Więcej opcji logowania",

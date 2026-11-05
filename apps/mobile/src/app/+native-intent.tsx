@@ -5,6 +5,7 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
@@ -54,6 +55,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (handlePrReviewInstanceFixturePath(path)) {
       return null;
     }
+    // Dev-only Run on sheet, opened with the bridge the composer writes
+    // (`dev/instance-picker-fixture/<state>` under the development scheme).
+    const instancePickerRoute = instancePickerFixtureRoute(path);
+    if (instancePickerRoute) {
+      return instancePickerRoute;
+    }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
     const singleRouteFixture = securityAgentSingleRouteFixtureRoute(path);
@@ -65,7 +72,8 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
       return `/(app)/pr-review-entry-fixture${reviewEntryFixture[1] ?? ''}`;
     }
     // Dev-only link that opens a PR-review copy surface the way the entry
-    // screen's own navigation does (`kiloapp:///dev/pr-review-copy-fixture/<surface>`).
+    // screen's own navigation does: the app's link scheme, then the dev
+    // PR-review copy fixture prefix and the surface name.
     // The handler navigates itself, so this returns falsy — never a route,
     // which the resolver would re-dispatch and race against a reset to Home.
     if (handlePrReviewCopyFixturePath(path)) {

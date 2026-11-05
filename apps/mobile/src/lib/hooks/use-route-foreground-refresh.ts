@@ -29,9 +29,10 @@ export function useRouteForegroundRefresh(queryKeys: readonly (readonly unknown[
   const firstFocusRef = useRef(true);
 
   // Subscribe to AppState directly and read focus live via
-  // `navigation.isFocused()`. A blurred tab is frozen, so it does not
-  // rerender: a focus value carried through React state or a ref updated in
-  // an effect stays stale at `true` and would refresh an unfocused route.
+  // `navigation.isFocused()`. A focus value carried through React state or a
+  // ref updated in an effect lags the navigation state, so it can still read
+  // `true` for a route that has lost focus and would refresh an unfocused
+  // route.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState !== 'active' || !navigation.isFocused()) {

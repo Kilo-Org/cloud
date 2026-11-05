@@ -189,6 +189,7 @@
     "resendCode": "কোড আবার পাঠান",
     "termsPrefix": "চালিয়ে যাওয়ার মাধ্যমে আপনি আমাদের ",
     "terms": "শর্তাবলি",
+    "termsInSentence": "শর্তাবলি",
     "termsConnector": " এবং ",
     "termsSuffix": "তে সম্মতি দিচ্ছেন।",
     "moreSignInOptions": "সাইন-ইনের আরও বিকল্প",

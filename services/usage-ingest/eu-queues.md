@@ -19,24 +19,24 @@ assume a separate manual deployment will provide a later approval gate.
 
 ## Production merge gate
 
-Deploy and verify the SFO selector and removal of background shadow publication
-first. Keep `USAGE_QUEUE_SFO_EXPOSURE=0` until processing is verified. Production
-FRA selection follows the deployed gateway source and has no runtime switch: an
-eligible production `fra1` deployment queues every payer with an identity, so
-`USAGE_QUEUE_SFO_EXPOSURE=0` does not keep FRA off, and only withholding or
-reverting that gateway source does. Before merging this queue change, obtain
-explicit production cutover authorization, pause all production queue publishers,
-and reconcile/drain source/DLQ, pending retries, in-flight work and accepted usage
-IDs. Verify those conditions before merge while normal production deployments
-remain active.
+Independently verify the processing consumer and remove background shadow publication
+**before** deploying any gateway source that carries the retired SFO/FRA controls.
+Neither production SFO nor FRA selection has a runtime switch: an eligible production
+`sfo1` or `fra1` deployment queues every payer with an identity as soon as it runs, so
+the default-on gateway deploy is the last step, not the first, and only withholding or
+reverting that source keeps it off. Before merging this queue change, obtain explicit
+production cutover authorization, pause all production queue publishers, and
+reconcile/drain source/DLQ, pending retries, in-flight work and accepted usage IDs.
+Verify those conditions before merge while normal production deployments remain
+active.
 
 If these prerequisites cannot be completed before merge, production deployments
 must be **explicitly held before merge** and kept held until the same authorization,
-deployed selector/shadow removal, publisher pause and reconciliation/drain
+verified consumer, shadow removal, publisher pause and reconciliation/drain
 conditions are verified. This document does not pause deployments or publishers.
-A selector that is OFF does not hold the deployment workflow or stop the consumer.
+A source revert does not hold the deployment workflow or stop the consumer.
 Verify the authenticated Frankfurt writer credential before merge: deployed
-processing consumes queued events regardless of gateway exposure. Missing writer
+processing consumes queued events regardless of gateway source selection. Missing writer
 configuration retries; it never ACKs events as receipts.
 Keep publishers paused through cutover and post-deployment verification below.
 

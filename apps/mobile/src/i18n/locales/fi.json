@@ -189,6 +189,7 @@
     "resendCode": "Lähetä koodi uudelleen",
     "termsPrefix": "Jatkamalla hyväksyt ",
     "terms": "Käyttöehdot",
+    "termsInSentence": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Lisää kirjautumisvaihtoehtoja",

@@ -3,6 +3,7 @@ import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { activityFixture, type ModelReply } from './kilo-activity-fixture.js';
 import { readSessionSnapshot } from './session-snapshot.js';
+import { kiloActivityReads } from './kilo-message-activity.js';
 import { createRuntimeActivity } from './runtime-activity.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 
@@ -61,7 +62,7 @@ suite('pinned Kilo native activity contract', () => {
           )
         ).toBe(true);
         const snapshot = await readSessionSnapshot({
-          client: f.wrapper,
+          client: { ...f.wrapper, ...kiloActivityReads(f.wrapper) },
           directory: f.directory,
           observedDirectories: [directory],
           knownSessions: [],
@@ -179,7 +180,7 @@ suite('pinned Kilo native activity contract', () => {
       const activity = createRuntimeActivity({
         nativeRuntimeId: 'child-permission-contract',
         directory: f.directory,
-        client: f.wrapper,
+        client: f.harness,
         timers: CONTROL_PLANE_TIMERS.wrapper,
         now: Date.now,
         onDeadline: (_identity, reason) => faults.push(reason),
@@ -672,7 +673,7 @@ suite('pinned Kilo native activity contract', () => {
       const recoveredActivity = createRuntimeActivity({
         nativeRuntimeId: 'recovered',
         directory: f.directory,
-        client: f.wrapper,
+        client: f.harness,
         timers: CONTROL_PLANE_TIMERS.wrapper,
         now: Date.now,
         onDeadline: () => {

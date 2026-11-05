@@ -5,7 +5,7 @@
   "description": "Polls the WorkOS Events API for directory-sync events and logs them",
   "type": "module",
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
+    "preinstall": "node ../../scripts/check-pnpm.mjs",
     "deploy:prod": "wrangler deploy --env=\"\"",
     "deploy:dev": "wrangler deploy --env dev",
     "dev": "wrangler dev --env dev",

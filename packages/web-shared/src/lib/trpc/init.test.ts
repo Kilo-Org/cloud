@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import * as z from 'zod';
+import { TRPCError } from '@trpc/server';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   adminProcedure,
@@ -18,6 +19,11 @@ import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({
   ping: adminProcedure.query(() => 'ok'),
+  chainedDenial: adminProcedure
+    .use(async () => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Specialized guard denied' });
+    })
+    .query(() => 'unreachable'),
   // Stands in for the `is_admin` bypasses on regular procedures, which can only
   // name their procedure if `baseProcedure` publishes it onto the context.
   bypass: baseProcedure.mutation(async ({ ctx }) => {
@@ -78,13 +84,59 @@ describe('adminProcedure admin_access telemetry', () => {
 
     await caller.ping();
 
-    expect(events).toHaveLength(1);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
     expect(events[0]).toMatchObject({
       surface: 'trpc',
       kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'platform_admin',
+      credential: 'delegated_workload',
+      wouldBlock: true,
       tokenSource: 'cloud-agent',
+    });
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'delegated_workload',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+    });
+  });
+
+  test('emits denied, not succeeded, when a chained guard refuses the request', async () => {
+    const caller = createCaller(
+      ctxFor({
+        user: defineTestUser({ is_admin: true, is_super_admin: false }),
+        authViaToken: true,
+      })
+    );
+
+    await expect(caller.chainedDenial()).rejects.toThrow();
+
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      wouldBlock: true,
+    });
+  });
+
+  test('emits a denied privileged_access event for a non-admin bearer caller', async () => {
+    const caller = createCaller(
+      ctxFor({ user: defineTestUser({ is_admin: false }), authViaToken: true })
+    );
+
+    await expect(caller.ping()).rejects.toThrow();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      actionClass: 'platform_read',
+      adminTier: null,
+      email: null,
+      wouldBlock: true,
     });
   });
 

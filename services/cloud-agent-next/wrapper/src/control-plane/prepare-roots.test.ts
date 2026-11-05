@@ -12,7 +12,6 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -32,6 +31,18 @@ const API_URL = 'https://github.com/acme/api.git';
 const WEB_URL = 'https://github.com/acme/web.git';
 const FOREIGN: WorkspaceStamp = { allocationId: 'alloc-builder', commit: 'built' };
 
+function openHarness(record?: (input: { restoreFiles: boolean; roots?: unknown }) => void): never {
+  return {
+    open: async (input: { restoreFiles: boolean; roots?: unknown }) => {
+      record?.({
+        restoreFiles: input.restoreFiles,
+        ...(input.roots === undefined ? {} : { roots: input.roots }),
+      });
+      return true;
+    },
+  } as never;
+}
+
 function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRouteSpec {
   return {
     sessionId: 'ses_00000000000000000000000000',
@@ -43,6 +54,7 @@ function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneR
     branch: 'kilo/generated',
     branchMode: 'working',
     setupCommands: ['npm install'],
+    environmentSetupCommandCount: 1,
     roots: [
       {
         directory: API,
@@ -110,7 +122,9 @@ function rootsHarness(
   const restoreOptions_: Array<Record<string, unknown>> = [];
   const runtime: PrepareRuntimePort = {
     ensure: async () =>
-      ({ serverUrl: 'http://127.0.0.1:1', ensureSession: async () => undefined }) as never,
+      openHarness(input => {
+        restoreOptions_.push(input);
+      }),
     installCredentials: async () => undefined,
     isUnavailable: () => false,
     getLiveClient: () => undefined,
@@ -169,15 +183,6 @@ function rootsHarness(
       setups.push({ command, directory });
       return { stdout: '', stderr: '', exitCode: 0 };
     },
-    restore: (async (
-      _id: string,
-      _directory: string,
-      _file: undefined,
-      restoreOptions: unknown
-    ) => {
-      restoreOptions_.push(restoreOptions as Record<string, unknown>);
-      return { ok: false, code: 404, error: 'not found', step: 'download' };
-    }) as never,
     ...(options.recoverWorktree
       ? {
           recoverWorktree: ((directory: string, recovery: { files: Array<{ path: string }> }) =>
@@ -187,8 +192,6 @@ function rootsHarness(
             )) as never,
         }
       : {}),
-    seedRegistration: async () => undefined,
-    sessionExists: async () => !options.recoverWorktree,
     sleep: async () => undefined,
   });
   const callsAt = (cwd: string, command: string) =>
@@ -428,7 +431,24 @@ describe('preparing a route with several git roots', () => {
     }
     expect(harness.clones()).toEqual([]);
     expect([...harness.repos]).toEqual([API, WEB]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
+    expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
+  });
+
+  it('runs inline setup once at the cwd after adopting all environment roots', async () => {
+    const harness = rootsHarness({
+      repos: [API, WEB],
+      stamps: { [API]: FOREIGN, [WEB]: FOREIGN },
+    });
+
+    await harness.manager.prepare(
+      rootSpec({ setupCommands: ['npm install', 'inline extra'], startCommands: ['serve'] })
+    );
+
+    expect(harness.setups).toEqual([
+      { command: 'inline extra', directory: CWD },
+      { command: 'serve', directory: CWD },
+    ]);
     expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
   });
 
@@ -702,11 +722,7 @@ describe('preparing real repositories in two roots', () => {
       timers: CONTROL_PLANE_TIMERS,
       emit,
       runtimes: {
-        ensure: async () =>
-          ({
-            serverUrl: 'http://127.0.0.1:1',
-            ensureSession: async () => undefined,
-          }) as unknown as WrapperKiloClient,
+        ensure: async () => openHarness(),
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         getLiveClient: () => undefined,
@@ -716,8 +732,6 @@ describe('preparing real repositories in two roots', () => {
       inheritedEnv: process.env,
       homeRoots: { directory: path.join(base, 'home'), legacy: path.join(base, 'legacy') },
       allocationId: 'alloc-current',
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
       sleep: async () => undefined,
     });
   }

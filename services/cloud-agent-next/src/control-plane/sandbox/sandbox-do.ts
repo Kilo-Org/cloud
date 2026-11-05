@@ -1,4 +1,6 @@
 import {
+  RUNTIME_HARNESSES,
+  type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
@@ -92,7 +94,11 @@ import {
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
 import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
-import { selectStartup } from '../../sandbox-control/startup-selection.js';
+import {
+  newSandboxHarness,
+  selectStartup,
+  type StartupCohortContext,
+} from '../../sandbox-control/startup-selection.js';
 import {
   STARTUP_FAILURES,
   type StartupFailureCode,
@@ -302,6 +308,7 @@ import {
   recordRepositoryLaunch,
   type RepositoryPreparationFailure,
 } from './repository-launch.js';
+import { startCommandsForWrapper, WrapperStartCommandsUnsupportedError } from './start-commands.js';
 import {
   environmentLaunchCandidate,
   environmentStartDetail,
@@ -337,6 +344,7 @@ import {
   worktreeSubscriberKey,
   type SharedWorktreeChangesInput,
 } from './worktree-changes.js';
+import { serveHistoryPage, type HistoryPageSession } from './history-pages.js';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -363,6 +371,7 @@ import {
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
+const RUNTIME_HARNESS_KEY = 'runtime_harness';
 const OWNER_KEY = 'control_plane_owner';
 
 const ALLOCATION_ROW_ID = 'current';
@@ -405,6 +414,7 @@ const wrapperSocketAttachmentSchema = z.object({
   workspaceSnapshots: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  startCommands: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
@@ -417,6 +427,7 @@ const WRAPPER_BILLING_CHECK_MS = 30_000;
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
   | 'wrapper_skills_sh_unsupported'
+  | 'wrapper_start_commands_unsupported'
   | 'frame_materialization_failed';
 
 class PrepareFrameMaterializationError extends Error {
@@ -438,9 +449,10 @@ function errorClassName(error: unknown): string {
 }
 
 function materializationStage(error: unknown): PrepareFrameMaterializationStage {
-  return error instanceof PrepareFrameMaterializationError
-    ? error.stage
-    : 'frame_materialization_failed';
+  if (error instanceof PrepareFrameMaterializationError) return error.stage;
+  if (error instanceof WrapperStartCommandsUnsupportedError)
+    return 'wrapper_start_commands_unsupported';
+  return 'frame_materialization_failed';
 }
 
 /**
@@ -448,7 +460,7 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * DO is B4, so the production factory resolves a stub only when the test-only
  * binding exists; tests inject a fake peer instead.
  */
-export type ControlPlaneSessionPeer = {
+export type ControlPlaneSessionPeer = HistoryPageSession & {
   issueCloudAgentMcpGrant?(
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
@@ -2650,6 +2662,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.branchMode ? { branchMode: spec.branchMode } : {}),
       ...(spec.env ? { env: spec.env } : {}),
       ...(spec.setupCommands ? { setupCommands: spec.setupCommands } : {}),
+      ...(spec.startCommands ? { startCommands: spec.startCommands } : {}),
+      ...(spec.environmentSetupCommandCount === undefined
+        ? {}
+        : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
       ...(spec.runtimeIsolation ? { runtimeIsolation: spec.runtimeIsolation } : {}),
       ...(spec.git ? { git: spec.git } : {}),
     };
@@ -2786,6 +2802,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       directory?: string | undefined;
       env?: Record<string, string> | undefined;
       setupCommands?: string[] | undefined;
+      startCommands?: string[] | undefined;
+      environmentSetupCommandCount?: number | undefined;
       git?: SessionAttachPayload['git'];
       kilo: NonNullable<SessionAttachPayload['kilo']>;
       githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
@@ -2812,6 +2830,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         : { githubReviewTarget: payload.githubReviewTarget }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
+      ...(payload.startCommands === undefined ? {} : { startCommands: payload.startCommands }),
+      ...(payload.environmentSetupCommandCount === undefined
+        ? {}
+        : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
       // The roots hold no credential; the wrapper takes each root's alias by host.
       ...(spec.roots === undefined ? {} : { roots: spec.roots }),
@@ -3621,6 +3643,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.installsSkillsSh === true;
   }
 
+  private wrapperRunsStartCommands(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.startCommands === true;
+  }
+
   private wrapperAcceptsWorkspaceConfiguration(socket: WebSocket): boolean {
     return this.readAttachment(socket)?.workspaceConfiguration === true;
   }
@@ -3630,16 +3656,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * route waits out its preparation deadline.
    */
   private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
-    const wireSpec = runtimeSpecForContract(
-      route.spec,
-      readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
-    );
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
     ) {
       throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
     }
+    const attachment = this.readAttachment(socket);
+    const snapshotFrame = workspaceSnapshotFrame(this.db, route, attachment);
+    const wireSpec = startCommandsForWrapper(
+      {
+        ...runtimeSpecForContract(
+          route.spec,
+          readRuntimeContract(this.ctx.storage.kv, attachment?.allocationId ?? null)
+        ),
+        ...snapshotFrame,
+      },
+      this.wrapperRunsStartCommands(socket)
+    );
     const encryptedSecrets = route.credentialSource?.encryptedSecrets;
     try {
       const frameEnv = buildFrameEnv({
@@ -3664,7 +3698,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const frameSpec = controlPlaneRouteSpecSchema.parse({
         ...wireSpec,
-        ...workspaceSnapshotFrame(this.db, route, this.readAttachment(socket)),
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
         ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
         ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
@@ -4258,6 +4291,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (ownerId === null) throw new Error('Notification owner unavailable');
     const peer = this.sessionPeerFor(ownerId, sessionId);
     if (peer === null) throw new Error('Notification peer unavailable');
+    if (notification.kind === 'events') {
+      notification = {
+        ...notification,
+        payload: {
+          ...notification.payload,
+          delivery: { id: crypto.randomUUID(), expiresAt: deadlineAt },
+        },
+      };
+    }
     await withDORetry(
       () => this.sessionPeerFor(ownerId, sessionId) ?? peer,
       target => {
@@ -4344,17 +4386,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (state.kind !== 'creating' || state.allocationId !== allocationId) return;
       let createdRef: string | null = null;
       try {
-        const credential = generateSandboxCredential();
-        await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin;
         if (pin === null) throw new ProviderCreationError('invalid_configuration');
-        const selection = selectStartup(this.env, pin.provider, {
+        const cohort = {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
             .map(route => ({ orgId: route.credentialSource?.orgId })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,
-        });
+        };
+        const harness = await this.runtimeHarness(pin.provider, cohort);
+        const credential = generateSandboxCredential();
+        const selection = selectStartup(this.env, pin.provider, cohort, harness);
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         const startupCommand =
@@ -4364,6 +4407,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 downloadedStartup({
                   env: this.env,
                   descriptor: selection.descriptor,
+                  harness,
                   sandboxId: this.sandboxId,
                   allocationId,
                   deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
@@ -4382,6 +4426,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           });
         }
 
+        // Preflight failures must not pin a harness or mark this sandbox as legacy v1.
+        await this.ctx.storage.put({
+          [RUNTIME_HARNESS_KEY]: harness,
+          [CREDENTIAL_HASH_KEY]: await hashSandboxCredential(credential),
+        });
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
@@ -4625,6 +4674,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
       });
     }
+  }
+
+  /**
+   * Native history does not move between v1 and v2, so the first allocation
+   * fixes the harness for every later one. A sandbox that allocated before this
+   * record existed ran v1.
+   */
+  private async runtimeHarness(
+    provider: AgentSandboxProvider,
+    cohort: StartupCohortContext
+  ): Promise<RuntimeHarness> {
+    const stored = z
+      .enum(RUNTIME_HARNESSES)
+      .optional()
+      .parse(await this.ctx.storage.get(RUNTIME_HARNESS_KEY));
+    if (stored !== undefined) return stored;
+    return (await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === undefined
+      ? newSandboxHarness(this.env, provider, cohort)
+      : 'kilo';
   }
 
   private async workspaceSnapshotLaunch(
@@ -5210,6 +5278,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(frame.startCommands ? { startCommands: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       logControlDiagnostic('workspace_snapshot_capability', {
@@ -5398,6 +5467,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return;
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
+        return;
+      case 'history.page':
+        // Off the serial queue: a Session DO read must not hold other frames.
+        if (current)
+          void serveHistoryPage({
+            frame,
+            readRoute: sessionId => readRoute(this.db, sessionId),
+            session: async sessionId => {
+              const owner = await this.requireOwner();
+              return owner === null ? null : this.sessionPeerFor(owner, sessionId);
+            },
+            send: result => this.trySendFrame(ws, result),
+          });
         return;
       default:
         return;

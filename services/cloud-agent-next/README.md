@@ -786,8 +786,8 @@ issuance while retaining real Session DO notifications. A fake wrapper answers
 #### Other Quality Checks
 
 ```bash
-# Type checking
-pnpm --filter cloud-agent-next typecheck
+# Type checking (this service and its nested wrapper workspace)
+pnpm --filter cloud-agent-next typecheck:wrapper
 
 # Linting
 pnpm --filter cloud-agent-next lint

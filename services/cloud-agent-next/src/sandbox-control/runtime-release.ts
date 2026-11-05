@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import { RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
 
 /** One immutable descriptor pairs the CLI and control payloads for a platform. */
@@ -227,6 +228,14 @@ export function serializeRuntimeRelease(descriptor: RuntimeReleaseDescriptor): U
 export function parseRuntimeRelease(input: string | Uint8Array): RuntimeReleaseDescriptor {
   const text = typeof input === 'string' ? input : new TextDecoder('utf-8').decode(input);
   return runtimeReleaseDescriptorSchema.parse(JSON.parse(text));
+}
+
+/**
+ * The release's CLI names its harness: the v2 distribution ships `bin/kilo2`.
+ * Deriving it keeps every published v1 descriptor byte-identical.
+ */
+export function runtimeReleaseHarness(descriptor: RuntimeReleaseDescriptor): RuntimeHarness {
+  return descriptor.cliExecutable.split('/').at(-1) === 'kilo2' ? 'kilo2' : 'kilo';
 }
 
 export function runtimeArtifactForRole(

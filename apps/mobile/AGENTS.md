@@ -126,6 +126,12 @@ Android searchable `formSheet` routes use only the existing safe-area-capped ful
 Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
 iOS keeps native detent expansion when the search field gains focus.
 
+The picker `formSheet` routes the `(app)` layout registers carry a single half detent on Android.
+Android lays a formSheet route's content out at the largest allowed detent, not at the presented one, so a second
+detent leaves the rows below the half sheet's edge outside the frame: the list has nothing to scroll and a drag
+on a row fires that row. One detent bounds the content host to the presented height, so the list scrolls inside
+it. `pickerSheetOptions` in that layout carries it.
+
 A sheet header takes its top clearance from `useSheetHeaderTopClearance` (`@/lib/form-sheet`), never from
 its own safe-area provider: a nested provider reports zero for the header's first frame and the window inset
 once the sheet presents, so the header moves by the status-bar height after it lands. The `SheetHeaderTopInset`

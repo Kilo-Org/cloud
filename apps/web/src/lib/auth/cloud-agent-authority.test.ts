@@ -87,7 +87,15 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   authViaTokenFromHeaders: (headers: Headers) => headers.has('authorization'),
   clientIpFromHeaders: () => null,
   routeFromHeaders: () => null,
+  methodFromHeaders: (_headers: Headers, requestMethod?: string | null) => requestMethod ?? null,
+  userAgentProductFromHeaders: () => null,
   emitAdminAccessEvent: jest.fn(),
+  emitPrivilegedAccessEvent: jest.fn(),
+  recordKiloAdminElevation: jest.fn(),
+  recordKiloAdminElevationForRequest: jest.fn(),
+  elevateViaKiloAdmin: async (_ctx: unknown, params: { grant: unknown }) => params.grant,
+  serviceTarget: (service: string) => `service:${service}`,
+  organizationTarget: (id: string) => `organization:${id}`,
 }));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
   isWebSessionCurrent: () => true,

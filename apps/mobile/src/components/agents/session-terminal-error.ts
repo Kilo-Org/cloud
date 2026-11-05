@@ -5,6 +5,7 @@ import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
 import { isSafeFailureMessage } from './safe-failure-messages';
+import { TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES } from './session-history-failures';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -407,11 +408,18 @@ export function resolveSessionTerminalError(input: {
   if (input.error !== null) {
     // The atom carries the transport's own English text. Show the reader a
     // translated line and keep the original for the clipboard.
+    //
+    // A typed transcript failure that a retry cannot recover (the stored page
+    // is oversize or unreadable) is the same permanent state as a denial: the
+    // same read answers the same way every time, so a Retry would only repeat
+    // it. Every other error keeps its Retry, which is what recovers a lost
+    // connection or a transient server failure.
+    const terminalTranscript = TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error);
     return {
       variant: 'server',
       title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
-      retryable: true,
+      retryable: !terminalTranscript,
       retryWith: 'session',
       detail: input.error,
     };

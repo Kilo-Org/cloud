@@ -196,6 +196,7 @@ import {
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -870,6 +871,43 @@ describe('User', () => {
 
     afterEach(() => {
       jest.restoreAllMocks();
+    });
+
+    it.each<WatchwoodSignupAssessment>([
+      {
+        status: 'assessed',
+        riskScore: 1,
+        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+        latencyMs: 10,
+        assessedAt: 1,
+      },
+      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
+      { status: 'missing', latencyMs: 0, assessedAt: 1 },
+    ])('creates an account with a $status shadow assessment', async watchwood => {
+      const email = `watchwood-${watchwood.status}@example.com`;
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Shadow Signup',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `watchwood-${watchwood.status}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        null,
+        { watchwood }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
+      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
+        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
+      ]);
     });
 
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {

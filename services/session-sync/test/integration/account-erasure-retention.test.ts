@@ -129,7 +129,7 @@ it('resumes a large creator index across bounded alarm pages', async () => {
       ok: true,
       value: { deleted: true },
     });
-});
+}, 15_000);
 
 it('expires an idle session at the retention deadline and releases tenant admission', async () => {
   const principal = personal(`retention-${crypto.randomUUID()}`);

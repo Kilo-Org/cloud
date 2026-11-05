@@ -80,8 +80,13 @@ function assistantErrorMarkedNonRetryable(
  * not the message row's). `UnknownError` is the name with nothing more to say:
  * its only content is provider text, so the title is the most specific safe
  * statement. Never surfaces `error.data` or provider message text.
+ *
+ * `nonRetryableByProvider` is the gateway's verdict on an `APIError`: a terminal
+ * one loses the row's only recovery action, so its line states that the refusal
+ * is final. Without it the row reads exactly like a transient failure that
+ * happens to be missing its Retry button (UX-DEFECT final refusal copy).
  */
-function assistantDetailKey(errorName: string): string | null {
+function assistantDetailKey(errorName: string, nonRetryableByProvider: boolean): string | null {
   switch (errorName) {
     case 'ProviderAuthError': {
       return 'agentChat.messageFailure.assistantProviderRejected';
@@ -93,9 +98,13 @@ function assistantDetailKey(errorName: string): string | null {
       return 'agentChat.messageFailure.assistantContextOverflow';
     }
     case 'APIError': {
-      // One line for every provider API failure: the status code and the
-      // retryability are provider metadata, not something the row states.
-      return 'agentChat.messageFailure.assistantProviderError';
+      // One line for every retryable provider API failure: the status code and
+      // the retryability are provider metadata, not something the row states.
+      // A terminal verdict is different: the row has no Retry, so the line says
+      // the refusal is final instead of leaving the missing action unexplained.
+      return nonRetryableByProvider
+        ? 'agentChat.messageFailure.assistantProviderRefused'
+        : 'agentChat.messageFailure.assistantProviderError';
     }
     case 'MessageOutputLengthError': {
       return 'agentChat.messageFailure.assistantOutputLimit';
@@ -232,8 +241,16 @@ export function messageFailureLabel(
 export function selectMessageFailure(input: {
   deliveryState?: MessageDeliveryState;
   info: MessageInfo;
+  /**
+   * Whether this row's session can accept a re-send right now. A read-only
+   * stored transcript and a session without a live transport cannot, so the
+   * failure keeps its copy and drops the Retry that could never send.
+   * Defaults to true.
+   */
+  retryAvailable?: boolean;
 }): MessageFailure | null {
   const { deliveryState, info } = input;
+  const retryAvailable = input.retryAvailable ?? true;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
@@ -246,7 +263,7 @@ export function selectMessageFailure(input: {
         detailKey: null,
         detail: null,
         copyDetail: deliveryState.error,
-        canRetry: true,
+        canRetry: retryAvailable,
         canCopy: true,
       };
     }
@@ -266,7 +283,7 @@ export function selectMessageFailure(input: {
       detailKey: copy.detailKey,
       detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
       copyDetail: deliveryState.error,
-      canRetry: true,
+      canRetry: retryAvailable,
       canCopy: true,
     };
   }
@@ -274,10 +291,11 @@ export function selectMessageFailure(input: {
   if (info.role === 'assistant' && info.error) {
     const { error } = info;
     const errorName = error.name;
-    const detailKey = assistantDetailKey(errorName);
-    // A terminal gateway verdict drops the Retry; the name set still covers the
-    // errors whose class is terminal on every transport.
+    // A terminal gateway verdict drops the Retry and changes the detail line;
+    // the name set still covers the errors whose class is terminal on every
+    // transport.
     const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
+    const detailKey = assistantDetailKey(errorName, !retryableByProvider);
     return {
       kind: 'assistant',
       side: 'assistant',
@@ -287,7 +305,10 @@ export function selectMessageFailure(input: {
       detailKey,
       detail: detailKey === null ? null : i18n.t(detailKey),
       copyDetail: '',
-      canRetry: retryableByProvider && !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      canRetry:
+        retryAvailable &&
+        retryableByProvider &&
+        !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,
     };
   }

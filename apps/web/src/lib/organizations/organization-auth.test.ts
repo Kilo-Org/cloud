@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { getAuthorizedOrgContext } from './organization-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
@@ -79,6 +79,48 @@ describe('getAuthorizedOrgContext', () => {
         reason: 'organization_access_rest',
         surface: 'server-component',
         target: `organization:${testOrganizationId}`,
+      });
+    });
+
+    test('records the elevation and still succeeds when the membership query throws', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+
+      const originalSelect = db.select.bind(db);
+      const selectSpy = jest.spyOn(db, 'select').mockImplementation((...args) => {
+        const builder = originalSelect(...args);
+        return new Proxy(builder, {
+          get(target, property, receiver) {
+            if (property === 'from') {
+              return (table: Parameters<typeof target.from>[0]) => {
+                if (table === organization_memberships) {
+                  throw new Error('membership query failed');
+                }
+                return target.from(table);
+              };
+            }
+            const value = Reflect.get(target, property, receiver);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        });
+      });
+
+      let result: Awaited<ReturnType<typeof getAuthorizedOrgContext>>;
+      try {
+        result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+        });
+      } finally {
+        selectSpy.mockRestore();
+        setAdminAccessSinkForTest(null);
+      }
+
+      expect(result.success).toBe(true);
+      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+        kind: 'kilo_admin_elevation',
+        membershipRole: null,
+        wouldPassWithoutAdmin: null,
       });
     });
 

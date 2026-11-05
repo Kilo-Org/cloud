@@ -2552,6 +2552,7 @@
       "assistantStopped": "Жауапты жасау тоқтатылды.",
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
+      "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."

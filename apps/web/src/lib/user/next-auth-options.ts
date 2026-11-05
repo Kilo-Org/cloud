@@ -5,6 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
+import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
@@ -111,6 +112,7 @@ export type TurnstileJwtPayload = {
    */
   guid: UUID;
   ip: string;
+  watchwoodIp?: string;
   iat: number;
   exp: number;
 };
@@ -1119,6 +1121,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const requestHeaders = await headers();
+        const watchwood = !isAccountLinking ? await readWatchwoodSignupAssessment() : undefined;
 
         if (accountInfo.provider === 'workos') {
           const { affiliateTrackingId, trackingContext } = !isAccountLinking
@@ -1135,12 +1138,10 @@ export const authOptions: NextAuthOptions = {
             }
           );
 
-          return processSSOUserLogin(
-            accountInfo,
-            requestHeaders,
-            affiliateTrackingId,
-            trackingContext
-          );
+          return processSSOUserLogin(accountInfo, requestHeaders, affiliateTrackingId, {
+            ...trackingContext,
+            watchwood,
+          });
         }
 
         // Validate Turnstile JWT for real OAuth logins (not fake logins or email auth)
@@ -1217,7 +1218,7 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                trackingContext
+                { ...trackingContext, watchwood }
               );
 
         if (result.success === false) {

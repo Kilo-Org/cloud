@@ -164,7 +164,8 @@ const MESSAGES_BY_FAILURE = {
 
 export function TranscriptStyleFixture({
   failure = 'retryable',
-}: Readonly<{ failure?: FixtureFailure }> = {}) {
+  retryAvailable = true,
+}: Readonly<{ failure?: FixtureFailure; retryAvailable?: boolean }> = {}) {
   const { t } = useTranslation();
   const messages = MESSAGES_BY_FAILURE[failure];
   const failedRow =
@@ -193,7 +194,8 @@ export function TranscriptStyleFixture({
           <MessageBubble
             key={message.info.id}
             message={message}
-            onRetryMessage={ignoreRetry}
+            onRetryMessage={retryAvailable ? ignoreRetry : undefined}
+            retryAvailable={retryAvailable}
             {...(failedRow !== undefined && message.info.id === failedRow.id
               ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
               : {})}

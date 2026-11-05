@@ -40,8 +40,13 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
+  emitPrivilegedAccessEvent,
+  methodFromHeaders,
   routeFromHeaders,
+  userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -148,6 +153,8 @@ export type RequiredPermissions = {
   expectedAudience?: string;
   // Derive from an actual Request URL or fixed route path, never a request header.
   requestPathname?: string;
+  /** The actual Request method when the caller has one; preferred over headers. */
+  requestMethod?: string;
   requestHeaders?: Headers;
 };
 
@@ -167,12 +174,12 @@ type GetAuthResponse =
       credentialsRejected?: boolean;
       rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
-      organizationId?: undefined;
-      internalApiUse?: undefined;
-      botId?: undefined;
-      tokenSource?: undefined;
-      deviceSessionId?: undefined;
-      cloudAgentAuthority?: undefined;
+      organizationId?: Organization['id'];
+      internalApiUse?: boolean;
+      botId?: string;
+      tokenSource?: string;
+      deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
     }
   | {
       user: User;
@@ -202,9 +209,46 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
       tokenSource: result.tokenSource ?? null,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
       route: routeFromHeaders(headersList),
-      // No reliable HTTP method header is available here; do not fabricate one.
-      method: null,
+      method: methodFromHeaders(headersList, opts.requestMethod),
+      userAgentProduct: userAgentProductFromHeaders(headersList),
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
+    const credential = deriveCredentialKind({
+      authViaToken: true,
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
+    const { actionClass, inventoryId } = actionClassForRoute({
+      surface: 'rest',
+      route: route ?? '',
+      method,
+    });
+    emitPrivilegedAccessEvent({
+      surface: 'rest',
+      user: result.user ?? undefined,
+      credential,
+      outcome: result.user ? 'succeeded' : 'denied',
+      actionClass,
+      actionId: inventoryId,
+      target: null,
+      wouldBlock: credential !== 'session',
+      userAgentProduct: userAgentProductFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route,
+      method,
       ip: clientIpFromHeaders(headersList),
     });
   }
@@ -335,10 +379,15 @@ async function resolveUserFromAuth(
       });
     }
 
+    const internalApiUse = authorizationValidationResult.internalApiUse;
+    const tokenSource = authorizationValidationResult.tokenSource;
     const scope = authorizationValidationResult.cloudAgentAuthority;
     if (scope && opts.adminOnly) {
       return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const fromDb = scope ? db : readDb;
@@ -353,7 +402,12 @@ async function resolveUserFromAuth(
             authorizationValidationResult.apiTokenPepper
           ))
     ) {
-      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
+      return authError(401, 'Invalid API token', user.id, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -361,14 +415,15 @@ async function resolveUserFromAuth(
     if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
       return authError(403, 'Scoped organization mismatch', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const organizationId = scope
       ? (scope.organizationId ?? undefined)
       : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
-    const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
-    const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
     const result = await validateUserAuthorization({
@@ -382,10 +437,14 @@ async function resolveUserFromAuth(
       botId,
       tokenSource,
       deviceSessionId,
+      cloudAgentAuthority: scope,
     });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     return result.user ? { ...result, cloudAgentAuthority: scope } : result;
@@ -458,6 +517,9 @@ function authError(
   options?: {
     credentialsRejected?: boolean;
     rejectionReason?: 'empty_organization_context';
+    internalApiUse?: boolean;
+    tokenSource?: string;
+    cloudAgentAuthority?: CloudAgentAuthority;
   }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
@@ -465,6 +527,9 @@ function authError(
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
+    internalApiUse: options?.internalApiUse,
+    tokenSource: options?.tokenSource,
+    cloudAgentAuthority: options?.cloudAgentAuthority,
     ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
   };
 }
@@ -480,6 +545,7 @@ type UserAuthorizationRequest = {
   botId?: string;
   tokenSource?: string;
   deviceSessionId?: string;
+  cloudAgentAuthority?: CloudAgentAuthority;
 };
 
 async function validateUserAuthorization({
@@ -493,15 +559,32 @@ async function validateUserAuthorization({
   botId,
   tokenSource,
   deviceSessionId,
+  cloudAgentAuthority,
 }: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
-    return authError(401, 'User not found', kiloUserId);
+    return authError(401, 'User not found', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (await isUserBlacklistedByDomain(user)) {
-    return authError(403, 'Access denied (R0)', kiloUserId);
+    return authError(403, 'Access denied (R0)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
-    return report_blocked_user(kiloUserId);
+    return authError(403, 'Access denied (R1)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (opts.adminOnly && !user.is_admin) {
-    return authError(403, 'Access denied (nonadmin)', kiloUserId);
+    return authError(403, 'Access denied (nonadmin)', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   }
 
   // A credential bound to a device session is only valid while that session is
@@ -520,6 +603,9 @@ async function validateUserAuthorization({
       // not degrade into an anonymous request.
       return authError(401, 'Device session is no longer active', kiloUserId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
       });
     }
   }
@@ -528,12 +614,19 @@ async function validateUserAuthorization({
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
       return authError(400, 'Invalid organization ID format', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
         ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
       });
     }
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
     if (!isMember) {
-      return authError(403, 'Access denied (not a member of the organization)', kiloUserId);
+      return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
     }
   }
 

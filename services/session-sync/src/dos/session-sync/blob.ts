@@ -98,10 +98,7 @@ export function abort(
   hash: string,
   attempt: string
 ): void {
-  const meta = visible(db, principal, sessionID);
-  if (meta.creator_id !== principal.userID) {
-    raise('creator_mismatch', 'Only the session creator can change this session');
-  }
+  visible(db, principal, sessionID);
   db.update(blobs)
     .set({ state: 'cleaning' })
     .where(and(eq(blobs.hash, hash), eq(blobs.attempt, attempt), eq(blobs.state, 'pending')))
@@ -149,13 +146,10 @@ export function target(
   attempt: string
 ) {
   const meta = visible(db, principal, sessionID);
-  if (meta.creator_id !== principal.userID) {
-    raise('creator_mismatch', 'Only the session creator can change this session');
-  }
   return { key: key(meta, hash, attempt), deleted: meta.deleted_at !== null };
 }
 
-/** Returns the physical object of a verified blob that any tenant member can read. */
+/** Returns the physical object of a verified blob for an authorized owner. */
 export function locate(db: Db, principal: Principal, sessionID: string, hash: string) {
   const meta = live(db, principal, sessionID);
   const row = db

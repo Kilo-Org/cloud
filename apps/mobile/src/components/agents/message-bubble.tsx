@@ -62,6 +62,13 @@ type MessageBubbleProps = {
   holdQueuedSlot?: boolean;
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
+  /**
+   * Whether this row's session can accept a re-send now. When false the failure
+   * footer keeps its statement and drops the Retry, so a read-only transcript or
+   * a session without a live transport still says why the turn failed. Defaults
+   * to true.
+   */
+  retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /** Restores a canceled queued message's prompt back into the composer. */
@@ -87,6 +94,7 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
+  retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
   condenseToolCalls,
@@ -147,14 +155,18 @@ function MessageBubbleImpl({
     );
   }
 
-  // Failed-row footer. Renders only when the relevant handler is wired
+  // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry only.
-  const failure = selectMessageFailure({ deliveryState, info: message.info });
+  // Retry or Copy, an assistant row needs Retry only. A caller that already
+  // knows the session cannot accept a re-send passes `retryAvailable: false`:
+  // the footer then still states the failure, with no action that could not
+  // act.
+  const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
-    failure?.kind === 'delivery'
+    retryAvailable === false ||
+    (failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined;
+      : onRetryMessage !== undefined);
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay

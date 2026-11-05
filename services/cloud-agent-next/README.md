@@ -62,6 +62,11 @@ project path; project credentials also support their recorded numeric project ID
 The configured instance base path and outbound container binding remain part of
 request authorization.
 
+The request method is part of authorization. A listed project resource answers
+the methods its policy allows: credential endpoints answer none, and
+configuration, membership and lifecycle endpoints answer reads only. The
+project root answers reads only.
+
 ## API Documentation
 
 ### Overview

@@ -14,8 +14,10 @@ In scope:
 - Create, update, and delete files using normal filesystem operations.
 - Artifacts shared across sibling chats in the same workspace. Access stays
   owner-only, matching Changes and session history.
-- Offline listing and downloads of everything ever synchronized for the
-  workspace.
+- Offline listing and downloads of everything synchronized for the workspace
+  in the last 14 days.
+- Deleting an artifact from the Artifacts view.
+- Agent guidance on the folder in the Cloud Agent sandbox rules.
 
 Out of scope:
 
@@ -24,6 +26,9 @@ Out of scope:
 - Publish tool, filesystem watcher, browser editing, previews, version history.
 - Native mobile UI (`.specs/cloud-agent-session.md` already scopes mobile out).
 - Files larger than the per-file cap (multipart uploads are a follow-up).
+- Showing skipped files (too large, over quota, invalid path) in the view. They
+  are reported as diagnostics only.
+- A feature flag. Older wrappers simply do not sync.
 
 Naming: "runtime artifacts" already exists (`runtime-artifact-routes.ts`). Use
 "workspace artifacts" / `workspaceArtifact*` in code, routes, and events.
@@ -46,6 +51,10 @@ All paths are relative to `services/cloud-agent-next/` unless they start with
 | Safety without restore | Baseline on first scan; publish only observed changes | An empty or stale folder can never delete or overwrite newer R2 state |
 | Durability point | Turn-end flush | Idle stop destroys compute without a `shutdown` frame |
 | Downloads | Presigned R2 GET with forced attachment disposition | Decided; needs a read-only key scoped to the artifacts bucket |
+| Retention | Each artifact expires 14 days after its last update | Sandbox DOs have no self-deletion; per-file expiry bounds storage without new lifecycle machinery |
+| User deletion | Delete action in the Artifacts view | Files from earlier sandboxes are not on disk, so the agent cannot remove them |
+| Exclusions | Skip dot-segments, `node_modules`, `__pycache__`, `venv` | Keeps accidental project trees from filling the quota |
+| Rollout | No feature flag | Older wrappers lack the transfer URL and never sync |
 | Notification | Copy `worktree_changes` | Persisted, deduplicated, revisioned, refetch on reconnect |
 | UI shape | Copy the Changes toggle | Changes replaces the chat content area; it is not a side panel |
 
@@ -66,6 +75,8 @@ Sandbox DO.
 | `WORKSPACE_ARTIFACT_TRANSFER_TIMEOUT_MS` | 120,000 | Per upload request |
 | `WORKSPACE_ARTIFACT_FLUSH_BUDGET_MS` | 30,000 | Turn-end flush |
 | `WORKSPACE_ARTIFACT_DOWNLOAD_URL_SECONDS` | 300 | Presigned browser download links |
+| `WORKSPACE_ARTIFACT_RETENTION_MS` | 14 days | From the entry's last update |
+| `WORKSPACE_ARTIFACT_EXCLUDED_SEGMENTS` | `node_modules`, `__pycache__`, `venv`, plus any segment starting with `.` | Excluded paths are never published, deleted, or counted |
 
 Before raising the per-file cap, confirm the account's Worker ingress limit.
 Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
@@ -108,8 +119,8 @@ Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
      wrapper releases age out.
 2. **Minting.** Extract minting into one Sandbox DO helper used at launch
    (`wrapperLaunchEnv`, which already holds the signing secret) and at renewal.
-   Mint on every wrapper launch, independent of whether diagnostics are enabled.
-   Include `workspace_artifacts` when the feature is enabled for the session.
+   Mint on every wrapper launch, independent of whether diagnostics are enabled,
+   always with both scopes. There is no feature flag.
 3. **Renewal over the control connection.** The wrapper asks the Sandbox DO for
    a fresh grant instead of relying on the launch-time one.
    - Add a wrapper-to-DO request pair, `transfer.grant` / `transfer.grant.result`
@@ -126,8 +137,9 @@ Vercel BYOC is not live; verify Vercel forwarding at 50 MiB before it launches
      immediately on a `401`. It renews only while connected; uploads after a
      disconnect use the last grant until it expires, which keeps the final log
      upload working.
-   - Renewal fixes the existing problem of log uploads stopping after four
-     hours, which the 12-hour turn work would otherwise make common.
+    - Renewal fixes the existing problem of log uploads stopping after four
+     hours, which the 12-hour turn work would otherwise make common. It is built
+     as part of this work, for both logs and artifacts.
 4. **Env names.** Add `SANDBOX_TRANSFER_URL` (base:
    `${WORKER_URL}/sandbox-transfer/<sandboxId>/<allocationId>/<wrapperInstanceId>`)
    and `SANDBOX_TRANSFER_GRANT`. Keep emitting the `CONTROL_LOG_*` names for
@@ -244,7 +256,30 @@ incremented in the same transaction as each index change.
   upload and removes it at commit, so the alarm sweeps anything left behind.
 - Workspace deletion (`worktree-deletion.ts` flow) deletes the index and queues
   every object. Account deletion goes through the same workspace deletion path.
-- Retention: artifacts live as long as the workspace.
+
+### Retention: 14 days per artifact
+
+Sandbox DOs have no self-deletion today (`SandboxDeleteReason` names
+`retention-expired`, but nothing in the Sandbox or Session DO expires storage),
+so retention is per artifact: each entry expires
+`WORKSPACE_ARTIFACT_RETENTION_MS` (14 days) after its `updated_at`.
+
+- **R2 deletes the bytes.** Add an R2 lifecycle rule on the artifacts bucket
+  that deletes objects 15 days after upload. Every update writes a new object
+  key, so an object's age equals its entry's age. The extra day covers clock
+  skew and commit latency. This works even when the Sandbox DO is never woken
+  again.
+- **The DO hides and prunes entries.** Listing, quota checks, downloads, and
+  commits ignore entries older than the retention. Any index access deletes
+  expired rows in the same transaction (no new alarm), and an expiry counts as
+  an index change (revision increment, notification).
+- **Expiry while the file is still on disk.** A file that sits unchanged in a
+  live sandbox for 14 days expires from the view and is not re-uploaded until it
+  changes. This is acceptable; the agent rules say artifacts are kept for 14
+  days after their last change.
+- **Downloads near expiry.** Download URLs are issued only for unexpired
+  entries; a URL issued in the last day still works because the lifecycle rule
+  runs one day later.
 
 Main integration:
 
@@ -256,6 +291,7 @@ Main integration:
 - `src/control-plane/sandbox/worktree-deletion.ts`
 - `drizzle.sandbox.config.ts`
 - `wrangler.jsonc`, `src/types.ts`, `ENVIRONMENT.md`
+- R2 bucket lifecycle rule (infrastructure, applied by an operator)
 - `docs/do-sqlite-drizzle.md`
 
 ## 3. Artifact Transfer Routes
@@ -303,6 +339,21 @@ Commit rules:
 Delete rules: remove only when the stored hash equals `expectedHash`, so a late
 or stale delete cannot remove a newer file.
 
+User deletion (from the Artifacts view, Section 6) uses a separate RPC without
+the wrapper liveness check, because it works offline:
+
+```ts
+deleteWorkspaceArtifactForUser({ relativePath, expectedHash }): Promise<
+  | { status: 'deleted' | 'absent' | 'hash_mismatch'; revision: number }
+>
+```
+
+It removes the entry, queues the object as an orphan, increments the revision,
+and notifies. It does not touch the sandbox: if the file is still on disk, the
+synchronizer keeps its `publishedHash` and does not re-upload it until the file
+changes. `expectedHash` is the hash the user saw, so a delete cannot remove a
+version uploaded after the list was loaded.
+
 ### HTTP contract
 
 | Route | Request | Success | Errors |
@@ -316,7 +367,9 @@ object stays queued as an orphan and the route returns the mapped error.
 
 Path validation (shared by wrapper, routes, and DO): relative, NFC, no empty,
 `.`, or `..` segments, no backslashes, NUL, or control characters, within the
-path length and depth limits.
+path length and depth limits, and no segment in
+`WORKSPACE_ARTIFACT_EXCLUDED_SEGMENTS` (so any segment starting with `.` is
+rejected).
 
 Main integration:
 
@@ -355,8 +408,9 @@ Follow the `file-log-uploader.ts` loop shape.
 
 Without a restore, the folder at wrapper start may be empty (fresh sandbox),
 older than R2 (a tail snapshot captured before a later allocation whose capture
-failed), or setup output from an environment snapshot. None of these may delete
-or overwrite newer R2 state. So the synchronizer only publishes changes it
+failed), or whatever an environment snapshot happens to contain (no special
+handling; setup is not expected to write there). None of these may delete or
+overwrite newer R2 state. So the synchronizer only publishes changes it
 observes:
 
 - The synchronizer keeps a small state file (`statePath`, for example
@@ -382,7 +436,9 @@ same path again replaces the R2 copy.
 
 Run a scan every `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS`, never overlapping:
 
-1. Enumerate regular files under `/artifacts` with `lstat`.
+1. Enumerate regular files under `/artifacts` with `lstat`. Do not descend into
+   excluded segments (`WORKSPACE_ARTIFACT_EXCLUDED_SEGMENTS`); excluded files are
+   never published, deleted, or counted toward limits.
 2. Record relative path, size, `mtimeNs`, `ctimeNs`, and inode.
 3. A changed or new file is eligible once unchanged across two successful scans.
 4. Hash eligible files (streaming SHA-256). Skip files whose hash equals the
@@ -402,7 +458,9 @@ Run a scan every `WORKSPACE_ARTIFACT_SCAN_INTERVAL_MS`, never overlapping:
 - Symlinks, sockets, FIFOs, and devices are skipped and reported.
 - Files over the per-file cap, paths over the limits, and files that would
   exceed the quota are skipped with a diagnostic. They are retried only when
-  they change.
+  they change. V1 does not surface them in the view.
+- A file removed by the user in the view, or expired by retention, is not
+  re-uploaded while its local copy is unchanged.
 - `409` (stale) stops the synchronizer. `401` triggers one grant renewal and a
   retry; a second `401` pauses it with a diagnostic until the next renewal.
   `503` and network errors back off and retry on the next scan.
@@ -492,10 +550,13 @@ Add `src/router/handlers/session-workspace-artifacts.ts`, modeled on
 - `listWorkspaceArtifacts({ sessionId })` returns `{ revision, entries }`.
 - `getWorkspaceArtifactDownloadUrl({ sessionId, relativePath })` returns
   `{ url, expiresAt }`.
+- `deleteWorkspaceArtifact({ sessionId, relativePath, expectedHash })` (mutation)
+  calls `deleteWorkspaceArtifactForUser` and returns `{ status, revision }`.
 
-Both use `protectedProcedure` and `requireCurrentSessionAccess`. They resolve
-the session's `sandboxId` and read the Sandbox DO index. They never prepare,
-start, or wake a sandbox.
+All three use `protectedProcedure` and `requireCurrentSessionAccess`. They
+resolve the session's `sandboxId` and use the Sandbox DO index. They never
+prepare, start, or wake a sandbox. Entries carry `contentHash` so the view can
+send `expectedHash`.
 
 ### Downloads (presigned R2 GET)
 
@@ -514,7 +575,7 @@ start, or wake a sandbox.
 
 ### Web tRPC
 
-- Add both procedures to the hand-written `CloudAgentNextTRPCClient` interface
+- Add the three procedures to the hand-written `CloudAgentNextTRPCClient` interface
   and wrapper methods in `apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts`.
 - Personal router: `assertUserOwnsSession`, then the client call.
 - Organization router: `organizationMemberProcedure` and
@@ -573,34 +634,74 @@ Follow the Changes pattern (`WorktreeChanges.tsx`, `CloudChatPage.tsx`):
   choosing the personal or organization procedure and refetching on mount,
   focus, reconnect, and the refresh atom.
 
-The read-only view shows:
+The view shows:
 
-- Path (grouped by folder), size, and last synchronized time.
+- Path (grouped by folder), size, last synchronized time, and when the file
+  expires (14 days after its last update).
 - Download action per file.
+- Delete action per file, with a confirmation that says the file is removed for
+  the user but a copy may remain in a running sandbox. Hidden in read-only
+  views. Invalidates the list on success; `hash_mismatch` refetches and tells
+  the user the file changed.
 - Loading, empty, and error states.
 - An offline notice when the sandbox is not running: saved files remain
   available, but new changes are not syncing.
 
 Follow `DESIGN.md` and the `kilo-design-cloud` skill.
 
-### Agent rules
+### Agent guidance in the sandbox rules
 
-Update `buildCloudAgentRules` in `src/shared/cloud-agent-rules.ts`:
+`buildCloudAgentRules` (`src/shared/cloud-agent-rules.ts`) produces the
+"Cloud Agent Environment" rules file that the wrapper writes to
+`~/.kilocode/rules/cloud-agent.md` in each workspace HOME before Kilo starts
+(`wrapper/src/cloud-agent-rules-file.ts`, `wrapper/src/control-plane/kilo-runtime.ts`).
 
-- Replace "The filesystem is ephemeral and will not persist after the session
-  ends" with: the filesystem is ephemeral, except that files saved in
-  `/artifacts` are kept for the user.
-- Add an "Artifacts" section: put user-facing outputs (reports, screenshots,
-  exports, generated files) in `/artifacts`; the user can see and download them
-  after the session ends. Files from earlier sessions may not be present in the
-  folder. State the per-file and total limits.
-- Do not mention synchronization.
+- Add `artifacts?: boolean` to `CloudAgentRulesInput`. The wrapper sets it only
+  when the synchronizer is running, so a sandbox without sync never promises
+  that files are kept.
+- Build every number in the text from the shared constants in
+  `src/shared/workspace-artifacts.ts`, so the rules cannot drift from the limits.
+- When `artifacts` is true, replace "The filesystem is ephemeral and will not
+  persist after the session ends." with:
+
+  > The filesystem is ephemeral and will not persist after the session ends,
+  > except for files saved in `/artifacts` (see Artifacts).
+
+- Add this section after "Dev Servers" when `artifacts` is true:
+
+  ```markdown
+  ## Artifacts
+
+  Save files the user should receive in `/artifacts`: reports, screenshots,
+  recordings, exports, generated documents, and build outputs they asked for.
+  The user can view and download everything in `/artifacts`, including after
+  this sandbox stops. Anything saved elsewhere may be lost.
+
+  - Use clear file names and subfolders. Saving to an existing path replaces the
+    user's copy.
+  - Write the finished file in place, or create it elsewhere and move it into
+    `/artifacts` when it is complete.
+  - Limits: 50 MiB per file, 500 MiB and 1,000 files in total. Larger files are
+    not kept. Paths with a folder or file name starting with `.`, or named
+    `node_modules`, `__pycache__`, or `venv`, are ignored.
+  - Files are kept for 14 days after their last change.
+  - Files saved in earlier sessions may not be present in `/artifacts`. Do not
+    rely on them.
+  - Do not put repositories, dependency folders, caches, secrets, credentials,
+    or tokens in `/artifacts`.
+  - When you save an artifact, tell the user its path, for example
+    `/artifacts/report.pdf`.
+  ```
+
+- Do not mention synchronization, R2, or the Artifacts view internals.
+- Add `src/shared/cloud-agent-rules.test.ts` covering both `artifacts` values,
+  and update the existing expectations in `wrapper/src/session-bootstrap.test.ts`.
 
 ### Spec
 
 Add a rule under `### Workspace` in `.specs/cloud-agent-session.md` (shared
-artifacts, offline access, owner-only, no restore outside tail snapshots) and a
-Changelog entry.
+artifacts, offline access, owner-only, user deletion, 14-day expiry, no restore
+outside tail snapshots) and a Changelog entry.
 
 Main integration:
 
@@ -609,21 +710,23 @@ Main integration:
 - New `apps/web/src/components/cloud-agent-next/WorkspaceArtifacts.tsx`
 - New `apps/web/src/components/cloud-agent-next/useWorkspaceArtifacts.ts`
 - `src/shared/cloud-agent-rules.ts`
+- `wrapper/src/control-plane/kilo-runtime.ts` (passes `artifacts`)
 - `.specs/cloud-agent-session.md`
 
 ## 8. Rollout And Compatibility
 
-- Gate artifact sync behind a feature flag checked when minting the grant scope
-  and when rendering the button.
-- Old wrappers: no `SANDBOX_TRANSFER_URL` means no sync; listing still works and
-  shows whatever exists.
+- No feature flag. The grant always carries both scopes and the button shows for
+  every session that can open Changes.
+- Old wrappers: no `SANDBOX_TRANSFER_URL` means no sync and no artifacts
+  guidance in the rules; listing shows an empty state.
+- Before the wrapper release, apply the R2 lifecycle rule and create the
+  read-only key.
 - Old routes and grant types (`/sandbox-logs`, `control_log_upload`) stay until
   telemetry shows no older wrappers.
 - Deploy order: Worker and DO (routes, schema, RPCs, secrets) before the wrapper
   release that uses them, then the UI.
-- Coordinate with the 12-hour turn work: grant renewal (Section 1, item 3) also
-  keeps log uploads working past four hours. Whichever change lands first should
-  own the renewal request pair; the other reuses it.
+- Grant renewal for logs and artifacts is built here. Tell the 12-hour turn work
+  that log uploads past four hours depend on it.
 - Grant renewal needs both a new DO (frame handler) and a new wrapper
   (`transferGrants` capability); mixed versions fall back to the launch-time
   grant.
@@ -647,6 +750,16 @@ Main integration:
 - **DO index:** migration applies on an existing DO; revision increments only on
   real changes; orphans are queued and swept; workspace deletion clears
   everything; data survives DO eviction.
+- **Retention:** entries older than 14 days are hidden from listing, downloads,
+  and quota, and pruned on the next index access with a revision increment; an
+  expired file unchanged on disk is not re-uploaded; a changed one is.
+- **User deletion:** works with no sandbox running; `expectedHash` mismatch
+  leaves a newer version; the synchronizer does not re-upload an unchanged local
+  copy; access checks match listing.
+- **Exclusions:** dot-segments, `node_modules`, `__pycache__`, and `venv` are
+  never published, deleted, or counted, and are rejected by the route.
+- **Agent rules:** the Artifacts section and the amended ephemeral line appear
+  only when `artifacts` is true, with numbers taken from the shared constants.
 - **Synchronizer:** creation, modification, deletion, unchanged files, failed
   and incomplete scans, missing root, concurrent writes, symlinks and special
   files, oversized files, retries and back-off, `409` stop, `401` pause.
@@ -668,7 +781,9 @@ Main integration:
   stop.
 - Uploads work in a restricted-egress container.
 - A 50 MiB upload succeeds.
-- Create artifacts, stop the sandbox, list and download them offline.
+- Create artifacts, stop the sandbox, list, download, and delete them offline.
+- The agent, following only the sandbox rules, saves a requested report in
+  `/artifacts` and tells the user its path.
 - Start a replacement without a tail snapshot: R2 is unchanged, the agent sees an
   empty folder, and new files sync.
 - Start a replacement from a tail snapshot (enrolled owner): the folder matches
@@ -696,7 +811,10 @@ Run focused formatting, type checks, and tests for
   empty `/artifacts`. Earlier files stay downloadable but are not available to
   the agent.
 - Files over 50 MiB or beyond the quota are not synchronized; the agent is told
-  the limits.
+  the limits, and V1 does not show skipped files to the user.
+- Artifacts expire 14 days after their last update.
+- Deleting in the view removes the user's copy only; a running sandbox keeps its
+  local file.
 
 ## Resolved Questions
 
@@ -706,46 +824,29 @@ Run focused formatting, type checks, and tests for
 | Can a wrapper outlive the four-hour grant? | Yes (12-hour turns, no allocation cap). The wrapper renews short-lived grants from the Sandbox DO over the control connection |
 | Download path | Presigned R2 GET |
 | Restore on replacement | None. Rely on workspace tail snapshots; baseline rule protects R2 |
+| Files nobody can delete filling the quota | Delete action in the Artifacts view; 14-day expiry also frees space |
+| Show skipped files? | Not in V1; diagnostics only |
+| Feature flag | None |
+| Retention | 14 days per artifact from last update. Sandbox DOs do not self-delete |
+| Exclusions | Dot-segments, `node_modules`, `__pycache__`, `venv` |
+| Environment snapshot output | No special handling; setup is not expected to write there |
+| Grant renewal ownership | Built here, for logs and artifacts |
 
 ## Open Questions
 
-1. **Unreachable files and the quota.** Outside tail-snapshot coverage, files
-   from earlier sandboxes stay in R2 but not on disk, so neither the agent nor
-   the user can delete them. They still count toward the 500 MiB / 1,000-file
-   quota, which can eventually block new uploads for good. Options: a delete
-   action in the Artifacts view (smallest fix), counting only paths seen by the
-   current allocation, or evicting the oldest unseen entries.
-2. **Skipped-file visibility.** Files over the size cap, past the quota, or with
-   invalid paths only produce a diagnostic. Should the Artifacts view show
-   them as "not synced", and should the agent be told when a write will not be
-   kept?
-3. **Rollout cohort.** Which flag system gates the feature, and should the first
-   cohort match the workspace tail snapshot allowlist, so early users also get
-   the local folder back on replacement?
-4. **Retention and cost.** Artifacts live as long as the workspace, and
-   workspaces have no expiry. Is that acceptable, or should idle workspaces'
-   artifacts expire?
-5. **Exclusions.** Sync everything under `/artifacts`, or skip dotfiles and
-   common heavy directories (`node_modules`, `.git`, `.venv`) that would quickly
-   hit the quota if an agent puts a project there?
-6. **Environment snapshot output.** Files that setup commands write into
-   `/artifacts` during an environment build are baseline and never published.
-   Is that the intended behavior?
-7. **Renewal ownership.** Does the 12-hour turn work or this work build the
-   `transfer.grant` request pair?
-8. **Worker ingress limit.** What is the account's limit? It decides whether the
+1. **Worker ingress limit.** What is the account's limit? It decides whether the
    50 MiB cap can be raised.
-9. **Vercel at 50 MiB.** Verify forwarding before Vercel BYOC launches.
+2. **Vercel at 50 MiB.** Verify forwarding before Vercel BYOC launches.
 
 ## Implementation Order
 
 1. Generalize the transfer channel: grant scopes, DO-minted grant renewal,
    shared wrapper identity, route helpers, wrapper client. Logs behave as today,
    except that they keep uploading past four hours.
-2. Artifact bucket, credentials, index schema and migration, DO RPCs, transfer
-   routes.
+2. Artifact bucket, lifecycle rule, credentials, index schema and migration,
+   retention pruning, DO RPCs, transfer routes.
 3. Wrapper synchronizer with baseline state, and the turn-end flush.
 4. Folder provisioning.
-5. Worker read procedures, presigned downloads, and notifications through the
-   SDK.
-6. Web tRPC, Artifacts view, agent rules, and spec.
+5. Worker procedures (list, download, delete), presigned downloads, and
+   notifications through the SDK.
+6. Web tRPC, Artifacts view with delete, agent rules, and spec.

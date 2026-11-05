@@ -141,4 +141,55 @@ describe('native session ownership', () => {
       });
     }
   );
+
+  it('admits one command before React rerenders and reuses unchanged pending inventory', async () => {
+    const original = fixture();
+    const deferred = Promise.withResolvers<string>();
+    original.connection.sendMessage.mockReturnValueOnce(deferred.promise);
+    const published: { current?: NativeRemoteSession } = {};
+    function Harness() {
+      published.current = useNativeSession(original.client, session);
+      return null;
+    }
+    function remote() {
+      if (!published.current) {
+        throw new Error('Session hook did not mount');
+      }
+      return published.current;
+    }
+    const holder: { current?: TestRenderer.ReactTestRenderer } = {};
+    act(() => {
+      holder.current = TestRenderer.create(createElement(Harness));
+    });
+    const renderer = holder.current;
+    const listener = original.listeners[0];
+    if (!renderer || !listener) {
+      throw new Error('Session did not connect');
+    }
+    act(() => {
+      listener(connected);
+    });
+    const pending = remote().pending;
+    const commands: { first?: Promise<boolean>; second?: Promise<boolean> } = {};
+    act(() => {
+      const current = remote();
+      commands.first = current.send('first', false);
+      commands.second = current.send('second', false);
+    });
+    expect(original.connection.sendMessage).toHaveBeenCalledOnce();
+    await expect(commands.second).resolves.toBe(false);
+    expect(remote().pending).toBe(pending);
+    await act(async () => {
+      deferred.resolve('first-command');
+      await commands.first;
+    });
+    expect(remote().busy).toBe(false);
+    await act(async () => {
+      expect(await remote().send('next', false)).toBe(true);
+    });
+    expect(original.connection.sendMessage).toHaveBeenCalledTimes(2);
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });

@@ -3,7 +3,7 @@ import {
   type NativeSessionState,
   type NativeSessionSummary,
 } from '@kilocode/cloud-agent-sdk';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 import { type NativePendingRequests, pendingRequests, sendNativePrompt } from './projections';
 import { nativeError, type NativeRemoteClient } from './use-native-inventory';
@@ -40,6 +40,7 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
     setCommandID('');
   }
   const connectionRef = useRef<NativeSessionConnection | null>(null);
+  const inFlight = useRef<NativeSessionConnection | null>(null);
   const scope = useRef({ client, sessionID, organizationID });
   scope.current = { client, sessionID, organizationID };
 
@@ -72,7 +73,7 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
   async function run(operation: (connection: NativeSessionConnection) => Promise<string>) {
     const connection = connectionRef.current;
     const started = scope.current;
-    if (!connection || busy) {
+    if (!connection || inFlight.current === connection) {
       return false;
     }
     const matches = () =>
@@ -80,6 +81,7 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
       scope.current.client === started.client &&
       scope.current.sessionID === started.sessionID &&
       scope.current.organizationID === started.organizationID;
+    inFlight.current = connection;
     setBusy(true);
     setError('');
     try {
@@ -97,18 +99,23 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
       }
       return false;
     } finally {
+      if (inFlight.current === connection) {
+        inFlight.current = null;
+      }
       if (matches()) {
         setBusy(false);
       }
     }
   }
+  const events = state?.events;
+  const pending = useMemo(() => pendingRequests(events ?? []), [events]);
 
   return {
     state,
     busy,
     error: errorMessage,
     commandID,
-    pending: pendingRequests(state?.events ?? []),
+    pending,
     canControl: state?.connection === 'connected' && state.runnerConnected && !busy,
     run,
     send: (text: string, queue: boolean) =>

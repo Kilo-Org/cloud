@@ -257,7 +257,6 @@ export function CodeReviewJobsCard({
       ? 'Select a model available for this account.'
       : null;
 
-  // Fetch code reviews with auto-refresh every 5 seconds if there are active jobs
   const { data, isLoading, isFetching } = useQuery({
     ...(organizationId
       ? trpc.codeReviews.listForOrganization.queryOptions({
@@ -708,7 +707,6 @@ export function CodeReviewJobsCard({
     </Dialog>
   );
 
-  // Retrigger mutation for failed/cancelled/interrupted reviews
   const retriggerMutation = useMutation(
     trpc.codeReviews.retrigger.mutationOptions({
       onSuccess: async result => {
@@ -723,7 +721,6 @@ export function CodeReviewJobsCard({
           });
         }
         setActionInProgressId(null);
-        // Invalidate the query to refetch the list
         await queryClient.invalidateQueries({
           queryKey: organizationId
             ? trpc.codeReviews.listForOrganization.queryKey({
@@ -744,7 +741,6 @@ export function CodeReviewJobsCard({
     })
   );
 
-  // Cancel mutation for pending/queued/running reviews
   const cancelMutation = useMutation(
     trpc.codeReviews.cancel.mutationOptions({
       onSuccess: async () => {
@@ -752,7 +748,6 @@ export function CodeReviewJobsCard({
           description: 'The code review has been cancelled.',
         });
         setActionInProgressId(null);
-        // Invalidate the query to refetch the list
         await queryClient.invalidateQueries({
           queryKey: organizationId
             ? trpc.codeReviews.listForOrganization.queryKey({
@@ -789,7 +784,6 @@ export function CodeReviewJobsCard({
   const hasPrevious = currentPage > 1;
   const hasNext = hasMore;
 
-  // Show empty state only on first page with no reviews
   if (reviews.length === 0 && currentPage === 1) {
     return (
       <>
@@ -1053,7 +1047,6 @@ export function CodeReviewJobsCard({
                     <CodeReviewStreamView
                       reviewId={review.id}
                       onComplete={() => {
-                        // Refetch reviews when complete
                         window.location.reload();
                       }}
                     />

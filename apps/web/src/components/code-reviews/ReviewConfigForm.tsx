@@ -141,7 +141,6 @@ export function ReviewConfigForm({
     ? `/organizations/${organizationId}/code-reviews/review-md`
     : '/code-reviews/review-md';
 
-  // Fetch current config
   const organizationConfigQuery = useQuery({
     ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
       organizationId: organizationId ?? '',
@@ -159,7 +158,6 @@ export function ReviewConfigForm({
     refetch,
   } = organizationId ? organizationConfigQuery : personalConfigQuery;
 
-  // Fetch repositories based on platform (cached by default)
   const {
     data: repositoriesData,
     isLoading: isLoadingRepositories,
@@ -184,7 +182,6 @@ export function ReviewConfigForm({
           })
   );
 
-  // Refresh repositories hook
   const { refresh: refreshRepositories, isRefreshing: isRefreshingRepos } = useRefreshRepositories({
     getRefreshQueryOptions: useCallback(
       () =>
@@ -230,13 +227,11 @@ export function ReviewConfigForm({
     ),
   });
 
-  // Fetch available models
   const { modelOptions, isLoadingModels } = useOrganizationModels(
     organizationId,
     'shared_services'
   );
 
-  // Local state
   const [isEnabled, setIsEnabled] = useState(false);
   const [reviewStyle, setReviewStyle] = useState<'strict' | 'balanced' | 'lenient' | 'roast'>(
     'balanced'
@@ -253,7 +248,6 @@ export function ReviewConfigForm({
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
-  // Per-repository model overrides keyed by repository id.
   const [repositoryModelOverrides, setRepositoryModelOverrides] = useState<
     Map<number, RepositoryModelOverrideValue>
   >(new Map());
@@ -268,33 +262,28 @@ export function ReviewConfigForm({
   const [councilEnabledRepositoryIds, setCouncilEnabledRepositoryIds] = useState<Set<number>>(
     new Set()
   );
-  // Optional council label gate, edited as a comma-separated string; parsed to a list on save.
   const [councilRequiredLabelsInput, setCouncilRequiredLabelsInput] = useState<string>('');
   const [useReviewMd, setUseReviewMd] = useState(true);
   // Feature-level guardrail; defaults to skipping bot PRs (matches the server default).
   const [skipBotPullRequests, setSkipBotPullRequests] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
-  // Webhook sync result from last save
   const [webhookSyncResult, setWebhookSyncResult] = useState<{
     created: number;
     updated: number;
     deleted: number;
     errors: Array<{ projectId: number; error: string; operation: string }>;
   } | null>(null);
-  // Manual webhook configuration state
   const [showManualWebhookSetup, setShowManualWebhookSetup] = useState(false);
   const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
   const [copiedWebhookSecret, setCopiedWebhookSecret] = useState(false);
   const [regeneratedSecret, setRegeneratedSecret] = useState<string | null>(null);
 
-  // Get webhook URL for GitLab
   const webhookUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/webhooks/gitlab`
       : '/api/webhooks/gitlab';
 
-  // Available thinking effort variants for the selected model
   const availableVariants = useMemo(
     () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
     [modelOptions, selectedModel]
@@ -415,7 +404,6 @@ export function ReviewConfigForm({
     }
   };
 
-  // Update local state when config loads
   useEffect(() => {
     if (configData) {
       setIsEnabled(configData.isEnabled);
@@ -482,7 +470,6 @@ export function ReviewConfigForm({
     });
   }, []);
 
-  // Organization mutations
   const orgToggleMutation = useMutation(
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
@@ -501,7 +488,6 @@ export function ReviewConfigForm({
   const orgSaveMutation = useMutation(
     trpc.organizations.reviewAgent.saveReviewConfig.mutationOptions({
       onSuccess: async data => {
-        // Handle webhook sync result for GitLab
         if (data.webhookSync) {
           setWebhookSyncResult(data.webhookSync);
           const { created, updated, deleted, errors } = data.webhookSync;
@@ -529,7 +515,6 @@ export function ReviewConfigForm({
     })
   );
 
-  // Personal mutations
   const personalToggleMutation = useMutation(
     trpc.personalReviewAgent.toggleReviewAgent.mutationOptions({
       onSuccess: async data => {
@@ -548,7 +533,6 @@ export function ReviewConfigForm({
   const personalSaveMutation = useMutation(
     trpc.personalReviewAgent.saveReviewConfig.mutationOptions({
       onSuccess: async data => {
-        // Handle webhook sync result for GitLab
         if (data.webhookSync) {
           setWebhookSyncResult(data.webhookSync);
           const { created, updated, deleted, errors } = data.webhookSync;

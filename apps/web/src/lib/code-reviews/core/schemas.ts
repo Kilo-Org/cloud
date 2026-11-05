@@ -1,10 +1,3 @@
-/**
- * Code Reviews - Zod Validation Schemas
- *
- * Runtime validation schemas for code review inputs.
- * Follows validation patterns used throughout the codebase.
- */
-
 import * as z from 'zod';
 import {
   CODE_REVIEW_PLATFORMS,
@@ -17,13 +10,6 @@ import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
-
-/**
- * Code review status enum
- */
 export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
 
 /**
@@ -32,43 +18,24 @@ export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
  */
 export const CodeReviewTerminalReasonSchema = z.enum(CODE_REVIEW_TERMINAL_REASONS);
 
-// ============================================================================
-// GitHub Webhook Schemas
-// ============================================================================
-
-/**
- * GitHub user schema
- */
 const GitHubUserSchema = z.object({
   login: z.string(),
 });
 
-/**
- * GitHub repository schema
- */
 export const GitHubRepositorySchema = z.object({
   full_name: z.string(),
   private: z.boolean(),
 });
 
-/**
- * GitHub pull request base/head ref schema
- */
 const GitHubRefSchema = z.object({
   ref: z.string(),
   sha: z.string(),
 });
 
-/**
- * GitHub pull request base schema (includes repo)
- */
 const GitHubPullRequestBaseSchema = GitHubRefSchema.extend({
   repo: GitHubRepositorySchema,
 });
 
-/**
- * GitHub pull request schema
- */
 export const GitHubPullRequestSchema = z.object({
   number: z.number().int().positive(),
   html_url: z.string().url(),
@@ -78,10 +45,6 @@ export const GitHubPullRequestSchema = z.object({
   head: GitHubRefSchema,
 });
 
-/**
- * GitHub pull_request webhook payload
- * Actions: opened, synchronize, reopened
- */
 export const CodeReviewWebhookPayloadSchema = z.object({
   action: z.enum(['opened', 'synchronize', 'reopened']),
   pull_request: GitHubPullRequestSchema,
@@ -89,19 +52,9 @@ export const CodeReviewWebhookPayloadSchema = z.object({
   sender: GitHubUserSchema,
 });
 
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
-
-/**
- * Platform type for code reviews
- */
 export const CodeReviewPlatformSchema = z.enum(CODE_REVIEW_PLATFORMS);
 export type CodeReviewPlatform = z.infer<typeof CodeReviewPlatformSchema>;
 
-/**
- * Create review params schema
- */
 export const CreateReviewParamsSchema = z.object({
   owner: OwnerSchema,
   platformIntegrationId: z.string().uuid().optional(),
@@ -123,9 +76,6 @@ export const CreateReviewParamsSchema = z.object({
   triggerSource: CodeReviewTriggerSourceSchema.optional(),
 });
 
-/**
- * Update review status params schema
- */
 export const UpdateReviewStatusParamsSchema = z.object({
   reviewId: z.string().uuid(),
   status: CodeReviewStatusSchema,
@@ -135,9 +85,6 @@ export const UpdateReviewStatusParamsSchema = z.object({
   completedAt: z.date().optional(),
 });
 
-/**
- * List reviews params schema
- */
 export const ListReviewsParamsSchema = z.object({
   owner: OwnerSchema,
   limit: z.number().int().min(1).max(100).default(50),
@@ -147,13 +94,6 @@ export const ListReviewsParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.optional(),
 });
 
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
-
-/**
- * List code reviews input (for organizations)
- */
 export const ListCodeReviewsInputSchema = z.object({
   organizationId: z.string().uuid(),
   limit: z.number().int().min(1).max(100).default(50).optional(),
@@ -163,9 +103,6 @@ export const ListCodeReviewsInputSchema = z.object({
   platform: CodeReviewPlatformSchema.optional(),
 });
 
-/**
- * List code reviews input (for personal users)
- */
 export const ListCodeReviewsForUserInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(50).optional(),
   offset: z.number().int().min(0).default(0).optional(),
@@ -174,34 +111,18 @@ export const ListCodeReviewsForUserInputSchema = z.object({
   platform: CodeReviewPlatformSchema.optional(),
 });
 
-/**
- * Get code review input
- */
 export const GetCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
 });
 
-/**
- * Cancel code review input
- */
 export const CancelCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
 });
 
-/**
- * Retrigger code review input
- */
 export const RetriggerCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
 });
 
-// ============================================================================
-// Trigger Schemas
-// ============================================================================
-
-/**
- * Trigger review params schema
- */
 export const TriggerReviewParamsSchema = z.object({
   reviewId: z.string().uuid(),
   owner: OwnerSchema,
@@ -209,17 +130,9 @@ export const TriggerReviewParamsSchema = z.object({
     .object({
       config: CodeReviewAgentConfigSchema,
     })
-    .passthrough(), // Allow additional fields beyond config
+    .passthrough(),
 });
 
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
-
-/**
- * Infer TypeScript types from Zod schemas for use in function signatures.
- * These provide type safety while keeping schemas as the single source of truth.
- */
 export type CodeReviewStatus = z.infer<typeof CodeReviewStatusSchema>;
 export { OwnerSchema, type Owner };
 export type CreateReviewParams = z.infer<typeof CreateReviewParamsSchema>;

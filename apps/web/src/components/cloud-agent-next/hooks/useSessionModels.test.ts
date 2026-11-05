@@ -1,22 +1,20 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CloudAgentModelOverride, RemoteModelState } from '@kilocode/cloud-agent-sdk';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import type { SessionModelOption } from './useSessionModels';
-
-jest.mock('./useOrganizationModels', () => ({ useOrganizationModels: jest.fn() }));
-jest.mock('./useRememberKnownModel', () => ({ useRememberKnownModel: () => {} }));
-
-const {
+import {
   buildSessionModels,
   createRemoteModelOverride,
   resolveGatewayOrganization,
   useSessionModels,
   validateRemoteModelOverride,
-} = require('./useSessionModels') as typeof import('./useSessionModels');
-const { useOrganizationModels } =
-  require('./useOrganizationModels') as typeof import('./useOrganizationModels');
+  type SessionModelOption,
+} from './useSessionModels';
+import { useOrganizationModels } from './useOrganizationModels';
+
+jest.mock('./useOrganizationModels', () => ({ useOrganizationModels: jest.fn() }));
+jest.mock('./useRememberKnownModel', () => ({ useRememberKnownModel: () => {} }));
 
 const gatewayModels = [
   {

@@ -205,8 +205,8 @@ async function presentDocumentPreview({
   owned: MaterializedRemoteFile | undefined;
   epoch: number;
 }): Promise<DocumentPreviewOutcome> {
-  const source = new File(uri);
-  if (!source.exists) {
+  const source = preparePreviewSource(uri);
+  if (source === null) {
     owned?.delete();
     return 'failed';
   }
@@ -254,6 +254,20 @@ async function presentDocumentPreview({
     registerTempFile(ownedCopy.uri);
   }
   return 'opened';
+}
+
+/**
+ * The file to present, or null when the uri does not name a readable file. A
+ * malformed or stale uri must not throw: both callers hand the outcome to a
+ * toast, never to an unhandled rejection.
+ */
+function preparePreviewSource(uri: string): File | null {
+  try {
+    const file = new File(uri);
+    return file.exists ? file : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

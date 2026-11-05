@@ -298,6 +298,22 @@ describe('previewRemoteDocument', () => {
     expect(registerTempFile).not.toHaveBeenCalled();
   });
 
+  it('reports a failed open instead of throwing on an unreadable uri', async () => {
+    fileSystem.File.mockImplementationOnce(function FileUnreadable() {
+      throw new Error('invalid uri');
+    });
+
+    const outcome = await previewRemoteDocument({
+      key: 'part-16',
+      url: 'file:///cache/session-file-parts/broken',
+      mimeType: 'application/pdf',
+      filename: 'broken.pdf',
+    });
+
+    expect(outcome).toBe('failed');
+    expect(registerTempFile).not.toHaveBeenCalled();
+  });
+
   it('presents a cache copy under the canonical extension when the name has none', async () => {
     const outcome = await previewRemoteDocument({
       key: 'part-13',
@@ -313,7 +329,9 @@ describe('previewRemoteDocument', () => {
     expect(source?.preview).not.toHaveBeenCalled();
     expect(source?.delete).not.toHaveBeenCalled();
     expect(presented?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
-    expect(registerTempFile).toHaveBeenCalledWith('file:///cache/session-file-parts/part-13-summary.pdf');
+    expect(registerTempFile).toHaveBeenCalledWith(
+      'file:///cache/session-file-parts/part-13-summary.pdf'
+    );
   });
 
   it('deletes the canonical copy and skips the viewer when the platform cannot present it', async () => {

@@ -51,10 +51,10 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
 
       # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
-      # off when the prefix holds a runnable copy of the pinned version: a hit
-      # restores that tree, and anything else installs into the same prefix.
-      # A cache failure or a missing entry only costs the registry install, so the
-      # restore never blocks a deploy.
+      # off when the prefix holds a runnable copy of the pinned version. A miss, or
+      # a cache failure, costs the registry install and never blocks a deploy. An
+      # entry that fails the check below is not replaced under an unchanged key, so
+      # it costs that install in every job until the key changes.
       - name: Restore Vercel CLI
         id: vercel-cli-cache
         continue-on-error: true
@@ -76,7 +76,7 @@ jobs:
           installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
 
           # A miss, a different version, or a tree the CLI cannot start from takes
-          # the registry path, so the next job restores a prefix that works.
+          # the registry path.
           if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$VERCEL_VERSION" ] \
             && "$VERCEL_CLI_PREFIX/bin/vercel" --version >/dev/null 2>&1; then
             echo "Restored vercel@$installed from the cache"

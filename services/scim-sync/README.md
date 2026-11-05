@@ -90,11 +90,13 @@ outright when a live subscription exists. The membership routes take the
 `{directoryGroupId, externalId}` pair in the body, including `DELETE`, because a
 membership is identified by two WorkOS identifiers.
 
-Calling them requires `INTERNAL_API_SECRET` in the `x-internal-api-key` header,
-which this Worker does not yet hold. Request bodies are `z.strictObject`, so an
-unknown field is a 400 rather than a silently dropped one — a new field must
-land in `directory-sync-contracts.ts` as optional before the Worker starts
-sending it.
+The endpoints are reached under `BACKEND_API_URL`, which the staging and
+production environments point at `staging-app.kilo.ai` and `app.kilo.ai`
+respectively. Calling them also requires `INTERNAL_API_SECRET` in the
+`x-internal-api-key` header, which this Worker does not yet hold. Request
+bodies are `z.strictObject`, so an unknown field is a 400 rather than a
+silently dropped one — a new field must land in `directory-sync-contracts.ts`
+as optional before the Worker starts sending it.
 
 ### Domain capture
 

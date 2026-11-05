@@ -26,6 +26,7 @@ const ProbeNodeSchema = z.object({
   hitSlop: InsetsSchema.optional(),
   lines: z.number().optional(),
   screenState: z.number().optional(),
+  a11yHidden: z.literal(true).optional(),
   scrollAxes: z.object({ x: z.boolean(), y: z.boolean() }).optional(),
   style: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
@@ -285,6 +286,7 @@ export function contentBox(node: LayoutNode, isRTL: boolean, box: Rect = node.re
 function hidden(node: ProbeNode): boolean {
   return (
     tags.isIgnored(node.tag) ||
+    node.a11yHidden === true ||
     node.style?.display === 'none' ||
     node.style?.opacity === 0 ||
     (tags.isScreen(node.tag) && node.screenState === 0)

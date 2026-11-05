@@ -36,6 +36,22 @@ test('normalize drops invisible subtrees', () => {
   );
 });
 
+test('normalize drops a subtree the app hides from assistive technology', () => {
+  // A covered tab keeps its screen mounted and hides it from screen readers, so
+  // its controls must not take part in measurement either.
+  const layout = normalize(
+    dump([
+      { parent: 0, tag: 'View', rect: [0, 0, 400, 800], a11yHidden: true },
+      { parent: 1, tag: 'View', rect: [0, 60, 70, 48], label: 'Personal' },
+      { parent: 0, tag: 'View', rect: [270, 60, 70, 48], label: 'Personal' },
+    ])
+  );
+  assert.deepEqual(
+    layout.nodes.map(node => node.index),
+    [0, 3]
+  );
+});
+
 test('normalize lifts children of zero-area wrappers and drops clipped-away nodes', () => {
   const layout = normalize(
     dump([

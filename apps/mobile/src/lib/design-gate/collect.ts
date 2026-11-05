@@ -28,6 +28,8 @@ export type ProbeNode = Readonly<{
   hitSlop?: Insets;
   lines?: number;
   screenState?: number;
+  /** The element hides its subtree from assistive technology. */
+  a11yHidden?: true;
   style?: Readonly<Record<string, string | number>>;
 }>;
 
@@ -178,6 +180,13 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
     hitSlop: insets(field(props, 'hitSlop')),
     lines: lines !== undefined && lines > 0 ? lines : undefined,
     screenState: finite(field(props, 'activityState')),
+    // A covered scene hides its subtree this way, so the platform reports only
+    // the scene a sighted user sees; the probe must agree.
+    a11yHidden:
+      field(props, 'importantForAccessibility') === 'no-hide-descendants' ||
+      field(props, 'accessibilityElementsHidden') === true
+        ? true
+        : undefined,
     style: layoutStyle(field(props, 'style')),
   };
 }

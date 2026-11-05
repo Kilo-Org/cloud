@@ -7,7 +7,7 @@
 import { type ReactTestInstance } from '@/test/renderer';
 
 /** The catalog title of the repo-defaults entry the list hosts. */
-export const REPO_DEFAULTS_TITLE = 'Default Profiles for Repos';
+const REPO_DEFAULTS_TITLE = 'Default Profiles for Repos';
 
 /** The profile summary shape the mocked `agentProfiles.list` answers with. */
 export type ProfileSummary = {

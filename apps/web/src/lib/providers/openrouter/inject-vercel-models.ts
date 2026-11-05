@@ -214,26 +214,23 @@ function getVercelOnlyOfferings(
     vercelMetadata: vercelModels,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {
-    const { id, storedModel, catalog } = vercelOnlyModel;
+    const { id, storedModel, pricing } = vercelOnlyModel;
     return {
       model: {
         slug: id,
         name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
         author: id.includes('/') ? id.slice(0, id.indexOf('/')) : 'Other',
-        description: catalog.description,
-        context_length: catalog.context_window,
-        input_modalities: catalog.modalities.input,
-        output_modalities: catalog.modalities.output,
+        description: storedModel.description ?? '',
+        context_length: vercelOnlyModel.contextLength,
+        input_modalities: vercelOnlyModel.inputModalities,
+        output_modalities: vercelOnlyModel.outputModalities,
         group: 'Other',
         updated_at: updatedAt,
         endpoint: null,
       },
       endpoints: storedModel.endpoints.map(endpoint => ({
         ...endpoint,
-        pricing: endpoint.pricing ?? {
-          prompt: catalog.pricing.input,
-          completion: catalog.pricing.output,
-        },
+        pricing: endpoint.pricing ?? pricing,
       })),
       isFree: isFreeModel(id),
     };

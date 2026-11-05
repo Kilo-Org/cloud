@@ -23,11 +23,9 @@ import type { StoredModel } from '@kilocode/db/schema-types';
 import {
   EndpointsSchema,
   ModelsSchema,
-  VercelCatalogSchema,
   VercelModelIdOverridesConfigSchema,
   type VercelModelIdOverride,
 } from '@kilocode/db/schema-types';
-import * as z from 'zod';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -61,10 +59,6 @@ import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-dir
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-const CatalogsSchema = z.object({
-  data: z.array(VercelCatalogSchema.optional().catch(undefined)),
-});
-
 export async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
@@ -78,15 +72,13 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
   if (!modelsResponse.ok) {
     throw new Error(`Fetching models from ${gateway.type} failed: ${modelsResponse.status}`);
   }
-  const body: unknown = await modelsResponse.json();
-  const models = ModelsSchema.parse(body);
-  const catalogs = CatalogsSchema.parse(body).data;
+  const models = ModelsSchema.parse(await modelsResponse.json());
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
   const modelsWithoutEndpoints: string[] = [];
   await Promise.all(
-    models.data.map((model, index) =>
+    models.data.map(model =>
       limit(async () => {
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
@@ -102,9 +94,18 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
             `Fetching model endpoints for ${gateway.type}/${model.id} failed: ${endpointsResponse.status}`
           );
         }
-        const endpoints = EndpointsSchema.parse(await endpointsResponse.json());
-        const { reasoning, ...modelMetadata } = model;
-        const catalog = model.type === 'language' ? catalogs[index] : undefined;
+        const { endpoints, ...endpointsModel } = EndpointsSchema.parse(
+          await endpointsResponse.json()
+        ).data;
+        // Vercel's model list omits the architecture and reasoning its endpoints response has.
+        const { reasoning, ...modelMetadata } = {
+          ...model,
+          description: model.description ?? endpointsModel.description,
+          created: model.created ?? endpointsModel.created,
+          released: model.released ?? endpointsModel.released,
+          architecture: model.architecture ?? endpointsModel.architecture,
+          reasoning: model.reasoning ?? endpointsModel.reasoning,
+        };
         result[model.id] = {
           ...modelMetadata,
           ...(reasoning && {
@@ -115,8 +116,7 @@ export async function fetchGatewayModels(gateway: Provider, modelsPath: string) 
               }),
             },
           }),
-          endpoints: endpoints.data.endpoints,
-          ...(catalog && { catalog }),
+          endpoints,
         };
       })
     )

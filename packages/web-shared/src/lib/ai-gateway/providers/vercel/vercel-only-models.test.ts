@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { StoredModel, VercelCatalog } from '@kilocode/db/schema-types';
+import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
@@ -29,35 +29,29 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
   getVercelModelIdOverrides: jest.fn(),
 }));
 
-function catalog(overrides: Partial<VercelCatalog> = {}): VercelCatalog {
+function endpoint(providerName: string, overrides: Partial<Endpoint> = {}): Endpoint {
   return {
-    description: 'A Vercel model',
-    created: 1_755_815_280,
-    released: 1_790_000_000,
-    context_window: 256_000,
-    max_tokens: 32_000,
-    modalities: { input: ['text', 'image'], output: ['text'] },
+    provider_name: providerName,
+    context_length: 256_000,
+    max_completion_tokens: 32_000,
     supported_parameters: ['max_tokens', 'tools', 'reasoning'],
-    pricing: { input: '0.0000004', output: '0.0000024', input_cache_read: '0.00000004' },
+    pricing: { prompt: '0.0000004', completion: '0.0000024', input_cache_read: '0.00000004' },
     ...overrides,
   };
 }
 
-function storedModel(
-  id: string,
-  {
-    name = id.slice(id.indexOf('/') + 1),
-    type = 'language',
-    endpoints = [{ provider_name: id.slice(0, id.indexOf('/')) }],
-    catalog: modelCatalog = catalog(),
-  }: {
-    name?: string;
-    type?: StoredModel['type'];
-    endpoints?: StoredModel['endpoints'];
-    catalog?: VercelCatalog | null;
-  } = {}
-): StoredModel {
-  return { id, name, type, endpoints, ...(modelCatalog && { catalog: modelCatalog }) };
+function storedModel(id: string, overrides: Partial<StoredModel> = {}): StoredModel {
+  return {
+    id,
+    name: id.slice(id.indexOf('/') + 1),
+    type: 'language',
+    description: 'A Vercel model',
+    created: 1_755_815_280,
+    released: 1_790_000_000,
+    architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
+    endpoints: [endpoint(id.slice(0, id.indexOf('/')))],
+    ...overrides,
+  };
 }
 
 function openRouterModel(id: string, name: string): OpenRouterModel {
@@ -78,35 +72,36 @@ const vercelMetadata: Record<string, StoredModel> = Object.fromEntries(
     storedModel('alibaba/qwen3-max'),
     storedModel('alibaba/qwen3.5-flash', {
       name: 'Qwen3.5 Flash',
-      endpoints: [{ provider_name: 'alibaba' }, { provider_name: 'bedrock' }],
-      catalog: catalog({
-        released: 1_790_000_100,
-        reasoning_options: [
-          { type: 'budget_tokens' },
-          { type: 'effort', values: ['instant', 'low', 'high'] },
-        ],
-      }),
+      released: 1_790_000_100,
+      reasoning: { mandatory: false, supported_efforts: ['low', 'high'] },
+      endpoints: [
+        endpoint('alibaba'),
+        endpoint('bedrock', {
+          context_length: 1_000_000,
+          supported_parameters: ['max_tokens', 'temperature'],
+        }),
+      ],
     }),
     storedModel('openai/gpt-5-fast', {
       name: 'GPT-5 (Fast)',
-      catalog: catalog({
-        released: undefined,
-        pricing: { input: '0.0000025', output: '0.00002', input_cache_write: '0.000003' },
-        deprecated_at: Date.UTC(2027, 0, 15),
-        reasoning_options: [{ type: 'unknown' }],
-      }),
+      released: undefined,
+      endpoints: [
+        endpoint('openai', {
+          pricing: { prompt: '0.0000025', completion: '0.00002', input_cache_write: '0.000003' },
+        }),
+      ],
     }),
     storedModel('reflection/beam-free', {
       name: 'Beam (Free)',
-      catalog: catalog({ released: 1_780_000_000, pricing: { input: '0', output: '0' } }),
+      released: 1_780_000_000,
+      endpoints: [endpoint('reflection', { pricing: { prompt: '0', completion: '0' } })],
     }),
     storedModel('openai/gpt-5-codex'),
     storedModel('anthropic/claude-opus-5-fast'),
     storedModel('openai/text-embedding-3-small', { type: 'embedding' }),
-    storedModel('quiverai/arrow-2-video', {
-      catalog: catalog({ modalities: { input: ['text'], output: ['video'] } }),
-    }),
-    storedModel('meta/llama-4-scout', { catalog: null }),
+    storedModel('quiverai/arrow-2-video', { architecture: { output_modalities: ['video'] } }),
+    storedModel('meta/llama-4-scout', { architecture: undefined }),
+    storedModel('vendor/unpriced', { endpoints: [endpoint('vendor', { pricing: undefined })] }),
   ].map(model => [model.id, model])
 );
 
@@ -203,7 +198,7 @@ describe('getVercelOnlyCatalogModels', () => {
       },
       top_provider: {
         is_moderated: false,
-        context_length: 256_000,
+        context_length: 1_000_000,
         max_completion_tokens: 32_000,
       },
       pricing: {
@@ -211,12 +206,11 @@ describe('getVercelOnlyCatalogModels', () => {
         completion: '0.0000024',
         input_cache_read: '0.00000004',
       },
-      context_length: 256_000,
-      supported_parameters: ['max_tokens', 'tools', 'reasoning'],
-      expiration_date: undefined,
+      context_length: 1_000_000,
+      supported_parameters: ['max_tokens', 'tools', 'reasoning', 'temperature'],
       opencode: {
         ai_sdk_provider: undefined,
-        reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+        reasoning_options: [{ type: 'effort', values: ['none', 'low', 'high'] }],
         variants: {
           none: { reasoning: { enabled: false, effort: 'none' } },
           low: { reasoning: { enabled: true, effort: 'low' } },
@@ -235,7 +229,6 @@ describe('getVercelOnlyCatalogModels', () => {
       name: 'OpenAI: GPT-5 (Fast)',
       created: 1_755_815_280,
       pricing: { prompt: '0.0000025', completion: '0.00002', input_cache_write: '0.000003' },
-      expiration_date: '2027-01-15',
       opencode: undefined,
     });
   });
@@ -243,7 +236,7 @@ describe('getVercelOnlyCatalogModels', () => {
   it('keeps a Claude model when a provider other than Anthropic serves it', async () => {
     jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
       'anthropic/claude-opus-5-fast': storedModel('anthropic/claude-opus-5-fast', {
-        endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+        endpoints: [endpoint('anthropic'), endpoint('bedrock')],
       }),
     });
 

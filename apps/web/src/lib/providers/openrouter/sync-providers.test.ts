@@ -21,7 +21,8 @@ const listedModelIds = [
 
 function mockGateway(
   endpointsStatus: (modelId: string) => number,
-  listedModel: (id: string) => Record<string, unknown> = id => ({ id, name: id })
+  listedModel: (id: string) => Record<string, unknown> = id => ({ id, name: id }),
+  endpointsModel: Record<string, unknown> = {}
 ) {
   return jest.spyOn(global, 'fetch').mockImplementation(async input => {
     const url = String(input);
@@ -31,7 +32,7 @@ function mockGateway(
     const modelId = url.slice(`${gateway.apiUrl}/models/`.length, -'/endpoints'.length);
     const status = endpointsStatus(modelId);
     if (status !== 200) return new Response(null, { status });
-    return Response.json({ data: { endpoints: [{ provider_name: 'test' }] } });
+    return Response.json({ data: { ...endpointsModel, endpoints: [{ provider_name: 'test' }] } });
   });
 }
 
@@ -52,33 +53,39 @@ describe('fetchGatewayModels', () => {
     expect(models['test/model-0']?.endpoints).toEqual([{ provider_name: 'test' }]);
   });
 
-  it('stores the Vercel catalog fields of language models only', async () => {
-    const catalog = {
-      description: 'A model',
-      created: 1_790_000_000,
-      context_window: 128_000,
-      modalities: { input: ['text'], output: ['text'] },
-      pricing: { input: '0.000001', output: '0.000002' },
-      reasoning_options: [{ type: 'toggle' }],
-    };
+  it('fills model fields the model list lacks from the endpoints response', async () => {
     mockGateway(
       () => 200,
       id => ({
         id,
         name: id,
-        type: id === 'test/model-1' ? 'embedding' : 'language',
+        type: 'language',
         owned_by: 'test',
-        ...(id !== 'test/model-2' && catalog),
-      })
+        description: 'Listed description',
+        created: 1_755_815_280,
+      }),
+      {
+        description: 'Endpoints description',
+        released: 1_790_000_000,
+        architecture: { input_modalities: ['text', 'file'], output_modalities: ['text'] },
+        reasoning: { supported_efforts: ['low', 'high'] },
+      }
     );
     jest.spyOn(console, 'debug').mockImplementation(() => {});
 
     const models = await fetchGatewayModels(gateway, '/models');
 
-    expect(models['test/model-0']?.catalog).toEqual(catalog);
-    expect(models['test/model-1']).not.toHaveProperty('catalog');
-    expect(models['test/model-2']).not.toHaveProperty('catalog');
-    expect(models['test/model-0']).not.toHaveProperty('owned_by');
+    expect(models['test/model-0']).toEqual({
+      id: 'test/model-0',
+      name: 'test/model-0',
+      type: 'language',
+      description: 'Listed description',
+      created: 1_755_815_280,
+      released: 1_790_000_000,
+      architecture: { input_modalities: ['text', 'file'], output_modalities: ['text'] },
+      reasoning: { mandatory: false, supported_efforts: ['low', 'high'] },
+      endpoints: [{ provider_name: 'test' }],
+    });
   });
 
   it('fails on other endpoint errors', async () => {

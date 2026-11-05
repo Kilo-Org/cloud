@@ -392,13 +392,11 @@ describe('injectVercelModels with providers only Vercel lists', () => {
 });
 
 describe('injectVercelModels with models only Vercel serves', () => {
-  const catalog = {
+  const described = {
     description: 'Qwen3.5 Flash description',
-    created: 1_790_000_000,
-    context_window: 1_000_000,
-    modalities: { input: ['text', 'image'], output: ['text'] },
-    pricing: { input: '0.0000001', output: '0.0000004' },
+    architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
   };
+  const freePricing = { prompt: '0', completion: '0' };
 
   function providerModelData() {
     return [
@@ -420,7 +418,7 @@ describe('injectVercelModels with models only Vercel serves', () => {
         id: 'alibaba/qwen3.5-flash',
         name: 'Qwen3.5 Flash',
         type: 'language',
-        catalog,
+        ...described,
         endpoints: [
           {
             provider_name: 'bedrock',
@@ -436,8 +434,8 @@ describe('injectVercelModels with models only Vercel serves', () => {
         id: 'alibaba/qwen3-max',
         name: 'Qwen3 Max',
         type: 'language',
-        catalog,
-        endpoints: [{ provider_name: 'alibaba' }],
+        ...described,
+        endpoints: [{ provider_name: 'alibaba', context_length: 128_000, pricing: freePricing }],
       },
     };
 
@@ -475,9 +473,45 @@ describe('injectVercelModels with models only Vercel serves', () => {
       },
     ]);
     expect(data[1]?.provider.dataPolicy).toMatchObject({ training: true, retainsPrompts: true });
+    // An endpoint without prices takes the first endpoint's.
     expect(data[1]?.models.map(model => [model.slug, model.endpoint?.pricing])).toEqual([
-      ['qwen/qwen3.5-flash', { prompt: '0.0000001', completion: '0.0000004' }],
+      ['qwen/qwen3.5-flash', { prompt: '0.0000002', completion: '0.0000008' }],
     ]);
+  });
+
+  test('skips a Vercel-only model without architecture, prices, or context', () => {
+    const data = providerModelData();
+    const endpoint = { provider_name: 'runinfra', context_length: 128_000, pricing: freePricing };
+    injectVercelModels({
+      vercelModels: Object.fromEntries(
+        [
+          { id: 'runinfra/no-architecture', endpoints: [endpoint] },
+          {
+            id: 'runinfra/no-pricing',
+            ...described,
+            endpoints: [{ ...endpoint, pricing: undefined }],
+          },
+          {
+            id: 'runinfra/no-context',
+            ...described,
+            endpoints: [{ ...endpoint, context_length: undefined }],
+          },
+          {
+            id: 'runinfra/video',
+            ...described,
+            architecture: { output_modalities: ['video'] },
+            endpoints: [endpoint],
+          },
+        ].map(model => [model.id, { name: model.id, type: 'language' as const, ...model }])
+      ),
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data.map(({ provider }) => provider.slug)).toEqual(['amazon-bedrock']);
   });
 
   test('marks a free Vercel-only model free and assumes it trains on prompts', () => {
@@ -488,11 +522,12 @@ describe('injectVercelModels with models only Vercel serves', () => {
           id: 'reflection/beam-free',
           name: 'Beam (Free)',
           type: 'language',
-          catalog: { ...catalog, pricing: { input: '0', output: '0' } },
+          ...described,
           endpoints: [
             {
               provider_name: 'reflection',
-              pricing: { prompt: '0', completion: '0' },
+              context_length: 128_000,
+              pricing: freePricing,
               has_zdr: true,
               has_no_training: true,
             },
@@ -527,8 +562,16 @@ describe('injectVercelModels with models only Vercel serves', () => {
           id: 'reflection/beam-free',
           name: 'Beam (Free)',
           type: 'language',
-          catalog: { ...catalog, pricing: { input: '0', output: '0' } },
-          endpoints: [{ provider_name: 'bedrock', has_zdr: true, has_no_training: true }],
+          ...described,
+          endpoints: [
+            {
+              provider_name: 'bedrock',
+              context_length: 128_000,
+              pricing: freePricing,
+              has_zdr: true,
+              has_no_training: true,
+            },
+          ],
         },
       },
       openRouterCatalogModels: [],
@@ -570,8 +613,16 @@ describe('injectVercelModels with models only Vercel serves', () => {
           id: 'runinfra/fast-1',
           name: 'Fast 1',
           type: 'language',
-          catalog,
-          endpoints: [{ provider_name: 'runinfra', has_zdr: true, has_no_training: true }],
+          ...described,
+          endpoints: [
+            {
+              provider_name: 'runinfra',
+              context_length: 128_000,
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+              has_zdr: true,
+              has_no_training: true,
+            },
+          ],
         },
       },
       openRouterCatalogModels: [],

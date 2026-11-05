@@ -3209,7 +3209,29 @@ export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
 
 // --- StoredModel ---
 
-export const ModelSchema = z.object({
+const ModelDescriptionSchema = z.object({
+  description: z.string().optional().catch(undefined),
+  /** Seconds since the epoch. Vercel sets it to when it added the model, often a backfill date. */
+  created: z.number().optional().catch(undefined),
+  /** Seconds since the epoch; only Vercel AI Gateway sets the release date. */
+  released: z.number().optional().catch(undefined),
+  architecture: z
+    .object({
+      input_modalities: z.array(z.string()).optional().catch(undefined),
+      output_modalities: z.array(z.string()),
+    })
+    .optional()
+    .catch(undefined),
+  reasoning: z
+    .object({
+      mandatory: z.boolean().default(false),
+      supported_efforts: z.array(ReasoningEffortSchema).optional(),
+    })
+    .optional()
+    .catch(undefined),
+});
+
+export const ModelSchema = ModelDescriptionSchema.extend({
   id: z.string(),
   name: z.string(),
   // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
@@ -3230,19 +3252,6 @@ export const ModelSchema = z.object({
   alias_target: z
     .object({
       slug: z.string().min(1),
-    })
-    .optional()
-    .catch(undefined),
-  architecture: z
-    .object({
-      output_modalities: z.array(z.string()),
-    })
-    .optional()
-    .catch(undefined),
-  reasoning: z
-    .object({
-      mandatory: z.boolean(),
-      supported_efforts: z.array(ReasoningEffortSchema).optional(),
     })
     .optional()
     .catch(undefined),
@@ -3267,6 +3276,8 @@ export const EndpointSchema = z.object({
       discount: z.number().optional(),
     })
     .optional(),
+  max_completion_tokens: z.number().nullable().optional().catch(undefined),
+  supported_parameters: z.array(z.string()).optional().catch(undefined),
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
@@ -3274,58 +3285,14 @@ export const EndpointSchema = z.object({
 
 export type Endpoint = z.infer<typeof EndpointSchema>;
 
+/** Both gateways describe the model again next to its endpoints, in OpenRouter's format. */
 export const EndpointsSchema = z.object({
-  data: z.object({ endpoints: z.array(EndpointSchema) }),
+  data: ModelDescriptionSchema.extend({ endpoints: z.array(EndpointSchema) }),
 });
-
-/**
- * The Vercel AI Gateway model list fields that describe a language model, so Kilo can list models
- * that only Vercel serves. OpenRouter models do not have this shape.
- */
-export const VercelCatalogSchema = z.object({
-  description: z.string().catch(''),
-  created: z.number(),
-  released: z.number().optional().catch(undefined),
-  context_window: z.number(),
-  max_tokens: z.number().optional().catch(undefined),
-  modalities: z.object({
-    input: z.array(z.string()),
-    output: z.array(z.string()),
-  }),
-  supported_parameters: z.array(z.string()).optional().catch(undefined),
-  pricing: z.object({
-    input: z.string(),
-    output: z.string(),
-    input_cache_read: z.string().optional().catch(undefined),
-    input_cache_write: z.string().optional().catch(undefined),
-  }),
-  /** Milliseconds since the epoch. */
-  deprecated_at: z
-    .number()
-    .int()
-    .min(0)
-    .max(Date.UTC(9999, 11, 31))
-    .nullable()
-    .optional()
-    .catch(undefined),
-  reasoning_options: z
-    .array(
-      z.object({
-        type: z.string(),
-        values: z.array(z.string()).optional().catch(undefined),
-      })
-    )
-    .optional()
-    .catch(undefined),
-});
-
-export type VercelCatalog = z.infer<typeof VercelCatalogSchema>;
 
 export const StoredModelSchema = ModelSchema.and(
   z.object({
     endpoints: z.array(EndpointSchema),
-    /** Set on Vercel language models only. */
-    catalog: VercelCatalogSchema.optional().catch(undefined),
   })
 );
 

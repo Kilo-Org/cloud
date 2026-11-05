@@ -5,12 +5,12 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import { GET } from './route';
 
 jest.mock('@/lib/organizations/organization-auth');
 
-const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
+const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContextOrSupport);
 
 async function request(organizationId: string) {
   const organization = await getOrganizationById(organizationId);

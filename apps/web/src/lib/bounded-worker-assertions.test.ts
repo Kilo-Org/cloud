@@ -260,8 +260,8 @@ const operations: WorkerOperation[] = [
         credentialVersion: 1,
       }),
     },
-    invoke: () => {
-      __resetGitHubUserAccessTokenClientForTests();
+    invoke: async () => {
+      await __resetGitHubUserAccessTokenClientForTests();
       return getGitHubUserAccessToken(userId, { op: 'fetch' });
     },
   },
@@ -308,9 +308,9 @@ const operations: WorkerOperation[] = [
 ];
 
 describe('bounded Worker assertions', () => {
-  afterEach(() => {
+  afterEach(async () => {
     jest.restoreAllMocks();
-    __resetGitHubUserAccessTokenClientForTests();
+    await __resetGitHubUserAccessTokenClientForTests();
     if (originalBoundedTokenFlag === undefined) {
       delete process.env[boundedTokenFlag];
     } else {

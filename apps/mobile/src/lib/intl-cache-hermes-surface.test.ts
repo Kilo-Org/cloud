@@ -42,6 +42,7 @@ describe('Hermes Intl surface', () => {
         expect(format.formatPercent(0.5, language)).toBeTruthy();
         expect(format.formatList(['a', 'b', 'c'], language)).toBeTruthy();
         expect(format.formatDuration(3725, language)).toBeTruthy();
+        expect(format.formatDurationIncludingZero(0, language)).toBeTruthy();
         expect(format.formatFileSize(2048, language)).toBeTruthy();
         expect(format.firstGrapheme('👍🏽x', language)).toBe('👍🏽');
         expect(format.formatDate(new Date(0), language)).toBeTruthy();

@@ -87,6 +87,11 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "SESSION_SYNC_SECRET_PROD",
     },
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -95,6 +100,8 @@
         "class_name": "SessionSyncDO",
       },
       { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
+      { "name": "SESSION_RELAY_DO", "class_name": "SessionRelayDO" },
+      { "name": "SESSION_PRESENCE_DO", "class_name": "SessionPresenceDO" },
     ],
   },
   "migrations": [
@@ -103,6 +110,7 @@
       "new_sqlite_classes": ["SessionSyncDO"],
     },
     { "tag": "v2", "new_sqlite_classes": ["SessionSyncTenantDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["SessionRelayDO", "SessionPresenceDO"] },
   ],
   "r2_buckets": [
     {
@@ -169,6 +177,8 @@
             "class_name": "SessionSyncDO",
           },
           { "name": "SESSION_SYNC_TENANT_DO", "class_name": "SessionSyncTenantDO" },
+          { "name": "SESSION_RELAY_DO", "class_name": "SessionRelayDO" },
+          { "name": "SESSION_PRESENCE_DO", "class_name": "SessionPresenceDO" },
         ],
       },
       "r2_buckets": [

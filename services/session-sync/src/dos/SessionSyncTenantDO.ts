@@ -1,10 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 
 import migrations from '../../drizzle-tenant/migrations';
-import { usage } from '../db/tenant-sqlite-schema';
+import { createdSessions, leases, usage, userErasure } from '../db/tenant-sqlite-schema';
 import type { Env } from '../env';
 import {
   LIMITS,
@@ -15,6 +16,7 @@ import {
   type Result,
   type Tenant,
 } from '../protocol';
+import * as erasure from './session-sync/user-erasure';
 
 const inputSchema = z.strictObject({
   tenant: tenantSchema,
@@ -33,14 +35,17 @@ function configured(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
-/** Serializes session admission and byte leases for one tenant. */
+/** Serializes tenant admission; the personal tenant also owns its creator's erasure index. */
 export class SessionSyncTenantDO extends DurableObject<Env> {
+  private db;
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    const db = drizzle(ctx.storage, { logger: false });
+    this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(db, migrations);
-      db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
+      await migrate(this.db, migrations);
+      this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
+      await erasure.schedule(this.db, ctx);
     });
   }
 
@@ -60,27 +65,22 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
       ),
     };
     return this.ctx.storage.transactionSync(() => {
-      const sql = this.ctx.storage.sql;
-      const prior = sql
-        .exec<{ bytes: number }>('SELECT bytes FROM leases WHERE session_id = ?', sessionID)
-        .toArray()[0];
-      const usage = sql
-        .exec<{ sessions: number; bytes: number }>('SELECT sessions, bytes FROM usage WHERE id = 1')
-        .one();
-      const sessions = usage.sessions + (prior ? 0 : 1);
-      const total = usage.bytes + bytes - (prior?.bytes ?? 0);
+      const prior = this.db.select().from(leases).where(eq(leases.session_id, sessionID)).get();
+      const used = this.db.select().from(usage).where(eq(usage.id, 1)).get();
+      if (!used) throw new Error('Tenant usage is missing');
+      const sessions = used.sessions + (prior ? 0 : 1);
+      const total = used.bytes + bytes - (prior?.bytes ?? 0);
       if (
         (!prior && sessions > limits.sessions) ||
         (bytes > (prior?.bytes ?? 0) && total > limits.bytes)
-      ) {
+      )
         return fail('tenant_budget_exceeded', 'The tenant storage budget is exhausted', limits);
-      }
-      sql.exec(
-        'INSERT INTO leases VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET bytes = excluded.bytes',
-        sessionID,
-        bytes
-      );
-      sql.exec('UPDATE usage SET sessions = ?, bytes = ? WHERE id = 1', sessions, total);
+      this.db
+        .insert(leases)
+        .values({ session_id: sessionID, bytes })
+        .onConflictDoUpdate({ target: leases.session_id, set: { bytes } })
+        .run();
+      this.db.update(usage).set({ sessions, bytes: total }).where(eq(usage.id, 1)).run();
       return ok({ bytes });
     });
   }
@@ -89,20 +89,91 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     const parsed = inputSchema.safeParse(input);
     if (!parsed.success) return fail('invalid_request', 'Invalid tenant lease');
     return this.ctx.storage.transactionSync(() => {
-      const sql = this.ctx.storage.sql;
-      const prior = sql
-        .exec<{ bytes: number }>(
-          'DELETE FROM leases WHERE session_id = ? RETURNING bytes',
-          parsed.data.sessionID
-        )
-        .toArray()[0];
-      if (prior)
-        sql.exec(
-          'UPDATE usage SET sessions = sessions - 1, bytes = bytes - ? WHERE id = 1',
-          prior.bytes
-        );
+      const prior = this.db
+        .delete(leases)
+        .where(eq(leases.session_id, parsed.data.sessionID))
+        .returning()
+        .get();
+      if (prior) {
+        const used = this.db.select().from(usage).where(eq(usage.id, 1)).get();
+        if (!used) throw new Error('Tenant usage is missing');
+        this.db
+          .update(usage)
+          .set({ sessions: used.sessions - 1, bytes: used.bytes - prior.bytes })
+          .where(eq(usage.id, 1))
+          .run();
+      }
       return ok(null);
     });
+  }
+
+  async trackCreatedSession(input: unknown): Promise<Result<null>> {
+    return erasure.track(this.db, input);
+  }
+
+  async forgetCreatedSession(input: unknown): Promise<Result<null>> {
+    const parsed = inputSchema.safeParse(input);
+    if (!parsed.success) return fail('invalid_request', 'Invalid creator index entry');
+    const { tenant, sessionID } = parsed.data;
+    this.db
+      .delete(createdSessions)
+      .where(eq(createdSessions.target, JSON.stringify([tenant.type, tenant.id, sessionID])))
+      .run();
+    return ok(null);
+  }
+
+  async listCreatedSessions(input: unknown) {
+    const parsed = z
+      .strictObject({
+        limit: z.number().int().min(1).max(100),
+        before: z
+          .strictObject({
+            createdAt: z.number().int().nonnegative(),
+            target: z.string().max(2048),
+          })
+          .optional(),
+      })
+      .safeParse(input);
+    if (!parsed.success) return fail('invalid_request', 'Invalid session list page');
+    if (this.db.select().from(userErasure).get()) {
+      return ok({ items: [], next: null });
+    }
+    const { before, limit } = parsed.data;
+    const rows = this.db
+      .select()
+      .from(createdSessions)
+      .where(
+        before
+          ? or(
+              lt(createdSessions.created_at, before.createdAt),
+              and(
+                eq(createdSessions.created_at, before.createdAt),
+                lt(createdSessions.target, before.target)
+              )
+            )
+          : undefined
+      )
+      .orderBy(desc(createdSessions.created_at), desc(createdSessions.target))
+      .limit(limit + 1)
+      .all();
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return ok({
+      items: items.map(row => ({
+        sessionID: row.session_id,
+        tenant: { type: row.tenant_type, id: row.tenant_id },
+        createdAt: row.created_at,
+      })),
+      next:
+        rows.length > limit && last ? { createdAt: last.created_at, target: last.target } : null,
+    });
+  }
+  async eraseUser(input: unknown): Promise<Result<null>> {
+    return erasure.begin(this.db, this.ctx, input);
+  }
+
+  override async alarm(): Promise<void> {
+    await erasure.alarm(this.db, this.ctx, this.env);
   }
 }
 

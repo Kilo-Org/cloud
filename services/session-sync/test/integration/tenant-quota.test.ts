@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 
 import tenantMigrations from '../../drizzle-tenant/migrations';
 import { session } from '../../src/db/sqlite-schema';
+import { createdSessions } from '../../src/db/tenant-sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
@@ -14,14 +15,17 @@ import { batch, client, newSessionID, personal, testEnv } from '../helpers';
 async function loseTenantResponse(
   stub: DurableObjectStub<SessionSyncDO>,
   tenant: Tenant,
-  operation: 'reserve' | 'release' = 'reserve'
+  operation: 'reserve' | 'release' | 'trackCreatedSession' = 'reserve'
 ) {
   await runInDurableObject(stub, instance => {
     const exposed = instance as unknown as { env: Env; reservationFaultInjected: boolean };
     const namespace = exposed.env.SESSION_SYNC_TENANT_DO;
     const realTenant = getTenantStub(testEnv, tenant);
     let lost = false;
-    const invoke = async (method: 'reserve' | 'release', input: unknown) => {
+    const invoke = async (
+      method: 'reserve' | 'release' | 'trackCreatedSession',
+      input: unknown
+    ) => {
       const result = await realTenant[method](input);
       if (method === operation && !lost) {
         lost = true;
@@ -37,6 +41,8 @@ async function loseTenantResponse(
         get: () => ({
           reserve: (input: unknown) => invoke('reserve', input),
           release: (input: unknown) => invoke('release', input),
+          trackCreatedSession: (input: unknown) => invoke('trackCreatedSession', input),
+          forgetCreatedSession: (input: unknown) => realTenant.forgetCreatedSession(input),
         }),
       } as unknown as Env['SESSION_SYNC_TENANT_DO'],
     };
@@ -176,7 +182,12 @@ it('returns retryable tenant failures without resetting the session or losing re
       ...exposed.env,
       SESSION_SYNC_TENANT_DO: {
         idFromName: namespace.idFromName.bind(namespace),
-        get: () => ({ reserve: unavailable, release: unavailable }),
+        get: () => ({
+          reserve: unavailable,
+          release: unavailable,
+          trackCreatedSession: unavailable,
+          forgetCreatedSession: unavailable,
+        }),
       } as unknown as Env['SESSION_SYNC_TENANT_DO'],
     };
   });
@@ -361,6 +372,7 @@ it.each([false, true])(
         expect(await state.storage.get('pendingRegistration')).toEqual({
           tenant: principal.tenant,
           sessionID,
+          creatorID: principal.userID,
         });
         expect(await state.storage.getAlarm()).not.toBeNull();
         expect(drizzle(state.storage).select().from(session).get()).toBeUndefined();
@@ -450,10 +462,12 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     const sql = state.storage.sql;
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(1);
+    ).toBe(tenantMigrations.journal.entries.length);
     // Recreate the raw-table layout used by earlier, never-deployed local fixtures.
     sql.exec('DROP TABLE leases');
     sql.exec('DROP TABLE usage');
+    sql.exec('DROP TABLE created_sessions');
+    sql.exec('DROP TABLE user_erasure');
     sql.exec('DROP TABLE __drizzle_migrations');
     sql.exec('CREATE TABLE leases (session_id TEXT PRIMARY KEY, bytes INTEGER NOT NULL)');
     sql.exec(
@@ -475,7 +489,7 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     });
     expect(
       sql.exec<{ count: number }>('SELECT COUNT(*) AS count FROM __drizzle_migrations').one().count
-    ).toBe(1);
+    ).toBe(tenantMigrations.journal.entries.length);
   });
   expect(await stub.reserve({ tenant, sessionID: newSessionID(), bytes: 256 })).toEqual({
     ok: true,
@@ -488,3 +502,42 @@ it('adopts the old local tenant tables without rewriting leases or usage', async
     });
   });
 });
+
+it.each([false, true])(
+  'cleans a creator index whose registration response was lost (restart: %s)',
+  async restart => {
+    const principal = personal(`lost-index-${crypto.randomUUID()}`);
+    const sessionID = newSessionID();
+    let stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    const tenant = getTenantStub(testEnv, principal.tenant);
+    await loseTenantResponse(stub, principal.tenant, 'trackCreatedSession');
+    expect((await client(principal).register(sessionID, crypto.randomUUID())).status).toBe(503);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('pendingRegistration')).toMatchObject({
+        sessionID,
+        creatorID: principal.userID,
+      });
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      expect(drizzle(state.storage).select().from(session).get()).toBeUndefined();
+    });
+    await runInDurableObject(tenant, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(createdSessions).all()).toHaveLength(1);
+    });
+    if (restart) {
+      await expect(
+        runInDurableObject(stub, (_instance, state) =>
+          state.abort('Synthetic creator-index restart')
+        )
+      ).rejects.toThrow();
+      stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+    }
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await runInDurableObject(tenant, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(createdSessions).all()).toHaveLength(0);
+      expect(state.storage.sql.exec('SELECT sessions, bytes FROM usage').one()).toEqual({
+        sessions: 0,
+        bytes: 0,
+      });
+    });
+  }
+);

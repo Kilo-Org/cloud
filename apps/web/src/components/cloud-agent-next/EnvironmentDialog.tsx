@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ChevronRight, Loader2, Terminal, KeyRound } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Play, Terminal, KeyRound } from 'lucide-react';
 import {
   ENVIRONMENT_LIMITS,
   validateEnvironmentCommands,
@@ -109,7 +109,7 @@ type EnvironmentFormProps = Omit<
   EnvironmentDialogProps,
   'open' | 'onOpenChange' | 'environmentId'
 > & { existing: EnvironmentResponse | undefined };
-type EditorPage = 'overview' | 'scripts' | 'variables';
+type EditorPage = 'overview' | 'scripts' | 'start' | 'variables';
 
 function EnvironmentForm({
   organizationId,
@@ -160,6 +160,10 @@ function EnvironmentForm({
   const [script, setScript] = useState(initialScript);
   // Leave existing scripts untouched when saving only variables or the sandbox size.
   const commands = existing && script === initialScript ? undefined : toEnvironmentCommands(script);
+  const [initialStartScript] = useState(() => toEnvironmentScript(existing?.startCommands ?? []));
+  const [startScript, setStartScript] = useState(initialStartScript);
+  const startCommands =
+    existing && startScript === initialStartScript ? undefined : toEnvironmentCommands(startScript);
   // Retain the baseline shown when editing starts, even if queries refresh in the background.
   const [savedVariables] = useState(() => ({
     plainVars: existing?.plainVars ?? [],
@@ -174,11 +178,12 @@ function EnvironmentForm({
       {
         name: existing?.name ?? defaultName,
         script: initialScript,
+        startScript: initialStartScript,
         variablesText: initialVariablesText,
         sandboxAllocation: initialSandboxAllocation,
         networkAccess: initialNetworkAccess,
       },
-      { name: savedName, script, variablesText, sandboxAllocation, networkAccess }
+      { name: savedName, script, startScript, variablesText, sandboxAllocation, networkAccess }
     ) || repositoriesChanged;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
@@ -194,6 +199,7 @@ function EnvironmentForm({
   }
   const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
   const hasScript = script.trim().length > 0;
+  const hasStartScript = startScript.trim().length > 0;
   const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
   const changePage = (next: EditorPage) => {
     setError(null);
@@ -217,6 +223,7 @@ function EnvironmentForm({
     try {
       validateEnvironmentName(savedName);
       validateEnvironmentCommands(commands);
+      validateEnvironmentCommands(startCommands, 'Start');
       if (existing) {
         await updateEnvironment.mutateAsync({
           organizationId,
@@ -226,6 +233,7 @@ function EnvironmentForm({
           plainVars: variables.plainVars,
           secrets: variables.secrets,
           commands,
+          startCommands,
           sandboxAllocation,
           ...egress.policy,
         });
@@ -247,6 +255,7 @@ function EnvironmentForm({
           plainVars: variables.plainVars,
           secrets,
           commands,
+          startCommands,
           sandboxAllocation,
           ...egress.policy,
         });
@@ -287,15 +296,17 @@ function EnvironmentForm({
           <DialogTitle>
             {page === 'scripts'
               ? 'Setup script'
-              : page === 'variables'
-                ? 'Environment variables'
-                : existing
-                  ? 'Environment'
-                  : 'Set up environment'}
+              : page === 'start'
+                ? 'Start script'
+                : page === 'variables'
+                  ? 'Environment variables'
+                  : existing
+                    ? 'Environment'
+                    : 'Set up environment'}
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure repositories, setup scripts, and environment variables.
+          Configure repositories, setup and start scripts, and environment variables.
         </DialogDescription>
         {!canManage && (
           <p className="text-muted-foreground text-xs">
@@ -359,6 +370,16 @@ function EnvironmentForm({
                   onClick={() => changePage('scripts')}
                 />
                 <EditorRow
+                  icon={<Play className="size-4" />}
+                  label="Start script"
+                  detail={
+                    hasStartScript
+                      ? 'Configure your start script'
+                      : 'Start services when a workspace starts'
+                  }
+                  onClick={() => changePage('start')}
+                />
+                <EditorRow
                   icon={<KeyRound className="size-4" />}
                   label="Environment variables"
                   detail={
@@ -375,6 +396,14 @@ function EnvironmentForm({
           )}
           {page === 'scripts' && (
             <EnvironmentScriptsEditor script={script} onChange={setScript} readOnly={!canManage} />
+          )}
+          {page === 'start' && (
+            <EnvironmentScriptsEditor
+              kind="start"
+              script={startScript}
+              onChange={setStartScript}
+              readOnly={!canManage}
+            />
           )}
           {page === 'variables' && (
             <EnvironmentVariablesEditor

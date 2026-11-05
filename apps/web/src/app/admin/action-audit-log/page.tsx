@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
@@ -12,8 +12,11 @@ const breadcrumbs = (
 );
 
 export default async function AdminActionAuditLogPage() {
-  const { user } = await getUserFromAuth({ adminOnly: true });
-  if (!user || !userIsSuperadmin(user)) {
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
+  }
+  if (!userIsSuperadmin(adminAccess.user)) {
     redirect('/admin/unauthorized');
   }
 

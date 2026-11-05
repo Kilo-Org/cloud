@@ -118,6 +118,11 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
     isPending: status.pending,
   }),
 }));
+// The start carries one operation key per draft; the real hook reads it from
+// expo-crypto, which this failure-copy suite does not need.
+vi.mock('@/lib/operation-key', () => ({
+  useHoistedOperationKey: () => ({ getKey: () => 'op-key', rotateKey: vi.fn() }),
+}));
 
 function findAllOfType(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => String(node.type) === type);

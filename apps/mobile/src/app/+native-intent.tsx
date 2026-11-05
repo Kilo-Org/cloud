@@ -5,10 +5,12 @@ import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
+import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
+import { handleRenderRecoveryFixturePath } from '@/lib/render-recovery-fixture';
 import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
 // Composes the native-intent concerns in order: the share-extension check
@@ -53,6 +55,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (handlePrReviewInstanceFixturePath(path)) {
       return null;
     }
+    // Dev-only Run on sheet, opened with the bridge the composer writes
+    // (`dev/instance-picker-fixture/<state>` under the development scheme).
+    const instancePickerRoute = instancePickerFixtureRoute(path);
+    if (instancePickerRoute) {
+      return instancePickerRoute;
+    }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
     const singleRouteFixture = securityAgentSingleRouteFixtureRoute(path);
@@ -82,6 +90,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
     }
+    if (/(?:^|\/)dev\/account-picker-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/account-picker-sheet-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
@@ -96,6 +107,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/transcript-terminal-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-terminal-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-readonly-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-readonly-failure-fixture';
+    }
+    // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
+    // arms one and opens the fixture route, or clears it without navigating.
+    const renderRecoveryFixture = handleRenderRecoveryFixturePath(path);
+    if (renderRecoveryFixture !== undefined) {
+      return renderRecoveryFixture;
     }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';

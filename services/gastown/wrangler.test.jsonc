@@ -43,5 +43,8 @@
     "CF_ACCESS_AUD": "f30e3fd893df52fa3ffc50fbdb5ee6a4f111625ae92234233429684e1429d809",
     "GASTOWN_API_URL": "http://host.docker.internal:9787",
     "GASTOWN_BILLING_ENABLED": "false",
+    "LEGACY_ADMIN_CLAIM_MODE": "honor",
+    "WORKER_ADMIN_CAPABILITY_PUBLIC_KEYS": "",
+    "KILO_INTERNAL_API_URL": "http://localhost:3000",
   },
 }

@@ -295,6 +295,47 @@ describe('POST /api/chat/link-account', () => {
     expect(mockedAfter).not.toHaveBeenCalled();
   });
 
+  test('accepts the Origin: null a no-referrer confirmation page produces', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const response = await POST(
+      postRequest({ origin: 'null', secFetchSite: 'same-origin' }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedLinkKiloUser).toHaveBeenCalledTimes(1);
+  });
+
+  test('trusts Sec-Fetch-Site over a matching Origin', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const responses = await Promise.all(
+      ['same-site', 'cross-site', 'none'].map(secFetchSite =>
+        POST(postRequest({ origin: APP_ORIGIN, secFetchSite }) as never)
+      )
+    );
+
+    for (const response of responses) expect(response.status).toBe(403);
+    expect(mockedVerifyLinkToken).not.toHaveBeenCalled();
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+  });
+
+  test('falls back to Origin when the browser sends no Sec-Fetch-Site', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const nullOrigin = await POST(postRequest({ origin: 'null' }) as never);
+    const crossOrigin = await POST(postRequest({ origin: 'https://evil.example' }) as never);
+
+    expect(nullOrigin.status).toBe(403);
+    expect(crossOrigin.status).toBe(403);
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+
+    const sameOrigin = await POST(postRequest({ origin: APP_ORIGIN }) as never);
+
+    expect(sameOrigin.status).toBe(200);
+    expect(mockedLinkKiloUser).toHaveBeenCalledTimes(1);
+  });
+
   test('completes a link at most once', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
     mockedConsumeLinkAccountContext.mockResolvedValue(false);

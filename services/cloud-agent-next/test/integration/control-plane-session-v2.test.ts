@@ -1676,7 +1676,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 
     const running = await connectStream(sessionId);
     const runningConnected = await waitForStreamEvent(running, 'connected');
-    expect(runningConnected.data).not.toHaveProperty('sessionStatus');
+    expect(runningConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     running.close();
 
     await stub.onOutcome({
@@ -1702,7 +1702,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.onEvents({ events: [busy] });
     const native = await connectStream(sessionId);
     const nativeConnected = await waitForStreamEvent(native, 'connected');
-    expect(nativeConnected.data).not.toHaveProperty('sessionStatus');
+    expect(nativeConnected.data).toMatchObject({ sessionStatus: { type: 'busy' } });
     native.close();
   });
 
@@ -1814,13 +1814,19 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
               .all()
               .map(row => JSON.parse(row.payload))
           );
+        const nativeSessionId = registeredKiloSessions.get(sessionId);
         wrapper.sendSessionEvents(sessionId, [
-          { type: 'message.removed', properties: { messageID: 'initial' } },
+          {
+            type: 'message.removed',
+            properties: { sessionID: nativeSessionId, messageID: 'initial' },
+          },
         ]);
         wrapper.heartbeat(true);
         await waitFor(async () => {
           expect(await persisted()).toContainEqual(
-            expect.objectContaining({ properties: { messageID: 'initial' } })
+            expect.objectContaining({
+              properties: { sessionID: nativeSessionId, messageID: 'initial' },
+            })
           );
           expect(leaseCalls).toBeGreaterThan(0);
         });
@@ -1833,13 +1839,18 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         if (frame === 'heartbeat') wrapper.heartbeat(true);
         wrapper.sendSessionEvents(sessionId, [
-          { type: 'message.removed', properties: { messageID: 'later' } },
+          {
+            type: 'message.removed',
+            properties: { sessionID: nativeSessionId, messageID: 'later' },
+          },
         ]);
         if (frame === 'unavailable') {
           wrapper.heartbeat(true);
           await waitFor(async () => {
             expect(await persisted()).toContainEqual(
-              expect.objectContaining({ properties: { messageID: 'later' } })
+              expect.objectContaining({
+                properties: { sessionID: nativeSessionId, messageID: 'later' },
+              })
             );
             expect(leaseCalls).toBeGreaterThan(0);
           });
@@ -1854,7 +1865,9 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         expect(leaseCalls).toBe(0);
         expect(billingReads).toBe(2);
         expect(await persisted()).not.toContainEqual(
-          expect.objectContaining({ properties: { messageID: 'later' } })
+          expect.objectContaining({
+            properties: { sessionID: nativeSessionId, messageID: 'later' },
+          })
         );
         await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'));
         expect(await readMessageReason(sessionStub, 'm1')).toBe('billing_blocked');

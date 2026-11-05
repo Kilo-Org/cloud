@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest';
 import worker from '../../src/index';
 import { instrument, jsonResponse } from '../../src/metrics';
 import { grant, newSessionID, personal, sha256, testEnv } from '../helpers';
+import type { Env } from '../../src/env';
 
 it('records one bounded datapoint with actual streamed bytes and no identifiers', async () => {
   const writeDataPoint = vi.fn();
@@ -159,4 +160,47 @@ it('counts unknown-length request and response streams without buffering them', 
   expect((await response.arrayBuffer()).byteLength).toBe(46);
   await waitOnExecutionContext(ctx);
   expect(writeDataPoint.mock.calls[0]![0].doubles.slice(4)).toEqual([123, 46]);
+});
+
+it('normalizes account-erasure metrics and exception logs without user identifiers', async () => {
+  const writeDataPoint = vi.fn();
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const ctx = createExecutionContext();
+  const userID = `oauth/private-${crypto.randomUUID()}`;
+  const namespace = testEnv.SESSION_SYNC_TENANT_DO;
+  try {
+    const response = await worker.fetch(
+      new Request(`https://session-sync.test/internal/users/${encodeURIComponent(userID)}/erase`, {
+        method: 'POST',
+        headers: { 'X-Internal-Secret': 'internal-test-secret-0123456789abcdef' },
+      }),
+      {
+        ...testEnv,
+        SESSION_SYNC_METRICS: { writeDataPoint },
+        SESSION_SYNC_TENANT_DO: {
+          idFromName: namespace.idFromName.bind(namespace),
+          get: () => {
+            throw new Error('Synthetic internal failure');
+          },
+        } as unknown as Env['SESSION_SYNC_TENANT_DO'],
+      },
+      ctx
+    );
+    expect(response.status).toBe(500);
+    await response.text();
+    await waitOnExecutionContext(ctx);
+    expect(writeDataPoint.mock.calls[0]?.[0]).toMatchObject({
+      blobs: ['POST /internal/users/:id/erase', '500', 'internal_error', 'unknown'],
+    });
+    expect(logged).toHaveBeenCalledWith('session-sync request failed', {
+      path: 'POST /internal/users/:id/erase',
+      error: 'Error',
+    });
+    expect(JSON.stringify([logged.mock.calls, writeDataPoint.mock.calls])).not.toContain(userID);
+    expect(JSON.stringify([logged.mock.calls, writeDataPoint.mock.calls])).not.toContain(
+      encodeURIComponent(userID)
+    );
+  } finally {
+    logged.mockRestore();
+  }
 });

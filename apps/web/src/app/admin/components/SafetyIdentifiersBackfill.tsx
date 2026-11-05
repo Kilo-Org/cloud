@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,7 @@ export function SafetyIdentifiersBackfill() {
   const { data: counts, isLoading } = useQuery<SafetyIdentifierCountsResponse>({
     queryKey: ['safety-identifier-counts'],
     queryFn: async () => {
-      const res = await fetch('/admin/api/safety-identifiers');
+      const res = await adminFetch('/admin/api/safety-identifiers');
       return res.json() as Promise<SafetyIdentifierCountsResponse>;
     },
     refetchInterval: false,
@@ -30,7 +32,7 @@ export function SafetyIdentifiersBackfill() {
 
   const mutation = useMutation<BackfillBatchResponse, Error>({
     mutationFn: async () => {
-      const res = await fetch('/admin/api/safety-identifiers', { method: 'POST' });
+      const res = await adminFetch('/admin/api/safety-identifiers', { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);

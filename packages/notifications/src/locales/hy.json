@@ -6,9 +6,9 @@
       "chatMessage": "Դուք ունեք նոր հաղորդագրություն",
       "instanceLifecycle": "Ձեր օրինակն ունի թարմացում",
       "scheduledAction": "Պլանավորված գործողությունն ունի թարմացում",
-      "lowBalance": "Ձեր մնացորդը ուշադրության կարիք ունի",
-      "spendAlert": "Ձեր ծախսը ուշադրության կարիք ունի",
-      "securityFinding": "Անվտանգության հայտնաբերումը ուշադրության կարիք ունի",
+      "lowBalance": "Ձեր մնացորդն ուշադրության կարիք ունի",
+      "spendAlert": "Ձեր ծախսն ուշադրության կարիք ունի",
+      "securityFinding": "Անվտանգության հայտնաբերումն ուշադրության կարիք ունի",
       "securityUpdate": "Անվտանգության ստուգումն ունի թարմացում",
       "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
     }
@@ -68,30 +68,30 @@
   "instanceLifecycle": {
     "ready": {
       "title": "{{instanceName}}-ը պատրաստ է",
-      "body": "Հպեք՝ զրույց սկսելու համար:"
+      "body": "Հպեք՝ զրույց սկսելու համար։"
     },
     "startFailed": {
       "title": "{{instanceName}}-ը չհաջողվեց գործարկել",
-      "body": "Գործարկումը ձախողվեց:"
+      "body": "Գործարկումը ձախողվեց։"
     }
   },
   "scheduledAction": {
     "restartNotice": {
       "title": "{{instanceName}}-ը շուտով կվերագործարկվի",
-      "body": "Նախատեսված է վերագործարկվել {{when}}-ին:"
+      "body": "Նախատեսված է վերագործարկվել {{when}}-ին։"
     },
     "restartCancelled": {
       "title": "{{instanceName}}-ի վերագործարկումը չեղարկված է",
-      "body": "Նախկինում նախատեսված վերագործարկումը չեղարկված է:"
+      "body": "Նախկինում նախատեսված վերագործարկումը չեղարկված է։"
     },
     "versionChangeNotice": {
       "title": "{{instanceName}}-ը շուտով կթարմացվի",
-      "bodyWithTag": "Թարմացնել {{targetImageTag}}-ին {{when}}-ին:",
-      "bodyWithoutTag": "Նախատեսված թարմացում {{when}}-ին:"
+      "bodyWithTag": "Թարմացնել {{targetImageTag}}-ին {{when}}-ին։",
+      "bodyWithoutTag": "Նախատեսված թարմացում {{when}}-ին։"
     },
     "versionChangeCancelled": {
       "title": "{{instanceName}}-ի թարմացումը չեղարկված է",
-      "body": "Նախկինում նախատեսված թարմացումը չեղարկված է:"
+      "body": "Նախկինում նախատեսված թարմացումը չեղարկված է։"
     }
   },
   "sessionReady": {

@@ -6,6 +6,19 @@ const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 export const KILO_SESSION_ID_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
 
 /**
+ * A session id as the session store addresses it. Reads must accept every id a
+ * `cli_sessions_v2` row can hold, including the ids minted before
+ * `KILO_SESSION_ID_PATTERN` became the only issued shape: an older session keeps
+ * the id it was created with, and its stored transcript is addressed by that id.
+ *
+ * Bounded and URL-safe because the id travels as a route segment and becomes a
+ * Durable Object name; `/` and U+0000 are never part of one. Authorization does
+ * not rest on this shape: a read is allowed only for a row the caller owns, with
+ * a current organization membership pass where the row is organization-scoped.
+ */
+export const storedSessionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,255}$/);
+
+/**
  * A session id proposed by a client so it can show the session before the server
  * confirms it. Stricter than `sessionIdSchema`, which also accepts older ids.
  */

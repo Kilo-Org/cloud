@@ -19,6 +19,8 @@ import {
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import {
   getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
@@ -442,10 +444,17 @@ export function SessionMessageList<T>({
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.session.scrollToBottom')}
               onPress={scrollToLatestAnimated}
-              hitSlop={2}
-              className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040] active:opacity-70"
+              // The pressable is the touch target a control-size audit
+              // measures, and `hitSlop` never moves that rect: the 48pt floor
+              // has to be this node's own box.
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
             >
-              <ChevronDown size={20} color={colors.foreground} />
+              {/* The visible circle stays compact (explicit px, because
+                  NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
+                  the target, not the visual, at 44pt. */}
+              <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                <ChevronDown size={20} color={colors.foreground} />
+              </View>
             </Pressable>
           </Animated.View>
         ) : null}

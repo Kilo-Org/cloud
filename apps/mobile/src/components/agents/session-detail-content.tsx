@@ -330,6 +330,11 @@ export function SessionDetailContent({
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  // A failed row offers Retry only when this session can accept the re-send now.
+  // A read-only stored transcript has no transport send at all, and a remote
+  // session with no CLI owner cannot deliver; both used to fail inside the SDK
+  // and report transient connection trouble for a turn nobody re-sent.
+  const retryAvailable = !isReadOnly && canSend;
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
@@ -1356,6 +1361,13 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
+      // Read the live capability at tap time: a stale row could outlive the
+      // session's writability (a read-only transcript, or a remote session whose
+      // CLI owner went away) and the SDK would report the refusal as connection
+      // trouble for a prompt it never sent.
+      if (store.get(manager.atoms.isReadOnly) || !store.get(manager.atoms.canSend)) {
+        return;
+      }
       const target = resolveRetryTarget(message, messagesRef.current);
       if (target === null) {
         return;
@@ -1419,7 +1431,7 @@ export function SessionDetailContent({
         },
       });
     },
-    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
+    [requiresModel, pinned.model, currentModel, handleSend, manager, sessionId, store]
   );
 
   const handleCancelQueued = useCallback(
@@ -1606,6 +1618,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
@@ -1638,6 +1651,7 @@ export function SessionDetailContent({
       handleOpenChildSession,
       pendingMessages,
       heldQueuedIds,
+      retryAvailable,
       handleRetryMessage,
       handleCopyToComposer,
       handleOpenDetails,
@@ -1904,15 +1918,24 @@ export function SessionDetailContent({
           messageCount: messages.length,
         })
       : null;
-  // A read-only transcript ends in the continue section, which states the
-  // read-only fact once and replaces the composer and its send reason.
-  const isReadOnlyTranscript = isReadOnly && messages.length > 0;
+  // A read-only session ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason. The fact
+  // is the kind the session resolved to, not how many rows its transcript
+  // holds: a stored session with no messages has nowhere to write either, so it
+  // must not mount a composer under the read-only line. `activeSessionType` is
+  // set only by a successful resolve, so a failed open (which may also read
+  // `isReadOnly`) keeps its composer beside the error's Retry. An unresolved
+  // open (`activeSessionType === null`) counts as not writable here; the
+  // pending slot below also reads the metadata that names a cloud-agent
+  // session, which lands before the resolve.
+  const isReadOnlySession = activeSessionType === 'read-only';
+  const isWritableResolved = activeSessionType !== null && activeSessionType !== 'read-only';
   const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
-    hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlySession,
     messageCount: messages.length,
   });
 
@@ -2032,9 +2055,9 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // The composer stays mounted for every writable session. A read-only
-  // transcript replaces it with the continue section, which names the
-  // destination it opens.
+  // The composer stays mounted for every writable session. A read-only session
+  // replaces it with the continue section, which names the destination it
+  // opens — whether or not its transcript holds a row.
   // The bottom BlurBar reserves the composer's space and shares its visibility
   // condition, so a blocking card or the continue section never leaves the bar
   // claiming space the composer does not fill. The strip is a pure full-bleed
@@ -2047,25 +2070,35 @@ export function SessionDetailContent({
   // session may not have. Reserve the area in the shape this session's kind
   // ends in instead, so one state ends where the other begins: a read-only
   // session keeps the read-only footer's area, and every other session keeps
-  // the composer's. `isReadOnly` is the kind the session resolved to, so a
-  // writable session no longer jumps from the footer's block to its composer,
-  // and a read-only one no longer jumps the other way. Both reserves are
+  // the composer's. `isReadOnly` is the settled read-only fact, so a writable
+  // session no longer jumps from the footer's block to its composer, and a
+  // read-only one no longer jumps the other way. Both reserves are
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
   // The slot switches from its reserve to the session's own control only once
-  // the transcript is painted, not merely once its first page arrived: a
-  // read-only footer above rows that are still skeletons is the same two states
-  // at once, so the reserve holds for that window too (see
-  // `isSessionChromePending`).
+  // the transcript is painted, not merely once the open resolves: a read-only
+  // footer above rows that are still skeletons is the same two states at once,
+  // so the reserve holds for that window too (see `isSessionChromePending`).
   const isComposerVisible =
-    !hasBlockingInteraction && !isReadOnlyTranscript && !isSessionChromePending;
+    !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlyTranscript && !hasBlockingInteraction && !isSessionChromePending;
+    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+  // The pending slot holds the shape its session will end in. The kind is only
+  // set once the transport answers, but the metadata read lands before that and
+  // names a cloud-agent session, which is writable by construction; the id
+  // check keeps another session's cached row out of this open's slot. An open
+  // that will end in the composer holds the composer's placeholder, and every
+  // other open holds the read-only footer's — the bar and the continue control
+  // a stored session ends in — so the footer lands on the area already held
+  // rather than replacing a composer the session may not get.
+  const isPendingComposer =
+    isWritableResolved ||
+    (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && isReadOnly;
+    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
   const isComposerSkeletonVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isReadOnly;
+    isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2714,18 +2747,28 @@ export function SessionDetailContent({
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
             </Text>
+            {/* The footer's one action, and the only control on this screen:
+                a filled primary. Light already fills it with the palette's
+                muted olive; dark's primary (#ffdd00) is the full brand accent
+                and glares as a full-width fill under the near-black page. Dark
+                takes `--selection` instead — the same olive hue lifted to stand
+                off the page — with its own label tone, so the control keeps the
+                light mode's weight in both schemes. */}
             <Button
               variant="default"
               size="action"
+              className="bg-primary dark:bg-selection"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('agentChat.session.continueInNewSession')}</Text>
+              <Text className="text-primary-foreground dark:text-selection-foreground">
+                {t('agentChat.session.continueInNewSession')}
+              </Text>
             </Button>
           </View>
         ) : null}
 
-        {isReadOnlyTranscript || isSessionChromePending ? null : (
+        {isReadOnlySession || isSessionChromePending ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}

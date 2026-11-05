@@ -42,6 +42,7 @@ import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { byokOwner, getByokKeyStates } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
 type Caller = Awaited<ReturnType<typeof createCallerForUser>>;
 
@@ -199,21 +200,38 @@ describe('BYOK Router', () => {
   });
 
   describe('reorder', () => {
-    async function createPersonalKeys(
+    let adminUser: User;
+    let billingManagerUser: User;
+
+    beforeAll(async () => {
+      adminUser = await insertTestUser({ google_user_email: 'byok-reorder-admin@example.com' });
+      billingManagerUser = await insertTestUser({
+        google_user_email: 'byok-reorder-billing-manager@example.com',
+      });
+      await addUserToOrganization(organizationA.id, adminUser.id, 'admin');
+      await addUserToOrganization(organizationA.id, billingManagerUser.id, 'billing_manager');
+    });
+
+    async function createKeys(
       userId: string,
-      providers: Parameters<Caller['byok']['create']>[0]['provider_id'][]
+      providers: Parameters<Caller['byok']['create']>[0]['provider_id'][],
+      organizationId?: string
     ) {
       const caller = await createCallerForUser(userId);
       const ids: string[] = [];
       for (const provider_id of providers) {
-        const key = await caller.byok.create({ provider_id, api_key: `key-${provider_id}` });
+        const key = await caller.byok.create({
+          organizationId,
+          provider_id,
+          api_key: `key-${provider_id}`,
+        });
         ids.push(key.id);
       }
       return { caller, ids };
     }
 
     test('lists personal keys oldest first until the owner reorders them', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, [
+      const { caller, ids } = await createKeys(ownerUser.id, [
         'anthropic',
         'mistral',
         'openrouter',
@@ -237,7 +255,7 @@ describe('BYOK Router', () => {
     });
 
     test('keeps other settings and lists keys added later after the prioritized ones', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic', 'mistral']);
       await db
         .update(byok_api_keys)
         .set({ settings: { serve_catalog_models: true } })
@@ -255,7 +273,7 @@ describe('BYOK Router', () => {
     });
 
     test('lists keys that were never reordered in the default route order', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, [
+      const { caller, ids } = await createKeys(ownerUser.id, [
         'openrouter',
         'anthropic',
         'vercel-ai-gateway',
@@ -290,7 +308,7 @@ describe('BYOK Router', () => {
     });
 
     test('adds a new provider key above the gateway keys once the owner reordered', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic', 'openrouter']);
       await caller.byok.reorder({ keyIds: ids });
 
       const provider = await caller.byok.create({ provider_id: 'mistral', api_key: 'key-mistral' });
@@ -308,7 +326,7 @@ describe('BYOK Router', () => {
     });
 
     test('ranks a key inserted outside byok.create, as coding plans do, by its default rank', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'openrouter']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic', 'openrouter']);
       await caller.byok.reorder({ keyIds: [ids[1], ids[0]] });
       const [planKey] = await db
         .insert(byok_api_keys)
@@ -324,7 +342,7 @@ describe('BYOK Router', () => {
     });
 
     test('rejects an order that leaves out one of the caller keys', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic', 'mistral']);
 
       await expect(caller.byok.reorder({ keyIds: [ids[1]] })).rejects.toThrow(
         'Your API keys changed'
@@ -333,10 +351,8 @@ describe('BYOK Router', () => {
     });
 
     test('rejects another user key without changing it', async () => {
-      const { ids: ownerIds } = await createPersonalKeys(ownerUser.id, ['anthropic']);
-      const { caller: memberCaller, ids: memberIds } = await createPersonalKeys(memberUser.id, [
-        'mistral',
-      ]);
+      const { ids: ownerIds } = await createKeys(ownerUser.id, ['anthropic']);
+      const { caller: memberCaller, ids: memberIds } = await createKeys(memberUser.id, ['mistral']);
       try {
         await expect(
           memberCaller.byok.reorder({ keyIds: [ownerIds[0], memberIds[0]] })
@@ -354,7 +370,7 @@ describe('BYOK Router', () => {
       }
     });
 
-    test('rejects organization keys, which keep their default order', async () => {
+    test('rejects organization keys when reordering personal keys', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const orgKey = await caller.byok.create({
         organizationId: organizationA.id,
@@ -368,7 +384,7 @@ describe('BYOK Router', () => {
     });
 
     test('ignores the ChatGPT connection row, which is not a listed key', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic', 'mistral']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic', 'mistral']);
       await db.insert(byok_api_keys).values({
         kilo_user_id: ownerUser.id,
         provider_id: 'openai-chatgpt',
@@ -391,11 +407,218 @@ describe('BYOK Router', () => {
     });
 
     test('rejects duplicate ids', async () => {
-      const { caller, ids } = await createPersonalKeys(ownerUser.id, ['anthropic']);
+      const { caller, ids } = await createKeys(ownerUser.id, ['anthropic']);
 
       await expect(caller.byok.reorder({ keyIds: [ids[0], ids[0]] })).rejects.toThrow(
         'Key ids must be unique'
       );
+    });
+
+    test.each(['owner', 'admin'] as const)(
+      'allows an organization %s to persist priorities and audits the change',
+      async role => {
+        const actor = role === 'owner' ? ownerUser : adminUser;
+        const { caller, ids } = await createKeys(
+          actor.id,
+          ['anthropic', 'mistral', 'openrouter'],
+          organizationA.id
+        );
+        await db
+          .update(byok_api_keys)
+          .set({ settings: { serve_catalog_models: true }, is_enabled: false })
+          .where(eq(byok_api_keys.id, ids[0]));
+        const { ids: personalIds } = await createKeys(ownerUser.id, ['anthropic']);
+        const { ids: otherOrgIds } = await createKeys(
+          otherOrgOwner.id,
+          ['mistral'],
+          organizationB.id
+        );
+        const logsBefore = await db
+          .select({ id: organization_audit_logs.id })
+          .from(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, organizationA.id));
+        const reordered = [ids[2], ids[0], ids[1]];
+
+        const result = await caller.byok.reorder({
+          organizationId: organizationA.id,
+          keyIds: reordered,
+        });
+
+        expect(result.map(key => key.id)).toEqual(reordered);
+        expect(result[1]).toMatchObject({
+          serve_catalog_models: true,
+          can_change_catalog_mode: true,
+          is_enabled: false,
+        });
+        expect(
+          (await caller.byok.list({ organizationId: organizationA.id })).map(key => key.id)
+        ).toEqual(reordered);
+        await expect(getByokKeyStates(db, byokOwner(actor.id, organizationA.id))).resolves.toEqual([
+          { providerId: 'openrouter', priority: 0, serveCatalogModels: false, isEnabled: true },
+          { providerId: 'anthropic', priority: 1, serveCatalogModels: true, isEnabled: false },
+          { providerId: 'mistral', priority: 2, serveCatalogModels: false, isEnabled: true },
+        ]);
+        const outsideKeys = await db
+          .select({ settings: byok_api_keys.settings })
+          .from(byok_api_keys)
+          .where(inArray(byok_api_keys.id, [...personalIds, ...otherOrgIds]));
+        expect(outsideKeys.map(key => key.settings)).toEqual([{}, {}]);
+        const logsAfter = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, organizationA.id));
+        expect(logsAfter.filter(log => !logsBefore.some(before => before.id === log.id))).toEqual([
+          expect.objectContaining({
+            action: 'organization.settings.change',
+            message: 'Updated BYOK key priorities',
+            actor_id: actor.id,
+            actor_email: actor.google_user_email,
+            actor_name: actor.google_user_name,
+            organization_id: organizationA.id,
+          }),
+        ]);
+      }
+    );
+
+    test.each(['member', 'billing_manager', 'nonmember'] as const)(
+      'denies organization reorder by a %s without changing keys or audit logs',
+      async role => {
+        const { ids } = await createKeys(ownerUser.id, ['anthropic', 'mistral'], organizationA.id);
+        const user =
+          role === 'member'
+            ? memberUser
+            : role === 'billing_manager'
+              ? billingManagerUser
+              : otherOrgOwner;
+        const caller = await createCallerForUser(user.id);
+        const logsBefore = await db
+          .select({ id: organization_audit_logs.id })
+          .from(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, organizationA.id));
+
+        await expect(
+          caller.byok.reorder({ organizationId: organizationA.id, keyIds: ids.toReversed() })
+        ).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message:
+            role === 'nonmember'
+              ? 'You do not have access to this organization'
+              : 'You do not have the required organizational role to access this feature',
+        });
+
+        const keys = await db
+          .select({ settings: byok_api_keys.settings })
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.organization_id, organizationA.id));
+        expect(keys.map(key => key.settings)).toEqual([{}, {}]);
+        const logsAfter = await db
+          .select({ id: organization_audit_logs.id })
+          .from(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, organizationA.id));
+        expect(logsAfter).toEqual(logsBefore);
+      }
+    );
+
+    test.each(['organization', 'personal', 'foreign'] as const)(
+      'rejects a %s key outside the organization scope without partial writes',
+      async scope => {
+        const { caller, ids } = await createKeys(
+          ownerUser.id,
+          ['anthropic', 'mistral'],
+          organizationA.id
+        );
+        const { ids: outsideIds } = await createKeys(
+          scope === 'personal' ? ownerUser.id : otherOrgOwner.id,
+          ['openai'],
+          scope === 'organization' ? organizationB.id : undefined
+        );
+
+        try {
+          for (const keyIds of [
+            [ids[1], outsideIds[0]],
+            [...ids.toReversed(), outsideIds[0]],
+          ]) {
+            await expect(
+              caller.byok.reorder({ organizationId: organizationA.id, keyIds })
+            ).rejects.toMatchObject({
+              code: 'CONFLICT',
+              message: expect.stringContaining('Your API keys changed'),
+            });
+          }
+          const keys = await db
+            .select({ settings: byok_api_keys.settings })
+            .from(byok_api_keys)
+            .where(inArray(byok_api_keys.id, [...ids, ...outsideIds]));
+          expect(keys.map(key => key.settings)).toEqual([{}, {}, {}]);
+        } finally {
+          await db.delete(byok_api_keys).where(inArray(byok_api_keys.id, outsideIds));
+        }
+      }
+    );
+
+    test('rejects an omitted organization key without changing persisted priorities or auditing', async () => {
+      const { caller, ids } = await createKeys(
+        ownerUser.id,
+        ['anthropic', 'mistral'],
+        organizationA.id
+      );
+      await caller.byok.reorder({ organizationId: organizationA.id, keyIds: ids });
+      const keysBefore = await db
+        .select({ id: byok_api_keys.id, settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id))
+        .orderBy(byok_api_keys.id);
+      const logsBefore = await db
+        .select({ id: organization_audit_logs.id })
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id));
+
+      await expect(
+        caller.byok.reorder({ organizationId: organizationA.id, keyIds: [ids[1]] })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: expect.stringContaining('Your API keys changed'),
+      });
+
+      const keysAfter = await db
+        .select({ id: byok_api_keys.id, settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id))
+        .orderBy(byok_api_keys.id);
+      expect(keysAfter).toEqual(keysBefore);
+      const logsAfter = await db
+        .select({ id: organization_audit_logs.id })
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id));
+      expect(logsAfter).toEqual(logsBefore);
+    });
+
+    test('excludes the organization ChatGPT connection from priorities and rejects its id', async () => {
+      const { caller, ids } = await createKeys(
+        ownerUser.id,
+        ['anthropic', 'mistral'],
+        organizationA.id
+      );
+      const [chatGpt] = await db
+        .insert(byok_api_keys)
+        .values({
+          organization_id: organizationA.id,
+          provider_id: 'openai-chatgpt',
+          encrypted_api_key: encryptApiKey('chatgpt-state', BYOK_ENCRYPTION_KEY),
+          created_by: ownerUser.id,
+        })
+        .returning({ id: byok_api_keys.id });
+
+      await expect(
+        caller.byok.reorder({ organizationId: organizationA.id, keyIds: [...ids, chatGpt.id] })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await caller.byok.reorder({ organizationId: organizationA.id, keyIds: ids.toReversed() });
+
+      const [stored] = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, chatGpt.id));
+      expect(stored.settings).toEqual({});
     });
   });
 

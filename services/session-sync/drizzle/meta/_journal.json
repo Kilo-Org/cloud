@@ -22,6 +22,20 @@
       "when": 1793806317648,
       "tag": "0002_nosy_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793841923646,
+      "tag": "0003_slimy_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793900000000,
+      "tag": "0004_session_roles",
+      "breakpoints": true
     }
   ]
 }

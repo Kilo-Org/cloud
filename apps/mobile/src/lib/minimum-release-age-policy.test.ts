@@ -34,12 +34,18 @@ const workspaceYaml = readFileSync(
 );
 const lines = workspaceYaml.split('\n');
 const sectionStart = lines.indexOf('minimumReleaseAgeExclude:');
-if (sectionStart === -1) throw new Error('Missing release-age exemption configuration');
+if (sectionStart === -1) {
+  throw new Error('Missing release-age exemption configuration');
+}
 const exemptions: string[] = [];
 for (const line of lines.slice(sectionStart + 1)) {
-  if (!line.startsWith('  ')) break;
+  if (!line.startsWith('  ')) {
+    break;
+  }
   const entry = /^ {2}- (.+)$/.exec(line)?.[1];
-  if (entry !== undefined) exemptions.push(entry.trim().replace(/^'(.*)'$/, '$1'));
+  if (entry !== undefined) {
+    exemptions.push(entry.trim().replace(/^'(.*)'$/, '$1'));
+  }
 }
 
 // Names can remain broad only when the existing policy explicitly permits them.
@@ -61,6 +67,8 @@ describe('minimum release age security policy', () => {
   });
 
   it('preserves the existing legacy exemptions', () => {
-    for (const name of LEGACY_NAME_EXEMPTIONS) expect(exemptions).toContain(name);
+    for (const name of LEGACY_NAME_EXEMPTIONS) {
+      expect(exemptions).toContain(name);
+    }
   });
 });

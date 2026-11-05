@@ -12,17 +12,19 @@ concurrency:
 
 jobs:
   verify-main:
-    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
-    # the web app to production using repo secrets. Only the canonical repo
-    # may run it. (verify-main already enforces GITHUB_REF == refs/heads/main,
-    # so the guard is defense-in-depth for the dispatch path.)
-    if: github.repository == 'Kilo-Org/cloud'
+    # This job holds no secrets, so it can report the reason a dispatch is
+    # rejected instead of being silently skipped. The jobs that use repo
+    # secrets carry the canonical-repo guard.
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
     steps:
       - name: Verify main branch
         run: |
+          if [ "$GITHUB_REPOSITORY" != "Kilo-Org/cloud" ]; then
+            echo "::error::This workflow must be run from the canonical Kilo-Org/cloud repository. Got: $GITHUB_REPOSITORY"
+            exit 1
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
             exit 1

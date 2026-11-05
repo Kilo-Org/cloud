@@ -474,7 +474,10 @@ jobs:
 
   deploy-cloud-agent-after-session-ingest:
     needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    # Guard: this reusable workflow can be invoked from a fork, and the job
+    # deploys to the target environment with inherited repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 100
     environment: ${{ inputs.target_environment }}

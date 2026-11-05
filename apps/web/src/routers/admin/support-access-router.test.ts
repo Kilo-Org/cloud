@@ -648,3 +648,26 @@ describe('admin.supportAccess viewAccess', () => {
     ).resolves.toEqual({ grantRequired: false, expiresAt: null });
   });
 });
+
+describe('admin.supportAccess list display names', () => {
+  test('active grants include the organization name and holder details', async () => {
+    const admin = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(admin.id);
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_read',
+      reason: 'investigating a customer report',
+    });
+
+    const active = await caller.admin.supportAccess.listActive();
+    const listed = active.find(item => item.id === grant.id);
+
+    expect(listed).toMatchObject({
+      organizationId: organization.id,
+      organizationName: organization.name,
+      actor: { id: admin.id, name: admin.google_user_name, email: admin.google_user_email },
+      approvedBy: null,
+    });
+  });
+});

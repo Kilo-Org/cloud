@@ -26,6 +26,7 @@ import {
   requestSupportGrant,
   reviewSupportGrant,
   revokeSupportGrant,
+  toSupportGrantListItems,
   toSupportGrantSummary,
 } from '@/lib/admin/support-access-service';
 
@@ -249,17 +250,17 @@ export const adminSupportAccessRouter = createTRPCRouter({
 
   listMine: adminProcedure.query(async ({ ctx }) => {
     const grants = await listMySupportGrants(ctx.user.id);
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listPending: adminProcedure.query(async () => {
     const grants = await listPendingSupportGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listActive: adminProcedure.query(async () => {
     const grants = await listActiveSupportGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   listUnreviewedEmergency: adminProcedure.query(async ({ ctx }) => {
@@ -267,7 +268,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
     }
     const grants = await listUnreviewedEmergencyGrants();
-    return grants.map(toSupportGrantSummary);
+    return toSupportGrantListItems(grants);
   }),
 
   viewAccess: adminProcedure
@@ -294,6 +295,6 @@ export const adminSupportAccessRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ input }) => {
       const grants = await getActiveSupportGrantsForOrganization(input.organizationId);
-      return grants.map(toSupportGrantSummary);
+      return toSupportGrantListItems(grants);
     }),
 });

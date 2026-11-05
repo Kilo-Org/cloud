@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
@@ -32,6 +33,33 @@ type ActionClass = 'support_read' | 'support_write';
 
 function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
+}
+
+function OrganizationCell({ id, name }: { id: string; name: string | null }) {
+  return (
+    <TableCell>
+      <Link href={`/admin/organizations/${id}`} className="hover:underline">
+        {name ?? <span className="font-mono text-xs">{id}</span>}
+      </Link>
+    </TableCell>
+  );
+}
+
+function PersonCell({
+  person,
+}: {
+  person: { id: string; name: string | null; email: string | null };
+}) {
+  return (
+    <TableCell>
+      <Link href={`/admin/users/${encodeURIComponent(person.id)}`} className="hover:underline">
+        {person.name ?? person.email ?? <span className="font-mono text-xs">{person.id}</span>}
+      </Link>
+      {person.name && person.email && (
+        <div className="text-muted-foreground text-xs">{person.email}</div>
+      )}
+    </TableCell>
+  );
 }
 
 export function SupportAccessContent() {
@@ -279,7 +307,7 @@ export function SupportAccessContent() {
               <TableBody>
                 {mine.data.map(grant => (
                   <TableRow key={grant.id}>
-                    <TableCell className="font-mono text-xs">{grant.organizationId}</TableCell>
+                    <OrganizationCell id={grant.organizationId} name={grant.organizationName} />
                     <TableCell>{grant.actionClass}</TableCell>
                     <TableCell>{grant.status}</TableCell>
                     <TableCell>{formatDate(grant.expiresAt)}</TableCell>
@@ -369,8 +397,8 @@ export function SupportAccessContent() {
               <TableBody>
                 {pending.data.map(grant => (
                   <TableRow key={grant.id}>
-                    <TableCell className="font-mono text-xs">{grant.organizationId}</TableCell>
-                    <TableCell className="font-mono text-xs">{grant.actorKiloUserId}</TableCell>
+                    <OrganizationCell id={grant.organizationId} name={grant.organizationName} />
+                    <PersonCell person={grant.actor} />
                     <TableCell className="max-w-80 truncate">{grant.reason}</TableCell>
                     <TableCell>{formatDate(grant.requestedAt)}</TableCell>
                     <TableCell>
@@ -427,8 +455,8 @@ export function SupportAccessContent() {
               <TableBody>
                 {active.data.map(grant => (
                   <TableRow key={grant.id}>
-                    <TableCell className="font-mono text-xs">{grant.organizationId}</TableCell>
-                    <TableCell className="font-mono text-xs">{grant.actorKiloUserId}</TableCell>
+                    <OrganizationCell id={grant.organizationId} name={grant.organizationName} />
+                    <PersonCell person={grant.actor} />
                     <TableCell>{grant.actionClass}</TableCell>
                     <TableCell>{formatDate(grant.expiresAt)}</TableCell>
                   </TableRow>
@@ -510,8 +538,8 @@ export function SupportAccessContent() {
               <TableBody>
                 {emergencies.data.map(grant => (
                   <TableRow key={grant.id}>
-                    <TableCell className="font-mono text-xs">{grant.organizationId}</TableCell>
-                    <TableCell className="font-mono text-xs">{grant.actorKiloUserId}</TableCell>
+                    <OrganizationCell id={grant.organizationId} name={grant.organizationName} />
+                    <PersonCell person={grant.actor} />
                     <TableCell>{formatDate(grant.issuedAt)}</TableCell>
                     <TableCell>
                       <Button

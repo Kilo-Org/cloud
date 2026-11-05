@@ -189,6 +189,7 @@
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú ",
     "terms": "Skilmála",
+    "termsInSentence": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",

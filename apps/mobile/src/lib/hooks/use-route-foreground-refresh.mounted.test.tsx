@@ -171,15 +171,15 @@ describe('useRouteForegroundRefresh mounted', () => {
     await renderProbe(KEYS);
     const rendersAfterMount = renderCount.value;
 
-    // A blurred tab is frozen: it never rerenders, so a focus value carried
-    // through React state or through a ref written in an effect stays stale.
-    // Blur without rerendering, then foreground the app.
+    // Blur without rerendering, then foreground the app: the hook reads focus
+    // from the navigation object at the event, so a value carried through
+    // React state or through a ref written in an effect would be stale here.
     focusState.isFocused = false;
     backgroundThenActive();
 
     expect(invalidateQueries).not.toHaveBeenCalled();
     // The hook holds no React state of its own, so the AppState transition
-    // itself cannot rerender a frozen route.
+    // cannot rerender the route.
     expect(renderCount.value).toBe(rendersAfterMount);
   });
 

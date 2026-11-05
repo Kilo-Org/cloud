@@ -189,6 +189,7 @@
     "resendCode": "Code opnieuw verzenden",
     "termsPrefix": "Door verder te gaan ga je akkoord met onze ",
     "terms": "Voorwaarden",
+    "termsInSentence": "Voorwaarden",
     "termsConnector": " en ",
     "termsSuffix": ".",
     "moreSignInOptions": "Meer aanmeldopties",

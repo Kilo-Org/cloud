@@ -179,7 +179,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
-- Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
+- Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 - A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
 - Respect padding at every size: content never touches or crosses its container's padding, and opposite sides match unless the design says otherwise.

@@ -189,6 +189,7 @@
     "resendCode": "Pošalji kod ponovo",
     "termsPrefix": "Nastavkom prihvataš naše ",
     "terms": "Uslove",
+    "termsInSentence": "Uslove",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više opcija za prijavu",

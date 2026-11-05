@@ -10,6 +10,7 @@ import {
   serviceTarget,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
+import { isWorkerAdminLegacyClaimIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Server-side resolver: given a user and a wastelandId, fetch the wasteland's
@@ -31,7 +32,8 @@ export async function resolveWastelandUpstreamForUser(
   if (!WASTELAND_URL) return null;
 
   try {
-    if (user.is_admin) {
+    const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
+    if (legacyIssuance && user.is_admin) {
       // Same elevation as POST /api/wasteland/token: the minted token carries
       // `isAdmin` into the worker, which emits nothing back here.
       await recordKiloAdminElevationForRequest({
@@ -46,7 +48,10 @@ export async function resolveWastelandUpstreamForUser(
     const orgMemberships = await getUserOrgMemberships(user.id);
     const token = generateApiToken(
       user,
-      { isAdmin: user.is_admin, orgMemberships },
+      {
+        ...(legacyIssuance && user.is_admin ? { isAdmin: true } : {}),
+        orgMemberships,
+      },
       { expiresIn: 60 * 5 }
     );
 

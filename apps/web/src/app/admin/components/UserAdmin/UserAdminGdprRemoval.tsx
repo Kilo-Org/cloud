@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +82,7 @@ export function UserAdminGdprRemoval(user: UserDetailProps) {
       const query = id
         ? `requestId=${encodeURIComponent(id)}`
         : `userId=${encodeURIComponent(user.id)}`;
-      const response = await fetch(`/admin/api/users/gdpr-removal?${query}`);
+      const response = await adminFetch(`/admin/api/users/gdpr-removal?${query}`);
       const body: unknown = await readJson(response);
       if (!response.ok) {
         throw new Error(readApiError(body, `Server responded with ${response.status}`));
@@ -158,7 +160,7 @@ export function UserAdminGdprRemoval(user: UserDetailProps) {
     setBusy({ kind: 'start' });
 
     try {
-      const response = await fetch('/admin/api/users/gdpr-removal', {
+      const response = await adminFetch('/admin/api/users/gdpr-removal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

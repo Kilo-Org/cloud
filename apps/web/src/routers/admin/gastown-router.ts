@@ -1,6 +1,17 @@
 import 'server-only';
 
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  isWorkerAdminCapabilityIssuanceEnabled,
+  isWorkerAdminLegacyClaimIssuanceEnabled,
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  GASTOWN_ADMIN_AUDIENCE,
+  matchWorkerAdminRestAction,
+  type WorkerAdminTarget,
+} from '@kilocode/worker-utils/worker-admin-capability';
+import { issueWorkerAdminCapability } from '@/lib/worker-admin/capability-issuer';
+import { requireWorkerAdminActor, WorkerAdminActorError } from '@/lib/worker-admin/actor-guard';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -229,15 +240,44 @@ const AdminAuditLogRecord = z.object({
 
 // ── Gastown HTTP client ───────────────────────────────────────────────────────
 
-/**
- * Build auth headers for server-side calls to the Gastown worker.
- * Uses the admin user's Kilo JWT (isAdmin: true, gastownAccess: true)
- * plus CF Access service token headers for production.
- */
-function buildAdminHeaders(adminUser: User): Record<string, string> {
+function targetForWorkerPath(path: string): WorkerAdminTarget | null {
+  const town = /^\/api\/towns\/([^/]+)/.exec(path);
+  if (town?.[1]) return { kind: 'town', id: town[1] };
+  const user = /^\/api\/users\/([^/]+)/.exec(path);
+  if (user?.[1]) return { kind: 'user', id: user[1] };
+  return null;
+}
+
+function targetForWorkerInput(input: unknown): WorkerAdminTarget | null {
+  if (typeof input === 'object' && input !== null) {
+    if ('townId' in input && typeof input.townId === 'string') {
+      return { kind: 'town', id: input.townId };
+    }
+    if ('wastelandId' in input && typeof input.wastelandId === 'string') {
+      return { kind: 'wasteland', id: input.wastelandId };
+    }
+  }
+  return null;
+}
+
+type AdminCaller = {
+  user: User;
+  credential?: string;
+  headersList?: Headers;
+};
+
+export async function buildAdminHeaders(
+  caller: AdminCaller,
+  params?: { action: string | null; target: WorkerAdminTarget | null }
+): Promise<Record<string, string>> {
+  const adminUser = caller.user;
+  const legacyIssuance = isWorkerAdminLegacyClaimIssuanceEnabled();
   const token = generateApiToken(
     adminUser,
-    { isAdmin: true, gastownAccess: true },
+    {
+      ...(legacyIssuance ? { isAdmin: true } : {}),
+      gastownAccess: true,
+    },
     { expiresIn: 60 } // 1-minute lifetime — server-side only
   );
 
@@ -246,12 +286,69 @@ function buildAdminHeaders(adminUser: User): Record<string, string> {
     'Content-Type': 'application/json',
   };
 
+  if (
+    !legacyIssuance &&
+    isWorkerAdminCapabilityIssuanceEnabled() &&
+    params?.action &&
+    params.target
+  ) {
+    if (caller.credential !== 'session') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Worker admin capabilities require a browser session',
+      });
+    }
+    try {
+      const actor = await requireWorkerAdminActor(null, caller.headersList ?? new Headers(), {
+        actionClass: 'worker_admin',
+        target: { kind: 'service', id: 'gastown' },
+        inventoryId: 'worker.gastown.adminRestClient',
+      });
+      if (actor.actor.assurance.userId !== adminUser.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Worker admin capabilities require the same authenticated user',
+        });
+      }
+      const issued = await issueWorkerAdminCapability({
+        user: { ...adminUser, api_token_pepper: actor.sessionBinding.apiTokenPepper },
+        audience: GASTOWN_ADMIN_AUDIENCE,
+        target: params.target,
+        actions: [params.action],
+        ttlSeconds: 60,
+      });
+      headers['X-Kilo-Worker-Capability'] = issued.capability;
+    } catch (error) {
+      if (error instanceof WorkerAdminActorError) {
+        throw new TRPCError({
+          code: error.status === 401 ? 'UNAUTHORIZED' : 'FORBIDDEN',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  }
+
   if (GASTOWN_CF_ACCESS_CLIENT_ID && GASTOWN_CF_ACCESS_CLIENT_SECRET) {
     headers['CF-Access-Client-Id'] = GASTOWN_CF_ACCESS_CLIENT_ID;
     headers['CF-Access-Client-Secret'] = GASTOWN_CF_ACCESS_CLIENT_SECRET;
   }
 
   return headers;
+}
+
+function workerRestParams(method: 'GET' | 'PATCH', path: string) {
+  return {
+    action: matchWorkerAdminRestAction(GASTOWN_ADMIN_AUDIENCE, method, path),
+    target: targetForWorkerPath(path),
+  };
+}
+
+function workerTrpcParams(procedure: string, input: unknown) {
+  return {
+    action: `trpc:${procedure}`,
+    target: targetForWorkerInput(input) ?? { kind: 'service', id: 'gastown' },
+  };
 }
 
 const GastownApiResponseSchema = z.union([
@@ -270,11 +367,11 @@ function requireGastownUrl(): string {
 }
 
 /** GET request to the Gastown worker, parsing the response with the given schema. */
-async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {
+async function gastownGet<T>(caller: AdminCaller, path: string, schema: z.ZodType<T>): Promise<T> {
   const baseUrl = requireGastownUrl();
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
-    headers: buildAdminHeaders(adminUser),
+    headers: await buildAdminHeaders(caller, workerRestParams('GET', path)),
   });
 
   if (!response.ok) {
@@ -294,7 +391,7 @@ async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>
 
 /** PATCH request to the Gastown worker. */
 async function gastownPatch<T>(
-  adminUser: User,
+  caller: AdminCaller,
   path: string,
   body: unknown,
   schema: z.ZodType<T>
@@ -302,7 +399,7 @@ async function gastownPatch<T>(
   const baseUrl = requireGastownUrl();
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'PATCH',
-    headers: buildAdminHeaders(adminUser),
+    headers: await buildAdminHeaders(caller, workerRestParams('PATCH', path)),
     body: JSON.stringify(body),
   });
 
@@ -328,13 +425,13 @@ async function gastownPatch<T>(
  * by the admin user — those procedures need admin-bypass support in the worker.
  */
 async function gastownTrpcGet<T>(
-  adminUser: User,
+  caller: AdminCaller,
   procedure: string,
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
   const baseUrl = requireGastownUrl();
-  const headers = buildAdminHeaders(adminUser);
+  const headers = await buildAdminHeaders(caller, workerTrpcParams(procedure, input));
   const url = `${baseUrl}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
   const response = await fetch(url, { headers });
   if (!response.ok) {
@@ -354,13 +451,13 @@ async function gastownTrpcGet<T>(
  * Returns null on failure.
  */
 async function gastownTrpcMutate<T>(
-  adminUser: User,
+  caller: AdminCaller,
   procedure: string,
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
   const baseUrl = requireGastownUrl();
-  const headers = buildAdminHeaders(adminUser);
+  const headers = await buildAdminHeaders(caller, workerTrpcParams(procedure, input));
   const url = `${baseUrl}/trpc/${procedure}`;
   const response = await fetch(url, {
     method: 'POST',
@@ -397,7 +494,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ userId: z.string().min(1) }))
     .output(z.array(UserTownRecord))
     .query(({ input, ctx }) => {
-      return gastownGet(ctx.user, `/api/users/${input.userId}/towns`, z.array(UserTownRecord));
+      return gastownGet(ctx, `/api/users/${input.userId}/towns`, z.array(UserTownRecord));
     }),
 
   /**
@@ -409,7 +506,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(UserRigRecord))
     .query(async ({ input, ctx }) => {
       const towns = await gastownGet(
-        ctx.user,
+        ctx,
         `/api/users/${input.userId}/towns`,
         z.array(UserTownRecord)
       );
@@ -417,7 +514,7 @@ export const adminGastownRouter = createTRPCRouter({
       const rigLists = await Promise.all(
         towns.map(town =>
           gastownGet(
-            ctx.user,
+            ctx,
             `/api/users/${input.userId}/towns/${town.id}/rigs`,
             z.array(UserRigRecord)
           ).catch((): z.infer<typeof UserRigRecord>[] => [])
@@ -438,7 +535,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(AlarmStatusRecord.nullable())
     .query(async ({ input, ctx }) => {
       return gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.adminGetAlarmStatus',
         { townId: input.townId },
         AlarmStatusRecord
@@ -473,7 +570,7 @@ export const adminGastownRouter = createTRPCRouter({
       }
 
       const debugInfo = await gastownGet(
-        ctx.user,
+        ctx,
         `/api/towns/${input.townId}/cloudflare-debug`,
         z.object({ containerDoId: z.string().nullable(), townDoId: z.string() })
       ).catch(() => null);
@@ -518,7 +615,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(BeadRecord))
     .query(async ({ input, ctx }) => {
       const result = await gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.adminListBeads',
         { townId: input.townId, status: input.status, type: input.type, limit: input.limit },
         z.array(BeadRecord)
@@ -531,7 +628,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(BeadRecord.nullable())
     .query(async ({ input, ctx }) => {
       return gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.adminGetBead',
         { townId: input.townId, beadId: input.beadId },
         BeadRecord
@@ -553,7 +650,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(BeadEventRecord))
     .query(async ({ input, ctx }) => {
       const result = await gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.adminGetTownEvents',
         { townId: input.townId, beadId: input.beadId, since: input.since, limit: input.limit },
         z.array(BeadEventRecord)
@@ -571,7 +668,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(AgentRecord))
     .query(async ({ input, ctx }) => {
       const result = await gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.adminListAgents',
         { townId: input.townId },
         z.array(AgentRecord)
@@ -672,7 +769,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ townId: z.string().uuid() }))
     .output(TownConfigRecord)
     .query(({ input, ctx }) => {
-      return gastownGet(ctx.user, `/api/towns/${input.townId}/config`, TownConfigRecord);
+      return gastownGet(ctx, `/api/towns/${input.townId}/config`, TownConfigRecord);
     }),
 
   /**
@@ -685,7 +782,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(ConvoyDetailRecord.nullable())
     .query(async ({ input, ctx }) => {
       const convoys = await gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.listConvoys',
         { townId: input.townId },
         z.array(ConvoyDetailRecord)
@@ -703,7 +800,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(ConvoyDetailRecord))
     .query(async ({ input, ctx }) => {
       const result = await gastownTrpcGet(
-        ctx.user,
+        ctx,
         'gastown.listConvoys',
         { townId: input.townId },
         z.array(ConvoyDetailRecord)
@@ -717,7 +814,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminForceResetAgent',
         { townId: input.townId, agentId: input.agentId },
         z.void().or(z.null())
@@ -728,7 +825,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminForceCloseBead',
         { townId: input.townId, beadId: input.beadId },
         BeadRecord
@@ -739,7 +836,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ townId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminForceFailBead',
         { townId: input.townId, beadId: input.beadId },
         BeadRecord
@@ -750,7 +847,7 @@ export const adminGastownRouter = createTRPCRouter({
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminForceRestartContainer',
         { townId: input.townId },
         z.void().or(z.null())
@@ -762,7 +859,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.object({ deleted: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const result = await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminBulkDeleteBeads',
         { townId: input.townId, beadIds: input.beadIds },
         z.object({ deleted: z.number() })
@@ -783,7 +880,7 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.object({ deleted: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const result = await gastownTrpcMutate(
-        ctx.user,
+        ctx,
         'gastown.adminDeleteBeadsByStatus',
         { townId: input.townId, status: input.status, type: input.type },
         z.object({ deleted: z.number() })
@@ -826,11 +923,6 @@ export const adminGastownRouter = createTRPCRouter({
     )
     .output(TownConfigRecord)
     .mutation(({ input, ctx }) => {
-      return gastownPatch(
-        ctx.user,
-        `/api/towns/${input.townId}/config`,
-        input.update,
-        TownConfigRecord
-      );
+      return gastownPatch(ctx, `/api/towns/${input.townId}/config`, input.update, TownConfigRecord);
     }),
 });

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Ngosipụta njikwa CLI v2 site n'ebe dị anya",
+    "sessionsEmpty": "Enwebeghị nnọkọ CLI v2",
+    "hosts": "Igwe ndị ejikọrọ",
+    "hostsEmpty": "Enweghị igwe ejikọrọ",
+    "directory": "Ndekọ ọrụ",
+    "createSession": "Mepụta nnọkọ CLI v2",
+    "queueIfOffline": "Tinye ntuziaka n'ahịrị ma ọ bụrụ na igwe ejikọghị",
+    "prompt": "Ntuziaka ma ọ bụ /command",
+    "localClear": "Hichapụ ihe ngosi naanị na ngwaọrụ a",
+    "abort": "Kwụsị ọrụ a",
+    "failed": "Njikwa CLI v2 site n'ebe dị anya kụrụ afọ n'ala",
+    "creationUnknown": "Amaghị ma emepụtara nnọkọ ahụ. Bugharịa nnọkọ tupu ị nwaa ọzọ.",
+    "commandFailed": "Iwu usoro CLI kụrụ afọ n'ala",
+    "invalidReply": "Nzaghachi usoro CLI ezighi ezi",
+    "unsafeCommand": "Jiri /compact, /new, /skill, /models, /agents ma ọ bụ /clear (naanị na ngwaọrụ a).",
+    "status": "Njikọ: {{connection}} · Usoro CLI: {{runner}}",
+    "presenceStatus": "Igwe: {{connection}}",
+    "commandStatus": "Nbufe iwu: {{status}}",
+    "delivered": "Ebufela",
+    "expired": "Oge agwụla"
+  },
   "common": {
     "cancel": "Kagbuo",
     "done": "Emechara",

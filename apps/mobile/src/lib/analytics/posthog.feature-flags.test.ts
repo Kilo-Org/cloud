@@ -64,7 +64,7 @@ vi.mock('@/lib/feature-flags', async importOriginal => {
     getFeatureFlagDefinition: (key: string) =>
       key === 'mobile-test-feature'
         ? { key, minAppVersion: '1.0.11', defaultValue: true }
-        : undefined,
+        : actual.getFeatureFlagDefinition(key),
   };
 });
 
@@ -174,5 +174,23 @@ describe('version-aware feature flags', () => {
     initPostHog();
 
     expect(await readFlag('mobile-not-in-registry', false)).toBe(true);
+  });
+
+  it('holds native remote off on older builds even when the remote flag is on', async () => {
+    hoisted.application.nativeApplicationVersion = '1.0.14';
+    hoisted.client.getFeatureFlag.mockReturnValue(true);
+    const { initPostHog } = await import('./posthog');
+    initPostHog();
+    expect(await readFlag('native-remote-mobile', false)).toBe(false);
+  });
+
+  it('permits native remote at the supported version only when the remote flag is on', async () => {
+    hoisted.application.nativeApplicationVersion = '1.0.15';
+    hoisted.client.getFeatureFlag.mockReturnValue(true);
+    const { initPostHog } = await import('./posthog');
+    initPostHog();
+    expect(await readFlag('native-remote-mobile', false)).toBe(true);
+    hoisted.client.getFeatureFlag.mockReturnValue(false);
+    expect(await readFlag('native-remote-mobile', false)).toBe(false);
   });
 });

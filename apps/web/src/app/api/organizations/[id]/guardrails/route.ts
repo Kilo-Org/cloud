@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import {
   getOrganizationGuardrailsPolicy,
   type OrganizationGuardrailsPolicy,
@@ -17,9 +17,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<OrganizationGuardrailsPolicy | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId, undefined, {
-    requestMethod: request.method,
-  });
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/guardrails',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }

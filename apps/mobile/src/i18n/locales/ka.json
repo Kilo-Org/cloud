@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ნატიური დისტანციური დემო",
+    "sessionsEmpty": "ნატიური სესიები ჯერ არ არის",
+    "hosts": "ონლაინ ჰოსტები",
+    "hostsEmpty": "ონლაინ ჰოსტები არ არის",
+    "directory": "გაშვების დირექტორია",
+    "createSession": "ნატიური სესიის შექმნა",
+    "queueIfOffline": "მოთხოვნის რიგში ჩაყენება, თუ ჰოსტი გათიშულია",
+    "prompt": "მოთხოვნა ან /command",
+    "localClear": "ლოკალური ხედის გასუფთავება",
+    "abort": "სვლის შეწყვეტა",
+    "failed": "ნატიური დისტანციური მოქმედება ვერ შესრულდა",
+    "creationUnknown": "შექმნის შედეგი უცნობია. ხელახლა ცდამდე განაახლეთ სესიები.",
+    "commandFailed": "შემსრულებლის ბრძანება ვერ შესრულდა",
+    "invalidReply": "შემსრულებლის არასწორი პასუხი",
+    "unsafeCommand": "გამოიყენეთ /compact, /new, /skill, /models, /agents ან /clear (მხოლოდ ლოკალურად).",
+    "status": "კავშირი: {{connection}} · შემსრულებელი: {{runner}}",
+    "presenceStatus": "ჰოსტები: {{connection}}",
+    "commandStatus": "ბრძანების მიწოდება: {{status}}",
+    "delivered": "მიწოდებულია",
+    "expired": "ვადაგასულია"
+  },
   "common": {
     "cancel": "გაუქმება",
     "done": "მზადაა",

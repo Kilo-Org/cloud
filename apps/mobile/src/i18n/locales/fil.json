@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo ng native remote",
+    "sessionsEmpty": "Wala pang native na sesyon",
+    "hosts": "Mga online na host",
+    "hostsEmpty": "Walang online na host",
+    "directory": "Direktoryo ng trabaho",
+    "createSession": "Gumawa ng native na sesyon",
+    "queueIfOffline": "Ipila ang prompt kung offline ang host",
+    "prompt": "Prompt o /command",
+    "localClear": "Linisin ang lokal na view",
+    "abort": "Ihinto ang turn",
+    "failed": "Nabigo ang aksyon sa native remote",
+    "creationUnknown": "Hindi tiyak kung nalikha ang sesyon. I-refresh ang mga sesyon bago subukang muli.",
+    "commandFailed": "Nabigo ang command sa runner",
+    "invalidReply": "Hindi wastong tugon mula sa runner",
+    "unsafeCommand": "Gamitin ang /compact, /new, /skill, /models, /agents o /clear (lokal lang).",
+    "status": "Koneksyon: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Mga host: {{connection}}",
+    "commandStatus": "Paghahatid ng command: {{status}}",
+    "delivered": "Naihatid",
+    "expired": "Nag-expire"
+  },
   "common": {
     "cancel": "Kanselahin",
     "done": "Tapos",

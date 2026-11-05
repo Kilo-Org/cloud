@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ನೇಟಿವ್ ರಿಮೋಟ್ ಡೆಮೊ",
+    "sessionsEmpty": "ಇನ್ನೂ ಯಾವುದೇ ನೇಟಿವ್ ಸೆಷನ್‌ಗಳಿಲ್ಲ",
+    "hosts": "ಆನ್‌ಲೈನ್ ಹೋಸ್ಟ್‌ಗಳು",
+    "hostsEmpty": "ಯಾವುದೇ ಆನ್‌ಲೈನ್ ಹೋಸ್ಟ್‌ಗಳಿಲ್ಲ",
+    "directory": "ಕಾರ್ಯ ಡೈರೆಕ್ಟರಿ",
+    "createSession": "ನೇಟಿವ್ ಸೆಷನ್ ರಚಿಸಿ",
+    "queueIfOffline": "ಹೋಸ್ಟ್ ಆಫ್‌ಲೈನ್ ಆಗಿದ್ದರೆ ಪ್ರಾಂಪ್ಟ್ ಅನ್ನು ಸರದಿಯಲ್ಲಿ ಇರಿಸಿ",
+    "prompt": "ಪ್ರಾಂಪ್ಟ್ ಅಥವಾ /command",
+    "localClear": "ಸ್ಥಳೀಯ ವೀಕ್ಷಣೆಯನ್ನು ತೆರವುಗೊಳಿಸಿ",
+    "abort": "ಟರ್ನ್ ಅನ್ನು ಸ್ಥಗಿತಗೊಳಿಸಿ",
+    "failed": "ನೇಟಿವ್ ರಿಮೋಟ್ ಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ",
+    "creationUnknown": "ರಚನೆಯ ಫಲಿತಾಂಶ ತಿಳಿದಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುವ ಮೊದಲು ಸೆಷನ್‌ಗಳನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
+    "commandFailed": "ರನ್ನರ್ ಕಮಾಂಡ್ ವಿಫಲವಾಗಿದೆ",
+    "invalidReply": "ಅಮಾನ್ಯ ರನ್ನರ್ ಪ್ರತ್ಯುತ್ತರ",
+    "unsafeCommand": "/compact, /new, /skill, /models, /agents ಅಥವಾ /clear (ಸ್ಥಳೀಯ ಮಾತ್ರ) ಬಳಸಿ.",
+    "status": "ಸಂಪರ್ಕ: {{connection}} · ರನ್ನರ್: {{runner}}",
+    "presenceStatus": "ಹೋಸ್ಟ್‌ಗಳು: {{connection}}",
+    "commandStatus": "ಕಮಾಂಡ್ ವಿತರಣೆ: {{status}}",
+    "delivered": "ತಲುಪಿಸಲಾಗಿದೆ",
+    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ"
+  },
   "common": {
     "cancel": "ರದ್ದುಮಾಡಿ",
     "done": "ಮುಗಿದಿದೆ",

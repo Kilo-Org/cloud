@@ -345,9 +345,15 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   const actionIndex = prepareSteps.findIndex(
     step => step.uses === './.github/actions/harness-sdk-build'
   );
-  const uploadIndex = prepareSteps.findIndex(step =>
-    step.uses?.startsWith('actions/upload-artifact@')
-  );
+  // prepare uploads two artifacts; pick this one by name, not by position.
+  const sdkUploads = prepareSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === sdkArtifact
+    );
+  assert.equal(sdkUploads.length, 1, 'prepare uploads the harness SDK build exactly once');
+  const uploadIndex = sdkUploads[0].index;
   assert.ok(prepareInstall >= 0 && actionIndex > prepareInstall, 'prepare builds after install');
   assert.ok(uploadIndex > actionIndex, 'prepare uploads what it built');
   const upload = prepareSteps[uploadIndex];
@@ -375,9 +381,16 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     const installIndex = steps.findIndex(step =>
       /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
     );
-    const downloadIndex = steps.findIndex(step =>
-      step.uses?.startsWith('actions/download-artifact@')
-    );
+    // The consumer also downloads the tRPC declarations; pick this artifact by
+    // name, not by position.
+    const sdkDownloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === sdkArtifact
+      );
+    assert.equal(sdkDownloads.length, 1, `${name} downloads the harness SDK build once`);
+    const downloadIndex = sdkDownloads[0].index;
     assert.ok(
       installIndex >= 0 && downloadIndex > installIndex,
       `${name} downloads the build after install`
@@ -397,6 +410,87 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   assert.ok(
     [jobs.test.needs].flat().includes('prepare'),
     'the required test job fails with the shared build'
+  );
+});
+
+// The mobile checks resolve the tRPC declarations too, and `prepare` gates them
+// both, so both used to run the action: a cache miss compiled the declaration
+// program twice and both jobs raced to save the one key. `prepare` builds it
+// once and the checks download the tree.
+const trpcAction = './.github/actions/trpc-declarations';
+const trpcDist = 'packages/trpc/dist';
+const trpcArtifact = 'trpc-declarations';
+
+test('kilo-app CI builds the tRPC declarations once and both checks download them', () => {
+  const jobs = workflows['kilo-app-ci.yml'].jobs;
+  const actionUsers = Object.entries(jobs)
+    .filter(([, job]) => (job.steps ?? []).some(step => step.uses === trpcAction))
+    .map(([name]) => name);
+  assert.deepEqual(actionUsers, ['prepare'], 'only the shared job builds the declarations');
+
+  const prepareSteps = jobs.prepare.steps;
+  const installIndex = prepareSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = prepareSteps.findIndex(step => step.uses === trpcAction);
+  // `prepare` uploads two artifacts; pick this one by name, not by position.
+  const uploads = prepareSteps
+    .map((step, index) => ({ step, index }))
+    .filter(
+      ({ step }) =>
+        step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === trpcArtifact
+    );
+  assert.equal(uploads.length, 1, 'prepare uploads the declarations exactly once');
+  assert.ok(installIndex >= 0 && actionIndex > installIndex, 'prepare builds after install');
+  assert.ok(uploads[0].index > actionIndex, 'prepare uploads what it built');
+  const upload = uploads[0].step;
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['retention-days'], 1);
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const [name, run] of [
+    ['typecheck', 'Typecheck'],
+    ['lint', 'Lint'],
+  ]) {
+    const job = jobs[name];
+    assert.ok([job.needs ?? []].flat().includes('prepare'), `${name} waits for the producer`);
+    const steps = job.steps;
+    assert.deepEqual(
+      steps.filter(step => step.uses === trpcAction).map(step => step.name),
+      [],
+      `${name} never builds the declarations itself`
+    );
+    const downloads = steps
+      .map((step, index) => ({ step, index }))
+      .filter(
+        ({ step }) =>
+          step.uses?.startsWith('actions/download-artifact@') && step.with?.name === trpcArtifact
+      );
+    assert.equal(downloads.length, 1, `${name} downloads the declarations once`);
+    assert.match(
+      downloads[0].step.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(
+      downloads[0].step.with.path,
+      trpcDist,
+      `${name} restores it where the build writes`
+    );
+    const jobInstall = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    const jobRun = steps.findIndex(step => step.name === run);
+    assert.ok(downloads[0].index > jobInstall, `${name} downloads after install`);
+    assert.ok(downloads[0].index < jobRun, `${name} has the declarations before ${run}`);
+  }
+
+  // A failed declaration build leaves the checks skipped, and a skipped
+  // required check passes, so the aggregator must carry the failure.
+  assert.ok(
+    [jobs.test.needs].flat().includes('prepare'),
+    'the required test job fails with the declaration build'
   );
 });
 

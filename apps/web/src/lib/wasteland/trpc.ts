@@ -14,6 +14,10 @@ import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
 import { WASTELAND_URL } from '@/lib/service-urls';
+import {
+  browserCapabilityHeader,
+  type BrowserWorkerIdentity,
+} from '@/lib/worker-admin/browser-capability';
 
 // ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types
@@ -25,44 +29,73 @@ export type WastelandOutputs = inferRouterOutputs<WrappedWastelandRouter>;
 // Fetches a short-lived JWT from /api/wasteland/token (session-cookie-authed)
 // and caches it in memory. Refreshes automatically when near expiry.
 
-let cachedToken: string | null = null;
+let cachedIdentity: BrowserWorkerIdentity | null = null;
 let tokenExpiresAt: number = 0;
-let inflightRequest: Promise<string> | null = null;
+let inflightRequest: Promise<BrowserWorkerIdentity> | null = null;
 
-async function fetchToken(): Promise<string> {
+async function fetchIdentity(): Promise<BrowserWorkerIdentity> {
   const res = await fetch('/api/wasteland/token', { method: 'POST' });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to fetch wasteland token: ${res.status} ${body}`);
   }
   const data: unknown = await res.json();
-  const parsed = z.object({ token: z.string(), expiresAt: z.string() }).parse(data);
-  cachedToken = parsed.token;
+  const parsed = z
+    .object({
+      token: z.string(),
+      expiresAt: z.string(),
+      admin: z.boolean().catch(false),
+      capabilityIssuance: z.boolean().catch(false),
+    })
+    .parse(data);
+  cachedIdentity = {
+    token: parsed.token,
+    admin: parsed.admin,
+    capabilityIssuance: parsed.capabilityIssuance,
+  };
   tokenExpiresAt = new Date(parsed.expiresAt).getTime();
-  return parsed.token;
+  return cachedIdentity;
 }
 
-export async function getToken(): Promise<string> {
-  // Return cached token if still fresh (5 min buffer)
-  if (cachedToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
-    return cachedToken;
+export async function getIdentity(): Promise<BrowserWorkerIdentity> {
+  // Return cached identity if still fresh (5 min buffer)
+  if (cachedIdentity && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
+    return cachedIdentity;
   }
   // Deduplicate concurrent requests
   if (!inflightRequest) {
-    inflightRequest = fetchToken().finally(() => {
+    inflightRequest = fetchIdentity().finally(() => {
       inflightRequest = null;
     });
   }
   return inflightRequest;
 }
 
+export async function getToken(): Promise<string> {
+  return (await getIdentity()).token;
+}
+
 // ── tRPC client ───────────────────────────────────────────────────────────
 
 const wastelandTrpcUrl = `${WASTELAND_URL}/trpc`;
 
-const headers = async () => {
-  const token = await getToken();
-  return { Authorization: `Bearer ${token}` };
+const headers = async (
+  opts:
+    | { op: { path: string; input: unknown } }
+    | { opList: ReadonlyArray<{ path: string; input: unknown }> }
+) => {
+  const operations = 'opList' in opts ? opts.opList : [opts.op];
+  const identity = await getIdentity();
+  const capability = await browserCapabilityHeader({
+    audience: 'wasteland-admin',
+    operations,
+    getIdentity: getIdentity,
+    tokenEndpoint: '/api/wasteland/token',
+  });
+  return {
+    Authorization: `Bearer ${identity.token}`,
+    ...(capability ? { 'X-Kilo-Worker-Capability': capability } : {}),
+  };
 };
 
 export function createWastelandTRPCClient() {

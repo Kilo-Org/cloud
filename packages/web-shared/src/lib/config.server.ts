@@ -91,6 +91,21 @@ export function isNativeResourceCredentialIssuanceEnabled(): boolean {
 export function isSharedResourceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('SHARED_RESOURCE_TOKENS_ENABLED') === 'true';
 }
+/**
+ * Legacy Worker admin claims (`isAdmin` on the ordinary Gastown/Wasteland
+ * identity token). Defaults to on so behavior is unchanged until the operator
+ * flips it off during the legacy drain.
+ */
+export function isWorkerAdminLegacyClaimIssuanceEnabled(): boolean {
+  return getEnvVariable('WORKER_ADMIN_LEGACY_CLAIM_ISSUANCE') !== 'off';
+}
+/**
+ * Worker admin capability issuance. Defaults to off; must stay off in
+ * production until session-bound MFA step-up (PR2) is live.
+ */
+export function isWorkerAdminCapabilityIssuanceEnabled(): boolean {
+  return getEnvVariable('WORKER_ADMIN_CAPABILITY_ISSUANCE') === 'on';
+}
 const resourceTokenFamilyFlags = {
   'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
   gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
@@ -462,3 +477,16 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
+
+/**
+ * Binary session-bound MFA step-up switch.
+ *
+ * `'true'` enforces step-up on the admin surfaces; anything else, including
+ * unset, leaves the application exactly as it was before step-up. This is an
+ * environment variable rather than a release toggle so security posture does
+ * not depend on PostHog.
+ */
+export function isAdminStepUpEnabled(): boolean {
+  // Exact match: no trimming or casing variants, so a typo stays off.
+  return getEnvVariable('ADMIN_STEP_UP_ENABLED') === 'true';
+}

@@ -180,6 +180,11 @@ describe('kilo admin elevation telemetry', () => {
       ip: '203.0.113.7',
       reason: 'organization_access',
       target: 'organization:org-1',
+      supportDecision: null,
+      supportGrantId: null,
+      supportActionId: null,
+      inventoryId: null,
+      issuanceId: null,
     });
   });
 

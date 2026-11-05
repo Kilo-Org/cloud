@@ -61,14 +61,22 @@ type Props = {
 };
 
 /**
- * Remove's 28pt visible badge (h-7 w-7) plus slop on every side must reach the
- * platform minimum touch target. Read at render time so it follows the
+ * Remove's visible badge is `h-8 w-8`. NativeWind's rem is 14, so that badge is
+ * 28 dp — the minimum a pressable may be — and the slop on every side brings the
+ * target to the platform minimum. Read at render time so it follows the
  * platform, never captured once at module load.
  */
+const REMOVE_BADGE_DP = 28;
+
 function removeHitSlop() {
-  const slop = ((Platform.OS === 'android' ? 48 : 44) - 28) / 2;
+  const slop = ((Platform.OS === 'android' ? 48 : REMOVE_BADGE_DP + 16) - REMOVE_BADGE_DP) / 2;
   return { top: slop, bottom: slop, left: slop, right: slop };
 }
+
+/** The document chip's body measures 40 dp inside its border at native rem 14,
+ *  so two points of vertical slop reach the 44 dp tap target without moving the
+ *  chip or stealing its neighbours' taps. */
+const CHIP_BODY_HIT_SLOP = { top: 2, bottom: 2 } as const;
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -462,6 +470,7 @@ const AttachmentChip = memo(function AttachmentChip({
               <Pressable
                 ref={bodyRef}
                 className="h-full w-full active:opacity-70"
+                hitSlop={CHIP_BODY_HIT_SLOP}
                 accessible
                 onPress={handleOpen}
                 accessibilityLabel={description.accessibilityLabel}
@@ -504,7 +513,7 @@ const AttachmentChip = memo(function AttachmentChip({
                 onRemove(attachment.id);
               }}
               hitSlop={removeHitSlop()}
-              className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+              className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-background active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
                 filename: attachment.filename,

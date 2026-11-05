@@ -167,8 +167,7 @@ vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache' },
 }));
 vi.mock('@/lib/share-remote-file', () => ({
-  getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) =>
-    `${id}-${filename}`,
+  getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`,
   shareLocalFile: vi.fn(async () => {
     await Promise.resolve();
   }),
@@ -1242,9 +1241,9 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
 });
 
 describe('AttachmentPreviewStrip — control hit targets', () => {
-  // The Remove control renders a 28pt visible badge (h-7 w-7) and reaches the
-  // platform minimum through its hitSlop. This catches a revert to the old
-  // fixed 8pt slop, which leaves Android at 44dp instead of 48dp.
+  // The Remove control renders a 28 dp visible badge (h-8 at native rem 14) and
+  // reaches the platform minimum through its hitSlop. This catches a revert to
+  // the old fixed 8pt slop, which leaves Android at 44dp instead of 48dp.
   function removeHitSlop(root: TestRenderer.ReactTestInstance): {
     top: number;
     bottom: number;
@@ -1269,6 +1268,17 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     const hitSlop = removeHitSlop(renderer.root);
     expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
     expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(44);
+
+    renderer.unmount();
+  });
+
+  it('reaches the 44 dp tap target from the document chip body with its slop', async () => {
+    const renderer = await mount([makeAttachment({})]);
+    const body = chipBody(renderer.root);
+    const slop = body.props.hitSlop as { top: number; bottom: number };
+
+    // 40 dp of body inside the chip's border, plus the vertical slop.
+    expect(40 + slop.top + slop.bottom).toBeGreaterThanOrEqual(44);
 
     renderer.unmount();
   });

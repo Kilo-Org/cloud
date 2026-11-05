@@ -792,7 +792,7 @@
       "truncationBanner_other": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է։",
-    "linkPasteDenied": "Տեղադրման հասանելիությունը մերժվեց։ Թույլատրիր տեղադրումը և կրկին փորձիր։",
+    "linkPasteDenied": "Սեղմատախտակից փակցնելու հասանելիությունը մերժվեց։ Թույլատրիր փակցնելը և կրկին փորձիր։",
     "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",
@@ -983,7 +983,7 @@
       "limit": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
       "sizeRejection": "{{filename}} ֆայլի չափը գերազանցում է կցորդի թույլատրելի {{limit}} սահմանը։",
       "unreadable": "Չհաջողվեց կարդալ {{filename}}-ը։",
-      "pastedImage": "տեղադրված պատկերը",
+      "pastedImage": "փակցված պատկերը",
       "defaultName": "Կցված ֆայլ",
       "classificationDenied": "Գործարկվող ֆայլերը հնարավոր չէ կցել։",
       "classificationEmpty": "Ֆայլը դատարկ է։",
@@ -993,7 +993,7 @@
       "cantUpload": "Այս ֆայլը հնարավոր չէ վերբեռնել։",
       "networkError": "Ցանցային սխալ է տեղի ունեցել։",
       "uploadFailed": "Վերբեռնումը ձախողվեց։",
-      "nothingToPaste": "Տեղադրելու բան չկա։",
+      "nothingToPaste": "Փակցնելու բան չկա։",
       "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։",
       "limit_one": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
       "limit_other": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։"
@@ -2791,8 +2791,8 @@
       "moveRight": "Տեղափոխել {{filename}}-ը աջ"
     },
     "attachmentPasteHint": {
-      "accessibility": "Տեղադրել պատկերը սեղմատախտակից",
-      "label": "Պատկեր է հայտնաբերվել, հպեք՝ տեղադրելու համար"
+      "accessibility": "Փակցնել պատկերը սեղմատախտակից",
+      "label": "Պատկեր է հայտնաբերվել, հպեք՝ փակցնելու համար"
     },
     "attachmentPicker": {
       "camera": "Տեսախցիկ",
@@ -2812,7 +2812,7 @@
       "attachmentsWithSlashCommands": "Կցումներ հնարավոր չէ ուղարկել / հրամանների հետ։",
       "photoMetadataNotRemoved": "Չհաջողվեց կցումից հեռացնել լուսանկարի մետատվյալները։",
       "waitForUploads": "Սպասեք, մինչև կցումների վերբեռնումն ավարտվի։",
-      "pasteFromClipboard": "Տեղադրել սեղմատախտակից",
+      "pasteFromClipboard": "Փակցնել սեղմատախտակից",
       "stopGenerating": "Դադարեցնել գեներացումը",
       "selectModelBeforeSending": "Ուղարկելուց առաջ ընտրեք մոդել։",
       "preparingPlaceholder": "Միջավայրը նախապատրաստվում է…",

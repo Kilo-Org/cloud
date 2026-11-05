@@ -7,6 +7,14 @@ const MODEL_LIST_MAX_REDIRECTS = 3;
 
 const JSON_MEDIA_TYPE = /^application\/(?:json|[\w.+-]*\+json)$/i;
 
+/** A model list endpoint did not deliver a usable list. */
+export class ModelListFetchError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'ModelListFetchError';
+  }
+}
+
 export type ModelListFetchOptions = {
   maxBytes?: number;
   timeoutMs?: number;
@@ -34,27 +42,33 @@ export async function fetchModelListJson(
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'request failed';
-      throw new Error(`Failed to fetch ${description}: ${reason}`, { cause: error });
+      throw new ModelListFetchError(`Failed to fetch ${description}: ${reason}`, { cause: error });
     }
 
     // A runtime that follows a redirect anyway reports the URL it actually reached.
     if (response.url && new URL(response.url).origin !== origin) {
       await discardBody(response);
-      throw new Error(`Failed to fetch ${description}: request left the configured origin`);
+      throw new ModelListFetchError(
+        `Failed to fetch ${description}: request left the configured origin`
+      );
     }
 
     if (response.status >= 300 && response.status < 400) {
       await discardBody(response);
       const location = response.headers.get('location');
       if (!location) {
-        throw new Error(`Failed to fetch ${description}: redirect without a location`);
+        throw new ModelListFetchError(
+          `Failed to fetch ${description}: redirect without a location`
+        );
       }
       if (redirects >= MODEL_LIST_MAX_REDIRECTS) {
-        throw new Error(`Failed to fetch ${description}: too many redirects`);
+        throw new ModelListFetchError(`Failed to fetch ${description}: too many redirects`);
       }
       const next = new URL(location, current);
       if (next.origin !== origin) {
-        throw new Error(`Failed to fetch ${description}: request left the configured origin`);
+        throw new ModelListFetchError(
+          `Failed to fetch ${description}: request left the configured origin`
+        );
       }
       current = next.toString();
       continue;
@@ -62,13 +76,15 @@ export async function fetchModelListJson(
 
     if (!response.ok) {
       await discardBody(response);
-      throw new Error(`Failed to fetch ${description}: ${response.status} ${response.statusText}`);
+      throw new ModelListFetchError(
+        `Failed to fetch ${description}: ${response.status} ${response.statusText}`
+      );
     }
 
     const mediaType = (response.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? '';
     if (!JSON_MEDIA_TYPE.test(mediaType)) {
       await discardBody(response);
-      throw new Error(
+      throw new ModelListFetchError(
         `Failed to fetch ${description}: unexpected content type ${mediaType || 'missing'}`
       );
     }
@@ -76,7 +92,7 @@ export async function fetchModelListJson(
     const declaredLength = response.headers.get('content-length');
     if (declaredLength !== null && Number(declaredLength) > maxBytes) {
       await discardBody(response);
-      throw new Error(`Failed to fetch ${description}: response body is too large`);
+      throw new ModelListFetchError(`Failed to fetch ${description}: response body is too large`);
     }
 
     let body: string;
@@ -87,12 +103,12 @@ export async function fetchModelListJson(
         throw error;
       }
       const reason = error instanceof Error ? error.message : 'response body read failed';
-      throw new Error(`Failed to fetch ${description}: ${reason}`, { cause: error });
+      throw new ModelListFetchError(`Failed to fetch ${description}: ${reason}`, { cause: error });
     }
     try {
       return JSON.parse(body) as unknown;
     } catch (error) {
-      throw new Error(`Failed to fetch ${description}: response is not valid JSON`, {
+      throw new ModelListFetchError(`Failed to fetch ${description}: response is not valid JSON`, {
         cause: error,
       });
     }
@@ -105,7 +121,8 @@ async function readBoundedBody(
   maxBytes: number
 ): Promise<string> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error(`Failed to fetch ${description}: response has no body`);
+  if (!reader)
+    throw new ModelListFetchError(`Failed to fetch ${description}: response has no body`);
 
   const decoder = new TextDecoder();
   let text = '';
@@ -117,7 +134,7 @@ async function readBoundedBody(
       totalBytes += value.byteLength;
       if (totalBytes > maxBytes) {
         await reader.cancel().catch(() => undefined);
-        throw new Error(`Failed to fetch ${description}: response body is too large`);
+        throw new ModelListFetchError(`Failed to fetch ${description}: response body is too large`);
       }
       text += decoder.decode(value, { stream: true });
     }

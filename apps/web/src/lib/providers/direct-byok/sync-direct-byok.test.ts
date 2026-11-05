@@ -2,6 +2,7 @@ import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/li
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_sync_providers_state, direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
 import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   indexCatalogModelIdsByCanonicalId,
@@ -10,6 +11,10 @@ import {
   syncAndStoreDirectByokProviders,
   syncDirectByokModels,
 } from './sync-direct-byok';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+const mockCaptureException = jest.mocked(captureException);
 
 describe('parseOpenAICompatibleProviderModels', () => {
   test('parses Morph OpenAI-compatible model metadata', () => {
@@ -471,6 +476,7 @@ describe('syncDirectByokModels database snapshots', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    mockCaptureException.mockClear();
   });
 
   async function readSnapshot() {
@@ -684,6 +690,16 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
   });
 
+  test('fails the run on an unexpected provider error instead of recording a skip', async () => {
+    await syncDirectByokModels();
+    const insertSpy = jest.spyOn(db, 'insert').mockImplementationOnce(() => {
+      throw new Error('database is unavailable');
+    });
+
+    await expect(syncDirectByokModels()).rejects.toThrow('database is unavailable');
+    insertSpy.mockRestore();
+  });
+
   describe('syncAndStoreDirectByokProviders', () => {
     const providersCompletedAt = '2020-01-01T00:00:00.000Z';
 
@@ -741,6 +757,37 @@ describe('syncDirectByokModels database snapshots', () => {
       await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(/Failed to fetch/);
 
       expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
+    });
+
+    test('reports a provider whose stored list is past the stale window', async () => {
+      await syncDirectByokModels();
+      await db
+        .update(direct_byok_model_lists)
+        .set({ synced_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() })
+        .where(eq(direct_byok_model_lists.provider_id, providerId));
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await syncAndStoreDirectByokProviders();
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining(providerId) }),
+        expect.objectContaining({
+          extra: { providers: [{ providerId, staleForMs: expect.any(Number) }] },
+        })
+      );
+    });
+
+    test('keeps a single failed tick out of the error tracker', async () => {
+      await syncDirectByokModels();
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      const summary = await syncAndStoreDirectByokProviders();
+
+      expect(summary.failed_provider_ids).toStrictEqual([providerId]);
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
   });
 });

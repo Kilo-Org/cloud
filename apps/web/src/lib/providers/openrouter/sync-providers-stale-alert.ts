@@ -252,15 +252,24 @@ export async function recordSyncCompleted(jobId: SyncJobId): Promise<string> {
   return completedAt;
 }
 
-export function recordSkippedSyncProviders(jobId: SyncJobId, providerIds: string[]): void {
+export function recordSkippedSyncProviders(
+  jobId: SyncJobId,
+  skipped: ReadonlyArray<{ providerId: string; staleForMs: number }>
+): void {
   const job = SYNC_JOBS[jobId];
   captureException(
     new Error(
-      `${job.logPrefix} providers whose list could not be refreshed: ${providerIds.join(', ')}`
+      `${job.logPrefix} providers whose stored list is stale: ${skipped
+        .map(({ providerId, staleForMs }) =>
+          Number.isFinite(staleForMs)
+            ? `${providerId} (${Math.round(staleForMs / 60_000)} min)`
+            : `${providerId} (never synced)`
+        )
+        .join(', ')}`
     ),
     {
       tags: { component: job.sentryComponent },
-      extra: { providers: providerIds },
+      extra: { providers: skipped },
     }
   );
 }

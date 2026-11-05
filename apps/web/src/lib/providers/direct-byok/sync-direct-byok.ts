@@ -6,6 +6,7 @@ import type {
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { inArray } from 'drizzle-orm';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
   ModalitySchema,
@@ -19,9 +20,10 @@ import {
   type RawModel,
 } from './models-dev';
 import { parseAwsBedrockModelsDevModels } from './bedrock-models';
-import { fetchModelListJson } from './fetch-model-list';
+import { ModelListFetchError, fetchModelListJson } from './fetch-model-list';
 import { parseGcpVertexModelsDevModels } from './vertex-models';
 import {
+  SYNC_PROVIDERS_STALE_AFTER_MS,
   recordSkippedSyncProviders,
   recordSyncCompleted,
 } from '@/lib/providers/openrouter/sync-providers-stale-alert';
@@ -309,6 +311,11 @@ function hasSyncError(
   return 'error' in outcome;
 }
 
+/** Only a provider's own model list counts as a skippable failure. */
+function isProviderListUnavailable(error: unknown): boolean {
+  return error instanceof ModelListFetchError || error instanceof z.ZodError;
+}
+
 export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
   let catalogPromise: Promise<ModelsDevCatalog> | null = null;
   let catalogModelIdsPromise: Promise<ReadonlyMap<string, string>> | null = null;
@@ -325,8 +332,11 @@ export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
       try {
         return { provider_id: fetcher.providerId, count: await syncProvider(fetcher, ctx) };
       } catch (error) {
+        // A database or internal failure is not a provider skip: it fails the run, so the
+        // completion record stays behind and the stale-sync alert still sees it.
+        if (!isProviderListUnavailable(error)) throw error;
         console.error(
-          `[sync-direct-byok-providers] ${fetcher.providerId} failed, keeping the stored list:`,
+          `[sync-direct-byok-providers] ${fetcher.providerId} list unavailable, keeping the stored list:`,
           error
         );
         return {
@@ -346,9 +356,6 @@ export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
       direct_byok_model_counts[outcome.provider_id] = outcome.count;
     }
   }
-  if (failed_provider_ids.length > 0) {
-    recordSkippedSyncProviders('direct_byok', failed_provider_ids);
-  }
 
   // Nothing was skipped in favour of anything else, so the run itself failed.
   const [firstFailure] = outcomes.filter(hasSyncError);
@@ -359,6 +366,33 @@ export async function syncDirectByokModels(): Promise<DirectByokSyncResult> {
   return { direct_byok_model_counts, failed_provider_ids };
 }
 
+/**
+ * Reports a provider whose stored list has not refreshed for the stale window. A list that failed
+ * this tick only is left to the next tick, so a single upstream hiccup stays out of the error
+ * tracker.
+ */
+async function reportStaleProviderLists(providerIds: DirectUserByokInferenceProviderId[]) {
+  const rows = await db
+    .select({
+      provider_id: direct_byok_model_lists.provider_id,
+      synced_at: direct_byok_model_lists.synced_at,
+    })
+    .from(direct_byok_model_lists)
+    .where(inArray(direct_byok_model_lists.provider_id, providerIds));
+  const syncedAtById = new Map(rows.map(row => [row.provider_id, row.synced_at]));
+
+  const now = Date.now();
+  const stale = providerIds.flatMap(providerId => {
+    const syncedAt = syncedAtById.get(providerId);
+    const staleForMs =
+      syncedAt === undefined ? Number.POSITIVE_INFINITY : now - Date.parse(syncedAt);
+    return staleForMs >= SYNC_PROVIDERS_STALE_AFTER_MS ? [{ providerId, staleForMs }] : [];
+  });
+  if (stale.length > 0) {
+    recordSkippedSyncProviders('direct_byok', stale);
+  }
+}
+
 export async function syncAndStoreDirectByokProviders() {
   const startTime = performance.now();
   const { direct_byok_model_counts, failed_provider_ids } = await syncDirectByokModels();
@@ -367,6 +401,7 @@ export async function syncAndStoreDirectByokProviders() {
       '[sync-direct-byok-providers] providers without a fresh list:',
       failed_provider_ids
     );
+    await reportStaleProviderLists(failed_provider_ids);
   }
   console.log('[sync-direct-byok-providers] model counts:', direct_byok_model_counts);
   const completed_at = await recordSyncCompleted('direct_byok');

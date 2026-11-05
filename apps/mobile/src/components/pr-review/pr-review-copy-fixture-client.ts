@@ -79,6 +79,10 @@ function fixtureResponse(data: FixtureReadData): Response {
   });
 }
 
+const FIXTURE_URL = 'review-copy-fixture-trpc';
+/** Absolute base for parsing the query off a relative fixture URL. */
+const FIXTURE_URL_BASE = 'review-copy-fixture:/';
+
 const FilePageInput = z.object({ cursor: z.literal(100).nullish() });
 
 /** A read failure in the shape the tRPC http link raises as its error. */
@@ -106,8 +110,10 @@ export function createFixtureClient(surface: string | undefined) {
     links: [
       httpLink({
         // The fixture never reaches the network: the fetch below answers every
-        // read, so this marker only names which client answered it.
-        url: 'review-copy-fixture-trpc',
+        // read, so this marker only names which client answered it. The base
+        // lets the read below parse the query off the relative URL the link
+        // builds from that marker.
+        url: FIXTURE_URL,
         fetch: async (input, init) => {
           await Promise.resolve();
           const url = input instanceof Request ? input.url : input.toString();
@@ -124,7 +130,7 @@ export function createFixtureClient(surface: string | undefined) {
           }
           if (url.includes('/githubPrReview.listFiles')) {
             const pageInput = FilePageInput.parse(
-              JSON.parse(new URL(url).searchParams.get('input') ?? '{}')
+              JSON.parse(new URL(url, FIXTURE_URL_BASE).searchParams.get('input') ?? '{}')
             );
             const offset = pageInput.cursor === 100 ? 100 : 0;
             return fixtureResponse({

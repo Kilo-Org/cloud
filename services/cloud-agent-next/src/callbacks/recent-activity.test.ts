@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { LatestAssistantMessage, AssistantMessagePart } from '../session/types.js';
+import type { AssistantMessagePart } from '../session/types.js';
+import { readV1Answer } from './assistant-answer.js';
 import { renderRecentActivity } from './recent-activity.js';
 
-function message(id: number, parts: Partial<AssistantMessagePart>[]): LatestAssistantMessage {
-  return {
-    eventId: id as LatestAssistantMessage['eventId'],
-    timestamp: id,
-    info: { id: String(id), role: 'assistant', secretMetadata: 'private' },
-    parts: parts.map((part, index) => ({ id: String(index), messageID: String(id), ...part })),
-  };
+function message(id: number, parts: Partial<AssistantMessagePart>[]) {
+  return readV1Answer(
+    parts.map((part, index) => ({ id: String(index), messageID: String(id), ...part }))
+  );
 }
 
 describe('renderRecentActivity', () => {

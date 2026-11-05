@@ -815,7 +815,13 @@ export const controlPlaneEventSchema = z
   .strict();
 
 export const controlPlaneEventsNotificationSchema = z
-  .object({ events: z.array(controlPlaneEventSchema).min(1) })
+  .object({
+    events: z.array(controlPlaneEventSchema).min(1),
+    delivery: z
+      .object({ id: z.uuid(), expiresAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+      .strict()
+      .optional(),
+  })
   .strict();
 
 export const controlPlaneOutcomeSchema = z
@@ -1407,6 +1413,40 @@ const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
     .strict(),
 ]);
 
+/**
+ * Wrapper -> Sandbox DO: one page of a native v2 session's Cloud history, so the
+ * wrapper restores a lost native database from the Session DO over this socket.
+ * The Sandbox DO answers with `history.result` on the same socket.
+ */
+const controlPlaneHistoryPageFrameSchema = z
+  .object({
+    type: z.literal('history.page'),
+    requestId: z.string().min(1).max(128),
+    sessionId: z.string().min(1),
+    kiloSessionId: z.string().min(1),
+    cursor: z.string().min(1).max(2048).optional(),
+  })
+  .strict();
+
+const controlPlaneHistoryResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('history.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      page: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('history.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
 export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneHelloFrameSchema,
   controlPlaneWelcomeFrameSchema,
@@ -1440,6 +1480,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlaneHistoryPageFrameSchema,
+  controlPlaneHistoryResultFrameSchema,
 ]);
 
 export type ControlPlaneRouteGit = z.infer<typeof controlPlaneRouteGitSchema>;
@@ -1532,4 +1574,6 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
+export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

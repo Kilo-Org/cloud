@@ -11,7 +11,7 @@ import type {
   ControlPlaneRouteSpec,
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import { createPreparationManager, type PrepareDeps } from './prepare.js';
 import { readWorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
@@ -85,16 +85,14 @@ function spec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRoute
   };
 }
 
-function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
+function manager(
+  allocationId: string,
+  overrides: Partial<PrepareDeps> = {},
+  open = mock<Harness['open']>(async () => true)
+) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
   const runtimeEnvs: Record<string, string>[] = [];
-  const restore = mock<NonNullable<PrepareDeps['restore']>>(async () => ({
-    ok: true,
-    downloaded: true,
-    imported: true,
-    diffs: { applied: 0, skipped: 0, total: 0 },
-  }));
   const runSetup = mock(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
   const recoverWorktree = mock(async () => ({
     applied: 0,
@@ -109,7 +107,7 @@ function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
     runtimes: {
       ensure: async input => {
         runtimeEnvs.push(input.env);
-        return { serverUrl: 'http://127.0.0.1:1' } as unknown as WrapperKiloClient;
+        return { open } as unknown as Harness;
       },
       installCredentials: async () => undefined,
       isUnavailable: () => false,
@@ -124,15 +122,12 @@ function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
       const { git: run } = await import('../utils.js');
       return run(args, options);
     },
-    seedRegistration: async () => undefined,
-    sessionExists: async () => true,
-    restore,
     runSetup,
     recoverWorktree,
     sleep: async () => undefined,
     ...overrides,
   });
-  return { prepared, frames, gitCalls, restore, runtimeEnvs, runSetup, recoverWorktree };
+  return { prepared, frames, gitCalls, open, runtimeEnvs, runSetup, recoverWorktree };
 }
 
 function ready(frames: ControlPlaneWrapperFrame[]) {
@@ -495,7 +490,7 @@ describe('restoring a private workspace disk snapshot', () => {
     expect(await fs.readFile(gitCredentialRecordPath(home), 'utf8')).toContain(
       'password=current-git-token\n'
     );
-    expect(restored.restore).not.toHaveBeenCalled();
+    expect(restored.open.mock.calls[0]?.[0].restoreFiles).toBe(false);
     expect(restored.runSetup).not.toHaveBeenCalled();
     expect(restored.recoverWorktree).not.toHaveBeenCalled();
     expect(
@@ -575,7 +570,7 @@ describe('restoring a private workspace disk snapshot', () => {
     ]);
     expect(restored.runtimeEnvs[0]?.CURRENT_CONFIG).toBe('refreshed');
     expect(restored.runSetup).not.toHaveBeenCalled();
-    expect(restored.restore).not.toHaveBeenCalled();
+    expect(restored.open.mock.calls[0]?.[0].restoreFiles).toBe(false);
     expect(restored.gitCalls.some(args => ['clone', 'fetch', 'checkout'].includes(args[0]!))).toBe(
       false
     );
@@ -604,21 +599,24 @@ describe('restoring a private workspace disk snapshot', () => {
     expect(await fs.readFile(path.join(directory, 'recovered.txt'), 'utf8')).toBe('keep me');
   });
 
-  it('defers stamping until session resolution succeeds and falls back to history-only ingest', async () => {
+  it('defers stamping until the harness opens the session and requests history-only restoration', async () => {
     await manager('alloc-source').prepared.prepare(workspaceSpec());
-    const failed = manager('alloc-restored', {
-      sessionExists: async () => false,
-      restore: async () => ({ ok: false, error: 'unavailable', code: 503, step: 'download' }),
-    });
+    const failed = manager(
+      'alloc-restored',
+      {},
+      mock<Harness['open']>(async () => {
+        throw new Error('history unavailable');
+      })
+    );
     await failed.prepared.prepare(workspaceSpec({ workspaceSnapshot: provenance() }));
     expect(failed.frames.at(-1)).toMatchObject({ type: 'session.failed', step: 'kilo_session' });
     expect(await readWorkspaceStamp(directory)).toMatchObject({
       allocationId: 'alloc-source',
     });
-    const restarted = manager('alloc-restored', { sessionExists: async () => false });
+    const restarted = manager('alloc-restored');
     await restarted.prepared.prepare(workspaceSpec({ workspaceSnapshot: provenance() }));
     expect(ready(restarted.frames)).toBeDefined();
-    expect(restarted.restore.mock.calls[0]?.[3]?.restoreFiles).toBe(false);
+    expect(restarted.open.mock.calls[0]?.[0].restoreFiles).toBe(false);
   });
 
   it.each([false, true])('restores a bare session with git init=%s', async initializeGit => {

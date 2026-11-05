@@ -820,6 +820,12 @@ the legacy profile restrictions.
     activity until cancellation is confirmed; unconfirmed cancellation uses the existing
     runtime restart owner. A later native abort
     event cannot overwrite the outcome or settle a newly queued message.
+    Kilo can also close a turn `completed` after it gives up on the model request, with an
+    empty last step: a finished root assistant message with `finish: "other"`, zero token usage
+    and no tool part. After finalization the wrapper fails that turn `missing_assistant_reply`
+    instead of `completed`. A step with any tool call or token usage, or an unfinished step,
+    still completes. The wrapper does not re-drive the turn: Kilo owns the model-request retry,
+    and replaying the prompt could repeat earlier tool side effects.
     A `superseded` turn-close is Kilo handing off to a queued follow-up, so the native
     execution and both of its clocks continue into the next turn. Follow-ups therefore cannot
     extend a run past 120 minutes from its start; if no turn follows, the next idle snapshot
@@ -1604,6 +1610,7 @@ failure monitors keep working.
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
+| `missing_assistant_reply` (Kilo closed the turn `completed` with an empty last step) | `post_dispatch_no_activity` / `missing_assistant_reply` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |

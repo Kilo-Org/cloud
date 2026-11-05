@@ -42,6 +42,9 @@ export type SafeFailureProjectionSource = {
   providerOwnership?: CloudAgentProviderOwnership;
 };
 
+export const MISSING_ASSISTANT_REPLY_MESSAGE =
+  'The model produced no reply. Retry the message to continue.';
+
 const GENERIC_FAILURE_MESSAGES = {
   sandbox_connect_failed: 'Could not connect to the sandbox',
   workspace_setup_failed: 'Workspace setup failed',
@@ -57,7 +60,7 @@ const GENERIC_FAILURE_MESSAGES = {
   wrapper_error_before_activity: 'Agent wrapper failed before processing the message',
   assistant_error: 'Assistant request failed',
   wrapper_error_after_activity: 'Agent wrapper failed while processing the message',
-  missing_assistant_reply: 'No assistant reply was produced',
+  missing_assistant_reply: MISSING_ASSISTANT_REPLY_MESSAGE,
   payment_required: 'Assistant request failed: insufficient credits',
   admission_billing_unavailable:
     'Sandbox billing or capacity verification is unavailable. Try again shortly.',

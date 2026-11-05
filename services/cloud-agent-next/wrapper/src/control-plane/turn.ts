@@ -107,6 +107,9 @@ type DeferredCompletion = {
   lastMessageId: string;
 };
 
+/** The latest root assistant message since the last dispatch: the evidence for an empty reply. */
+type AssistantStep = { id: string; info?: Record<string, unknown>; hasTool: boolean };
+
 type MaterializedPrompt = Awaited<ReturnType<typeof materializeMessageAttachments>>;
 type PendingPrompt = {
   payload: ControlPlanePromptPayload;
@@ -130,6 +133,7 @@ export type Turn = {
   route: TurnRoute;
   phase: TurnPhase;
   assistantMessageId?: string;
+  assistantStep?: AssistantStep;
   /** Prompts received but not yet submitted because Kilo is restarting/suspected. */
   inbox: PendingPrompt[];
   /** Prompts received in this batch, kept (with their materialized message) until the outcome. */
@@ -229,12 +233,62 @@ function hasUndispatchedPrompt(turn: Pick<Turn, 'prompts'>): boolean {
  * cover the work it starts, so the pending idle is dropped.
  */
 function markDispatched(
-  turn: Pick<Turn, 'submittedSinceIdle' | 'idleWhileFinalizing' | 'phase'>,
+  turn: Pick<Turn, 'submittedSinceIdle' | 'idleWhileFinalizing' | 'phase' | 'assistantStep'>,
   pending: PendingPrompt
 ): void {
   pending.dispatched = true;
   turn.submittedSinceIdle = true;
+  turn.assistantStep = undefined;
   if (turn.phase === 'finalizing') turn.idleWhileFinalizing = false;
+}
+
+function hasZeroTokenUsage(tokens: unknown): boolean {
+  if (!isRecord(tokens)) return false;
+  const cache = tokens.cache;
+  return (
+    tokens.input === 0 &&
+    tokens.output === 0 &&
+    tokens.reasoning === 0 &&
+    (cache === undefined ||
+      (isRecord(cache) &&
+        (cache.read === undefined || cache.read === 0) &&
+        (cache.write === undefined || cache.write === 0)))
+  );
+}
+
+/**
+ * Kilo closed the turn `completed` after it gave up on the model request, but the last step
+ * produced nothing: a finished assistant message with `finish: "other"`, no token usage and no
+ * tool call. A step with any tool or usage, or an unfinished step, is not this case.
+ */
+function isEmptyAssistantReply(step: AssistantStep | undefined): boolean {
+  const info = step?.info;
+  if (step === undefined || info === undefined || step.hasTool) return false;
+  return (
+    info.finish === 'other' &&
+    isRecord(info.time) &&
+    typeof info.time.completed === 'number' &&
+    hasZeroTokenUsage(info.tokens)
+  );
+}
+
+function observeAssistantStep(
+  turn: Pick<Turn, 'assistantStep'>,
+  type: string,
+  properties: Record<string, unknown>
+): void {
+  if (type === 'message.updated') {
+    const info = properties.info;
+    if (!isRecord(info) || info.role !== 'assistant' || typeof info.id !== 'string') return;
+    const hasTool = turn.assistantStep?.id === info.id && turn.assistantStep.hasTool;
+    turn.assistantStep = { id: info.id, info, hasTool };
+    return;
+  }
+  if (type !== 'message.part.updated') return;
+  const part = properties.part;
+  if (!isRecord(part) || part.type !== 'tool' || typeof part.messageID !== 'string') return;
+  if (turn.assistantStep?.id === part.messageID) turn.assistantStep.hasTool = true;
+  else turn.assistantStep = { id: part.messageID, hasTool: true };
 }
 
 /**
@@ -482,6 +536,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           if (!runtime) throw new Error('Kilo runtime unavailable');
           const agent = turn.prompts.at(-1)?.payload.agent;
           turn.submittedSinceIdle = true;
+          turn.assistantStep = undefined;
           turn.deferredCompletion = undefined;
           await runtime.client.sendPromptAsync({
             sessionId: route.kiloSessionId,
@@ -828,6 +883,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
         if (turn.idleWhileFinalizing) continue; // the newer prompt's idle arrived; run again
         // A newer prompt is running; wait for its idle.
         turn.phase = 'busy';
+        return;
+      }
+      // Finalization still ran, so work from earlier steps is committed. Kilo already
+      // retried the model request; re-driving the turn could repeat earlier tool side effects.
+      if (isEmptyAssistantReply(turn.assistantStep)) {
+        sendOutcome(turn, 'failed', 'missing_assistant_reply');
         return;
       }
       sendOutcome(turn, 'completed');
@@ -1324,6 +1385,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.assistantMessageId = info.id;
         }
       }
+      observeAssistantStep(turn, event.type, event.properties);
       observeRootEvent(turn, event.type, event.properties);
     },
 

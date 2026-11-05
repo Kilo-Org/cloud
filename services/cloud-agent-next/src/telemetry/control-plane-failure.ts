@@ -129,6 +129,8 @@ export function classifyControlPlaneFailure(
     case 'no_progress':
     case 'no_outcome':
       return POST_DISPATCH_WRAPPER_NO_OUTPUT;
+    case 'missing_assistant_reply':
+      return { stage: 'post_dispatch_no_activity', code: 'missing_assistant_reply' };
     case 'prompt_failed':
       return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;
     case 'sandbox_stopped':

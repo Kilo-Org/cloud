@@ -3,6 +3,7 @@ import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import type { LatestAssistantMessage } from '../../session/types.js';
 import type { SessionMessage } from './messages.js';
 import { CALLBACK_QUEUE_MAX_SERIALIZED_BYTES } from '../../callbacks/queue-payload.js';
+import { SAFE_FAILURE_MESSAGE_MAX_LENGTH } from '../../session/safe-failure-projection.js';
 import {
   CALLBACK_OUTBOX_PREFIX,
   createMessageCallbacks,
@@ -17,6 +18,51 @@ const metadata = {
   lifecycle: { version: 1, timestamp: 1 },
   callback: { target: { url: 'https://example.com/callback' } },
 } satisfies SessionMetadata;
+
+describe('control-plane callback failure copy', () => {
+  it('tells the user an empty model reply can be retried', () => {
+    const stored = new Map<string, PendingCallbackJob>();
+    const callbacks = createMessageCallbacks({
+      storage: {
+        kv: {
+          get: <T>(key: string) => stored.get(key) as T | undefined,
+          put: (key: string, value: PendingCallbackJob) => {
+            stored.set(key, value);
+          },
+          delete: (key: string) => stored.delete(key),
+          list: () => stored,
+        } as DurableObjectStorage['kv'],
+      },
+      getMetadata: () => metadata,
+      getCallbackQueue: () => undefined,
+      getAssistantMessageForUserMessage: () => null,
+      getRecentAssistantMessagesForUserMessage: () => [],
+    });
+    const message = {
+      messageId: 'empty_reply',
+      intent: { agent: {} },
+      state: 'failed',
+      createdAt: 1,
+      acceptedAt: 2,
+      settledAt: 3,
+      reason: 'missing_assistant_reply',
+    } as SessionMessage;
+    expect(callbacks.persistDrainedBatchCallback([message], new Set([message.messageId]))).toBe(
+      true
+    );
+    const payload = stored.get(`${CALLBACK_OUTBOX_PREFIX}${message.messageId}`)?.job.payload;
+    const copy = 'The model produced no reply. Retry the message to continue.';
+    expect(payload).toMatchObject({
+      status: 'failed',
+      errorMessage: copy,
+      failureStage: 'post_dispatch_no_activity',
+      failure: { code: 'missing_assistant_reply', message: copy },
+      clientError: { code: 'MISSING_ASSISTANT_REPLY', message: copy, retryable: true },
+    });
+    expect(copy.length).toBeLessThanOrEqual(SAFE_FAILURE_MESSAGE_MAX_LENGTH);
+    expect(copy).not.toMatch(/execution failed|lost|unchanged/i);
+  });
+});
 
 describe('control-plane callback recent activity', () => {
   it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(

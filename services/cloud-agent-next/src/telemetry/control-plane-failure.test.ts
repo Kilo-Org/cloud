@@ -151,6 +151,13 @@ const cases: ReadonlyArray<
   ['no_progress', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   ['no_outcome', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   [
+    'missing_assistant_reply',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'missing_assistant_reply',
+  ],
+  [
     'prompt_failed',
     'accepted',
     'failed',
@@ -177,6 +184,22 @@ describe('classifyControlPlaneFailure', () => {
       reportStatus: 'failed',
       responsibility: 'user',
       failureReason: 'container_limit_reached',
+    });
+  });
+  it('attributes an empty assistant reply to the platform', () => {
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'missing_assistant_reply',
+        dispatchState: 'accepted',
+        status: 'failed',
+        admittedModel: 'deepseek/deepseek-v4.1-flash-1017',
+      })
+    ).toEqual({
+      stage: 'post_dispatch_no_activity',
+      code: 'missing_assistant_reply',
+      reportStatus: 'failed',
+      responsibility: 'platform',
+      failureReason: 'assistant_no_reply',
     });
   });
   it('attributes a blocked account to the user with its own reason', () => {

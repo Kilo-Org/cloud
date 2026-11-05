@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     name: 'postgres',
     environment: 'node',
+    setupFiles: ['./test/unit-setup.ts'],
     include: ['test/postgres/**/*.test.ts'],
   },
 });

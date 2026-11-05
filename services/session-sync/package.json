@@ -9,6 +9,7 @@
     "test": "vitest run && node --test scripts/render-staging-config.test.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
+    "types": "wrangler types --include-env=false",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-sync/src services/session-sync/test services/session-sync/scripts"
   },
@@ -22,7 +23,6 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",

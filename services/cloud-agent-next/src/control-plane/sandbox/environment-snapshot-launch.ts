@@ -95,9 +95,8 @@ export type EnvironmentLookup =
   | { kind: 'unavailable' };
 
 /**
- * One bounded lookup: at most `SNAPSHOT_LOOKUP_BUDGET_MS`, capped by what is left
- * of the launch deadline. A timeout does not cancel coordinator work; admission
- * is idempotent, so a later lookup returns the same build.
+ * The launch deadline bounds local waiting, not coordinator work. Native retries
+ * retain call identity; a new application call could admit another build.
  */
 export async function lookupEnvironmentSnapshot(input: {
   namespace: DurableObjectNamespace<EnvironmentBuild> | undefined;
@@ -108,29 +107,26 @@ export async function lookupEnvironmentSnapshot(input: {
   const now = input.now ?? Date.now;
   if (input.namespace === undefined) return { kind: 'unavailable' };
   const deadlineAt = Math.min(now() + SNAPSHOT_LOOKUP_BUDGET_MS, input.launchDeadlineAt);
+  const remaining = deadlineAt - now();
+  if (remaining <= 0) return { kind: 'timeout' };
   const stub = input.namespace.getByName(input.candidate.reference.environmentId);
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const remaining = deadlineAt - now();
-    if (remaining <= 0) return { kind: 'timeout' };
-    let timedOut = false;
-    try {
-      const resolution = (await withTimeout(
-        stub.resolveSnapshot({
-          reference: input.candidate.reference,
-          actorUserId: input.candidate.actorUserId,
-        }),
-        remaining,
-        'Environment snapshot lookup timed out',
-        () => {
-          timedOut = true;
-        }
-      )) as SnapshotResolution;
-      return { kind: 'resolved', resolution };
-    } catch {
-      if (timedOut) return { kind: 'timeout' };
-    }
+  let timedOut = false;
+  try {
+    const resolution = await withTimeout(
+      stub.resolveSnapshot({
+        reference: input.candidate.reference,
+        actorUserId: input.candidate.actorUserId,
+      }),
+      remaining,
+      'Environment snapshot lookup timed out',
+      () => {
+        timedOut = true;
+      }
+    );
+    return { kind: 'resolved', resolution };
+  } catch {
+    return { kind: timedOut ? 'timeout' : 'unavailable' };
   }
-  return { kind: 'unavailable' };
 }
 
 export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotStart | undefined {

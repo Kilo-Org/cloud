@@ -22,6 +22,7 @@ jest.mock(
   }),
   { virtual: true }
 );
+jest.mock('cloudflare:durable-objects', () => ({ retryable: jest.fn() }), { virtual: true });
 
 /**
  * The generated `drizzle/migrations` module imports `.sql` and `.json` files,

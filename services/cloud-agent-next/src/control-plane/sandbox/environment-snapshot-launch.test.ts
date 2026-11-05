@@ -189,13 +189,13 @@ describe('environment snapshot lookup', () => {
     expect(Date.now() - started).toBeLessThan(1_000);
   });
 
-  it('retries one transient failure and then starts without a snapshot', async () => {
-    let calls = 0;
+  it('starts without a snapshot after an ambiguous admission without creating another build', async () => {
+    const admittedBuilds: string[] = [];
     const namespace = {
       getByName: () => ({
         resolveSnapshot: async () => {
-          calls += 1;
-          throw new Error('transient');
+          admittedBuilds.push(crypto.randomUUID());
+          throw Object.assign(new Error('Admission reply lost'), { retryable: true });
         },
       }),
     };
@@ -206,7 +206,7 @@ describe('environment snapshot lookup', () => {
         launchDeadlineAt: Date.now() + 60_000,
       })
     ).resolves.toEqual({ kind: 'unavailable' });
-    expect(calls).toBe(2);
+    expect(admittedBuilds).toHaveLength(1);
     await expect(
       lookupEnvironmentSnapshot({
         namespace: undefined,

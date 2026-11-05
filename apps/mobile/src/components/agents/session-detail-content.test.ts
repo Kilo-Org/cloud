@@ -91,8 +91,8 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
 // The open gate's verdict the list mock publishes. `true` is the settled open
 // these cases describe; a test that needs the still-measuring window sets it to
-// `false` before mounting.
-const openSettledReport = vi.hoisted(() => ({ value: true }));
+// `false`, and `null` models a list that never reports.
+const openSettledReport = vi.hoisted(() => ({ value: true as boolean | null }));
 const connectionHealth = vi.hoisted(() => ({
   isConnected: true,
   reconnectExhausted: false,
@@ -366,7 +366,11 @@ vi.mock('@/components/agents/session-message-list', () => ({
     // needs the still-measuring window sets `openSettledReport.value = false`.
     const { onOpenSettledChange, sessionId } = props;
     useEffect(() => {
-      onOpenSettledChange?.(sessionId, openSettledReport.value);
+      const report = openSettledReport.value;
+      if (report === null) {
+        return;
+      }
+      onOpenSettledChange?.(sessionId, report);
     }, [onOpenSettledChange, sessionId]);
     return createElement(
       'MessageList',
@@ -4423,6 +4427,18 @@ describe('session detail read-only composer', () => {
       i18n.t('agentChat.session.readOnly')
     );
     expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('keeps the footer live when the mounted list never reports its open state', async () => {
+    openSettledReport.value = null;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    // A list that stays silent must not leave the bottom slot in its reserve:
+    // the session's own footer replaces the placeholder.
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
   });
 
   it('opens the new-session composer once on a repeated continue press', async () => {

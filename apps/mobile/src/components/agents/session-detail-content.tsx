@@ -404,8 +404,9 @@ export function SessionDetailContent({
   // final and paints the skeleton in the meantime. That verdict decides the
   // chrome around the transcript too: a finished footer, composer, or header
   // pill beside a loading body is the screen showing two states at once. Keyed
-  // by session, so a verdict from the previous one cannot leak into this one;
-  // until the mounted list reports, the chrome stays in its loading shape.
+  // by session, so a verdict from the previous one cannot leak into this one,
+  // and absent a verdict for this session the chrome stays settled: a host
+  // whose list never reports keeps the behavior it had before this hand-off.
   const [openSettledReport, setOpenSettledReport] = useState<{
     sessionId: string;
     settled: boolean;
@@ -418,7 +419,9 @@ export function SessionDetailContent({
     );
   }, []);
   const transcriptOpenSettled =
-    openSettledReport?.sessionId === sessionId && openSettledReport.settled;
+    openSettledReport === null ||
+    openSettledReport.sessionId !== sessionId ||
+    openSettledReport.settled;
   // The route's `at` is the position this screen resumes at. A resume link
   // dedupes onto an already-mounted route and updates its params instead of
   // remounting, so the position is adopted when the live param changes — unless

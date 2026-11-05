@@ -173,9 +173,11 @@ export function validateGitLabSessionCapabilityPath(
     let family: string;
     try {
       decodedProjectSelector = decodeURIComponent(projectSelector);
-      // Keep only the first component of the family segment.
+      // Keep only the first component of the family segment, without a format
+      // suffix, which the upstream router strips before it selects a resource.
       const familySegment = decodeURIComponent(remainingSegments[0] ?? '');
-      family = (familySegment.split(/[/\\]/, 1)[0] ?? '').toLowerCase();
+      const familyComponent = familySegment.split(/[/\\]/)[0] ?? '';
+      family = (familyComponent.split('.')[0] ?? '').toLowerCase();
     } catch {
       return { failure: 'invalid_upstream_url', authSurface: 'api' };
     }

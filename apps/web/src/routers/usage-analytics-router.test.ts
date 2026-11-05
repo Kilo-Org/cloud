@@ -318,12 +318,15 @@ describe('usage analytics date window', () => {
 
   it('derives the aggregation tier from the window boundaries', () => {
     const older = '2024-01-01T00:00:00.000Z';
-    const newer = '2026-11-05T00:00:00.000Z';
     const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const current = new Date().toISOString();
 
-    expect(resolveTier('hour', older, newer)).toEqual(resolveTier('hour', newer, older));
-    expect(resolveTier('hour', older, newer).effectiveGranularity).toBe('day');
+    // Pairs an old boundary with a fresh one so the assertion keeps failing if
+    // the clamp ever reads only one side of the window, whatever today's date.
+    expect(resolveTier('hour', older, recent)).toEqual(resolveTier('hour', recent, older));
+    expect(resolveTier('hour', older, recent).effectiveGranularity).toBe('day');
+    expect(resolveTier('hour', recent, older).effectiveGranularity).toBe('day');
+
+    const current = new Date().toISOString();
     expect(resolveTier('hour', recent, current)).toEqual(resolveTier('hour', current, recent));
     expect(resolveTier('hour', recent, current).effectiveGranularity).toBe('hour');
   });

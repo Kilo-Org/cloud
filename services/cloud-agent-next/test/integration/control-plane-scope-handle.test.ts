@@ -3,7 +3,7 @@ import {
   RUNTIME_CONTRACT_KEY,
   readRuntimeContract,
 } from '../../src/control-plane/sandbox/runtime-contract.js';
-import { runInDurableObject, env, reset } from 'cloudflare:test';
+import { createExecutionContext, runInDurableObject, env, reset } from 'cloudflare:test';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,6 +19,8 @@ import {
   issueRuntimeCredentialProxyHandle,
 } from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
+import worker from '../../src/server.js';
+import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
@@ -27,7 +29,7 @@ import {
 } from '../../src/control-plane/sandbox/accepted-handles.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import type { AgentSandboxProvider } from '../../src/types.js';
+import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,

@@ -145,6 +145,7 @@ const environmentResponseBaseSchema = {
     })
   ),
   commands: z.array(z.string()),
+  startCommands: z.array(z.string()),
   secretKeys: z.array(z.string()),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
@@ -294,6 +295,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretsSchema.optional(),
           commands: environmentCommandsSchema.optional(),
+          startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
         })
         .and(environmentEgressPolicySchema)
@@ -335,6 +337,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         plainVars: input.plainVars,
         secrets: input.secrets,
         commands: input.commands,
+        startCommands: input.startCommands,
         sandboxAllocation: input.sandboxAllocation,
         egressMode: input.egressMode,
         egressAllowlist: input.egressAllowlist,
@@ -364,6 +367,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretChangesSchema.optional(),
           commands: environmentCommandsSchema.optional(),
+          startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
         })
         .and(environmentEgressPolicySchema)
@@ -412,6 +416,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           plainVars: input.plainVars,
           secrets: input.secrets,
           commands: input.commands,
+          startCommands: input.startCommands,
           sandboxAllocation: input.sandboxAllocation,
           egressMode: input.egressMode,
           egressAllowlist: input.egressAllowlist,

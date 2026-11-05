@@ -359,6 +359,8 @@ function mapReasoningDetailsToReasoningString(
 
     if (reasoningText) {
       messageWithReasoning[field] = reasoningText;
+    } else if (legacyReasoning && !messageWithReasoning[field]) {
+      messageWithReasoning[field] = legacyReasoning;
     }
   }
 }

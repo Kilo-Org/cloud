@@ -4,8 +4,14 @@ import {
   type KiloSdkMessageHistoryPage,
   type KiloSdkStoredMessage,
   type KiloSessionId,
+  type CloudAgentSessionId,
 } from '@kilocode/cloud-agent-sdk';
-import { fetchWebSessionSnapshotPage, type SessionPageTrpcClient } from './session-page-adapter';
+import {
+  fetchWebCloudSessionSnapshotPage,
+  fetchWebSessionSnapshotPage,
+  type CloudSessionPageTrpcClient,
+  type SessionPageTrpcClient,
+} from './session-page-adapter';
 
 function kiloSessionId(id: string): KiloSessionId {
   return id as KiloSessionId;
@@ -65,6 +71,106 @@ function createClient(
     },
   };
 }
+
+describe('fetchWebCloudSessionSnapshotPage', () => {
+  const sessionId = 'workspace_12345678-1234-4234-9234-123456789abc' as CloudAgentSessionId;
+  const page = {
+    kind: 'success',
+    info: { id: 'ses_12345678901234567890123456' },
+    messages: [],
+    nextCursor: 'older',
+    omittedItemCount: 0,
+    updateCursor: 42,
+    totalCostMicrodollars: 350_000,
+  };
+
+  function client() {
+    const personal = jest.fn<
+      CloudSessionPageTrpcClient['cloudAgentNext']['getSessionMessagesPage']['query']
+    >(async () => page);
+    const organization = jest.fn<
+      CloudSessionPageTrpcClient['organizations']['cloudAgentNext']['getSessionMessagesPage']['query']
+    >(async () => page);
+    const ingest =
+      jest.fn<SessionPageTrpcClient['cliSessionsV2']['getSessionMessagesPage']['query']>();
+    return {
+      trpc: {
+        ...createClient(ingest),
+        cloudAgentNext: { getSessionMessagesPage: { query: personal } },
+        organizations: { cloudAgentNext: { getSessionMessagesPage: { query: organization } } },
+      },
+      personal,
+      organization,
+      ingest,
+    };
+  }
+
+  it('uses only the Cloud Agent personal endpoint for initial and older pages', async () => {
+    const fixture = client();
+    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toEqual(
+      page
+    );
+    await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { cursor: 'older', limit: 20 });
+    expect(fixture.personal).toHaveBeenNthCalledWith(1, { sessionId });
+    expect(fixture.personal).toHaveBeenNthCalledWith(2, { sessionId, cursor: 'older', limit: 20 });
+    expect(fixture.organization).not.toHaveBeenCalled();
+    expect(fixture.ingest).not.toHaveBeenCalled();
+  });
+
+  it('keeps organization scope on the DO proxy without calling the ingest router', async () => {
+    const fixture = client();
+    await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {
+      organizationId: 'org-1',
+      cursor: 'older',
+    });
+    expect(fixture.organization).toHaveBeenCalledWith({
+      sessionId,
+      cursor: 'older',
+      organizationId: 'org-1',
+    });
+    expect(fixture.personal).not.toHaveBeenCalled();
+    expect(fixture.ingest).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 'org-1'])(
+    'forwards a native child selector through the root DO for scope %s',
+    async organizationId => {
+      const fixture = client();
+      const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const childPage = { ...page, info: { id: childId, parentID: page.info.id } };
+      fixture.personal.mockResolvedValue(childPage);
+      fixture.organization.mockResolvedValue(childPage);
+      await expect(
+        fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {
+          organizationId,
+          kiloSessionId: childId,
+          cursor: 'child-older',
+        })
+      ).resolves.toEqual(childPage);
+      const input = {
+        sessionId,
+        kiloSessionId: childId,
+        cursor: 'child-older',
+      };
+      if (organizationId) {
+        expect(fixture.organization).toHaveBeenCalledWith({ ...input, organizationId });
+      } else {
+        expect(fixture.personal).toHaveBeenCalledWith(input);
+      }
+      expect(fixture.ingest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('validates mutation cursors and does not fall back on null or invalid DO results', async () => {
+    const fixture = client();
+    fixture.personal
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...page, updateCursor: 'wrong' });
+    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toBeNull();
+    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).rejects.toThrow();
+    expect(fixture.ingest).not.toHaveBeenCalled();
+  });
+});
 
 describe('fetchWebSessionSnapshotPage', () => {
   it('maps a successful shared history page to SessionSnapshotPageOutcome success', async () => {

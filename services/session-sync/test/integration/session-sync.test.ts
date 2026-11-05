@@ -359,7 +359,7 @@ describe('batches', () => {
 });
 
 describe('creator and tenant authority', () => {
-  it('lets organization members read but not change another creator session', async () => {
+  it('requires creator ACL for organization reads and writes', async () => {
     const organizationID = crypto.randomUUID();
     const { api, id, sourceID } = await setup(member(`usr-${crypto.randomUUID()}`, organizationID));
     await api.apply(
@@ -369,9 +369,9 @@ describe('creator and tenant authority', () => {
     const { hash } = await upload(api, id, 'creator bytes');
 
     const other = client(member(`usr-${crypto.randomUUID()}`, organizationID));
-    expect((await state(other, id)).deleted).toBe(false);
-    expect(await readAll(other, id)).toHaveLength(1);
-    expect((await other.getBlob(id, hash)).status).toBe(200);
+    await expectError(await other.state(id), 403, 'creator_mismatch');
+    await expectError(await other.entities(id), 403, 'creator_mismatch');
+    await expectError(await other.getBlob(id, hash), 403, 'creator_mismatch');
 
     await expectError(await other.register(id, sourceID), 403, 'creator_mismatch');
     await expectError(

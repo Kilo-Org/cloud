@@ -1,4 +1,5 @@
 import type { KiloAuthVariables } from '@kilocode/worker-utils/kilo-auth-middleware';
+import type { WorkerAdminAuthority } from '@kilocode/worker-utils/worker-admin-capability';
 import type { KiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 
 export type JwtOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
@@ -14,6 +15,7 @@ export type AuthVariables = KiloAuthVariables & {
   kiloApiTokenPepper: string | null;
   kiloGastownAccess: boolean;
   kiloOrgMemberships: JwtOrgMembership[];
+  workerAdmin: WorkerAdminAuthority;
   requestStartTime: number;
   debugOperator: DebugOperator;
 };

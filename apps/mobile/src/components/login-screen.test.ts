@@ -45,6 +45,9 @@ const authState = vi.hoisted(() => ({
   sessionEnded: false,
   token: undefined as string | undefined,
 }));
+// Per-test safe-area insets: the header row reserves the top inset, so the
+// mounted test drives it to a non-zero status bar instead of the zero default.
+const safeInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -60,7 +63,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
+  useSafeAreaInsets: () => safeInsets,
 }));
 vi.mock('sonner-native', () => ({ toast: vi.fn() }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
@@ -371,22 +374,31 @@ describe('login-screen language globe', () => {
     renderer.unmount();
   });
 
-  it('renders the globe after the screen without raising it above the toaster', async () => {
+  it('reserves a header row above the scroll content for the globe', async () => {
+    safeInsets.top = 24;
     const renderer = await mountLoginScreen();
     const globe = findGlobe(renderer.root);
-    const parent = globe.parent;
-    if (!parent) {
+    const headerRow = globe.parent;
+    if (!headerRow) {
       throw new Error('language globe parent not found');
     }
 
-    const scrollViewIndex = parent.children.findIndex(
+    const screen = headerRow.parent;
+    if (!screen) {
+      throw new Error('language globe header row parent not found');
+    }
+    const scrollViewIndex = screen.children.findIndex(
       child => typeof child !== 'string' && (child.type as string) === 'ScrollView'
     );
-    expect(scrollViewIndex).toBeGreaterThanOrEqual(0);
-    expect(parent.children.indexOf(globe)).toBeGreaterThan(scrollViewIndex);
+    // The row comes first and the scroller after it, so the scroll content
+    // starts below the control instead of running under an absolute overlay.
+    expect(screen.children.indexOf(headerRow)).toBeLessThan(scrollViewIndex);
+    // The row clears the status bar before the globe's own 48dp box.
+    expect(headerRow.props.style).toMatchObject({ paddingTop: 24 + 8, paddingEnd: 16 });
     expect(globe.props.className).not.toMatch(/\bz-/);
 
     renderer.unmount();
+    safeInsets.top = 0;
   });
 
   it('disables the globe during pending auth', async () => {

@@ -1,5 +1,6 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import * as z from 'zod';
 
 type JsonSchema = Record<string, unknown>;
@@ -53,6 +54,14 @@ export const TrpcErrorDataSchema = z
     zodError: TrpcZodFlattenedErrorSchema.nullable(),
     upstreamCode: z.string().optional(),
     authRequired: z.boolean().optional(),
+    stepUp: z
+      .object({
+        code: z.string(),
+        actionClass: z.string(),
+        purpose: z.string(),
+        maxAgeSeconds: z.number(),
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -115,6 +124,15 @@ export const trpcErrorFormatter = (({ shape, error }) => {
           : null,
       upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
       authRequired: error.cause instanceof AuthContextError ? true : undefined,
+      stepUp:
+        error.cause instanceof StepUpRequiredError
+          ? {
+              code: error.cause.code,
+              actionClass: error.cause.actionClass,
+              purpose: error.cause.purpose,
+              maxAgeSeconds: error.cause.maxAgeSeconds,
+            }
+          : undefined,
       ...(billingFailure ? { billingFailure } : {}),
     },
   };

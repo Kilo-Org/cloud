@@ -155,7 +155,9 @@ function buildAttemptUpdateData(
   if (fields.sessionId !== undefined) updateData.session_id = fields.sessionId;
   if (fields.cliSessionId !== undefined) updateData.cli_session_id = fields.cliSessionId;
   if (fields.executionId !== undefined) updateData.execution_id = fields.executionId;
-  if (fields.errorMessage !== undefined) updateData.error_message = fields.errorMessage;
+  if (fields.errorMessage !== undefined) {
+    updateData.error_message = sanitizePostgresString(fields.errorMessage);
+  }
   if (fields.terminalReason !== undefined) updateData.terminal_reason = fields.terminalReason;
   if (fields.startedAt !== undefined) updateData.started_at = fields.startedAt.toISOString();
   if (fields.completedAt !== undefined) updateData.completed_at = fields.completedAt.toISOString();
@@ -234,6 +236,7 @@ function codeReviewInsertValues(
     platform: params.platform ?? 'github',
     platform_project_id: params.platformProjectId ?? null,
     manual_config: params.manualConfig ?? null,
+    manual_operation_key: params.manualOperationKey ?? null,
     review_type: params.reviewType ?? 'standard',
     trigger_source: params.triggerSource ?? null,
     agent_version: 'v2',
@@ -590,7 +593,8 @@ export async function createCodeReviewAttempt(params: {
           execution_id: params.executionId ?? null,
           analytics_enabled_at_dispatch: params.analyticsEnabledAtDispatch ?? null,
           status,
-          error_message: params.errorMessage ?? null,
+          error_message:
+            params.errorMessage === undefined ? null : sanitizePostgresString(params.errorMessage),
           terminal_reason: params.terminalReason ?? null,
           started_at:
             params.startedAt?.toISOString() ?? (status === 'running' ? now.toISOString() : null),
@@ -1188,7 +1192,9 @@ function buildCodeReviewStatusUpdateData(
 
   if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
   if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
-  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.errorMessage !== undefined) {
+    updateData.error_message = sanitizePostgresString(updates.errorMessage);
+  }
   if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
   if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
   if (updates.completedAt !== undefined) {
@@ -1508,7 +1514,9 @@ export async function updateRepositoryReviewInstructionsMetadata(
 /**
  * Lists code reviews for an owner (org or user)
  * Supports filtering by status and repository
- * Returns reviews sorted by creation date (newest first)
+ * Returns reviews sorted by creation date (newest first), with the review id
+ * as the tiebreaker so an offset page never repeats or drops a row that shares
+ * a `created_at` value with another
  */
 export type CodeReviewListRow = Omit<
   CloudAgentCodeReview,
@@ -1553,7 +1561,7 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       .select(listColumns)
       .from(cloud_agent_code_reviews)
       .where(and(...conditions))
-      .orderBy(desc(cloud_agent_code_reviews.created_at))
+      .orderBy(desc(cloud_agent_code_reviews.created_at), asc(cloud_agent_code_reviews.id))
       .limit(limit)
       .offset(offset);
 
@@ -1789,14 +1797,26 @@ export async function createCodeReviewIfAbsentInTransaction(
 }
 
 /**
- * Cancels a code review
- * Sets status to 'cancelled' and records completion time
+ * Cancels one review on request, and only while it is still cancellable: the
+ * update is a compare-and-set from a non-terminal status, so a review that
+ * reached a terminal state in the meantime is left untouched.
+ *
+ * Cancelling runs through {@link cancelCodeReviewsWithDatabase} so the review's
+ * non-terminal attempts are cancelled in the same statement, the diagnostic
+ * phrase matches the attempt rows, and a dangling dispatch reservation is
+ * cleared. Ledger settling belongs to the caller, which only has a settle to
+ * make when this reports that a row changed.
  */
-export async function cancelCodeReview(reviewId: string): Promise<void> {
+export async function cancelCodeReview(reviewId: string): Promise<boolean> {
   try {
-    await updateCodeReviewStatus(reviewId, 'cancelled', {
-      completedAt: new Date(),
+    const cancelled = await cancelCodeReviewsWithDatabase(db, {
+      targetPredicate: eq(cloud_agent_code_reviews.id, reviewId),
+      terminalReason: 'user_cancelled',
+      errorMessage: 'Cancelled by user',
+      clearDispatchReservation: true,
     });
+
+    return cancelled.length > 0;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelCodeReview' },
@@ -1914,6 +1934,58 @@ export async function findActiveProviderPublishingReview(input: {
     captureException(error, {
       tags: { operation: 'findActiveProviderPublishingReview' },
       extra: { input },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Resolves the review a manual-start operation key already produced. The
+ * client sends the same key with a retry of the same draft, so a lookup hit
+ * means the first attempt was accepted even if its response never reached the
+ * client. Owner-scoped, matching the partial unique indexes on
+ * `manual_operation_key`.
+ */
+export async function findManualReviewByOperationKey(input: {
+  owner: CreateReviewParams['owner'];
+  manualOperationKey: string;
+}): Promise<{
+  id: string;
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  prNumber: number;
+} | null> {
+  const ownerCondition =
+    input.owner.type === 'org'
+      ? eq(cloud_agent_code_reviews.owned_by_organization_id, input.owner.id)
+      : eq(cloud_agent_code_reviews.owned_by_user_id, input.owner.id);
+
+  try {
+    const [review] = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        platform: cloud_agent_code_reviews.platform,
+        repoFullName: cloud_agent_code_reviews.repo_full_name,
+        prNumber: cloud_agent_code_reviews.pr_number,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          ownerCondition,
+          eq(cloud_agent_code_reviews.manual_operation_key, input.manualOperationKey)
+        )
+      )
+      .limit(1);
+
+    return review ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'findManualReviewByOperationKey' },
+      extra: {
+        ownerType: input.owner.type,
+        ownerId: input.owner.id,
+        manualOperationKey: input.manualOperationKey,
+      },
     });
     throw error;
   }

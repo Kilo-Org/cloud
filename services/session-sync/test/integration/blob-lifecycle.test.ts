@@ -237,14 +237,19 @@ describe('bounded blob cleanup', () => {
       uploads.push(upload);
     }
     await expire(stub);
-    // Each alarm claims one bounded page and schedules the next one. Drain the
-    // scheduled pages, then wait for a page the runtime may already be running.
-    while (await runDurableObjectAlarm(stub));
+    // Advance bounded cleanup pages until the blob budget is reclaimed; a live
+    // session can retain its separate future idle-retention alarm afterwards.
     await expect
-      .poll(async () => sessionStateSchema.parse(await (await api.state(sessionID)).json()))
+      .poll(
+        async () => {
+          await runDurableObjectAlarm(stub);
+          return sessionStateSchema.parse(await (await api.state(sessionID)).json());
+        },
+        { timeout: 10_000 }
+      )
       .toMatchObject({ usage: { blobBytes: 0 } });
     for (const upload of uploads) expect(await testEnv.SESSION_SYNC_R2.head(upload.key)).toBeNull();
-  });
+  }, 15_000);
 
   it('counts empty blobs against the metadata budget', async () => {
     const { principal, sessionID, stub } = await fixture();

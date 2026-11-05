@@ -1,5 +1,3 @@
-import { withDeadline } from '@kilocode/event-service';
-import { useQueryClient } from '@tanstack/react-query';
 import { Component, type ErrorInfo, type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -7,15 +5,8 @@ import { View } from 'react-native';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useRefetchBeforeRemount } from '@/lib/hooks/use-refetch-before-remount';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
-
-/**
- * Bound on the recovery refetch. A read that cannot settle (a query paused
- * while the device has no usable connection) must not leave the fallback's
- * Retry spinning: the stack remounts when the deadline lands and the refetch
- * continues in the background.
- */
-const RECOVERY_REFETCH_DEADLINE_MS = 10_000;
 
 /** Cap the React component stack before it rides in `extra`. */
 const MAX_COMPONENT_STACK_LENGTH = 2000;
@@ -174,27 +165,11 @@ export function TabStackErrorBoundary({
   queryPrefixes,
   children,
 }: Readonly<TabStackErrorBoundaryProps>) {
-  const queryClient = useQueryClient();
   const [attempt, setAttempt] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const retry = useCallback(() => {
-    setIsRetrying(true);
-    void (async () => {
-      try {
-        await withDeadline(RECOVERY_REFETCH_DEADLINE_MS, async () => {
-          await Promise.all(
-            queryPrefixes.map(queryKey => queryClient.refetchQueries({ queryKey, type: 'all' }))
-          );
-        });
-      } catch {
-        // A read that cannot settle inside the deadline must not leave Retry
-        // spinning; the remount below still rebinds the stack to its reads.
-      } finally {
-        setIsRetrying(false);
-        setAttempt(current => current + 1);
-      }
-    })();
-  }, [queryClient, queryPrefixes]);
+  const remount = useCallback(() => {
+    setAttempt(current => current + 1);
+  }, []);
+  const { retry, isRetrying } = useRefetchBeforeRemount(queryPrefixes, remount);
 
   return (
     <TabStackRenderBoundary

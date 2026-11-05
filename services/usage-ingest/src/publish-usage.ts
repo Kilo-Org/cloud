@@ -50,10 +50,41 @@ async function readUsageBody(request: Request) {
   }
 }
 
+function observeEnqueueCompletion(
+  pending: Promise<unknown>,
+  sendStartedAt: number,
+  usageId: string,
+  ctx: ExecutionContext | undefined
+): void {
+  if (!ctx) return;
+  const observed = pending.then(
+    () => logCompletion(sendStartedAt, usageId, 'accepted'),
+    () => logCompletion(sendStartedAt, usageId, 'unavailable')
+  );
+  try {
+    ctx.waitUntil(observed);
+  } catch {
+    logSafely('warn', () => ({
+      event: 'usage_ingest_enqueue_observation_unregistered',
+      usage_id: usageId,
+    }));
+  }
+}
+
+function logCompletion(sendStartedAt: number, usageId: string, outcome: string): void {
+  logSafely(outcome === 'accepted' ? 'info' : 'warn', () => ({
+    event: 'usage_ingest_enqueue_observed',
+    usage_id: usageId,
+    outcome,
+    send_duration_ms: Math.round(performance.now() - sendStartedAt),
+  }));
+}
+
 async function handlePublishUsage(
   request: Request,
   env: Env,
-  entryAtMs: number
+  entryAtMs: number,
+  ctx?: ExecutionContext
 ): Promise<Response> {
   const secret = env.USAGE_INGEST_PUBLISH_SECRET;
   if (!secret) return errorResponse('Service unavailable', 503);
@@ -90,9 +121,23 @@ async function handlePublishUsage(
     before_send_at_ms: beforeSendAtMs,
   }));
   const sendStartedAt = performance.now();
+  let sendPromise: Promise<unknown>;
+  try {
+    sendPromise = env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
+  } catch {
+    logSafely('warn', () => ({
+      event: 'usage_ingest_enqueue',
+      usage_id: result.data.core.id,
+      outcome: 'unavailable',
+      after_send_at_ms: Date.now(),
+      send_duration_ms: Math.round(performance.now() - sendStartedAt),
+    }));
+    return errorResponse('Queue unavailable', 503);
+  }
+  observeEnqueueCompletion(sendPromise, sendStartedAt, result.data.core.id, ctx);
   let response: unknown;
   try {
-    response = await env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
+    response = await sendPromise;
   } catch {
     logSafely('warn', () => ({
       event: 'usage_ingest_enqueue',
@@ -118,7 +163,11 @@ async function handlePublishUsage(
   return new Response(null, { status: 202 });
 }
 
-export async function handleFetch(request: Request, env: Env): Promise<Response> {
+export async function handleFetch(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext
+): Promise<Response> {
   const entryAtMs = Date.now();
   if (new URL(request.url).pathname !== '/usage') {
     return new Response('Not Found', { status: 404 });
@@ -127,5 +176,5 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
 
-  return handlePublishUsage(request, env, entryAtMs);
+  return handlePublishUsage(request, env, entryAtMs, ctx);
 }

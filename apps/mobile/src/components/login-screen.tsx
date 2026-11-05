@@ -4,7 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
@@ -189,7 +189,13 @@ export function LoginScreen() {
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
-  const globeTrailingInset = (I18nManager.isRTL ? insets.left : insets.right) + 16;
+  // The globe owns the screen's first row, and the scroll content starts below
+  // it: the logo used to share the control's band on a compact screen because
+  // the scroller began at the window top while the globe was an absolute overlay.
+  // The root's side paddings already carry `insets.left`/`insets.right`, so
+  // `paddingEnd` keeps the same RTL-aware clearance from the cutout that the old
+  // absolute `end` offset measured.
+  const headerRowStyle = { paddingTop: insets.top + 8, paddingEnd: 16 } as const;
   // A terminal device-auth error — an expired code, denied access, or the poll
   // timing out — renders its message above the idle form. Idle, every terminal
   // error, and a start that has not answered yet share the same single IdleAuth
@@ -217,6 +223,24 @@ export function LoginScreen() {
         paddingRight: insets.right,
       }}
     >
+      <View className="flex-row justify-end" style={headerRowStyle}>
+        <Pressable
+          onPress={() => {
+            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+            router.push('/(auth)/language-picker' as Href);
+          }}
+          disabled={globeDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'rounded-full active:opacity-70 disabled:opacity-50'
+          )}
+        >
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
+      </View>
       <ScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
@@ -333,24 +357,6 @@ export function LoginScreen() {
           )}
         </View>
       </ScrollView>
-      <Pressable
-        onPress={() => {
-          setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-          router.push('/(auth)/language-picker' as Href);
-        }}
-        disabled={globeDisabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.language')}
-        accessibilityState={{ disabled: globeDisabled }}
-        className={cn(
-          ICON_TARGET_BOX_CLASS,
-          'absolute rounded-full active:opacity-70 disabled:opacity-50'
-        )}
-        // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
-        style={{ top: insets.top + 8, end: globeTrailingInset }}
-      >
-        <Globe size={22} color={colors.foreground} />
-      </Pressable>
     </View>
   );
 }

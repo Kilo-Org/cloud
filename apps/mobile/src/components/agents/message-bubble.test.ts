@@ -248,6 +248,7 @@ async function renderBubbleWithHandlers(
   props: {
     deliveryState?: MessageDeliveryState;
     onRetryMessage?: (m: StoredMessage) => void;
+    retryAvailable?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
@@ -271,12 +272,12 @@ function assistantMessageWithText(id: string): StoredMessage {
 function assistantMessageWithError(
   id: string,
   errorName: string,
-  options: { content?: boolean } = {}
+  options: { content?: boolean; isRetryable?: boolean } = {}
 ): StoredMessage {
   const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
   (message.info as { error?: { name: string; data: unknown } }).error = {
     name: errorName,
-    data: { message: 'raw', isRetryable: true },
+    data: { message: 'raw', isRetryable: options.isRetryable ?? true },
   };
   return message;
 }
@@ -403,6 +404,47 @@ describe('MessageBubble failure footer', () => {
       { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
     );
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a failed turn without Retry when the session cannot send', async () => {
+    // No handler is wired at all: the read-only transcript declares the row
+    // cannot be re-sent, and the row must still say why it failed.
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-readonly', 'APIError'),
+      { retryAvailable: false }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The provider returned an error.')).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(findText(tree, t => t.includes('You can retry'))).toBe(false);
+  });
+
+  it('keeps a failed delivery’s copy and drops its Retry when the session cannot send', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-fail-readonly'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      retryAvailable: false,
+    });
+
+    expect(findText(tree, t => t === 'Failed to deliver')).toBe(true);
+    expect(
+      findText(tree, t => t === 'We could not deliver this message after several attempts.')
+    ).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a gateway-marked final refusal in the detail line, without Retry', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-terminal', 'APIError', { isRetryable: false }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(true);
+    // The transient failure's line is what the terminal row used to repeat.
+    expect(findText(tree, t => t === 'The provider returned an error.')).toBe(false);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
   });
 

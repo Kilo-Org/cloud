@@ -25,11 +25,11 @@ import type { Owner } from '@/lib/integrations/core/types';
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
 const GitLabOAuthConnectPostBodySchema = z.object({
-  organizationId: z.string().optional(),
-  instanceUrl: z.string().optional(),
-  clientId: z.string().optional(),
-  clientSecret: z.string().optional(),
-  returnTo: z.string().optional(),
+  organizationId: z.string().max(128).optional(),
+  instanceUrl: z.string().max(2048).optional(),
+  clientId: z.string().max(512).optional(),
+  clientSecret: z.string().max(512).optional(),
+  returnTo: z.string().max(2048).optional(),
 });
 
 type GitLabOAuthConnectOptions = {
@@ -105,21 +105,8 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
 }
 
 export async function handleGitLabOAuthConnectPost(request: NextRequest): Promise<Response> {
-  const rawBody = await request.json().catch(() => null);
-  const parsedBody = GitLabOAuthConnectPostBodySchema.safeParse(rawBody);
-
-  if (!parsedBody.success) {
-    return NextResponse.json({ error: 'Invalid GitLab OAuth request' }, { status: 400 });
-  }
-
-  const {
-    organizationId,
-    instanceUrl,
-    clientId,
-    clientSecret,
-    returnTo: rawReturnTo,
-  } = parsedBody.data;
-  const returnTo = rawReturnTo ? validateReturnPath(rawReturnTo) : null;
+  let organizationId: string | null = null;
+  let hasCustomCredentials = false;
 
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -127,8 +114,20 @@ export async function handleGitLabOAuthConnectPost(request: NextRequest): Promis
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rawBody = await request.json().catch(() => null);
+    const parsedBody = GitLabOAuthConnectPostBodySchema.safeParse(rawBody);
+
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid GitLab OAuth request' }, { status: 400 });
+    }
+
+    const { instanceUrl, clientId, clientSecret, returnTo: rawReturnTo } = parsedBody.data;
+    organizationId = parsedBody.data.organizationId ?? null;
+    hasCustomCredentials = Boolean(clientId && clientSecret);
+    const returnTo = rawReturnTo ? validateReturnPath(rawReturnTo) : null;
+
     const oauthUrl = await buildGitLabConnectOAuthUrl(user, {
-      organizationId: organizationId ?? null,
+      organizationId,
       instanceUrl,
       clientId,
       clientSecret,
@@ -148,7 +147,7 @@ export async function handleGitLabOAuthConnectPost(request: NextRequest): Promis
         },
         extra: {
           organizationId,
-          hasCustomCredentials: Boolean(clientId && clientSecret),
+          hasCustomCredentials,
         },
       });
     }

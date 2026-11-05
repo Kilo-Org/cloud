@@ -13,6 +13,7 @@ import {
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { EmptyState } from '@/components/empty-state';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
 import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
@@ -21,15 +22,13 @@ import { Text } from '@/components/ui/text';
 import { pickNewestSession } from '@/lib/glanceable/newest-session';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
  * The four ranked state counts, in the order every glanceable surface draws
  * them: what the user must act on, then what is making progress, then what will
- * wake later, then what is only connected. Every row draws while a session is
- * live, so a state stays visible even when nothing occupies it; an entirely
- * empty card draws the one line of its zero state instead.
+ * wake later, then what is only connected. Zero rows still draw, so every
+ * state remains visible even when no session currently occupies it.
  */
 const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
   { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
@@ -45,17 +44,6 @@ const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
-/**
- * The zero state, drawn in the frame the counts block, the divider and the
- * newest block make together. The counts rows, their gaps and padding, the
- * divider and the newest block measure 195 dp on the loaded card, so the card
- * keeps one height from the skeleton through the first live session. It speaks
- * in the same shape as the Agents list's empty state — the icon bubble over the
- * title — so the two surfaces read as one pattern for one condition.
- */
-const EMPTY_BLOCK_CLASS = 'min-h-[195px] items-center justify-center gap-4 px-4 py-3';
-const EMPTY_ICON_CLASS =
-  'h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
   return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
@@ -72,9 +60,9 @@ type GlanceableActiveCardProps = {
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index. With no sessions it is the zero state: the card
- * keeps its frame and speaks once, centering `Nothing running` in the space the
- * counts would repeat as four zeros.
+ * header opens the live index. With no sessions it is the zero state, and four
+ * zero counts would only restate its one message: the counters are left out and
+ * the empty message takes the card's body.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -82,7 +70,6 @@ export function GlanceableActiveCard({
   embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   // A minute-bucketed clock keeps the relative age fresh without reading
   // `Date.now()` behind a memoized render (see `useNowTicker`).
   const now = useNowTicker(10_000);
@@ -108,10 +95,19 @@ export function GlanceableActiveCard({
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
+  const empty = newestSession === null;
 
   return (
-    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
-      {newestSession === null ? null : (
+    <View
+      className={cn(
+        CARD_CLASS,
+        embedded && 'rounded-none border-0 bg-transparent',
+        // The frame reserves the counts card's height, so the zero state fills
+        // that height with its one message instead of leaving a band below it.
+        empty && 'flex-1'
+      )}
+    >
+      {empty ? null : (
         <>
           <View className={COUNTS_CLASS}>
             {COUNT_LINES.map(line => {
@@ -148,43 +144,41 @@ export function GlanceableActiveCard({
           value on the native view, and Android keeps announcing the previous
           account's session from the reused node. A new node per session and
           per zero state is the same remedy the PR-review inbox slot uses. */}
-      <CardControl
-        key={newestSession?.id ?? 'no-session'}
-        disabled={newestSession === null}
-        onPress={() => {
-          if (newestSession !== null) {
+      {newestSession !== null && newestTitle !== null && newestKind !== null ? (
+        <CardControl
+          key={newestSession.id}
+          onPress={() => {
             onPressSession(newestSession);
-          }
-        }}
-        accessibilityRole={newestSession === null ? undefined : 'button'}
-        accessibilityLabel={newestSession === null ? undefined : newestLabel}
-      >
-        <View className={newestSession === null ? EMPTY_BLOCK_CLASS : NEWEST_BLOCK_CLASS}>
-          {newestTitle !== null && newestKind !== null ? (
-            <>
-              <Text className="text-sm text-foreground">{newestTitle}</Text>
-              <View className={NEWEST_ROW_CLASS}>
-                <SessionStatusIcon kind={newestKind} />
-                <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
-                  {newestAge !== null ? (
-                    <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
-                  ) : null}
-                </View>
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={newestLabel}
+        >
+          <View className={NEWEST_BLOCK_CLASS}>
+            <Text className="text-sm text-foreground">{newestTitle}</Text>
+            <View className={NEWEST_ROW_CLASS}>
+              <SessionStatusIcon kind={newestKind} />
+              <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
+                {newestAge !== null ? (
+                  <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
+                ) : null}
               </View>
-            </>
-          ) : (
-            <>
-              <View className={EMPTY_ICON_CLASS}>
-                <Bot size={24} color={colors.mutedForeground} strokeWidth={1.5} />
-              </View>
-              <Text variant="large" className="text-center text-muted-foreground">
-                {t('home.noLiveSessions')}
-              </Text>
-            </>
-          )}
+            </View>
+          </View>
+        </CardControl>
+      ) : (
+        <View key="no-session" className="flex-1 justify-center">
+          {/* The card keeps its reserved frame with nothing live, so the zero
+              state fills that frame with the shared empty state's icon, title
+              and one-line hint instead of a lone line in a blank card. */}
+          <EmptyState
+            placement="static"
+            icon={Bot}
+            title={t('home.noLiveSessions')}
+            description={t('agents.sessionList.noSessionsYetDescription')}
+          />
         </View>
-      </CardControl>
+      )}
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { ActivityReads } from './harness-activity.js';
 import { KILO_ACTIVITY_MESSAGE_LIMIT } from '../kilo-api.js';
 import {
   executionRetry,
@@ -19,7 +20,16 @@ type PendingRequest = {
 
 /** Reads a bounded, complete observation; callers reject all partial failures. */
 export async function readSessionSnapshot(input: {
-  client: WrapperKiloClient;
+  client: Pick<
+    WrapperKiloClient,
+    | 'listSessionMetadata'
+    | 'getSessionStatuses'
+    | 'getQuestions'
+    | 'getPermissions'
+    | 'getSuggestions'
+    | 'getSessionDetails'
+  > &
+    ActivityReads;
   directory: string;
   observedDirectories: Iterable<string>;
   knownSessions: KnownSession[];
@@ -63,21 +73,18 @@ export async function readSessionSnapshot(input: {
       if (details.directory !== directory)
         throw new Error('Activity snapshot received mismatched execution directory');
       const requests = pending.filter(request => request.sessionID === id);
-      const messages = await client.getRecentSessionMessages(id, directory, signal);
-      const byId = new Map(messages.map(message => [message.info.id, message]));
+      const messages = await client.getRecentActivity(id, directory, signal);
+      const byId = new Map(messages.map(message => [message.id, message]));
       const messageIds = new Set([
         ...(known.get(id)?.messageIds ?? []),
         ...requests.flatMap(request => (request.tool ? [request.tool.messageID] : [])),
         ...messages
-          .filter(
-            message =>
-              message.info.role === 'assistant' && message.info.time.completed === undefined
-          )
-          .map(message => message.info.id),
+          .filter(message => message.role === 'assistant' && message.time?.completed === undefined)
+          .map(message => message.id),
       ]);
       for (const messageId of messageIds) {
-        const message = await client.getSessionMessage(id, directory, messageId, signal);
-        if (message.info.sessionID !== id || message.info.id !== messageId)
+        const message = await client.getMessageActivity(id, directory, messageId, signal);
+        if (message.sessionId !== id || message.id !== messageId)
           throw new Error('Activity snapshot received mismatched message identity');
         byId.set(messageId, message);
       }
@@ -85,7 +92,7 @@ export async function readSessionSnapshot(input: {
       // older native work is. Never guess idle or no-progress from that window.
       if (
         messages.length === KILO_ACTIVITY_MESSAGE_LIMIT &&
-        ![...byId.values()].some(message => message.info.role === 'assistant')
+        ![...byId.values()].some(message => message.role === 'assistant')
       ) {
         throw new Error('Activity message window cannot establish in-flight execution');
       }

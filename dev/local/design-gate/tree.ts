@@ -137,6 +137,34 @@ export const tags = {
 
 const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\))$/i;
 
+/**
+ * Owners whose content a native dialog or sheet hosts.
+ *
+ * The platform presents that surface in its own window and positions it there,
+ * so `getBoundingClientRect` reports every frame of its content from the
+ * surface's own origin: a bottom sheet whose top sits 307 dp down the app window
+ * measures its heading at y 0. The window's insets therefore do not describe
+ * those frames, and the surface owns them itself — `SessionPageSheet` pads the
+ * top inset on Android and sits below the status bar on iOS, as its own
+ * definition documents. No frame the probe can read distinguishes a surface that
+ * coincides with the window from one that does not, so a rule about the window's
+ * insets skips all of them rather than guessing from a height.
+ */
+const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
+
+/** True when one of a probe node's owners is a presented surface. */
+export function hasPresentedOwner(probe: ProbeNode): boolean {
+  return (probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true);
+}
+
+/**
+ * True when a native dialog or sheet hosts the node's content, so its frame is
+ * measured from that surface's origin rather than the window's.
+ */
+export function insidePresentedSurface(node: LayoutNode): boolean {
+  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
+}
+
 function visibleContainer(style: ProbeNode['style']): boolean {
   const background = style?.backgroundColor;
   const filled =

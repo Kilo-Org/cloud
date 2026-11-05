@@ -9,6 +9,7 @@ import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mou
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
+import { ScreenErrorBoundary } from '@/components/screen-error-boundary';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
@@ -27,7 +28,7 @@ import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
 import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
-import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useAppWideForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
@@ -97,7 +98,7 @@ function ForegroundReconciliationMount() {
  */
 function AppWideFreshnessMount() {
   const trpc = useTRPC();
-  useRouteForegroundRefresh([
+  useAppWideForegroundRefresh([
     trpc.user.getMe.queryKey(),
     trpc.organizations.list.queryKey(),
     // Kilo-chat keys are FLAT (['kilo-chat', 'conversations', …]), so the
@@ -116,6 +117,13 @@ export const unstable_settings = {
   // return to. `/` itself resolves straight to this anchor: it seeds the tab
   // navigator, so the group needs no `index` redirect of its own.
   anchor: '(tabs)',
+  // A throw while a route screen of this stack renders degrades to that
+  // screen's own retryable state instead of replacing the app: expo-router
+  // wraps each screen in this boundary inside its navigator, so the header, the
+  // back stack and every other screen survive. Nested layouts inherit it; the
+  // tab stacks that own `TabStackErrorBoundary` opt out in their own layouts
+  // and keep that recovery.
+  screenErrorBoundary: ScreenErrorBoundary,
 };
 
 export default function AppLayout() {
@@ -127,6 +135,18 @@ export default function AppLayout() {
     Platform.OS === 'android'
       ? { ...sheetOptions, sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
       : sheetOptions;
+  // Android lays a formSheet route's content out at the sheet's largest
+  // detent, not at the detent it presents: the run-target list measured 789dp
+  // inside a sheet whose presented body is 384dp, so whatever overflowed the
+  // sheet could be scrolled neither into view nor tapped, and a drag on a row
+  // fired that row instead of scrolling. One detent bounds the content host to
+  // the presented height, so these sheets always present at half height and
+  // their lists scroll inside it; a second detent would leave the overflow of
+  // the smaller one unreachable and the larger one empty once its list is
+  // bounded. Searchable sheets keep the full detent below, because the IME
+  // covers the half one.
+  const pickerSheetOptions =
+    Platform.OS === 'android' ? { ...sheetOptions, sheetAllowedDetents: [0.5] } : sheetOptions;
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
@@ -190,14 +210,16 @@ export default function AppLayout() {
               <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
               <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
-              <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
+              <Stack.Screen name="agent-chat/branch-picker" options={pickerSheetOptions} />
+              {/* The mode picker has always pinned its one detent on both
+                  platforms; only the other pickers move to it on Android. */}
               <Stack.Screen
                 name="agent-chat/mode-picker"
                 options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
               />
-              <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
-              <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
-              <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+              <Stack.Screen name="agent-chat/instance-picker" options={pickerSheetOptions} />
+              <Stack.Screen name="agent-chat/folder-picker" options={pickerSheetOptions} />
+              <Stack.Screen name="agent-chat/profile-picker" options={pickerSheetOptions} />
               <Stack.Screen name="todos/[list-id]" />
               <Stack.Screen name="todos/item/[item-id]" />
               <Stack.Screen
@@ -209,7 +231,7 @@ export default function AppLayout() {
               <Stack.Screen name="agent-briefing/settings" />
               <Stack.Screen name="share-gate" options={sheetOptions} />
               <Stack.Screen name="language-picker" options={searchSheetOptions} />
-              <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+              <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />
               <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
               <Stack.Screen
                 name="kilo-pass"

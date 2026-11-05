@@ -14,6 +14,7 @@ import {
   renderReport,
   resolveFont,
   screenBoxes,
+  skippedRules,
   writeArtifacts,
 } from './report';
 
@@ -75,7 +76,8 @@ test('renderReport lists the summary table and one line per finding', () => {
       finishedAt: 'F',
     },
     cells,
-    collapseFindings(findings)
+    collapseFindings(findings),
+    fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-render-'))
   );
   assert.match(report, /\| base \| 1 \| 1 \| 0 \|/);
   assert.ok(report.includes('| base | sessions | `/login` | 1 | 0 |'));
@@ -91,7 +93,8 @@ test('renderReport lists the summary table and one line per finding', () => {
     renderReport(
       { platform: 'ios', device: 'u', matrix: 'base', startedAt: 'S', finishedAt: 'F' },
       [],
-      []
+      [],
+      fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-empty-'))
     ),
     /No findings\./
   );
@@ -132,7 +135,8 @@ test('collapseFindings merges list-row repeats and keeps every box', () => {
   const report = renderReport(
     { platform: 'android', device: 'd', matrix: 'base', startedAt: 'S', finishedAt: 'F' },
     [],
-    groups
+    groups,
+    fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-collapse-'))
   );
   assert.ok(report.includes('1. **warning** `touch-target` ×12 · base · sessions'));
   assert.ok(report.includes('2. **warning** `touch-target` · base'));
@@ -262,4 +266,65 @@ test('writeArtifacts writes one sheet per target in matrix order and lists it', 
     fs.readFileSync(path.join(out, 'report.md'), 'utf8'),
     /base · home · safe-area: snapshot has no system-bar inset evidence/
   );
+});
+
+test('skippedRules lists the safe-area gap a presented surface leaves', () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-presented-'));
+  const write = (name: string, owners: string[] | undefined) => {
+    const file = path.join(out, name);
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        env: {
+          platform: 'android',
+          osVersion: '36',
+          route: '/',
+          window: { width: 400, height: 800 },
+          pixelRatio: 2,
+          fontScale: 1,
+          colorScheme: 'light',
+          isRTL: false,
+          language: 'en',
+          languagePreference: 'device',
+          safeArea: { top: 24, right: 0, bottom: 24, left: 0 },
+          tapTarget: { min: 28, touch: 44 },
+        },
+        nodes: [
+          { parent: -1, tag: 'RootView', rect: [0, 0, 400, 800] },
+          { parent: 0, tag: 'View', rect: [0, 600, 400, 170], ...(owners ? { owners } : {}) },
+        ],
+      })
+    );
+    return file;
+  };
+  const screen = (target: string, dump: string) => ({
+    target,
+    link: `kiloapp://${target}`,
+    screenshot: '',
+    annotated: '',
+    dump,
+    env: { route: '/' } as CellRun['screens'][number]['env'],
+  });
+  const cells: CellRun[] = [
+    {
+      id: 'base',
+      config: matrixCells('android', 'standard')[0],
+      screens: [
+        screen('sheet', write('sheet.json', ['View', 'PresentedContent'])),
+        screen('home', write('home.json', undefined)),
+      ],
+    },
+  ];
+
+  // The sheet's frames are surface-local, so the window's insets cannot be
+  // checked there; the report names the rule it skipped instead of staying quiet.
+  assert.deepEqual(skippedRules(cells, out), [
+    {
+      cell: 'base',
+      target: 'sheet',
+      rule: 'safe-area',
+      reason: 'a native dialog or sheet hosts the content, so its frames are surface-local',
+    },
+  ]);
 });

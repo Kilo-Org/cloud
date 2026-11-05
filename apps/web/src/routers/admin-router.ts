@@ -122,6 +122,7 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -2022,6 +2023,10 @@ export const adminRouter = createTRPCRouter({
               });
             }
 
+            // The session pepper and API pepper rotated above, so every step-up
+            // proof bound to the old credentials is no longer usable.
+            await revokeStepUpProofs(target.id, 'role_change', tx);
+
             await tx.insert(user_admin_notes).values({
               kilo_user_id: target.id,
               admin_kilo_user_id: actor.id,
@@ -2151,6 +2156,8 @@ export const adminRouter = createTRPCRouter({
               message: 'Failed to update target user',
             });
           }
+
+          await revokeStepUpProofs(target.id, 'permission_change', tx);
 
           const notes = [
             changes.is_super_admin !== undefined &&

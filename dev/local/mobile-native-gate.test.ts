@@ -108,6 +108,25 @@ test('a platform is skipped by the gate output it publishes', () => {
   assert.match(workflow.jobs.android.if ?? '', /needs\.gate\.outputs\.need_android == 'true'/);
 });
 
+test('the gate installs only what its hash steps read, before it releases the heavy jobs', () => {
+  const job = readWorkflow().jobs.gate;
+  const decide = job.steps.indexOf(step(job, 'decide'));
+  const filteredInstall = job.steps.findIndex(
+    item =>
+      item.run?.trim() ===
+      'pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts'
+  );
+  assert.ok(
+    filteredInstall >= 0,
+    'the gate must install the root project and the mobile app its Expo config comes from'
+  );
+  assert.ok(filteredInstall < decide, 'the filtered install must precede the hash and gate step');
+  assert.ok(
+    job.steps.every(item => item.run?.trim() !== 'pnpm install --frozen-lockfile'),
+    'the gate must not pay the recursive workspace install both builds wait behind'
+  );
+});
+
 test('each heavy job takes its own pull_request slot, the nativeHash slot elsewhere, and re-checks its artifact', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {

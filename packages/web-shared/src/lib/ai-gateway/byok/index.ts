@@ -8,8 +8,8 @@ import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/fai
 import {
   decryptByokEnvelope,
   getByokKmsClientConfig,
-  type ByokKmsContext,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {

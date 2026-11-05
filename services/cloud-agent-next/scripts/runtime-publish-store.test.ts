@@ -70,3 +70,48 @@ it('a missing key still means publication can be pending', async () => {
     await store('NoSuchKey').getBytes('runtime-artifacts/v1/handoffs/' + 'b'.repeat(40) + '.json')
   ).toBeNull();
 });
+const handoffKey = 'runtime-artifacts/v1/handoffs/' + 'b'.repeat(40) + '.json';
+const upload = (responses: Array<() => Response>) => {
+  const { store, request } = storeWith(responses);
+  return {
+    request,
+    put: () => store.putIfAbsent(handoffKey, new Uint8Array([1]), 'application/octet-stream'),
+  };
+};
+it('does not upload when the object already exists', async () => {
+  const { put, request } = upload([() => new Response(null, { status: 200 })]);
+  await expect(put()).resolves.toBe(false);
+  expect(request).toHaveBeenCalledTimes(1);
+});
+it('retries a transient HEAD failure before upload', async () => {
+  const { put, request } = upload([
+    () => new Response(null, { status: 503 }),
+    () => new Response(null, { status: 404 }),
+    () => new Response(null, { status: 200 }),
+  ]);
+  await expect(put()).resolves.toBe(true);
+  expect(request).toHaveBeenCalledTimes(3);
+});
+it('retries a transient PUT failure', async () => {
+  const { put, request } = upload([
+    () => new Response(null, { status: 404 }),
+    () => new Response(null, { status: 503 }),
+    () => new Response(null, { status: 200 }),
+  ]);
+  await expect(put()).resolves.toBe(true);
+  expect(request).toHaveBeenCalledTimes(3);
+});
+it('returns false when a retried upload finds the object', async () => {
+  const { put, request } = upload([
+    () => new Response(null, { status: 503 }),
+    () => new Response(null, { status: 404 }),
+    () => new Response(null, { status: 412 }),
+  ]);
+  await expect(put()).resolves.toBe(false);
+  expect(request).toHaveBeenCalledTimes(3);
+});
+it('does not retry a permanent HEAD failure', async () => {
+  const { put, request } = upload([() => new Response(null, { status: 403 })]);
+  await expect(put()).rejects.toThrow('runtime store HEAD failed (403)');
+  expect(request).toHaveBeenCalledTimes(1);
+});

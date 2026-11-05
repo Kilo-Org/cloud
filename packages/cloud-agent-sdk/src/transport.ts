@@ -6,7 +6,7 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { CloudAgentSessionId, KiloSessionId } from './types';
+import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 /**
@@ -177,6 +177,12 @@ type Transport = {
   acceptSuggestion?: (payload: { requestId: string; index: number }) => Promise<unknown>;
   /** Dismiss a `suggest` tool request. Requires Kilo CLI >= v7.2.7 on the remote side. */
   dismissSuggestion?: (payload: { requestId: string }) => Promise<unknown>;
+  /**
+   * Seed native part positions from a history page fetched outside the
+   * transport, such as a child session page, so later live deltas for a
+   * message that is still streaming continue after its stored parts.
+   */
+  observeProjected?: (messages: SessionSnapshot['messages']) => void;
 };
 
 /** Factory signature — creates a transport wired to the given sink. */

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
-import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -374,13 +374,17 @@ export function ScreenHeader({
   // reserve would shift the body the moment it reached the extra line.
   const titleLines = Math.min(Math.max(titleNumberOfLines, 1), MAX_TITLE_LINES);
 
-  // The slop widens the title into the free space beside it. RN does not mirror
-  // hitSlop under RTL, so the physical right slop would reach across the
-  // visually mirrored back control and the title (the later sibling) would win
-  // those taps — spell the free side per direction instead.
-  const titleHitSlop = I18nManager.isRTL
-    ? { top: 13, right: 0, bottom: 13, left: 13 }
-    : { top: 13, right: 13, bottom: 13, left: 0 };
+  // The title's touch area stays inside its own column. The free side beside
+  // the heading is the row's gap to the trailing slot, and a trailing control
+  // may carry a slop that reaches into that gap from the other side, so a
+  // title slop there made one strip of the row two ambiguous targets (measured
+  // on the session screen: 10.33 dp across, in every state and every gate
+  // cell). The box already carries the full target height
+  // (`HEADER_TITLE_TARGET_CLASS`); the vertical slop only widens the row's own
+  // padding, where nothing else is pressable. RN does not mirror hitSlop under
+  // RTL, so a side slop also had to be spelled per direction — with none, the
+  // touch area is the same box in both directions.
+  const titleHitSlop = { top: 13, bottom: 13 };
 
   // What pressing the title does. The pressable title itself is labelled with
   // the title's own text, so this is the hint, never the label: a screen reader

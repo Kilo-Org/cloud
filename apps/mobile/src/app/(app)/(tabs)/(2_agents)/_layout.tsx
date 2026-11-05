@@ -6,6 +6,11 @@ import { settleTabSwitchInput } from '@/lib/tab-switch-input-gate';
 
 export const unstable_settings = {
   initialRouteName: 'index',
+  // This stack carries `TabStackErrorBoundary`, whose fallback keeps the tab's
+  // own header and refetches this tab's reads. Opt out of the authenticated
+  // stack's screen boundary, which would otherwise catch a tab screen's throw
+  // first and take that recovery over.
+  screenErrorBoundary: null,
 };
 
 /**

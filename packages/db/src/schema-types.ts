@@ -1146,11 +1146,10 @@ export const ENKRYPT_DETECTOR_LIMITS = {
   keywords: 200,
   keywordLength: 100,
   policyTextLength: 10_000,
-  rules: 50,
+  rules: 5,
   ruleIdLength: 64,
   ruleDisplayTextLength: 120,
   ruleTextLength: 1_000,
-  serializedLength: 64_000,
 } as const;
 
 const enkryptLimits = ENKRYPT_DETECTOR_LIMITS;
@@ -1316,13 +1315,6 @@ function refineEnkryptDetectors(
     }
     seenRuleIds.add(rule.id);
   });
-  if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
-    ctx.addIssue({
-      code: 'custom',
-      path: [],
-      message: 'This detector configuration is too large. Remove some keywords, topics, or rules.',
-    });
-  }
 }
 
 /**

@@ -179,6 +179,24 @@ describe('getEnkryptGuardrailsIssues', () => {
     );
     expect(issueAt(issues, 'policy_violation.rules.0.id')).toBeUndefined();
   });
+
+  it('reports more than five structured rules', () => {
+    const draft = enabledDraft();
+    draft.detectors.policy_violation = {
+      enabled: true,
+      format: 'rules',
+      policy_text: '',
+      rules: Array.from({ length: 6 }, (_, index) => ({
+        ...createPolicyRule([]),
+        id: `rule-${index}`,
+        text: 'Do not share customer records.',
+      })),
+    };
+
+    expect(issueAt(getEnkryptGuardrailsIssues(draft), 'policy_violation.rules')).toBe(
+      'Add up to 5 rules.'
+    );
+  });
 });
 
 describe('getEnkryptOutputGuardrailIssues', () => {
@@ -204,5 +222,25 @@ describe('getEnkryptOutputGuardrailIssues', () => {
     const issues = getEnkryptGuardrailsIssues(draft);
     expect(issueAt(issues, 'output.topic_detector.topic')).toBe('Add at least one topic.');
     expect(issueAt(issues, 'topic_detector')).toBeUndefined();
+  });
+
+  it('reports more than five structured rules', () => {
+    const { output } = enabledDraft();
+    output.enabled = true;
+    output.detectors.policy_violation = {
+      enabled: true,
+      action: 'block',
+      format: 'rules',
+      policy_text: '',
+      rules: Array.from({ length: 6 }, (_, index) => ({
+        ...createPolicyRule([]),
+        id: `rule-${index}`,
+        text: 'Do not share customer records.',
+      })),
+    };
+
+    expect(issueAt(getEnkryptOutputGuardrailIssues(output), 'policy_violation.rules')).toBe(
+      'Add up to 5 rules.'
+    );
   });
 });

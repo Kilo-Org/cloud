@@ -14,6 +14,7 @@ import type { User, Organization } from '@kilocode/db/schema';
 import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
 import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import type * as GitHubAdapterModule from '@/lib/integrations/platforms/github/adapter';
 import {
   createEmptyPrObservations,
   type PrObservations,
@@ -110,14 +111,20 @@ jest.mock('@sentry/nextjs', () => {
 // module members fails. Replace `fetchPullRequestByNumber` on the already-mocked
 // adapter module with a fresh `jest.fn()` so individual tests can drive it.
 jest.mock('@/lib/integrations/platforms/github/adapter', () => {
-  const actual: Record<string, unknown> = jest.requireActual(
+  const actual = jest.requireActual<typeof GitHubAdapterModule>(
     '@/lib/integrations/platforms/github/adapter'
   );
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
+    toGitHubRateLimitError: jest.fn(actual.toGitHubRateLimitError),
   };
 });
+
+jest.mock('@/lib/integrations/platforms/github/pr-refresh-budget', () => ({
+  claimPrRefresh: jest.fn(async () => ({ allowed: true })),
+  deferPrRefresh: jest.fn(async () => undefined),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/pr-status', () => ({
   fetchPullRequestObservations: jest.fn(),
@@ -3374,6 +3381,7 @@ describe('cli-sessions-v2-router', () => {
         appType: 'standard',
         includeCommits: true,
         expectedHeadSha: 'abc123',
+        signal: expect.any(AbortSignal),
       });
       expect(mockedFetchPullRequestObservations).toHaveBeenCalledTimes(1);
       expect(mockedFetchPullRequestObservations).toHaveBeenCalledWith({
@@ -3385,6 +3393,7 @@ describe('cli-sessions-v2-router', () => {
         appType: 'standard',
         pullRequest: fetched,
         existing: null,
+        signal: expect.any(AbortSignal),
       });
       expect(mockedFetchPullRequestObservations.mock.calls[0][0].pullRequest).toBe(fetched);
       expect(result.associatedPr).toMatchObject({

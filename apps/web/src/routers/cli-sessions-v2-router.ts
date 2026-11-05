@@ -72,7 +72,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
-  GitHubRateLimitError,
+  toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -94,6 +94,10 @@ import {
   prObservationSummarySchema,
 } from '@/lib/integrations/platforms/github/pr-observations';
 import { fetchPullRequestObservations } from '@/lib/integrations/platforms/github/pr-status';
+import {
+  claimPrRefresh,
+  deferPrRefresh,
+} from '@/lib/integrations/platforms/github/pr-refresh-budget';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
 import {
@@ -2235,6 +2239,28 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
       const appType = integration.github_app_type ?? 'standard';
+      const refreshBudget = await claimPrRefresh({
+        appType,
+        installationId: String(installationId),
+        owner: session.organization_id
+          ? { type: 'org', id: session.organization_id }
+          : { type: 'user', id: ctx.user.id },
+        repo: `${parsed.owner}/${parsed.repo}`,
+        number: parsed.number,
+      });
+      if (!refreshBudget.allowed) {
+        throw new TRPCError({
+          code:
+            refreshBudget.reason === 'unavailable' ? 'SERVICE_UNAVAILABLE' : 'TOO_MANY_REQUESTS',
+          message:
+            refreshBudget.reason === 'unavailable'
+              ? 'PR refresh is temporarily unavailable. Cached PR data is unchanged.'
+              : refreshBudget.reason === 'rate_limited'
+                ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
+                : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+        });
+      }
+      const signal = AbortSignal.timeout(45_000);
 
       // Fetch the PR by number from the stored link. When the session reported
       // a head SHA that may not be the current PR head, also fetch the PR's
@@ -2249,13 +2275,19 @@ export const cliSessionsV2Router = createTRPCRouter({
           appType,
           includeCommits: session.pr_head_sha != null,
           expectedHeadSha: session.pr_head_sha,
+          signal,
         });
       } catch (error) {
-        if (error instanceof GitHubRateLimitError) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
+          });
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
-            message: `GitHub rate limit reached; try again after ${error.resetAt.toISOString()}`,
-            cause: error,
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
           });
         }
         captureException(error, {
@@ -2326,8 +2358,21 @@ export const cliSessionsV2Router = createTRPCRouter({
             appType,
             pullRequest: fetched,
             existing: cacheRow.pr_observations,
+            signal,
           }));
       } catch (error) {
+        const rateLimit = toGitHubRateLimitError(error);
+        if (rateLimit) {
+          await deferPrRefresh({
+            appType,
+            installationId: String(installationId),
+            resetAt: rateLimit.resetAt,
+          });
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+          });
+        }
         observations = {
           ...observations,
           checksComplete: false,

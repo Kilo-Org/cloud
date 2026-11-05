@@ -4,8 +4,10 @@ import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
 import {
   generateGitHubInstallationToken,
+  toGitHubRateLimitError,
   type AssociatedPullRequest,
   type GitHubAppType,
+  type GitHubRateLimitError,
 } from './adapter';
 import {
   createEmptyPrObservations,
@@ -20,7 +22,16 @@ import {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const PAGE_SIZE = 100;
-const MAX_PAGES = 5;
+// Two pages hold the 200-observation state cap without reading history nobody
+// can persist.
+const MAX_PAGES = 2;
+// GraphQL reports rate limiting in a HTTP 200 body; scan every entry because
+// the limiting error is not guaranteed to be first.
+const GRAPHQL_RATE_LIMIT_CODES = new Set([
+  'RATE_LIMITED',
+  'SECONDARY_RATE_LIMIT',
+  'ABUSE_DETECTION',
+]);
 
 export type PullRequestObservationMetadata = AssociatedPullRequest & {
   baseSha?: string;
@@ -38,6 +49,8 @@ export type FetchPullRequestObservationsInput = {
   number: number;
   pullRequest: PullRequestObservationMetadata;
   existing: unknown;
+  /** Shared deadline for every GitHub request this refresh makes. */
+  signal?: AbortSignal;
 };
 
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null;
@@ -164,12 +177,59 @@ function linkHasNext(headers: unknown): boolean | null {
   return /rel="?next"?/i.test(link);
 }
 
+type RateLimitState = { error: GitHubRateLimitError | null };
+
+/**
+ * Record a rate limit for this invocation, keeping the latest deadline so the
+ * caller waits for the longest signal any leg saw. Returns the normalized
+ * error, or null when the failure is not a rate limit.
+ */
+function recordRateLimit(state: RateLimitState, error: unknown): GitHubRateLimitError | null {
+  const rateError = toGitHubRateLimitError(error);
+  if (!rateError) return null;
+  if (!state.error || rateError.resetAt.getTime() > state.error.resetAt.getTime()) {
+    state.error = rateError;
+  }
+  return rateError;
+}
+
+function isRateLimitGraphQlError(entry: unknown): boolean {
+  if (!isRecord(entry)) return false;
+  const codes: unknown[] = [entry.type];
+  if (isRecord(entry.extensions)) codes.push(entry.extensions.code);
+  return codes.some(
+    code => typeof code === 'string' && GRAPHQL_RATE_LIMIT_CODES.has(code.toUpperCase())
+  );
+}
+
+/**
+ * GraphQL answers rate limits with HTTP 200, so there are no rate headers to
+ * classify. Reuse the adapter's header parser against a synthetic 429 carrying
+ * the response's actual headers to keep one deadline rule.
+ */
+function graphQlRateLimitError(headers: unknown): GitHubRateLimitError | null {
+  return toGitHubRateLimitError({
+    status: 429,
+    message: 'GitHub GraphQL rate limit',
+    response: { headers },
+  });
+}
+
 async function collectRestPages<T>(
+  state: RateLimitState,
   fetchPage: (page: number) => Promise<{ data: T[]; headers: unknown }>
 ): Promise<CheckPage<T>> {
   const items: T[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const response = await fetchPage(page);
+    // A sibling leg saw a rate limit: stop before starting another request.
+    if (state.error) throw state.error;
+    let response: { data: T[]; headers: unknown };
+    try {
+      response = await fetchPage(page);
+    } catch (error) {
+      const rateError = recordRateLimit(state, error);
+      throw rateError ?? error;
+    }
     items.push(...response.data);
     const hasNext = linkHasNext(response.headers) ?? response.data.length >= PAGE_SIZE;
     if (!hasNext) return { items, truncated: false };
@@ -188,23 +248,39 @@ function normalizeReviewDecision(value: string | null): ReviewDecision {
 async function fetchReviewPage(
   octokit: Octokit,
   params: { owner: string; repo: string; number: number },
-  after: string | null
+  after: string | null,
+  state: RateLimitState
 ): Promise<ReviewThreadPage> {
-  const response = await octokit.request('POST /graphql', {
-    query: REVIEW_THREADS_QUERY,
-    variables: {
-      owner: params.owner,
-      name: params.repo,
-      number: params.number,
-      after,
-    },
-  });
+  if (state.error) throw state.error;
+
+  let response: { data: unknown; headers: unknown };
+  try {
+    response = await octokit.request('POST /graphql', {
+      query: REVIEW_THREADS_QUERY,
+      variables: {
+        owner: params.owner,
+        name: params.repo,
+        number: params.number,
+        after,
+      },
+    });
+  } catch (error) {
+    const rateError = recordRateLimit(state, error);
+    throw rateError ?? error;
+  }
 
   const body = graphQlResponseSchema.safeParse(response.data);
   if (!body.success) {
     throw new Error('GitHub returned an invalid GraphQL response for pull request reviews');
   }
   if (body.data.errors && body.data.errors.length > 0) {
+    if (body.data.errors.some(isRateLimitGraphQlError)) {
+      const rateError = graphQlRateLimitError(response.headers);
+      if (rateError) {
+        recordRateLimit(state, rateError);
+        throw rateError;
+      }
+    }
     throw new Error('GitHub reported errors while reading pull request reviews');
   }
 
@@ -218,14 +294,15 @@ async function fetchReviewPage(
 
 async function readReviews(
   octokit: Octokit,
-  params: { owner: string; repo: string; number: number }
+  params: { owner: string; repo: string; number: number },
+  state: RateLimitState
 ): Promise<{ reviewDecision: ReviewDecision; threads: ReviewThreadRecord[]; truncated: boolean }> {
   let after: string | null = null;
   let reviewDecision: ReviewDecision = null;
   const threads: ReviewThreadRecord[] = [];
 
   for (let pageIndex = 1; pageIndex <= MAX_PAGES; pageIndex += 1) {
-    const page = await fetchReviewPage(octokit, params, after);
+    const page = await fetchReviewPage(octokit, params, after, state);
     if (pageIndex === 1) reviewDecision = normalizeReviewDecision(page.reviewDecision);
     for (const node of page.reviewThreads.nodes) {
       if (threads.length >= PR_OBSERVATION_LIMIT) {
@@ -328,15 +405,26 @@ function seedMergeability(
 export async function fetchPullRequestObservations(
   input: FetchPullRequestObservationsInput
 ): Promise<FetchPullRequestObservationsResult> {
-  const token = await generateGitHubInstallationToken(
-    input.installationId,
-    input.appType,
-    input.integrationId,
-    'agent'
-  );
+  const rateLimitState: RateLimitState = { error: null };
+  const signal = input.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+  let token: Awaited<ReturnType<typeof generateGitHubInstallationToken>>;
+  try {
+    token = await generateGitHubInstallationToken(
+      input.installationId,
+      input.appType,
+      input.integrationId,
+      'agent',
+      signal
+    );
+  } catch (error) {
+    const rateError = recordRateLimit(rateLimitState, error);
+    throw rateError ?? error;
+  }
+
   const octokit = new Octokit({
     auth: token.token,
-    request: { timeout: REQUEST_TIMEOUT_MS },
+    request: { signal },
   });
 
   const { owner, repo, number } = input;
@@ -366,7 +454,7 @@ export async function fetchPullRequestObservations(
   }
 
   const [checkRunsResult, statusesResult, reviewsResult] = await Promise.allSettled([
-    collectRestPages<CheckRunLike>(async page => {
+    collectRestPages<CheckRunLike>(rateLimitState, async page => {
       const response = await octokit.checks.listForRef({
         owner,
         repo,
@@ -377,18 +465,22 @@ export async function fetchPullRequestObservations(
       });
       return { data: response.data.check_runs, headers: response.headers };
     }),
-    collectRestPages<CommitStatusLike>(async page => {
-      const response = await octokit.repos.listCommitStatusesForRef({
+    collectRestPages<CommitStatusLike>(rateLimitState, async page => {
+      const response = await octokit.repos.getCombinedStatusForRef({
         owner,
         repo,
         ref: headSha,
         per_page: PAGE_SIZE,
         page,
       });
-      return { data: response.data, headers: response.headers };
+      return { data: response.data.statuses, headers: response.headers };
     }),
-    readReviews(octokit, { owner, repo, number }),
+    readReviews(octokit, { owner, repo, number }, rateLimitState),
   ]);
+
+  // A rate limit is an operational signal for the whole refresh, not partial
+  // data. Propagate it before building or persisting any fresh observations.
+  if (rateLimitState.error) throw rateLimitState.error;
 
   const checkRunsPage = checkRunsResult.status === 'fulfilled' ? checkRunsResult.value : null;
   const statusesPage = statusesResult.status === 'fulfilled' ? statusesResult.value : null;

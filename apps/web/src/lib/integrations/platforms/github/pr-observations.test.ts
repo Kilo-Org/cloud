@@ -443,17 +443,44 @@ describe('webhook-only PR observations', () => {
   it.each([
     ['resolved', 'unresolved'],
     ['unresolved', 'resolved'],
-  ])('does not guess ordering for %s followed by %s', (first, second) => {
+  ])('applies the latest observed %s to %s transition', (first, second) => {
     const state = apply(apply(null, thread(first)), thread(second));
     expect(getPrObservationSummary(state, head)).toEqual({
       checks: null,
-      unresolvedThreads: null,
-      truncated: true,
+      unresolvedThreads: second === 'resolved' ? 0 : 1,
+      truncated: false,
       threadsComplete: false,
     });
-    expect(
-      getPrObservationSummary(apply(state, thread(second)), head)?.unresolvedThreads
-    ).toBeNull();
+    expect(getPrObservationSummary(apply(state, thread(second)), head)?.unresolvedThreads).toBe(
+      second === 'resolved' ? 0 : 1
+    );
+  });
+  it('updates repeated resolve/reopen cycles without extra threads or GitHub reads', () => {
+    let state = apply(null, comment());
+    for (const [action, count] of [
+      ['resolved', 0],
+      ['unresolved', 1],
+      ['resolved', 0],
+    ] as const) {
+      state = apply(state, thread(action));
+      expect(getPrObservationSummary(state, head)?.unresolvedThreads).toBe(count);
+      const duplicate = apply(state, thread(action));
+      expect(duplicate).toEqual(state);
+      expect(duplicate?.threads).toHaveLength(1);
+    }
+  });
+  it('recovers a previously uncertain mapped thread when a resolution webhook arrives', () => {
+    const state = apply(
+      {
+        ...createEmptyPrObservations(),
+        threadsObserved: true,
+        threadsTruncated: true,
+        threads: [{ rootId: '100', threadId: 'PRRT_thread_900', state: 'unknown' }],
+      },
+      thread('resolved')
+    );
+    expect(getPrObservationSummary(state, head)?.unresolvedThreads).toBe(0);
+    expect(getPrObservationSummary(state, head)?.truncated).toBe(true);
   });
   it('does not infer that deleting a root removed its replies and thread', () => {
     const state = apply(apply(null, comment()), comment(100, 'deleted'));

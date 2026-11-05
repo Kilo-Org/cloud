@@ -2,12 +2,66 @@ const mockGenerateToken = jest.fn();
 const mockOctokitConstructor = jest.fn();
 const mockPullsGet = jest.fn();
 const mockListForRef = jest.fn();
-const mockListCommitStatusesForRef = jest.fn();
+const mockGetCombinedStatusForRef = jest.fn();
 const mockGraphQlRequest = jest.fn();
 
-jest.mock('./adapter', () => ({
-  generateGitHubInstallationToken: (...args: unknown[]) => mockGenerateToken(...args),
-}));
+jest.mock('./adapter', () => {
+  class MockGitHubRateLimitError extends Error {
+    public readonly resetAt: Date;
+    constructor(resetAt: Date) {
+      super(`GitHub rate limited until ${resetAt.toISOString()}`);
+      this.name = 'GitHubRateLimitError';
+      this.resetAt = resetAt;
+    }
+  }
+
+  function toGitHubRateLimitError(error: unknown): MockGitHubRateLimitError | null {
+    if (error instanceof MockGitHubRateLimitError) return error;
+    if (typeof error !== 'object' || error === null) return null;
+    const record = error as {
+      status?: unknown;
+      message?: unknown;
+      response?: { headers?: Record<string, unknown> };
+    };
+    const headers = record.response?.headers ?? {};
+    const header = (name: string) => {
+      const value = headers[name] ?? headers[name.toLowerCase()];
+      return typeof value === 'string' ? value : undefined;
+    };
+    const status = record.status;
+    const message = typeof record.message === 'string' ? record.message.toLowerCase() : '';
+    const rateLimited =
+      status === 429 ||
+      header('x-ratelimit-remaining') === '0' ||
+      (status === 403 &&
+        (header('retry-after') !== undefined ||
+          message.includes('rate limit') ||
+          message.includes('abuse')));
+    if (!rateLimited) return null;
+    const now = Date.now();
+    const deadlines: number[] = [];
+    const retryAfter = header('retry-after')?.trim();
+    if (retryAfter) {
+      if (/^\d+$/.test(retryAfter)) deadlines.push(now + Number(retryAfter) * 1000);
+      else {
+        const parsed = Date.parse(retryAfter);
+        if (Number.isFinite(parsed)) deadlines.push(parsed);
+      }
+    }
+    if (header('x-ratelimit-remaining') === '0') {
+      const reset = Number(header('x-ratelimit-reset'));
+      if (Number.isFinite(reset) && reset > 0) deadlines.push(reset * 1000);
+    }
+    const deadline = deadlines.length > 0 ? Math.max(...deadlines) : now + 60_000;
+    return new MockGitHubRateLimitError(new Date(deadline));
+  }
+
+  return {
+    generateGitHubInstallationToken: (...args: unknown[]) => mockGenerateToken(...args),
+    GitHubRateLimitError: MockGitHubRateLimitError,
+    toGitHubRateLimitError,
+  };
+});
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation((options: unknown) => {
@@ -15,7 +69,7 @@ jest.mock('@octokit/rest', () => ({
     return {
       pulls: { get: mockPullsGet },
       checks: { listForRef: mockListForRef },
-      repos: { listCommitStatusesForRef: mockListCommitStatusesForRef },
+      repos: { getCombinedStatusForRef: mockGetCombinedStatusForRef },
       request: mockGraphQlRequest,
     };
   }),
@@ -86,8 +140,8 @@ function checkRun(overrides: CheckRunOverrides = {}) {
   };
 }
 
-function restPage(items: unknown[], link?: string) {
-  return { data: items, headers: link ? { link } : {} };
+function combinedStatusPage(items: unknown[], link?: string) {
+  return { data: { statuses: items }, headers: link ? { link } : {} };
 }
 
 function checkRunPage(items: unknown[], link?: string) {
@@ -138,18 +192,28 @@ beforeEach(() => {
   mockOctokitConstructor.mockReset();
   mockPullsGet.mockReset();
   mockListForRef.mockReset().mockResolvedValue(checkRunPage([]));
-  mockListCommitStatusesForRef.mockReset().mockResolvedValue(restPage([]));
+  mockGetCombinedStatusForRef.mockReset().mockResolvedValue(combinedStatusPage([]));
   mockGraphQlRequest.mockReset().mockResolvedValue(graphQlResponse(graphQlPage()));
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('fetchPullRequestObservations', () => {
   it('generates the agent installation token with the exact app and integration association', async () => {
     await fetchPullRequestObservations({ ...input, appType: 'lite' });
 
-    expect(mockGenerateToken).toHaveBeenCalledWith('123', 'lite', 'integration-1', 'agent');
+    expect(mockGenerateToken).toHaveBeenCalledWith(
+      '123',
+      'lite',
+      'integration-1',
+      'agent',
+      expect.any(AbortSignal)
+    );
     expect(mockOctokitConstructor).toHaveBeenCalledWith({
       auth: 'installation-token',
-      request: { timeout: 10_000 },
+      request: { signal: expect.any(AbortSignal) },
     });
   });
 
@@ -168,8 +232,8 @@ describe('fetchPullRequestObservations', () => {
         checkRun({ id: 4, name: 'docs', conclusion: 'neutral' }),
       ])
     );
-    mockListCommitStatusesForRef.mockResolvedValue(
-      restPage([
+    mockGetCombinedStatusForRef.mockResolvedValue(
+      combinedStatusPage([
         { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(1) },
         { id: 11, context: 'lint', state: 'pending', updated_at: updatedAt(1) },
         { id: 12, context: 'scan', state: 'failure', updated_at: updatedAt(1) },
@@ -241,7 +305,7 @@ describe('fetchPullRequestObservations', () => {
     for (const call of mockListForRef.mock.calls) {
       expect(call[0]).toMatchObject({ ref: HEAD_SHA, filter: 'latest', per_page: 100 });
     }
-    for (const call of mockListCommitStatusesForRef.mock.calls) {
+    for (const call of mockGetCombinedStatusForRef.mock.calls) {
       expect(call[0]).toMatchObject({ ref: HEAD_SHA, per_page: 100 });
     }
     const [method, request] = mockGraphQlRequest.mock.calls[0] as [
@@ -388,8 +452,8 @@ describe('fetchPullRequestObservations', () => {
       checksComplete: true,
     });
     mockListForRef.mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403 }));
-    mockListCommitStatusesForRef.mockResolvedValue(
-      restPage([
+    mockGetCombinedStatusForRef.mockResolvedValue(
+      combinedStatusPage([
         { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(2) },
         { id: 9, context: 'deploy', state: 'failure', updated_at: updatedAt(1) },
       ])
@@ -456,7 +520,7 @@ describe('fetchPullRequestObservations', () => {
     mockListForRef.mockResolvedValue(
       checkRunPage([checkRun({ id: 10, name: 'fresh', conclusion: 'failure' })])
     );
-    mockListCommitStatusesForRef.mockRejectedValue(new Error('Resource not accessible'));
+    mockGetCombinedStatusForRef.mockRejectedValue(new Error('Resource not accessible'));
 
     const result = await fetchPullRequestObservations({ ...input, existing });
 
@@ -626,8 +690,8 @@ describe('fetchPullRequestObservations', () => {
   });
 
   it('skips malformed legacy statuses instead of forging context or state', async () => {
-    mockListCommitStatusesForRef.mockResolvedValue(
-      restPage([
+    mockGetCombinedStatusForRef.mockResolvedValue(
+      combinedStatusPage([
         { id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(1) },
         { id: 11, context: '', state: 'success', updated_at: updatedAt(1) },
         { id: 12, context: 'scan', state: 'mystery', updated_at: updatedAt(1) },
@@ -649,7 +713,7 @@ describe('fetchPullRequestObservations', () => {
     });
   });
 
-  it('bounds check pagination at five pages and the state cap at 200 with explicit flags', async () => {
+  it('bounds check pagination at two pages and the state cap at 200 with explicit flags', async () => {
     const nextLink =
       '<https://api.github.com/repos/acme/widgets/commits/head/check-runs?page=next>; rel="next"';
     mockListForRef.mockImplementation(async (params: { page: number }) =>
@@ -666,7 +730,7 @@ describe('fetchPullRequestObservations', () => {
 
     const result = await fetchPullRequestObservations(input);
 
-    expect(mockListForRef).toHaveBeenCalledTimes(5);
+    expect(mockListForRef).toHaveBeenCalledTimes(2);
     expect(result.observations.checks).toHaveLength(200);
     expect(result.observations).toMatchObject({
       checksObserved: true,
@@ -680,9 +744,9 @@ describe('fetchPullRequestObservations', () => {
   });
 
   it('paginates legacy statuses and keeps only the latest status per context', async () => {
-    mockListCommitStatusesForRef
+    mockGetCombinedStatusForRef
       .mockResolvedValueOnce(
-        restPage(
+        combinedStatusPage(
           [
             { id: 10, context: 'ci/lint', state: 'failure', updated_at: updatedAt(1) },
             { id: 12, context: 'ci/lint', state: 'success', updated_at: updatedAt(2) },
@@ -691,12 +755,14 @@ describe('fetchPullRequestObservations', () => {
         )
       )
       .mockResolvedValueOnce(
-        restPage([{ id: 11, context: 'ci/build', state: 'pending', updated_at: updatedAt(1) }])
+        combinedStatusPage([
+          { id: 11, context: 'ci/build', state: 'pending', updated_at: updatedAt(1) },
+        ])
       );
 
     const result = await fetchPullRequestObservations(input);
 
-    expect(mockListCommitStatusesForRef).toHaveBeenCalledTimes(2);
+    expect(mockGetCombinedStatusForRef).toHaveBeenCalledTimes(2);
     expect(result.observations.checks.map(entry => entry.key).sort()).toEqual([
       'status:ci/build',
       'status:ci/lint',
@@ -710,12 +776,12 @@ describe('fetchPullRequestObservations', () => {
         outcome: 'pending',
       }
     );
-    for (const call of mockListCommitStatusesForRef.mock.calls) {
+    for (const call of mockGetCombinedStatusForRef.mock.calls) {
       expect(call[0]).toMatchObject({ ref: HEAD_SHA });
     }
   });
 
-  it('keeps a fetched thread uncertain after an unordered contradictory resolution event (does not guess)', async () => {
+  it('updates a fetched thread from a subsequent reopening webhook', async () => {
     const fullDatabaseId = '9007199254740993';
     mockGraphQlRequest.mockResolvedValue(
       graphQlResponse(
@@ -744,13 +810,13 @@ describe('fetchPullRequestObservations', () => {
 
     const updated = reducePrObservation(fetched.observations, HEAD_SHA, event);
     expect(updated?.threads).toEqual([
-      { rootId: fullDatabaseId, threadId: 'PRRT_thread_900', state: 'unknown' },
+      { rootId: fullDatabaseId, threadId: 'PRRT_thread_900', state: 'unresolved' },
     ]);
-    expect(updated?.threadsTruncated).toBe(true);
+    expect(updated?.threadsTruncated).toBe(false);
     expect(getPrObservationSummary(updated, HEAD_SHA)).toMatchObject({
-      unresolvedThreads: null,
-      threadsComplete: false,
-      truncated: true,
+      unresolvedThreads: 1,
+      threadsComplete: true,
+      truncated: false,
     });
   });
 
@@ -780,6 +846,98 @@ describe('fetchPullRequestObservations', () => {
       unresolvedThreads: 200,
       threadsComplete: false,
       truncated: true,
+    });
+  });
+
+  it('passes the shared abort signal to every Octokit request', async () => {
+    const controller = new AbortController();
+
+    await fetchPullRequestObservations({ ...input, signal: controller.signal });
+
+    expect(mockOctokitConstructor).toHaveBeenCalledWith({
+      auth: 'installation-token',
+      request: { signal: controller.signal },
+    });
+  });
+
+  it('reads latest per-context statuses from the combined status endpoint within two pages', async () => {
+    const nextLink =
+      '<https://api.github.com/repos/acme/widgets/commits/head/status?page=2>; rel="next"';
+    mockGetCombinedStatusForRef.mockImplementation(async (params: { page: number }) =>
+      combinedStatusPage(
+        [
+          {
+            id: params.page * 100,
+            context: `ci/context-${params.page}`,
+            state: 'success',
+            updated_at: updatedAt(params.page),
+          },
+        ],
+        nextLink
+      )
+    );
+
+    const result = await fetchPullRequestObservations(input);
+
+    expect(mockGetCombinedStatusForRef).toHaveBeenCalledTimes(2);
+    expect(mockGetCombinedStatusForRef).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'acme',
+        repo: 'widgets',
+        ref: HEAD_SHA,
+        per_page: 100,
+        page: 1,
+      })
+    );
+    expect(result.observations.checksTruncated).toBe(true);
+  });
+
+  it('stops sibling pagination after a REST rate limit and propagates the typed error', async () => {
+    const now = Date.parse('2026-01-01T00:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    mockListForRef.mockRejectedValue(
+      Object.assign(new Error('rate limit exceeded'), {
+        status: 429,
+        response: { headers: { 'retry-after': '30' } },
+      })
+    );
+    mockGetCombinedStatusForRef.mockImplementation(async ({ page }: { page: number }) => {
+      await Promise.resolve();
+      return combinedStatusPage(
+        [{ id: 10, context: 'deploy', state: 'success', updated_at: updatedAt(1) }],
+        page === 1
+          ? '<https://api.github.com/repos/acme/widgets/commits/head/status?page=2>; rel="next"'
+          : undefined
+      );
+    });
+
+    await expect(fetchPullRequestObservations(input)).rejects.toMatchObject({
+      name: 'GitHubRateLimitError',
+      resetAt: new Date(now + 30_000),
+    });
+    expect(mockGetCombinedStatusForRef).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['type', { message: 'slow down', type: 'RATE_LIMITED' }],
+    ['extension code', { message: 'slow down', extensions: { code: 'SECONDARY_RATE_LIMIT' } }],
+  ])('detects a GraphQL rate limit from a %s in a later error entry', async (_label, rateEntry) => {
+    const now = Date.parse('2026-01-01T00:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    mockGraphQlRequest.mockResolvedValue({
+      data: {
+        data: null,
+        errors: [
+          { message: 'Resource not accessible by integration', type: 'FORBIDDEN' },
+          rateEntry,
+        ],
+      },
+      headers: { 'retry-after': '45' },
+    });
+
+    await expect(fetchPullRequestObservations(input)).rejects.toMatchObject({
+      name: 'GitHubRateLimitError',
+      resetAt: new Date(now + 45_000),
     });
   });
 });

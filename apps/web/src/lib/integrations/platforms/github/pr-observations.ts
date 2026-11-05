@@ -327,12 +327,9 @@ export function reducePrObservation(
       }
       return state;
     }
-    if (old.threadId !== null && old.state !== event.state) {
-      old.state = 'unknown';
-      state.threadsTruncated = true;
-    }
     if (event.threadId) old.threadId = event.threadId;
-    if (old.state !== 'unknown') old.state = event.state;
+    // GitHub supplies no resolution revision; this cache reflects the last received action.
+    old.state = event.state;
   } else if (event.rootId) {
     if (state.threads.length < PR_OBSERVATION_LIMIT)
       state.threads.push({ rootId: event.rootId, threadId: event.threadId, state: event.state });

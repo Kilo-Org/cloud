@@ -6,7 +6,11 @@ import type * as ZodModule from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import type { AssociatedPullRequest } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GitHubRateLimitError,
+  type AssociatedPullRequest,
+} from '@/lib/integrations/platforms/github/adapter';
+import type * as SharedAdapterMock from '@/tests/setup/__mocks__/lib/integrations/platforms/github/adapter';
 import {
   createEmptyPrObservations,
   type PrObservations,
@@ -25,6 +29,7 @@ const WINNING_HEAD_SHA = '9'.repeat(40);
 const BASE_SHA = 'b'.repeat(40);
 const VERIFIED_AT = '2026-01-01T00:00:00.000Z';
 const STALE_SYNCED_AT = '2026-01-01T00:00:00.000Z';
+const RETRY_AT = new Date('2026-03-01T00:01:00.000Z');
 const RAW_CACHE_UPDATED_AT = '2026-01-01 00:00:00.123+00';
 
 const selectChain = {
@@ -108,13 +113,22 @@ jest.mock('@/lib/cloud-agent/watch-pr', () => {
 });
 
 const mockFetchPullRequestByNumber = jest.fn();
-jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
-  fetchPullRequestByNumber: (...args: unknown[]) => mockFetchPullRequestByNumber(...args),
-  GitHubRateLimitError: class GitHubRateLimitError extends Error {
-    constructor(public readonly resetAt: Date) {
-      super('rate limited');
-    }
-  },
+jest.mock('@/lib/integrations/platforms/github/adapter', () => {
+  const sharedMock = jest.requireActual<typeof SharedAdapterMock>(
+    '@/tests/setup/__mocks__/lib/integrations/platforms/github/adapter'
+  );
+  return {
+    fetchPullRequestByNumber: (...args: unknown[]) => mockFetchPullRequestByNumber(...args),
+    GitHubRateLimitError: sharedMock.GitHubRateLimitError,
+    toGitHubRateLimitError: sharedMock.toGitHubRateLimitError,
+  };
+});
+
+const mockClaimPrRefresh = jest.fn();
+const mockDeferPrRefresh = jest.fn();
+jest.mock('@/lib/integrations/platforms/github/pr-refresh-budget', () => ({
+  claimPrRefresh: (...args: unknown[]) => mockClaimPrRefresh(...args),
+  deferPrRefresh: (...args: unknown[]) => mockDeferPrRefresh(...args),
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
@@ -355,6 +369,13 @@ beforeEach(() => {
   mockGetIntegrationForOwner.mockReset().mockResolvedValue(repositoryIntegration);
   mockFetchPullRequestByNumber.mockReset();
   mockFetchPullRequestObservations.mockReset();
+  mockClaimPrRefresh.mockReset().mockResolvedValue({ allowed: true });
+  mockDeferPrRefresh.mockReset().mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 function refresh() {
@@ -388,6 +409,7 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
 
     expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
     expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockClaimPrRefresh).not.toHaveBeenCalled();
     expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
     expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
   });
@@ -410,6 +432,7 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       ORGANIZATION_ID
     );
     expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockClaimPrRefresh).not.toHaveBeenCalled();
     expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
     expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
   });
@@ -426,6 +449,7 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
 
     const result = await refresh();
 
+    expect(mockClaimPrRefresh).not.toHaveBeenCalled();
     expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
     expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
     expect(result.associatedPr).toEqual({
@@ -469,6 +493,8 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
 
     const result = await refresh();
 
+    expect(mockClaimPrRefresh).toHaveBeenCalledTimes(1);
+    expect(mockDeferPrRefresh).not.toHaveBeenCalled();
     expect(mockFetchPullRequestByNumber).toHaveBeenCalledTimes(1);
     expect(mockFetchPullRequestByNumber).toHaveBeenCalledWith({
       installationId: 12345,
@@ -478,6 +504,7 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       appType: 'lite',
       includeCommits: false,
       expectedHeadSha: null,
+      signal: expect.any(AbortSignal),
     });
     expect(mockFetchPullRequestObservations).toHaveBeenCalledTimes(1);
     expect(mockFetchPullRequestObservations).toHaveBeenCalledWith({
@@ -489,6 +516,7 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
       appType: 'lite',
       pullRequest: fetched,
       existing,
+      signal: expect.any(AbortSignal),
     });
     expect(mockFetchPullRequestObservations.mock.calls[0][0].pullRequest).toBe(fetched);
 
@@ -511,6 +539,188 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
         review_decision_pending: false,
       })
     );
+  });
+
+  it('claims the refresh budget with the exact user tenant, installation, app, repo, and PR scope', async () => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockResolvedValue(makeFetched());
+    mockFetchPullRequestObservations.mockResolvedValue({
+      observations: makeObservations(),
+      reviewDecision: 'approved',
+      reviewDecisionFetched: true,
+    });
+
+    await refresh();
+
+    expect(mockClaimPrRefresh).toHaveBeenCalledWith({
+      appType: 'lite',
+      installationId: '12345',
+      owner: { type: 'user', id: USER_ID },
+      repo: 'acme/widgets',
+      number: 7,
+    });
+  });
+
+  it('claims the refresh budget with the exact organization tenant scope', async () => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({
+        session: { organization_id: ORGANIZATION_ID, pr_link_verified_at: VERIFIED_AT },
+      }),
+    ]);
+    mockClaimPrRefresh.mockResolvedValueOnce({
+      allowed: false,
+      reason: 'throttled',
+      retryAt: RETRY_AT,
+    });
+
+    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
+    expect(mockClaimPrRefresh).toHaveBeenCalledWith({
+      appType: 'lite',
+      installationId: '12345',
+      owner: { type: 'org', id: ORGANIZATION_ID },
+      repo: 'acme/widgets',
+      number: 7,
+    });
+    expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['throttled', 'TOO_MANY_REQUESTS'],
+    ['rate_limited', 'TOO_MANY_REQUESTS'],
+    ['unavailable', 'SERVICE_UNAVAILABLE'],
+  ] as const)('does not call GitHub when the budget denies with %s', async (reason, code) => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockClaimPrRefresh.mockResolvedValueOnce({
+      allowed: false,
+      reason,
+      retryAt: RETRY_AT,
+    });
+
+    await expect(refresh()).rejects.toMatchObject({ code });
+
+    expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
+    expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockDeferPrRefresh).not.toHaveBeenCalled();
+  });
+
+  it('does not claim the budget when the session has no usable PR link', async () => {
+    mockLimit.mockResolvedValueOnce([makeRow({ session: { pr_url: null } })]);
+
+    const result = await refresh();
+
+    expect(result.associatedPr).toBeNull();
+    expect(mockClaimPrRefresh).not.toHaveBeenCalled();
+    expect(mockFetchPullRequestByNumber).not.toHaveBeenCalled();
+    expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
+  });
+
+  it('shares one 45 second abort signal across both GitHub legs', async () => {
+    const signal = new AbortController().signal;
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockResolvedValue(makeFetched());
+    mockFetchPullRequestObservations.mockResolvedValue({
+      observations: makeObservations(),
+      reviewDecision: 'approved',
+      reviewDecisionFetched: true,
+    });
+
+    await refresh();
+
+    expect(timeoutSpy).toHaveBeenCalledWith(45_000);
+    expect(mockFetchPullRequestByNumber.mock.calls[0][0].signal).toBe(signal);
+    expect(mockFetchPullRequestObservations.mock.calls[0][0].signal).toBe(signal);
+  });
+
+  it('defers the cooldown when the core fetch is rate limited and writes no cache', async () => {
+    const resetAt = new Date('2026-03-01T00:00:30.000Z');
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockRejectedValueOnce(new GitHubRateLimitError(resetAt));
+
+    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockDeferPrRefresh).toHaveBeenCalledWith({
+      appType: 'lite',
+      installationId: '12345',
+      resetAt,
+    });
+    expect(mockFetchPullRequestObservations).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a raw 429 from the core GitHub leg before deferring', async () => {
+    const now = new Date('2026-03-01T00:00:00.000Z').getTime();
+    jest.useFakeTimers({ now });
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockRejectedValueOnce({
+      status: 429,
+      response: { headers: { 'retry-after': '42' } },
+    });
+
+    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockDeferPrRefresh).toHaveBeenCalledWith({
+      appType: 'lite',
+      installationId: '12345',
+      resetAt: new Date(now + 42_000),
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a raw retry 403 from the supplemental leg before deferring and writing cache', async () => {
+    const now = new Date('2026-03-01T00:00:00.000Z').getTime();
+    jest.useFakeTimers({ now });
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockResolvedValue(makeFetched());
+    mockFetchPullRequestObservations.mockRejectedValueOnce({
+      status: 403,
+      message: 'You have exceeded a secondary rate limit',
+      response: { headers: { 'retry-after': '30' } },
+    });
+
+    await expect(refresh()).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+
+    expect(mockFetchPullRequestObservations).toHaveBeenCalledTimes(1);
+    expect(mockDeferPrRefresh).toHaveBeenCalledWith({
+      appType: 'lite',
+      installationId: '12345',
+      resetAt: new Date(now + 30_000),
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('does not release the attempt when the core fetch fails for a non-rate-limit reason', async () => {
+    mockLimit.mockResolvedValueOnce([
+      makeCachedRow({ session: { pr_link_verified_at: VERIFIED_AT } }),
+    ]);
+    mockFetchPullRequestByNumber.mockRejectedValueOnce(new Error('core read failed'));
+
+    await expect(refresh()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    expect(mockClaimPrRefresh).toHaveBeenCalledTimes(1);
+    expect(mockDeferPrRefresh).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it.each<[string, AssociatedPullRequest | null]>([
@@ -637,6 +847,8 @@ describe('cliSessionsV2.refreshAssociatedPullRequest', () => {
     expect(lastUpsertConfig().set.pr_review_decision).toBe(
       github_branch_pull_requests.pr_review_decision
     );
+    expect(mockClaimPrRefresh).toHaveBeenCalledTimes(1);
+    expect(mockDeferPrRefresh).not.toHaveBeenCalled();
   });
 
   it('uses a false upsert guard when no initial cache row was read', async () => {

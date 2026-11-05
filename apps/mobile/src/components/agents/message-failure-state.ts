@@ -198,8 +198,16 @@ export function messageFailureLabel(
 export function selectMessageFailure(input: {
   deliveryState?: MessageDeliveryState;
   info: MessageInfo;
+  /**
+   * Whether this row's session can accept a re-send right now. A read-only
+   * stored transcript and a session without a live transport cannot, so the
+   * failure keeps its copy and drops the Retry that could never send.
+   * Defaults to true.
+   */
+  retryAvailable?: boolean;
 }): MessageFailure | null {
   const { deliveryState, info } = input;
+  const retryAvailable = input.retryAvailable ?? true;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
@@ -210,7 +218,7 @@ export function selectMessageFailure(input: {
         detailKey: null,
         detail: null,
         copyDetail: deliveryState.error,
-        canRetry: true,
+        canRetry: retryAvailable,
         canCopy: true,
       };
     }
@@ -222,7 +230,7 @@ export function selectMessageFailure(input: {
       detailKey,
       detail: i18n.t(detailKey),
       copyDetail: deliveryState.error,
-      canRetry: true,
+      canRetry: retryAvailable,
       canCopy: true,
     };
   }
@@ -241,7 +249,10 @@ export function selectMessageFailure(input: {
       detailKey,
       detail: detailKey === null ? null : i18n.t(detailKey),
       copyDetail: '',
-      canRetry: retryableByProvider && !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
+      canRetry:
+        retryAvailable &&
+        retryableByProvider &&
+        !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,
     };
   }

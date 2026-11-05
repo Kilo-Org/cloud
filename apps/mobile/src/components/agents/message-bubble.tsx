@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
 import {
   type MessageDeliveryState,

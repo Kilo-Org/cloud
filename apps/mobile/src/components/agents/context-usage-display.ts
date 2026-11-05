@@ -253,7 +253,7 @@ function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): 
  * sentence terminator — where its grammar puts them; the code adds no
  * punctuation of its own. An absent cost contributes nothing.
  */
-export function spokenCostClause(spoken: string | null): string {
+function spokenCostClause(spoken: string | null): string {
   return spoken === null ? '' : i18n.t('agentChat.contextUsage.costClause', { cost: spoken });
 }
 

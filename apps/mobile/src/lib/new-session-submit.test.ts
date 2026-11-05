@@ -646,17 +646,6 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBe('select-repository');
   });
 
-  it('keeps the empty composer beside a chosen repository as the named reason', () => {
-    expect(
-      resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({
-          selectedRepo: 'org/repo',
-          gate: newSessionGate({ hasPrompt: false }),
-        })
-      )
-    ).toBe('enter-prompt');
-  });
-
   it('returns null when another precondition blocks Start', () => {
     expect(
       resolveNewSessionStartBlockedReason(

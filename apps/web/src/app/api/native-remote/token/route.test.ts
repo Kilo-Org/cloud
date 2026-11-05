@@ -45,7 +45,7 @@ it('mints a five-minute non-chat credential without a feature gate', async () =>
     env: 'test',
     audience: KILO_API_AUDIENCE,
     tokenPurpose: 'human-api',
-    credentialExchange: true,
+    credentialExchange: false,
     expiresInSeconds: 300,
   });
   expect(response.headers.get('Cache-Control')).toBe('no-store');

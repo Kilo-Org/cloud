@@ -150,8 +150,9 @@ function sessionParam(c: C): Result<string> {
 export const app = new Hono<AppContext>();
 
 const browserCors = cors({
-  origin: origin =>
-    ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'].includes(origin)
+  origin: (origin, c: C) =>
+    ['https://kilo.ai', 'https://app.kilo.ai'].includes(origin) ||
+    (c.env.ENVIRONMENT === 'development' && origin === 'http://localhost:3000')
       ? origin
       : null,
   allowMethods: ['GET', 'POST', 'OPTIONS'],

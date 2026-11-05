@@ -17,7 +17,7 @@ export async function POST() {
     env: process.env.NODE_ENV,
     audience: KILO_API_AUDIENCE,
     tokenPurpose: 'human-api',
-    credentialExchange: true,
+    credentialExchange: false,
     expiresInSeconds: 300,
   });
   return NextResponse.json(credential, { headers: { 'Cache-Control': 'no-store' } });

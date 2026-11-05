@@ -754,12 +754,14 @@ runner and its current incarnation/run identity. `/clear` only clears the local 
 The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
 PostHog flag `native-remote-web` is enabled. Its same-origin
 `POST /api/native-remote/token` authenticates the web session and issues a five-minute
-Kilo credential; session-sync still enforces all creator ACLs independently of the
+Kilo credential with credential exchange disabled; session-sync enforces all creator ACLs independently of the
 flag. `NEXT_PUBLIC_SESSION_SYNC_URL` optionally selects an isolated local Worker
 (`http://localhost:8817`); otherwise the production destination is used.
-Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`,
-`https://app.kilo.ai`, and `http://localhost:3000`, without cookies. WebSockets continue
-to authenticate exclusively through the ticket subprotocol, never URL parameters.
+Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
+and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only
+when the Worker environment is `development`. Browser and React Native WebSockets
+authenticate through the ticket subprotocol; CLI sockets use `Authorization: Bearer`.
+URL tickets are rejected.
 
 ## Production prerequisites
 

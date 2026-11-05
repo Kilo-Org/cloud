@@ -1,6 +1,9 @@
 import { SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
+import { app } from '../../src/app';
+import { testEnv } from '../helpers';
+
 describe('native browser transport CORS', () => {
   it.each(['https://app.kilo.ai', 'https://kilo.ai', 'http://localhost:3000'])(
     'accepts bearer preflights from %s without credentials',
@@ -21,6 +24,20 @@ describe('native browser transport CORS', () => {
       expect(response.headers.get('Access-Control-Allow-Credentials')).toBeNull();
     }
   );
+  it('rejects the local web origin outside development', async () => {
+    const response = await app.request(
+      'https://session-sync.test/v1/auth/exchange',
+      {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'http://localhost:3000',
+          'Access-Control-Request-Method': 'POST',
+        },
+      },
+      { ...testEnv, ENVIRONMENT: 'production' }
+    );
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
   it('does not authorize requests or expose them to arbitrary origins', async () => {
     const response = await SELF.fetch('https://session-sync.test/v1/sessions', {
       headers: { Origin: 'https://untrusted.test' },

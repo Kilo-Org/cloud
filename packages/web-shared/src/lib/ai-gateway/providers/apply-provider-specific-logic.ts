@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
@@ -13,10 +14,9 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import {
-  applyKiloExclusiveModelSettings,
-  findKiloExclusiveModel,
-  isKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+  AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
+  isAutoSmallFreeModel,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
@@ -37,7 +37,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -254,8 +254,8 @@ export function removeUnsupportedRequestServiceTier(
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
-      : isKiloExclusiveModel(requestedModel)
-        ? 'Kilo-exclusive model'
+      : isAutoSmallFreeModel(requestedModel)
+        ? 'auto small free model'
         : null;
   const serviceTier = requestToMutate.body.service_tier;
   if (!reason || serviceTier === undefined) {
@@ -314,7 +314,8 @@ export async function applyProviderSpecificLogic(
   organizationId: string | null,
   sessionId: string | null,
   taskId: string | null,
-  isNonTrialEnterprise: boolean
+  isNonTrialEnterprise: boolean,
+  dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
@@ -323,10 +324,7 @@ export async function applyProviderSpecificLogic(
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (
-    isFreeModelExcludingCustomLlms(requestedModel) ||
-    (userByok !== null && !usesUserGatewayKey)
-  ) {
+  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -379,22 +377,21 @@ export async function applyProviderSpecificLogic(
     requestToMutate,
     getCustomPricing(await getCustomPricingConfig(), requestedModel)
   );
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-  if (kiloExclusiveModel) {
-    applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
+  if (isAutoSmallFreeModel(requestedModel)) {
+    requestToMutate.body.model = AUTO_SMALL_FREE_MODEL_UPSTREAM_ID;
   }
 
   if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (!usesUserGatewayKey && (provider.type === 'openrouter' || provider.type === 'vercel')) {
-    // A user's own BYOK credential is never ignored.
+  // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
+  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,
       requestToMutate.body,
-      isNonTrialEnterprise || userByok !== null
+      isNonTrialEnterprise
     );
   }
 
@@ -420,7 +417,8 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok
+      usesUserGatewayKey ? null : userByok,
+      dataRegion
     );
   }
 

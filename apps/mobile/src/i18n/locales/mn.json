@@ -442,7 +442,6 @@
         "rebase": "Суурь солих"
       },
       "terminal": {
-        "alreadyMerged": "Аль хэдийн нэгтгэсэн",
         "closed": "Энэ нэгтгэх хүсэлт хаагдсан",
         "closedMergeRequest": "Энэ нэгтгэх хүсэлт хаагдсан"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Шаардлагатай хяналт дутуу",
         "requiredReviewsDetail": "Заавал хянах хүмүүсийн зөвшөөрөл дутуу эсвэл хүлээгдэж байна.",
         "failingChecksTitle": "Шаардлагатай шалгалтууд амжилтгүй",
-        "failingChecksDetail": "Шаардлагатай төлөвийн шалгалтууд амжилтгүй болж байна.",
         "unstableTitle": "Зарим шалгалт амжилтгүй болж байна",
         "unstableDetail": "Заавал амжилттай байх шаардлагагүй шалгалтууд амжилтгүй болж байна. Энэ нь нэгтгэхэд саад болохгүй.",
         "draftTitle": "Ноорог нэгтгэх хүсэлт",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
       "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
+      "reconnectTitleGitLab": "GitLab-ыг дахин холбох",
+      "reconnectTitleBitbucket": "Bitbucket-ыг дахин холбох",
       "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна.",
       "gitlabDescription": "Нэгтгэх хүсэлтийг гар утаснаас хянах",
       "gitlabInstanceMismatchTitle": "GitLab холболт нь өөр инстанцад хамаарна",
@@ -708,7 +708,12 @@
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",
       "submitCountOfTotal": "Нийт {{displayTotalCount}} сэтгэгдлээс {{displayFreshCount}} сэтгэгдэл илгээх",
       "submitReview": "Шалгалтын дүнг илгээх",
-      "partialPostedMessage": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. {{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedFresh": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} сэтгэгдэл нийтэлсэн. ",
+      "partialPostedStale": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedStale_one": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
+      "partialPostedStale_other": "{{displayStaleCount}} сэтгэгдэл хуучин коммитод хамаарах тул илгээх жагсаалтад үлдсэн.",
       "blockedRequestChanges": "Өөрчлөлт хүсэхийн тулд хураангуй эсвэл дор хаяж нэг сэтгэгдэл нэмнэ үү.",
       "blockedComment": "Сэтгэгдэл хэлбэрээр хяналт илгээхийн тулд хураангуй эсвэл дор хаяж нэг сэтгэгдэл нэмнэ үү."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md файлын pull request нээгдлээ",
       "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
       "status": {
+        "open": "Нээлттэй",
         "edited": "Засварласан",
         "opening_change_request": "PR нээж байна",
         "change_request_failed": "PR амжилтгүй болсон",
@@ -1614,6 +1620,8 @@
       "set": "Тохируулсан",
       "notSet": "Тохируулаагүй",
       "nSelected": "{{displayCount}} сонгогдсон",
+      "nSelected_one": "{{displayCount}} сонгогдсон",
+      "nSelected_other": "{{displayCount}} сонгогдсон",
       "proposedReviewMdGuidance": "Санал болгосон REVIEW.md зөвлөмж"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Халдлагад ашиглах боломжийн үндэслэл",
       "suggestedFix": "Санал болгосон засвар",
       "whereFound": "Илэрсэн байршлууд ({{displayCount}})",
+      "whereFound_one": "Илэрсэн байршлууд ({{displayCount}})",
+      "whereFound_other": "Илэрсэн байршлууд ({{displayCount}})",
       "fullReport": "Боловсруулсан бүрэн тайлан",
       "yes": "Тийм",
       "no": "Үгүй",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} дунд ба бага",
       "dueThisWeek": "Эцсийн хугацаа энэ долоо хоногт",
       "dueThisWeekDetail": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail_one": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail_other": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
       "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
       "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай.",
       "syncNoRepositories": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Аюулгүй байдлын агентын хянадаг репозиторуудыг сонгоод, дахин синхрончлоорой.",
+      "syncNoRepositoriesNoManage": "Синхрончлолын хүрээнд нэг ч репозитор байхгүй. Синхрончлол ажиллахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежер репозиторуудыг холбох ёстой.",
       "syncIntegrationInactive": "«Аюулгүй байдлын агент»-ын GitHub холболт идэвхтэй биш байна. Kilo GitHub App-ыг дахин холбож, дараа нь дахин синхрончлоорой.",
       "syncMissingPermission": "Kilo GitHub App нь vulnerability alerts-г уншиж чадахгүй байна. GitHub дээр тухайн зөвшөөрлийг олгоод, дахин синк хийнэ үү.",
       "configConflict": "Аюулгүй байдлын агентын тохиргоо өөр газар өөрчлөгдсөн. Хамгийн сүүлийн тохиргоог шалгаад дахин хадгална уу."
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Энэ хүрээний зарцуулалт хязгаараас хэтэрсэн эсвэл ердийн цагийн хурдаас дээш өссөн үед төлбөрийн холбоо барих хаягуудад имэйл эсвэл push-ээр анхааруулга илгээ.",
     "thresholdTitle": "Босго давсан",
-    "thresholdSubtitle": "Гүйлтийн зарцуулалт таны хязгаараас хэтэрч байна",
+    "thresholdSubtitle": "Сонгосон цонхны хугацаанд энэ хүрээний гүйлтийн зарцуулалт таны хязгаараас хэтэрч байна",
     "anomalyTitle": "Цагийн огцом өсөлт",
-    "anomalySubtitle": "Нэг цаг энэ хүрээний ердийн хурдаас хамаагүй өндөр байна",
+    "anomalySubtitle": "Энэ хүрээний цагийн хурд өөрийн p95 түвшингээс хамаагүй өндөр байна",
     "limitLabel": "Хязгаар (USD)",
     "windowLabel": "Цонх",
     "window24h": "24 цаг",
@@ -3796,14 +3809,14 @@
     "saved": "Зарцуулалтын анхааруулгын тохиргоо хадгалагдлаа",
     "loadError": "Зарцуулалтын анхааруулгыг ачаалж чадсангүй.",
     "saveError": "Зарцуулалтын анхааруулгыг хадгалж чадсангүй.",
-    "empty": "Зарцуулалтын анхааруулга унтарсан байна. Энэ хүрээний төлбөрийн хаягуудад мэдэгдэхийн тулд асаа.",
-    "noSpend": "Одоогоор зарцуулалт бүртгэгдээгүй",
+    "sendAlerts": "Анхааруулга илгээх",
+    "noSpend": "Зарцуулалт хараахан алга",
     "spend24h": "Сүүлийн 24 цагийн зарцуулалт",
     "multiplierError": "1 буюу түүнээс их үржүүлэгч оруул",
     "permissionDenied": "Зарцуулалтын анхааруулгыг удирдах эрх танд байхгүй.",
     "pushOffByCategory": "Мэдэгдэлд унтарсан",
     "multiplierMaxError": "{{max}} буюу түүнээс бага үржүүлэгч оруул",
-    "thresholdMaxError": "{{max}} буюу түүнээс бага дүн оруулна уу."
+    "thresholdMaxError": "{{max}} буюу түүнээс бага дүн оруулна уу"
   },
   "profiles": {
     "title": "Профайлууд",

@@ -442,7 +442,6 @@
         "rebase": "रिबेस"
       },
       "terminal": {
-        "alreadyMerged": "पहिले नै मर्ज भइसकेको",
         "closed": "यो पुल रिक्वेस्ट बन्द छ",
         "closedMergeRequest": "यो मर्ज रिक्वेस्ट बन्द छ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "आवश्यक समीक्षाहरू छैनन्",
         "requiredReviewsDetail": "आवश्यक समीक्षकहरूको स्वीकृति अझै प्राप्त भएको छैन वा विचाराधीन छ।",
         "failingChecksTitle": "असफल आवश्यक जाँचहरू",
-        "failingChecksDetail": "आवश्यक स्थिति जाँचहरू असफल भइरहेका छन्।",
         "unstableTitle": "केही जाँचहरू असफल भइरहेका छन्",
         "unstableDetail": "अनिवार्य नभएका जाँचहरू असफल भइरहेका छन्। यसले मर्ज गर्न रोक्दैन।",
         "draftTitle": "मस्यौदा पुल रिक्वेस्ट",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
       "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
       "reconnectTitle": "GitHub मा पुनः जडान",
+      "reconnectTitleGitLab": "GitLab मा पुनः जडान",
+      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",
@@ -708,7 +708,12 @@
       "pendingComment_other": "नपठाइएका टिप्पणीहरू",
       "submitCountOfTotal": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
       "submitReview": "समीक्षा पठाउनुहोस्",
-      "partialPostedMessage": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। {{displayStaleCount}} टिप्पणी पुरानो कमिटसँग सम्बन्धित भएकाले तपाईंको कतारमै राखियो।",
+      "partialPostedFresh": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
+      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
+      "partialPostedFresh_other": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
+      "partialPostedStale": "{{displayStaleCount}} टिप्पणी पुरानो कमिटसँग सम्बन्धित भएकाले तपाईंको कतारमै राखियो।",
+      "partialPostedStale_one": "{{displayStaleCount}} टिप्पणी पुरानो कमिटसँग सम्बन्धित भएकाले तपाईंको कतारमै राखियो।",
+      "partialPostedStale_other": "{{displayStaleCount}} टिप्पणी पुरानो कमिटसँग सम्बन्धित भएकाले तपाईंको कतारमै राखियो।",
       "blockedRequestChanges": "परिवर्तनको अनुरोध गर्न सारांश वा कम्तीमा एउटा टिप्पणी थप्नुहोस्।",
       "blockedComment": "टिप्पणीसहित समीक्षा पठाउन सारांश वा कम्तीमा एउटा टिप्पणी थप्नुहोस्।"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md को पुल रिक्वेस्ट खोलियो",
       "alreadyPresent": "निर्देशनहरू REVIEW.md मा पहिले नै छन्",
       "status": {
+        "open": "खुला",
         "edited": "सम्पादन गरिएको",
         "opening_change_request": "PR खोल्दै",
         "change_request_failed": "PR असफल भयो",
@@ -1614,6 +1620,8 @@
       "set": "तोकिएको",
       "notSet": "तोकिएको छैन",
       "nSelected": "{{displayCount}} चयन गरिएको",
+      "nSelected_one": "{{displayCount}} चयन गरिएको",
+      "nSelected_other": "{{displayCount}} चयन गरिएको",
       "proposedReviewMdGuidance": "REVIEW.md का लागि प्रस्तावित निर्देशनहरू"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "दुरुपयोगको सम्भावना ठहर गर्ने आधार",
       "suggestedFix": "सुझाव गरिएको समाधान",
       "whereFound": "फेला परेका स्थानहरू ({{displayCount}})",
+      "whereFound_one": "फेला परेका स्थानहरू ({{displayCount}})",
+      "whereFound_other": "फेला परेका स्थानहरू ({{displayCount}})",
       "fullReport": "तयार गरिएको पूर्ण प्रतिवेदन",
       "yes": "हो",
       "no": "होइन",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} मध्यम र न्यून",
       "dueThisWeek": "यस हप्ता म्याद सकिने",
       "dueThisWeekDetail": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
+      "dueThisWeekDetail_one": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
+      "dueThisWeekDetail_other": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
       "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"
@@ -2070,6 +2082,7 @@
       "actionFailed": "यो कार्य सम्पन्न गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "actionBlocked": "यो कार्य सम्पन्न गर्न सकिएन। फेरि प्रयास गर्नुअघि समस्या समाधान गर्नुपर्छ।",
       "syncNoRepositories": "सिङ्क स्कोपमा कुनै रिपोजिटोरी छैनन्। सुरक्षा एजेन्टले निगरानी गर्ने रिपोजिटोरीहरू छान्नुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
+      "syncNoRepositoriesNoManage": "सिङ्क स्कोपमा कुनै रिपोजिटोरी छैनन्। सिङ्क हुनु अघि संस्थाका मालिक, प्रशासक वा बिलिङ व्यवस्थापकले रिपोजिटोरीहरू जोड्नुपर्छ।",
       "syncIntegrationInactive": "«सुरक्षा एजेन्ट» को GitHub जडान सक्रिय छैन। Kilo GitHub App पुनः जोड्नुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
       "syncMissingPermission": "Kilo GitHub एपले vulnerability alerts पढ्न सक्दैन। GitHub मा त्यो अनुमति दिनुहोस्, त्यसपछि फेरि सिङ्क गर्नुहोस्।",
       "configConflict": "सुरक्षा एजेन्टका सेटिङहरू अन्तै परिवर्तन भएका छन्। नवीनतम सेटिङहरू समीक्षा गर्नुहोस् र फेरि सेभ गर्नुहोस्।"
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "क्लोन पुनः प्रयास गर्दै ({{total}} मध्ये {{attempt}} प्रयास)",
       "detailSetupCommandFailed": "सेटअप आदेश {{index}} असफल भयो",
       "detailSetupCommandTimedOut": "सेटअप आदेश {{index}} समय सकियो",
-      "detailColdRestore": "कोल्ड रिस्टोर, स्न्यापसट लागू गरियो, {{total}} मध्ये {{applied}} फाइल रिस्टोर भयो",
+      "detailColdRestore": "कोल्ड रिस्टोर, स्न्यापसट लागू गरियो, रिस्टोर गरिएका फाइलहरू: {{total}} मध्ये {{applied}}",
       "detailProgressPercent": "{{percent}}% पूरा भयो",
-      "detailRestoreIncompleteReport": "सेसन रिस्टोर अपूर्ण: {{total}} मध्ये {{skipped}} फाइल रिस्टोर भएनन् ({{reasons}})।",
+      "detailRestoreIncompleteReport": "सेसन रिस्टोर अपूर्ण, रिस्टोर नभएका फाइलहरू: {{total}} मध्ये {{skipped}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "छुटेका: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} र {{omitted}} थप",
       "detailReasonPatchFailed": "प्याच लागू भएन",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "यो स्कोपको खर्च कुनै सीमा नाघ्दा वा यसको सामान्य प्रति घण्टाको दरभन्दा माथि बढ्दा बिलिङ सम्पर्कहरूलाई इमेल वा पुशमार्फत चेतावनी पठाउनुहोस्।",
     "thresholdTitle": "सीमा नाघ्नु",
-    "thresholdSubtitle": "चालु खर्च तपाईंको सीमा नाघिरहेको छ",
+    "thresholdSubtitle": "यो स्कोपको रोजिएको अवधिमा चालु खर्च तपाईंको सीमा नाघिरहेको छ",
     "anomalyTitle": "प्रति घण्टा वृद्धि",
-    "anomalySubtitle": "एक घण्टा यो स्कोपको सामान्य दरभन्दा धेरै माथि छ",
+    "anomalySubtitle": "यो स्कोपको प्रति घण्टा दर यसको आफ्नै p95 आधाररेखाभन्दा धेरै माथि छ",
     "limitLabel": "सीमा (USD)",
     "windowLabel": "अवधि",
     "window24h": "24 घण्टा",
@@ -3796,14 +3809,14 @@
     "saved": "खर्च चेतावनीका सेटिङहरू सुरक्षित भए",
     "loadError": "खर्चका चेतावनीहरू लोड गर्न सकिएन।",
     "saveError": "खर्चका चेतावनीहरू सुरक्षित गर्न सकिएन।",
-    "empty": "खर्चका चेतावनीहरू बन्द छन्। यो स्कोपका बिलिङ सम्पर्कहरूलाई जानकारी दिन तिनीहरू खोल्नुहोस्।",
-    "noSpend": "अहिलेसम्म कुनै खर्च अभिलेख भएको छैन",
+    "sendAlerts": "चेतावनीहरू पठाउनुहोस्",
+    "noSpend": "अझै खर्च छैन",
     "spend24h": "पछिल्लो 24 घण्टाको खर्च",
     "multiplierError": "1 वा त्यसभन्दा बढीको गुणक लेख्नुहोस्",
     "permissionDenied": "तपाईंसँग खर्चका चेतावनीहरू व्यवस्थापन गर्ने अनुमति छैन।",
     "pushOffByCategory": "सूचनाहरूमा बन्द",
     "multiplierMaxError": "{{max}} वा त्यसभन्दा कमको गुणक लेख्नुहोस्",
-    "thresholdMaxError": "{{max}} वा त्यसभन्दा कम रकम प्रविष्ट गर्नुहोस्।"
+    "thresholdMaxError": "{{max}} वा त्यसभन्दा कम रकम प्रविष्ट गर्नुहोस्"
   },
   "profiles": {
     "title": "प्रोफाइलहरू",

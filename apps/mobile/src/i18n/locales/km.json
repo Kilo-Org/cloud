@@ -442,7 +442,6 @@
         "rebase": "ប្តូរមូលដ្ឋាន"
       },
       "terminal": {
-        "alreadyMerged": "បានបញ្ចូលរួច",
         "closed": "សំណើបញ្ចូលកូដនេះបានបិទ",
         "closedMergeRequest": "សំណើបញ្ចូលនេះបានបិទ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ខ្វះការពិនិត្យចាំបាច់",
         "requiredReviewsDetail": "មិនទាន់ទទួលបានការអនុម័តពីអ្នកពិនិត្យដែលត្រូវអនុម័តនៅឡើយទេ។",
         "failingChecksTitle": "ការត្រួតពិនិត្យចាំបាច់មិនជោគជ័យ",
-        "failingChecksDetail": "ការត្រួតពិនិត្យស្ថានភាពចាំបាច់មិនជោគជ័យទេ។",
         "unstableTitle": "ការត្រួតពិនិត្យមួយចំនួនមិនជោគជ័យ",
         "unstableDetail": "ការត្រួតពិនិត្យមិនចាំបាច់មួយចំនួនមិនជោគជ័យទេ។ វាមិនរារាំងការបញ្ចូលទេ។",
         "draftTitle": "សេចក្តីព្រាងសំណើបញ្ចូលកូដ",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "មិនអាចពិនិត្យការតភ្ជាប់ Bitbucket បានទេ។",
       "providerCheckFailedMessage": "ស្ថានភាពការតភ្ជាប់មិនអាចប្រើបានទេរហូតដល់បានផ្ទុករួច។",
       "reconnectTitle": "ភ្ជាប់ GitHub ឡើងវិញ",
+      "reconnectTitleGitLab": "ភ្ជាប់ GitLab ឡើងវិញ",
+      "reconnectTitleBitbucket": "ភ្ជាប់ Bitbucket ឡើងវិញ",
       "reconnectDescription": "ការអនុញ្ញាតឱ្យភ្ជាប់ GitHub របស់អ្នកត្រូវបានដកហូត។",
       "gitlabDescription": "ពិនិត្យសំណើបញ្ចូលនៅលើទូរស័ព្ទ",
       "gitlabInstanceMismatchTitle": "ការតភ្ជាប់ GitLab គឺសម្រាប់អង្គភាពផ្សេងទៀត",
@@ -708,7 +708,12 @@
       "pendingComment_other": "មតិយោបល់មិនទាន់ដាក់ស្នើ",
       "submitCountOfTotal": "ដាក់ស្នើមតិយោបល់ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}}",
       "submitReview": "ដាក់ស្នើលទ្ធផលពិនិត្យ",
-      "partialPostedMessage": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedFresh": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedFresh_one": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedFresh_other": "បានបង្ហោះមតិយោបល់ {{displayFreshCount}}។ ",
+      "partialPostedStale": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedStale_one": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
+      "partialPostedStale_other": "មតិយោបល់ {{displayStaleCount}} សំដៅលើកំណត់ត្រាកែប្រែចាស់ ហើយនៅតែស្ថិតក្នុងបញ្ជីរង់ចាំរបស់អ្នក។",
       "blockedRequestChanges": "បន្ថែមសេចក្តីសង្ខេប ឬមតិយោបល់យ៉ាងហោចណាស់មួយ ដើម្បីស្នើសុំការកែប្រែ។",
       "blockedComment": "បន្ថែមសេចក្តីសង្ខេប ឬមតិយោបល់យ៉ាងហោចណាស់មួយ ដើម្បីដាក់ស្នើការពិនិត្យបែបបញ្ចេញមតិ។"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "បានបើក pull request សម្រាប់ REVIEW.md",
       "alreadyPresent": "ការណែនាំមានរួចហើយនៅក្នុង REVIEW.md",
       "status": {
+        "open": "បើក",
         "edited": "បានកែសម្រួល",
         "opening_change_request": "កំពុងបើក PR",
         "change_request_failed": "ការបើក PR បានបរាជ័យ",
@@ -1614,6 +1620,8 @@
       "set": "បានកំណត់",
       "notSet": "មិនបានកំណត់",
       "nSelected": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_one": "បានជ្រើសរើស {{displayCount}}",
+      "nSelected_other": "បានជ្រើសរើស {{displayCount}}",
       "proposedReviewMdGuidance": "ការណែនាំ REVIEW.md ដែលបានស្នើ"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "ហេតុផលនៃលទ្ធភាពកេងប្រវ័ញ្ច",
       "suggestedFix": "វិធីជួសជុលដែលបានណែនាំ",
       "whereFound": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
+      "whereFound_one": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
+      "whereFound_other": "ទីតាំងដែលរកឃើញ ({{displayCount}})",
       "fullReport": "របាយការណ៍ពេញលេញដែលបានបង្កើត",
       "yes": "បាទ/ចាស",
       "no": "ទេ",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "និងមធ្យម និងទាប {{displayCount}}",
       "dueThisWeek": "ដល់កំណត់សប្តាហ៍នេះ",
       "dueThisWeekDetail": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
+      "dueThisWeekDetail_one": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
+      "dueThisWeekDetail_other": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
       "noDeadline": "គ្មានកាលកំណត់",
       "reviewSlaAssignment": "ពិនិត្យការកំណត់ SLA",
       "allOpenFindingsTracked": "បានតាមដានបញ្ហាដែលរកឃើញនៅបើកទាំងអស់"
@@ -2070,6 +2082,7 @@
       "actionFailed": "មិនអាចបញ្ចប់សកម្មភាពនេះបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "actionBlocked": "មិនអាចបញ្ចប់សកម្មភាពនេះបានទេ។ ត្រូវតែដោះស្រាយបញ្ហានេះជាមុនសិន។",
       "syncNoRepositories": "គ្មានឃ្លាំងណាមួយស្ថិតក្នុងវិសាលភាពសមកាលកម្មទេ។ សូមជ្រើសរើសឃ្លាំងដែល«ភ្នាក់ងារសុវត្ថិភាព»ត្រួតពិនិត្យ បន្ទាប់មកសមកាលកម្មម្តងទៀត។",
+      "syncNoRepositoriesNoManage": "គ្មានឃ្លាំងណាមួយស្ថិតក្នុងវិសាលភាពសមកាលកម្មទេ។ ម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់ត្រូវតែភ្ជាប់ឃ្លាំង មុនពេលអាចធ្វើសមកាលកម្មបាន។",
       "syncIntegrationInactive": "ការតភ្ជាប់ GitHub សម្រាប់ភ្នាក់ងារសុវត្ថិភាពមិនសកម្មទេ។ សូមភ្ជាប់ Kilo GitHub App ឡើងវិញ បន្ទាប់មកសមកាលកម្មម្តងទៀត។",
       "syncMissingPermission": "Kilo GitHub App មិនអាចអាន vulnerability alerts បានទេ។ ផ្តល់សិទ្ធិនោះនៅក្នុង GitHub បន្ទាប់មកសមកាលកម្មម្តងទៀត។",
       "configConflict": "ការកំណត់របស់ភ្នាក់ងារសុវត្ថិភាពត្រូវបានផ្លាស់ប្តូរនៅកន្លែងផ្សេង។ ពិនិត្យការកំណត់ចុងក្រោយ ហើយរក្សាទុកម្តងទៀត។"
@@ -3796,8 +3809,8 @@
     "saved": "បានរក្សាទុកការកំណត់នៃការជូនដំណឹងអំពីការចំណាយ",
     "loadError": "មិនអាចផ្ទុកការជូនដំណឹងអំពីការចំណាយបានទេ។",
     "saveError": "មិនអាចរក្សាទុកការជូនដំណឹងអំពីការចំណាយបានទេ។",
-    "empty": "ការជូនដំណឹងអំពីការចំណាយបិទ។ បើកវាដើម្បីជូនដំណឹងអ្នកទំនាក់ទំនងវិក្កយបត្ររបស់វិសាលភាពនេះ។",
-    "noSpend": "មិនទាន់មានការចំណាយត្រូវបានកត់ត្រាទេ",
+    "sendAlerts": "ផ្ញើការជូនដំណឹងអំពីការចំណាយ",
+    "noSpend": "មិនទាន់មានការចំណាយ",
     "spend24h": "ការចំណាយក្នុងរយៈពេល 24 ម៉ោងចុងក្រោយ",
     "multiplierError": "បញ្ចូលតម្លៃគុណ 1 ឬច្រើនជាងនេះ",
     "permissionDenied": "អ្នកមិនមានសិទ្ធិគ្រប់គ្រងការជូនដំណឹងអំពីការចំណាយទេ។",

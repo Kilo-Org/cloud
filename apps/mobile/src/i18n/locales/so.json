@@ -442,7 +442,6 @@
         "rebase": "Saldhig-beddel"
       },
       "terminal": {
-        "alreadyMerged": "Hore ayaa la isugu daray",
         "closed": "Codsigan isku-darka waa xiran yahay",
         "closedMergeRequest": "Codsigan merge request waa xiran yahay"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Dib-u-eegisyadii loo baahnaa ayaa maqan",
         "requiredReviewsDetail": "Ansixinta dib-u-eegayaasha loo baahan yahay ayaa maqan ama weli la sugayaa.",
         "failingChecksTitle": "Hubinno loo baahan yahay oo fashilmaya",
-        "failingChecksDetail": "Hubinnada xaaladda ee loo baahan yahay ayaa fashilmaya.",
         "unstableTitle": "Hubinnada qaar ayaa fashilmaya",
         "unstableDetail": "Hubinnada aan khasabka ahayn ayaa fashilmaya. Ma hor istaagi doonaan isku-darka.",
         "draftTitle": "Codsi isku-darid oo qabyo ah",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Xiriirka Bitbucket lama hubin karin.",
       "providerCheckFailedMessage": "Xaaladda xiriirka ma muuqato inta la soo dhacayo.",
       "reconnectTitle": "Dib u xir GitHub",
+      "reconnectTitleGitLab": "Dib u xir GitLab",
+      "reconnectTitleBitbucket": "Dib u xir Bitbucket",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday.",
       "gitlabDescription": "Taleefanka ku eeg merge request-yada",
       "gitlabInstanceMismatchTitle": "Xiriirka GitLab waa server kale",
@@ -708,7 +708,12 @@
       "pendingComment_other": "faallooyin aan weli la gudbin",
       "submitCountOfTotal": "Dir {{displayFreshCount}} ka mid ah {{displayTotalCount}} faallo",
       "submitReview": "Gudbi dib-u-eegista",
-      "partialPostedMessage": "Waxaa la daabacay {{displayFreshCount}} faallo. {{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedFresh": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedFresh_one": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedFresh_other": "Waxaa la daabacay {{displayFreshCount}} faallo. ",
+      "partialPostedStale": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedStale_one": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
+      "partialPostedStale_other": "{{displayStaleCount}} faallo ayaa tixraacaya diiwaan isbeddel oo hore waxayna ku hareen safkaaga.",
       "blockedRequestChanges": "Ku dar soo koobid ama ugu yaraan hal faallo si aad u codsato isbeddello.",
       "blockedComment": "Ku dar soo koobid ama ugu yaraan hal faallo si aad u gudbiso dib-u-eegis faallo ah."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Pull request-ka REVIEW.md waa la furay",
       "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
       "status": {
+        "open": "Furan",
         "edited": "Wax laga beddelay",
         "opening_change_request": "Waa la furayaa PR",
         "change_request_failed": "PR wuu fashilmay",
@@ -1614,6 +1620,8 @@
       "set": "La dejiyay",
       "notSet": "Lama dejin",
       "nSelected": "{{displayCount}} ayaa la doortay",
+      "nSelected_one": "{{displayCount}} ayaa la doortay",
+      "nSelected_other": "{{displayCount}} ayaa la doortay",
       "proposedReviewMdGuidance": "Hagaha REVIEW.md ee la soo jeediyay"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Sababaha qiimaynta suurtagalnimada weerarka",
       "suggestedFix": "Hagaajin la soo jeediyay",
       "whereFound": "Meelaha laga helay ({{displayCount}})",
+      "whereFound_one": "Meelaha laga helay ({{displayCount}})",
+      "whereFound_other": "Meelaha laga helay ({{displayCount}})",
       "fullReport": "Warbixin dhammaystiran oo la soo saaray",
       "yes": "Haa",
       "no": "Maya",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} dhexdhexaad iyo hoose",
       "dueThisWeek": "Waqtigoodu wuxuu dhammaanayaa toddobaadkan",
       "dueThisWeekDetail": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
+      "dueThisWeekDetail_one": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
+      "dueThisWeekDetail_other": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
       "noDeadline": "Ma jiro waqti kama-dambays ah",
       "reviewSlaAssignment": "Dib u eeg qoondaynta SLA",
       "allOpenFindingsTracked": "Dhammaan natiijooyinka furan waa lala socdaa"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Ficilkan lama dhammeeyi karin. Fadlan mar kale isku day.",
       "actionBlocked": "Ficilkan lama dhammeeyi karin. Waa in dhibaatadan horay loo xalliyo.",
       "syncNoRepositories": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Dooro kayd-baakhaarada uu Wakiilka amniga ilaaliyo, ka dibna mar kale is-waafaji.",
+      "syncNoRepositoriesNoManage": "Ma jiro kayd-baakhaaro ku jira baaxadda is-waafajinta. Milkiilaha ururka, maamulaha, ama maareeyaha biilasha waa inuu isku xidhaa kayd-baakhaarada ka hor inta aan la is-waafajin.",
       "syncIntegrationInactive": "Isku xirka GitHub ee Wakiilka amniga ma firfircoona. Dib u xir Kilo GitHub App, ka dibna mar kale isku dubarid.",
       "syncMissingPermission": "Kilo GitHub App ma akhrin karo digniinaha nuglaanta. Sii ogolaanshahaas gudaha GitHub, ka dibna mar kale isku-dhaji.",
       "configConflict": "Dejinta Wakiilka amniga ayaa meel kale laga beddelay. Dib u eeg dejinta ugu dambeysa oo mar kale kaydi."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Dib isku day duubista (isku day {{attempt}} ee {{total}})",
       "detailSetupCommandFailed": "Amarka dejinta {{index}} wuu fashilmay",
       "detailSetupCommandTimedOut": "Amarka dejinta {{index}} wuu waqtigii ka baxay",
-      "detailColdRestore": "Soo celin qabow, nuqul waa laga dhaarsaday, {{applied}} fayl oo {{total}} ah ayaa laga soo celiyay",
+      "detailColdRestore": "Soo celin qabow, nuqul waa laga dhaarsaday, faylasha la soo celiyay: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% ayaa la dhammaystiray",
-      "detailRestoreIncompleteReport": "Soo celinta kulanka ma dhammaystirin: {{skipped}} fayl oo {{total}} ah lama soo celin ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Soo celinta kulanka ma dhammaystirin, faylasha lama soo celin: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Maqan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} iyo {{omitted}} kale",
       "detailReasonPatchFailed": "beddelka lama dhaarin",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "U dir digniin iimayl ama push xiriirka biilasha marka kharashka goobtan uu dhaafo xad ama uu ka sarreeyo heerka saacadlaha caadiga ah.",
     "thresholdTitle": "Dhaafitaanka xadka",
-    "thresholdSubtitle": "Kharashka socda ayaa dhaafaya xadkaaga",
+    "thresholdSubtitle": "Kharashka socda ee goobtan oo muddada la doortay ayaa dhaafaya xadkaaga",
     "anomalyTitle": "Kor u kaca saacadlaha",
-    "anomalySubtitle": "Hal saac aad ayuu uga sarreeyaa heerka caadiga ah ee goobtan",
+    "anomalySubtitle": "Heerka saacadlaha ee goobtan aad buu uga sarreeyaa saldhigga p95 ee u gaar ah",
     "limitLabel": "Xad (USD)",
     "windowLabel": "Muddo",
     "window24h": "24 saac",
@@ -3796,14 +3809,14 @@
     "saved": "Dejinta digniinaha kharashka waa la kaydiyay",
     "loadError": "Digniinaha kharashka lama soo dejin karin.",
     "saveError": "Digniinaha kharashka lama kaydin karin.",
-    "empty": "Digniinaha kharashka waa damman yihiin. Daar si aad uga digniiso xiriirka biilasha goobtan.",
-    "noSpend": "Weli lama diiwaangelin kharash",
+    "sendAlerts": "Dir digniinaha kharashka",
+    "noSpend": "Kharash ma jiro",
     "spend24h": "Kharashka 24-kii saacadood ee ugu dambeeyay",
     "multiplierError": "Geli isku-dhufasho 1 ama ka badan",
     "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha kharashka.",
     "pushOffByCategory": "Waa damman Ogeysiisyada",
     "multiplierMaxError": "Geli isku-dhufasho {{max}} ama ka yar",
-    "thresholdMaxError": "Geli qaddar {{max}} ama ka yar."
+    "thresholdMaxError": "Geli qaddar {{max}} ama ka yar"
   },
   "profiles": {
     "title": "Profile-yada",

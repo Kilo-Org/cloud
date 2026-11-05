@@ -442,7 +442,6 @@
         "rebase": "ری‌بیس"
       },
       "terminal": {
-        "alreadyMerged": "قبلاً ادغام شده",
         "closed": "این درخواست ادغام بسته شده است",
         "closedMergeRequest": "این درخواست ادغام بسته شده است"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "بازبینی‌های الزامی انجام نشده‌اند",
         "requiredReviewsDetail": "بازبین‌های تعیین‌شده هنوز تأیید لازم را نداده‌اند.",
         "failingChecksTitle": "بررسی‌های الزامی ناموفق",
-        "failingChecksDetail": "بررسی‌های الزامی وضعیت با خطا روبه‌رو شده‌اند.",
         "unstableTitle": "برخی بررسی‌ها ناموفق‌اند",
         "unstableDetail": "بررسی‌های غیرالزامی با خطا روبه‌رو شده‌اند. این خطاها مانع ادغام نمی‌شوند.",
         "draftTitle": "پول ریکوئست پیش‌نویس",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
       "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
+      "reconnectTitleGitLab": "اتصال مجدد به GitLab",
+      "reconnectTitleBitbucket": "اتصال مجدد به Bitbucket",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است.",
       "gitlabDescription": "بازبینی درخواست‌های ادغام در موبایل",
       "gitlabInstanceMismatchTitle": "اتصال GitLab برای نمونه دیگری است",
@@ -708,7 +708,12 @@
       "pendingComment_other": "نظر در انتظار ارسال",
       "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
-      "partialPostedMessage": "{{displayFreshCount}} نظر ارسال شد. {{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedFresh": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} نظر ارسال شد. ",
+      "partialPostedStale": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedStale_one": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
+      "partialPostedStale_other": "{{displayStaleCount}} نظر به کامیت قدیمی‌تری مربوط است و در صف شما باقی مانده است.",
       "blockedRequestChanges": "برای درخواست تغییرات، یک خلاصه یا حداقل یک نظر اضافه کنید.",
       "blockedComment": "برای ارسال بازبینی از نوع نظر، یک خلاصه یا دست‌کم یک نظر اضافه کنید."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "پول ریکوئست برای REVIEW.md باز شد",
       "alreadyPresent": "دستورالعمل‌ها از قبل در REVIEW.md موجود است",
       "status": {
+        "open": "باز",
         "edited": "ویرایش‌شده",
         "opening_change_request": "در حال باز کردن PR",
         "change_request_failed": "باز کردن PR ناموفق بود",
@@ -1614,6 +1620,8 @@
       "set": "تنظیم‌شده",
       "notSet": "تنظیم‌نشده",
       "nSelected": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_one": "{{displayCount}} مورد انتخاب‌شده",
+      "nSelected_other": "{{displayCount}} مورد انتخاب‌شده",
       "proposedReviewMdGuidance": "دستورالعمل‌های پیشنهادی برای REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "دلایل ارزیابی قابلیت بهره‌برداری",
       "suggestedFix": "اصلاح پیشنهادی",
       "whereFound": "محل شناسایی ({{displayCount}})",
+      "whereFound_one": "محل شناسایی ({{displayCount}})",
+      "whereFound_other": "محل شناسایی ({{displayCount}})",
       "fullReport": "گزارش کامل تولیدشده",
       "yes": "بله",
       "no": "خیر",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} متوسط و پایین",
       "dueThisWeek": "سررسید این هفته",
       "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
+      "dueThisWeekDetail_one": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
+      "dueThisWeekDetail_other": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",
       "reviewSlaAssignment": "بررسی مهلت‌های تعیین‌شده در SLA",
       "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
@@ -2076,6 +2088,7 @@
       "actionFailed": "امکان انجام این عملیات وجود نداشت. لطفاً دوباره تلاش کنید.",
       "actionBlocked": "امکان انجام این عملیات وجود نداشت. مشکل باید ابتدا برطرف شود تا بتوانید دوباره تلاش کنید.",
       "syncNoRepositories": "هیچ مخزنی در محدوده همگام‌سازی نیست. مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید، سپس دوباره همگام‌سازی کنید.",
+      "syncNoRepositoriesNoManage": "هیچ مخزنی در محدوده همگام‌سازی نیست. مالک سازمان، مدیر یا مدیر صورتحساب باید مخازن را متصل کند تا همگام‌سازی انجام شود.",
       "syncIntegrationInactive": "اتصال GitHub برای عامل امنیتی فعال نیست. برنامه Kilo در GitHub را دوباره متصل کنید، سپس دوباره همگام‌سازی کنید.",
       "syncMissingPermission": "برنامه Kilo در GitHub نمی‌تواند هشدارهای آسیب‌پذیری را بخواند. آن مجوز را در GitHub اعطا کنید، سپس دوباره همگام‌سازی کنید.",
       "configConflict": "تنظیمات عامل امنیتی جای دیگری تغییر کرده است. آخرین تنظیمات را بررسی و دوباره ذخیره کنید."
@@ -2612,9 +2625,9 @@
       "detailRetryingClone": "تلاش مجدد برای کلون (تلاش {{attempt}} از {{total}})",
       "detailSetupCommandFailed": "دستور راه‌اندازی {{index}} ناموفق بود",
       "detailSetupCommandTimedOut": "مهلت دستور راه‌اندازی {{index}} به پایان رسید",
-      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، {{applied}} از {{total}} فایل بازیابی شد",
+      "detailColdRestore": "بازیابی سرد، اسنپ‌شات اعمال شد، فایل‌های بازیابی‌شده: {{applied}} از {{total}}",
       "detailProgressPercent": "{{percent}}٪ کامل شد",
-      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود: {{skipped}} از {{total}} فایل بازیابی نشدند ({{reasons}}).",
+      "detailRestoreIncompleteReport": "بازیابی نشست ناقص بود، فایل‌های بازیابی‌نشده: {{skipped}} از {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "موارد حذف‌شده: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} و {{omitted}} مورد دیگر",
       "detailReasonPatchFailed": "وصله اعمال نشد",
@@ -3790,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "وقتی هزینهٔ این حوزه از حدی فراتر می‌رود یا از نرخ ساعتی معمول آن بالاتر می‌جهد، هشداری را با ایمیل یا نوتیفیکیشن برای مخاطبان صورتحساب بفرست.",
     "thresholdTitle": "عبور از آستانه",
-    "thresholdSubtitle": "هزینهٔ جاری از حد شما فراتر می‌رود",
+    "thresholdSubtitle": "هزینهٔ جاری این حوزه در بازهٔ زمانی انتخاب‌شده از حد شما فراتر می‌رود",
     "anomalyTitle": "جهش ساعتی",
-    "anomalySubtitle": "یک ساعت بسیار بالاتر از نرخ معمول این حوزه است",
+    "anomalySubtitle": "نرخ ساعتی این حوزه بسیار بالاتر از خط پایه p95 خودش است",
     "limitLabel": "حد (USD)",
     "windowLabel": "بازهٔ زمانی",
     "window24h": "۲۴ ساعت",
@@ -3802,14 +3815,14 @@
     "saved": "تنظیمات هشدار هزینه ذخیره شد",
     "loadError": "هشدارهای هزینه بارگذاری نشد.",
     "saveError": "هشدارهای هزینه ذخیره نشد.",
-    "empty": "هشدارهای هزینه خاموش است. برای هشدار دادن به مخاطبان صورتحساب این حوزه آن‌ها را روشن کن.",
-    "noSpend": "هنوز هیچ هزینه‌ای ثبت نشده است",
+    "sendAlerts": "فرستادن هشدارها",
+    "noSpend": "هنوز هیچ هزینه‌ای",
     "spend24h": "هزینه در ۲۴ ساعت گذشته",
     "multiplierError": "ضریبی برابر ۱ یا بیشتر وارد کن",
     "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
     "pushOffByCategory": "در اعلان‌ها خاموش",
     "multiplierMaxError": "ضریبی برابر {{max}} یا کمتر وارد کن",
-    "thresholdMaxError": "مبلغی برابر {{max}} یا کمتر وارد کنید."
+    "thresholdMaxError": "مبلغی برابر {{max}} یا کمتر وارد کنید"
   },
   "profiles": {
     "title": "پروفایل ها",

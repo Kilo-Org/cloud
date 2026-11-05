@@ -229,6 +229,7 @@ export type MessageDeliveryState =
     };
 
 export type SessionCommit = {
+  repository?: string | undefined;
   commitHash: string;
   commitMessage: string;
   messageId: string;

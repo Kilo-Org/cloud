@@ -25,12 +25,7 @@ export function isFraUsageQueueSelected(
   config: UsageQueueFraConfig,
   context: UsageQueuePayer
 ): boolean {
-  return (
-    config.enabled &&
-    config.exposure > 0 &&
-    !!context.kiloUserId &&
-    usageQueuePayerBucket(context, 'usage-fra-v1') < config.exposure * 10_000
-  );
+  return config.enabled && !!context.kiloUserId;
 }
 
 function usageQueuePayerBucket(context: UsageQueuePayer, seed: string): number {

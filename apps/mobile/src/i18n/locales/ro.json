@@ -449,7 +449,6 @@
         "rebase": "Rebazare"
       },
       "terminal": {
-        "alreadyMerged": "Deja îmbinat",
         "closed": "PR închis",
         "closedMergeRequest": "Merge request închis"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Lipsesc revizuirile obligatorii",
         "requiredReviewsDetail": "Lipsesc aprobările persoanelor desemnate să revizuiască modificările sau acestea sunt încă în așteptare.",
         "failingChecksTitle": "Verificări obligatorii eșuate",
-        "failingChecksDetail": "Verificările de stare obligatorii au eșuat.",
         "unstableTitle": "Unele verificări au eșuat",
         "unstableDetail": "Unele verificări opționale au eșuat. Acestea nu vor bloca îmbinarea.",
         "draftTitle": "PR în stadiu de ciornă",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Nu s-a putut verifica conexiunea la Bitbucket.",
       "providerCheckFailedMessage": "Starea conexiunii nu este disponibilă până când se încarcă.",
       "reconnectTitle": "Reconectare la GitHub",
+      "reconnectTitleGitLab": "Reconectare la GitLab",
+      "reconnectTitleBitbucket": "Reconectare la Bitbucket",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat.",
       "gitlabDescription": "Revizuiește merge requesturi pe mobil",
       "gitlabInstanceMismatchTitle": "Conexiunea la GitLab este pentru o altă instanță",
@@ -723,7 +723,14 @@
       "pendingComment_other": "comentarii în așteptare",
       "submitCountOfTotal": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
       "submitReview": "Trimite revizuirea",
-      "partialPostedMessage": "Comentarii publicate: {{displayFreshCount}}. Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentarii publicate: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_few": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentarii care se referă la un commit mai vechi și au rămas în așteptare: {{displayStaleCount}}.",
       "pendingComment_few": "comentarii în așteptare",
       "blockedRequestChanges": "Adaugă un rezumat sau cel puțin un comentariu pentru a cere modificări.",
       "blockedComment": "Adaugă un rezumat sau cel puțin un comentariu pentru a trimite o revizuire de tip comentariu."
@@ -1549,6 +1556,7 @@
       "prOpened": "Pull request pentru REVIEW.md deschis",
       "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
       "status": {
+        "open": "Deschisă",
         "edited": "Editată",
         "opening_change_request": "Se deschide PR-ul",
         "change_request_failed": "Deschiderea PR-ului a eșuat",
@@ -1636,6 +1644,9 @@
       "set": "Configurat",
       "notSet": "Nu este configurat",
       "nSelected": "{{displayCount}} selectate",
+      "nSelected_one": "{{displayCount}} selectate",
+      "nSelected_other": "{{displayCount}} selectate",
+      "nSelected_few": "{{displayCount}} selectate",
       "proposedReviewMdGuidance": "Instrucțiuni propuse pentru REVIEW.md"
     },
     "decision": {
@@ -1771,6 +1782,9 @@
       "exploitabilityReasoning": "Justificarea exploatabilității",
       "suggestedFix": "Remediere sugerată",
       "whereFound": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_one": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_few": "Locuri în care a fost identificată ({{displayCount}})",
+      "whereFound_other": "Locuri în care a fost identificată ({{displayCount}})",
       "fullReport": "Raport complet generat",
       "yes": "Da",
       "no": "Nu",
@@ -1857,6 +1871,9 @@
       "breakdownMediumLow_other": "{{displayCount}} cu gravitate medie și scăzută",
       "dueThisWeek": "Cu termen săptămâna aceasta",
       "dueThisWeekDetail": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_one": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_few": "{{exploitable}} dintre acestea confirmate ca exploatabile",
+      "dueThisWeekDetail_other": "{{exploitable}} dintre acestea confirmate ca exploatabile",
       "noDeadline": "Fără termen limită",
       "reviewSlaAssignment": "Verifică atribuirea termenelor SLA",
       "allOpenFindingsTracked": "Toate constatările deschise sunt urmărite"
@@ -2103,6 +2120,7 @@
       "actionFailed": "Această acțiune nu a putut fi finalizată. Încearcă din nou.",
       "actionBlocked": "Această acțiune nu a putut fi finalizată. Problema trebuie rezolvată înainte de a încerca din nou.",
       "syncNoRepositories": "Niciun repository nu face parte din domeniul de sincronizare. Alege repository-urile monitorizate de Agentul de securitate, apoi sincronizează din nou.",
+      "syncNoRepositoriesNoManage": "Niciun repository nu face parte din domeniul de sincronizare. Un proprietar, administrator sau manager de facturare al organizației trebuie să conecteze repository-uri înainte ca sincronizarea să poată rula.",
       "syncIntegrationInactive": "Conexiunea GitHub pentru Agentul de securitate nu este activă. Reconectează Kilo GitHub App, apoi sincronizează din nou.",
       "syncMissingPermission": "Aplicația Kilo pentru GitHub nu poate citi alertele de vulnerabilitate. Acordă această permisiune în GitHub, apoi sincronizează din nou.",
       "configConflict": "Setările Agentului de securitate au fost modificate în altă parte. Verifică cele mai recente setări și salvează din nou."
@@ -2647,9 +2665,9 @@
       "detailRetryingClone": "Se reîncearcă clonarea (încercarea {{attempt}} din {{total}})",
       "detailSetupCommandFailed": "Comanda de configurare {{index}} a eșuat",
       "detailSetupCommandTimedOut": "Comanda de configurare {{index}} a expirat",
-      "detailColdRestore": "Restaurare la rece, snapshot aplicat, {{applied}} din {{total}} fișiere restaurate",
+      "detailColdRestore": "Restaurare la rece, snapshot aplicat, fișiere restaurate: {{applied}} din {{total}}",
       "detailProgressPercent": "{{percent}}% finalizat",
-      "detailRestoreIncompleteReport": "Restaurarea sesiunii este incompletă: {{skipped}} din {{total}} fișiere nu au fost restaurate ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restaurarea sesiunii este incompletă — fișiere nerestaurate: {{skipped}} din {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Lipsesc: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} și încă {{omitted}}",
       "detailReasonPatchFailed": "patch-ul nu s-a aplicat",
@@ -3835,9 +3853,9 @@
   "spendAlerts": {
     "subtitle": "Trimite o alertă prin e-mail sau push către contactele de facturare când cheltuielile acestui domeniu depășesc o limită sau sar peste ritmul orar obișnuit.",
     "thresholdTitle": "Depășirea pragului",
-    "thresholdSubtitle": "Cheltuielile cumulate depășesc limita ta",
+    "thresholdSubtitle": "Cheltuielile cumulate ale acestui domeniu pe durata ferestrei alese depășesc limita ta",
     "anomalyTitle": "Vârf orar",
-    "anomalySubtitle": "O oră este mult peste ritmul obișnuit al acestui domeniu",
+    "anomalySubtitle": "Ritmul orar al acestui domeniu este mult peste propria linie de bază p95",
     "limitLabel": "Limită (USD)",
     "windowLabel": "Fereastră",
     "window24h": "24 de ore",
@@ -3847,14 +3865,14 @@
     "saved": "Setările alertelor de cheltuieli au fost salvate",
     "loadError": "Alertele de cheltuieli nu au putut fi încărcate.",
     "saveError": "Alertele de cheltuieli nu au putut fi salvate.",
-    "empty": "Alertele de cheltuieli sunt oprite. Activează-le pentru a-i avertiza pe contactele de facturare ale acestui domeniu.",
-    "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
+    "sendAlerts": "Trimite alerte",
+    "noSpend": "Încă nicio cheltuială",
     "spend24h": "Cheltuieli din ultimele 24 de ore",
     "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
     "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
     "pushOffByCategory": "Oprit în Notificări",
     "multiplierMaxError": "Introdu un multiplicator de {{max}} sau mai mic",
-    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin."
+    "thresholdMaxError": "Introdu o sumă de {{max}} sau mai puțin"
   },
   "profiles": {
     "title": "Profiluri",

@@ -108,13 +108,16 @@ jest.mock(
     getOrganizationGroupPolicyContext: mockGetContext,
   })
 );
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  ).allowsInferenceProviderUserByok,
-  evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
-  getEffectiveModelDecision: mockDecision,
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ).allowsInferenceProviderUserByok,
+    evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
+    getEffectiveModelDecision: mockDecision,
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
   listAvailableCustomLlms: mockCustom,
 }));
@@ -126,6 +129,7 @@ jest.mock(
   () => ({ getAllowedDirectByokCatalogModelIds: mockDirectByokCatalogModelIds })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/ai-gateway/auto-model'),
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () => ({

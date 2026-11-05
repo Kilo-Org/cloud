@@ -442,7 +442,6 @@
         "rebase": "ਰੀਬੇਸ"
       },
       "terminal": {
-        "alreadyMerged": "ਪਹਿਲਾਂ ਹੀ ਮਰਜ ਹੋ ਗਈ",
         "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ",
         "closedMergeRequest": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ਲੋੜੀਂਦੀਆਂ ਸਮੀਖਿਆਵਾਂ ਅਜੇ ਬਾਕੀ",
         "requiredReviewsDetail": "ਲੋੜੀਂਦੇ ਸਮੀਖਿਅਕਾਂ ਦੀ ਮਨਜ਼ੂਰੀ ਅਜੇ ਨਹੀਂ ਮਿਲੀ ਜਾਂ ਬਾਕੀ ਹੈ।",
         "failingChecksTitle": "ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ",
-        "failingChecksDetail": "ਸਥਿਤੀ ਦੀਆਂ ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ।",
         "unstableTitle": "ਕੁਝ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ",
         "unstableDetail": "ਕੁਝ ਵਿਕਲਪਿਕ ਜਾਂਚਾਂ ਅਸਫਲ ਹੋ ਰਹੀਆਂ ਹਨ। ਇਹ ਮਰਜ ਨੂੰ ਨਹੀਂ ਰੋਕਣਗੀਆਂ।",
         "draftTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਖਰੜਾ",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
+      "reconnectTitleGitLab": "GitLab ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
+      "reconnectTitleBitbucket": "Bitbucket ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectDescription": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
       "gitlabDescription": "ਮੋਬਾਈਲ 'ਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "gitlabInstanceMismatchTitle": "GitLab ਕਨੈਕਸ਼ਨ ਹੋਰ ਇੰਸਟੈਂਸ ਲਈ ਹੈ",
@@ -708,7 +708,12 @@
       "pendingComment_other": "ਨਾ ਭੇਜੀਆਂ ਟਿੱਪਣੀਆਂ",
       "submitCountOfTotal": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
       "submitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰੋ",
-      "partialPostedMessage": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedFresh": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedFresh_one": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedFresh_other": "ਪੋਸਟ ਕੀਤੀਆਂ ਟਿੱਪਣੀਆਂ: {{displayFreshCount}}। ",
+      "partialPostedStale": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedStale_one": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
+      "partialPostedStale_other": "ਪੁਰਾਣੇ ਕਮਿਟ ਨਾਲ ਜੁੜੀਆਂ ਟਿੱਪਣੀਆਂ ਅਜੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਹਨ: {{displayStaleCount}}।",
       "blockedRequestChanges": "ਬਦਲਾਵਾਂ ਦੀ ਬੇਨਤੀ ਕਰਨ ਲਈ ਸਾਰ ਜਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਟਿੱਪਣੀ ਜੋੜੋ।",
       "blockedComment": "ਟਿੱਪਣੀ ਵਾਲੀ ਸਮੀਖਿਆ ਪੋਸਟ ਕਰਨ ਲਈ ਸਾਰ ਜਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਟਿੱਪਣੀ ਜੋੜੋ।"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md ਲਈ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੀ ਗਈ",
       "alreadyPresent": "ਹਦਾਇਤਾਂ REVIEW.md ਵਿੱਚ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹਨ",
       "status": {
+        "open": "ਖੁੱਲ੍ਹਾ",
         "edited": "ਸੰਪਾਦਿਤ",
         "opening_change_request": "PR ਖੋਲ੍ਹੀ ਜਾ ਰਹੀ ਹੈ",
         "change_request_failed": "PR ਅਸਫਲ ਰਹੀ",
@@ -1614,6 +1620,8 @@
       "set": "ਸੈੱਟ ਕੀਤਾ ਹੋਇਆ",
       "notSet": "ਸੈੱਟ ਨਹੀਂ ਹੈ",
       "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_one": "{{displayCount}} ਚੁਣੇ ਗਏ",
+      "nSelected_other": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "ਦੁਰਵਰਤੋਂ ਦੀ ਸੰਭਾਵਨਾ ਦਾ ਆਧਾਰ",
       "suggestedFix": "ਸੁਝਾਇਆ ਗਿਆ ਹੱਲ",
       "whereFound": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
+      "whereFound_one": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
+      "whereFound_other": "ਮਿਲਣ ਦੀਆਂ ਥਾਵਾਂ ({{displayCount}})",
       "fullReport": "ਤਿਆਰ ਕੀਤੀ ਪੂਰੀ ਰਿਪੋਰਟ",
       "yes": "ਹਾਂ",
       "no": "ਨਹੀਂ",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} ਦਰਮਿਆਨੀ ਤੇ ਘੱਟ",
       "dueThisWeek": "ਇਸ ਹਫ਼ਤੇ ਆਖ਼ਰੀ ਮਿਤੀ",
       "dueThisWeekDetail": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
+      "dueThisWeekDetail_one": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
+      "dueThisWeekDetail_other": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
       "noDeadline": "ਕੋਈ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
       "reviewSlaAssignment": "SLA ਨਿਰਧਾਰਨ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "allOpenFindingsTracked": "ਸਾਰੀਆਂ ਖੁੱਲ੍ਹੀਆਂ ਸਮੱਸਿਆਵਾਂ ਦੀ ਨਿਗਰਾਨੀ ਜਾਰੀ"
@@ -2076,6 +2088,7 @@
       "actionFailed": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "actionBlocked": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨਾ ਜ਼ਰੂਰੀ ਹੈ।",
       "syncNoRepositories": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਉਹ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ ਜਿਨ੍ਹਾਂ ਦੀ ਨਿਗਰਾਨੀ ਸੁਰੱਖਿਆ ਏਜੰਟ ਕਰਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
+      "syncNoRepositoriesNoManage": "ਸਿੰਕ ਸਕੋਪ ਵਿੱਚ ਕੋਈ ਵੀ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਹੈ। ਸਿੰਕ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਕਨੈਕਟ ਕਰਨੀਆਂ ਹੋਣਗੀਆਂ।",
       "syncIntegrationInactive": "«ਸੁਰੱਖਿਆ ਏਜੰਟ» ਲਈ GitHub ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਨਹੀਂ ਹੈ। Kilo GitHub App ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts ਨਹੀਂ ਪੜ੍ਹ ਸਕਦੀ। GitHub ਵਿੱਚ ਇਹ ਅਨੁਮਤੀ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਸਿੰਕ ਕਰੋ।",
       "configConflict": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਕਿਤੇ ਹੋਰ ਬਦਲੀਆਂ ਗਈਆਂ ਹਨ। ਨਵੀਨਤਮ ਸੈਟਿੰਗਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਸੰਭਾਲੋ।"
@@ -2612,9 +2625,9 @@
       "detailRetryingClone": "ਕਲੋਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਜਾਰੀ ({{total}} ਵਿੱਚੋਂ {{attempt}})",
       "detailSetupCommandFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਅਸਫਲ ਰਹੀ",
       "detailSetupCommandTimedOut": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਦਾ ਸਮਾਂ ਸਮਾਪਤ",
-      "detailColdRestore": "ਕੋਲਡ ਰੀਸਟੋਰ, ਸਨੈਪਸ਼ਾਟ ਲਾਗੂ ਹੋਈ, {{total}} ਵਿੱਚੋਂ {{applied}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਹੋਈਆਂ",
+      "detailColdRestore": "ਕੋਲਡ ਰੀਸਟੋਰ, ਸਨੈਪਸ਼ਾਟ ਲਾਗੂ, ਰੀਸਟੋਰ ਹੋਈਆਂ ਫਾਈਲਾਂ: {{total}} ਵਿੱਚੋਂ {{applied}}",
       "detailProgressPercent": "{{percent}}% ਪੂਰਾ",
-      "detailRestoreIncompleteReport": "ਸੈਸ਼ਨ ਰੀਸਟੋਰ ਅਧੂਰਾ: {{total}} ਵਿੱਚੋਂ {{skipped}} ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ ਹੋਈਆਂ ({{reasons}})।",
+      "detailRestoreIncompleteReport": "ਸੈਸ਼ਨ ਰੀਸਟੋਰ ਅਧੂਰਾ — ਫਾਈਲਾਂ ਰੀਸਟੋਰ ਨਹੀਂ: {{total}} ਵਿੱਚੋਂ {{skipped}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "ਗੁੰਮ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ਅਤੇ {{omitted}} ਹੋਰ",
       "detailReasonPatchFailed": "ਪੈਚ ਲਾਗੂ ਨਹੀਂ ਹੋਈ",
@@ -3790,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "ਜਦੋਂ ਇਸ ਸਕੋਪ ਦਾ ਖਰਚਾ ਕੋਈ ਸੀਮਾ ਟੱਪ ਜਾਵੇ ਜਾਂ ਆਪਣੀ ਆਮ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਤੋਂ ਉੱਪਰ ਚੜ੍ਹ ਜਾਵੇ, ਤਾਂ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਈਮੇਲ ਜਾਂ ਪੁਸ਼ ਰਾਹੀਂ ਚੇਤਾਵਨੀ ਭੇਜੋ।",
     "thresholdTitle": "ਸੀਮਾ ਟੱਪਣਾ",
-    "thresholdSubtitle": "ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
+    "thresholdSubtitle": "ਚੁਣੇ ਗਏ ਸਮੇਂ ਦੌਰਾਨ ਇਸ ਸਕੋਪ ਦਾ ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
     "anomalyTitle": "ਪ੍ਰਤੀ ਘੰਟਾ ਵਾਧਾ",
-    "anomalySubtitle": "ਇੱਕ ਘੰਟਾ ਇਸ ਸਕੋਪ ਦੀ ਆਮ ਦਰ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
+    "anomalySubtitle": "ਇਸ ਸਕੋਪ ਦੀ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਉਸ ਦੇ ਆਪਣੇ p95 ਬੇਸਲਾਈਨ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
     "limitLabel": "ਸੀਮਾ (USD)",
     "windowLabel": "ਸਮਾਂ",
     "window24h": "24 ਘੰਟੇ",
@@ -3802,14 +3815,14 @@
     "saved": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀ ਸੈਟਿੰਗਾਂ ਸੰਭਾਲੀਆਂ ਗਈਆਂ",
     "loadError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "saveError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਸੰਭਾਲੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
-    "empty": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਹਨ। ਇਸ ਸਕੋਪ ਦੇ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਸੂਚਿਤ ਕਰਨ ਲਈ ਇਨ੍ਹਾਂ ਨੂੰ ਚਾਲੂ ਕਰੋ।",
-    "noSpend": "ਹਾਲੇ ਕੋਈ ਖਰਚਾ ਦਰਜ ਨਹੀਂ ਹੋਇਆ",
+    "sendAlerts": "ਚੇਤਾਵਨੀਆਂ ਭੇਜੋ",
+    "noSpend": "ਕੋਈ ਖਰਚਾ ਨਹੀਂ",
     "spend24h": "ਪਿਛਲੇ 24 ਘੰਟਿਆਂ ਦਾ ਖਰਚਾ",
     "multiplierError": "1 ਜਾਂ ਵੱਧ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
     "permissionDenied": "ਤੁਹਾਨੂੰ ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਪ੍ਰਬੰਧਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "pushOffByCategory": "ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਬੰਦ",
     "multiplierMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
-    "thresholdMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦੀ ਰਕਮ ਦਰਜ ਕਰੋ।"
+    "thresholdMaxError": "{{max}} ਜਾਂ ਘੱਟ ਦੀ ਰਕਮ ਦਰਜ ਕਰੋ"
   },
   "profiles": {
     "title": "ਪ੍ਰੋਫਾਈਲਾਂ",

@@ -442,7 +442,6 @@
         "rebase": "Herbasering"
       },
       "terminal": {
-        "alreadyMerged": "Reeds saamgevoeg",
         "closed": "Hierdie trekversoek is gesluit",
         "closedMergeRequest": "Hierdie merge request is gesluit"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Vereiste hersienings ontbreek",
         "requiredReviewsDetail": "Goedkeurings van die vereiste hersieners ontbreek of is nog uitstaande.",
         "failingChecksTitle": "Vereiste kontroles misluk",
-        "failingChecksDetail": "Vereiste statuskontroles misluk.",
         "unstableTitle": "Sommige kontroles misluk",
         "unstableDetail": "Sommige opsionele kontroles misluk. Dit sal nie die samevoeging blokkeer nie.",
         "draftTitle": "Konseptrekversoek",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Kon nie die Bitbucket-verbinding kontroleer nie.",
       "providerCheckFailedMessage": "Verbindingsstatus is nie beskikbaar voordat die laai voltooi is nie.",
       "reconnectTitle": "Koppel GitHub weer",
+      "reconnectTitleGitLab": "Koppel GitLab weer",
+      "reconnectTitleBitbucket": "Koppel Bitbucket weer",
       "reconnectDescription": "Jou GitHub-verbinding is herroep.",
       "gitlabDescription": "Hersien merge requests op jou selfoon",
       "gitlabInstanceMismatchTitle": "GitLab-koppeling is vir 'n ander instansie",
@@ -708,7 +708,12 @@
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
-      "partialPostedMessage": "{{displayFreshCount}} kommentaar(e) is geplaas. {{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
+      "partialPostedStale": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedStale_one": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
+      "partialPostedStale_other": "{{displayStaleCount}} kommentaar(e) verwys na 'n ouer vaslegging en bly op jou waglys.",
       "blockedRequestChanges": "Voeg 'n opsomming of minstens een kommentaar by om veranderings te versoek.",
       "blockedComment": "Voeg 'n opsomming of minstens een kommentaar by om 'n hersiening met kommentaar te plaas."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Pull request vir REVIEW.md oopgemaak",
       "alreadyPresent": "Riglyne is reeds in REVIEW.md",
       "status": {
+        "open": "Oop",
         "edited": "Gewysig",
         "opening_change_request": "Maak PR oop",
         "change_request_failed": "PR het misluk",
@@ -1614,6 +1620,8 @@
       "set": "Ingestel",
       "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
+      "nSelected_one": "{{displayCount}} gekies",
+      "nSelected_other": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Redes vir uitbuitbaarheidsoordeel",
       "suggestedFix": "Voorgestelde regstelling",
       "whereFound": "Waar dit gevind is ({{displayCount}})",
+      "whereFound_one": "Waar dit gevind is ({{displayCount}})",
+      "whereFound_other": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "yes": "Ja",
       "no": "Nee",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} matig en laag",
       "dueThisWeek": "Sperdatum hierdie week",
       "dueThisWeekDetail": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
+      "dueThisWeekDetail_one": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
+      "dueThisWeekDetail_other": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
       "noDeadline": "Geen sperdatum nie",
       "reviewSlaAssignment": "Hersien SLA-toewysing",
       "allOpenFindingsTracked": "Alle oop bevindings word gemonitor"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Kon nie hierdie aksie voltooi nie. Probeer asseblief weer.",
       "actionBlocked": "Hierdie aksie kon nie voltooi word nie. Die probleem moet eers reggemaak word voordat jy weer kan probeer.",
       "syncNoRepositories": "Geen bewaarplekke is in die sinkroniseringsomvang nie. Kies die bewaarplekke wat die Sekuriteitsagent monitor en sinkroniseer dan weer.",
+      "syncNoRepositoriesNoManage": "Geen bewaarplekke is in die sinkroniseringsomvang nie. 'n Organisasie-eienaar, administrateur of faktureringsbestuurder moet bewaarplekke koppel voordat dit kan sinkroniseer.",
       "syncIntegrationInactive": "Die GitHub-verbinding vir die Sekuriteitsagent is nie aktief nie. Herkoppel die Kilo GitHub-app en sinkroniseer dan weer.",
       "syncMissingPermission": "Die Kilo GitHub-app kan nie kwesbaarheidswaarskuwings lees nie. Verleen daardie toestemming in GitHub en sinkroniseer dan weer.",
       "configConflict": "Die Sekuriteitsagent se instellings is elders verander. Hersien die nuutste instellings en stoor weer."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Probeer kloon weer (poging {{attempt}} van {{total}})",
       "detailSetupCommandFailed": "Opstelopdrag {{index}} het misluk",
       "detailSetupCommandTimedOut": "Opstelopdrag {{index}} se tyd het uitgeloop",
-      "detailColdRestore": "Koue herstel, momentopname toegepas, {{applied}} van {{total}} lêers herstel",
+      "detailColdRestore": "Koue herstel, momentopname toegepas, herstelde lêers: {{applied}} van {{total}}",
       "detailProgressPercent": "{{percent}}% voltooi",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} lêers is nie herstel nie ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sessieherstel onvolledig, nie-herstelde lêers: {{skipped}} van {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbreek: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "die pleister is nie toegepas nie",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
     "thresholdTitle": "Oorskryding van drempel",
-    "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
+    "thresholdSubtitle": "Hierdie omvang se lopende besteding oor die gekose venster oorskry jou limiet",
     "anomalyTitle": "Uurlikse piek",
-    "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
+    "anomalySubtitle": "Hierdie omvang se uurlikse tempo is ver bo sy eie p95-basislyn",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
     "window24h": "24 uur",
@@ -3796,14 +3809,14 @@
     "saved": "Instellings vir bestedingswaarskuwings gestoor",
     "loadError": "Kon nie bestedingswaarskuwings laai nie.",
     "saveError": "Kon nie bestedingswaarskuwings stoor nie.",
-    "empty": "Bestedingswaarskuwings is af. Skakel dit aan om hierdie omvang se faktuurkontakte te waarsku.",
-    "noSpend": "Nog geen besteding aangeteken nie",
+    "sendAlerts": "Stuur waarskuwings",
+    "noSpend": "Geen besteding nie",
     "spend24h": "Besteding in die afgelope 24 uur",
     "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
     "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
     "pushOffByCategory": "Af in Kennisgewings",
     "multiplierMaxError": "Voer 'n vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in."
+    "thresholdMaxError": "Voer 'n bedrag van {{max}} of minder in"
   },
   "profiles": {
     "title": "Profiele",

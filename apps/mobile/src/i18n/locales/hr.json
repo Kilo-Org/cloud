@@ -449,7 +449,6 @@
         "rebase": "Promjena osnove"
       },
       "terminal": {
-        "alreadyMerged": "Već spojeno",
         "closed": "Ovaj zahtjev za spajanje je zatvoren",
         "closedMergeRequest": "Ovaj merge request je zatvoren"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Nedostaju obavezni pregledi koda",
         "requiredReviewsDetail": "Još nisu dobivena odobrenja svih osoba čiji je pregled koda obavezan.",
         "failingChecksTitle": "Obavezne provjere nisu uspjele",
-        "failingChecksDetail": "Obavezne provjere statusa nisu uspjele.",
         "unstableTitle": "Neke provjere nisu uspjele",
         "unstableDetail": "Neobavezne provjere nisu uspjele. One ne sprječavaju spajanje.",
         "draftTitle": "Nacrt zahtjeva za spajanje",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Nije moguće provjeriti vezu s Bitbucketom.",
       "providerCheckFailedMessage": "Status povezavanja dostupan je nakon učitavanja.",
       "reconnectTitle": "Ponovno poveži GitHub",
+      "reconnectTitleGitLab": "Ponovno poveži GitLab",
+      "reconnectTitleBitbucket": "Ponovno poveži Bitbucket",
       "reconnectDescription": "Tvoja veza s GitHubom je opozvana.",
       "gitlabDescription": "Pregledaj merge requeste na mobitelu",
       "gitlabInstanceMismatchTitle": "GitLab veza je za drugu instancu",
@@ -723,7 +723,14 @@
       "pendingComment_other": "neposlanih komentara",
       "submitCountOfTotal": "Pošalji {{displayFreshCount}} od {{displayTotalCount}} komentara",
       "submitReview": "Pošalji pregled",
-      "partialPostedMessage": "Broj objavljenih komentara: {{displayFreshCount}}. Komentari koji se odnose na stariju reviziju ostali su na čekanju: {{displayStaleCount}}.",
+      "partialPostedFresh": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_few": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Broj objavljenih komentara: {{displayFreshCount}}. ",
+      "partialPostedStale": "Komentari koji se odnose na stariju reviziju ostali su na čekanju: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Komentari koji se odnose na stariju reviziju ostali su na čekanju: {{displayStaleCount}}.",
+      "partialPostedStale_few": "Komentari koji se odnose na stariju reviziju ostali su na čekanju: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Komentari koji se odnose na stariju reviziju ostali su na čekanju: {{displayStaleCount}}.",
       "pendingComment_few": "komentara na čekanju",
       "blockedRequestChanges": "Dodaj sažetak ili barem jedan komentar za traženje izmjena.",
       "blockedComment": "Dodaj sažetak ili barem jedan komentar za objavu pregleda koda s komentarom."
@@ -1549,6 +1556,7 @@
       "prOpened": "Zahtjev za povlačenje za REVIEW.md otvoren",
       "alreadyPresent": "Smjernice već postoje u datoteci REVIEW.md",
       "status": {
+        "open": "Otvoreno",
         "edited": "Uređeno",
         "opening_change_request": "Otvaranje PR-a",
         "change_request_failed": "Otvaranje PR-a nije uspjelo",
@@ -1636,6 +1644,9 @@
       "set": "Postavljeno",
       "notSet": "Nije postavljeno",
       "nSelected": "{{displayCount}} odabrano",
+      "nSelected_one": "{{displayCount}} odabrano",
+      "nSelected_other": "{{displayCount}} odabrano",
+      "nSelected_few": "{{displayCount}} odabrano",
       "proposedReviewMdGuidance": "Predložene smjernice za REVIEW.md"
     },
     "decision": {
@@ -1771,6 +1782,9 @@
       "exploitabilityReasoning": "Obrazloženje iskoristivosti",
       "suggestedFix": "Predloženo rješenje",
       "whereFound": "Mjesta nalaza ({{displayCount}})",
+      "whereFound_one": "Mjesta nalaza ({{displayCount}})",
+      "whereFound_few": "Mjesta nalaza ({{displayCount}})",
+      "whereFound_other": "Mjesta nalaza ({{displayCount}})",
       "fullReport": "Cijelo generirano izvješće",
       "yes": "Da",
       "no": "Ne",
@@ -1857,6 +1871,9 @@
       "breakdownMediumLow_other": "srednje i nisko: {{displayCount}}",
       "dueThisWeek": "Dospijeva ovaj tjedan",
       "dueThisWeekDetail": "Od njih je {{exploitable}} potvrđeno iskoristivih",
+      "dueThisWeekDetail_one": "Od njih je {{exploitable}} potvrđeno iskoristivih",
+      "dueThisWeekDetail_few": "Od njih je {{exploitable}} potvrđeno iskoristivih",
+      "dueThisWeekDetail_other": "Od njih je {{exploitable}} potvrđeno iskoristivih",
       "noDeadline": "Bez roka",
       "reviewSlaAssignment": "Provjeri dodjelu rokova prema SLA-u",
       "allOpenFindingsTracked": "Svi otvoreni nalazi obuhvaćeni praćenjem"
@@ -2103,6 +2120,7 @@
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovno.",
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem je potrebno riješiti prije ponovnog pokušaja.",
       "syncNoRepositories": "Nijedan repozitorij nije u opsegu sinkronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, zatim ponovno sinkronizirajte.",
+      "syncNoRepositoriesNoManage": "Nijedan repozitorij nije u opsegu sinkronizacije. Vlasnik organizacije, administrator ili upravitelj naplate mora povezati repozitorije prije nego što se sinkronizacija može izvršiti.",
       "syncIntegrationInactive": "Veza s GitHubom za Sigurnosni agent nije aktivna. Ponovno povežite Kilo GitHub App, zatim ponovno sinkronizirajte.",
       "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, pa ponovno sinkroniziraj.",
       "configConflict": "Postavke Sigurnosnog agenta promijenjene su negdje drugdje. Pregledaj najnovije postavke i ponovno spremi."
@@ -2647,9 +2665,9 @@
       "detailRetryingClone": "Ponovni pokušaj kloniranja (pokušaj {{attempt}} od {{total}})",
       "detailSetupCommandFailed": "Naredba za postavljanje {{index}} nije uspjela",
       "detailSetupCommandTimedOut": "Naredbi za postavljanje {{index}} isteklo je vrijeme",
-      "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćeno {{applied}} od {{total}} datoteka",
+      "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćene datoteke: {{applied}} od {{total}}",
       "detailProgressPercent": "{{percent}}% dovršeno",
-      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno: nije vraćeno {{skipped}} od {{total}} datoteka ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno – nisu vraćene datoteke: {{skipped}} od {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Nedostaje: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} i još {{omitted}}",
       "detailReasonPatchFailed": "zakrpa nije primijenjena",
@@ -3835,9 +3853,9 @@
   "spendAlerts": {
     "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega prijeđe limit ili skoči iznad uobičajene satne stope.",
     "thresholdTitle": "Prekoračenje praga",
-    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "thresholdSubtitle": "Tekuća potrošnja ovog opsega u odabranom prozoru prelazi tvoj limit",
     "anomalyTitle": "Satni skok",
-    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog opsega",
+    "anomalySubtitle": "Satna stopa ovog opsega daleko je iznad vlastite p95 osnovne vrijednosti",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Prozor",
     "window24h": "24 sata",
@@ -3847,14 +3865,14 @@
     "saved": "Postavke upozorenja o potrošnji su spremljene",
     "loadError": "Upozorenja o potrošnji nisu učitana.",
     "saveError": "Upozorenja o potrošnji nisu spremljena.",
-    "empty": "Upozorenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog opsega.",
-    "noSpend": "Još nema zabilježene potrošnje",
+    "sendAlerts": "Pošalji upozorenja",
+    "noSpend": "Još nema potrošnje",
     "spend24h": "Potrošnja u posljednja 24 sata",
     "multiplierError": "Unesi množitelj 1 ili veći",
     "permissionDenied": "Nemaš dopuštenje za upravljanje upozorenjima o potrošnji.",
     "pushOffByCategory": "Isključeno u Obavijestima",
     "multiplierMaxError": "Unesi množitelj {{max}} ili manji",
-    "thresholdMaxError": "Unesi iznos {{max}} ili manji."
+    "thresholdMaxError": "Unesi iznos {{max}} ili manji"
   },
   "profiles": {
     "title": "Profili",

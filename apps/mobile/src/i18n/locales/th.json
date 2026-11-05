@@ -442,7 +442,6 @@
         "rebase": "รีเบส"
       },
       "terminal": {
-        "alreadyMerged": "รวมแล้ว",
         "closed": "PR นี้ปิดแล้ว",
         "closedMergeRequest": "Merge request นี้ปิดแล้ว"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ยังไม่ได้รับรีวิวครบตามที่กำหนด",
         "requiredReviewsDetail": "ยังไม่ได้รับการอนุมัติครบจากผู้รีวิวที่กำหนด หรือยังรอการอนุมัติอยู่",
         "failingChecksTitle": "ไม่ผ่านการตรวจสอบที่บังคับ",
-        "failingChecksDetail": "การตรวจสอบสถานะที่บังคับยังไม่ผ่าน",
         "unstableTitle": "การตรวจสอบบางรายการไม่ผ่าน",
         "unstableDetail": "การตรวจสอบที่ไม่บังคับบางรายการไม่ผ่าน แต่ยังรวมได้",
         "draftTitle": "PR ฉบับร่าง",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "ไม่สามารถตรวจสอบการเชื่อมต่อ Bitbucket ได้",
       "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
+      "reconnectTitleGitLab": "เชื่อมต่อ GitLab ใหม่",
+      "reconnectTitleBitbucket": "เชื่อมต่อ Bitbucket ใหม่",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน",
       "gitlabDescription": "ตรวจสอบ merge request บนมือถือ",
       "gitlabInstanceMismatchTitle": "การเชื่อมต่อ GitLab เป็นของอินสแตนซ์อื่น",
@@ -708,7 +708,12 @@
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
-      "partialPostedMessage": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
+      "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
+      "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
+      "partialPostedFresh_other": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
+      "partialPostedStale": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
+      "partialPostedStale_one": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
+      "partialPostedStale_other": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
       "blockedRequestChanges": "เพิ่มสรุปรีวิวหรือความคิดเห็นอย่างน้อยหนึ่งรายการเพื่อขอให้แก้ไข",
       "blockedComment": "เพิ่มสรุปรีวิวหรือความคิดเห็นอย่างน้อยหนึ่งรายการเพื่อส่งรีวิวแบบแสดงความคิดเห็น"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "เปิด Pull Request สำหรับไฟล์ REVIEW.md แล้ว",
       "alreadyPresent": "มีคำแนะนำนี้ในไฟล์ REVIEW.md อยู่แล้ว",
       "status": {
+        "open": "เปิด",
         "edited": "แก้ไขแล้ว",
         "opening_change_request": "กำลังเปิด PR",
         "change_request_failed": "เปิด PR ไม่สำเร็จ",
@@ -1614,6 +1620,8 @@
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_one": "เลือกแล้ว {{displayCount}} รายการ",
+      "nSelected_other": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "เหตุผลในการประเมินความสามารถในการใช้โจมตี",
       "suggestedFix": "วิธีแก้ไขที่แนะนำ",
       "whereFound": "ตำแหน่งที่พบ ({{displayCount}})",
+      "whereFound_one": "ตำแหน่งที่พบ ({{displayCount}})",
+      "whereFound_other": "ตำแหน่งที่พบ ({{displayCount}})",
       "fullReport": "รายงานฉบับเต็มที่สร้างขึ้น",
       "yes": "ใช่",
       "no": "ไม่",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "ระดับปานกลางและต่ำ {{displayCount}} รายการ",
       "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
       "dueThisWeekDetail": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
+      "dueThisWeekDetail_one": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
+      "dueThisWeekDetail_other": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "noDeadline": "ไม่มีกำหนดเวลา",
       "reviewSlaAssignment": "ตรวจสอบการกำหนด SLA",
       "allOpenFindingsTracked": "ติดตามข้อค้นพบที่ยังเปิดอยู่ครบแล้ว"
@@ -2070,6 +2082,7 @@
       "actionFailed": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ กรุณาลองอีกครั้ง",
       "actionBlocked": "ดำเนินการนี้ให้เสร็จสมบูรณ์ไม่ได้ ต้องแก้ไขปัญหาก่อนจึงจะลองใหม่ได้",
       "syncNoRepositories": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ โปรดเลือก repositories ที่เอเจนต์ความปลอดภัยตรวจสอบ แล้วซิงค์อีกครั้ง",
+      "syncNoRepositoriesNoManage": "ไม่มีรีโพซิทอรีใดอยู่ในขอบเขตการซิงค์ เจ้าขององค์กร ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินต้องเชื่อมต่อรีโพซิทอรีก่อนจึงจะซิงค์ได้",
       "syncIntegrationInactive": "การเชื่อมต่อ GitHub สำหรับเอเจนต์ความปลอดภัยยังไม่เปิดใช้งาน เชื่อมต่อ Kilo GitHub App ใหม่อีกครั้ง แล้วซิงค์อีกครั้ง",
       "syncMissingPermission": "Kilo GitHub App อ่าน vulnerability alerts ไม่ได้ ให้สิทธิ์นั้นใน GitHub แล้วซิงก์อีกครั้ง",
       "configConflict": "การตั้งค่าของเอเจนต์ความปลอดภัยถูกเปลี่ยนที่อื่น ตรวจสอบการตั้งค่าล่าสุดแล้วบันทึกอีกครั้ง"
@@ -3796,8 +3809,8 @@
     "saved": "บันทึกการตั้งค่าการแจ้งเตือนการใช้จ่ายแล้ว",
     "loadError": "ไม่สามารถโหลดการแจ้งเตือนการใช้จ่ายได้",
     "saveError": "ไม่สามารถบันทึกการแจ้งเตือนการใช้จ่ายได้",
-    "empty": "การแจ้งเตือนการใช้จ่ายปิดอยู่ เปิดใช้งานเพื่อแจ้งเตือนผู้ติดต่อด้านการเรียกเก็บเงินของขอบเขตนี้",
-    "noSpend": "ยังไม่มีการบันทึกการใช้จ่าย",
+    "sendAlerts": "ส่งการแจ้งเตือนการใช้จ่าย",
+    "noSpend": "ยังไม่มีการใช้จ่าย",
     "spend24h": "การใช้จ่ายใน 24 ชั่วโมงที่ผ่านมา",
     "multiplierError": "ป้อนตัวคูณ 1 หรือมากกว่า",
     "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการใช้จ่าย",

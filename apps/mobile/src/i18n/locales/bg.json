@@ -442,7 +442,6 @@
         "rebase": "Пребазиране"
       },
       "terminal": {
-        "alreadyMerged": "Вече обединена",
         "closed": "Заявката е затворена",
         "closedMergeRequest": "Тази merge заявка е затворена"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Липсват задължителни прегледи",
         "requiredReviewsDetail": "Липсват одобрения от задължителните проверяващи или все още се очакват.",
         "failingChecksTitle": "Неуспешни задължителни проверки",
-        "failingChecksDetail": "Задължителните проверки на състоянието са неуспешни.",
         "unstableTitle": "Някои проверки са неуспешни",
         "unstableDetail": "Незадължителните проверки са неуспешни. Те няма да попречат на обединяването.",
         "draftTitle": "Чернова на заявка за сливане",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
       "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
       "reconnectTitle": "Повторно свързване с GitHub",
+      "reconnectTitleGitLab": "Повторно свързване с GitLab",
+      "reconnectTitleBitbucket": "Повторно свързване с Bitbucket",
       "reconnectDescription": "Достъпът ти до GitHub е отнет.",
       "gitlabDescription": "Преглеждай merge заявки от телефона си",
       "gitlabInstanceMismatchTitle": "Връзката с GitLab е за друга инстанция",
@@ -708,7 +708,12 @@
       "pendingComment_other": "неизпратени коментара",
       "submitCountOfTotal": "Изпрати {{displayFreshCount}} от {{displayTotalCount}} коментара",
       "submitReview": "Изпрати прегледа",
-      "partialPostedMessage": "Публикувани коментари: {{displayFreshCount}}. Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedFresh": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Публикувани коментари: {{displayFreshCount}}. ",
+      "partialPostedStale": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Коментарите към по-стар комит остават в списъка ти за изпращане: {{displayStaleCount}}.",
       "blockedRequestChanges": "Добави обобщение или поне един коментар, за да поискаш промени.",
       "blockedComment": "Добави обобщение или поне един коментар, за да изпратиш преглед с коментар."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Отворен е pull request за REVIEW.md",
       "alreadyPresent": "Насоките вече са в REVIEW.md",
       "status": {
+        "open": "Отворено",
         "edited": "Редактирано",
         "opening_change_request": "Отваряне на PR",
         "change_request_failed": "Неуспешен PR",
@@ -1614,6 +1620,8 @@
       "set": "Зададено",
       "notSet": "Не е зададено",
       "nSelected": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Обосновка на възможността за атака",
       "suggestedFix": "Предложена корекция",
       "whereFound": "Къде е открито ({{displayCount}})",
+      "whereFound_one": "Къде е открито ({{displayCount}})",
+      "whereFound_other": "Къде е открито ({{displayCount}})",
       "fullReport": "Пълен генериран доклад",
       "yes": "Да",
       "no": "Не",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} със средна и ниска тежест",
       "dueThisWeek": "С краен срок тази седмица",
       "dueThisWeekDetail": "От тях {{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail_one": "От тях {{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail_other": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
       "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Не можахме да завършим това действие. Опитай отново.",
       "actionBlocked": "Не можахме да завършим това действие. Проблемът трябва да бъде отстранен, преди да опиташ отново.",
       "syncNoRepositories": "Няма репозиторита в обхвата на синхронизиране. Изберете репозиторитата, които Агентът по сигурността наблюдава, и синхронизирайте отново.",
+      "syncNoRepositoriesNoManage": "Няма репозиторита в обхвата на синхронизиране. Собственик на организацията, администратор или отговорник за плащанията трябва да свърже репозиторита, преди да може да се извърши синхронизиране.",
       "syncIntegrationInactive": "Връзката с GitHub за Агент по сигурността не е активна. Свържете отново Kilo GitHub App и след това синхронизирайте отново.",
       "syncMissingPermission": "Приложението на Kilo за GitHub не може да чете vulnerability alerts. Дай това разрешение в GitHub и синхронизирай отново.",
       "configConflict": "Настройките на Агента по сигурността са променени другаде. Прегледай последните настройки и запази отново."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Нов опит за клониране (опит {{attempt}} от {{total}})",
       "detailSetupCommandFailed": "Командата за настройка {{index}} не успя",
       "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
-      "detailColdRestore": "Студено възстановяване, снимката е приложена, {{applied}} от {{total}} файла са възстановени",
+      "detailColdRestore": "Студено възстановяване, снимката е приложена, възстановени файлове: {{applied}} от {{total}}",
       "detailProgressPercent": "{{percent}}% завършено",
-      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно: {{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно — невъзстановени файлове: {{skipped}} от {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
       "detailReasonPatchFailed": "кръпката не беше приложена",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Изпращай известие по имейл или push до контактите за фактуриране, когато разходите на този обхват надхвърлят лимит или скочат над обичайната си часова норма.",
     "thresholdTitle": "Преминаване на праг",
-    "thresholdSubtitle": "Текущите разходи надхвърлят лимита ти",
+    "thresholdSubtitle": "Текущите разходи на този обхват за избрания прозорец надхвърлят лимита ти",
     "anomalyTitle": "Часов скок",
-    "anomalySubtitle": "Един час е далеч над обичайната норма за този обхват",
+    "anomalySubtitle": "Часовата норма на този обхват е далеч над собствената му p95 базова линия",
     "limitLabel": "Лимит (USD)",
     "windowLabel": "Прозорец",
     "window24h": "24 часа",
@@ -3796,14 +3809,14 @@
     "saved": "Настройките за известия за разходи са запазени",
     "loadError": "Известията за разходи не можаха да се заредят.",
     "saveError": "Известията за разходи не можаха да се запазят.",
-    "empty": "Известията за разходи са изключени. Включи ги, за да предупреждаваш контактите за фактуриране на този обхват.",
-    "noSpend": "Още няма записани разходи",
+    "sendAlerts": "Изпращай известия",
+    "noSpend": "Още няма разходи",
     "spend24h": "Разходи през последните 24 часа",
     "multiplierError": "Въведи множител 1 или повече",
     "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
     "pushOffByCategory": "Изключено в „Известия“",
     "multiplierMaxError": "Въведи множител {{max}} или по-малко",
-    "thresholdMaxError": "Въведи сума {{max}} или по-малко."
+    "thresholdMaxError": "Въведи сума {{max}} или по-малко"
   },
   "profiles": {
     "title": "Профили",

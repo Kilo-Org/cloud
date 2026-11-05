@@ -1049,6 +1049,7 @@
       "prOpened": "REVIEW.md için pull request açıldı",
       "alreadyPresent": "Yönergeler REVIEW.md dosyasında zaten mevcut",
       "status": {
+        "open": "Açık",
         "edited": "Düzenlendi",
         "opening_change_request": "PR açılıyor",
         "change_request_failed": "PR başarısız oldu",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "Tüm alanlar",
       "nSelected": "{{displayCount}} seçili",
+      "nSelected_one": "{{displayCount}} seçili",
+      "nSelected_other": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
       "set": "Belirlendi",
       "notSet": "Belirlenmedi"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "Ön değerlendirme gerekçesi",
       "watchInCloudAgent": "Bulut ajanında izle",
       "whereFound": "Bulunduğu yerler ({{displayCount}})",
+      "whereFound_one": "Bulunduğu yerler ({{displayCount}})",
+      "whereFound_other": "Bulunduğu yerler ({{displayCount}})",
       "yes": "Evet",
       "action": {
         "analyzeCodebase": "Kod tabanını analiz et",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} orta ve düşük",
       "dueThisWeek": "Süresi bu hafta doluyor",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail_one": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
+      "dueThisWeekDetail_other": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",
       "reviewSlaAssignment": "SLA atamasını incele",
       "allOpenFindingsTracked": "Tüm açık bulgular takip ediliyor"
@@ -1536,6 +1543,7 @@
       "actionFailed": "Bu işlem tamamlanamadı. Lütfen tekrar dene.",
       "actionBlocked": "Bu işlem tamamlanamadı. Yeniden denemeden önce sorunun düzeltilmesi gerekiyor.",
       "syncNoRepositories": "Eşitleme kapsamında hiçbir depo yok. Güvenlik ajanının izleyeceği depoları seç, ardından yeniden eşitle.",
+      "syncNoRepositoriesNoManage": "Eşitleme kapsamında hiçbir depo yok. Eşitlemenin çalışabilmesi için bir kuruluş sahibi, yöneticisi veya faturalandırma yöneticisi depoları bağlamalı.",
       "syncIntegrationInactive": "Güvenlik ajanının GitHub bağlantısı etkin değil. Kilo GitHub uygulamasını yeniden bağla, ardından yeniden eşitle.",
       "syncMissingPermission": "Kilo GitHub uygulaması güvenlik açığı uyarılarını okuyamıyor. Bu izni GitHub'da ver, ardından yeniden eşitle.",
       "configConflict": "Güvenlik ajanının ayarları başka bir yerde değiştirildi. En son ayarları gözden geçirip yeniden kaydet."
@@ -2714,6 +2722,8 @@
       "checkFailedTitleBitbucket": "Bitbucket bağlantısı kontrol edilemedi.",
       "providerCheckFailedMessage": "Bağlantı durumu, yüklenene kadar kullanılamıyor.",
       "reconnectTitle": "GitHub'a yeniden bağlan",
+      "reconnectTitleGitLab": "GitLab'a yeniden bağlan",
+      "reconnectTitleBitbucket": "Bitbucket'a yeniden bağlan",
       "reconnectDescription": "GitHub bağlantının izni kaldırıldı.",
       "gitlabDescription": "Birleştirme isteklerini mobilde incele",
       "gitlabInstanceMismatchTitle": "GitLab bağlantısı başka bir örneğe ait",
@@ -2993,7 +3003,6 @@
         "squash": "Sıkıştırma"
       },
       "terminal": {
-        "alreadyMerged": "Zaten birleştirildi",
         "closed": "Bu çekme isteği kapalı",
         "closedMergeRequest": "Bu birleştirme isteği kapalı"
       },
@@ -3010,7 +3019,6 @@
         "requiredReviewsTitle": "Gerekli incelemeler eksik",
         "requiredReviewsDetail": "Gerekli incelemelerin onayları eksik veya henüz verilmedi.",
         "failingChecksTitle": "Başarısız olan gerekli kontroller",
-        "failingChecksDetail": "Gerekli durum kontrolleri başarısız.",
         "unstableTitle": "Bazı kontroller başarısız",
         "unstableDetail": "Gerekli olmayan kontroller başarısız. Bunlar birleştirmeyi engellemez.",
         "draftTitle": "Taslak çekme isteği",
@@ -3117,7 +3125,12 @@
       "pendingComment_other": "bekleyen yorum",
       "pendingComment_one": "bekleyen yorum",
       "summaryOptional": "Özet (isteğe bağlı)",
-      "partialPostedMessage": "{{displayFreshCount}} yorum gönderildi. {{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedFresh": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} yorum gönderildi. ",
+      "partialPostedStale": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
+      "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Bu kapsamın harcaması bir sınırı aştığında veya olağan saatlik hızının üzerine çıktığında faturalandırma kişilerine e-posta veya push ile uyarı gönder.",
     "thresholdTitle": "Eşik aşımı",
-    "thresholdSubtitle": "Cari harcama limitini aşıyor",
+    "thresholdSubtitle": "Bu kapsamın seçilen penceredeki cari harcaması limitini aşıyor",
     "anomalyTitle": "Saatlik artış",
-    "anomalySubtitle": "Bir saat bu kapsamın olağan hızının çok üzerinde",
+    "anomalySubtitle": "Bu kapsamın saatlik hızı kendi p95 temelinin çok üzerinde",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Pencere",
     "window24h": "24 saat",
@@ -3796,14 +3809,14 @@
     "saved": "Harcama uyarısı ayarları kaydedildi",
     "loadError": "Harcama uyarıları yüklenemedi.",
     "saveError": "Harcama uyarıları kaydedilemedi.",
-    "empty": "Harcama uyarıları kapalı. Bu kapsamın faturalandırma kişilerini uyarmak için aç.",
-    "noSpend": "Henüz harcama kaydedilmedi",
+    "sendAlerts": "Uyarı gönder",
+    "noSpend": "Henüz harcama yok",
     "spend24h": "Son 24 saatteki harcama",
     "multiplierError": "1 veya daha büyük bir çarpan gir",
     "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
     "pushOffByCategory": "Bildirimler'de kapalı",
     "multiplierMaxError": "{{max}} veya daha küçük bir çarpan gir",
-    "thresholdMaxError": "{{max}} veya daha az bir tutar gir."
+    "thresholdMaxError": "{{max}} veya daha az bir tutar gir"
   },
   "profiles": {
     "title": "Profiller",

@@ -11,7 +11,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -24,6 +24,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import {
   DashboardSections,
   DashboardSectionsSkeleton,
+  type SectionAction,
 } from '@/components/security-agent/dashboard-sections';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
@@ -203,6 +204,7 @@ export function buildLocalizedMetrics(
           label: i18n.t('securityAgent.dashboardMetrics.dueThisWeek'),
           value: number(data.sla.dueSoon.total),
           detail: i18n.t('securityAgent.dashboardMetrics.dueThisWeekDetail', {
+            count: data.sla.dueSoon.exploitable,
             exploitable: number(data.sla.dueSoon.exploitable),
           }),
         });
@@ -463,6 +465,39 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // only" option list. A failed fetch is recoverable: the retry card below and
   // pull-to-refresh both refetch the repositories query.
   const repoFilterUnavailable = repositories.isLoading || repositories.isError;
+  // "All repositories" is a claim about the GitHub App grant, and the settings
+  // overview refuses to make it for a settled empty grant. This row names the
+  // same scope one tap apart, so it reads the same way when the grant holds
+  // nothing; a read still in flight or a failed one proves neither state.
+  const repositoryScopeEmpty =
+    config.data?.repositorySelectionMode === 'all' &&
+    repositories.data?.length === 0 &&
+    !repoFilterUnavailable;
+  // A scope with nothing in it leaves nothing to filter, so the sheet — whose
+  // only option would be "All repositories" — stays shut for the same reason
+  // the loading and failed cases keep it shut.
+  const repoFilterOff = repoFilterUnavailable || repositoryScopeEmpty;
+  // A chosen repository can leave the scope after the filter was applied: the
+  // grant is narrowed out of band and the next refresh answers with a list that
+  // no longer holds it. The row would name a repository this dashboard cannot
+  // show, and the sheet that clears the filter is the one control that state
+  // closes, so the filter drops with it.
+  const inScopeRepoNames = useMemo(
+    () =>
+      getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
+        repo => repo.fullName
+      ),
+    [repositories.data, config.data]
+  );
+  useEffect(() => {
+    if (repoFilterUnavailable || repoFullName === undefined) {
+      return;
+    }
+    if (inScopeRepoNames.includes(repoFullName)) {
+      return;
+    }
+    setRepoFullName(undefined);
+  }, [inScopeRepoNames, repoFilterUnavailable, repoFullName]);
 
   // A non-retryable sync outcome ended the intent, so both sync controls
   // disable and the inline copy below explains the state.
@@ -482,6 +517,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const syncInFlight = triggerSync.isPending || syncWatch !== null || syncRunning.syncRunning;
   const syncDisabled = syncInFlight || syncBlocked;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+  // A member cannot change repository policy: the repositories screen disables
+  // every mode row for them, so a control that opens it sends them to a page
+  // they cannot act on. Only the resolved role proves that state — the personal
+  // scope is always `allowed`, and an unresolved role keeps the manager path
+  // until it settles rather than telling a real manager they cannot manage.
+  const repositoryPolicyReadOnly = capability.status === 'denied';
   // The ledger’s in-progress conflict is not a failure of this sync: it is the
   // sync already running under the same operation key. It gets the running
   // presentation instead of a sentence with a Retry that would collide again.
@@ -567,15 +608,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // action instead of a Retry that would fail the same way: the in-app
   // repository picker when nothing is in the sync scope, the GitHub App page
   // when the connection itself is what blocks the sync.
-  let syncAction: { label: string; pending: boolean; handlePress: () => void } | null = null;
+  let syncAction: SectionAction | null = null;
   if (syncPrecondition === 'noRepositories') {
-    syncAction = {
-      label: t('securityAgent.dashboard.manageRepositories'),
-      pending: false,
-      handlePress: () => {
-        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-      },
-    };
+    if (!repositoryPolicyReadOnly) {
+      syncAction = {
+        label: t('securityAgent.dashboard.manageRepositories'),
+        pending: false,
+        handlePress: () => {
+          pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+        },
+      };
+    }
   } else if (syncPrecondition !== null) {
     syncAction = {
       label: t('securityAgent.repositories.manageAccess'),
@@ -595,6 +638,36 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       handlePress: () => {
         startSync(lastSyncAttempt?.intent ?? { repoFullName });
       },
+    };
+  }
+  // The empty-scope sentence ends "then sync again" and says to choose the
+  // repositories, which is a step only a manager can take. A member reads who
+  // can connect them instead.
+  const syncFailureMessage =
+    syncPrecondition === 'noRepositories' && repositoryPolicyReadOnly
+      ? t('securityAgent.mutations.syncNoRepositoriesNoManage')
+      : syncFailure?.message;
+
+  // A grant that holds nothing blocks every scan, so the repository card's
+  // empty state carries the step out of it. A manager opens the repository
+  // settings; a member cannot change the policy there, so they are handed to
+  // the GitHub App page where the grant itself is widened — the same control
+  // the repositories screen offers them for this exact state. A role read that
+  // has not settled keeps the manager path, as the rejection above does.
+  let emptyGrantAction: SectionAction | null = null;
+  if (repositoryScopeEmpty && !repositoryPolicyReadOnly) {
+    emptyGrantAction = {
+      label: t('securityAgent.dashboard.manageRepositories'),
+      pending: false,
+      handlePress: () => {
+        pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+      },
+    };
+  } else if (repositoryScopeEmpty && manageAccess) {
+    emptyGrantAction = {
+      label: t('securityAgent.repositories.manageAccess'),
+      pending: manageAccess.pending,
+      handlePress: manageAccess.handlePress,
     };
   }
 
@@ -627,20 +700,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   const openRepoFilter = () => {
-    if (repoFilterUnavailable) {
+    if (repoFilterOff) {
       return;
     }
-    const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
-      repo => repo.fullName
-    );
-    const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
+    const options = [t('common.allRepositories'), ...inScopeRepoNames, t('common.cancel')];
     showActionSheetWithOptions(
       { ...themedSheet, options, cancelButtonIndex: options.length - 1 },
       index => {
         if (index === undefined || index === options.length - 1) {
           return;
         }
-        setRepoFullName(index === 0 ? undefined : repoNames[index - 1]);
+        setRepoFullName(index === 0 ? undefined : inScopeRepoNames[index - 1]);
       }
     );
   };
@@ -674,18 +744,21 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               the lines where they already sat. */}
           <Pressable
             onPress={openRepoFilter}
-            disabled={repoFilterUnavailable}
+            disabled={repoFilterOff}
             className={cn(
               ROW_TARGET_CLASS,
               'flex-1 justify-center active:opacity-70',
-              repoFilterUnavailable && 'opacity-50'
+              repoFilterOff && 'opacity-50'
             )}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
-            accessibilityState={{ disabled: repoFilterUnavailable }}
+            accessibilityState={{ disabled: repoFilterOff }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
-              {repoFullName ?? t('common.allRepositories')}
+              {repoFullName ??
+                (repositoryScopeEmpty
+                  ? t('securityAgent.repositories.noRepositories')
+                  : t('common.allRepositories'))}
             </Text>
             <Text variant="muted" className="text-xs">
               {syncInFlight ? t('securityAgent.dashboard.syncing') : lastSyncLabel}
@@ -735,7 +808,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 triggerSync.isPending ? 'text-warn' : 'text-destructive'
               )}
             >
-              {syncFailure.message}
+              {syncFailureMessage}
             </Text>
             {syncAction ? (
               <Button
@@ -808,14 +881,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         {dashboardStats.isPending || lastSync.isPending ? (
           <View className="gap-4">
             <DashboardMetricTiles neverSynced={neverSynced} />
-            {neverSynced && slaEnabled ? (
+            {neverSynced && slaEnabled && !repositoryPolicyReadOnly && !repositoryScopeEmpty ? (
               // The Manage repositories link renders whenever SLA tracking is
-              // on and nothing carries a deadline. Before the first sync that
+              // on, nothing carries a deadline, and the reader may change the
+              // repository policy. Before the first sync that
               // is certain, so the placeholder holds the link's own inline
               // box and the sections below keep their place when the link
               // arrives. Once the tiles are measured the link needs a
               // measured total, which the placeholder cannot read, so a scope
-              // that has synced keeps it out of the loading state.
+              // that has synced keeps it out of the loading state. A settled
+              // empty grant keeps it out too: the repository card below holds
+              // that state's step, and the placeholder already knows that
+              // shape.
               <View className="flex-row items-center gap-4">
                 <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
               </View>
@@ -847,7 +924,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
 
-        {slaEnabled && data && data.sla.overall.total === 0 ? (
+        {slaEnabled &&
+        data &&
+        data.sla.overall.total === 0 &&
+        !repositoryPolicyReadOnly &&
+        // An empty grant is the reason this empty state has no deadline to
+        // show, and the repository card below carries its step out. This link
+        // would repeat that same destination from further away — but only while
+        // that card really holds it: the card renders the step in its empty
+        // state alone, which a scope that already synced findings outgrew when
+        // the grant narrowed afterwards, and the cards wait for the sync-status
+        // read. Until both hold, this link is the screen's only way there.
+        !(repositoryScopeEmpty && data.repoHealth.length === 0 && !lastSync.isPending) ? (
           // The header’s Sync now button already starts this run, so the empty
           // state offers only the navigation it alone provides. It carries the
           // dashboard’s card language — the same surface and radius as the
@@ -892,6 +980,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
             neverSynced={neverSynced}
+            emptyGrant={repositoryScopeEmpty}
+            emptyGrantAction={emptyGrantAction}
           />
         ) : null}
       </TabScreenScrollView>

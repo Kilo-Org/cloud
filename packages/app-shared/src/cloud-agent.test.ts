@@ -35,6 +35,15 @@ describe('cloudAgentFileLabel', () => {
     expect(cloudAgentFileLabel('/workspace/app/src/a.ts')).toBe('src/a.ts');
   });
 
+  it('strips the public session namespace without losing the file suffix', () => {
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc/src/nested/a.ts')).toBe(
+      'src/nested/a.ts'
+    );
+    expect(cloudAgentFileLabel(String.raw`\cloud-agent\sessions\ses_abc\src\a.ts`)).toBe(
+      'src/a.ts'
+    );
+  });
+
   it('strips a relative session or worktree prefix', () => {
     expect(cloudAgentFileLabel('sessions/ses_abc/src/a.ts')).toBe('src/a.ts');
     expect(cloudAgentFileLabel('worktrees/worktree_9b1deb4d/src/a.ts')).toBe('src/a.ts');
@@ -67,11 +76,25 @@ describe('cloudAgentFileLabel', () => {
     );
   });
 
+  it('keeps the leaf of a multi-repository environment path', () => {
+    expect(cloudAgentFileLabel('/workspace/web/src/a.ts')).toBe('/workspace/web/src/a.ts');
+    expect(cloudAgentFileLabel('/workspace/web/src/a.ts')).toContain('web/src/a.ts');
+    expect(cloudAgentFileLabel('/workspace/api/x')).toContain('api/x');
+  });
+
+  it('does not relabel paths outside a session directory', () => {
+    expect(cloudAgentFileLabel('/workspace')).toBe('/workspace');
+    expect(cloudAgentFileLabel('/workspace/user-1/.cache/x')).toBe('/workspace/user-1/.cache/x');
+    expect(cloudAgentFileLabel('/workspace/tmp/x')).toBe('/workspace/tmp/x');
+  });
+
   it('labels workspace roots as the repo root', () => {
     expect(cloudAgentFileLabel('/workspace/user-1/sessions/ses_abc')).toBe('.');
     expect(cloudAgentFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d')).toBe('.');
     expect(cloudAgentFileLabel('/workspace/app')).toBe('.');
     expect(cloudAgentFileLabel('sessions/ses_abc')).toBe('.');
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc')).toBe('.');
+    expect(cloudAgentFileLabel('/cloud-agent/sessions/ses_abc/')).toBe('.');
   });
 
   it('leaves a path outside a cloud workspace untouched', () => {

@@ -56,6 +56,7 @@ import {
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
+  projectKnownCloudAgentPath,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -87,8 +88,22 @@ import {
   verifySessionPullRequestLink,
 } from '@/lib/integrations/platforms/github/pr-link-identity';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import {
+  getPrObservationSummary,
+  prObservationSummarySchema,
+} from '@/lib/integrations/platforms/github/pr-observations';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  changeWatchPr,
+  enableWatchPr,
+  getWatchPr,
+  getPrWatchOptions,
+  recheckWatchPr,
+  watchPrEnableSchema,
+  watchPrMutationSchema,
+  watchPrQuerySchema,
+} from '@/lib/cloud-agent/watch-pr';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -123,7 +138,14 @@ function isSessionNotFoundError(err: unknown): boolean {
   return false;
 }
 
+function isParentLookupUnavailableError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'FORBIDDEN' || isSessionNotFoundError(err);
+}
+
 const privateTranscriptPathFields = new Set([
+  'directory',
+  'cwd',
+  'root',
   'path',
   'file',
   'activeFile',
@@ -131,6 +153,9 @@ const privateTranscriptPathFields = new Set([
   'absolutePath',
   'filePath',
   'filepath',
+  'file_path',
+  'workdir',
+  'movePath',
 ]);
 const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
 
@@ -152,13 +177,8 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
 
   for (const [key, current] of Object.entries(value)) {
     if (typeof current === 'string') {
-      if (
-        key === 'directory' ||
-        key === 'cwd' ||
-        key === 'root' ||
-        (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory))
-      ) {
-        Reflect.set(value, key, directory);
+      if (privateTranscriptPathFields.has(key) && isPrivateTranscriptPath(current, directory)) {
+        Reflect.set(value, key, projectKnownCloudAgentPath(current, directory) ?? directory);
       } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
         Reflect.set(value, key, '');
       }
@@ -169,7 +189,7 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
       for (let index = 0; index < current.length; index += 1) {
         const path = current[index];
         if (typeof path === 'string' && isPrivateTranscriptPath(path, directory)) {
-          current[index] = directory;
+          current[index] = projectKnownCloudAgentPath(path, directory) ?? directory;
         } else {
           projectGroupedTranscriptPaths(path, directory);
         }
@@ -219,6 +239,7 @@ export const associatedPrSchema = z.object({
   state: z.string(),
   title: z.string().nullable(),
   headSha: z.string().nullable(),
+  observations: prObservationSummarySchema.nullable(),
   lastSyncedAt: z.string(),
   reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
   // True when the server has flagged this PR for an async review-decision
@@ -237,6 +258,7 @@ type AssociatedPrRow = {
   pr_state: string | null;
   pr_title: string | null;
   pr_head_sha: string | null;
+  pr_observations?: unknown;
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
@@ -360,6 +382,7 @@ function formatCacheRow(
     state: cache.pr_state,
     title: cache.pr_title,
     headSha: cache.pr_head_sha,
+    observations: getPrObservationSummary(cache.pr_observations, cache.pr_head_sha),
     lastSyncedAt: cache.pr_last_synced_at,
     reviewDecision,
     reviewDecisionPending: cache.review_decision_pending === true,
@@ -404,6 +427,7 @@ function pendingPartialFromSession(
     state: 'unknown',
     title: null,
     headSha: null,
+    observations: null,
     lastSyncedAt: session.updated_at
       ? new Date(session.updated_at).toISOString()
       : new Date().toISOString(),
@@ -577,6 +601,7 @@ const commonSessionFieldsWithPr = {
   pr_state: github_branch_pull_requests.pr_state,
   pr_title: github_branch_pull_requests.pr_title,
   pr_head_sha: github_branch_pull_requests.pr_head_sha,
+  pr_observations: github_branch_pull_requests.pr_observations,
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -642,6 +667,7 @@ export function projectAssociatedPr<
     pr_state,
     pr_title,
     pr_head_sha,
+    pr_observations,
     pr_last_synced_at,
     pr_review_decision,
     review_decision_pending,
@@ -680,6 +706,7 @@ export function projectAssociatedPr<
         pr_state,
         pr_title,
         pr_head_sha,
+        pr_observations,
         pr_last_synced_at,
         pr_review_decision,
         review_decision_pending,
@@ -714,6 +741,10 @@ const WorktreeInputSchema = z.object({
   worktreeId: cloudAgentWorktreeIdSchema,
   organizationId: z.uuid().nullable(),
 });
+
+function workspaceAnchorSessionId(worktreeId: string): string {
+  return `workspace_${worktreeId.slice('worktree_'.length)}`;
+}
 
 const WorktreeDetailsInputSchema = z.object({
   worktreeIds: z
@@ -989,6 +1020,27 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  getPrWatchOptions: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getPrWatchOptions(ctx, input)),
+  enableWatchPr: baseProcedure
+    .input(watchPrEnableSchema)
+    .mutation(({ ctx, input }) => enableWatchPr(ctx, input)),
+  getWatchPr: baseProcedure
+    .input(watchPrQuerySchema)
+    .query(({ ctx, input }) => getWatchPr(ctx, input)),
+  pauseWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'pause')),
+  resumeWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'resume')),
+  stopWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => changeWatchPr(ctx, input, 'stop')),
+  recheckWatchPr: baseProcedure
+    .input(watchPrMutationSchema)
+    .mutation(({ ctx, input }) => recheckWatchPr(ctx, input)),
   worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
     const worktrees: Record<string, WorktreeDetail> = {};
     if (input.worktreeIds.length === 0) {
@@ -1128,6 +1180,105 @@ export const cliSessionsV2Router = createTRPCRouter({
       );
     }
     return { worktrees };
+  }),
+
+  worktreeParent: baseProcedure.input(WorktreeInputSchema).query(async ({ ctx, input }) => {
+    if (input.organizationId !== null) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
+
+    const anchorSessionId = workspaceAnchorSessionId(input.worktreeId);
+    const organizationCondition =
+      input.organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : eq(cli_sessions_v2.organization_id, input.organizationId);
+    const worktreeJoin = eq(
+      cloud_agent_worktrees.worktree_id,
+      cli_sessions_v2.cloud_agent_worktree_id
+    );
+    const worktreeScope = or(
+      isNull(cloud_agent_worktrees.worktree_id),
+      and(
+        eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+        sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+      )
+    );
+
+    const [anchor] = await db
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, anchorSessionId),
+          eq(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!anchor) return null;
+
+    let parentCloudAgentSessionId: string | undefined;
+    try {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: input.organizationId ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const anchorMetadata =
+        await createCloudAgentNextClient(authToken).getSession(anchorSessionId);
+      parentCloudAgentSessionId = anchorMetadata.parentCloudAgentSessionId;
+    } catch (error) {
+      if (isParentLookupUnavailableError(error)) return null;
+      throw error;
+    }
+
+    if (
+      !parentCloudAgentSessionId ||
+      parentCloudAgentSessionId === anchorSessionId ||
+      !parentCloudAgentSessionId.startsWith('workspace_')
+    ) {
+      return null;
+    }
+
+    const [parent] = await db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        title: cli_sessions_v2.title,
+        organizationId: cli_sessions_v2.organization_id,
+        worktreeName: cloud_agent_worktrees.name,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(cloud_agent_worktrees, worktreeJoin)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          eq(cli_sessions_v2.cloud_agent_session_id, parentCloudAgentSessionId),
+          worktreeMembershipCondition(ctx.user.id, input.organizationId),
+          organizationCondition,
+          worktreeScope,
+          isNull(cloud_agent_worktrees.deletion_started_at),
+          isNull(cloud_agent_worktrees.deletion_completed_at)
+        )
+      )
+      .limit(1);
+
+    if (!parent) return null;
+
+    const worktreeName = parent.worktreeName?.trim();
+    return {
+      session_id: parent.sessionId,
+      title: worktreeName ? worktreeName : parent.title,
+      organization_id: parent.organizationId ?? null,
+    };
   }),
 
   renameWorktree: baseProcedure
@@ -1774,6 +1925,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1879,6 +2031,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             pr_state: row.pr_state,
             pr_title: row.pr_title,
             pr_head_sha: row.pr_head_sha,
+            pr_observations: row.pr_observations,
             pr_last_synced_at: row.pr_last_synced_at,
             pr_review_decision: row.pr_review_decision,
             review_decision_pending: row.review_decision_pending,
@@ -1924,6 +2077,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
@@ -1967,6 +2121,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         pr_state: row.pr_state,
         pr_title: row.pr_title,
         pr_head_sha: row.pr_head_sha,
+        pr_observations: row.pr_observations,
         pr_last_synced_at: row.pr_last_synced_at,
         pr_review_decision: row.pr_review_decision,
         review_decision_pending: row.review_decision_pending,
@@ -2216,6 +2371,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_state: github_branch_pull_requests.pr_state,
           pr_title: github_branch_pull_requests.pr_title,
           pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_observations: github_branch_pull_requests.pr_observations,
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,

@@ -442,7 +442,6 @@
         "rebase": "Αλλαγή βάσης"
       },
       "terminal": {
-        "alreadyMerged": "Ήδη συγχωνευμένο",
         "closed": "Αυτό το αίτημα ενσωμάτωσης είναι κλειστό",
         "closedMergeRequest": "Αυτό το αίτημα συγχώνευσης είναι κλειστό"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Εκκρεμούν απαιτούμενες αξιολογήσεις",
         "requiredReviewsDetail": "Λείπουν ή εκκρεμούν εγκρίσεις από τους απαιτούμενους αξιολογητές.",
         "failingChecksTitle": "Αποτυχία απαιτούμενων ελέγχων",
-        "failingChecksDetail": "Οι απαιτούμενοι έλεγχοι κατάστασης αποτυγχάνουν.",
         "unstableTitle": "Αποτυγχάνουν ορισμένοι έλεγχοι",
         "unstableDetail": "Ορισμένοι μη υποχρεωτικοί έλεγχοι αποτυγχάνουν. Δεν εμποδίζουν τη συγχώνευση.",
         "draftTitle": "Πρόχειρο αίτημα ενσωμάτωσης",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης με το Bitbucket.",
       "providerCheckFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη έως ότου φορτωθεί.",
       "reconnectTitle": "Επανασύνδεση με το GitHub",
+      "reconnectTitleGitLab": "Επανασύνδεση με το GitLab",
+      "reconnectTitleBitbucket": "Επανασύνδεση με το Bitbucket",
       "reconnectDescription": "Η σύνδεσή σου με το GitHub ανακλήθηκε.",
       "gitlabDescription": "Έλεγχος αιτημάτων συγχώνευσης στο κινητό",
       "gitlabInstanceMismatchTitle": "Η σύνδεση με το GitLab αφορά άλλη εγκατάσταση",
@@ -708,7 +708,12 @@
       "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αξιολόγησης",
-      "partialPostedMessage": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedFresh": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Σχόλια που δημοσιεύτηκαν: {{displayFreshCount}}. ",
+      "partialPostedStale": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Σχόλια που παρέμειναν στην ουρά σου επειδή αναφέρονται σε παλαιότερη καταχώριση: {{displayStaleCount}}.",
       "blockedRequestChanges": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να ζητήσεις αλλαγές.",
       "blockedComment": "Πρόσθεσε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να υποβάλεις αξιολόγηση με σχόλια."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Το pull request για το REVIEW.md άνοιξε",
       "alreadyPresent": "Οι οδηγίες υπάρχουν ήδη στο REVIEW.md",
       "status": {
+        "open": "Ανοιχτή",
         "edited": "Τροποποιήθηκε",
         "opening_change_request": "Άνοιγμα PR",
         "change_request_failed": "Το PR απέτυχε",
@@ -1614,6 +1620,8 @@
       "set": "Έχει οριστεί",
       "notSet": "Δεν έχει οριστεί",
       "nSelected": "Επιλεγμένα: {{displayCount}}",
+      "nSelected_one": "Επιλεγμένα: {{displayCount}}",
+      "nSelected_other": "Επιλεγμένα: {{displayCount}}",
       "proposedReviewMdGuidance": "Προτεινόμενες οδηγίες για το REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Αιτιολόγηση δυνατότητας εκμετάλλευσης",
       "suggestedFix": "Προτεινόμενη διόρθωση",
       "whereFound": "Σημεία εντοπισμού ({{displayCount}})",
+      "whereFound_one": "Σημεία εντοπισμού ({{displayCount}})",
+      "whereFound_other": "Σημεία εντοπισμού ({{displayCount}})",
       "fullReport": "Πλήρης παραγόμενη αναφορά",
       "yes": "Ναι",
       "no": "Όχι",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} μέτριας και χαμηλής σοβαρότητας",
       "dueThisWeek": "Λήγουν αυτή την εβδομάδα",
       "dueThisWeekDetail": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
+      "dueThisWeekDetail_one": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
+      "dueThisWeekDetail_other": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
       "noDeadline": "Χωρίς προθεσμία",
       "reviewSlaAssignment": "Έλεγχος ορισμού προθεσμιών SLA",
       "allOpenFindingsTracked": "Όλα τα ανοιχτά ευρήματα παρακολουθούνται"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας. Δοκίμασε ξανά.",
       "actionBlocked": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας. Το πρόβλημα πρέπει να διορθωθεί πρώτα.",
       "syncNoRepositories": "Κανένα αποθετήριο δεν βρίσκεται στο εύρος συγχρονισμού. Επιλέξτε τα αποθετήρια που παρακολουθεί ο Πράκτορας ασφάλειας και, στη συνέχεια, συγχρονίστε ξανά.",
+      "syncNoRepositoriesNoManage": "Κανένα αποθετήριο δεν βρίσκεται στο εύρος συγχρονισμού. Ένας κάτοχος του οργανισμού, διαχειριστής ή διαχειριστής χρέωσης πρέπει να συνδέσει αποθετήρια πριν να μπορεί να πραγματοποιηθεί συγχρονισμός.",
       "syncIntegrationInactive": "Η σύνδεση GitHub του Πράκτορα ασφάλειας δεν είναι ενεργή. Επανασυνδέστε την Kilo GitHub App και, στη συνέχεια, συγχρονίστε ξανά.",
       "syncMissingPermission": "Η εφαρμογή Kilo GitHub δεν μπορεί να διαβάσει ειδοποιήσεις ευπάθειας. Χορήγησε αυτό το δικαίωμα στο GitHub και μετά συγχρόνισε ξανά.",
       "configConflict": "Οι ρυθμίσεις του πράκτορα ασφάλειας άλλαξαν αλλού. Έλεγξε τις πιο πρόσφατες ρυθμίσεις και αποθήκευσε ξανά."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Επανάληψη κλωνοποίησης (προσπάθεια {{attempt}} από {{total}})",
       "detailSetupCommandFailed": "Η εντολή ρύθμισης {{index}} απέτυχε",
       "detailSetupCommandTimedOut": "Η εντολή ρύθμισης {{index}} ξεπέρασε το χρονικό όριο",
-      "detailColdRestore": "Cold restore, εφαρμόστηκε στιγμιότυπο, επαναφέρθηκαν {{applied}} από {{total}} αρχεία",
+      "detailColdRestore": "Cold restore, εφαρμόστηκε στιγμιότυπο, αρχεία που επαναφέρθηκαν: {{applied}} από {{total}}",
       "detailProgressPercent": "Ολοκληρώθηκε {{percent}}%",
-      "detailRestoreIncompleteReport": "Η επαναφορά συνεδρίας δεν ολοκληρώθηκε: δεν επαναφέρθηκαν {{skipped}} από {{total}} αρχεία ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Η επαναφορά συνεδρίας δεν ολοκληρώθηκε — αρχεία που δεν επαναφέρθηκαν: {{skipped}} από {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Λείπουν: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} και άλλα {{omitted}}",
       "detailReasonPatchFailed": "το patch δεν εφαρμόστηκε",
@@ -3796,14 +3809,14 @@
     "saved": "Οι ρυθμίσεις ειδοποιήσεων δαπανών αποθηκεύτηκαν",
     "loadError": "Δεν ήταν δυνατή η φόρτωση των ειδοποιήσεων δαπανών.",
     "saveError": "Δεν ήταν δυνατή η αποθήκευση των ειδοποιήσεων δαπανών.",
-    "empty": "Οι ειδοποιήσεις δαπανών είναι ανενεργές. Ενεργοποίησέ τις για να ειδοποιούνται οι επαφές χρέωσης του λογαριασμού ή οργανισμού.",
-    "noSpend": "Δεν έχει καταγραφεί ακόμη καμία δαπάνη",
+    "sendAlerts": "Στείλε ειδοποιήσεις",
+    "noSpend": "Καμία δαπάνη ακόμη",
     "spend24h": "Δαπάνη τις τελευταίες 24 ώρες",
     "multiplierError": "Εισήγαγε πολλαπλασιαστή 1 ή μεγαλύτερο",
     "permissionDenied": "Δεν έχεις δικαίωμα να διαχειρίζεσαι τις ειδοποιήσεις δαπανών.",
     "pushOffByCategory": "Ανενεργό στις Ειδοποιήσεις",
     "multiplierMaxError": "Εισήγαγε πολλαπλασιαστή {{max}} ή μικρότερο",
-    "thresholdMaxError": "Συμπλήρωσε ένα ποσό {{max}} ή μικρότερο."
+    "thresholdMaxError": "Συμπλήρωσε ένα ποσό {{max}} ή μικρότερο"
   },
   "profiles": {
     "title": "Προφίλ",

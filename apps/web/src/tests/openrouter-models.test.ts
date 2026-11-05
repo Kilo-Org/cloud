@@ -42,11 +42,6 @@ import {
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getTerminalBenchSummaries } from '@kilocode/web-shared/lib/model-stats/terminal-bench';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import { AUTO_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
@@ -154,14 +149,21 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   return { ...actual, getDirectByokModelsForUser: jest.fn(actual.getDirectByokModelsForUser) };
 });
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
-  ...jest.requireActual<typeof CustomLlmCatalog>(
-    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
-  ),
-  getCustomLlmsById: jest.fn(async () => new Map()),
-  requireCustomLlmsById: jest.fn(async () => new Map()),
-  isCustomLlm: jest.fn(async () => false),
-}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => {
+  const getCustomLlmsById = jest.fn(async (): Promise<ReadonlyMap<string, CustomLlm>> => new Map());
+  return {
+    ...jest.requireActual<typeof CustomLlmCatalog>(
+      '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+    ),
+    getCustomLlmsById,
+    requireCustomLlmsById: jest.fn(async () => new Map()),
+    findCustomLlm: jest.fn(
+      async (modelId: string) =>
+        (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null
+    ),
+    isCustomLlm: jest.fn(async () => false),
+  };
+});
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
@@ -270,23 +272,7 @@ beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-useKiloExclusiveModel();
-
 describe('GET /api/v1/models', () => {
-  test('lists Kilo-exclusive models without exposing their internal id', async () => {
-    mockAuth = { user: null, organizationId: null };
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
-
-    const response = await GET(createTestRequest('/api/v1/models'));
-
-    expect(response.status).toBe(200);
-    const rawBody = await response.text();
-    expect(rawBody).toContain(kiloExclusiveModelFixture.public_id);
-    expect(rawBody).not.toContain(kiloExclusiveModelFixture.internal_id);
-  });
-
   test('should handle OpenRouter API errors', async () => {
     const request = createTestRequest('/api/v1/models');
 
@@ -442,14 +428,11 @@ describe('GET /api/v1/models', () => {
     expect(model).not.toHaveProperty('terminalBench');
   });
 
-  test('enriches listed Kilo-exclusive models but not virtual catalog entries', async () => {
-    const exclusiveModel = kiloExclusiveModelFixture;
-    const exclusiveBenchmark = { ...enkryptBenchmark, model_name: exclusiveModel.display_name };
+  test('does not enrich virtual catalog entries', async () => {
     jest
       .mocked(mockRows)
       .mockResolvedValueOnce(
         new Map([
-          [exclusiveModel.public_id, exclusiveBenchmark],
           ...AUTO_MODELS.map(model => [model.id, enkryptBenchmark] as const),
           ['kilo-internal/custom', enkryptBenchmark],
           ['byok/openai/model', enkryptBenchmark],
@@ -461,14 +444,9 @@ describe('GET /api/v1/models', () => {
 
     const response = await GET(createTestRequest('/api/v1/models'));
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
-    const model = responseData.data.find(item => item.id === exclusiveModel.public_id);
     const virtualModels = responseData.data.filter(item => item.id.startsWith('kilo-auto/'));
 
     expect(response.status).toBe(200);
-    expect(model?.enkrypt).toEqual({
-      ...publishedEnkryptBenchmark,
-      model_name: exclusiveBenchmark.model_name,
-    });
     expect(virtualModels.length).toBeGreaterThan(0);
     for (const virtualModel of virtualModels) {
       expect(virtualModel).not.toHaveProperty('enkrypt');
@@ -494,7 +472,7 @@ describe('GET /api/v1/models', () => {
     });
     jest.mocked(getCustomLlmsById).mockResolvedValue(
       new Map([
-        ['acme/public-model', customLlm('acme/public-model', true)],
+        ['acme/public-model-free', customLlm('acme/public-model-free', true)],
         ['acme/private-model', customLlm('acme/private-model', false)],
         ['acme/claude-review', customLlm('acme/claude-review', true)],
         ['some-other-model', customLlm('some-other-model', true)],
@@ -509,8 +487,8 @@ describe('GET /api/v1/models', () => {
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
 
     expect(response.status).toBe(200);
-    expect(responseData.data.find(item => item.id === 'acme/public-model')).toMatchObject({
-      name: 'Custom acme/public-model',
+    expect(responseData.data.find(item => item.id === 'acme/public-model-free')).toMatchObject({
+      name: 'Custom acme/public-model-free',
       description: 'Public custom model',
       isFree: true,
       mayTrainOnYourPrompts: true,
@@ -615,14 +593,7 @@ describe('Enkrypt catalog publication boundaries', () => {
     'withholds cached and raw upstream scores at %s when publication is disabled',
     async (path, handler) => {
       mockPublicationEnabled = false;
-      jest
-        .mocked(mockRows)
-        .mockResolvedValue(
-          new Map([
-            ['some-other-model', enkryptBenchmark],
-            ...kiloExclusiveModels.map(model => [model.public_id, enkryptBenchmark] as const),
-          ])
-        );
+      jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
       const upstream = {
         data: mockOpenRouterModels.data.map(model => ({
           ...model,

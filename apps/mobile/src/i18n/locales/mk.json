@@ -442,7 +442,6 @@
         "rebase": "Пребазирање"
       },
       "terminal": {
-        "alreadyMerged": "Веќе споено",
         "closed": "Ова барање за спојување е затворено",
         "closedMergeRequest": "Ова merge барање е затворено"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Недостигаат задолжителните прегледи",
         "requiredReviewsDetail": "Недостигаат одобренија од задолжителните рецензенти или сè уште се чекаат.",
         "failingChecksTitle": "Задолжителните проверки не поминуваат",
-        "failingChecksDetail": "Задолжителните проверки на статусот не поминуваат.",
         "unstableTitle": "Некои проверки не поминуваат",
         "unstableDetail": "Незадолжителните проверки не поминуваат. Тие нема да го блокираат спојувањето.",
         "draftTitle": "PR во нацрт",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
       "providerCheckFailedMessage": "Статусот на врската е недостапен додека не се вчита.",
       "reconnectTitle": "Повторно поврзување со GitHub",
+      "reconnectTitleGitLab": "Повторно поврзување со GitLab",
+      "reconnectTitleBitbucket": "Повторно поврзување со Bitbucket",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан.",
       "gitlabDescription": "Прегледувај merge барања на мобилен уред",
       "gitlabInstanceMismatchTitle": "Поврзувањето со GitLab е за друга инстанца",
@@ -708,7 +708,12 @@
       "pendingComment_other": "неиспратени коментари",
       "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
-      "partialPostedMessage": "Објавени коментари: {{displayFreshCount}}. Коментари што се однесуваат на постар комит и останаа во твојот список за испраќање: {{displayStaleCount}}.",
+      "partialPostedFresh": "Објавени коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Објавени коментари: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Објавени коментари: {{displayFreshCount}}. ",
+      "partialPostedStale": "Коментари што се однесуваат на постар комит и останаа во твојот список за испраќање: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Коментари што се однесуваат на постар комит и останаа во твојот список за испраќање: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Коментари што се однесуваат на постар комит и останаа во твојот список за испраќање: {{displayStaleCount}}.",
       "blockedRequestChanges": "Додај резиме или барем еден коментар за да побараш промени.",
       "blockedComment": "Додај резиме или барем еден коментар за да објавиш преглед со коментари."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Отворен е PR за REVIEW.md",
       "alreadyPresent": "Насоките веќе се во REVIEW.md",
       "status": {
+        "open": "Отворено",
         "edited": "Изменето",
         "opening_change_request": "Се отвора PR",
         "change_request_failed": "Не успеа отворањето на PR",
@@ -1614,6 +1620,8 @@
       "set": "Поставено",
       "notSet": "Не е поставено",
       "nSelected": "{{displayCount}} избрани",
+      "nSelected_one": "{{displayCount}} избрани",
+      "nSelected_other": "{{displayCount}} избрани",
       "proposedReviewMdGuidance": "Предложени насоки за REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Образложение за искористливоста",
       "suggestedFix": "Предложена поправка",
       "whereFound": "Места на откривање ({{displayCount}})",
+      "whereFound_one": "Места на откривање ({{displayCount}})",
+      "whereFound_other": "Места на откривање ({{displayCount}})",
       "fullReport": "Целосен генериран извештај",
       "yes": "Да",
       "no": "Не",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} со средна и ниска сериозност",
       "dueThisWeek": "Со рок оваа недела",
       "dueThisWeekDetail": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
+      "dueThisWeekDetail_one": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
+      "dueThisWeekDetail_other": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",
       "reviewSlaAssignment": "Провери ги доделените рокови според SLA",
       "allOpenFindingsTracked": "Се следат сите отворени наоди"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Не успеа да се заврши ова дејство. Обиди се повторно.",
       "actionBlocked": "Не успеа да се заврши ова дејство. Проблемот мора да се реши пред да се обидеш повторно.",
       "syncNoRepositories": "Нема репозиториуми во опсегот за синхронизација. Изберете ги репозиториумите што ги надгледува Безбедносниот агент, потоа синхронизирајте повторно.",
+      "syncNoRepositoriesNoManage": "Нема репозиториуми во опсегот за синхронизација. Сопственик на организацијата, администратор или одговорен за наплата мора да поврзе репозиториуми пред да може да се изврши синхронизација.",
       "syncIntegrationInactive": "Врската со GitHub за Безбедносниот агент не е активна. Поврзете ја повторно Kilo GitHub App, потоа синхронизирајте повторно.",
       "syncMissingPermission": "Апликацијата Kilo GitHub App не може да чита предупредувања за ранливости. Додели ја таа дозвола во GitHub, потоа синхронизирај повторно.",
       "configConflict": "Поставките на безбедносниот агент се променети на друго место. Прегледај ги најновите поставки и зачувај повторно."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Повторен обид за клонирање (обид {{attempt}} од {{total}})",
       "detailSetupCommandFailed": "Командата за подготовка {{index}} не успеа",
       "detailSetupCommandTimedOut": "Командата за подготовка {{index}} истече",
-      "detailColdRestore": "Студено обновување, снимката е применета, обновени се {{applied}} од {{total}} датотеки",
+      "detailColdRestore": "Студено обновување, снимката е применета, обновени датотеки: {{applied}} од {{total}}",
       "detailProgressPercent": "{{percent}}% завршено",
-      "detailRestoreIncompleteReport": "Обновувањето на сесијата е нецелосно: {{skipped}} од {{total}} датотеки не беа обновени ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Обновувањето на сесијата е нецелосно, необновени датотеки: {{skipped}} од {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Недостасуваат: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} и уште {{omitted}}",
       "detailReasonPatchFailed": "патчот не беше применет",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Испрати предупредување по е-пошта или push до контактите за наплата кога трошењето на овој опсег ќе премине лимит или ќе скокне над вообичаеното часовно темпо.",
     "thresholdTitle": "Преминување на праг",
-    "thresholdSubtitle": "Тековното трошење го надминува твојот лимит",
+    "thresholdSubtitle": "Тековното трошење на овој опсег во избраниот прозорец го надминува твојот лимит",
     "anomalyTitle": "Часовен скок",
-    "anomalySubtitle": "Еден час е далеку над вообичаеното темпо на овој опсег",
+    "anomalySubtitle": "Часовното темпо на овој опсег е далеку над неговата сопствена p95 основа",
     "limitLabel": "Лимит (USD)",
     "windowLabel": "Прозорец",
     "window24h": "24 часа",
@@ -3796,14 +3809,14 @@
     "saved": "Поставките за предупредувања за трошење се зачувани",
     "loadError": "Предупредувањата за трошење не можеа да се вчитаат.",
     "saveError": "Предупредувањата за трошење не можеа да се зачуваат.",
-    "empty": "Предупредувањата за трошење се исклучени. Вклучи ги за да ги предупредиш контактите за наплата на овој опсег.",
-    "noSpend": "Сè уште нема евидентирано трошење",
+    "sendAlerts": "Испраќај предупредувања",
+    "noSpend": "Нема трошоци",
     "spend24h": "Трошење во последните 24 часа",
     "multiplierError": "Внеси множител од 1 или повеќе",
     "permissionDenied": "Немаш дозвола да управуваш со предупредувањата за трошење.",
     "pushOffByCategory": "Исклучено во Известувања",
     "multiplierMaxError": "Внеси множител од {{max}} или помалку",
-    "thresholdMaxError": "Внеси износ од {{max}} или помалку."
+    "thresholdMaxError": "Внеси износ од {{max}} или помалку"
   },
   "profiles": {
     "title": "Профили",

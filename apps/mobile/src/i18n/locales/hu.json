@@ -442,7 +442,6 @@
         "rebase": "Újraalapozás"
       },
       "terminal": {
-        "alreadyMerged": "Már összevonva",
         "closed": "A módosítási kérelem lezárva",
         "closedMergeRequest": "Ez a merge request le van zárva"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Hiányoznak a kötelező kódellenőrzések",
         "requiredReviewsDetail": "A kötelező kódellenőrök jóváhagyásai hiányoznak vagy még függőben vannak.",
         "failingChecksTitle": "Sikertelen kötelező ellenőrzések",
-        "failingChecksDetail": "A kötelező állapotellenőrzések sikertelenek.",
         "unstableTitle": "Egyes ellenőrzések sikertelenek",
         "unstableDetail": "Egyes nem kötelező ellenőrzések sikertelenek. Ezek nem akadályozzák az összevonást.",
         "draftTitle": "PR-piszkozat",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
       "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
+      "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
+      "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét.",
       "gitlabDescription": "Merge requestek ellenőrzése mobilon",
       "gitlabInstanceMismatchTitle": "A GitLab-kapcsolat egy másik példányhoz tartozik",
@@ -708,7 +708,12 @@
       "pendingComment_other": "elküldésre váró hozzászólás",
       "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} hozzászólás elküldése",
       "submitReview": "Ellenőrzés elküldése",
-      "partialPostedMessage": "{{displayFreshCount}} hozzászólás elküldve. {{displayStaleCount}} hozzászólás egy korábbi véglegesítésre hivatkozik, ezért a küldésre váró hozzászólások között maradt.",
+      "partialPostedFresh": "{{displayFreshCount}} hozzászólás elküldve. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} hozzászólás elküldve. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} hozzászólás elküldve. ",
+      "partialPostedStale": "{{displayStaleCount}} hozzászólás egy korábbi véglegesítésre hivatkozik, ezért a küldésre váró hozzászólások között maradt.",
+      "partialPostedStale_one": "{{displayStaleCount}} hozzászólás egy korábbi véglegesítésre hivatkozik, ezért a küldésre váró hozzászólások között maradt.",
+      "partialPostedStale_other": "{{displayStaleCount}} hozzászólás egy korábbi véglegesítésre hivatkozik, ezért a küldésre váró hozzászólások között maradt.",
       "blockedRequestChanges": "Módosítások kéréséhez írj összefoglalót vagy legalább egy hozzászólást.",
       "blockedComment": "A kódellenőrzés hozzászólásként való elküldéséhez írj összefoglalót vagy legalább egy hozzászólást."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Pull request megnyitva a REVIEW.md fájlhoz",
       "alreadyPresent": "Az útmutatás már szerepel a REVIEW.md fájlban",
       "status": {
+        "open": "Nyitva",
         "edited": "Szerkesztve",
         "opening_change_request": "PR megnyitása",
         "change_request_failed": "PR megnyitása sikertelen",
@@ -1614,6 +1620,8 @@
       "set": "Beállítva",
       "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",
+      "nSelected_one": "{{displayCount}} kijelölve",
+      "nSelected_other": "{{displayCount}} kijelölve",
       "proposedReviewMdGuidance": "Javasolt útmutatás a REVIEW.md fájlhoz"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Kihasználhatóság indoklása",
       "suggestedFix": "Javasolt javítás",
       "whereFound": "Hol található ({{displayCount}})",
+      "whereFound_one": "Hol található ({{displayCount}})",
+      "whereFound_other": "Hol található ({{displayCount}})",
       "fullReport": "Teljes elkészült jelentés",
       "yes": "Igen",
       "no": "Nem",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} közepes és alacsony",
       "dueThisWeek": "Ezen a héten esedékes",
       "dueThisWeekDetail": "ezek közül {{exploitable}} igazoltan kihasználható",
+      "dueThisWeekDetail_one": "ezek közül {{exploitable}} igazoltan kihasználható",
+      "dueThisWeekDetail_other": "ezek közül {{exploitable}} igazoltan kihasználható",
       "noDeadline": "Nincs határidő",
       "reviewSlaAssignment": "SLA-hozzárendelés felülvizsgálata",
       "allOpenFindingsTracked": "Minden nyitott találat nyomon követve"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Nem sikerült befejezni ezt a műveletet. Próbáld újra.",
       "actionBlocked": "Nem sikerült befejezni ezt a műveletet. A hibát előbb javítani kell.",
       "syncNoRepositories": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. Válassza ki azokat az adattárakat, amelyeket a Biztonsági ügynök figyel, majd szinkronizáljon újra.",
+      "syncNoRepositoriesNoManage": "Egyetlen adattár sem esik a szinkronizálás hatókörébe. A szervezet egyik tulajdonosának, adminisztrátorának vagy számlázási felelősének csatlakoztatnia kell az adattárakat ahhoz, hogy a szinkronizálás elindulhasson.",
       "syncIntegrationInactive": "A Biztonsági ügynök GitHub-kapcsolata nem aktív. Csatlakoztassa újra a Kilo GitHub App-ot, majd szinkronizáljon újra.",
       "syncMissingPermission": "A Kilo GitHub-alkalmazás nem tudja olvasni a sebezhetőségi riasztásokat. Add meg ezt az engedélyt a GitHubbon, majd szinkronizálj újra.",
       "configConflict": "A biztonsági ügynök beállításai máshol módosultak. Nézd át a legfrissebb beállításokat, és ments újra."
@@ -3796,14 +3809,14 @@
     "saved": "A költésfigyelmeztetési beállítások elmentve",
     "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
     "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
-    "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
-    "noSpend": "Még nincs rögzített költés",
+    "sendAlerts": "Értesítések küldése",
+    "noSpend": "Nincs költés",
     "spend24h": "Költés az elmúlt 24 órában",
     "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
     "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
     "pushOffByCategory": "Értesítésekben kikapcsolva",
     "multiplierMaxError": "Adj meg {{max}} vagy kisebb szorzót",
-    "thresholdMaxError": "Adj meg {{max}} vagy kisebb összeget."
+    "thresholdMaxError": "Adj meg {{max}} vagy kisebb összeget"
   },
   "profiles": {
     "title": "Profilok",

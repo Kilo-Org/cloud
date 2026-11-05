@@ -1049,6 +1049,7 @@
       "prOpened": "已建立 REVIEW.md PR",
       "alreadyPresent": "REVIEW.md 中已有此指引",
       "status": {
+        "open": "開啟",
         "edited": "已編輯",
         "opening_change_request": "正在建立 PR",
         "change_request_failed": "PR 建立失敗",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "所有面向",
       "nSelected": "已選取 {{displayCount}} 項",
+      "nSelected_one": "已選取 {{displayCount}} 項",
+      "nSelected_other": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
       "set": "已設定",
       "notSet": "未設定"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "初步評估依據",
       "watchInCloudAgent": "在雲端代理中檢視",
       "whereFound": "發現位置（{{displayCount}}）",
+      "whereFound_one": "發現位置（{{displayCount}}）",
+      "whereFound_other": "發現位置（{{displayCount}}）",
       "yes": "是",
       "action": {
         "analyzeCodebase": "分析程式碼庫",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "中低：{{displayCount}} 項",
       "dueThisWeek": "本週到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 項已確認可遭利用",
+      "dueThisWeekDetail_one": "其中 {{exploitable}} 項已確認可遭利用",
+      "dueThisWeekDetail_other": "其中 {{exploitable}} 項已確認可遭利用",
       "noDeadline": "無期限",
       "reviewSlaAssignment": "檢視 SLA 期限設定",
       "allOpenFindingsTracked": "所有未解決的資安問題均已納入追蹤"
@@ -1536,6 +1543,7 @@
       "actionFailed": "無法完成此操作。請再試一次。",
       "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
       "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
+      "syncNoRepositoriesNoManage": "同步範圍內沒有任何存放庫。組織擁有者、管理員或帳單管理員必須先連結存放庫，才能進行同步。",
       "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
       "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。",
       "configConflict": "資安代理程式的設定已在其他地方變更。請檢視最新設定並重新儲存。"
@@ -2714,6 +2722,8 @@
       "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
       "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
       "reconnectTitle": "重新連線至 GitHub",
+      "reconnectTitleGitLab": "重新連線至 GitLab",
+      "reconnectTitleBitbucket": "重新連線至 Bitbucket",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。",
       "gitlabDescription": "在行動裝置上審查合併請求",
       "gitlabInstanceMismatchTitle": "GitLab 連線屬於另一個執行個體",
@@ -2993,7 +3003,6 @@
         "squash": "壓縮"
       },
       "terminal": {
-        "alreadyMerged": "已合併",
         "closed": "此提取請求已關閉",
         "closedMergeRequest": "此合併請求已關閉"
       },
@@ -3010,7 +3019,6 @@
         "requiredReviewsTitle": "尚未完成必要審查",
         "requiredReviewsDetail": "尚未取得必要審查者的核准。",
         "failingChecksTitle": "必要檢查未通過",
-        "failingChecksDetail": "必要狀態檢查未通過。",
         "unstableTitle": "部分檢查未通過",
         "unstableDetail": "部分非必要檢查未通過，但不影響合併。",
         "draftTitle": "提取要求草稿",
@@ -3117,7 +3125,12 @@
       "pendingComment_other": "則待送出的留言",
       "pendingComment_one": "則待送出留言",
       "summaryOptional": "摘要（非必填）",
-      "partialPostedMessage": "已發佈 {{displayFreshCount}} 則留言。另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedFresh": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedFresh_one": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedFresh_other": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedStale": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedStale_one": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedStale_other": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
       "submitReview": "送出審查",
       "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
@@ -3796,14 +3809,14 @@
     "saved": "支出提醒設定已儲存",
     "loadError": "無法載入支出提醒。",
     "saveError": "無法儲存支出提醒。",
-    "empty": "支出提醒已關閉。開啟後會通知此範圍的帳單聯絡人。",
-    "noSpend": "尚無支出記錄",
+    "sendAlerts": "發送支出提醒",
+    "noSpend": "尚無支出",
     "spend24h": "過去 24 小時的支出",
     "multiplierError": "請輸入 1 或更大的倍數",
     "permissionDenied": "你沒有管理支出提醒的權限。",
     "pushOffByCategory": "已在通知中關閉",
     "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
-    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。"
+    "thresholdMaxError": "請輸入不超過 {{max}} 的金額"
   },
   "profiles": {
     "title": "設定檔",

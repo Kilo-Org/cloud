@@ -442,7 +442,6 @@
         "rebase": "Ombasering"
       },
       "terminal": {
-        "alreadyMerged": "Allerede flettet",
         "closed": "Denne PR-en er lukket",
         "closedMergeRequest": "Denne merge request-en er lukket"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Påkrevde kodegjennomganger mangler",
         "requiredReviewsDetail": "Godkjenninger fra de påkrevde kodegranskerne mangler eller avventes.",
         "failingChecksTitle": "Påkrevde sjekker feiler",
-        "failingChecksDetail": "Påkrevde statussjekker feiler.",
         "unstableTitle": "Noen sjekker feiler",
         "unstableDetail": "Valgfrie sjekker feiler. De blokkerer ikke flettingen.",
         "draftTitle": "PR-utkast",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Kunne ikke sjekke Bitbucket-tilkoblingen.",
       "providerCheckFailedMessage": "Tilkoblingsstatusen er ikke tilgjengelig før innlastingen er fullført.",
       "reconnectTitle": "Koble til GitHub på nytt",
+      "reconnectTitleGitLab": "Koble til GitLab på nytt",
+      "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
       "gitlabDescription": "Gå gjennom merge requests på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",
@@ -708,7 +708,12 @@
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send gjennomgang",
-      "partialPostedMessage": "{{displayFreshCount}} kommentar(er) er publisert. {{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kommentar(er) er publisert. ",
+      "partialPostedStale": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedStale_one": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
+      "partialPostedStale_other": "{{displayStaleCount}} kommentar(er) viser til en eldre commit og ligger fortsatt i køen din.",
       "blockedRequestChanges": "Legg til et sammendrag eller minst én kommentar for å be om endringer.",
       "blockedComment": "Legg til et sammendrag eller minst én kommentar for å sende inn kodegjennomgangen som en kommentar."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Pull request for REVIEW.md er åpnet",
       "alreadyPresent": "Retningslinjene finnes allerede i REVIEW.md",
       "status": {
+        "open": "Åpen",
         "edited": "Redigert",
         "opening_change_request": "Åpner PR",
         "change_request_failed": "PR mislyktes",
@@ -1614,6 +1620,8 @@
       "set": "Angitt",
       "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
+      "nSelected_one": "{{displayCount}} valgt",
+      "nSelected_other": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Begrunnelse for utnyttbarhet",
       "suggestedFix": "Foreslått rettelse",
       "whereFound": "Funnet her ({{displayCount}})",
+      "whereFound_one": "Funnet her ({{displayCount}})",
+      "whereFound_other": "Funnet her ({{displayCount}})",
       "fullReport": "Hele den genererte rapporten",
       "yes": "Ja",
       "no": "Nei",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} middels og lav",
       "dueThisWeek": "Frist denne uken",
       "dueThisWeekDetail": "{{exploitable}} av disse er bekreftet utnyttbare",
+      "dueThisWeekDetail_one": "{{exploitable}} av disse er bekreftet utnyttbare",
+      "dueThisWeekDetail_other": "{{exploitable}} av disse er bekreftet utnyttbare",
       "noDeadline": "Ingen frist",
       "reviewSlaAssignment": "Gjennomgå tildelingen av SLA-frister",
       "allOpenFindingsTracked": "Alle åpne funn følges opp"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Kunne ikke fullføre denne handlingen. Prøv igjen.",
       "actionBlocked": "Kunne ikke fullføre denne handlingen. Problemet må løses før du kan prøve igjen.",
       "syncNoRepositories": "Ingen repositorier er i synkroniseringsomfanget. Velg repositoriene Sikkerhetsagenten overvåker, og synkroniser på nytt.",
+      "syncNoRepositoriesNoManage": "Ingen repositorier er i synkroniseringsomfanget. En organisasjonseier, administrator eller faktureringsansvarlig må koble til repositorier før det kan synkroniseres.",
       "syncIntegrationInactive": "GitHub-tilkoblingen for Sikkerhetsagenten er ikke aktiv. Koble Kilo GitHub App til på nytt, og synkroniser deretter på nytt.",
       "syncMissingPermission": "Kilo GitHub App kan ikke lese vulnerability alerts. Gi denne tillatelsen i GitHub, og synkroniser på nytt.",
       "configConflict": "Innstillingene for sikkerhetsagenten ble endret et annet sted. Se gjennom de nyeste innstillingene og lagre på nytt."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Prøver kloning på nytt (forsøk {{attempt}} av {{total}})",
       "detailSetupCommandFailed": "Oppsettskommando {{index}} mislyktes",
       "detailSetupCommandTimedOut": "Oppsettskommando {{index}} fikk tidsavbrudd",
-      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, {{applied}} av {{total}} filer gjenopprettet",
+      "detailColdRestore": "Kald gjenoppretting, snapshot anvendt, gjenopprettede filer: {{applied}} av {{total}}",
       "detailProgressPercent": "{{percent}} % fullført",
-      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig: {{skipped}} av {{total}} filer ble ikke gjenopprettet ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Øktgjenoppretting ufullstendig, filer som ikke ble gjenopprettet: {{skipped}} av {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Mangler: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} og {{omitted}} til",
       "detailReasonPatchFailed": "patchen ble ikke anvendt",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Send et varsel på e-post eller push til faktureringskontaktene når forbruket i dette området overskrider en grense eller stiger over den vanlige timesraten.",
     "thresholdTitle": "Grenseoverskridelse",
-    "thresholdSubtitle": "Løpende forbruk overskrider grensen din",
+    "thresholdSubtitle": "Dette områdets løpende forbruk i det valgte vinduet overskrider grensen din",
     "anomalyTitle": "Topp per time",
-    "anomalySubtitle": "Én time er langt over dette områdets vanlige rate",
+    "anomalySubtitle": "Dette områdets rate per time ligger langt over områdets egen p95-baselinje",
     "limitLabel": "Grense (USD)",
     "windowLabel": "Vindu",
     "window24h": "24 timer",
@@ -3796,14 +3809,14 @@
     "saved": "Innstillingene for forbruksvarsler er lagret",
     "loadError": "Forbruksvarslene kunne ikke lastes.",
     "saveError": "Forbruksvarslene kunne ikke lagres.",
-    "empty": "Forbruksvarsler er av. Slå dem på for å varsle faktureringskontaktene i dette området.",
-    "noSpend": "Ingen forbruk registrert ennå",
+    "sendAlerts": "Send varsler",
+    "noSpend": "Ingen forbruk ennå",
     "spend24h": "Forbruk de siste 24 timene",
     "multiplierError": "Angi en multiplikator på 1 eller mer",
     "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
     "pushOffByCategory": "Av i Varsler",
     "multiplierMaxError": "Angi en multiplikator på {{max}} eller mindre",
-    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre."
+    "thresholdMaxError": "Angi et beløp på {{max}} eller mindre"
   },
   "profiles": {
     "title": "Profiler",

@@ -1049,6 +1049,7 @@
       "prOpened": "Đã mở pull request cho REVIEW.md",
       "alreadyPresent": "Hướng dẫn đã có trong REVIEW.md",
       "status": {
+        "open": "Còn mở",
         "edited": "Đã chỉnh sửa",
         "opening_change_request": "Đang mở PR",
         "change_request_failed": "Không thể mở PR",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "Tất cả nội dung",
       "nSelected": "Đã chọn {{displayCount}}",
+      "nSelected_one": "Đã chọn {{displayCount}}",
+      "nSelected_other": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
       "set": "Đã thiết lập",
       "notSet": "Chưa thiết lập"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "Cơ sở phân loại",
       "watchInCloudAgent": "Theo dõi trong Trợ lý đám mây",
       "whereFound": "Vị trí phát hiện ({{displayCount}})",
+      "whereFound_one": "Vị trí phát hiện ({{displayCount}})",
+      "whereFound_other": "Vị trí phát hiện ({{displayCount}})",
       "yes": "Có",
       "action": {
         "analyzeCodebase": "Phân tích cơ sở mã",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} trung bình và thấp",
       "dueThisWeek": "Đến hạn trong tuần này",
       "dueThisWeekDetail": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail_one": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
+      "dueThisWeekDetail_other": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
       "noDeadline": "Không có hạn chót",
       "reviewSlaAssignment": "Rà soát việc đặt hạn chót SLA",
       "allOpenFindingsTracked": "Đang theo dõi tất cả vấn đề chưa xử lý"
@@ -1536,6 +1543,7 @@
       "actionFailed": "Không thể hoàn tất hành động này. Vui lòng thử lại.",
       "actionBlocked": "Không thể hoàn tất hành động này. Bạn cần khắc phục sự cố trước khi thử lại.",
       "syncNoRepositories": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Hãy chọn các kho lưu trữ mà Trợ lý bảo mật giám sát, rồi đồng bộ lại.",
+      "syncNoRepositoriesNoManage": "Không có kho lưu trữ nào trong phạm vi đồng bộ. Chủ sở hữu tổ chức, quản trị viên hoặc người quản lý thanh toán phải kết nối kho lưu trữ trước khi có thể đồng bộ.",
       "syncIntegrationInactive": "Kết nối GitHub của Trợ lý bảo mật chưa hoạt động. Hãy kết nối lại Ứng dụng GitHub của Kilo, sau đó đồng bộ lại.",
       "syncMissingPermission": "Kilo GitHub App không thể đọc cảnh báo lỗ hổng bảo mật. Cấp quyền đó trong GitHub, rồi đồng bộ lại.",
       "configConflict": "Cài đặt của Trợ lý bảo mật đã bị thay đổi ở nơi khác. Hãy xem lại cài đặt mới nhất và lưu lại."
@@ -2714,6 +2722,8 @@
       "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
       "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
       "reconnectTitle": "Kết nối lại GitHub",
+      "reconnectTitleGitLab": "Kết nối lại GitLab",
+      "reconnectTitleBitbucket": "Kết nối lại Bitbucket",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi.",
       "gitlabDescription": "Rà soát merge request trên điện thoại",
       "gitlabInstanceMismatchTitle": "Kết nối GitLab dành cho một máy chủ khác",
@@ -2993,7 +3003,6 @@
         "squash": "Gộp bản ghi"
       },
       "terminal": {
-        "alreadyMerged": "Đã hợp nhất",
         "closed": "PR này đã đóng",
         "closedMergeRequest": "Merge request này đã đóng"
       },
@@ -3010,7 +3019,6 @@
         "requiredReviewsTitle": "Thiếu các đánh giá bắt buộc",
         "requiredReviewsDetail": "Chưa có phê duyệt từ những người bắt buộc phải đánh giá.",
         "failingChecksTitle": "Các bước kiểm tra bắt buộc không đạt",
-        "failingChecksDetail": "Các bước kiểm tra trạng thái bắt buộc không đạt yêu cầu.",
         "unstableTitle": "Một số bước kiểm tra không đạt",
         "unstableDetail": "Các bước kiểm tra không bắt buộc không đạt yêu cầu. Kết quả này không ngăn việc hợp nhất.",
         "draftTitle": "Yêu cầu hợp nhất nháp",
@@ -3117,7 +3125,12 @@
       "pendingComment_other": "bình luận chưa gửi",
       "pendingComment_one": "bình luận chờ gửi",
       "summaryOptional": "Tóm tắt (tùy chọn)",
-      "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedFresh": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedFresh_one": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedFresh_other": "Đã đăng {{displayFreshCount}} bình luận. ",
+      "partialPostedStale": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedStale_one": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "partialPostedStale_other": "Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi kết quả rà soát",
       "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
     "thresholdTitle": "Vượt ngưỡng",
-    "thresholdSubtitle": "Chi tiêu tích lũy vượt giới hạn của bạn",
+    "thresholdSubtitle": "Chi tiêu tích lũy của phạm vi này trong khoảng thời gian đã chọn vượt giới hạn của bạn",
     "anomalyTitle": "Tăng vọt theo giờ",
-    "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
+    "anomalySubtitle": "Chi tiêu theo giờ của phạm vi này cao hơn hẳn mức cơ sở p95 của chính nó",
     "limitLabel": "Giới hạn (USD)",
     "windowLabel": "Khoảng thời gian",
     "window24h": "24 giờ",
@@ -3796,14 +3809,14 @@
     "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
     "loadError": "Không thể tải cảnh báo chi tiêu.",
     "saveError": "Không thể lưu cảnh báo chi tiêu.",
-    "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
-    "noSpend": "Chưa ghi nhận chi tiêu nào",
+    "sendAlerts": "Gửi cảnh báo chi tiêu",
+    "noSpend": "Chưa có chi tiêu",
     "spend24h": "Chi tiêu trong 24 giờ qua",
     "multiplierError": "Nhập hệ số từ 1 trở lên",
     "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
     "pushOffByCategory": "Đã tắt trong Thông báo",
     "multiplierMaxError": "Nhập hệ số từ {{max}} trở xuống",
-    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống."
+    "thresholdMaxError": "Hãy nhập số tiền từ {{max}} trở xuống"
   },
   "profiles": {
     "title": "Hồ sơ",

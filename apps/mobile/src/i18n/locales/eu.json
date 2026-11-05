@@ -442,7 +442,6 @@
         "rebase": "Oinarri-aldaketa"
       },
       "terminal": {
-        "alreadyMerged": "Dagoeneko bateratuta",
         "closed": "Bateratze-eskaera hau itxita dago",
         "closedMergeRequest": "Merge-eskaera hau itxita dago"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Beharrezko berrikuspenak falta dira",
         "requiredReviewsDetail": "Beharrezko berrikusleen onespenak falta dira edo jasotzeko daude.",
         "failingChecksTitle": "Beharrezko egiaztapenek huts egiten dute",
-        "failingChecksDetail": "Beharrezko egoera-egiaztapenek huts egiten dute.",
         "unstableTitle": "Egiaztapen batzuek huts egiten dute",
         "unstableDetail": "Beharrezkoak ez diren egiaztapenek huts egiten dute. Ez dute bateratzea eragotziko.",
         "draftTitle": "Bateratze-eskaeraren zirriborroa",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
       "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
+      "reconnectTitleGitLab": "Konektatu GitLab berriro",
+      "reconnectTitleBitbucket": "Konektatu Bitbucket berriro",
       "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da.",
       "gitlabDescription": "Berrikusi merge-eskaerak mugikorrean",
       "gitlabInstanceMismatchTitle": "GitLab konexioa beste instantzia baterako da",
@@ -708,7 +708,12 @@
       "pendingComment_other": "iruzkin bidaltzeko zain",
       "submitCountOfTotal": "Bidali {{displayTotalCount}} iruzkinetatik {{displayFreshCount}}",
       "submitReview": "Bidali berrikuspena",
-      "partialPostedMessage": "{{displayFreshCount}} iruzkin argitaratu dira. Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedFresh": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} iruzkin argitaratu dira. ",
+      "partialPostedStale": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_one": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
+      "partialPostedStale_other": "Beste {{displayStaleCount}} iruzkin egikaritze zaharrago bati buruzkoak dira eta zure ilaran geratu dira.",
       "blockedRequestChanges": "Gehitu laburpen bat edo gutxienez iruzkin bat aldaketak eskatzeko.",
       "blockedComment": "Gehitu laburpen bat edo gutxienez iruzkin bat berrikuspena iruzkin gisa argitaratzeko."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md fitxategirako pull requesta irekita",
       "alreadyPresent": "Jarraibideak dagoeneko REVIEW.md fitxategian daude",
       "status": {
+        "open": "Irekita",
         "edited": "Editatuta",
         "opening_change_request": "PRa irekitzen",
         "change_request_failed": "PRak huts egin du",
@@ -1614,6 +1620,8 @@
       "set": "Ezarrita",
       "notSet": "Ezarri gabe",
       "nSelected": "{{displayCount}} hautatuta",
+      "nSelected_one": "{{displayCount}} hautatuta",
+      "nSelected_other": "{{displayCount}} hautatuta",
       "proposedReviewMdGuidance": "REVIEW.md fitxategirako proposatutako jarraibideak"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Ustiagarritasunari buruzko arrazoibidea",
       "suggestedFix": "Proposatutako konponketa",
       "whereFound": "Non aurkitu den ({{displayCount}})",
+      "whereFound_one": "Non aurkitu den ({{displayCount}})",
+      "whereFound_other": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sortutako txosten osoa",
       "yes": "Bai",
       "no": "Ez",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} larritasun ertaineko eta txikiko",
       "dueThisWeek": "Aste honetan amaitzen da",
       "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_one": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
+      "dueThisWeekDetail_other": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",
       "reviewSlaAssignment": "Berrikusi SLAren esleipena",
       "allOpenFindingsTracked": "Aurkikuntza ireki guztien jarraipena egiten da"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Ezin izan da ekintza hau burutu. Saiatu berriro.",
       "actionBlocked": "Ezin izan da ekintza hau burutu. Arazoa konpondu behar da berriro saiatu aurretik.",
       "syncNoRepositories": "Ez dago biltegirik sinkronizazio-esparruan. Aukeratu Segurtasun-agenteak gainbegiratzen dituen biltegiak, eta gero sinkronizatu berriro.",
+      "syncNoRepositoriesNoManage": "Ez dago biltegirik sinkronizazio-esparruan. Erakundeko jabe batek, administratzaile batek edo fakturazio-kudeatzaile batek biltegiak konektatu behar ditu sinkronizatu ahal izateko.",
       "syncIntegrationInactive": "Segurtasun-agentearen GitHub konexioa ez dago aktibo. Konektatu berriro Kilo GitHub App, eta gero sinkronizatu berriro.",
       "syncMissingPermission": "Kilo GitHub App-ek ezin ditu vulnerability alerts irakurri. Eman baimen hori GitHub-en, eta gero sinkronizatu berriro.",
       "configConflict": "Segurtasun-agentearen ezarpenak beste leku batean aldatu dira. Berrikusi azken ezarpenak eta gorde berriro."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Klonatzen berriro saiatzen ({{total}} saiotatik {{attempt}}. saiakera)",
       "detailSetupCommandFailed": "{{index}}. konfigurazio-komandoak huts egin du",
       "detailSetupCommandTimedOut": "{{index}}. konfigurazio-komandoaren denbora-muga gainditu da",
-      "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, {{total}} fitxategitatik {{applied}} berrezarri dira",
+      "detailColdRestore": "Berrezartze hotza, snapshot-a aplikatuta, berrezarritako fitxategiak: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% osatuta",
-      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe: {{total}} fitxategitatik {{skipped}} ez dira berrezarri ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Saioaren berrezartzea osatu gabe, berrezarri gabeko fitxategiak: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Falta dira: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} eta beste {{omitted}}",
       "detailReasonPatchFailed": "adabakia ezin izan da aplikatu",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
     "thresholdTitle": "Atalasaren gainditzea",
-    "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
+    "thresholdSubtitle": "Eremu honen metatutako gastuak aukeratutako leihoan zehar zure muga gainditzen du",
     "anomalyTitle": "Orduko gorakada",
-    "anomalySubtitle": "Ordu bat eremu honen ohiko tasatik oso gainetik dago",
+    "anomalySubtitle": "Eremu honen orduko tasa bere p95 oinarritik oso gainetik dago",
     "limitLabel": "Muga (USD)",
     "windowLabel": "Leihoa",
     "window24h": "24 ordu",
@@ -3796,14 +3809,14 @@
     "saved": "Gastu-alerten ezarpenak gorde dira",
     "loadError": "Ezin izan dira gastu-alertak kargatu.",
     "saveError": "Ezin izan dira gastu-alertak gorde.",
-    "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
-    "noSpend": "Oraindik ez da gasturik erregistratu",
+    "sendAlerts": "Bidali gastu-alertak",
+    "noSpend": "Gasturik ez",
     "spend24h": "Azken 24 orduetako gastua",
     "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
     "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
     "pushOffByCategory": "Jakinarazpenetan itzalita",
     "multiplierMaxError": "Sartu {{max}} edo txikiagoa den biderkatzaile bat",
-    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat."
+    "thresholdMaxError": "Sartu {{max}} edo txikiagoa den zenbateko bat"
   },
   "profiles": {
     "title": "Profilak",

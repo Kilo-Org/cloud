@@ -26,7 +26,7 @@ import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/t
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { AUTO_SMALL_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   getOpenAiChatGptStoredConnection,
@@ -90,6 +90,7 @@ describe('bounded spending provider enforcement', () => {
       response: jsonResponse(200, { ok: true }),
     } as never);
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: { provider: { type: providerId }, userByok } as never,
       requestedModel: model.id,
       request: {
@@ -144,6 +145,7 @@ describe('bounded spending provider enforcement', () => {
     } as never);
 
     const result = await sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: { provider: { type: 'openrouter' }, userByok: null } as never,
       requestedModel: model.id,
       request: request as never,
@@ -167,7 +169,6 @@ describe('bounded spending provider enforcement', () => {
 });
 describe('upstream model catalog validation', () => {
   type AttemptInput = Parameters<typeof sendUpstreamAttempt>[0];
-  const exclusiveModel = gemma_4_26b_a4b_it_free_model;
   const canonicalModels = new Set([
     'qwen/qwen3-coder',
     'z-ai/glm-5',
@@ -221,6 +222,7 @@ describe('upstream model catalog validation', () => {
         request.body.model = wireModel;
       });
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: {
         provider: { type: providerId },
         userByok,
@@ -299,13 +301,13 @@ describe('upstream model catalog validation', () => {
   });
 
   it.each(['openrouter', 'vercel'] as const)(
-    '%s skips catalog validation for a Kilo-exclusive model',
+    '%s skips catalog validation for the auto small free model',
     async providerId => {
       jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
       const result = await attempt({
         providerId,
-        requestedModel: exclusiveModel.public_id,
-        wireModel: exclusiveModel.internal_id,
+        requestedModel: AUTO_SMALL_TARGET_MODELS.free,
+        wireModel: AUTO_SMALL_TARGET_MODELS.paid,
       });
 
       expect(result.type).toBe('success');
@@ -313,7 +315,7 @@ describe('upstream model catalog validation', () => {
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
       expect(upstreamRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({ model: exclusiveModel.internal_id }),
+          body: expect.objectContaining({ model: AUTO_SMALL_TARGET_MODELS.paid }),
         })
       );
     }
@@ -367,6 +369,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
   async function send(response: Response) {
     jest.mocked(upstreamRequest).mockResolvedValue({ type: 'success', response } as never);
     return sendUpstreamAttempt({
+      dataRegion: null,
       providerContext: {
         provider: { type: 'openai-chatgpt', chatGptOwner: owner },
         userByok: null,

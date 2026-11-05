@@ -26,9 +26,8 @@ where
     and mu.usage_date < current_date()
     and (
         mu.provider != 'custom'
-        or mu.requested_model like 'reflection/%'
-        or mu.requested_model like 'inclusionai/%'
-        or mu.requested_model like 'stealth/%'
+        or mu.requested_model = 'reflection/beam-free'
+        or mu.requested_model = 'stealth/glyph-cluster'
     )
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false

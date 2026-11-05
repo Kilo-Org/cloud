@@ -55,10 +55,10 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-export function redactApiRequestLogRequest(request: GatewayRequest): unknown {
+export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
-    return request.body;
+    return { ...request.body };
   }
 
   const redactedByok = Object.fromEntries(
@@ -134,7 +134,7 @@ async function createRequestLogCapture(
         return;
       }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
-        request: JSON.stringify(redactApiRequestLogRequest(request)),
+        request: redactApiRequestLogRequest(request),
         response: responseText,
       });
       const r2UploadError = uploadError?.substring(0, 4000);

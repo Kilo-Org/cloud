@@ -79,7 +79,10 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/lib/utils', () => ({ parseTimestamp: (value: string) => new Date(value) }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
+  parseTimestamp: (value: string) => new Date(value),
+}));
 vi.mock('@/lib/format', () => ({
   formatDate: (value: Date) => value.toISOString().slice(0, 10),
 }));
@@ -137,14 +140,14 @@ describe('account surface states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     const signOut = renderer.root.findAll(node => String(node.type) === 'Pressable');
     expect(signOut).toHaveLength(1);
-    // The native rem is 14pt, so `min-h-11`/`min-w-11` is only 38.5pt — below
-    // the app's 44pt minimum. The px form (what button.tsx and the image viewer
-    // use) makes the visible box itself 44pt; hitSlop 8 keeps the effective
-    // area larger still. The loading skeleton reserves this same box (asserted
-    // below), so the taller control does not jump the list when rows arrive.
-    expect(signOut[0]?.props.className).toContain('min-h-[44px]');
-    expect(signOut[0]?.props.className).toContain('min-w-[44px]');
-    expect(signOut[0]?.props.hitSlop).toBe(8);
+    // The control box hugs its 16 pt glyph so its outer edge lines up with the
+    // card padding instead of sitting 14 dp inside it; 28 dp plus 9 dp of hit
+    // slop per side reaches 46 dp, clear of the app's 44 dp minimum even after
+    // pixel rounding. The loading skeleton reserves this same box (asserted
+    // below), so the control does not jump the list when rows arrive.
+    expect(signOut[0]?.props.className).toContain('min-h-[28px]');
+    expect(signOut[0]?.props.className).toContain('min-w-[28px]');
+    expect(signOut[0]?.props.hitSlop).toBe(9);
     unmount();
   });
 
@@ -153,13 +156,13 @@ describe('account surface states', () => {
     query.isError = true;
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
-    // Every skeleton row reserves the sign-out control's final 44x44pt box, so
+    // Every skeleton row reserves the sign-out control's final 28x28pt box, so
     // the loaded rows are the same height and the list does not jump on load.
     const reserved = renderer.root.findAll(
       node =>
         String(node.type) === 'View' &&
-        String(node.props.className).includes('min-h-[44px]') &&
-        String(node.props.className).includes('min-w-[44px]')
+        String(node.props.className).includes('min-h-[28px]') &&
+        String(node.props.className).includes('min-w-[28px]')
     );
     expect(reserved).toHaveLength(3);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);

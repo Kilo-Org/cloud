@@ -1019,6 +1019,7 @@
       "prOpened": "Pull request per REVIEW.md aperta",
       "alreadyPresent": "Le indicazioni sono già presenti in REVIEW.md",
       "status": {
+        "open": "Aperta",
         "edited": "Modificata",
         "opening_change_request": "Apertura della PR",
         "change_request_failed": "Apertura della PR non riuscita",
@@ -1054,6 +1055,9 @@
     "overview": {
       "allAreas": "Tutte le aree",
       "nSelected": "Selezionati: {{displayCount}}",
+      "nSelected_one": "Selezionati: {{displayCount}}",
+      "nSelected_other": "Selezionati: {{displayCount}}",
+      "nSelected_many": "Selezionati: {{displayCount}}",
       "proposedReviewMdGuidance": "Indicazioni proposte per REVIEW.md",
       "set": "Configurato",
       "notSet": "Non configurato"
@@ -1153,6 +1157,9 @@
       "triageReasoning": "Motivazioni della valutazione preliminare",
       "watchInCloudAgent": "Segui in Cloud Agent",
       "whereFound": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_one": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_many": "Punti di rilevamento ({{displayCount}})",
+      "whereFound_other": "Punti di rilevamento ({{displayCount}})",
       "yes": "Sì",
       "action": {
         "analyzeCodebase": "Analizza codebase",
@@ -1322,6 +1329,9 @@
       "breakdownMediumLow_other": "{{displayCount}} di gravità media e bassa",
       "dueThisWeek": "In scadenza questa settimana",
       "dueThisWeekDetail": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_one": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_many": "{{exploitable}} di queste con sfruttabilità confermata",
+      "dueThisWeekDetail_other": "{{exploitable}} di queste con sfruttabilità confermata",
       "noDeadline": "Nessuna scadenza",
       "reviewSlaAssignment": "Verifica l'assegnazione degli SLA",
       "allOpenFindingsTracked": "Tutte le segnalazioni aperte sono monitorate"
@@ -1517,6 +1527,7 @@
       "actionFailed": "Impossibile completare questa operazione. Riprova.",
       "actionBlocked": "Impossibile completare questa operazione. Il problema deve essere risolto prima di riprovare.",
       "syncNoRepositories": "Nessun repository è incluso nell'ambito di sincronizzazione. Scegli i repository monitorati dall'Agente di sicurezza, poi sincronizza di nuovo.",
+      "syncNoRepositoriesNoManage": "Nessun repository è incluso nell'ambito di sincronizzazione. Un proprietario dell'organizzazione, un amministratore o un responsabile della fatturazione deve connettere i repository prima che sia possibile sincronizzare.",
       "syncIntegrationInactive": "La connessione GitHub per l'Agente di sicurezza non è attiva. Riconnetti l'app GitHub di Kilo, poi sincronizza di nuovo.",
       "syncMissingPermission": "L'app GitHub di Kilo non può leggere gli avvisi di vulnerabilità. Concedi questa autorizzazione in GitHub, poi sincronizza di nuovo.",
       "configConflict": "Le impostazioni dell'Agente di sicurezza sono state modificate altrove. Controlla le impostazioni più recenti e salva di nuovo."
@@ -2061,9 +2072,9 @@
       "detailRetryingClone": "Nuovo tentativo di clone (tentativo {{attempt}} su {{total}})",
       "detailSetupCommandFailed": "Comando di configurazione {{index}} non riuscito",
       "detailSetupCommandTimedOut": "Tempo scaduto per il comando di configurazione {{index}}",
-      "detailColdRestore": "Ripristino a freddo, snapshot applicata, {{applied}} su {{total}} file ripristinati",
+      "detailColdRestore": "Ripristino a freddo, snapshot applicata, file ripristinati: {{applied}} su {{total}}",
       "detailProgressPercent": "{{percent}}% completato",
-      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto: {{skipped}} su {{total}} file non sono stati ripristinati ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Ripristino della sessione incompleto — file non ripristinati: {{skipped}} su {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Mancanti: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e altri {{omitted}}",
       "detailReasonPatchFailed": "la patch non è stata applicata",
@@ -2748,6 +2759,8 @@
       "checkFailedTitleBitbucket": "Impossibile verificare la connessione a Bitbucket.",
       "providerCheckFailedMessage": "Lo stato della connessione sarà disponibile al termine del caricamento.",
       "reconnectTitle": "Riconnetti GitHub",
+      "reconnectTitleGitLab": "Riconnetti GitLab",
+      "reconnectTitleBitbucket": "Riconnetti Bitbucket",
       "reconnectDescription": "L'autorizzazione a connetterti a GitHub è stata revocata.",
       "gitlabDescription": "Esamina le merge request dal telefono",
       "gitlabInstanceMismatchTitle": "La connessione GitLab è per un'altra istanza",
@@ -3037,7 +3050,6 @@
         "squash": "Accorpamento"
       },
       "terminal": {
-        "alreadyMerged": "Già unita",
         "closed": "Questa pull request è chiusa",
         "closedMergeRequest": "Questo merge request è chiuso"
       },
@@ -3054,7 +3066,6 @@
         "requiredReviewsTitle": "Revisioni obbligatorie mancanti",
         "requiredReviewsDetail": "Le approvazioni dei revisori designati mancano o sono ancora in attesa.",
         "failingChecksTitle": "Controlli obbligatori non superati",
-        "failingChecksDetail": "I controlli di stato obbligatori non sono stati superati.",
         "unstableTitle": "Alcuni controlli non sono stati superati",
         "unstableDetail": "Alcuni controlli facoltativi non sono stati superati. Non impediranno l'unione.",
         "draftTitle": "PR in bozza",
@@ -3164,7 +3175,14 @@
       "pendingComment_other": "commenti da inviare",
       "pendingComment_one": "commento in attesa di invio",
       "summaryOptional": "Riepilogo (facoltativo)",
-      "partialPostedMessage": "Commenti pubblicati: {{displayFreshCount}}. I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedFresh": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Commenti pubblicati: {{displayFreshCount}}. ",
+      "partialPostedStale": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_one": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_many": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
+      "partialPostedStale_other": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "submitCountOfTotal": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
       "submitReview": "Invia revisione",
       "pendingComment_many": "commenti in sospeso",
@@ -3835,9 +3853,9 @@
   "spendAlerts": {
     "subtitle": "Invia un avviso via email o push ai contatti di fatturazione quando la spesa di questo ambito supera un limite o schizza sopra il suo ritmo orario abituale.",
     "thresholdTitle": "Superamento della soglia",
-    "thresholdSubtitle": "La spesa progressiva supera il tuo limite",
+    "thresholdSubtitle": "La spesa progressiva di questo ambito nella finestra scelta supera il tuo limite",
     "anomalyTitle": "Picco orario",
-    "anomalySubtitle": "Un'ora è molto sopra il ritmo abituale di questo ambito",
+    "anomalySubtitle": "Il ritmo orario di questo ambito è molto sopra la sua baseline p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Finestra",
     "window24h": "24 ore",
@@ -3847,14 +3865,14 @@
     "saved": "Impostazioni degli avvisi di spesa salvate",
     "loadError": "Impossibile caricare gli avvisi di spesa.",
     "saveError": "Impossibile salvare gli avvisi di spesa.",
-    "empty": "Gli avvisi di spesa sono disattivati. Attivali per avvisare i contatti di fatturazione di questo ambito.",
-    "noSpend": "Nessuna spesa registrata finora",
+    "sendAlerts": "Invia avvisi",
+    "noSpend": "Ancora nessuna spesa",
     "spend24h": "Spesa nelle ultime 24 ore",
     "multiplierError": "Inserisci un moltiplicatore di 1 o più",
     "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
     "pushOffByCategory": "Disattivato in Notifiche",
     "multiplierMaxError": "Inserisci un moltiplicatore di {{max}} o meno",
-    "thresholdMaxError": "Inserisci un importo di {{max}} o meno."
+    "thresholdMaxError": "Inserisci un importo di {{max}} o meno"
   },
   "profiles": {
     "title": "Profili",

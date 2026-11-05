@@ -442,7 +442,6 @@
         "rebase": "ରିବେସ୍"
       },
       "terminal": {
-        "alreadyMerged": "ଆଗରୁ ମର୍ଜ୍ ହୋଇଛି",
         "closed": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି",
         "closedMergeRequest": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ଆବଶ୍ୟକ ସମୀକ୍ଷା ମିଳିନାହିଁ",
         "requiredReviewsDetail": "ଆବଶ୍ୟକ ସମୀକ୍ଷକଙ୍କ ଅନୁମୋଦନ ମିଳିନାହିଁ କିମ୍ବା ଏବେ ବି ବାକି ଅଛି।",
         "failingChecksTitle": "ବିଫଳ ହେଉଥିବା ଆବଶ୍ୟକ ଯାଞ୍ଚ",
-        "failingChecksDetail": "ଆବଶ୍ୟକ ସ୍ଥିତି ଯାଞ୍ଚଗୁଡ଼ିକ ବିଫଳ ହେଉଛି।",
         "unstableTitle": "କିଛି ଯାଞ୍ଚ ବିଫଳ ହେଉଛି",
         "unstableDetail": "ବାଧ୍ୟତାମୂଳକ ନଥିବା ଯାଞ୍ଚଗୁଡ଼ିକ ବିଫଳ ହେଉଛି। ଏଗୁଡ଼ିକ ମର୍ଜ୍‌କୁ ଅଟକାଇବ ନାହିଁ।",
         "draftTitle": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟର ଖସଡ଼ା",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "providerCheckFailedMessage": "ଏହା ଲୋଡ୍ ହେବା ପର୍ଯ୍ୟନ୍ତ ସଂଯୋଗ ଅବସ୍ଥା ଉପଲବ୍ଧ ନୁହେଁ।",
       "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
+      "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ",
+      "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ",
       "reconnectDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗର ଅନୁମତି ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
       "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
       "gitlabInstanceMismatchTitle": "GitLab ସଂଯୋଗ ଅନ୍ୟ ଏକ ଇନଷ୍ଟାନ୍ସ ପାଇଁ ଅଟେ",
@@ -708,7 +708,12 @@
       "pendingComment_other": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ",
       "submitCountOfTotal": "{{displayTotalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{displayFreshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
-      "partialPostedMessage": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। {{displayStaleCount}} ମନ୍ତବ୍ୟ ପୁରୁଣା କମିଟ୍ ସମ୍ବନ୍ଧୀୟ ହୋଇଥିବାରୁ ଦାଖଲ ଅପେକ୍ଷାରେ ଆପଣଙ୍କ ତାଲିକାରେ ରହିଛି।",
+      "partialPostedFresh": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
+      "partialPostedFresh_one": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
+      "partialPostedFresh_other": "{{displayFreshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। ",
+      "partialPostedStale": "{{displayStaleCount}} ମନ୍ତବ୍ୟ ପୁରୁଣା କମିଟ୍ ସମ୍ବନ୍ଧୀୟ ହୋଇଥିବାରୁ ଦାଖଲ ଅପେକ୍ଷାରେ ଆପଣଙ୍କ ତାଲିକାରେ ରହିଛି।",
+      "partialPostedStale_one": "{{displayStaleCount}} ମନ୍ତବ୍ୟ ପୁରୁଣା କମିଟ୍ ସମ୍ବନ୍ଧୀୟ ହୋଇଥିବାରୁ ଦାଖଲ ଅପେକ୍ଷାରେ ଆପଣଙ୍କ ତାଲିକାରେ ରହିଛି।",
+      "partialPostedStale_other": "{{displayStaleCount}} ମନ୍ତବ୍ୟ ପୁରୁଣା କମିଟ୍ ସମ୍ବନ୍ଧୀୟ ହୋଇଥିବାରୁ ଦାଖଲ ଅପେକ୍ଷାରେ ଆପଣଙ୍କ ତାଲିକାରେ ରହିଛି।",
       "blockedRequestChanges": "ପରିବର୍ତ୍ତନ ପାଇଁ ଅନୁରୋଧ କରିବାକୁ ଏକ ସାରାଂଶ କିମ୍ବା ଅତି କମରେ ଗୋଟିଏ ମନ୍ତବ୍ୟ ଯୋଡ଼ନ୍ତୁ।",
       "blockedComment": "ମନ୍ତବ୍ୟ ଭାବେ ସମୀକ୍ଷା ପୋଷ୍ଟ କରିବାକୁ ଏକ ସାରାଂଶ କିମ୍ବା ଅତି କମରେ ଗୋଟିଏ ମନ୍ତବ୍ୟ ଯୋଡ଼ନ୍ତୁ।"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md ପାଇଁ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଯାଇଛି",
       "alreadyPresent": "ନିର୍ଦ୍ଦେଶାବଳୀ REVIEW.md ରେ ପୂର୍ବରୁ ଅଛି",
       "status": {
+        "open": "ଖୋଲା",
         "edited": "ସମ୍ପାଦିତ",
         "opening_change_request": "PR ଖୋଲାଯାଉଛି",
         "change_request_failed": "PR ବିଫଳ ହୋଇଛି",
@@ -1614,6 +1620,8 @@
       "set": "ନିର୍ଦ୍ଧାରିତ",
       "notSet": "ନିର୍ଦ୍ଧାରିତ ନୁହେଁ",
       "nSelected": "{{displayCount}}ଟି ଚୟନ କରାଯାଇଛି",
+      "nSelected_one": "{{displayCount}}ଟି ଚୟନ କରାଯାଇଛି",
+      "nSelected_other": "{{displayCount}}ଟି ଚୟନ କରାଯାଇଛି",
       "proposedReviewMdGuidance": "ପ୍ରସ୍ତାବିତ REVIEW.md ନିର୍ଦ୍ଦେଶାବଳୀ"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "ଆକ୍ରମଣରେ ବ୍ୟବହାର ସମ୍ଭାବନାର ଯୁକ୍ତି",
       "suggestedFix": "ପ୍ରସ୍ତାବିତ ସମାଧାନ",
       "whereFound": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
+      "whereFound_one": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
+      "whereFound_other": "ଚିହ୍ନଟ ହୋଇଥିବା ସ୍ଥାନ ({{displayCount}})",
       "fullReport": "ତିଆରି ହୋଇଥିବା ସମ୍ପୂର୍ଣ୍ଣ ରିପୋର୍ଟ",
       "yes": "ହଁ",
       "no": "ନା",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
       "dueThisWeek": "ଏହି ସପ୍ତାହରେ ସମୟସୀମା ଶେଷ",
       "dueThisWeekDetail": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
+      "dueThisWeekDetail_one": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
+      "dueThisWeekDetail_other": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",
       "reviewSlaAssignment": "ଧାର୍ଯ୍ୟ SLA ସମୟସୀମା ସମୀକ୍ଷା କରନ୍ତୁ",
       "allOpenFindingsTracked": "ସମସ୍ତ ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟାର ସ୍ଥିତି ନଜରରେ ଅଛି"
@@ -2070,6 +2082,7 @@
       "actionFailed": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "actionBlocked": "ଏହି କାର୍ଯ୍ୟଟି ସମ୍ପୂର୍ଣ୍ଣ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ ସମସ୍ୟାଟି ସମାଧାନ କରିବାକୁ ହେବ।",
       "syncNoRepositories": "ସିଙ୍କ୍ ପରିସରରେ କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ। ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଯେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖେ ସେଗୁଡ଼ିକୁ ବାଛନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
+      "syncNoRepositoriesNoManage": "ସିଙ୍କ୍ ପରିସରରେ କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ। ସିଙ୍କ୍ କରିବା ପୂର୍ବରୁ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ ରିପୋଜିଟୋରୀ ସଂଯୋଗ କରିବାକୁ ହେବ।",
       "syncIntegrationInactive": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ GitHub ସଂଯୋଗ ସକ୍ରିୟ ନାହିଁ। Kilo GitHub App କୁ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts ପଢ଼ିପାରିବ ନାହିଁ। GitHub ରେ ସେହି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ସିଙ୍କ୍ କରନ୍ତୁ।",
       "configConflict": "ସୁରକ୍ଷା ଏଜେଣ୍ଟର ସେଟିଂସ ଅନ୍ୟଠାରେ ବଦଳିଛି। ସାମ୍ପ୍ରତିକ ସେଟିଂସ ସମୀକ୍ଷା କରି ପୁଣି ସଂରକ୍ଷଣ କରନ୍ତୁ।"
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "କ୍ଲୋନ୍ ପୁଣି ଚେଷ୍ଟା କରାଯାଉଛି ({{total}} ମଧ୍ୟରୁ {{attempt}} ପ୍ରୟାସ)",
       "detailSetupCommandFailed": "ସେଟଅପ୍ କମାଣ୍ଡ {{index}} ବିଫଳ ହେଲା",
       "detailSetupCommandTimedOut": "ସେଟଅପ୍ କମାଣ୍ଡ {{index}}ର ସମୟ ସମାପ୍ତ ହେଲା",
-      "detailColdRestore": "କୋଲ୍ଡ୍ ପୁନଃସ୍ଥାପନ, ସ୍ନାପସଟ୍ ପ୍ରୟୋଗ କରାଯାଇଛି, {{total}} ଫାଇଲ୍ ମଧ୍ୟରୁ {{applied}} ପୁନଃସ୍ଥାପିତ ହୋଇଛି",
+      "detailColdRestore": "କୋଲ୍ଡ୍ ପୁନଃସ୍ଥାପନ, ସ୍ନାପସଟ୍ ପ୍ରୟୋଗ କରାଯାଇଛି, ପୁନଃସ୍ଥାପିତ ଫାଇଲ୍: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% ସମ୍ପୂର୍ଣ୍ଣ",
-      "detailRestoreIncompleteReport": "ସେସନ୍ ପୁନଃସ୍ଥାପନ ଅସମ୍ପୂର୍ଣ୍ଣ: {{total}} ଫାଇଲ୍ ମଧ୍ୟରୁ {{skipped}} ପୁନଃସ୍ଥାପିତ ହୋଇନାହାଁନ୍ତି ({{reasons}})।",
+      "detailRestoreIncompleteReport": "ସେସନ୍ ପୁନଃସ୍ଥାପନ ଅସମ୍ପୂର୍ଣ୍ଣ, ପୁନଃସ୍ଥାପିତ ହୋଇନଥିବା ଫାଇଲ୍: {{skipped}} / {{total}} ({{reasons}})।",
       "detailRestoreIncompleteMissing": "ଅନୁପସ୍ଥିତ: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ଏବଂ ଆଉ {{omitted}}ଟି",
       "detailReasonPatchFailed": "ପ୍ୟାଚ୍ ପ୍ରୟୋଗ କରାଯାଇପାରିଲା ନାହିଁ",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "ଏହି ସ୍କୋପର ଖର୍ଚ୍ଚ ଏକ ସୀମା ଅତିକ୍ରମ କଲେ କିମ୍ବା ଏହାର ସାଧାରଣ ଘଣ୍ଟାପ୍ରତି ହାରଠାରୁ ଉପରକୁ ଗଲେ ବିଲିଂ ସମ୍ପର୍କମାନଙ୍କୁ ଇମେଲ କିମ୍ବା ପୁଶ୍ ମାଧ୍ୟମରେ ସତର୍କତା ପଠାନ୍ତୁ।",
     "thresholdTitle": "ସୀମା ଅତିକ୍ରମ",
-    "thresholdSubtitle": "ଚାଲୁ ଖର୍ଚ୍ଚ ଆପଣଙ୍କ ସୀମା ଅତିକ୍ରମ କରୁଛି",
+    "thresholdSubtitle": "ଏହି ସ୍କୋପର ବଛା ଅବଧିରେ ଚାଲୁ ଖର୍ଚ୍ଚ ଆପଣଙ୍କ ସୀମା ଅତିକ୍ରମ କରୁଛି",
     "anomalyTitle": "ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି",
-    "anomalySubtitle": "ଏକ ଘଣ୍ଟା ଏହି ସ୍କୋପର ସାଧାରଣ ହାରଠାରୁ ବହୁତ ଉପରେ",
+    "anomalySubtitle": "ଏହି ସ୍କୋପର ଘଣ୍ଟାପ୍ରତି ହାର ଏହାର ନିଜସ୍ଵ p95 ଆଧାରରେଖାଠାରୁ ବହୁତ ଉପରେ",
     "limitLabel": "ସୀମା (USD)",
     "windowLabel": "ଅବଧି",
     "window24h": "24 ଘଣ୍ଟା",
@@ -3796,14 +3809,14 @@
     "saved": "ଖର୍ଚ୍ଚ ସତର୍କତା ସେଟିଂସ୍ ସଞ୍ଚିତ ହେଲା",
     "loadError": "ଖର୍ଚ୍ଚ ସତର୍କତା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "saveError": "ଖର୍ଚ୍ଚ ସତର୍କତା ସଞ୍ଚିତ ହୋଇପାରିଲା ନାହିଁ।",
-    "empty": "ଖର୍ଚ୍ଚ ସତର୍କତା ବନ୍ଦ ଅଛି। ଏହି ସ୍କୋପର ବିଲିଂ ସମ୍ପର୍କମାନଙ୍କୁ ସୂଚିତ କରିବାକୁ ସେଗୁଡ଼ିକୁ ଚାଲୁ କରନ୍ତୁ।",
-    "noSpend": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଖର୍ଚ୍ଚ ରେକର୍ଡ ହୋଇନାହିଁ",
+    "sendAlerts": "ସତର୍କତା ପଠାନ୍ତୁ",
+    "noSpend": "କୌଣସି ଖର୍ଚ୍ଚ ନାହିଁ",
     "spend24h": "ଗତ 24 ଘଣ୍ଟାର ଖର୍ଚ୍ଚ",
     "multiplierError": "1 କିମ୍ବା ତାହାଠାରୁ ଅଧିକ ଗୁଣକ ଦିଅନ୍ତୁ",
     "permissionDenied": "ଖର୍ଚ୍ଚ ସତର୍କତା ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
     "pushOffByCategory": "ବିଜ୍ଞପ୍ତିରେ ବନ୍ଦ",
     "multiplierMaxError": "{{max}} କିମ୍ବା ତାହାଠାରୁ କମ ଗୁଣକ ଦିଅନ୍ତୁ",
-    "thresholdMaxError": "{{max}} କିମ୍ବା ତାହାଠାରୁ କମ ରାଶି ଲେଖନ୍ତୁ।"
+    "thresholdMaxError": "{{max}} କିମ୍ବା ତାହାଠାରୁ କମ ରାଶି ଲେଖନ୍ତୁ"
   },
   "profiles": {
     "title": "ପ୍ରୋଫାଇଲ୍",

@@ -442,7 +442,6 @@
         "rebase": "Mgbanwe ntọala"
       },
       "terminal": {
-        "alreadyMerged": "Ejikọtala ya",
         "closed": "Emechiela arịrịọ njikọta a",
         "closedMergeRequest": "Emechiela arịrịọ njikọta a"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Nyocha achọrọ adịghị",
         "requiredReviewsDetail": "Ndị nyocha achọrọ enyeghị nkwado ha ma ọ bụ ha ka na-enyocha.",
         "failingChecksTitle": "Nnwale achọrọ na-ada",
-        "failingChecksDetail": "Nnwale ọnọdụ achọrọ na-ada.",
         "unstableTitle": "Ụfọdụ nnwale na-ada",
         "unstableDetail": "Nnwale ndị na-abụghị iwu na-ada. Ha agaghị egbochi njikọta.",
         "draftTitle": "Arịrịọ ijikọ koodu nke mbido",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Enweghị ike ịlele njikọ Bitbucket.",
       "providerCheckFailedMessage": "Ọnọdụ njikọ agaghị adị ruo mgbe nke a budatara.",
       "reconnectTitle": "Jikọtaghachi GitHub",
+      "reconnectTitleGitLab": "Jikọtaghachi GitLab",
+      "reconnectTitleBitbucket": "Jikọtaghachi Bitbucket",
       "reconnectDescription": "Akagbuola njikọ GitHub gị.",
       "gitlabDescription": "Nyochaa arịrịọ njikọta na ekwentị",
       "gitlabInstanceMismatchTitle": "Njikọ GitLab bụ nke nrụnye ọzọ",
@@ -708,7 +708,12 @@
       "pendingComment_other": "nkwupụta a na-ezigabeghị",
       "submitCountOfTotal": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
       "submitReview": "Nyefee nyocha",
-      "partialPostedMessage": "Ebipụtala okwu {{displayFreshCount}}. Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie, ha ka nọ na ndepụta okwu gị na-eche iziga.",
+      "partialPostedFresh": "Ebipụtala okwu {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Ebipụtala okwu {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Ebipụtala okwu {{displayFreshCount}}. ",
+      "partialPostedStale": "Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie, ha ka nọ na ndepụta okwu gị na-eche iziga.",
+      "partialPostedStale_one": "Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie, ha ka nọ na ndepụta okwu gị na-eche iziga.",
+      "partialPostedStale_other": "Okwu {{displayStaleCount}} na-ezo aka na ndekọ mgbanwe ochie, ha ka nọ na ndepụta okwu gị na-eche iziga.",
       "blockedRequestChanges": "Tinye nchịkọta ma ọ bụ ma ọ dịkarịa ala otu okwu ka ị rịọ mgbanwe.",
       "blockedComment": "Tinye nchịkọta ma ọ bụ ma ọ dịkarịa ala otu okwu ka ị bipụta nyocha nke okwu."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Emeghela pull request maka REVIEW.md",
       "alreadyPresent": "Nduzi adịlarị na REVIEW.md",
       "status": {
+        "open": "Mepe",
         "edited": "Edezigharịrị",
         "opening_change_request": "Na-emepe PR",
         "change_request_failed": "Imepe PR akụrụ afọ n'ala",
@@ -1614,6 +1620,8 @@
       "set": "E debere",
       "notSet": "E debeghị",
       "nSelected": "A họrọla {{displayCount}}",
+      "nSelected_one": "A họrọla {{displayCount}}",
+      "nSelected_other": "A họrọla {{displayCount}}",
       "proposedReviewMdGuidance": "Nduzi REVIEW.md atụrụ aro"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Ihe kpatara mkpebi gbasara ohere mwakpo",
       "suggestedFix": "Ndozi a tụrụ aro",
       "whereFound": "Ebe a chọtara nke a ({{displayCount}})",
+      "whereFound_one": "Ebe a chọtara nke a ({{displayCount}})",
+      "whereFound_other": "Ebe a chọtara nke a ({{displayCount}})",
       "fullReport": "Akụkọ zuru ezu e mepụtara",
       "yes": "Ee",
       "no": "Mba",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} dị n'etiti ma ọ bụ ala",
       "dueThisWeek": "Oge ga-eru n'izu a",
       "dueThisWeekDetail": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
+      "dueThisWeekDetail_one": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
+      "dueThisWeekDetail_other": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "noDeadline": "Enweghị oge njedebe",
       "reviewSlaAssignment": "Nyochaa oge SLA e kenyere",
       "allOpenFindingsTracked": "A na-esochi ihe achọpụtara niile a ka na-arụ na ya"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Enweghị ike imecha omume a. Biko nwaa ọzọ.",
       "actionBlocked": "Enweghị ike imecha omume a. A ghaghị idozi nsogbu a tupu ị nwee ike ịnwa ọzọ.",
       "syncNoRepositories": "Ọnweghị repository dị n'ime oke sync. Họrọ repositories ndị Onye enyemaka nchebe na-enyocha, wee sync ọzọ.",
+      "syncNoRepositoriesNoManage": "Ọnweghị repository dị n'ime oke sync. Onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ aghaghị ijikọ repositories tupu ọ nwee ike sync.",
       "syncIntegrationInactive": "Njikọ GitHub maka Onye enyemaka nchebe adịghị arụ ọrụ. Jikọọ Kilo GitHub App ọzọ, wee megharịa ọzọ.",
       "syncMissingPermission": "Kilo GitHub App enweghị ike ịgụ vulnerability alerts. Nye ikike ahụ na GitHub, wee sync ọzọ.",
       "configConflict": "Agbanweela ntọala Onye enyemaka nchebe n'ebe ọzọ. Lelee ntọala kachasị ọhụrụ ma chekwaa ọzọ."
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
     "thresholdTitle": "Ịgafe oke",
-    "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
+    "thresholdSubtitle": "Mmefu na-aga n'ihu nke mpaghara a n'oge a họọrọ na-agafe oke gị",
     "anomalyTitle": "Mmụba kwa awa",
-    "anomalySubtitle": "Otu awa dị nnọọ elu karịa ọnụ ọgụgụ mpaghara a",
+    "anomalySubtitle": "Ọnụ ọgụgụ kwa awa nke mpaghara a dị nnọọ elu karịa akara ala p95 nke ya",
     "limitLabel": "Oke (USD)",
     "windowLabel": "Oge",
     "window24h": "Awa 24",
@@ -3796,14 +3809,14 @@
     "saved": "Echekwara ntọala ọkwa gbasara mmefu",
     "loadError": "Enweghị ike ibudata ọkwa gbasara mmefu.",
     "saveError": "Enweghị ike ichekwa ọkwa gbasara mmefu.",
-    "empty": "Ọkwa gbasara mmefu gbanyụrụ. Gbanye ya iji kwaa ndị kọntaktị ịgba ụgwọ nke mpaghara a aka na ntị.",
-    "noSpend": "Edebebeghị mmefu ọ bụla",
+    "sendAlerts": "Zipu ọkwa",
+    "noSpend": "Ọ nweghị mmefu",
     "spend24h": "Mmefu n'ime awa 24 gara aga",
     "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
     "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
     "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa",
     "multiplierMaxError": "Tinye ọnụọgụ mmụba nke {{max}} ma ọ bụ obere",
-    "thresholdMaxError": "Tinye ego nke {{max}} ma ọ bụ obere."
+    "thresholdMaxError": "Tinye ego nke {{max}} ma ọ bụ obere"
   },
   "profiles": {
     "title": "Profaịlụ",

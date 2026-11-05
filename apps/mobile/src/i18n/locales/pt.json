@@ -449,7 +449,6 @@
         "rebase": "Reaplicar"
       },
       "terminal": {
-        "alreadyMerged": "Já integrado",
         "closed": "Este PR está fechado",
         "closedMergeRequest": "Este merge request está fechado"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Faltam revisões obrigatórias",
         "requiredReviewsDetail": "As aprovações dos revisores obrigatórios estão em falta ou pendentes.",
         "failingChecksTitle": "Verificações obrigatórias com falhas",
-        "failingChecksDetail": "As verificações de estado obrigatórias estão a falhar.",
         "unstableTitle": "Algumas verificações estão a falhar",
         "unstableDetail": "Algumas verificações não obrigatórias estão a falhar, mas não impedem a integração.",
         "draftTitle": "PR em rascunho",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Não foi possível verificar a ligação ao Bitbucket.",
       "providerCheckFailedMessage": "O estado da ligação só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Voltar a ligar o GitHub",
+      "reconnectTitleGitLab": "Voltar a ligar o GitLab",
+      "reconnectTitleBitbucket": "Voltar a ligar o Bitbucket",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada.",
       "gitlabDescription": "Rever merge requests no telemóvel",
       "gitlabInstanceMismatchTitle": "A ligação ao GitLab é de outra instância",
@@ -723,7 +723,14 @@
       "pendingComment_other": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
-      "partialPostedMessage": "Comentários publicados: {{displayFreshCount}}. Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_many": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentários publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_many": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentários que se referem a um commit anterior e ficaram na tua fila: {{displayStaleCount}}.",
       "pendingComment_many": "comentários pendentes",
       "blockedRequestChanges": "Adiciona um resumo ou pelo menos um comentário para pedir alterações.",
       "blockedComment": "Adiciona um resumo ou pelo menos um comentário para publicar uma revisão com comentários."
@@ -1549,6 +1556,7 @@
       "prOpened": "Pull request para o REVIEW.md aberto",
       "alreadyPresent": "As orientações já constam do REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "A abrir PR",
         "change_request_failed": "Falha ao abrir PR",
@@ -1636,6 +1644,9 @@
       "set": "Definido",
       "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",
+      "nSelected_one": "{{displayCount}} selecionados",
+      "nSelected_other": "{{displayCount}} selecionados",
+      "nSelected_many": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o ficheiro REVIEW.md"
     },
     "decision": {
@@ -1771,6 +1782,9 @@
       "exploitabilityReasoning": "Justificação da explorabilidade",
       "suggestedFix": "Correção sugerida",
       "whereFound": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_one": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_many": "Locais onde foi detetada ({{displayCount}})",
+      "whereFound_other": "Locais onde foi detetada ({{displayCount}})",
       "fullReport": "Relatório completo gerado",
       "yes": "Sim",
       "no": "Não",
@@ -1863,6 +1877,9 @@
       "breakdownMediumLow_zero": "{{displayCount}} de gravidade média e baixa",
       "dueThisWeek": "Prazo termina esta semana",
       "dueThisWeekDetail": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_one": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_many": "{{exploitable}} destas com exploração possível confirmada",
+      "dueThisWeekDetail_other": "{{exploitable}} destas com exploração possível confirmada",
       "noDeadline": "Sem prazo",
       "reviewSlaAssignment": "Rever a atribuição de prazos do SLA",
       "allOpenFindingsTracked": "Todas as ocorrências abertas acompanhadas"
@@ -2109,6 +2126,7 @@
       "actionFailed": "Não foi possível concluir esta ação. Tenta novamente.",
       "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente.",
       "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
+      "syncNoRepositoriesNoManage": "Nenhum repositório está no escopo de sincronização. Um proprietário da organização, um administrador ou um gestor de faturação tem de ligar repositórios antes de a sincronização poder ser executada.",
       "syncIntegrationInactive": "A conexão com o GitHub do Agente de segurança não está ativa. Reconecte o GitHub App do Kilo e sincronize novamente.",
       "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente.",
       "configConflict": "As definições do agente de segurança foram alteradas noutro local. Revê as definições mais recentes e guarda novamente."
@@ -2653,9 +2671,9 @@
       "detailRetryingClone": "A tentar novamente a clonagem (tentativa {{attempt}} de {{total}})",
       "detailSetupCommandFailed": "O comando de configuração {{index}} falhou",
       "detailSetupCommandTimedOut": "O comando de configuração {{index}} excedeu o tempo limite",
-      "detailColdRestore": "Restauro a frio, snapshot aplicado, {{applied}} de {{total}} ficheiros restaurados",
+      "detailColdRestore": "Restauro a frio, snapshot aplicado, ficheiros restaurados: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% concluído",
-      "detailRestoreIncompleteReport": "Restauro da sessão incompleto: {{skipped}} de {{total}} ficheiros não foram restaurados ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauro da sessão incompleto, ficheiros não restaurados: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Em falta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e mais {{omitted}}",
       "detailReasonPatchFailed": "a correção não foi aplicada",
@@ -3841,9 +3859,9 @@
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
     "thresholdTitle": "Ultrapassagem do limite",
-    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "thresholdSubtitle": "Os gastos acumulados deste âmbito na janela escolhida ultrapassam o seu limite",
     "anomalyTitle": "Pico horário",
-    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste âmbito",
+    "anomalySubtitle": "O ritmo horário deste âmbito está muito acima da sua própria linha de base p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Janela",
     "window24h": "24 horas",
@@ -3853,14 +3871,14 @@
     "saved": "Definições dos alertas de gastos guardadas",
     "loadError": "Não foi possível carregar os alertas de gastos.",
     "saveError": "Não foi possível guardar os alertas de gastos.",
-    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contactos de faturação deste âmbito.",
-    "noSpend": "Ainda não há gastos registados",
+    "sendAlerts": "Enviar alertas",
+    "noSpend": "Ainda sem gastos",
     "spend24h": "Gastos nas últimas 24 horas",
     "multiplierError": "Introduza um multiplicador de 1 ou mais",
     "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações",
     "multiplierMaxError": "Introduza um multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduza um valor de {{max}} ou menos."
+    "thresholdMaxError": "Introduza um valor de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfis",

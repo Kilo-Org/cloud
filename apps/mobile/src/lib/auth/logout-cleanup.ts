@@ -1,5 +1,9 @@
 import * as SecureStore from '@/lib/auth/secure-store';
 import { readStoredValueForUpdate } from '@/lib/auth/secure-store-value';
+import {
+  forgetUnreadableStoreReports,
+  reportUnreadableStore,
+} from '@/lib/auth/unreadable-store-report';
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
@@ -170,6 +174,9 @@ function dedupeByOwner(records: readonly LogoutCleanupRecord[]): LogoutCleanupRe
  * must then leave the key alone rather than persist a list derived from a
  * store it never read. A malformed entry inside the current version is
  * discarded on its own so the valid records survive.
+ *
+ * An unreadable or corrupt payload is reported once per process and state, so
+ * one unchanged store state is one event rather than one per read.
  */
 export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> {
   const stored = await readStoredValueForUpdate(LOGOUT_CLEANUP_TOMBSTONE_KEY);
@@ -178,16 +185,7 @@ export async function readLogoutCleanupStore(): Promise<LogoutCleanupStoreRead> 
   }
   const read = parseStoredRecords(stored.value);
   if (read.status !== 'records') {
-    // Report the state, never the payload: it can hold account ids and device
-    // tokens. A corrupt payload is repaired by the next write; an unknown
-    // version stays for the build that wrote it.
-    Sentry.captureException(new Error('Logout cleanup store is not readable by this build'), {
-      tags: {
-        'error.subsystem': 'auth',
-        'error.operation': 'read_logout_cleanup_store',
-        'logout.cleanup.store': read.status,
-      },
-    });
+    reportUnreadableStore(read.status);
   }
   return read;
 }
@@ -238,14 +236,17 @@ export async function writeLogoutCleanupRecords(
   records: readonly LogoutCleanupRecord[]
 ): Promise<void> {
   const live = dedupeByOwner(records.filter(record => hasLogoutCleanupObligation(record)));
-  if (live.length === 0) {
-    await SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
-    return;
-  }
-  await SecureStore.setItemAsync(
-    LOGOUT_CLEANUP_TOMBSTONE_KEY,
-    JSON.stringify({ version: LOGOUT_CLEANUP_STORE_VERSION, records: live })
-  );
+  // An empty list removes the key; a non-empty one replaces the payload.
+  await (live.length === 0
+    ? SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY)
+    : SecureStore.setItemAsync(
+        LOGOUT_CLEANUP_TOMBSTONE_KEY,
+        JSON.stringify({ version: LOGOUT_CLEANUP_STORE_VERSION, records: live })
+      ));
+  // This write repaired or replaced whatever this process could not read, so a
+  // later unreadable state is new information and earns its own report. A
+  // failed write throws before here and keeps the claim.
+  forgetUnreadableStoreReports();
 }
 
 /**

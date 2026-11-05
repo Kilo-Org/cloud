@@ -2,22 +2,21 @@ import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/con
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   countAndStoreFimUsage,
   extractFimPromptInfo,
-  extractFraudAndProjectHeaders,
   invalidRequestResponse,
+  malformedJsonResponse,
   temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
-  captureProxyError,
-  extractHeaderAndLimitLength,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -26,6 +25,10 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
+import {
+  gatewayUsageContextBase,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   findSupportedFimModel,
   type FimProvider,
@@ -86,46 +89,32 @@ const FIMRequestBody = z.object({
   stream: z.boolean().optional(),
 });
 
-type FIMRequestBody = z.infer<typeof FIMRequestBody>;
-
 export async function handleFimCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
   const requesBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    organizationId,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
   authSpan.end();
-  if (authFailedResponse) return authFailedResponse;
-
-  const user = maybeUser;
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
   const requestBodyText = await requesBodyTextPromise;
   debugSaveProxyRequest(requestBodyText);
 
-  // Parse request body
-  let requestBody: FIMRequestBody;
+  let requestJson: unknown;
   try {
-    const { success, data, error } = FIMRequestBody.safeParse(JSON.parse(requestBodyText));
-
-    if (!success) {
-      sentryLogger('fim-proxy')('request failed to parse', {
-        extra: { kiloUserId: user.id, error, organizationId },
-        tags: { source: 'fim-proxy' },
-        user: { id: user.id },
-      });
-      return invalidRequestResponse();
-    }
-    requestBody = data;
+    requestJson = JSON.parse(requestBodyText);
   } catch (e) {
-    captureException(e, {
-      extra: { kiloUserId: user.id },
+    return malformedJsonResponse(e);
+  }
+  const { success, data: requestBody, error } = FIMRequestBody.safeParse(requestJson);
+  if (!success) {
+    sentryLogger('fim-proxy')('request failed to parse', {
+      extra: { kiloUserId: user.id, error, organizationId },
       tags: { source: 'fim-proxy' },
       user: { id: user.id },
     });
@@ -153,14 +142,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     return temporarilyUnavailableResponse();
   }
 
-  // Use new shared helper for fraud & project headers
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(rawClientIp(request)),
-    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
     userId: user.id,
     organizationId,
     feature,
@@ -175,38 +162,25 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
     : await getBYOKforUser(readDb, user.id, byokProviderKeys);
+  const userByokEntry = byokProviderKeys
+    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
+    .find(entry => entry !== undefined);
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'fim_completions',
-    kiloUserId: user.id,
     provider: fimProvider,
     requested_model: requestBody.model,
-    is_free: isFreeModelExcludingCustomLlms(requestBody.model),
-    custom_llm_pricing: null,
+    is_free: isFreeModel(requestBody.model),
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
-    has_middle_out_transform: null, // N/A for FIM
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: requestBody.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-    user_byok: !!userByok,
+    user_byok: !!userByokEntry,
     has_tools: false,
     feature,
-    session_id: taskId ?? null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
-    requestStartedAt,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // FIM feeds volume rules only, which do not read a prompt hash.
@@ -221,7 +195,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     model: requestBody.model,
     provider: fimProvider,
     isFreeUsage: usageContext.is_free,
-    hasByok: !!userByok,
+    hasByok: !!userByokEntry,
   });
   if (accessResult.rejection) return accessResult.rejection;
   const { balance, plan, payer } = accessResult.access;
@@ -232,9 +206,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   // carry the same classification.
 
   const systemKey = getSystemApiKey(fimProvider);
-  const userByokEntry = byokProviderKeys
-    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
-    .find(entry => entry !== undefined);
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
   const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
 
@@ -316,23 +287,20 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     );
   }
 
-  // Handle errors
-  if (proxyRes.status >= 400) {
-    await captureProxyError({
-      user,
-      request: bodyForUpstream,
-      response: proxyRes,
-      organizationId,
-      model: requestBody.model,
-      errorMessage: `FIM provider returned error ${proxyRes.status}`,
-      trackInSentry: proxyRes.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response: proxyRes,
+    providerId: fimProvider,
+    isUserByok: !!userByokEntry,
+    user,
+    request: bodyForUpstream,
+    organizationId,
+    model: requestBody.model,
+  });
 
   const clonedResponse = proxyRes.clone(); // reading from body is side-effectful
 
   // Account for usage using FIM-specific parser
   countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
 
-  return wrapInSafeNextResponse(proxyRes);
+  return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

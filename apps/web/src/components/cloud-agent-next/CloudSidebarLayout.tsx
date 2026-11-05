@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -21,7 +22,10 @@ import {
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
@@ -66,11 +70,17 @@ import { useClosedWorktreeChatTabs } from './hooks/useClosedWorktreeChatTabs';
 import { useWorkspaceFolders } from './hooks/useWorkspaceFolders';
 import { createdOnPlatformForFilter } from './hooks/sidebar-queries';
 import {
+  arriveAtChatAddress,
+  getActiveChatSessionId,
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
+  getLatestOpenChatSessionId,
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
   getWorktreeBranch,
+  isRestoredDocumentNavigation,
+  requestChatNavigation,
+  type PendingChatNavigation,
 } from './worktree-chat-tabs';
 import type { ComposerFocusRequest } from './useSessionComposerFocus';
 import {
@@ -93,7 +103,7 @@ import { localSessionsStorageKey } from './local-sessions/local-session-storage'
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
   currentSessionId: string | null;
-  selectedWorktreeId: string | null;
+  selectedWorktreeId: CloudAgentWorktreeId | null;
   worktreeChats: StoredSession[];
   openWorktreeChats: StoredSession[];
   closedWorktreeChats: StoredSession[];
@@ -107,6 +117,22 @@ type WorktreeChatTabs = {
   /** Drop a chat whose creation failed and close its tab. */
   discardLocalChat: (sessionId: string) => void;
 };
+
+let documentNavigationConsumed = false;
+
+/** Only the first chat address a document shows can be the one it was restored with. */
+function consumeRestoredDocumentNavigation(): boolean {
+  if (documentNavigationConsumed) return false;
+  documentNavigationConsumed = true;
+  const navigation = performance
+    .getEntriesByType('navigation')
+    .find((entry): entry is PerformanceNavigationTiming => 'type' in entry);
+  return isRestoredDocumentNavigation(
+    navigation,
+    window.location.href,
+    'wasDiscarded' in document && document.wasDiscarded === true
+  );
+}
 
 const UNTITLED_WORKTREE_DETAILS: SidebarWorktreeDetails = {
   name: null,
@@ -264,10 +290,8 @@ function CloudSidebarLayoutContent({
     replaceChatTab,
     forgetWorktreeTabs,
   } = useClosedWorktreeChatTabs(getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId));
-
-  useEffect(() => {
-    if (currentSessionId) openChatTab(currentSessionId);
-  }, [currentSessionId, openChatTab]);
+  const addressedSessionRef = useRef<{ sessionId: string | null } | null>(null);
+  const pendingNavigationRef = useRef<PendingChatNavigation>(null);
 
   const manager = useManager();
   const activity = useAtomValue(manager.atoms.activity);
@@ -586,6 +610,7 @@ function CloudSidebarLayoutContent({
   const openSessionInternal = useCallback(
     (sessionId: string, options?: { replace?: boolean }) => {
       openChatTab(sessionId);
+      pendingNavigationRef.current = requestChatNavigation(pendingNavigationRef.current, sessionId);
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       const chatPath = `${basePath}/chat`;
       const targetUrl = `${chatPath}?sessionId=${sessionId}`;
@@ -620,12 +645,15 @@ function CloudSidebarLayoutContent({
   );
 
   const openWorktree = useCallback(
-    (worktreeId: string) => {
+    (worktreeId: string, options?: { replace?: boolean }) => {
+      pendingNavigationRef.current = requestChatNavigation(pendingNavigationRef.current, null);
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       const chatPath = `${basePath}/chat`;
       const targetUrl = `${chatPath}?worktreeId=${worktreeId}`;
       if (pathname === chatPath) {
-        window.history.pushState(null, '', targetUrl);
+        window.history[options?.replace ? 'replaceState' : 'pushState'](null, '', targetUrl);
+      } else if (options?.replace) {
+        router.replace(targetUrl);
       } else {
         router.push(targetUrl);
       }
@@ -634,22 +662,82 @@ function CloudSidebarLayoutContent({
     [organizationId, pathname, router]
   );
 
+  const openWorktreeFromSidebar = useCallback(
+    (worktreeId: string, sessionIdsByRecency: readonly string[]) => {
+      const sessionId = getLatestOpenChatSessionId(sessionIdsByRecency, closedSessionIds);
+      if (sessionId) {
+        selectSession(sessionId);
+      } else {
+        openWorktree(worktreeId);
+      }
+    },
+    [closedSessionIds, openWorktree, selectSession]
+  );
+
+  // Arriving at a chat's address from elsewhere (a link, history) reopens its
+  // tab. A shown chat that is closed, by another window or while this window
+  // was still navigating to it, is left instead, so it cannot come back later.
+  useEffect(() => {
+    const shownSessionId = currentSessionId ?? null;
+    const addressed = addressedSessionRef.current;
+    if (addressed === null || addressed.sessionId !== shownSessionId) {
+      addressedSessionRef.current = { sessionId: shownSessionId };
+      const arrival = arriveAtChatAddress(pendingNavigationRef.current, shownSessionId);
+      pendingNavigationRef.current = arrival.pending;
+      const restored = addressed === null && consumeRestoredDocumentNavigation();
+      if (shownSessionId && !arrival.requestedHere && !restored) {
+        openChatTab(shownSessionId);
+        return;
+      }
+    }
+    if (
+      !shownSessionId ||
+      !selectedWorktreeId ||
+      getActiveChatSessionId(pendingNavigationRef.current, shownSessionId) !== shownSessionId ||
+      !closedSessionIds.includes(shownSessionId) ||
+      !worktreeChats.some(session => session.sessionId === shownSessionId)
+    ) {
+      return;
+    }
+    const nextSessionId = openWorktreeChats[0]?.sessionId;
+    if (nextSessionId) {
+      openSessionInternal(nextSessionId, { replace: true });
+    } else {
+      openWorktree(selectedWorktreeId, { replace: true });
+    }
+  }, [
+    closedSessionIds,
+    currentSessionId,
+    openChatTab,
+    openSessionInternal,
+    openWorktree,
+    openWorktreeChats,
+    selectedWorktreeId,
+    worktreeChats,
+  ]);
+
   const closeSession = useCallback(
     (sessionId: string) => {
       if (!selectedWorktreeId || !worktreeChats.some(session => session.sessionId === sessionId)) {
         return;
       }
       closeChatTab(sessionId);
-      if (sessionId !== currentSessionId) return;
+      // The tab may already be the target of a navigation the router has not shown yet.
+      const activeSessionId = getActiveChatSessionId(
+        pendingNavigationRef.current,
+        currentSessionId ?? null
+      );
+      if (sessionId !== activeSessionId) return;
 
+      // Replace, so going back does not land on, and reopen, the closed chat.
       const nextSessionId = getNextOpenChatSessionId(
         openWorktreeChats.map(session => session.sessionId),
         sessionId
       );
       if (nextSessionId) {
-        openSessionInternal(nextSessionId);
+        openSessionInternal(nextSessionId, { replace: true });
       } else {
-        openWorktree(selectedWorktreeId);
+        openWorktree(selectedWorktreeId, { replace: true });
       }
     },
     [
@@ -807,6 +895,7 @@ function CloudSidebarLayoutContent({
     async (sessionId: string, title: string) => {
       await renameCliSessionV2({ session_id: sessionId, title });
       renameSessionLocally(sessionId, title);
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
@@ -823,6 +912,7 @@ function CloudSidebarLayoutContent({
         organizationId: organizationId ?? null,
       });
       await Promise.all([
+        queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
       ]);
@@ -953,6 +1043,7 @@ function CloudSidebarLayoutContent({
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
               onOpenSession={selectSession}
+              onOpenWorktree={openWorktreeFromSidebar}
               organizationId={organizationId}
               onDeleteSession={setSessionPendingDeletion}
               onRenameSession={handleRenameSession}
@@ -988,6 +1079,7 @@ function CloudSidebarLayoutContent({
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}
             onOpenSession={selectSession}
+            onOpenWorktree={openWorktreeFromSidebar}
             organizationId={organizationId}
             onDeleteSession={setSessionPendingDeletion}
             onRenameSession={handleRenameSession}

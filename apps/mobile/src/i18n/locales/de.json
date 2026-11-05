@@ -1049,6 +1049,7 @@
       "prOpened": "Pull-Request für REVIEW.md geöffnet",
       "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
       "status": {
+        "open": "Offen",
         "edited": "Bearbeitet",
         "opening_change_request": "PR wird geöffnet",
         "change_request_failed": "PR fehlgeschlagen",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "Alle Bereiche",
       "nSelected": "{{displayCount}} ausgewählt",
+      "nSelected_one": "{{displayCount}} ausgewählt",
+      "nSelected_other": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "Begründung der Ersteinschätzung",
       "watchInCloudAgent": "Im Cloud Agent ansehen",
       "whereFound": "Fundstellen ({{displayCount}})",
+      "whereFound_one": "Fundstellen ({{displayCount}})",
+      "whereFound_other": "Fundstellen ({{displayCount}})",
       "yes": "Ja",
       "action": {
         "analyzeCodebase": "Codebasis analysieren",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} mittel und niedrig",
       "dueThisWeek": "Diese Woche fällig",
       "dueThisWeekDetail": "{{exploitable}} davon nachweislich ausnutzbar",
+      "dueThisWeekDetail_one": "{{exploitable}} davon nachweislich ausnutzbar",
+      "dueThisWeekDetail_other": "{{exploitable}} davon nachweislich ausnutzbar",
       "noDeadline": "Keine Frist",
       "reviewSlaAssignment": "SLA-Zuweisung prüfen",
       "allOpenFindingsTracked": "Alle offenen Befunde erfasst"
@@ -1536,6 +1543,7 @@
       "actionFailed": "Diese Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
       "actionBlocked": "Diese Aktion konnte nicht abgeschlossen werden. Das Problem muss behoben werden, bevor du es erneut versuchen kannst.",
       "syncNoRepositories": "Es befinden sich keine Repositories im Sync-Bereich. Wähle die Repositories aus, die der Sicherheitsagent überwacht, und synchronisiere dann erneut.",
+      "syncNoRepositoriesNoManage": "Es befinden sich keine Repositories im Sync-Bereich. Ein Organisationsinhaber, Admin oder Abrechnungsmanager muss Repositories verbinden, bevor synchronisiert werden kann.",
       "syncIntegrationInactive": "Die GitHub-Verbindung für den Sicherheitsagenten ist nicht aktiv. Verbinde die Kilo-GitHub-App erneut und synchronisiere dann noch einmal.",
       "syncMissingPermission": "Die Kilo-GitHub-App kann keine Schwachstellenwarnungen lesen. Erteile diese Berechtigung in GitHub und synchronisiere dann noch einmal.",
       "configConflict": "Die Einstellungen des Sicherheitsagenten wurden anderswo geändert. Prüfe die neuesten Einstellungen und speichere erneut."
@@ -2072,9 +2080,9 @@
       "detailRetryingClone": "Klonen wird wiederholt (Versuch {{attempt}} von {{total}})",
       "detailSetupCommandFailed": "Einrichtungsbefehl {{index}} fehlgeschlagen",
       "detailSetupCommandTimedOut": "Zeitüberschreitung bei Einrichtungsbefehl {{index}}",
-      "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, {{applied}} von {{total}} Dateien wiederhergestellt",
+      "detailColdRestore": "Kalt-Wiederherstellung, Snapshot angewendet, wiederhergestellte Dateien: {{applied}} von {{total}}",
       "detailProgressPercent": "{{percent}}% abgeschlossen",
-      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig: {{skipped}} von {{total}} Dateien wurden nicht wiederhergestellt ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sitzungswiederherstellung unvollständig, nicht wiederhergestellte Dateien: {{skipped}} von {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Fehlend: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} und {{omitted}} weitere",
       "detailReasonPatchFailed": "der Patch konnte nicht angewendet werden",
@@ -2714,6 +2722,8 @@
       "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
       "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
       "reconnectTitle": "GitHub erneut verbinden",
+      "reconnectTitleGitLab": "GitLab erneut verbinden",
+      "reconnectTitleBitbucket": "Bitbucket erneut verbinden",
       "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen.",
       "gitlabDescription": "Merge-Requests mobil prüfen",
       "gitlabInstanceMismatchTitle": "GitLab-Verbindung gehört zu einer anderen Instanz",
@@ -2993,7 +3003,6 @@
         "squash": "Bündeln"
       },
       "terminal": {
-        "alreadyMerged": "Bereits zusammengeführt",
         "closed": "Dieser Pull-Request ist geschlossen",
         "closedMergeRequest": "Dieser Merge-Request ist geschlossen"
       },
@@ -3010,7 +3019,6 @@
         "requiredReviewsTitle": "Erforderliche Reviews fehlen",
         "requiredReviewsDetail": "Die erforderlichen Freigaben der Reviewer fehlen oder stehen noch aus.",
         "failingChecksTitle": "Erforderliche Prüfungen fehlgeschlagen",
-        "failingChecksDetail": "Erforderliche Statusprüfungen sind fehlgeschlagen.",
         "unstableTitle": "Einige Prüfungen sind fehlgeschlagen",
         "unstableDetail": "Optionale Prüfungen sind fehlgeschlagen. Sie verhindern das Zusammenführen nicht.",
         "draftTitle": "Pull-Request-Entwurf",
@@ -3117,7 +3125,12 @@
       "pendingComment_other": "noch nicht gesendete Kommentare",
       "pendingComment_one": "ausstehender Kommentar",
       "summaryOptional": "Zusammenfassung (optional)",
-      "partialPostedMessage": "Veröffentlichte Kommentare: {{displayFreshCount}}. Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
+      "partialPostedFresh": "Veröffentlichte Kommentare: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Veröffentlichte Kommentare: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Veröffentlichte Kommentare: {{displayFreshCount}}. ",
+      "partialPostedStale": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
+      "partialPostedStale_one": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
+      "partialPostedStale_other": "Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
       "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
       "submitReview": "Prüfung senden",
       "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
     "thresholdTitle": "Schwellenwertüberschreitung",
-    "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
+    "thresholdSubtitle": "Die laufenden Ausgaben dieses Bereichs überschreiten im gewählten Zeitfenster dein Limit",
     "anomalyTitle": "Stündliche Spitze",
-    "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
+    "anomalySubtitle": "Die stündliche Rate dieses Bereichs liegt weit über seiner eigenen p95-Basislinie",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Zeitfenster",
     "window24h": "24 Stunden",
@@ -3796,14 +3809,14 @@
     "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
     "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
     "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
-    "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
-    "noSpend": "Noch keine Ausgaben erfasst",
+    "sendAlerts": "Warnungen senden",
+    "noSpend": "Noch keine Ausgaben",
     "spend24h": "Ausgaben der letzten 24 Stunden",
     "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
     "pushOffByCategory": "In Benachrichtigungen aus",
     "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
-    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein."
+    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein"
   },
   "profiles": {
     "title": "Profile",

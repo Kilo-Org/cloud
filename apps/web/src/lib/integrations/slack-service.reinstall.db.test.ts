@@ -3,7 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { upsertSlackInstallation } from './slack-service';
+import { deleteInstallationByTeamId, upsertSlackInstallation } from './slack-service';
 import { INTEGRATION_STATUS, PLATFORM } from './core/constants';
 import {
   getPlatformIntegration,
@@ -84,6 +84,9 @@ describe('Slack workspace re-authorization', () => {
       suspended_by: null,
       platform_installation_id: 'T0RESTORE',
     });
+    expect(row?.metadata).toMatchObject({ bot_user_id: 'U_BOT' });
+    expect(row?.metadata).not.toHaveProperty('duplicate_slack_platform_installation_id');
+    expect(row?.metadata).not.toHaveProperty('duplicate_slack_platform_installation_detached_at');
 
     await expect(
       getPlatformIntegration({
@@ -148,5 +151,107 @@ describe('Slack workspace re-authorization', () => {
       platform_installation_id: null,
     });
     expect(otherRow?.suspended_at).not.toBeNull();
+  });
+
+  it('re-authorizes through the canonical row when a legacy row also records the workspace', async () => {
+    const owner = await insertTestUser();
+    testUserIds.push(owner.id);
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'T0PAIRED',
+        platform_account_login: 'Paired Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+    const [canonical] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: 'T0PAIRED',
+        platform_account_id: 'T0PAIRED',
+        platform_account_login: 'Paired Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+
+    const updated = await upsertSlackInstallation({
+      owner: { type: 'user', id: owner.id },
+      teamId: 'T0PAIRED',
+      installation: {
+        botToken: '[REDACTED by s1-secret-redact]',
+        botUserId: 'U_BOT',
+        teamName: 'Paired Workspace',
+      },
+    });
+
+    expect(updated).toMatchObject({
+      id: canonical.id,
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      platform_installation_id: 'T0PAIRED',
+    });
+
+    const [legacyRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, legacy.id));
+    expect(legacyRow?.platform_installation_id).toBeNull();
+  });
+
+  it('removes the row that records the workspace', async () => {
+    const owner = await insertTestUser();
+    testUserIds.push(owner.id);
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'T0LEGACYDELETE',
+        platform_account_login: 'Legacy Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+
+    await expect(deleteInstallationByTeamId('T0LEGACYDELETE')).resolves.toEqual({
+      success: true,
+      deleted: true,
+    });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, legacy.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('keeps a detached row in place', async () => {
+    const owner = await insertTestUser();
+    testUserIds.push(owner.id);
+    const [detached] = await db
+      .insert(platform_integrations)
+      .values(suspendedWorkspaceRow(owner.id, 'T0DETACHEDONLY', 'Detached Workspace'))
+      .returning();
+
+    await expect(deleteInstallationByTeamId('T0DETACHEDONLY')).resolves.toEqual({
+      success: true,
+      deleted: false,
+    });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, detached.id));
+    expect(rows).toHaveLength(1);
   });
 });

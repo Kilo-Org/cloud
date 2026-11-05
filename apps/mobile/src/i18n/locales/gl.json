@@ -442,7 +442,6 @@
         "rebase": "Cambio de base"
       },
       "terminal": {
-        "alreadyMerged": "Xa fusionada",
         "closed": "Solicitude de integración pechada",
         "closedMergeRequest": "Solicitude de fusión pechada"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Faltan revisións obrigatorias",
         "requiredReviewsDetail": "Faltan as aprobacións dos revisores obrigatorios ou aínda están pendentes.",
         "failingChecksTitle": "Comprobacións obrigatorias con erros",
-        "failingChecksDetail": "As comprobacións de estado obrigatorias dan erro.",
         "unstableTitle": "Algunhas comprobacións dan erro",
         "unstableDetail": "As comprobacións non obrigatorias dan erro, pero non bloquearán a fusión.",
         "draftTitle": "Solicitude de cambios en borrador",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Non se puido comprobar a conexión con Bitbucket.",
       "providerCheckFailedMessage": "O estado da conexión non está dispoñible ata que cargue.",
       "reconnectTitle": "Volver conectar con GitHub",
+      "reconnectTitleGitLab": "Volver conectar con GitLab",
+      "reconnectTitleBitbucket": "Volver conectar con Bitbucket",
       "reconnectDescription": "Revogouse a túa conexión con GitHub.",
       "gitlabDescription": "Revisar solicitudes de fusión no móbil",
       "gitlabInstanceMismatchTitle": "A conexión de GitLab é para outra instancia",
@@ -708,7 +708,12 @@
       "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar a revisión",
-      "partialPostedMessage": "Comentarios publicados: {{displayFreshCount}}. Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedFresh": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Comentarios publicados: {{displayFreshCount}}. ",
+      "partialPostedStale": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Comentarios que fan referencia a unha remisión anterior e seguen na túa cola: {{displayStaleCount}}.",
       "blockedRequestChanges": "Engade un resumo ou polo menos un comentario para solicitar cambios.",
       "blockedComment": "Engade un resumo ou polo menos un comentario para enviar unha revisión con comentarios."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Solicitude de incorporación para REVIEW.md aberta",
       "alreadyPresent": "As pautas xa están en REVIEW.md",
       "status": {
+        "open": "Aberta",
         "edited": "Editada",
         "opening_change_request": "Abrindo a PR",
         "change_request_failed": "Erro ao abrir a PR",
@@ -1614,6 +1620,8 @@
       "set": "Definido",
       "notSet": "Non definido",
       "nSelected": "{{displayCount}} seleccionados",
+      "nSelected_one": "{{displayCount}} seleccionados",
+      "nSelected_other": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Pautas propostas para REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Xustificación da explotabilidade",
       "suggestedFix": "Corrección suxerida",
       "whereFound": "Localizacións do achado ({{displayCount}})",
+      "whereFound_one": "Localizacións do achado ({{displayCount}})",
+      "whereFound_other": "Localizacións do achado ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "yes": "Si",
       "no": "Non",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} de gravidade media e baixa",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_one": "{{exploitable}} destes confirmados como explotables",
+      "dueThisWeekDetail_other": "{{exploitable}} destes confirmados como explotables",
       "noDeadline": "Sen prazo",
       "reviewSlaAssignment": "Revisar a asignación do SLA",
       "allOpenFindingsTracked": "Todos os achados abertos en seguimento"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
       "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
       "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
+      "syncNoRepositoriesNoManage": "Non hai repositorios no ámbito de sincronización. Un propietario da organización, un administrador ou un xestor de facturación debe conectar repositorios antes de poder sincronizar.",
       "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
       "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo.",
       "configConflict": "Os axustes do axente de seguridade cambiáronse noutro lugar. Revisa os axustes máis recentes e garda de novo."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Reintentando a clonación (intento {{attempt}} de {{total}})",
       "detailSetupCommandFailed": "Fallou o comando de configuración {{index}}",
       "detailSetupCommandTimedOut": "O comando de configuración {{index}} esgotou o tempo de espera",
-      "detailColdRestore": "Restauración en frío, aplicouse a instantánea, restauráronse {{applied}} de {{total}} ficheiros",
+      "detailColdRestore": "Restauración en frío, aplicouse a instantánea, ficheiros restaurados: {{applied}} de {{total}}",
       "detailProgressPercent": "{{percent}}% completado",
-      "detailRestoreIncompleteReport": "Restauración da sesión incompleta: non se restauraron {{skipped}} de {{total}} ficheiros ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Restauración da sesión incompleta — ficheiros non restaurados: {{skipped}} de {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Faltan: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} e {{omitted}} máis",
       "detailReasonPatchFailed": "o parche non se aplicou",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Envía unha alerta por correo ou notificación push aos contactos de facturación cando o gasto deste ámbito supere un límite ou se dispare por riba do seu ritmo horario habitual.",
     "thresholdTitle": "Superación do limiar",
-    "thresholdSubtitle": "O gasto acumulado supera o teu límite",
+    "thresholdSubtitle": "O gasto acumulado deste ámbito na ventá elixida supera o teu límite",
     "anomalyTitle": "Pico por hora",
-    "anomalySubtitle": "Unha hora está moi por riba do ritmo habitual deste ámbito",
+    "anomalySubtitle": "O ritmo por hora deste ámbito está moi por riba da súa propia liña base p95",
     "limitLabel": "Límite (USD)",
     "windowLabel": "Ventá",
     "window24h": "24 horas",
@@ -3796,14 +3809,14 @@
     "saved": "Gardáronse os axustes das alertas de gasto",
     "loadError": "Non se puideron cargar as alertas de gasto.",
     "saveError": "Non se puideron gardar as alertas de gasto.",
-    "empty": "As alertas de gasto están desactivadas. Actívaas para avisar os contactos de facturación deste ámbito.",
-    "noSpend": "Aínda non se rexistrou ningún gasto",
+    "sendAlerts": "Enviar alertas",
+    "noSpend": "Aínda ningún gasto",
     "spend24h": "Gasto nas últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 ou máis",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificacións",
     "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos."
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfís",

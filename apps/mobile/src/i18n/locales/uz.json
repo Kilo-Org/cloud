@@ -442,7 +442,6 @@
         "rebase": "Asosni almashtirish"
       },
       "terminal": {
-        "alreadyMerged": "Allaqachon birlashtirilgan",
         "closed": "Bu PR yopilgan",
         "closedMergeRequest": "Bu merge so‘rovi yopilgan"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Majburiy ko'rib chiqishlar yetishmayapti",
         "requiredReviewsDetail": "Belgilangan tekshiruvchilar hali tasdiqlamagan yoki ularning tasdig'i kutilmoqda.",
         "failingChecksTitle": "Majburiy tekshiruvlar o'tmadi",
-        "failingChecksDetail": "Majburiy holat tekshiruvlari xato bilan yakunlanmoqda.",
         "unstableTitle": "Ayrim tekshiruvlar o'tmadi",
         "unstableDetail": "Majburiy bo'lmagan tekshiruvlar xato bilan yakunlanmoqda. Ular birlashtirishga to'sqinlik qilmaydi.",
         "draftTitle": "Qoralama PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
       "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
+      "reconnectTitleGitLab": "GitLabga qayta ulanish",
+      "reconnectTitleBitbucket": "Bitbucketga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan.",
       "gitlabDescription": "Merge so‘rovlari tekshiruvlarini mobil qurilmada bajarish",
       "gitlabInstanceMismatchTitle": "GitLab ulanishi boshqa instansiya uchun",
@@ -708,7 +708,12 @@
       "pendingComment_other": "yuborilmagan izoh",
       "submitCountOfTotal": "{{displayTotalCount}} ta izohdan {{displayFreshCount}} tasini yuborish",
       "submitReview": "Ko‘rib chiqish natijasini yuborish",
-      "partialPostedMessage": "{{displayFreshCount}} ta izoh yuborildi. {{displayStaleCount}} ta izoh eski kommitga tegishli bo'lgani uchun navbatda qoldi.",
+      "partialPostedFresh": "{{displayFreshCount}} ta izoh yuborildi. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} ta izoh yuborildi. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} ta izoh yuborildi. ",
+      "partialPostedStale": "{{displayStaleCount}} ta izoh eski kommitga tegishli bo'lgani uchun navbatda qoldi.",
+      "partialPostedStale_one": "{{displayStaleCount}} ta izoh eski kommitga tegishli bo'lgani uchun navbatda qoldi.",
+      "partialPostedStale_other": "{{displayStaleCount}} ta izoh eski kommitga tegishli bo'lgani uchun navbatda qoldi.",
       "blockedRequestChanges": "O'zgarishlarni so'rash uchun xulosa yoki kamida bitta izoh qo'shing.",
       "blockedComment": "Ko'rib chiqish natijasini izoh sifatida yuborish uchun xulosa yoki kamida bitta izoh qo'shing."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md uchun pull request ochildi",
       "alreadyPresent": "Ko'rsatmalar REVIEW.md faylida allaqachon mavjud",
       "status": {
+        "open": "Ochiq",
         "edited": "Tahrirlangan",
         "opening_change_request": "PR ochilmoqda",
         "change_request_failed": "PR ochilmadi",
@@ -1614,6 +1620,8 @@
       "set": "Belgilangan",
       "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
+      "nSelected_one": "{{displayCount}} ta tanlangan",
+      "nSelected_other": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Hujumda foydalanish imkoniyati asoslari",
       "suggestedFix": "Tavsiya etilgan tuzatish",
       "whereFound": "Aniqlangan joylar ({{displayCount}})",
+      "whereFound_one": "Aniqlangan joylar ({{displayCount}})",
+      "whereFound_other": "Aniqlangan joylar ({{displayCount}})",
       "fullReport": "Yaratilgan hisobotning to'liq matni",
       "yes": "Ha",
       "no": "Yo'q",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} ta o‘rta va past",
       "dueThisWeek": "Muddati shu hafta tugaydi",
       "dueThisWeekDetail": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
+      "dueThisWeekDetail_one": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
+      "dueThisWeekDetail_other": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
       "noDeadline": "Muddat yo'q",
       "reviewSlaAssignment": "SLA muddati belgilanishini ko'rib chiqish",
       "allOpenFindingsTracked": "Barcha ochiq muammolar kuzatilmoqda"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Bu amalni tugallab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "actionBlocked": "Bu amalni tugallab bo'lmadi. Muammoni avval hal qilish kerak.",
       "syncNoRepositories": "Sinxronlash doirasida hech qanday repozitoriy yo'q. «Xavfsizlik agenti» kuzatadigan repozitoriylarni tanlang, so'ngra qayta sinxronlang.",
+      "syncNoRepositoriesNoManage": "Sinxronlash doirasida hech qanday repozitoriy yo'q. Sinxronlashdan oldin tashkilot egasi, administrator yoki to'lov menejeri repozitoriylarni ulashi kerak.",
       "syncIntegrationInactive": "«Xavfsizlik agenti»ning GitHub ulanishi faol emas. Kilo GitHub App’ni qayta ulang, so‘ng qaytadan sinxronlang.",
       "syncMissingPermission": "Kilo GitHub App zaiflik ogohlantirishlarini o'qiy olmaydi. GitHubda shu ruxsatni bering, so'ng yana sinxronlang.",
       "configConflict": "Xavfsizlik agentining sozlamalari boshqa joyda o'zgartirildi. Eng so'nggi sozlamalarni ko'rib chiqib, qayta saqlang."
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
     "thresholdTitle": "Chegaradan oshish",
-    "thresholdSubtitle": "Joriy xarajat limitingizdan oshib ketdi",
+    "thresholdSubtitle": "Bu sohaning tanlangan oynadagi joriy xarajati limitingizdan oshib ketmoqda",
     "anomalyTitle": "Soatlik ko'tarilish",
-    "anomalySubtitle": "Bir soat bu sohaning odatdagi sur'atidan ancha yuqori",
+    "anomalySubtitle": "Bu sohaning soatlik sur'ati o'zining p95 asosiy darajasidan ancha yuqori",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Oyna",
     "window24h": "24 soat",
@@ -3796,14 +3809,14 @@
     "saved": "Xarajat bildirishnomasi sozlamalari saqlandi",
     "loadError": "Xarajat bildirishnomalarini yuklab bo'lmadi.",
     "saveError": "Xarajat bildirishnomalarini saqlab bo'lmadi.",
-    "empty": "Xarajat bildirishnomalari o'chirilgan. Bu sohaning to'lov kontaktlarini ogohlantirish uchun ularni yoqing.",
-    "noSpend": "Hozircha xarajat qayd etilmagan",
+    "sendAlerts": "Xarajat bildirishnomalarini yuborish",
+    "noSpend": "Hozircha xarajat yo'q",
     "spend24h": "Oxirgi 24 soatdagi xarajat",
     "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
     "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
     "pushOffByCategory": "Bildirishnomalarda o'chirilgan",
     "multiplierMaxError": "{{max}} yoki undan kichik koeffitsiyent kiriting",
-    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting."
+    "thresholdMaxError": "{{max}} yoki undan kichik miqdorni kiriting"
   },
   "profiles": {
     "title": "Profillar",

@@ -114,8 +114,10 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
-  EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
+  WatchPrPolicy,
+  WatchPrStatus,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
   EnkryptVerifications,
@@ -237,6 +239,16 @@ export const StripeServiceFeeOutcome = {
 
 export type StripeServiceFeeOutcome =
   (typeof StripeServiceFeeOutcome)[keyof typeof StripeServiceFeeOutcome];
+
+export const ServiceFeeRollbackRefundStatus = {
+  Pending: 'pending',
+  Succeeded: 'succeeded',
+  Skipped: 'skipped',
+  Failed: 'failed',
+} as const;
+
+export type ServiceFeeRollbackRefundStatus =
+  (typeof ServiceFeeRollbackRefundStatus)[keyof typeof ServiceFeeRollbackRefundStatus];
 
 // ADR 0005 custom router values. Declared here rather than imported from
 // @kilocode/auto-routing-contracts: consumers that typecheck this package's
@@ -2850,6 +2862,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     reasoning_setting_id: integer(),
+    inference_region_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     // Microdollars charged on top of BYOK inference, such as server tools, plugins
     // and PDF parsing, excluding OpenRouter's BYOK fee. Null when not reported separately.
@@ -3016,6 +3029,15 @@ export const reasoning_setting = pgTable(
     reasoning_setting: text().notNull(),
   },
   table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
+export const inference_region = pgTable(
+  'inference_region',
+  {
+    inference_region_id: serial().notNull().primaryKey(),
+    inference_region: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_inference_region').on(table.inference_region)]
 );
 
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
@@ -6576,6 +6598,99 @@ export const cli_sessions_v2 = pgTable(
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
 
+export const cloud_agent_pr_watches = pgTable(
+  'cloud_agent_pr_watches',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    installation_id: text().notNull(),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    repository_id: text().notNull(),
+    repo_url: text().notNull(),
+    pr_number: integer().notNull(),
+    source_session_id: text().notNull(),
+    source_cloud_agent_session_id: text().notNull(),
+    worktree_id: text().notNull(),
+    head_ref: text().notNull(),
+    base_ref: text().notNull(),
+    head_sha: text().notNull(),
+    base_sha: text().notNull(),
+    status: text().$type<WatchPrStatus>().notNull().default('watching'),
+    generation: integer().notNull().default(1),
+    pending_revision: integer().notNull().default(0),
+    policy: jsonb().$type<WatchPrPolicy>().notNull(),
+    projection: jsonb().$type<unknown>().notNull(),
+    lifecycle_reason: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_event_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_watches_live_pr')
+      .on(table.repository_id, table.pr_number)
+      .where(sql`${table.status} != 'finished'`),
+    index('IDX_cloud_agent_pr_watches_owner').on(table.kilo_user_id, table.worktree_id),
+    index('IDX_cloud_agent_pr_watches_updated').on(table.updated_at),
+    index('IDX_cloud_agent_pr_watches_event_identity').on(
+      table.installation_id,
+      table.github_app_type,
+      table.repository_id,
+      table.pr_number
+    ),
+    index('IDX_cloud_agent_pr_watches_head').on(table.repository_id, table.head_sha),
+    check(
+      'cloud_agent_pr_watches_status_check',
+      sql`${table.status} IN ('watching', 'paused', 'finished')`
+    ),
+    check(
+      'cloud_agent_pr_watches_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'cloud_agent_pr_watches_version_check',
+      sql`${table.generation} > 0 AND ${table.pending_revision} >= 0 AND ${table.pr_number} > 0`
+    ),
+    check(
+      'cloud_agent_pr_watches_repo_url_check',
+      sql`${table.repo_url} = lower(${table.repo_url}) AND ${table.repo_url} ~ '^https://github[.]com/[^/]+/[^/]+$'`
+    ),
+  ]
+);
+
+export type CloudAgentPrWatch = typeof cloud_agent_pr_watches.$inferSelect;
+
+export const cloud_agent_pr_watch_activity = pgTable(
+  'cloud_agent_pr_watch_activity',
+  {
+    id: idPrimaryKeyColumn,
+    watch_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_pr_watches.id, { onDelete: 'cascade' }),
+    generation: integer().notNull(),
+    delivery_id: text(),
+    kind: text().notNull(),
+    reason: text(),
+    data: jsonb().$type<unknown>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_pr_watch_activity_delivery').on(
+      table.watch_id,
+      table.generation,
+      table.delivery_id
+    ),
+    index('IDX_cloud_agent_pr_watch_activity_watch').on(table.watch_id, table.created_at),
+    index('IDX_cloud_agent_pr_watch_activity_created').on(table.created_at),
+  ]
+);
+
 export const todo_lists = pgTable(
   'todo_lists',
   {
@@ -6734,6 +6849,7 @@ export type CloudAgentFailureReason =
   | 'session_import_failed'
   | 'setup_command_timeout'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -6870,6 +6986,7 @@ export type CloudAgentSessionRunFailureStage =
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
   | 'container_limit_reached'
+  | 'account_blocked'
   | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
@@ -7002,6 +7119,7 @@ export const github_branch_pull_requests = pgTable(
     pr_state: text(),
     pr_title: text(),
     pr_head_sha: text(),
+    pr_observations: jsonb().$type<unknown>(),
     pr_review_decision: text(),
     review_decision_pending: boolean().notNull().default(false),
     review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -8295,11 +8413,18 @@ export const cloud_agent_environments = pgTable(
     created_by_user_id: text(), // Audit trail: the user who created this environment.
 
     name: text().notNull(),
-    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }).notNull(),
-    repo_full_name: text().notNull(),
+    // Nullable since multi-repository environments: a V2 row stores its members in
+    // `repositories` and no identity here. See the identity check.
+    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }),
+    repo_full_name: text(),
     gitlab_clone_url: text(),
     bitbucket_workspace_uuid: uuid(),
     bitbucket_repository_uuid: uuid(),
+    // V2 environments: the ordered members, each validated by the repository entry
+    // schema in `@kilocode/cloud-agent-profile` on every write and every read.
+    // Null for V1 environments, which keep their one repository in the identity
+    // columns above.
+    repositories: jsonb(),
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
@@ -8309,6 +8434,11 @@ export const cloud_agent_environments = pgTable(
     // Saved sandbox allocation key for this repository's sessions; null uses the
     // owner's default. Not a build input, so it never advances the revision.
     sandbox_allocation: text(),
+    // Saved network egress policy. Both null keeps the legacy unrestricted
+    // behavior. `unrestricted` also has no list. `allowlist` always has a list,
+    // where an empty list permits only the server-owned Kilo/Git baseline.
+    egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
+    egress_allowlist: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -8351,14 +8481,44 @@ export const cloud_agent_environments = pgTable(
         (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
       )`
     ),
+    // `jsonb_path_ops` serves the `@>` containment lookup, which is the only use.
+    index('IDX_cloud_agent_environments_repositories')
+      .using('gin', table.repositories.op('jsonb_path_ops'))
+      .concurrently(),
+    // Exactly one alternative. V1: no `repositories` and the whole identity of
+    // one platform. V2: a non-empty `repositories` and no identity column. `platform
+    // IS NOT NULL` is explicit: `platform = 'github'` is UNKNOWN for a null
+    // platform, and a check constraint accepts UNKNOWN.
     check(
-      'cloud_agent_environments_platform_check',
-      sql`${table.platform} IN ('github', 'gitlab', 'bitbucket')`
-    ),
-    check(
-      'cloud_agent_environments_github_identity_check',
+      'cloud_agent_environments_identity_check',
       sql`(
-        (${table.platform} = 'github') = (
+        (
+          ${table.repositories} IS NULL AND
+          ${table.platform} IS NOT NULL AND
+          ${table.repo_full_name} IS NOT NULL AND (
+            (
+              ${table.platform} = 'github' AND
+              ${table.gitlab_clone_url} IS NULL AND
+              ${table.bitbucket_workspace_uuid} IS NULL AND
+              ${table.bitbucket_repository_uuid} IS NULL
+            ) OR (
+              ${table.platform} = 'gitlab' AND
+              ${table.gitlab_clone_url} IS NOT NULL AND
+              ${table.bitbucket_workspace_uuid} IS NULL AND
+              ${table.bitbucket_repository_uuid} IS NULL
+            ) OR (
+              ${table.platform} = 'bitbucket' AND
+              ${table.bitbucket_workspace_uuid} IS NOT NULL AND
+              ${table.bitbucket_repository_uuid} IS NOT NULL AND
+              ${table.gitlab_clone_url} IS NULL
+            )
+          )
+        ) OR (
+          ${table.repositories} IS NOT NULL AND
+          jsonb_typeof(${table.repositories}) = 'array' AND
+          ${table.repositories} <> '[]'::jsonb AND
+          ${table.platform} IS NULL AND
+          ${table.repo_full_name} IS NULL AND
           ${table.gitlab_clone_url} IS NULL AND
           ${table.bitbucket_workspace_uuid} IS NULL AND
           ${table.bitbucket_repository_uuid} IS NULL
@@ -8366,23 +8526,14 @@ export const cloud_agent_environments = pgTable(
       )`
     ),
     check(
-      'cloud_agent_environments_gitlab_identity_check',
+      'cloud_agent_environments_egress_policy_check',
       sql`(
-        (${table.platform} = 'gitlab') = (
-          ${table.gitlab_clone_url} IS NOT NULL AND
-          ${table.bitbucket_workspace_uuid} IS NULL AND
-          ${table.bitbucket_repository_uuid} IS NULL
-        )
-      )`
-    ),
-    check(
-      'cloud_agent_environments_bitbucket_identity_check',
-      sql`(
-        (${table.platform} = 'bitbucket') = (
-          ${table.bitbucket_workspace_uuid} IS NOT NULL AND
-          ${table.bitbucket_repository_uuid} IS NOT NULL AND
-          ${table.gitlab_clone_url} IS NULL
-        )
+        (
+          (${table.egress_mode} IS NULL AND ${table.egress_allowlist} IS NULL) OR
+          (${table.egress_mode} IS NOT NULL AND ${table.egress_mode} IN ('unrestricted', 'allowlist'))
+        ) AND
+        (${table.egress_mode} IS DISTINCT FROM 'unrestricted' OR ${table.egress_allowlist} IS NULL) AND
+        (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
   ]
@@ -10503,32 +10654,6 @@ export const exa_usage_log = pgTable(
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
 
-// Retained only for migration tracking; application code uses enkrypt_usage.
-export const enkrypt_guardrail_charges = pgTable(
-  'enkrypt_guardrail_charges',
-  {
-    id: uuid()
-      .notNull()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey(),
-    organization_id: uuid().notNull(),
-    kilo_user_id: text().notNull(),
-    session_id: text(),
-    api_kind: text().notNull().$type<EnkryptGuardrailApiKind>(),
-    decision: text().notNull().$type<EnkryptGuardrailDecision>(),
-    enkrypt_credits_cost: real(),
-    charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    added_latency_ms: integer(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_enkrypt_guardrail_charges_organization_created_at').on(
-      table.organization_id,
-      table.created_at
-    ),
-  ]
-);
-
 export const enkrypt_usage_decision = pgTable(
   'enkrypt_usage_decision',
   {
@@ -10536,6 +10661,15 @@ export const enkrypt_usage_decision = pgTable(
     decision: text().notNull().$type<EnkryptGuardrailDecision>(),
   },
   table => [uniqueIndex('UQ_enkrypt_usage_decision').on(table.decision)]
+);
+
+export const enkrypt_usage_guardrail = pgTable(
+  'enkrypt_usage_guardrail',
+  {
+    guardrail_id: serial().notNull().primaryKey(),
+    guardrail: text().notNull().$type<EnkryptGuardrailDirection>(),
+  },
+  table => [uniqueIndex('UQ_enkrypt_usage_guardrail').on(table.guardrail)]
 );
 
 // Monthly created_at partitioning is defined in the migration; Drizzle cannot express it.
@@ -10556,10 +10690,14 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict before its upstream call. Set only on
-    // the request's final call, so it is counted once per request; null on a retried call or when
-    // the request returned before awaiting the verdict.
+    // How long the request waited for the guardrail verdict: before its upstream call for the input
+    // guardrail, and between the end of the upstream response and its release for the output
+    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
+    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
+    // on other calls or when the request returned before awaiting the verdict.
     added_latency_ms: integer(),
+    // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
+    guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -11590,6 +11728,67 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+// One claim per assessment for the admin-initiated refund of service fees
+// charged before collection was disabled. The row is claimed before Stripe is
+// called so that concurrent or repeated runs cannot refund the same fee twice.
+export const service_fee_rollback_refunds = pgTable(
+  'service_fee_rollback_refunds',
+  {
+    assessment_key: text().primaryKey().notNull(),
+    status: text().notNull().$type<ServiceFeeRollbackRefundStatus>(),
+    attempt: integer().default(1).notNull(),
+    // Definite Stripe refund rejections only; failures before Stripe is asked
+    // to refund do not count toward the retry cap.
+    rejected_attempts: integer().default(0).notNull(),
+    amount_minor: integer().default(0).notNull(),
+    currency: text().notNull(),
+    stripe_charge_id: text(),
+    stripe_refund_id: text(),
+    reason: text(),
+    requested_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.assessment_key],
+      foreignColumns: [stripe_service_fee_assessments.assessment_key],
+      name: 'FK_svc_fee_rollback_refunds_assessment',
+    })
+      .onDelete('restrict')
+      .onUpdate('cascade'),
+    foreignKey({
+      columns: [table.requested_by_kilo_user_id],
+      foreignColumns: [kilocode_users.id],
+      name: 'FK_svc_fee_rollback_refunds_requested_by',
+    })
+      .onDelete('set null')
+      .onUpdate('cascade'),
+    uniqueIndex('UQ_service_fee_rollback_refunds_stripe_refund_id')
+      .on(table.stripe_refund_id)
+      .where(isNotNull(table.stripe_refund_id)),
+    index('IDX_service_fee_rollback_refunds_status').on(table.status),
+    enumCheck(
+      'service_fee_rollback_refunds_status_check',
+      table.status,
+      ServiceFeeRollbackRefundStatus
+    ),
+    check(
+      'service_fee_rollback_refunds_amounts_check',
+      sql`${table.amount_minor} >= 0 AND ${table.attempt} >= 1 AND ${table.rejected_attempts} >= 0`
+    ),
+    check(
+      'service_fee_rollback_refunds_succeeded_check',
+      sql`${table.status} <> 'succeeded' OR ${table.stripe_refund_id} IS NOT NULL`
+    ),
+  ]
+);
+
+export type ServiceFeeRollbackRefund = typeof service_fee_rollback_refunds.$inferSelect;
 
 export const agent_briefing_preferences = pgTable(
   'agent_briefing_preferences',

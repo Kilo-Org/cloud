@@ -442,7 +442,6 @@
         "rebase": "Chanjman baz"
       },
       "terminal": {
-        "alreadyMerged": "Deja fizyonnen",
         "closed": "Demann fizyon sa a fèmen",
         "closedMergeRequest": "Merge request sa a fèmen"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Gen revizyon obligatwa ki manke",
         "requiredReviewsDetail": "Moun ki dwe revize yo poko bay tout apwobasyon ki nesesè yo.",
         "failingChecksTitle": "Verifikasyon obligatwa ki echwe",
-        "failingChecksDetail": "Verifikasyon estati obligatwa yo ap echwe.",
         "unstableTitle": "Kèk verifikasyon ap echwe",
         "unstableDetail": "Verifikasyon ki pa obligatwa yo ap echwe. Yo p ap bloke fizyon an.",
         "draftTitle": "Demann fizyon an bwouyon",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Pa t ka tcheke koneksyon Bitbucket la.",
       "providerCheckFailedMessage": "Estati koneksyon an pa disponib jiskaske li chaje.",
       "reconnectTitle": "Rekonekte GitHub",
+      "reconnectTitleGitLab": "Rekonekte GitLab",
+      "reconnectTitleBitbucket": "Rekonekte Bitbucket",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a.",
       "gitlabDescription": "Revize merge request yo sou mobil",
       "gitlabInstanceMismatchTitle": "Koneksyon GitLab la se pou yon lòt enstans",
@@ -708,7 +708,12 @@
       "pendingComment_other": "kòmantè an atant",
       "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon an",
-      "partialPostedMessage": "{{displayFreshCount}} kòmantè pibliye. {{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedFresh": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedStale": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_one": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_other": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
       "blockedRequestChanges": "Ajoute yon rezime oswa omwen yon kòmantè pou mande chanjman.",
       "blockedComment": "Ajoute yon rezime oswa omwen yon kòmantè pou pibliye yon revizyon kòm kòmantè."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Pull request pou REVIEW.md ouvri",
       "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
       "status": {
+        "open": "Louvri",
         "edited": "Modifye",
         "opening_change_request": "Ap ouvri PR",
         "change_request_failed": "Ouvèti PR la echwe",
@@ -1614,6 +1620,8 @@
       "set": "Konfigire",
       "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
+      "nSelected_one": "{{displayCount}} chwazi",
+      "nSelected_other": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Rezon ki jistifye si li ka eksplwate",
       "suggestedFix": "Koreksyon ki rekòmande",
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_one": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_other": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
       "no": "Non",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} mwayen ak ba",
       "dueThisWeek": "Dat limit semèn sa a",
       "dueThisWeekDetail": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_one": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_other": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
       "noDeadline": "Pa gen dat limit",
       "reviewSlaAssignment": "Revize SLA ki asiyen yo",
       "allOpenFindingsTracked": "Tout konsta ouvè yo gen swivi"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
       "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
       "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
+      "syncNoRepositoriesNoManage": "Pa gen okenn depo nan sijè senkronizasyon an. Yon pwopriyetè òganizasyon, yon administratè oswa yon responsab faktirasyon dwe konekte depo yo anvan li ka senkronize.",
       "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
       "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò.",
       "configConflict": "Paramèt Ajan sekirite a chanje yon lòt kote. Revize paramèt ki pi resan yo epi anrejistre ankò."
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
     "thresholdTitle": "Depasman papòt",
-    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "thresholdSubtitle": "Depans aktyèl la pou sektè sa a nan fenèt ou chwazi a depase limit ou",
     "anomalyTitle": "Ogmantasyon chak èdtan",
-    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "anomalySubtitle": "Vitès chak èdtan sektè sa a byen pi wo pase bazliy p95 pa li menm",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Fenèt",
     "window24h": "24 èdtan",
@@ -3796,14 +3809,14 @@
     "saved": "Paramèt alèt depans yo anrejistre",
     "loadError": "Pa t kapab chaje alèt depans yo.",
     "saveError": "Pa t kapab anrejistre alèt depans yo.",
-    "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
-    "noSpend": "Poko gen depans ki anrejistre",
+    "sendAlerts": "Voye alèt depans",
+    "noSpend": "Poko gen depans",
     "spend24h": "Depans nan 24 èdtan ki sot pase yo",
     "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon",
     "multiplierMaxError": "Antre yon miltiplikatè {{max}} oswa mwens",
-    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens."
+    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens"
   },
   "profiles": {
     "title": "Pwofil yo",

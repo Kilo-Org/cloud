@@ -442,7 +442,6 @@
         "rebase": "Msingi upya"
       },
       "terminal": {
-        "alreadyMerged": "Tayari limeunganishwa",
         "closed": "Ombi hili la kuunganisha limefungwa",
         "closedMergeRequest": "Ombi hili la kuunganisha limefungwa"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Ukaguzi unaohitajika haupo",
         "requiredReviewsDetail": "Idhini za wakaguzi wanaohitajika hazipo au bado zinasubiriwa.",
         "failingChecksTitle": "Vipimo vinavyohitajika havifaulu",
-        "failingChecksDetail": "Vipimo vya hali vinavyohitajika havifaulu.",
         "unstableTitle": "Baadhi ya vipimo havifaulu",
         "unstableDetail": "Vipimo visivyo vya lazima havifaulu. Havitazuia kuunganisha.",
         "draftTitle": "Rasimu ya ombi la kuunganisha",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Imeshindikana kuangalia muunganisho wa Bitbucket.",
       "providerCheckFailedMessage": "Hali ya muunganisho haipatikani hadi hii ipakie.",
       "reconnectTitle": "Unganisha GitHub tena",
+      "reconnectTitleGitLab": "Unganisha GitLab tena",
+      "reconnectTitleBitbucket": "Unganisha Bitbucket tena",
       "reconnectDescription": "Ruhusa ya muunganisho wako wa GitHub imebatilishwa.",
       "gitlabDescription": "Kagua maombi ya kuunganisha kwenye simu",
       "gitlabInstanceMismatchTitle": "Muunganisho wa GitLab ni wa mfumo mwingine",
@@ -708,7 +708,12 @@
       "pendingComment_other": "maoni yanayosubiri kutumwa",
       "submitCountOfTotal": "Wasilisha maoni {{displayFreshCount}} kati ya {{displayTotalCount}}",
       "submitReview": "Wasilisha ukaguzi",
-      "partialPostedMessage": "Maoni {{displayFreshCount}} yamechapishwa. Maoni {{displayStaleCount}} yanahusu rekodi ya zamani ya mabadiliko na yamebaki kwenye foleni yako.",
+      "partialPostedFresh": "Maoni {{displayFreshCount}} yamechapishwa. ",
+      "partialPostedFresh_one": "Maoni {{displayFreshCount}} yamechapishwa. ",
+      "partialPostedFresh_other": "Maoni {{displayFreshCount}} yamechapishwa. ",
+      "partialPostedStale": "Maoni {{displayStaleCount}} yanahusu rekodi ya zamani ya mabadiliko na yamebaki kwenye foleni yako.",
+      "partialPostedStale_one": "Maoni {{displayStaleCount}} yanahusu rekodi ya zamani ya mabadiliko na yamebaki kwenye foleni yako.",
+      "partialPostedStale_other": "Maoni {{displayStaleCount}} yanahusu rekodi ya zamani ya mabadiliko na yamebaki kwenye foleni yako.",
       "blockedRequestChanges": "Ongeza muhtasari au angalau maoni moja ili kuomba mabadiliko.",
       "blockedComment": "Ongeza muhtasari au angalau maoni moja ili kutuma ukaguzi wa maoni."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Ombi la kuunganisha mabadiliko ya REVIEW.md limefunguliwa",
       "alreadyPresent": "Mwongozo tayari upo kwenye REVIEW.md",
       "status": {
+        "open": "Bado wazi",
         "edited": "Limehaririwa",
         "opening_change_request": "Inafungua PR",
         "change_request_failed": "PR imeshindikana",
@@ -1614,6 +1620,8 @@
       "set": "Imewekwa",
       "notSet": "Haijawekwa",
       "nSelected": "{{displayCount}} zimechaguliwa",
+      "nSelected_one": "{{displayCount}} zimechaguliwa",
+      "nSelected_other": "{{displayCount}} zimechaguliwa",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Sababu za uwezekano wa kutumiwa vibaya",
       "suggestedFix": "Rekebisho linalopendekezwa",
       "whereFound": "Mahali tatizo lilipopatikana ({{displayCount}})",
+      "whereFound_one": "Mahali tatizo lilipopatikana ({{displayCount}})",
+      "whereFound_other": "Mahali tatizo lilipopatikana ({{displayCount}})",
       "fullReport": "Ripoti kamili iliyotengenezwa",
       "yes": "Ndiyo",
       "no": "Hapana",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "kati na chini: {{displayCount}}",
       "dueThisWeek": "Muda unaisha wiki hii",
       "dueThisWeekDetail": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
+      "dueThisWeekDetail_one": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
+      "dueThisWeekDetail_other": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
       "noDeadline": "Hakuna muda wa mwisho",
       "reviewSlaAssignment": "Kagua upangaji wa muda wa SLA",
       "allOpenFindingsTracked": "Matatizo yote ambayo hayajafungwa yanafuatiliwa"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
+      "syncNoRepositoriesNoManage": "Hakuna hazina zilizo katika wigo wa usawazishaji. Mmiliki, msimamizi, au msimamizi wa bili wa shirika lazima aunganishe hazina kabla ya kusawazisha.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
       "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
       "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Inajaribu kunakili tena (jaribio la {{attempt}} kati ya {{total}})",
       "detailSetupCommandFailed": "Amri ya usanidi {{index}} imeshindikana",
       "detailSetupCommandTimedOut": "Amri ya usanidi {{index}} imeisha muda",
-      "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, faili {{applied}} kati ya {{total}} zimerejeshwa",
+      "detailColdRestore": "Urejeshi wa baridi, snapshot imetumika, urejeshi wa faili: {{applied}} kati ya {{total}}",
       "detailProgressPercent": "{{percent}}% imekamilika",
-      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika: faili {{skipped}} kati ya {{total}} hazikurejeshwa ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Urejeshi wa kikao haujakamilika — faili bila urejeshi: {{skipped}} kati ya {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Zinazokosekana: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} na nyingine {{omitted}}",
       "detailReasonPatchFailed": "patch haikutumika",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
     "thresholdTitle": "Kuvuka kizingiti",
-    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "thresholdSubtitle": "Matumizi yanayoendelea ya wigo huu kwenye kipindi ulichochagua yanapita kikomo chako",
     "anomalyTitle": "Kuongezeka kwa saa",
-    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "anomalySubtitle": "Kiwango cha matumizi kwa saa cha wigo huu kiko juu sana kuliko msingi wake wa p95",
     "limitLabel": "Kikomo (USD)",
     "windowLabel": "Kipindi",
     "window24h": "Saa 24",
@@ -3796,14 +3809,14 @@
     "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
     "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
     "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
-    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
-    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "sendAlerts": "Tuma tahadhari",
+    "noSpend": "Hakuna matumizi bado",
     "spend24h": "Matumizi katika saa 24 zilizopita",
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa",
     "multiplierMaxError": "Weka kizidishi cha {{max}} au chini",
-    "thresholdMaxError": "Weka kiasi cha {{max}} au chini."
+    "thresholdMaxError": "Weka kiasi cha {{max}} au chini"
   },
   "profiles": {
     "title": "Wasifu",

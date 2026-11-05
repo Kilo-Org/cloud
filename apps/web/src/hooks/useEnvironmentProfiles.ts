@@ -1,6 +1,6 @@
 'use client';
 
-import { resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { appliesRepoBindings, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import {
   useCombinedProfiles,
   useProfile,
@@ -13,10 +13,13 @@ export function useEnvironmentProfiles({
   organizationId,
   repository,
   selectedProfileId,
+  environment,
 }: {
   organizationId?: string;
   repository?: { platform: string; fullName: string };
   selectedProfileId?: string | null;
+  /** The environment being edited or used. A V2 environment skips the repo binding; the effective default still applies. */
+  environment?: { repositories?: unknown } | null;
 }) {
   const personal = useProfiles({ enabled: !organizationId });
   const combined = useCombinedProfiles({
@@ -25,8 +28,9 @@ export function useEnvironmentProfiles({
   });
   const bindings = useRepoBindings({ organizationId });
   const summaries = organizationId ? combined.data?.allProfiles : personal.data;
+  const binds = appliesRepoBindings(environment);
   const binding =
-    repository?.platform === 'bitbucket'
+    !binds || repository?.platform === 'bitbucket'
       ? undefined
       : bindings.data?.find(
           candidate =>

@@ -1052,6 +1052,7 @@
       "prOpened": "נפתחה בקשת משיכה עבור REVIEW.md",
       "alreadyPresent": "ההנחיות כבר קיימות בקובץ REVIEW.md",
       "status": {
+        "open": "פתוחה",
         "edited": "נערכה",
         "opening_change_request": "פתיחת PR מתבצעת",
         "change_request_failed": "פתיחת PR נכשלה",
@@ -1087,6 +1088,9 @@
     "overview": {
       "allAreas": "כל התחומים",
       "nSelected": "{{displayCount}} נבחרו",
+      "nSelected_one": "{{displayCount}} נבחרו",
+      "nSelected_other": "{{displayCount}} נבחרו",
+      "nSelected_two": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
       "set": "הוגדר",
       "notSet": "לא הוגדר"
@@ -1186,6 +1190,9 @@
       "triageReasoning": "נימוקי המיון הראשוני",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_one": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_two": "מיקומי הממצא ({{displayCount}})",
+      "whereFound_other": "מיקומי הממצא ({{displayCount}})",
       "yes": "כן",
       "action": {
         "analyzeCodebase": "נתח את בסיס הקוד",
@@ -1355,6 +1362,9 @@
       "breakdownMediumLow_other": "{{displayCount}} בדרגת חומרה בינונית ונמוכה",
       "dueThisWeek": "המועד האחרון חל השבוע",
       "dueThisWeekDetail": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_one": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_two": "{{exploitable}} מהם אושרו כניתנים לניצול",
+      "dueThisWeekDetail_other": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
       "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
@@ -1550,6 +1560,7 @@
       "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
       "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
       "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
+      "syncNoRepositoriesNoManage": "אין מאגרים בהיקף הסנכרון. על בעל ארגון, מנהל או מנהל חיובים לחבר מאגרים לפני שניתן לסנכרן.",
       "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
       "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב.",
       "configConflict": "ההגדרות של סוכן האבטחה שונו במקום אחר. בדוק את ההגדרות העדכניות ושמור שוב."
@@ -2094,9 +2105,9 @@
       "detailRetryingClone": "משבט שוב (ניסיון {{attempt}} מתוך {{total}})",
       "detailSetupCommandFailed": "פקודת ההכנה {{index}} נכשלה",
       "detailSetupCommandTimedOut": "פקודת ההכנה {{index}} חרגה מהזמן",
-      "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שוחזרו {{applied}} מתוך {{total}} קבצים",
+      "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שחזור קבצים: {{applied}} מתוך {{total}}",
       "detailProgressPercent": "{{percent}}% הושלם",
-      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם: {{skipped}} מתוך {{total}} קבצים לא שוחזרו ({{reasons}}).",
+      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם, קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "חסרים: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ועוד {{omitted}}",
       "detailReasonPatchFailed": "הטלאי לא הוחל",
@@ -2748,6 +2759,8 @@
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
       "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
+      "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
+      "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל.",
       "gitlabDescription": "סקירת בקשות מיזוג בנייד",
       "gitlabInstanceMismatchTitle": "חיבור GitLab מיועד למופע אחר",
@@ -3037,7 +3050,6 @@
         "squash": "איחוד קומיטים"
       },
       "terminal": {
-        "alreadyMerged": "כבר מוזגה",
         "closed": "בקשת המשיכה הזו סגורה",
         "closedMergeRequest": "בקשת המיזוג הזו סגורה"
       },
@@ -3054,7 +3066,6 @@
         "requiredReviewsTitle": "חסרות סקירות נדרשות",
         "requiredReviewsDetail": "חסרים אישורים מהסוקרים הנדרשים, או שעדיין ממתינים להם.",
         "failingChecksTitle": "בדיקות חובה נכשלו",
-        "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלו.",
         "unstableTitle": "חלק מהבדיקות נכשלו",
         "unstableDetail": "בדיקות שאינן חובה נכשלו. הן לא יחסמו את המיזוג.",
         "draftTitle": "טיוטת PR",
@@ -3164,7 +3175,14 @@
       "pendingComment_other": "תגובות ממתינות",
       "pendingComment_one": "תגובה ממתינה",
       "summaryOptional": "סיכום (לא חובה)",
-      "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedFresh": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_one": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_two": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedFresh_other": "פורסמו {{displayFreshCount}} תגובות. ",
+      "partialPostedStale": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_one": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_two": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "partialPostedStale_other": "{{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
       "pendingComment_two": "תגובות ממתינות",
@@ -3835,9 +3853,9 @@
   "spendAlerts": {
     "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
     "thresholdTitle": "חציית סף",
-    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "thresholdSubtitle": "ההוצאה המצטברת של תחום זה בחלון הנבחר חוצה את המגבלה שלך",
     "anomalyTitle": "זינוק שעתי",
-    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "anomalySubtitle": "הקצב השעתי של תחום זה גבוה בהרבה מקו הבסיס p95 שלו",
     "limitLabel": "מגבלה (USD)",
     "windowLabel": "חלון",
     "window24h": "24 שעות",
@@ -3847,14 +3865,14 @@
     "saved": "הגדרות התראות ההוצאות נשמרו",
     "loadError": "לא ניתן לטעון את התראות ההוצאות.",
     "saveError": "לא ניתן לשמור את התראות ההוצאות.",
-    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
-    "noSpend": "עדיין לא נרשמה הוצאה",
+    "sendAlerts": "שלח התראות",
+    "noSpend": "אין עדיין הוצאות",
     "spend24h": "הוצאה ב־24 השעות האחרונות",
     "multiplierError": "הזן מכפיל של 1 או יותר",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות",
     "multiplierMaxError": "הזן מכפיל של {{max}} או פחות",
-    "thresholdMaxError": "הזן סכום של {{max}} או פחות."
+    "thresholdMaxError": "הזן סכום של {{max}} או פחות"
   },
   "profiles": {
     "title": "פרופילים",

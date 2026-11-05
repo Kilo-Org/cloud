@@ -2,17 +2,24 @@ import {
   ENKRYPT_DETECTOR_IDS,
   ENKRYPT_DETECTOR_LIMITS,
   EnkryptInputDetectorsSchema,
+  EnkryptOutputDetectorsSchema,
   type EnkryptInputDetectors,
+  type EnkryptOutputDetectors,
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
 import {
   blockingEnkryptDetectorIds,
+  blockingEnkryptOutputDetectorIds,
   buildEnkryptDetectRequestDetectors,
+  createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
+  enabledEnkryptDetectorIds,
+  enabledEnkryptOutputDetectorIds,
   ENKRYPT_BLOCK_DETECTOR_IDS,
   ENKRYPT_DETECTOR_TYPES,
   ENKRYPT_REVISE_DETECTOR_IDS,
   ENKRYPT_SUMMARY_DETECTORS,
+  enkryptOutputDetectorsAsInputDetectors,
 } from './detectors';
 
 const rule: EnkryptPolicyRule = {
@@ -284,5 +291,100 @@ describe('buildEnkryptDetectRequestDetectors', () => {
     detectors.injection_attack.enabled = false;
     detectors.pii.enabled = false;
     expect(buildEnkryptDetectRequestDetectors(detectors)).toEqual({});
+  });
+});
+
+function allOutputEnabled(): EnkryptOutputDetectors {
+  return {
+    pii: { enabled: true, action: 'block', entities: ['pii', 'secrets'] },
+    keyword_detector: { enabled: true, action: 'log', banned_keywords: ['Project Phoenix'] },
+    topic_detector: { enabled: true, action: 'block', topic: ['weapons'] },
+    policy_violation: {
+      enabled: true,
+      action: 'log',
+      format: 'policy_text',
+      policy_text: 'Do not share customer data.',
+      rules: [rule],
+    },
+    toxicity: { enabled: true, action: 'block' },
+    nsfw: { enabled: true, action: 'log' },
+    bias: { enabled: true, action: 'block' },
+  };
+}
+
+describe('createEmptyEnkryptOutputDetectors', () => {
+  it('is a valid configuration with no detector enabled', () => {
+    const detectors = createEmptyEnkryptOutputDetectors();
+
+    expect(EnkryptOutputDetectorsSchema.safeParse(detectors).success).toBe(true);
+    expect(enabledEnkryptOutputDetectorIds(detectors)).toEqual([]);
+    expect(blockingEnkryptOutputDetectorIds(detectors)).toEqual([]);
+  });
+
+  it('accepts every output detector enabled', () => {
+    expect(EnkryptOutputDetectorsSchema.safeParse(allOutputEnabled()).success).toBe(true);
+  });
+});
+
+describe('enabledEnkryptOutputDetectorIds', () => {
+  it('lists enabled output detectors in detector order', () => {
+    const detectors = allOutputEnabled();
+    detectors.keyword_detector.enabled = false;
+    detectors.nsfw.enabled = false;
+
+    expect(enabledEnkryptOutputDetectorIds(detectors)).toEqual([
+      'pii',
+      'topic_detector',
+      'policy_violation',
+      'toxicity',
+      'bias',
+    ]);
+  });
+});
+
+describe('blockingEnkryptOutputDetectorIds', () => {
+  it('blocks only on enabled detectors set to block', () => {
+    const detectors = allOutputEnabled();
+    detectors.bias.enabled = false;
+
+    expect(blockingEnkryptOutputDetectorIds(detectors)).toEqual([
+      'pii',
+      'topic_detector',
+      'toxicity',
+    ]);
+  });
+});
+
+describe('enkryptOutputDetectorsAsInputDetectors', () => {
+  it('keeps each output detector setting and disables prompt-only detectors', () => {
+    const detectors = allOutputEnabled();
+    const input = enkryptOutputDetectorsAsInputDetectors(detectors);
+
+    expect(EnkryptInputDetectorsSchema.safeParse(input).success).toBe(true);
+    expect(input).toEqual({
+      injection_attack: { enabled: false },
+      pii: detectors.pii,
+      keyword_detector: detectors.keyword_detector,
+      topic_detector: { enabled: true, topic: ['weapons'] },
+      policy_violation: {
+        enabled: true,
+        format: 'policy_text',
+        policy_text: 'Do not share customer data.',
+        rules: [rule],
+      },
+      toxicity: { enabled: true },
+      nsfw: { enabled: true },
+      bias: detectors.bias,
+      sponge_attack: { enabled: false },
+    });
+    expect(enabledEnkryptDetectorIds(input)).toEqual(enabledEnkryptOutputDetectorIds(detectors));
+  });
+
+  it('keeps disabled output detectors disabled', () => {
+    expect(
+      enabledEnkryptDetectorIds(
+        enkryptOutputDetectorsAsInputDetectors(createEmptyEnkryptOutputDetectors())
+      )
+    ).toEqual([]);
   });
 });

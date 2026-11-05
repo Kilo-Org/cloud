@@ -52,10 +52,12 @@
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
     "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts",
-    "web:env": "tsx scripts/web-env/index.ts"
+    "web:env": "tsx scripts/web-env/index.ts",
+    "dev:mobile:diagnostics": "tsx dev/local/mobile-diagnostics.ts"
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
+    "@expo/agent-cli": "1.0.22",
     "@expo/fingerprint": "~0.21.5",
     "@kilocode/db": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",

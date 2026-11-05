@@ -442,7 +442,6 @@
         "rebase": "Pag-rebase"
       },
       "terminal": {
-        "alreadyMerged": "Na-merge na",
         "closed": "Nakasara ang pull request na ito",
         "closedMergeRequest": "Nakasara ang merge request na ito"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Kulang ang mga kinakailangang pagsusuri",
         "requiredReviewsDetail": "Kulang o hinihintay pa ang pag-apruba ng mga kinakailangang tagasuri.",
         "failingChecksTitle": "Hindi pumasa ang mga kinakailangang pagsusuri",
-        "failingChecksDetail": "Hindi pumasa ang mga kinakailangang pagsusuri ng status.",
         "unstableTitle": "May mga pagsusuring hindi pumasa",
         "unstableDetail": "Hindi pumasa ang ilang opsyonal na pagsusuri. Hindi nito pipigilan ang pag-merge.",
         "draftTitle": "Burador na PR",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Hindi masuri ang koneksyon sa Bitbucket.",
       "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
+      "reconnectTitleGitLab": "Kumonekta muli sa GitLab",
+      "reconnectTitleBitbucket": "Kumonekta muli sa Bitbucket",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub.",
       "gitlabDescription": "Suriin ang mga merge request sa mobile",
       "gitlabInstanceMismatchTitle": "Ang koneksyon sa GitLab ay para sa ibang instance",
@@ -708,7 +708,12 @@
       "pendingComment_other": "na nakabinbing komento",
       "submitCountOfTotal": "Isumite ang {{displayFreshCount}} sa {{displayTotalCount}} na komento",
       "submitReview": "Isumite ang pagsusuri",
-      "partialPostedMessage": "Na-post ang {{displayFreshCount}} na komento. Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedFresh": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_one": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedFresh_other": "Na-post ang {{displayFreshCount}} na komento. ",
+      "partialPostedStale": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_one": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
+      "partialPostedStale_other": "Tumutukoy sa mas lumang commit ang {{displayStaleCount}} na komento, kaya nanatili ang mga ito sa pila mo.",
       "blockedRequestChanges": "Magdagdag ng buod o kahit isang komento para humingi ng pagbabago.",
       "blockedComment": "Magdagdag ng buod o kahit isang komento para makapagsumite ng pagsusuri na komento lang."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
       "alreadyPresent": "Nasa REVIEW.md na ang gabay",
       "status": {
+        "open": "Nakaopen",
         "edited": "Na-edit",
         "opening_change_request": "Binubuksan ang PR",
         "change_request_failed": "Nabigong buksan ang PR",
@@ -1614,6 +1620,8 @@
       "set": "Nakatakda",
       "notSet": "Hindi nakatakda",
       "nSelected": "{{displayCount}} napili",
+      "nSelected_one": "{{displayCount}} napili",
+      "nSelected_other": "{{displayCount}} napili",
       "proposedReviewMdGuidance": "Iminungkahing gabay sa REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Batayan kung maaaring samantalahin",
       "suggestedFix": "Iminungkahing pag-aayos",
       "whereFound": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_one": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
+      "whereFound_other": "Mga lokasyon kung saan ito natukoy ({{displayCount}})",
       "fullReport": "Buong nabuong ulat",
       "yes": "Oo",
       "no": "Hindi",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_one": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail_other": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"
@@ -2076,6 +2088,7 @@
       "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
       "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
       "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
+      "syncNoRepositoriesNoManage": "Walang mga repositoryo sa saklaw ng pag-sync. Kailangan ng may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta ang mga repositoryo bago ito maisync.",
       "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
       "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli.",
       "configConflict": "Nagbago ang mga setting ng Ahente sa seguridad sa ibang lugar. Suriin ang pinakabagong mga setting at i-save muli."
@@ -2612,9 +2625,9 @@
       "detailRetryingClone": "Sumusubok ulit i-clone (pagsubok {{attempt}} sa {{total}})",
       "detailSetupCommandFailed": "Nabigo ang utos sa paghahanda {{index}}",
       "detailSetupCommandTimedOut": "Nag-time out ang utos sa paghahanda {{index}}",
-      "detailColdRestore": "Cold restore, nailapat ang snapshot, {{applied}} sa {{total}} files ang nabalik",
+      "detailColdRestore": "Cold restore, nailapat ang snapshot, nabalik na files: {{applied}} sa {{total}}",
       "detailProgressPercent": "{{percent}}% kumpleto",
-      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session: {{skipped}} sa {{total}} files ang hindi naibalik ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session, hindi naibalik na files: {{skipped}} sa {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Nawawala: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} at {{omitted}} pa",
       "detailReasonPatchFailed": "hindi naaplay ang patch",
@@ -3790,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
     "thresholdTitle": "Paglampas sa hangganan",
-    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ng saklaw na ito sa loob ng napiling panahon ay lumampas sa iyong limitasyon",
     "anomalyTitle": "Pagtaas bawat oras",
-    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "anomalySubtitle": "Ang rate ng saklaw na ito bawat oras ay malayo sa itaas ng sarili nitong p95 baseline",
     "limitLabel": "Limitasyon (USD)",
     "windowLabel": "Panahon",
     "window24h": "24 na oras",
@@ -3802,14 +3815,14 @@
     "saved": "Nai-save ang mga setting ng babala sa gastos",
     "loadError": "Hindi ma-load ang mga babala sa gastos.",
     "saveError": "Hindi mai-save ang mga babala sa gastos.",
-    "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
-    "noSpend": "Wala pang naitalang gastos",
+    "sendAlerts": "Magpadala ng babala",
+    "noSpend": "Wala pang gastos",
     "spend24h": "Gastos sa nakalipas na 24 na oras",
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso",
     "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
-    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa"
   },
   "profiles": {
     "title": "Mga profile",

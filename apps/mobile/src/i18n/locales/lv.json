@@ -449,7 +449,6 @@
         "rebase": "Pārbāzēšana"
       },
       "terminal": {
-        "alreadyMerged": "Jau apvienots",
         "closed": "Izmaiņu pieprasījums ir slēgts",
         "closedMergeRequest": "Šis merge request ir slēgts"
       },
@@ -466,7 +465,6 @@
         "requiredReviewsTitle": "Trūkst obligāto vērtējumu",
         "requiredReviewsDetail": "Vēl nav saņemti apstiprinājumi no visiem obligātajiem pārskatītājiem.",
         "failingChecksTitle": "Nesekmīgas obligātās pārbaudes",
-        "failingChecksDetail": "Obligātās statusa pārbaudes ir nesekmīgas.",
         "unstableTitle": "Dažas pārbaudes ir nesekmīgas",
         "unstableDetail": "Neobligātās pārbaudes ir nesekmīgas. Tās netraucēs apvienošanu.",
         "draftTitle": "Izmaiņu pieprasījuma melnraksts",
@@ -696,6 +694,8 @@
       "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
       "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
+      "reconnectTitleGitLab": "Atkārtoti savienot GitLab",
+      "reconnectTitleBitbucket": "Atkārtoti savienot Bitbucket",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve.",
       "gitlabDescription": "Pārbaudīt merge requests mobilajā ierīcē",
       "gitlabInstanceMismatchTitle": "GitLab savienojums ir paredzēts citai instancei",
@@ -723,7 +723,14 @@
       "pendingComment_other": "neiesniegti komentāri",
       "submitCountOfTotal": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatīšanas rezultātus",
-      "partialPostedMessage": "Publicēto komentāru skaits: {{displayFreshCount}}. Komentāru skaits par vecāku komitu: {{displayStaleCount}}. Tie palika tavā rindā.",
+      "partialPostedFresh": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
+      "partialPostedFresh_zero": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
+      "partialPostedStale": "Komentāru skaits par vecāku komitu: {{displayStaleCount}}. Tie palika tavā rindā.",
+      "partialPostedStale_zero": "Komentāru skaits par vecāku komitu: {{displayStaleCount}}. Tie palika tavā rindā.",
+      "partialPostedStale_one": "Komentāru skaits par vecāku komitu: {{displayStaleCount}}. Tie palika tavā rindā.",
+      "partialPostedStale_other": "Komentāru skaits par vecāku komitu: {{displayStaleCount}}. Tie palika tavā rindā.",
       "pendingComment_zero": "neiesniegtu komentāru",
       "blockedRequestChanges": "Pievieno kopsavilkumu vai vismaz vienu komentāru, lai pieprasītu izmaiņas.",
       "blockedComment": "Pievieno kopsavilkumu vai vismaz vienu komentāru, lai iesniegtu komentējošu vērtējumu."
@@ -1549,6 +1556,7 @@
       "prOpened": "Atvērts PR failam REVIEW.md",
       "alreadyPresent": "Norādījumi jau ir REVIEW.md failā",
       "status": {
+        "open": "Atvērts",
         "edited": "Rediģēts",
         "opening_change_request": "Tiek atvērts PR",
         "change_request_failed": "Neizdevās atvērt PR",
@@ -1636,6 +1644,9 @@
       "set": "Iestatīts",
       "notSet": "Nav iestatīts",
       "nSelected": "Atlasīts: {{displayCount}}",
+      "nSelected_one": "Atlasīts: {{displayCount}}",
+      "nSelected_other": "Atlasīts: {{displayCount}}",
+      "nSelected_zero": "Atlasīts: {{displayCount}}",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
     },
     "decision": {
@@ -1771,6 +1782,9 @@
       "exploitabilityReasoning": "Izmantojamības uzbrukumā pamatojums",
       "suggestedFix": "Ieteiktais labojums",
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
+      "whereFound_zero": "Konstatējuma atrašanās vietas ({{displayCount}})",
+      "whereFound_one": "Konstatējuma atrašanās vietas ({{displayCount}})",
+      "whereFound_other": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
       "yes": "Jā",
       "no": "Nē",
@@ -1857,6 +1871,9 @@
       "breakdownMediumLow_other": "vidēja un zema pakāpe: {{displayCount}}",
       "dueThisWeek": "Termiņš šonedēļ",
       "dueThisWeekDetail": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
+      "dueThisWeekDetail_zero": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
+      "dueThisWeekDetail_one": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
+      "dueThisWeekDetail_other": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
       "noDeadline": "Nav termiņa",
       "reviewSlaAssignment": "Pārskatīt SLA termiņu piešķiršanu",
       "allOpenFindingsTracked": "Visiem atvērtajiem konstatējumiem tiek uzraudzīti termiņi"
@@ -2103,6 +2120,7 @@
       "actionFailed": "Neizdevās pabeigt šo darbību. Lūdzu, mēģini vēlreiz.",
       "actionBlocked": "Neizdevās pabeigt šo darbību. Vispirms jāatrisina problēma, lai varētu mēģināt vēlreiz.",
       "syncNoRepositories": "Sinhronizācijas tvērumā nav neviena repozitorija. Izvēlieties repozitorijus, kurus pārrauga Drošības aģents, un pēc tam sinhronizējiet vēlreiz.",
+      "syncNoRepositoriesNoManage": "Sinhronizācijas tvērumā nav neviena repozitorija. Organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam ir jāpievieno repozitoriji, pirms var sākt sinhronizāciju.",
       "syncIntegrationInactive": "Drošības aģenta GitHub savienojums nav aktīvs. Atkārtoti pievienojiet Kilo GitHub App un pēc tam sinhronizējiet vēlreiz.",
       "syncMissingPermission": "Kilo GitHub lietotne nevar lasīt ievainojamību brīdinājumus. Piešķir šo atļauju GitHub un pēc tam sinhronizē vēlreiz.",
       "configConflict": "Drošības aģenta iestatījumi ir mainīti citur. Pārskati jaunākos iestatījumus un saglabā vēlreiz."
@@ -2647,9 +2665,9 @@
       "detailRetryingClone": "Mēģina klonēt vēlreiz ({{attempt}}. mēģinājums no {{total}})",
       "detailSetupCommandFailed": "Sagatavošanas komanda {{index}} neizdevās",
       "detailSetupCommandTimedOut": "Sagatavošanas komandai {{index}} iestājās noilgums",
-      "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunoti {{applied}} no {{total}} failiem",
+      "detailColdRestore": "Aukstā atjaunošana, moments piemērots, atjaunotie faili: {{applied}} no {{total}}",
       "detailProgressPercent": "{{percent}}% pabeigti",
-      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta: {{skipped}} no {{total}} failiem netika atjaunoti ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sesijas atjaunošana nepabeigta, neizdevās atjaunot failus: {{skipped}} no {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Trūkst: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} un vēl {{omitted}}",
       "detailReasonPatchFailed": "iestākums netika piemērots",
@@ -3835,9 +3853,9 @@
   "spendAlerts": {
     "subtitle": "Sūti brīdinājumu pa e-pastu vai push ziņojumu norēķinu kontaktpersonām, kad šīs jomas izdevumi pārsniedz limitu vai pārlec virs ierastā stundas tempa.",
     "thresholdTitle": "Sliekšņa pārsniegums",
-    "thresholdSubtitle": "Tekošie izdevumi pārsniedz tavu limitu",
+    "thresholdSubtitle": "Šīs jomas tekošie izdevumi izvēlētajā logā pārsniedz tavu limitu",
     "anomalyTitle": "Stundas lēciens",
-    "anomalySubtitle": "Viena stunda ir krietni virs šīs jomas ierastā tempa",
+    "anomalySubtitle": "Šīs jomas stundas temps ir krietni virs tās pašas p95 pamatlīnijas",
     "limitLabel": "Limits (USD)",
     "windowLabel": "Logs",
     "window24h": "24 stundas",
@@ -3847,14 +3865,14 @@
     "saved": "Izdevumu brīdinājumu iestatījumi saglabāti",
     "loadError": "Neizdevās ielādēt izdevumu brīdinājumus.",
     "saveError": "Neizdevās saglabāt izdevumu brīdinājumus.",
-    "empty": "Izdevumu brīdinājumi ir izslēgti. Ieslēdz tos, lai brīdinātu šīs jomas norēķinu kontaktpersonas.",
-    "noSpend": "Izdevumi vēl nav reģistrēti",
+    "sendAlerts": "Sūtīt brīdinājumus",
+    "noSpend": "Vēl nav izdevumu",
     "spend24h": "Izdevumi pēdējo 24 stundu laikā",
     "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
     "pushOffByCategory": "Izslēgts paziņojumos",
     "multiplierMaxError": "Ievadi reizinātāju, kas ir {{max}} vai mazāks",
-    "thresholdMaxError": "Ievadi summu, kas ir {{max}} vai mazāka."
+    "thresholdMaxError": "Ievadi summu, kas ir {{max}} vai mazāka"
   },
   "profiles": {
     "title": "Profili",

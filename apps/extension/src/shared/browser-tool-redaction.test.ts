@@ -82,6 +82,59 @@ describe('body redaction', () => {
     );
   });
 
+  it('replaces every private-key field spelling in JSON bodies', () => {
+    expect(
+      redactSensitiveBody(
+        '{"private_key":"a","privateKey":"b","private-key":"c","client_email":"svc@example.com"}'
+      )
+    ).toBe(
+      JSON.stringify(
+        {
+          private_key: '[REDACTED]',
+          privateKey: '[REDACTED]',
+          'private-key': '[REDACTED]',
+          client_email: 'svc@example.com',
+        },
+        null,
+        2
+      )
+    );
+  });
+
+  it('replaces private-key material whatever its JSON key or array position', () => {
+    const pem = '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody';
+
+    expect(
+      redactSensitiveBody(JSON.stringify({ items: [{ note: 'kept' }, pem], material: pem }))
+    ).toBe(
+      JSON.stringify({ items: [{ note: 'kept' }, '[REDACTED]'], material: '[REDACTED]' }, null, 2)
+    );
+  });
+
+  it('replaces typed private-key labels and leaves public key material', () => {
+    expect(
+      redactSensitiveBody(
+        JSON.stringify({
+          ec: '-----BEGIN EC PRIVATE KEY-----',
+          pgp: '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+          public: '-----BEGIN PUBLIC KEY-----',
+          cert: '-----BEGIN CERTIFICATE-----',
+        })
+      )
+    ).toBe(
+      JSON.stringify(
+        {
+          ec: '[REDACTED]',
+          pgp: '[REDACTED]',
+          public: '-----BEGIN PUBLIC KEY-----',
+          cert: '-----BEGIN CERTIFICATE-----',
+        },
+        null,
+        2
+      )
+    );
+  });
+
   it('matches keys case-insensitively and walks arrays', () => {
     expect(redactSensitiveBody('[{"Token":"t1"},{"ok":true}]')).toBe(
       JSON.stringify([{ Token: '[REDACTED]' }, { ok: true }], null, 2)
@@ -91,6 +144,17 @@ describe('body redaction', () => {
   it('returns undefined for non-object JSON scalars', () => {
     expect(redactSensitiveBody('"just a string"')).toBeUndefined();
     expect(redactSensitiveBody('42')).toBeUndefined();
+  });
+
+  it('keeps the unstructured pass when a JSON body is nested beyond the walk', () => {
+    // A body nested far past the walk's recursion budget still returns, so the
+    // Renderer keeps the body instead of the tool call failing.
+    let body = '"leaf"';
+    for (let index = 0; index < 200_000; index += 1) {
+      body = `{"a":${body}}`;
+    }
+
+    expect(redactSensitiveBody(body)).toBeUndefined();
   });
 
   it('replaces urlencoded listed-key values only', () => {
@@ -266,6 +330,155 @@ describe('body redaction', () => {
     );
   });
 
+  it('replaces a form value that holds private-key material under any name', () => {
+    const pem = '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody';
+
+    expect(redactSensitiveBody(`user=ada&material=${encodeURIComponent(pem)}&flag=true`)).toBe(
+      'user=ada&material=[REDACTED]&flag=true'
+    );
+  });
+
+  it('replaces a form value whose spaces are plus signs', () => {
+    expect(redactSensitiveBody('material=-----BEGIN+OPENSSH+PRIVATE+KEY-----&flag=true')).toBe(
+      'material=[REDACTED]&flag=true'
+    );
+  });
+
+  it('leaves a form value with a malformed escape unmatched instead of throwing', () => {
+    expect(redactSensitiveBody('material=%E0%A4%A&flag=true')).toBeUndefined();
+  });
+
+  it('replaces a multipart part value that holds private-key material under any name', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="username"',
+      '',
+      'ada',
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="material"',
+      '',
+      '-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="username"',
+        '',
+        'ada',
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="material"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('keeps a following part masked when an earlier part has no blank separator', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="username"',
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name="password"',
+      '',
+      'hunter2',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="username"',
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name="password"',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('replaces a pem block in a plain text body and keeps the surrounding text', () => {
+    const block = '-----BEGIN EC PRIVATE KEY-----MIIEfixtureBody-----END EC PRIVATE KEY-----';
+
+    expect(redactSensitiveBody(['downloaded material', block, 'trailer'].join('\n'))).toBe(
+      ['downloaded material', '[REDACTED]', 'trailer'].join('\n')
+    );
+  });
+
+  it('replaces a multipart part value when the name is unquoted', () => {
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data; name=password',
+      '',
+      'hunter2',
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data; name=password',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('replaces a pem block in a file part that carries no name', () => {
+    const block = '-----BEGIN EC PRIVATE KEY-----MIIEfixtureBody-----END EC PRIVATE KEY-----';
+    const body = [
+      '--BOUNDARY',
+      'Content-Disposition: form-data',
+      'Content-Type: application/octet-stream',
+      '',
+      block,
+      '--BOUNDARY--',
+      '',
+    ].join('\r\n');
+
+    expect(redactSensitiveBody(body)).toBe(
+      [
+        '--BOUNDARY',
+        'Content-Disposition: form-data',
+        'Content-Type: application/octet-stream',
+        '',
+        '[REDACTED]',
+        '--BOUNDARY--',
+        '',
+      ].join('\r\n')
+    );
+  });
+
+  it('replaces a pgp armored block in a plain text body', () => {
+    const block = [
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      'MIIEfixtureBody',
+      '-----END PGP PRIVATE KEY BLOCK-----',
+    ].join('\n');
+
+    expect(redactSensitiveBody(['downloaded material', block, 'trailer'].join('\n'))).toBe(
+      ['downloaded material', '[REDACTED]', 'trailer'].join('\n')
+    );
+  });
+
+  it('replaces a block in a form segment that carries no separator', () => {
+    expect(
+      redactSensitiveBody(
+        'password=hunter2&-----BEGIN RSA PRIVATE KEY-----MIIEfixtureBody&flag=true'
+      )
+    ).toBe('password=[REDACTED]&[REDACTED]');
+  });
+
   it('returns undefined for free-text bodies', () => {
     expect(redactSensitiveBody('plain text body')).toBeUndefined();
   });
@@ -281,6 +494,16 @@ describe('base64 body redaction', () => {
   it('replaces listed pairs in a base64 urlencoded body', () => {
     expect(redactSensitiveBase64Body(encode('user=ada&password=hunter2'))).toBe(
       'user=ada&password=[REDACTED]'
+    );
+  });
+
+  it('replaces private-key material in a base64 JSON body', () => {
+    const body = encode(
+      JSON.stringify({ material: '-----BEGIN ENCRYPTED PRIVATE KEY-----MIIEfixtureBody' })
+    );
+
+    expect(redactSensitiveBase64Body(body)).toBe(
+      JSON.stringify({ material: '[REDACTED]' }, null, 2)
     );
   });
 
@@ -323,6 +546,20 @@ describe('response body rendering', () => {
     expect(renderResponseBody(encode('{"ok":true}'), true)).toBe(
       `(base64) ${encode('{"ok":true}')}`
     );
+  });
+
+  it('replaces a pem block in a plain body', () => {
+    const block = '-----BEGIN EC PRIVATE KEY-----MIIEfixtureBody-----END EC PRIVATE KEY-----';
+
+    expect(renderResponseBody(['material', block].join('\n'), false)).toBe(
+      ['material', '[REDACTED]'].join('\n')
+    );
+  });
+
+  it('marks a decoded body that carries a pem block', () => {
+    const block = '-----BEGIN EC PRIVATE KEY-----MIIEfixtureBody-----END EC PRIVATE KEY-----';
+
+    expect(renderResponseBody(encode(block), true)).toBe('(base64, decoded) [REDACTED]');
   });
 
   it('marks a decoded body', () => {

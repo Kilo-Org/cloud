@@ -442,7 +442,6 @@
         "rebase": "ປ່ຽນຖານ"
       },
       "terminal": {
-        "alreadyMerged": "ລວມແລ້ວ",
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
         "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "ຍັງຂາດການກວດທານທີ່ບັງຄັບ",
         "requiredReviewsDetail": "ຍັງບໍ່ໄດ້ຮັບການອະນຸມັດຈາກຜູ້ກວດທານທີ່ກຳນົດ ຫຼື ຍັງລໍຖ້າການອະນຸມັດຢູ່.",
         "failingChecksTitle": "ການກວດສອບທີ່ບັງຄັບບໍ່ຜ່ານ",
-        "failingChecksDetail": "ການກວດສອບສະຖານະທີ່ບັງຄັບບໍ່ຜ່ານ.",
         "unstableTitle": "ການກວດສອບບາງລາຍການບໍ່ຜ່ານ",
         "unstableDetail": "ການກວດສອບທີ່ບໍ່ບັງຄັບບໍ່ຜ່ານ. ຜົນນີ້ບໍ່ຂັດຂວາງການລວມ.",
         "draftTitle": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ Bitbucket ໄດ້.",
       "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
+      "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
+      "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
       "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
       "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",
@@ -708,7 +708,12 @@
       "pendingComment_other": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
       "submitCountOfTotal": "ສົ່ງຄຳເຫັນ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ລາຍການ",
       "submitReview": "ສົ່ງຜົນການກວດສອບ",
-      "partialPostedMessage": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedFresh": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedFresh_one": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedFresh_other": "ໂພດຄຳເຫັນແລ້ວ {{displayFreshCount}} ລາຍການ. ",
+      "partialPostedStale": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedStale_one": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
+      "partialPostedStale_other": "ຄຳເຫັນອີກ {{displayStaleCount}} ລາຍການອ້າງອີງຄອມມິດເກົ່າ ຈຶ່ງຍັງຢູ່ໃນຄິວຂອງທ່ານ.",
       "blockedRequestChanges": "ເພີ່ມບົດສະຫຼຸບ ຫຼື ຄຳເຫັນຢ່າງໜ້ອຍໜຶ່ງລາຍການເພື່ອຂໍໃຫ້ແກ້ໄຂ.",
       "blockedComment": "ເພີ່ມບົດສະຫຼຸບ ຫຼື ຄຳເຫັນຢ່າງໜ້ອຍໜຶ່ງລາຍການເພື່ອສົ່ງຜົນການກວດທານແບບໃຫ້ຄຳເຫັນ."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "ເປີດ PR ສຳລັບ REVIEW.md ແລ້ວ",
       "alreadyPresent": "ມີຄຳແນະນຳຢູ່ໃນ REVIEW.md ແລ້ວ",
       "status": {
+        "open": "ເປີດ",
         "edited": "ແກ້ໄຂແລ້ວ",
         "opening_change_request": "ກຳລັງເປີດ PR",
         "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
@@ -1614,6 +1620,8 @@
       "set": "ຕັ້ງຄ່າແລ້ວ",
       "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_one": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
+      "nSelected_other": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "ເຫດຜົນການປະເມີນວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ຫຼືບໍ່",
       "suggestedFix": "ວິທີແກ້ໄຂທີ່ແນະນຳ",
       "whereFound": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
+      "whereFound_one": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
+      "whereFound_other": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນສະບັບເຕັມ",
       "yes": "ແມ່ນ",
       "no": "ບໍ່ແມ່ນ",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "ປານກາງ ແລະ ຕ່ຳ {{displayCount}}",
       "dueThisWeek": "ຄົບກຳນົດອາທິດນີ້",
       "dueThisWeekDetail": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
+      "dueThisWeekDetail_one": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
+      "dueThisWeekDetail_other": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
       "noDeadline": "ບໍ່ມີວັນຄົບກຳນົດ",
       "reviewSlaAssignment": "ກວດທານການຕັ້ງກຳນົດ SLA",
       "allOpenFindingsTracked": "ຕິດຕາມບັນຫາທີ່ຍັງເປີດຢູ່ທັງໝົດແລ້ວ"
@@ -2070,6 +2082,7 @@
       "actionFailed": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ກະລຸນາລອງໃໝ່.",
       "actionBlocked": "ບໍ່ສາມາດສຳເລັດການດຳເນີນການນີ້ໄດ້. ຕ້ອງແກ້ໄຂບັນຫານີ້ກ່ອນຈຶ່ງຈະລອງໃໝ່ໄດ້.",
       "syncNoRepositories": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເລືອກ repository ທີ່ «ເອເຈນດ້ານຄວາມປອດໄພ» ຕິດຕາມ, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
+      "syncNoRepositoriesNoManage": "ບໍ່ມີ repository ໃດຢູ່ໃນຂອບເຂດການຊິງຄ໌. ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນ ຕ້ອງເຊື່ອມຕໍ່ repository ກ່ອນຈຶ່ງຈະຊິງຄ໌ໄດ້.",
       "syncIntegrationInactive": "ການເຊື່ອມຕໍ່ GitHub ສຳລັບ ເອເຈນດ້ານຄວາມປອດໄພ ບໍ່ໄດ້ເປີດໃຊ້ງານ. ເຊື່ອມຕໍ່ Kilo GitHub App ຄືນໃໝ່, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "syncMissingPermission": "Kilo GitHub App ບໍ່ສາມາດອ່ານ vulnerability alerts ໄດ້. ໃຫ້ສິດນັ້ນໃນ GitHub, ແລ້ວຊິງຄ໌ອີກຄັ້ງ.",
       "configConflict": "ການຕັ້ງຄ່າຂອງເອເຈນດ້ານຄວາມປອດໄພຖືກປ່ຽນແປງຢູ່ບ່ອນອື່ນ. ກວດເບິ່ງການຕັ້ງຄ່າລ່າສຸດແລ້ວບັນທຶກອີກຄັ້ງ."
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "ສົ່ງການແຈ້ງເຕືອນຜ່ານອີເມວ ຫຼື push ໄປຫາຜູ້ຕິດຕໍ່ການຮຽກເກັບເງິນ ເມື່ອການໃຊ້ຈ່າຍຂອງຂອບເຂດນີ້ຂ້າມຂີດຈຳກັດ ຫຼື ເພີ່ມຂຶ້ນເໜືອອັດຕາຕໍ່ຊົ່ວໂມງປົກກະຕິ.",
     "thresholdTitle": "ການຂ້າມຂີດຈຳກັດ",
-    "thresholdSubtitle": "ການໃຊ້ຈ່າຍປັດຈຸບັນຂ້າມຂີດຈຳກັດຂອງທ່ານ",
+    "thresholdSubtitle": "ການໃຊ້ຈ່າຍປັດຈຸບັນຂອງຂອບເຂດນີ້ໃນໄລຍະເວລາທີ່ເລືອກຂ້າມຂີດຈຳກັດຂອງທ່ານ",
     "anomalyTitle": "ການເພີ່ມຂຶ້ນຕໍ່ຊົ່ວໂມງ",
-    "anomalySubtitle": "ໜຶ່ງຊົ່ວໂມງສູງກວ່າອັດຕາປົກກະຕິຂອງຂອບເຂດນີ້ຫຼາຍ",
+    "anomalySubtitle": "ອັດຕາຊົ່ວໂມງຂອງຂອບເຂດນີ້ສູງກວ່າຄ່າພື້ນຖານ p95 ຂອງມັນເອງຫຼາຍ",
     "limitLabel": "ຂີດຈຳກັດ (USD)",
     "windowLabel": "ໄລຍະເວລາ",
     "window24h": "24 ຊົ່ວໂມງ",
@@ -3796,14 +3809,14 @@
     "saved": "ບັນທຶກການຕັ້ງຄ່າການແຈ້ງເຕືອນການໃຊ້ຈ່າຍແລ້ວ",
     "loadError": "ບໍ່ສາມາດໂຫຼດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍໄດ້.",
     "saveError": "ບໍ່ສາມາດບັນທຶກການແຈ້ງເຕືອນການໃຊ້ຈ່າຍໄດ້.",
-    "empty": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍປິດຢູ່. ເປີດມັນເພື່ອແຈ້ງເຕືອນຜູ້ຕິດຕໍ່ການຮຽກເກັບເງິນຂອງຂອບເຂດນີ້.",
-    "noSpend": "ຍັງບໍ່ມີການບັນທຶກການໃຊ້ຈ່າຍ",
+    "sendAlerts": "ສົ່ງການແຈ້ງເຕືອນ",
+    "noSpend": "ຍັງບໍ່ມີການໃຊ້ຈ່າຍ",
     "spend24h": "ການໃຊ້ຈ່າຍໃນ 24 ຊົ່ວໂມງຜ່ານມາ",
     "multiplierError": "ໃສ່ຕົວຄູນ 1 ຫຼື ຫຼາຍກວ່າ",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ.",
     "pushOffByCategory": "ປິດໃນການແຈ້ງເຕືອນ",
     "multiplierMaxError": "ໃສ່ຕົວຄູນ {{max}} ຫຼື ໜ້ອຍກວ່າ",
-    "thresholdMaxError": "ໃສ່ຈຳນວນເງິນ {{max}} ຫຼື ໜ້ອຍກວ່າ."
+    "thresholdMaxError": "ໃສ່ຈຳນວນເງິນ {{max}} ຫຼື ໜ້ອຍກວ່າ"
   },
   "profiles": {
     "title": "ໂປຣໄຟລ໌",

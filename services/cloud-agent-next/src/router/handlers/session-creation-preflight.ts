@@ -8,34 +8,41 @@ import {
   type EnvironmentForSession,
   type EnvironmentInlineArgs,
   type EnvironmentOwner,
-  type EnvironmentRepositoryIdentity,
   type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
-import { canonicalGitLabCloneUrl, repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
-import type {
-  SessionCreateRequest,
-  SessionRepositoryRequest,
-} from '../../session/session-requests.js';
+import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { launchRepositoryIdentity } from '../../session/environment-launch.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import {
+  assertEnvironmentRepositoriesAccess,
+  assertRepositoryAccessBeforeSessionCreation,
+} from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
-import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { assertRequestedRepositories } from './requested-environment-repositories.js';
+import { getSandboxSessionStub, type SessionStub } from '../../sandbox-session/session-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+
+const WEB_ORIGIN = 'cloud-agent-web';
 
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
-  'cloud-agent-web',
+  WEB_ORIGIN,
   'slack',
   'github',
   'linear',
@@ -78,32 +85,15 @@ function environmentOwnerForSession(
     : { type: 'user', id: ctx.userId };
 }
 
-/** The identity an environment is keyed by; none for a generic git repository. */
-function environmentRepositoryIdentity(
-  repository: SessionRepositoryRequest
-): EnvironmentRepositoryIdentity | undefined {
-  switch (repository.type) {
-    case 'github':
-      return { platform: 'github', repoFullName: repository.repo };
-    case 'gitlab': {
-      const cloneUrl = canonicalGitLabCloneUrl(repository.url);
-      return cloneUrl ? { platform: 'gitlab', cloneUrl } : undefined;
-    }
-    case 'bitbucket':
-      return {
-        platform: 'bitbucket',
-        workspaceUuid: repository.workspaceUuid,
-        repositoryUuid: repository.repositoryUuid,
-      };
-    case 'git':
-      return undefined;
-  }
-}
-
 /**
  * The environment of the session's repository. It applies on the same origins
  * as the implicit profile defaults; other origins (for example code review and
  * the security agent) run without it.
+ *
+ * Several environments can contain the repository. A client that selected one
+ * names it in `requestedEnvironment`. Without a selection, a client that marks
+ * `requireEnvironmentChoice` gets a conflict that names the environments, and
+ * every other client runs with no environment.
  */
 async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
@@ -112,13 +102,35 @@ async function resolveEnvironment(
   db?: WorkerDb
 ): Promise<EnvironmentForSession | null> {
   if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
-  const repository = environmentRepositoryIdentity(input.repository);
+  const repository = launchRepositoryIdentity(input.repository);
   if (!repository) return null;
 
-  return loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
+  const resolution = await loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
     owner: environmentOwnerForSession(ctx, input),
     repository,
+    ...(input.requestedEnvironment ? { environmentId: input.requestedEnvironment.id } : {}),
   });
+  switch (resolution.status) {
+    case 'match':
+      return resolution.environment;
+    case 'none':
+      return null;
+    case 'requested-not-found':
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'The selected environment was not found' });
+    case 'requested-without-repository':
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The selected environment does not contain this repository',
+      });
+    case 'conflict':
+      if (input.requireEnvironmentChoice !== true) return null;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: `Several environments contain this repository: ${resolution.environments
+          .map(environment => `"${environment.name}" (${environment.id})`)
+          .join(', ')}. Select one.`,
+      });
+  }
 }
 
 function inlineOverridesForResolution(input: SessionCreateRequest): EnvironmentInlineArgs {
@@ -241,6 +253,11 @@ export async function resolveEffectiveSessionConfiguration(
   db?: WorkerDb
 ): Promise<SessionCreateRequest> {
   const environment = await resolveEnvironment(ctx, input, policy, db);
+  assertRequestedRepositories({
+    environment: environment?.reference ?? null,
+    launch: launchRepositoryIdentity(input.repository),
+    requested: input.requestedEnvironment,
+  });
   // An environment resolves only under the implicit-defaults policy, so the
   // profile path always runs when one exists.
   const resolved = shouldResolveProfile(input, policy)
@@ -256,13 +273,82 @@ export async function resolveEffectiveSessionConfiguration(
     environmentSandboxAllocation: _clientAllocation,
     ...withoutEnvironment
   } = resolvedRequest;
-  if (!environment) return withoutEnvironment;
-  return {
+  let effectiveRequest: SessionCreateRequest = {
     ...withoutEnvironment,
-    environment: environment.reference,
-    ...(environment.sandboxAllocation
+    ...(environment ? { environment: environment.reference } : {}),
+    ...(environment?.sandboxAllocation
       ? { environmentSandboxAllocation: environment.sandboxAllocation }
       : {}),
+  };
+  // A saved allowlist enters the same runtime slot as explicit input, but only
+  // when the request named no policy. Full and legacy null policies are already
+  // the unrestricted default, so they need no write.
+  if (
+    environment?.egressMode === 'allowlist' &&
+    input.runtime?.egressMode === undefined &&
+    input.runtime?.egressAllowlist === undefined
+  ) {
+    effectiveRequest = {
+      ...effectiveRequest,
+      runtime: {
+        ...effectiveRequest.runtime,
+        egressMode: 'allowlist',
+        egressAllowlist: environment.egressAllowlist ?? [],
+      },
+    };
+  }
+  return effectiveRequest;
+}
+
+type InheritedEgressPolicy = {
+  egressMode: EgressMode;
+  egressAllowlist?: string[];
+  egressAudit?: boolean;
+};
+
+function parentPolicyUnavailableError(): TRPCError {
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Cloud Agent parent policy unavailable',
+  });
+}
+
+/**
+ * Reads the policy the authorized parent recorded when it was created. The
+ * environment's current settings do not apply to an existing parent.
+ */
+async function readParentEgressPolicy(
+  getStub: () => SessionStub,
+  authority: CloudAgentAuthority
+): Promise<InheritedEgressPolicy | undefined> {
+  let raw: unknown;
+  try {
+    raw = await withDORetry(getStub, parent => parent.getMetadata(), 'getMetadata');
+  } catch {
+    throw parentPolicyUnavailableError();
+  }
+
+  // The RPC returns the current grouped schema, but revalidate so a malformed
+  // or legacy payload cannot be read as an unrestricted parent.
+  const parsed = CurrentSessionMetadataSchema.safeParse(raw);
+  if (!parsed.success) throw parentPolicyUnavailableError();
+  const metadata = parsed.data;
+  if (
+    metadata.identity.sessionId !== authority.parentSessionId ||
+    metadata.identity.userId !== authority.ownerId ||
+    (metadata.identity.orgId ?? null) !== authority.organizationId
+  ) {
+    throw parentPolicyUnavailableError();
+  }
+
+  const workspace = metadata.workspace;
+  if (workspace?.egressMode !== 'allowlist' && workspace?.egressAudit !== true) return undefined;
+  return {
+    egressMode: workspace.egressMode ?? 'unrestricted',
+    ...(workspace.egressMode === 'allowlist'
+      ? { egressAllowlist: workspace.egressAllowlist ?? [] }
+      : {}),
+    ...(workspace.egressAudit === true ? { egressAudit: true } : {}),
   };
 }
 
@@ -327,6 +413,7 @@ export async function preflightSessionCreation(
   validateEndpoint?: EndpointValidator,
   policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
+  let inheritedEgress: InheritedEgressPolicy | undefined;
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     if (
@@ -336,19 +423,34 @@ export async function preflightSessionCreation(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
     }
+    const parentStub = () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId);
     let token: string;
+    let parentCreatedOnPlatform: string | undefined;
     try {
-      token = await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
-        stub => stub.getCloudAgentSpawnRuntimeToken(authority),
-        'getCloudAgentSpawnRuntimeToken'
+      const parent = await withDORetry(
+        parentStub,
+        stub => stub.getCloudAgentSpawnContext(authority),
+        'getCloudAgentSpawnContext'
       );
+      token = parent.token;
+      parentCreatedOnPlatform = parent.createdOnPlatform;
     } catch {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Cloud Agent parent authorization unavailable',
       });
     }
+    if (!isInteractiveSessionOrigin(parentCreatedOnPlatform)) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    }
+    request.options = {
+      ...request.options,
+      createdOnPlatform: parentCreatedOnPlatform,
+    };
+    inheritedEgress = await readParentEgressPolicy(parentStub, authority);
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
@@ -401,6 +503,31 @@ export async function preflightSessionCreation(
         ).mode,
       },
     };
+  }
+  // The environment resolves here, so its members are authorized after it.
+  await assertEnvironmentRepositoriesAccess({
+    env: ctx.env,
+    userId: ctx.userId,
+    orgId: organizationId,
+    createdOnPlatform: resolvedRequest.options?.createdOnPlatform,
+    repository: resolvedRequest.repository,
+    environment: resolvedRequest.environment,
+  });
+  if (
+    inheritedEgress &&
+    request.runtime?.egressMode === undefined &&
+    request.runtime?.egressAllowlist === undefined
+  ) {
+    const { egressAllowlist, ...inheritedPolicy } = inheritedEgress;
+    const runtime = { ...resolvedRequest.runtime, ...inheritedPolicy };
+    // An environment-derived allowlist must not survive an unrestricted
+    // inherited mode; the policy schema rejects that combination.
+    if (runtime.egressMode === 'allowlist') {
+      runtime.egressAllowlist = egressAllowlist ?? [];
+    } else {
+      delete runtime.egressAllowlist;
+    }
+    resolvedRequest = { ...resolvedRequest, runtime };
   }
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,

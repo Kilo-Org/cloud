@@ -442,7 +442,6 @@
         "rebase": "রিবেস"
       },
       "terminal": {
-        "alreadyMerged": "ইতিমধ্যে মার্জ হয়েছে",
         "closed": "এই পুল রিকোয়েস্ট বন্ধ",
         "closedMergeRequest": "এই মার্জ রিকোয়েস্ট বন্ধ"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "প্রয়োজনীয় রিভিউ বাকি",
         "requiredReviewsDetail": "যাঁদের রিভিউ প্রয়োজন, তাঁদের অনুমোদন এখনও পাওয়া যায়নি বা অপেক্ষমাণ।",
         "failingChecksTitle": "প্রয়োজনীয় চেক ব্যর্থ হচ্ছে",
-        "failingChecksDetail": "প্রয়োজনীয় স্ট্যাটাস চেকগুলো ব্যর্থ হচ্ছে।",
         "unstableTitle": "কিছু চেক ব্যর্থ হচ্ছে",
         "unstableDetail": "বাধ্যতামূলক নয় এমন কিছু চেক ব্যর্থ হচ্ছে। এগুলো মার্জে বাধা দেবে না।",
         "draftTitle": "খসড়া পুল রিকোয়েস্ট",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
       "providerCheckFailedMessage": "লোড হওয়া পর্যন্ত সংযোগের অবস্থা উপলব্ধ নয়।",
       "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleGitLab": "GitLab-এর সঙ্গে আবার সংযোগ",
+      "reconnectTitleBitbucket": "Bitbucket-এর সঙ্গে আবার সংযোগ",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে।",
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করুন",
       "gitlabInstanceMismatchTitle": "GitLab সংযোগটি অন্য একটি ইনস্ট্যান্সের জন্য",
@@ -708,7 +708,12 @@
       "pendingComment_other": "অপেক্ষমাণ মন্তব্য",
       "submitCountOfTotal": "{{displayTotalCount}}টি মন্তব্যের মধ্যে {{displayFreshCount}}টি জমা দিন",
       "submitReview": "পর্যালোচনা জমা দিন",
-      "partialPostedMessage": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। {{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedFresh": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_one": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedFresh_other": "{{displayFreshCount}}টি মন্তব্য পোস্ট হয়েছে। ",
+      "partialPostedStale": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_one": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
+      "partialPostedStale_other": "{{displayStaleCount}}টি মন্তব্য পুরোনো কমিটের সঙ্গে যুক্ত থাকায় আপনার অপেক্ষমাণ তালিকায় রয়ে গেছে।",
       "blockedRequestChanges": "পরিবর্তনের অনুরোধ করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।",
       "blockedComment": "মন্তব্যসহ রিভিউ পোস্ট করতে একটি সারাংশ বা অন্তত একটি মন্তব্য যোগ করুন।"
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md-এর পুল রিকোয়েস্ট খোলা হয়েছে",
       "alreadyPresent": "নির্দেশনা ইতিমধ্যেই REVIEW.md-এ রয়েছে",
       "status": {
+        "open": "খোলা",
         "edited": "সম্পাদিত",
         "opening_change_request": "PR খোলা হচ্ছে",
         "change_request_failed": "PR ব্যর্থ হয়েছে",
@@ -1614,6 +1620,8 @@
       "set": "নির্ধারিত",
       "notSet": "নির্ধারিত নয়",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_one": "{{displayCount}}টি নির্বাচিত",
+      "nSelected_other": "{{displayCount}}টি নির্বাচিত",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "আক্রমণে কাজে লাগানোর সম্ভাবনার যুক্তি",
       "suggestedFix": "প্রস্তাবিত সমাধান",
       "whereFound": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_one": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
+      "whereFound_other": "যেখানে এটি পাওয়া গেছে ({{displayCount}})",
       "fullReport": "তৈরি করা সম্পূর্ণ রিপোর্ট",
       "yes": "হ্যাঁ",
       "no": "না",
@@ -1832,6 +1842,8 @@
       "breakdownMediumLow_zero": "{{displayCount}}টি মাঝারি ও নিম্ন",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
       "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_one": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail_other": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
       "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"
@@ -2076,6 +2088,7 @@
       "actionFailed": "এই কাজটি সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।",
       "actionBlocked": "এই কাজটি সম্পন্ন করা যায়নি। সমস্যাটি ঠিক করা না হলে আবার চেষ্টা করা যাবে না।",
       "syncNoRepositories": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। নিরাপত্তা এজেন্ট যে রিপোজিটরিগুলো মনিটর করে সেগুলো বেছে নিন, তারপর আবার সিঙ্ক করুন।",
+      "syncNoRepositoriesNoManage": "সিঙ্ক স্কোপে কোনো রিপোজিটরি নেই। সিঙ্ক চালানোর আগে একজন সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজারকে রিপোজিটরি সংযুক্ত করতে হবে।",
       "syncIntegrationInactive": "«নিরাপত্তা এজেন্ট»-এর জন্য GitHub সংযোগ সক্রিয় নয়। Kilo GitHub App আবার সংযুক্ত করুন, তারপর আবার সিঙ্ক করুন।",
       "syncMissingPermission": "Kilo GitHub App vulnerability alerts পড়তে পারে না। GitHub-এ সেই অনুমতি দিন, তারপর আবার সিঙ্ক করুন।",
       "configConflict": "নিরাপত্তা এজেন্টের সেটিংস অন্য জায়গায় পরিবর্তিত হয়েছে। সর্বশেষ সেটিংস দেখে আবার সংরক্ষণ করুন।"
@@ -3790,9 +3803,9 @@
   "spendAlerts": {
     "subtitle": "এই স্কোপের খরচ একটি সীমা ছাড়িয়ে গেলে বা স্বাভাবিক ঘণ্টাভিত্তিক হারের চেয়ে বেড়ে গেলে বিলিং পরিচিতিদের ইমেল বা পুশের মাধ্যমে সতর্কতা পাঠান।",
     "thresholdTitle": "সীমা অতিক্রম",
-    "thresholdSubtitle": "চলমান খরচ আপনার সীমা ছাড়িয়ে যাচ্ছে",
+    "thresholdSubtitle": "নির্বাচিত সময়সীমায় এই স্কোপের চলমান খরচ আপনার সীমা ছাড়িয়ে যাচ্ছে",
     "anomalyTitle": "ঘণ্টাভিত্তিক বৃদ্ধি",
-    "anomalySubtitle": "এক ঘণ্টার খরচ এই স্কোপের স্বাভাবিক হারের চেয়ে অনেক বেশি",
+    "anomalySubtitle": "এই স্কোপের ঘণ্টাভিত্তিক হার তার নিজের p95 বেসলাইনের চেয়ে অনেক বেশি",
     "limitLabel": "সীমা (USD)",
     "windowLabel": "সময়সীমা",
     "window24h": "24 ঘণ্টা",
@@ -3802,14 +3815,14 @@
     "saved": "খরচের সতর্কতার সেটিংস সংরক্ষিত হয়েছে",
     "loadError": "খরচের সতর্কতা লোড করা যায়নি।",
     "saveError": "খরচের সতর্কতা সংরক্ষণ করা যায়নি।",
-    "empty": "খরচের সতর্কতা বন্ধ আছে। এই স্কোপের বিলিং পরিচিতিদের সতর্ক করতে এটি চালু করুন।",
-    "noSpend": "এখনও কোনো খরচ নথিভুক্ত হয়নি",
+    "sendAlerts": "সতর্কতা পাঠান",
+    "noSpend": "কোনো খরচ নেই",
     "spend24h": "গত 24 ঘণ্টার খরচ",
     "multiplierError": "1 বা তার বেশি গুণক লিখুন",
     "permissionDenied": "খরচের সতর্কতা পরিচালনার অনুমতি আপনার নেই।",
     "pushOffByCategory": "বিজ্ঞপ্তিতে বন্ধ",
     "multiplierMaxError": "{{max}} বা তার কম গুণক লিখুন",
-    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন।"
+    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন"
   },
   "profiles": {
     "title": "প্রোফাইল",

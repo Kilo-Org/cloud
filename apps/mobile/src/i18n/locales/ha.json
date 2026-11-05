@@ -442,7 +442,6 @@
         "rebase": "Sake kafa tushe"
       },
       "terminal": {
-        "alreadyMerged": "An riga an haɗa",
         "closed": "An rufe wannan buƙatar haɗawa",
         "closedMergeRequest": "An rufe wannan buƙatar haɗawa"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Ba a kammala bitar da ake buƙata ba",
         "requiredReviewsDetail": "Ba a samu amincewar masu bitar da ake buƙata ba, ko kuma ana jiranta.",
         "failingChecksTitle": "Gwaje-gwajen da ake buƙata sun gaza",
-        "failingChecksDetail": "Gwaje-gwajen matsayi da ake buƙata sun gaza.",
         "unstableTitle": "Wasu gwaje-gwaje sun gaza",
         "unstableDetail": "Gwaje-gwajen da ba dole ba ne sun gaza. Ba za su hana haɗawa ba.",
         "draftTitle": "Daftarin buƙatar haɗa canje-canje",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
       "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
       "reconnectTitle": "Sake haɗa GitHub",
+      "reconnectTitleGitLab": "Sake haɗa GitLab",
+      "reconnectTitleBitbucket": "Sake haɗa Bitbucket",
       "reconnectDescription": "An soke haɗinka na GitHub.",
       "gitlabDescription": "Yi bitar buƙatun haɗawa a waya",
       "gitlabInstanceMismatchTitle": "Haɗawar GitLab ta wani misali ce",
@@ -708,7 +708,12 @@
       "pendingComment_other": "tsokace-tsokacen da ke jiran aikawa",
       "submitCountOfTotal": "Aika tsokaci {{displayFreshCount}} cikin {{displayTotalCount}}",
       "submitReview": "Aika bita",
-      "partialPostedMessage": "An wallafa tsokaci {{displayFreshCount}}. Tsokaci {{displayStaleCount}} suna nuni ga tsohon rikodin canje-canje kuma sun rage a jerin masu jira.",
+      "partialPostedFresh": "An wallafa tsokaci {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "An wallafa tsokaci {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "An wallafa tsokaci {{displayFreshCount}}. ",
+      "partialPostedStale": "Tsokaci {{displayStaleCount}} suna nuni ga tsohon rikodin canje-canje kuma sun rage a jerin masu jira.",
+      "partialPostedStale_one": "Tsokaci {{displayStaleCount}} suna nuni ga tsohon rikodin canje-canje kuma sun rage a jerin masu jira.",
+      "partialPostedStale_other": "Tsokaci {{displayStaleCount}} suna nuni ga tsohon rikodin canje-canje kuma sun rage a jerin masu jira.",
       "blockedRequestChanges": "Ƙara taƙaitawa ko aƙalla tsokaci ɗaya don neman canje-canje.",
       "blockedComment": "Ƙara taƙaitawa ko aƙalla tsokaci ɗaya don aika bitar tsokaci."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "An buɗe pull request na REVIEW.md",
       "alreadyPresent": "Ƙa'idodin sun riga sun kasance a cikin REVIEW.md",
       "status": {
+        "open": "Buɗe",
         "edited": "An gyara",
         "opening_change_request": "Ana buɗe PR",
         "change_request_failed": "An kasa buɗe PR",
@@ -1614,6 +1620,8 @@
       "set": "An saita",
       "notSet": "Ba a saita ba",
       "nSelected": "An zaɓi {{displayCount}}",
+      "nSelected_one": "An zaɓi {{displayCount}}",
+      "nSelected_other": "An zaɓi {{displayCount}}",
       "proposedReviewMdGuidance": "Ƙa'idodin REVIEW.md da aka ba da shawara"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Dalilan yiwuwar amfani da matsalar wajen kai hari",
       "suggestedFix": "Gyaran da aka ba da shawara",
       "whereFound": "Inda aka samu wannan ({{displayCount}})",
+      "whereFound_one": "Inda aka samu wannan ({{displayCount}})",
+      "whereFound_other": "Inda aka samu wannan ({{displayCount}})",
       "fullReport": "Cikakken rahoton da aka samar",
       "yes": "Ee",
       "no": "A'a",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "matsakaici da ƙarami: {{displayCount}}",
       "dueThisWeek": "Wa'adi zai cika wannan makon",
       "dueThisWeekDetail": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
+      "dueThisWeekDetail_one": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
+      "dueThisWeekDetail_other": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
       "noDeadline": "Babu wa'adi",
       "reviewSlaAssignment": "Duba yadda aka saita wa'adin SLA",
       "allOpenFindingsTracked": "Ana bin diddigin duk matsalolin da ba a warware ba"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Ba za a iya kammala wannan aikin ba. Sake gwadawa.",
       "actionBlocked": "Ba za a iya kammala wannan aikin ba. Dole a gyara matsalar kafin a sake gwadawa.",
       "syncNoRepositories": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Zaɓi ma'ajiyoyin bayanai da Wakilin tsaro ke sa ido a kansu, sannan a sake daidaitawa.",
+      "syncNoRepositoriesNoManage": "Babu wata ma'ajiyar bayanai da ke cikin iyakar daidaitawa. Dole ne mai ƙungiya, mai gudanarwa, ko manajan biyan kuɗi ya haɗa ma'ajiyoyin bayanai kafin a iya yin daidaitawa.",
       "syncIntegrationInactive": "Haɗin GitHub na Wakilin tsaro ba ya aiki. Sake haɗa Kilo GitHub App, sannan ka sake daidaitawa.",
       "syncMissingPermission": "Kilo GitHub App ba ya iya karanta vulnerability alerts. Ba da wannan izni a GitHub, sannan ka sake daidaitawa.",
       "configConflict": "An canza saitunan Wakilin tsaro a wani wuri. Duba sabbin saitunan sannan ka sake adanawa."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Ana sake gwada kwafawa (gwaji na {{attempt}} daga cikin {{total}})",
       "detailSetupCommandFailed": "Umarnin shiri na {{index}} ya kasa aiki",
       "detailSetupCommandTimedOut": "Lokacin umarnin shiri na {{index}} ya ƙare",
-      "detailColdRestore": "Sanyar da sanyi, an dawo da hoton yanayi, an mayar da fayiloli {{applied}} daga cikin {{total}}",
+      "detailColdRestore": "Sanyar da sanyi, an dawo da hoton yanayi, an mayar da fayiloli: {{applied}} daga cikin {{total}}",
       "detailProgressPercent": "An kammala {{percent}}%",
-      "detailRestoreIncompleteReport": "Ba a kammala mayar da zaman aiki ba: ba a mayar da fayiloli {{skipped}} daga cikin {{total}} ba ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Ba a kammala mayar da zaman aiki ba — ba a mayar da fayiloli ba: {{skipped}} daga cikin {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Rashawa: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} da ƙarin {{omitted}}",
       "detailReasonPatchFailed": "manhalar ba ta shiga aiki ba",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Aika faɗakarwa ta imel ko turawa zuwa ga abokan hulɗar biyan kuɗi lokacin da kashe kuɗin wannan yanki ya wuce iyaka ko ya haura fiye da yawan sa'ar da ya saba.",
     "thresholdTitle": "Wucewar iyaka",
-    "thresholdSubtitle": "Kashe kuɗin da ake yi ya wuce iyakarka",
+    "thresholdSubtitle": "Kashe kuɗin da wannan yanki ke yi a cikin tagar da aka zaɓa ya wuce iyakarka",
     "anomalyTitle": "Hauhawar sa'a",
-    "anomalySubtitle": "Sa'a ɗaya ta fi yawan da wannan yanki ya saba nisa",
+    "anomalySubtitle": "Yawan kashe kuɗin wannan yanki a kowane sa'a ya wuce ma'auninsa na p95 da nisa",
     "limitLabel": "Iyaka (USD)",
     "windowLabel": "Taga",
     "window24h": "Sa'o'i 24",
@@ -3796,14 +3809,14 @@
     "saved": "An adana saitunan faɗakarwar kashe kuɗi",
     "loadError": "An kasa loda faɗakarwar kashe kuɗi.",
     "saveError": "An kasa adana faɗakarwar kashe kuɗi.",
-    "empty": "Faɗakarwar kashe kuɗi a kashe take. Kunna ta domin faɗakar da abokan hulɗar biyan kuɗi na wannan yanki.",
-    "noSpend": "Ba a rubuta wani kashe kuɗi ba tukuna",
+    "sendAlerts": "Aika faɗakarwa",
+    "noSpend": "Babu kashe kuɗi",
     "spend24h": "Kashe kuɗi a cikin sa'o'i 24 da suka gabata",
     "multiplierError": "Shigar da mai ninka 1 ko fiye",
     "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar kashe kuɗi.",
     "pushOffByCategory": "A kashe a cikin Sanarwa",
     "multiplierMaxError": "Shigar da mai ninka {{max}} ko ƙasa da haka",
-    "thresholdMaxError": "Shigar da adadin kuɗin da bai wuce {{max}} ba."
+    "thresholdMaxError": "Shigar da adadin kuɗin da bai wuce {{max}} ba"
   },
   "profiles": {
     "title": "Bayanan martaba",

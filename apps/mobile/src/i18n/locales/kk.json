@@ -442,7 +442,6 @@
         "rebase": "Негізін ауыстыру"
       },
       "terminal": {
-        "alreadyMerged": "Бұрын біріктірілген",
         "closed": "Бұл біріктіру сұрауы жабылған",
         "closedMergeRequest": "Бұл біріктіру сұрауы жабылған"
       },
@@ -459,7 +458,6 @@
         "requiredReviewsTitle": "Міндетті код тексерулері жоқ",
         "requiredReviewsDetail": "Міндетті тексерушілердің мақұлдауы жоқ немесе әлі күтілуде.",
         "failingChecksTitle": "Міндетті тексерулер сәтсіз аяқталды",
-        "failingChecksDetail": "Міндетті күй тексерулері сәтсіз аяқталды.",
         "unstableTitle": "Кейбір тексерулер сәтсіз аяқталды",
         "unstableDetail": "Міндетті емес тексерулер сәтсіз аяқталды. Олар біріктіруге кедергі болмайды.",
         "draftTitle": "Біріктіру сұрауының нобайы",
@@ -681,6 +679,8 @@
       "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
       "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
+      "reconnectTitleGitLab": "GitLab-қа қайта қосылу",
+      "reconnectTitleBitbucket": "Bitbucket-қа қайта қосылу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды.",
       "gitlabDescription": "Біріктіру сұрауларын мобильді құрылғыда тексеру",
       "gitlabInstanceMismatchTitle": "GitLab қосылымы басқа инстанцияға арналған",
@@ -708,7 +708,12 @@
       "pendingComment_other": "жіберілмеген пікір",
       "submitCountOfTotal": "{{displayFreshCount}}/{{displayTotalCount}} пікірді жіберу",
       "submitReview": "Тексеру нәтижесін жіберу",
-      "partialPostedMessage": "{{displayFreshCount}} пікір жарияланды. {{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedFresh": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} пікір жарияланды. ",
+      "partialPostedStale": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedStale_one": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
+      "partialPostedStale_other": "{{displayStaleCount}} пікір бұрынғы коммитке қатысты болғандықтан, кезекте қалды.",
       "blockedRequestChanges": "Өзгеріс енгізуді сұрау үшін қорытынды немесе кемінде бір пікір қосыңыз.",
       "blockedComment": "Кодты тексеру нәтижесін пікір түрінде жариялау үшін қорытынды немесе кемінде бір пікір қосыңыз."
     },
@@ -1527,6 +1532,7 @@
       "prOpened": "REVIEW.md үшін pull request ашылды",
       "alreadyPresent": "Нұсқаулар REVIEW.md файлында бұрыннан бар",
       "status": {
+        "open": "Ашық",
         "edited": "Өңделген",
         "opening_change_request": "PR ашылуда",
         "change_request_failed": "PR ашу сәтсіз аяқталды",
@@ -1614,6 +1620,8 @@
       "set": "Белгіленген",
       "notSet": "Белгіленбеген",
       "nSelected": "{{displayCount}} таңдалды",
+      "nSelected_one": "{{displayCount}} таңдалды",
+      "nSelected_other": "{{displayCount}} таңдалды",
       "proposedReviewMdGuidance": "REVIEW.md файлына ұсынылған нұсқаулар"
     },
     "decision": {
@@ -1748,6 +1756,8 @@
       "exploitabilityReasoning": "Шабуылға пайдалану мүмкіндігінің негіздемесі",
       "suggestedFix": "Ұсынылған түзету",
       "whereFound": "Табылған орындар ({{displayCount}})",
+      "whereFound_one": "Табылған орындар ({{displayCount}})",
+      "whereFound_other": "Табылған орындар ({{displayCount}})",
       "fullReport": "Жасалған толық есеп",
       "yes": "Иә",
       "no": "Жоқ",
@@ -1826,6 +1836,8 @@
       "breakdownMediumLow_other": "{{displayCount}} орташа және төмен",
       "dueThisWeek": "Мерзімі осы аптада",
       "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail_one": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
+      "dueThisWeekDetail_other": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",
       "reviewSlaAssignment": "SLA мерзімдерінің белгіленуін тексеру",
       "allOpenFindingsTracked": "Барлық ашық мәселелер қадағаланады"
@@ -2070,6 +2082,7 @@
       "actionFailed": "Бұл әрекетті аяқтау мүмкін болмады. Қайталап көріңіз.",
       "actionBlocked": "Бұл әрекетті аяқтау мүмкін болмады. Мәселені алдымен шешу қажет.",
       "syncNoRepositories": "Синхрондау аясында репозиторийлер жоқ. Қауіпсіздік агенті бақылайтын репозиторийлерді таңдап, қайтадан синхрондаңыз.",
+      "syncNoRepositoriesNoManage": "Синхрондау аясында репозиторийлер жоқ. Синхрондау мүмкін болуы үшін ұйым иесі, әкімшісі немесе төлем менеджері репозиторийлерді қосуы керек.",
       "syncIntegrationInactive": "Қауіпсіздік агенті үшін GitHub байланысы белсенді емес. Kilo GitHub App қайта қосып, қайтадан синхрондаңыз.",
       "syncMissingPermission": "Kilo GitHub App осалдықтар туралы ескертулерді оқи алмайды. GitHub-та сол рұқсатты беріп, қайтадан синхрондаңыз.",
       "configConflict": "Қауіпсіздік агентінің параметрлері басқа жерде өзгертілді. Ең соңғы параметрлерді қарап, қайта сақтаңыз."
@@ -2606,9 +2619,9 @@
       "detailRetryingClone": "Клондауды қайта талаптану ({{total}} әрекеттің {{attempt}}-і)",
       "detailSetupCommandFailed": "{{index}} баптау пәрмені сәтсіз аяқталды",
       "detailSetupCommandTimedOut": "{{index}} баптау пәрменінің уақыты бітті",
-      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, {{total}} файлдың {{applied}}-і қалпына келтірілді",
+      "detailColdRestore": "Салқын қалпына келтіру, снапшот қолданылды, қалпына келтірілген файлдар: {{applied}} / {{total}}",
       "detailProgressPercent": "{{percent}}% аяқталды",
-      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады: {{total}} файлдың {{skipped}}-і қалпына келтірілмеді ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Сессияны қалпына келтіру аяқталмады — қалпына келтірілмеген файлдар: {{skipped}} / {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Жетіспейді: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} және тағы {{omitted}}",
       "detailReasonPatchFailed": "патч қолданылмады",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Осы ауқымның шығысы шектен асып кеткенде немесе әдеттегі сағаттық қарқынынан жоғары көтерілгенде, төлем бойынша байланыстарға электрондық пошта немесе push арқылы ескерту жібер.",
     "thresholdTitle": "Шектен асу",
-    "thresholdSubtitle": "Ағымдағы шығыс шегіңізден асады",
+    "thresholdSubtitle": "Осы ауқымның таңдалған терезедегі ағымдағы шығысы шегіңізден асады",
     "anomalyTitle": "Сағаттық секіріс",
-    "anomalySubtitle": "Бір сағат осы ауқымның әдеттегі қарқынынан әлдеқайда жоғары",
+    "anomalySubtitle": "Осы ауқымның сағаттық қарқыны оның өзінің p95 базалық деңгейінен әлдеқайда жоғары",
     "limitLabel": "Шек (USD)",
     "windowLabel": "Терезе",
     "window24h": "24 сағат",
@@ -3796,14 +3809,14 @@
     "saved": "Шығыс ескертуінің параметрлері сақталды",
     "loadError": "Шығыс ескертулері жүктелмеді.",
     "saveError": "Шығыс ескертулері сақталмады.",
-    "empty": "Шығыс ескертулері өшірулі. Осы ауқымның төлем бойынша байланыстарын ескерту үшін оларды қос.",
-    "noSpend": "Әзірге шығыс тіркелмеген",
+    "sendAlerts": "Ескертулерді жібер",
+    "noSpend": "Әзірге шығыс жоқ",
     "spend24h": "Соңғы 24 сағаттағы шығыс",
     "multiplierError": "1 немесе одан үлкен көбейткіш енгіз",
     "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
     "pushOffByCategory": "Хабарландыруларда өшірулі",
     "multiplierMaxError": "{{max}} немесе одан кіші көбейткіш енгіз",
-    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз."
+    "thresholdMaxError": "{{max}} немесе одан кіші соманы енгізіңіз"
   },
   "profiles": {
     "title": "Профильдер",

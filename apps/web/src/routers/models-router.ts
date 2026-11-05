@@ -21,6 +21,8 @@ export const modelsRouter = createTRPCRouter({
       name: model.name,
       supportsVision: model.architecture.input_modalities.includes('image'),
       isPreferred: preferredSet.has(model.id),
+      variants: Object.keys(model.opencode?.variants ?? {}),
+      ...(model.alias_target ? { alias_target: model.alias_target } : {}),
     }));
   }),
 });

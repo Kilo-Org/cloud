@@ -1049,6 +1049,7 @@
       "prOpened": "Pull request voor REVIEW.md geopend",
       "alreadyPresent": "De richtlijnen staan al in REVIEW.md",
       "status": {
+        "open": "Open",
         "edited": "Bewerkt",
         "opening_change_request": "PR openen",
         "change_request_failed": "PR mislukt",
@@ -1084,6 +1085,8 @@
     "overview": {
       "allAreas": "Alle aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
+      "nSelected_one": "{{displayCount}} geselecteerd",
+      "nSelected_other": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
       "set": "Ingesteld",
       "notSet": "Niet ingesteld"
@@ -1183,6 +1186,8 @@
       "triageReasoning": "Onderbouwing van de eerste beoordeling",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Gevonden op deze locaties ({{displayCount}})",
+      "whereFound_one": "Gevonden op deze locaties ({{displayCount}})",
+      "whereFound_other": "Gevonden op deze locaties ({{displayCount}})",
       "yes": "Ja",
       "action": {
         "analyzeCodebase": "Codebasis analyseren",
@@ -1342,6 +1347,8 @@
       "breakdownMediumLow_other": "{{displayCount}} gemiddeld en laag",
       "dueThisWeek": "Deadline deze week",
       "dueThisWeekDetail": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail_one": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
+      "dueThisWeekDetail_other": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
       "noDeadline": "Geen deadline",
       "reviewSlaAssignment": "SLA-toewijzing controleren",
       "allOpenFindingsTracked": "Alle open bevindingen bijgehouden"
@@ -1536,6 +1543,7 @@
       "actionFailed": "Deze actie kon niet worden voltooid. Probeer het opnieuw.",
       "actionBlocked": "Deze actie kon niet worden voltooid. Het probleem moet eerst worden opgelost.",
       "syncNoRepositories": "Geen repositories in het synchronisatiebereik. Kies de repositories die de Beveiligingsagent bewaakt en synchroniseer daarna opnieuw.",
+      "syncNoRepositoriesNoManage": "Er zijn geen repositories in het synchronisatiebereik. Een organisatie-eigenaar, beheerder of factuurbeheerder moet repositories verbinden voordat er kan worden gesynchroniseerd.",
       "syncIntegrationInactive": "De GitHub-koppeling voor de Beveiligingsagent is niet actief. Verbind de Kilo GitHub-app opnieuw en synchroniseer daarna opnieuw.",
       "syncMissingPermission": "De Kilo GitHub-app kan geen kwetsbaarheidsalerts lezen. Verleen die machtiging in GitHub en synchroniseer daarna opnieuw.",
       "configConflict": "De instellingen van de Beveiligingsagent zijn elders gewijzigd. Controleer de nieuwste instellingen en sla opnieuw op."
@@ -2072,9 +2080,9 @@
       "detailRetryingClone": "Klonen opnieuw proberen (poging {{attempt}} van {{total}})",
       "detailSetupCommandFailed": "Voorbereidingsopdracht {{index}} is mislukt",
       "detailSetupCommandTimedOut": "Time-out bij voorbereidingsopdracht {{index}}",
-      "detailColdRestore": "Koude herstel, snapshot toegepast, {{applied}} van {{total}} bestanden hersteld",
+      "detailColdRestore": "Koud herstel, snapshot toegepast, bestanden hersteld: {{applied}} van {{total}}",
       "detailProgressPercent": "{{percent}}% voltooid",
-      "detailRestoreIncompleteReport": "Sessieherstel onvolledig: {{skipped}} van {{total}} bestanden zijn niet hersteld ({{reasons}}).",
+      "detailRestoreIncompleteReport": "Sessieherstel onvolledig, bestanden niet hersteld: {{skipped}} van {{total}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "Ontbrekend: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} en nog {{omitted}} meer",
       "detailReasonPatchFailed": "de patch kon niet worden toegepast",
@@ -2714,6 +2722,8 @@
       "checkFailedTitleBitbucket": "De Bitbucket-verbinding kon niet worden gecontroleerd.",
       "providerCheckFailedMessage": "De verbindingsstatus is pas beschikbaar zodra het laden is voltooid.",
       "reconnectTitle": "GitHub opnieuw verbinden",
+      "reconnectTitleGitLab": "GitLab opnieuw verbinden",
+      "reconnectTitleBitbucket": "Bitbucket opnieuw verbinden",
       "reconnectDescription": "De toegang tot je GitHub-account is ingetrokken.",
       "gitlabDescription": "Merge requests op je mobiel beoordelen",
       "gitlabInstanceMismatchTitle": "GitLab-verbinding is voor een andere instantie",
@@ -2993,7 +3003,6 @@
         "squash": "Squashen"
       },
       "terminal": {
-        "alreadyMerged": "Al samengevoegd",
         "closed": "Deze PR is gesloten",
         "closedMergeRequest": "Deze merge request is gesloten"
       },
@@ -3010,7 +3019,6 @@
         "requiredReviewsTitle": "Vereiste beoordelingen ontbreken",
         "requiredReviewsDetail": "De vereiste beoordelaars hebben nog geen goedkeuring gegeven.",
         "failingChecksTitle": "Vereiste controles mislukt",
-        "failingChecksDetail": "Vereiste statuscontroles mislukken.",
         "unstableTitle": "Sommige controles mislukken",
         "unstableDetail": "Niet-verplichte controles mislukken. Ze blokkeren het samenvoegen niet.",
         "draftTitle": "Concept-PR",
@@ -3117,7 +3125,12 @@
       "pendingComment_other": "nog niet verzonden opmerkingen",
       "pendingComment_one": "nog niet verzonden opmerking",
       "summaryOptional": "Samenvatting (optioneel)",
-      "partialPostedMessage": "Geplaatste opmerkingen: {{displayFreshCount}}. Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedFresh": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedFresh_other": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
+      "partialPostedStale": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedStale_one": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
+      "partialPostedStale_other": "Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
       "blockedRequestChanges": "Voeg een samenvatting of minstens één opmerking toe om wijzigingen te vragen.",
@@ -3784,9 +3797,9 @@
   "spendAlerts": {
     "subtitle": "Stuur een e-mail- of pushmelding naar de factuurcontacten wanneer de besteding van dit bereik een limiet overschrijdt of boven het gebruikelijke uurtarief uitstijgt.",
     "thresholdTitle": "Drempeloverschrijding",
-    "thresholdSubtitle": "Lopende besteding overschrijdt je limiet",
+    "thresholdSubtitle": "De lopende besteding van dit bereik overschrijdt je limiet in het gekozen venster",
     "anomalyTitle": "Uurlijkse piek",
-    "anomalySubtitle": "Een uur ligt ver boven het gebruikelijke tarief van dit bereik",
+    "anomalySubtitle": "Het uurlijkse tarief van dit bereik ligt ver boven de eigen p95-basislijn",
     "limitLabel": "Limiet (USD)",
     "windowLabel": "Venster",
     "window24h": "24 uur",
@@ -3796,14 +3809,14 @@
     "saved": "Instellingen voor bestedingswaarschuwingen opgeslagen",
     "loadError": "Bestedingswaarschuwingen konden niet worden geladen.",
     "saveError": "Bestedingswaarschuwingen konden niet worden opgeslagen.",
-    "empty": "Bestedingswaarschuwingen staan uit. Zet ze aan om de factuurcontacten van dit bereik te waarschuwen.",
-    "noSpend": "Nog geen besteding geregistreerd",
+    "sendAlerts": "Waarschuwingen sturen",
+    "noSpend": "Nog geen besteding",
     "spend24h": "Besteding in de afgelopen 24 uur",
     "multiplierError": "Voer een vermenigvuldiger van 1 of meer in",
     "permissionDenied": "Je hebt geen toestemming om bestedingswaarschuwingen te beheren.",
     "pushOffByCategory": "Uit in Meldingen",
     "multiplierMaxError": "Voer een vermenigvuldiger van {{max}} of minder in",
-    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in."
+    "thresholdMaxError": "Voer een bedrag van {{max}} of minder in"
   },
   "profiles": {
     "title": "Profielen",

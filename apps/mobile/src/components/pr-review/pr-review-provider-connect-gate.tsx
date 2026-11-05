@@ -315,6 +315,14 @@ export function ProviderConnectGate({
       platform === 'gitlab'
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
+    // The expired-connection arm's CTA names the reconnection, the way the
+    // GitHub revoked gate's button and title both say "Reconnect GitHub": the
+    // reader already authorized this provider once, so the action is not a
+    // first-time connect.
+    const reconnectActionTitle =
+      platform === 'gitlab'
+        ? t('prReview.connect.reconnectTitleGitLab')
+        : t('prReview.connect.reconnectTitleBitbucket');
     let title = reconnect ? reconnectTitle : connectTitle;
     let description = connectDescription;
     if (reconnect) {
@@ -388,7 +396,7 @@ export function ProviderConnectGate({
                   ) : (
                     <RefreshCcw size={16} color={colors.primaryForeground} />
                   )}
-                  <Text>{connectTitle}</Text>
+                  <Text>{reconnect ? reconnectActionTitle : connectTitle}</Text>
                 </Button>
               ) : null}
             </PrReviewGateActionGroup>

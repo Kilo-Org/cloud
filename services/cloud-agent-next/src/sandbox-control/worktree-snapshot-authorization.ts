@@ -66,8 +66,8 @@ type SnapshotObjectBucket = {
 
 /**
  * Writes the tombstone first, so a failed object delete still refuses later
- * reads and uploads. Returns false only when the object delete failed; the
- * 30-day lifecycle remains the fallback for that object.
+ * reads and uploads. Returns false when object deletion fails. Orphan cleanup
+ * requires a separately provisioned bucket lifecycle rule.
  */
 export async function purgeWorktreeSnapshot(input: {
   worktreeId: string;

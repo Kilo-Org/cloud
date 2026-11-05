@@ -400,10 +400,11 @@ jobs:
   # every consumer downloads the built tree instead of building it again.
   trpc-declarations:
     needs: changes
-    # Only a consumer needs the artifact: every typecheck group downloads it,
-    # and the lint matrix only for its trpc entry. A lint-rest-only run must not
-    # wait for it.
-    if: needs.changes.outputs.typecheck_groups != '[]' || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
+    # Only the trpc rows consume the declarations: the typecheck group that
+    # covers the extension, and the lint group that lints it. The web and
+    # packages groups never read packages/trpc/dist, so a run that selects only
+    # them must not wait for this job.
+    if: contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -437,10 +438,11 @@ jobs:
 
   typecheck-groups:
     needs: [changes, trpc-declarations]
-    # `always()` so a failed or skipped producer cannot quietly skip every
-    # group: the download below then fails and the required aggregator reports
-    # it, instead of passing on skipped rows. A failed `changes` job keeps them
-    # skipped, because its outputs carry no group list.
+    # `always()` keeps every non-trpc group running when the producer is
+    # skipped, and makes a failed producer surface as a failed download in the
+    # trpc group instead of a quietly skipped row the aggregator would pass. A
+    # failed `changes` job keeps them skipped, because its outputs carry no
+    # group list.
     if: always() && needs.changes.result == 'success' && needs.changes.outputs.typecheck_groups != '[]'
     strategy:
       fail-fast: false
@@ -477,6 +479,7 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
       - name: Download tRPC declarations
+        if: matrix.group == 'trpc'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: trpc-declarations
@@ -485,8 +488,7 @@ jobs:
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
-          # The producer job built or restored the declarations for every group.
-          KILO_TYPECHECK_TRPC_BUILT: '1'
+          KILO_TYPECHECK_TRPC_BUILT: ${{ matrix.group == 'trpc' && '1' || '' }}
         run: scripts/typecheck-all.sh --group ${{ matrix.group }}
 
   # Required check. Skipped groups (nothing affected) pass; a failed or

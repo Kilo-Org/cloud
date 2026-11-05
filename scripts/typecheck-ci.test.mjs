@@ -371,8 +371,8 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.equal(producer.needs, 'changes');
   assert.equal(
     producer.if,
-    "needs.changes.outputs.typecheck_groups != '[]' || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')",
-    'a lint-rest-only run must not wait for the producer'
+    "contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')",
+    'a run that selects neither trpc row must not pay for the producer'
   );
   const producerInstall = producer.steps.findIndex(step =>
     /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
@@ -388,7 +388,7 @@ test('one job builds the tRPC declarations and both matrices download them', () 
   assert.equal(upload.with['if-no-files-found'], 'error');
 
   for (const [name, guard] of [
-    ['typecheck-groups', undefined],
+    ['typecheck-groups', "matrix.group == 'trpc'"],
     ['lint-groups', "matrix.group == 'trpc'"],
   ]) {
     const job = ci.jobs[name];
@@ -416,12 +416,15 @@ test('one job builds the tRPC declarations and both matrices download them', () 
     assert.ok(downloadIndex > installIndex, `${name} downloads after install`);
   }
 
-  // Every typecheck group receives the declarations, so neither the group
-  // script nor apps/web's typecheck builds them again.
+  // The trpc typecheck row consumes the declarations, so its group script and
+  // apps/web's typecheck skip their own build there.
   const typecheck = ci.jobs['typecheck-groups'].steps.find(step =>
     (step.run ?? '').startsWith('scripts/typecheck-all.sh')
   );
-  assert.equal(typecheck.env.KILO_TYPECHECK_TRPC_BUILT, '1');
+  assert.equal(
+    typecheck.env.KILO_TYPECHECK_TRPC_BUILT,
+    "${{ matrix.group == 'trpc' && '1' || '' }}"
+  );
 
   // The required aggregators keep their needs; a failed download fails the
   // group they already wait for.

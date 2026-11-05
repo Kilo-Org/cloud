@@ -809,11 +809,9 @@ async function settle(
   const turns = await runtime.runPromise(chat.handle.history);
   await countCall(sessionId, chat, { total: await runtime.runPromise(chat.handle.usageByModel) });
   const failed = failure?.reason ?? null;
-  if (failure === null) {
-    await forgetAsked(sessionId);
-  } else {
-    await keepAskedFailure(sessionId, failure.key);
-  }
+  /* A question whose answer landed is forgotten; one whose answer failed keeps
+     the reason beside it, so a reopened chat still says why. */
+  await (failure === null ? forgetAsked(sessionId) : keepAskedFailure(sessionId, failure.key));
   chat.answering = undefined;
   change(sessionId, {
     turns,

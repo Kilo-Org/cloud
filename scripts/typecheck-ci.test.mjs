@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -417,4 +417,80 @@ test('a failed root tRPC build stops the typecheck', t => {
   const result = runTypecheck(t, { root: true, buildExit: 7 });
   assert.equal(result.status, 7);
   assert.deepEqual(result.commands, ['pnpm --filter @kilocode/trpc run build']);
+});
+
+// `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
+// (services/cloud-agent-next/wrapper is one). Both the full and the affected
+// group runs select members with `pnpm -r ... run typecheck`, which starts
+// every selected member's own script, so a member script that also starts
+// another member's typecheck compiles that member twice per run.
+const workspaces = (() => {
+  const patterns = load(
+    readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8')
+  ).packages;
+  const dirs = [];
+  for (const pattern of patterns) {
+    if (!pattern.endsWith('/*')) {
+      dirs.push(pattern);
+      continue;
+    }
+    const parent = posix.dirname(pattern);
+    for (const entry of readdirSync(new URL(`../${parent}/`, import.meta.url))) {
+      const dir = posix.join(parent, entry);
+      if (existsSync(new URL(`../${dir}/package.json`, import.meta.url))) dirs.push(dir);
+    }
+  }
+  return dirs.map(dir => ({
+    dir,
+    manifest: JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')),
+  }));
+})();
+
+const workspaceDirByName = new Map(workspaces.map(({ dir, manifest }) => [manifest.name, dir]));
+
+// The workspace members whose `typecheck` one script of `dir` starts.
+function typecheckedWorkspaces(dir, script) {
+  const targets = new Set();
+  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*\brun\s+typecheck\b/g)) {
+    for (const [, flag, quoted] of command.matchAll(
+      /(-C|--dir|--filter|-F)(?:=|\s+)('[^']*'|"[^"]*"|\S+)/g
+    )) {
+      const value = quoted.replace(/^['"]|['"]$/g, '').replace(/\.\.\.$/, '');
+      const target =
+        flag === '-C' || flag === '--dir'
+          ? posix.normalize(posix.join(dir, value))
+          : workspaceDirByName.get(value);
+      if (target) targets.add(target);
+    }
+  }
+  return [...targets];
+}
+
+test('no workspace typecheck starts another workspace typecheck', () => {
+  const duplicates = [];
+  for (const { dir, manifest } of workspaces) {
+    const script = manifest.scripts?.typecheck;
+    if (!script) continue;
+    for (const target of typecheckedWorkspaces(dir, script)) {
+      if (target !== dir) duplicates.push(`${manifest.name} also typechecks ${target}`);
+    }
+  }
+  assert.deepEqual(duplicates, [], 'a recursive workspace run already typechecks every member');
+});
+
+// Dropping the nested call leaves a standalone `typecheck` covering only this
+// program, so the service keeps a script that covers both for a caller outside
+// the recursive workspace run.
+test('cloud-agent-next keeps a standalone typecheck that covers its wrapper', () => {
+  const service = workspaces.find(({ manifest }) => manifest.name === 'cloud-agent-next');
+  const wrapper = workspaces.find(
+    ({ manifest }) => manifest.name === '@kilocode/cloud-agent-wrapper'
+  );
+  assert.ok(service && wrapper);
+  assert.equal(wrapper.dir, posix.join(service.dir, 'wrapper'));
+  const combined = Object.entries(service.manifest.scripts)
+    .filter(([, script]) => /\btsgo\b|\btsc\b/.test(script))
+    .filter(([, script]) => typecheckedWorkspaces(service.dir, script).includes(wrapper.dir))
+    .map(([name]) => name);
+  assert.notEqual(combined.length, 0, 'a script typechecks the service and its wrapper');
 });

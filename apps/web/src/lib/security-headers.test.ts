@@ -96,7 +96,12 @@ describe('security headers', () => {
         NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
         NEXT_PUBLIC_SESSION_SYNC_URL: 'http://localhost:8791',
       })
-    ).toEqual(['http://localhost:8787', 'ws://localhost:8787', 'http://localhost:8791', 'ws://localhost:8791']);
+    ).toEqual([
+      'http://localhost:8787',
+      'ws://localhost:8787',
+      'http://localhost:8791',
+      'ws://localhost:8791',
+    ]);
   });
 
   it('supports enforcement, report-only, and off modes', () => {

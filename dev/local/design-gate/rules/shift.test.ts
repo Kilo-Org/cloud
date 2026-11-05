@@ -173,3 +173,47 @@ test('layout-shift: a route change starts a new rest', () => {
   const samples = [sample('/', 10), sample('/', 10), sample('/target', 40), sample('/target', 40)];
   assert.deepEqual(checkShift(samples, 120), []);
 });
+
+test('layout-shift: a tab switch starts a new rest even though the route is unchanged', () => {
+  // Every tab group reports `/`, and the tabs keep the blurred screen mounted,
+  // so its copy of the header control sits at the other tab's position until
+  // the navigator detaches it. That is another screen on top, not a move.
+  const sample = (screen: string, x: number) =>
+    tree(
+      [
+        { parent: 0, tag: 'RNSScreenContainer', rect: [0, 0, 400, 800] },
+        {
+          parent: 1,
+          tag: 'RNSScreen',
+          rect: [0, 0, 400, 800],
+          screenState: 2,
+        },
+        {
+          parent: 2,
+          tag: 'View',
+          rect: [x, 60, 70, 48],
+          label: 'Personal',
+          owners: ['View', 'Pressable', 'View', 'ContextControl', 'View', 'ScreenHeader'],
+        },
+      ],
+      { route: '/', screen }
+    );
+  const samples = [sample('tabs/home', 326), sample('tabs/home', 326)];
+  assert.deepEqual(
+    checkShift([...samples, sample('tabs/agents', 270), sample('tabs/agents', 270)], 120),
+    []
+  );
+  // The same control still reports a move inside one screen.
+  assert.deepEqual(
+    checkShift(
+      [
+        sample('tabs/agents', 270),
+        sample('tabs/agents', 270),
+        sample('tabs/agents', 304),
+        sample('tabs/agents', 304),
+      ],
+      120
+    ).map(f => f.measured),
+    [34]
+  );
+});

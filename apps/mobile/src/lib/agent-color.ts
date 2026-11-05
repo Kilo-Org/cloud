@@ -110,6 +110,24 @@ export function toneColor(key: ToneKey): Tint {
   return TONES[key];
 }
 
+/**
+ * The tint every settings row with no hue of its own renders: the neutral tile
+ * (`bg-hair-soft` / `border-border`) behind a `secondaryForeground` icon.
+ *
+ * A settings list is not a list of agents, so no row hashes its title into the
+ * agent ramp: a single list would show several accents. `ConfigureRow` and
+ * `PreferenceRow` share this one value so a switch row and a destination row
+ * standing next to each other start their icon column at the same x.
+ */
+export const NEUTRAL_TINT = {
+  hueClass: 'bg-hair-soft',
+  hueTextClass: 'text-secondary-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-hair-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'secondaryForeground',
+} as const satisfies Tint;
+
 /** Deterministic agent hue from the agent name. */
 export function agentColor(name: string): Tint {
   let hash = 0;

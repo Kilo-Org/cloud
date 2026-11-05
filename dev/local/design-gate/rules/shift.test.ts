@@ -127,6 +127,22 @@ test('layout-shift: text-only identities repeated within a sample are not tracke
   );
 });
 
+test('layout-shift: a label two mounted screens share is not tracked', () => {
+  // A hidden tab keeps its screen in the tree, so the same control exists twice
+  // at different x. Which one the traversal meets first can change between
+  // samples; tracking either would report the distance between them as a move.
+  const sample = (x: number) =>
+    tree([
+      { parent: 0, tag: 'View', rect: [x, 60, 70, 48], label: 'Personal' },
+      { parent: 0, tag: 'View', rect: [326.48, 60, 70, 48], label: 'Personal' },
+    ]);
+  const alternating = [270.48, 326.48, 270.48, 326.48].map(x => sample(x));
+  assert.deepEqual(checkShift(alternating, 120), []);
+  const single = (x: number) =>
+    tree([{ parent: 0, tag: 'View', rect: [x, 60, 70, 48], label: 'Personal' }]);
+  assert.equal(checkShift([single(270), single(270), single(326), single(326)], 120).length, 1);
+});
+
 test('layout-shift: transforms do not hide late content moving a fixed-size wrapper', () => {
   const sample = (visualY: number, layoutY: number, absolute = false) =>
     tree([

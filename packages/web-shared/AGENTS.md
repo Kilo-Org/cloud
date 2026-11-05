@@ -23,7 +23,7 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
 
-## AI gateway database access
+## AI gateway database and Redis access
 
 AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
 in `sfo1`, but the read-write `db` from `lib/drizzle` always connects to the
@@ -74,6 +74,14 @@ gateway deployment, or adding another production caller of the usage-accounting
 path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
+
+The same rule applies to `redisClient` from `lib/redis`: Redis is not in
+`sfo1`, so each command from an `sfo1` instance is a transatlantic round trip.
+Do not add Redis reads or writes before the upstream inference request starts;
+prefer an in-process cache or `readDb`, and defer writes with `after()`. Async
+work, work after the upstream request starts, and exceptional paths may use it.
+A Redis cache in front of a slower remote call, such as the BYOK data-key cache
+in front of KMS, is also allowed; comment why.
 
 ## Data collection versus ZDR
 

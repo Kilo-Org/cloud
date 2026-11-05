@@ -47,6 +47,7 @@ jobs:
               - 'apps/extension/**'
               - '.github/workflows/extension-ci.yml'
               - 'scripts/changed-workspaces.sh'
+              - 'scripts/affected-workspaces.mjs'
               - 'scripts/changed-dependencies.mjs'
               - 'scripts/changed-dependencies.test.mjs'
               - 'package.json'

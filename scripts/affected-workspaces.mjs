@@ -2,8 +2,10 @@
 // Select the workspaces whose typecheck and lint results a change can alter.
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
+//        node scripts/affected-workspaces.mjs --filter-neutral
 // Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
-// test_only_packages, test_only_files }.
+// test_only_packages, test_only_files }. With --filter-neutral it instead prints
+// the standard-input paths that some check reads, one per line.
 //
 // A workspace is affected when one of its files changed, or when it reads an
 // affected workspace. A workspace reads another through a workspace:* entry in
@@ -23,7 +25,7 @@ import { posix } from 'node:path';
 
 // Root paths that change how every workspace is checked.
 const GLOBAL = [
-  /^(package\.json|pnpm-workspace\.yaml|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
+  /^(package\.json|\.npmrc|\.pnpmfile\.cjs|\.nvmrc|\.oxlintrc\.json|\.oxfmtrc\.json|oxlint-plugin-drizzle\.js|tsconfig[^/]*\.json)$/,
   /^(patches|tools\/oxlint)\//,
   /^\.github\/workflows\/(ci|kilo-app-ci)\.yml$/,
   /^\.github\/actions\//,
@@ -56,6 +58,20 @@ const NEUTRAL = [
   /^(\.specs|\.plans|docs|dev|\.kilo|\.agents|\.vscode|\.husky|\.cursor|script|\.github|scripts)\//,
   /^(LICENSE|skills-lock\.json|kilo\.json|flake\.nix|flake\.lock|\.syft\.yaml|\.gitignore|\.gitattributes|\.envrc|\.kilocodeignore|\.prettierignore|\.env\.local\.example)$/,
 ];
+
+// Paths that no check reads on its own: documents, and the root locations above
+// that hold no workspace input. A suite that reads a document as data selects
+// itself through `test_only_*` instead.
+export function isNeutral(file) {
+  return NEUTRAL.some(pattern => pattern.test(file));
+}
+
+// Manifests whose effect reaches one workspace at a time through its resolved
+// dependency graph (scripts/changed-dependencies.mjs). They select the
+// workspaces whose graph moved, and everything only when the graph cannot
+// attribute the change: a root or unscoped dependency, a workspace glob or an
+// installation-policy key, or an unreadable manifest.
+const DEPENDENCY_MANIFESTS = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml']);
 
 const SOURCE_GLOBS = ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs', 'json', 'jsonc'];
 
@@ -179,7 +195,7 @@ function relativeReferences(dirs) {
   return references;
 }
 
-export function selectAffected({ items, changedFiles, lockfileDirs, references }) {
+export function selectAffected({ items, changedFiles, dependencyDirs, references }) {
   const dirs = items.map(item => item.dir);
   const dirOf = new Map(items.map(item => [item.name, item.dir]));
   const nameOf = new Map(items.map(item => [item.dir, item.name]));
@@ -248,11 +264,13 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
       fullChecks.add(script[1]);
       continue;
     }
-    if (file === 'pnpm-lock.yaml') {
-      if (lockfileDirs.includes('*') || lockfileDirs.includes('.')) {
-        reasons.push('pnpm-lock.yaml changes root or unscoped dependencies');
+    if (DEPENDENCY_MANIFESTS.has(file)) {
+      if (dependencyDirs.includes('*') || dependencyDirs.includes('.')) {
+        reasons.push(`${file} changes root or unscoped dependencies`);
       }
-      for (const lockDir of lockfileDirs) if (readers.has(lockDir)) changed.add(lockDir);
+      for (const dependencyDir of dependencyDirs) {
+        if (readers.has(dependencyDir)) changed.add(dependencyDir);
+      }
       continue;
     }
     const rootReaders = rootReads.filter(
@@ -264,7 +282,7 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
     }
     const owned = OWNED.find(([pattern]) => pattern.test(file));
     if (owned) changed.add(owned[1]);
-    if (owned || rootReaders.length || NEUTRAL.some(pattern => pattern.test(file))) continue;
+    if (owned || rootReaders.length || isNeutral(file)) continue;
     reasons.push(`${file} is outside every workspace`);
   }
 
@@ -298,8 +316,14 @@ export function selectAffected({ items, changedFiles, lockfileDirs, references }
   };
 }
 
-if (import.meta.main) {
-  const base = process.argv[2] ?? '';
+// Print the standard-input paths that some check reads, so a selector can skip
+// documents and the neutral root locations.
+function filterNeutral() {
+  const paths = readFileSync(0, 'utf8').split('\n').filter(Boolean);
+  console.log(paths.filter(file => !isNeutral(file)).join('\n'));
+}
+
+function detect(base) {
   const items = workspaces();
   const valid =
     /^[0-9a-f]{40}$/.test(base) &&
@@ -314,11 +338,16 @@ if (import.meta.main) {
   const changedFiles = valid
     ? git('diff', '--name-only', base, 'HEAD').split('\n').filter(Boolean)
     : ['<no base revision>'];
-  const lockfileDirs = changedFiles.includes('pnpm-lock.yaml')
+  const dependencyDirs = changedFiles.some(file => DEPENDENCY_MANIFESTS.has(file))
     ? execFileSync('node', ['scripts/changed-dependencies.mjs', base], { encoding: 'utf8' })
         .split('\n')
         .filter(Boolean)
     : [];
   const references = valid ? relativeReferences(items.map(item => item.dir)) : [];
-  console.log(JSON.stringify(selectAffected({ items, changedFiles, lockfileDirs, references })));
+  console.log(JSON.stringify(selectAffected({ items, changedFiles, dependencyDirs, references })));
+}
+
+if (import.meta.main) {
+  if (process.argv[2] === '--filter-neutral') filterNeutral();
+  else detect(process.argv[2] ?? '');
 }

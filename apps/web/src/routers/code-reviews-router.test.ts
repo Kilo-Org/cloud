@@ -754,6 +754,71 @@ describe('personalReviewAgent.createManualReviewJob', () => {
     });
   });
 
+  it('replays the review an accepted start created when a retry carries the same operation key', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '0f7b7d0e-9d43-4d8f-9a11-2b0c3d4e5f60';
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // The retry a stalled start sends: the first attempt was already accepted,
+    // its response lost, so the same key must resolve to the same review.
+    const retry = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    expect(retry).toEqual(first);
+    // The replay repeats no provider read and creates no second row.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        manualOperationKey: cloud_agent_code_reviews.manual_operation_key,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows).toEqual([{ id: first.reviewId, manualOperationKey: operationKey }]);
+  });
+
+  it('refuses an operation key that already produced a review for another change', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '4b2b6b0f-1234-4c9a-8f1d-0a1b2c3d4e5f';
+
+    await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/2`,
+        modelSlug: 'test-model',
+        operationKey,
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('CONFLICT');
+    expect(rejection.message).toBe('operation_key_reuse_mismatch');
+  });
+
   // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
   // public API. A provider failure there used to escape as a raw Error, so tRPC
   // answered 500 and the client showed a generic failure. Each case below must

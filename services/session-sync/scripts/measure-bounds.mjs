@@ -85,27 +85,31 @@ async function start(name) {
 async function stop() {
   assert(current, 'No active measurement');
   sampling = false;
-  await sampler;
-  await sample();
-  const { profile } = await command('Profiler.stop');
-  const names = new Map(profile.nodes.map(node => [node.id, node.callFrame.functionName]));
-  let activeUs = 0;
-  for (let index = 0; index < (profile.samples?.length ?? 0); index++) {
-    if (names.get(profile.samples[index]) !== '(idle)') activeUs += profile.timeDeltas[index];
+  try {
+    await sampler;
+    await sample();
+    const { profile } = await command('Profiler.stop');
+    const names = new Map(profile.nodes.map(node => [node.id, node.callFrame.functionName]));
+    let activeUs = 0;
+    for (let index = 0; index < (profile.samples?.length ?? 0); index++) {
+      if (names.get(profile.samples[index]) !== '(idle)') activeUs += profile.timeDeltas[index];
+    }
+    const row = {
+      ...current,
+      incrementalUsedHeapBytes: current.peakUsedHeapBytes - current.baselineUsedHeapBytes,
+      sampledCpuMs: activeUs / 1000,
+      profileWindowMs: (profile.endTime - profile.startTime) / 1000,
+    };
+    assert(
+      row.incrementalUsedHeapBytes < 32 * 1024 * 1024,
+      'Boundary fixture added at least 32 MiB sampled heap'
+    );
+    rows.push(row);
+    console.log(`BOUNDS_MEASUREMENT ${JSON.stringify(row)}`);
+  } finally {
+    current = undefined;
+    sampler = undefined;
   }
-  const row = {
-    ...current,
-    incrementalUsedHeapBytes: current.peakUsedHeapBytes - current.baselineUsedHeapBytes,
-    sampledCpuMs: activeUs / 1000,
-    profileWindowMs: (profile.endTime - profile.startTime) / 1000,
-  };
-  assert(
-    row.incrementalUsedHeapBytes < 32 * 1024 * 1024,
-    'Boundary fixture added at least 32 MiB sampled heap'
-  );
-  rows.push(row);
-  console.log(`BOUNDS_MEASUREMENT ${JSON.stringify(row)}`);
-  current = undefined;
 }
 
 const server = createServer(async (request, response) => {
@@ -143,7 +147,29 @@ try {
     child.once('exit', resolve);
   });
   assert.equal(code, 0, 'Workers-pool bounds tests failed');
-  assert(rows.length >= 9, 'Every boundary scenario must be measured');
+  assert.deepEqual(
+    rows.map(row => row.name).sort(),
+    [
+      'reject-json-0',
+      'reject-json-1',
+      'reject-json-2',
+      'reject-preparse-depth',
+      'batch-inline-bytes',
+      'changes',
+      'depth',
+      'json-nodes',
+      'page-seed-0',
+      'page-seed-1',
+      'page-seed-2',
+      'page-seed-3',
+      'page-seed-4',
+      'page-bytes',
+      'page-items',
+      'queue-bytes',
+      'queue-requests',
+    ].sort(),
+    'Every boundary scenario must be measured exactly once'
+  );
   console.log(
     JSON.stringify(
       {

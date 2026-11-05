@@ -34,20 +34,26 @@ async function measure<T>(name: string, fn: () => Promise<T>): Promise<T> {
   // workerd processes forced-GC inspector commands at request safepoints.
   // Issue local no-auth requests until the actual profiler-ready signal arrives.
   let ready = false;
-  const starting = fetch(`${url}/start/${name}`).finally(() => {
-    ready = true;
-  });
-  while (!ready) {
-    const wakeup = await SELF.fetch('https://session-sync.test/__bounds-inspector-wakeup');
-    await wakeup.arrayBuffer();
-  }
-  const started = await starting;
-  expect(started.ok).toBe(true);
-  await started.text();
   try {
+    const starting = fetch(`${url}/start/${name}`, { signal: AbortSignal.timeout(10_000) })
+      .then(
+        response => ({ response }),
+        (error: unknown) => ({ error })
+      )
+      .finally(() => {
+        ready = true;
+      });
+    while (!ready) {
+      const wakeup = await SELF.fetch('https://session-sync.test/__bounds-inspector-wakeup');
+      await wakeup.arrayBuffer();
+    }
+    const start = await starting;
+    if ('error' in start) throw start.error;
+    expect(start.response.ok).toBe(true);
+    await start.response.text();
     return await fn();
   } finally {
-    const stopped = await fetch(`${url}/stop`);
+    const stopped = await fetch(`${url}/stop`, { signal: AbortSignal.timeout(10_000) });
     expect(stopped.ok).toBe(true);
     await stopped.text();
   }

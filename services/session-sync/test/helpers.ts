@@ -18,7 +18,7 @@ async function secret(): Promise<string> {
 /** Mints a sync grant in the exact format that `authorize` accepts. */
 export async function grant(principal: Principal): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ version: 1, tenant: principal.tenant })
+  return new SignJWT({ version: 1, tenant: principal.tenant, env: testEnv.ENVIRONMENT })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer('session-sync')
     .setAudience('session-sync')

@@ -141,9 +141,9 @@ const config: ExpoConfig = {
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
-  // without claiming an "essential" exception. `ios.requireFullScreen` below
-  // STAYS true so iPad split-view/multitasking remains out of scope:
-  // full-screen rotation yes, Split View/Slide Over no.
+  // without claiming an "essential" exception. Rotation does not describe the
+  // window: the iOS 27 SDK makes every window resizable on its own, so
+  // `ios.requireFullScreen` below is a resizing preference, not a scope.
   orientation: 'default',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -185,7 +185,14 @@ const config: ExpoConfig = {
       tinted: './assets/images/logo-tinted.png',
     },
     bundleIdentifier: 'com.kilocode.kiloapp',
-    requireFullScreen: true,
+    // Apple deprecated `UIRequiresFullScreen` in iOS 27: it no longer opts an
+    // app out of resizing, it asks for discrete resizing only. `false` keeps
+    // continuous resizing, which the shared geometry helpers already serve
+    // (src/lib/screen-insets.ts, narrow-layout.ts, tab-bar-layout.ts,
+    // form-sheet.ts). With `supportsTablet`, Expo's config plugin then writes
+    // all four `UISupportedInterfaceOrientations~ipad` values, which App Store
+    // validation requires of a resizable iPad app (ITMS-90474).
+    requireFullScreen: false,
     supportsTablet: true,
     usesAppleSignIn: true,
     // `webcredentials` is the passkey half of the claim: it lets the iOS

@@ -211,6 +211,8 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Sign local simulator builds with an Apple Development identity and its correct team ID.
 - Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
+- `ios.requireFullScreen` is false, so an iOS 27 window resizes continuously.
+- Expo's config plugin then writes the four `UISupportedInterfaceOrientations~ipad` values for App Store validation.
 
 #### Widget layout checks
 
@@ -232,6 +234,9 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+- Resize the window to a narrow size and to a wide size; keep headers, tab labels, lists and transcript controls inside the horizontal safe areas.
+- Resize with an open sheet and the keyboard shown; keep every field and action visible and tappable.
+- Type a draft, resize the window, then background and foreground the app; keep the draft, the route and the transcript position.
 
 ## Diagram host checks
 

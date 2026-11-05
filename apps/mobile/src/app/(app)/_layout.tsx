@@ -9,6 +9,7 @@ import { BriefingSyncMount } from '@/components/agent-briefing/briefing-sync-mou
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
+import { ScreenErrorBoundary } from '@/components/screen-error-boundary';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
@@ -27,7 +28,7 @@ import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
 import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
-import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useAppWideForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { LeaveSettleMount } from '@/lib/navigation/leave-settle-mount';
@@ -97,7 +98,7 @@ function ForegroundReconciliationMount() {
  */
 function AppWideFreshnessMount() {
   const trpc = useTRPC();
-  useRouteForegroundRefresh([
+  useAppWideForegroundRefresh([
     trpc.user.getMe.queryKey(),
     trpc.organizations.list.queryKey(),
     // Kilo-chat keys are FLAT (['kilo-chat', 'conversations', …]), so the
@@ -116,6 +117,13 @@ export const unstable_settings = {
   // return to. `/` itself resolves straight to this anchor: it seeds the tab
   // navigator, so the group needs no `index` redirect of its own.
   anchor: '(tabs)',
+  // A throw while a route screen of this stack renders degrades to that
+  // screen's own retryable state instead of replacing the app: expo-router
+  // wraps each screen in this boundary inside its navigator, so the header, the
+  // back stack and every other screen survive. Nested layouts inherit it; the
+  // tab stacks that own `TabStackErrorBoundary` opt out in their own layouts
+  // and keep that recovery.
+  screenErrorBoundary: ScreenErrorBoundary,
 };
 
 export default function AppLayout() {

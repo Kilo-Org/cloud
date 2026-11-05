@@ -1,4 +1,3 @@
-// Temporary probe line for the Next.js build cache key check.
 import type { User } from '@kilocode/db/schema';
 import type { PaymentMethodInfo } from './stripePaymentMethodInfo';
 import { clsx, type ClassValue } from 'clsx';

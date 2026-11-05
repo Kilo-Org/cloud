@@ -49,7 +49,7 @@
     "knip.ts",
     "sentry.edge.config.ts",
     ".next/dev/types/**/*.ts",
-    "dev/discord-gateway-cron.ts"
+    "../../dev/discord-gateway-cron.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

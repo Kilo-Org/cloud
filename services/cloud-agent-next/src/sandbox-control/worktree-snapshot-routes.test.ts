@@ -1,24 +1,20 @@
 import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
-import jwt from 'jsonwebtoken';
 import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type { HonoContext } from '../hono-context.js';
-import {
-  WORKTREE_SNAPSHOT_AUDIENCE,
-  validateWorktreeSnapshotGrant,
-  worktreeSnapshotObjectKey,
-} from './worktree-snapshot-grant.js';
+import { mintSandboxLaunchCredential } from './credential.js';
+import { worktreeSnapshotObjectKey } from './worktree-snapshot-authorization.js';
 import {
   registerWorktreeSnapshotRoutes,
   WORKTREE_SNAPSHOT_ROUTE_PREFIX,
 } from './worktree-snapshot-routes.js';
 
 const secret = 'worktree-snapshot-route-test-secret';
+const rawCredential = 'a'.repeat(64);
 const identity = {
   sandboxId: 'sandbox_test',
-  allocationId: 'allocation_test',
-  wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+  allocationId: '11111111-1111-4111-8111-111111111111',
 };
 const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
 
@@ -27,11 +23,14 @@ function digest(bytes: Uint8Array): string {
 }
 
 function tokenFor(target = identity): string {
-  return jwt.sign({ type: 'worktree_snapshot', identity: target }, secret, {
-    algorithm: 'HS256',
-    audience: WORKTREE_SNAPSHOT_AUDIENCE,
-    expiresIn: 60,
-  });
+  return mintSandboxLaunchCredential(
+    {
+      sandboxId: target.sandboxId,
+      allocationId: target.allocationId,
+      credential: rawCredential,
+    },
+    secret
+  );
 }
 
 function token(): string {
@@ -39,11 +38,11 @@ function token(): string {
 }
 
 function pathFor(target = identity, suffix = ''): string {
-  return `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${target.sandboxId}/${target.allocationId}/${target.wrapperInstanceId}/${worktreeId}${suffix}`;
+  return `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${target.sandboxId}/${worktreeId}${suffix}`;
 }
 
-function path(suffix = ''): string {
-  return pathFor(identity, suffix);
+function path(): string {
+  return pathFor();
 }
 
 function createBucket() {
@@ -171,6 +170,7 @@ describe('worktree snapshot PUT route', () => {
     expect(authorizeWorktreeSnapshot).toHaveBeenCalledWith({
       allocationId: identity.allocationId,
       worktreeId,
+      credential: rawCredential,
     });
     expect(bucket.put).toHaveBeenCalledOnce();
     const [key, body, options] = bucket.put.mock.calls[0]!;
@@ -331,13 +331,16 @@ describe('worktree snapshot PUT route', () => {
     expect(response.status).toBe(415);
   });
 
-  it('rejects a grant for another identity', async () => {
-    const { env, bucket } = createEnv();
+  it('rejects a launch credential for another sandbox', async () => {
+    const { env, bucket, authorizeWorktreeSnapshot } = createEnv();
     const bytes = new TextEncoder().encode('snapshot');
-    const other = jwt.sign(
-      { type: 'worktree_snapshot', identity: { ...identity, allocationId: 'allocation_old' } },
-      secret,
-      { algorithm: 'HS256', audience: WORKTREE_SNAPSHOT_AUDIENCE, expiresIn: 60 }
+    const other = mintSandboxLaunchCredential(
+      {
+        sandboxId: 'sandbox_other',
+        allocationId: identity.allocationId,
+        credential: rawCredential,
+      },
+      secret
     );
     const response = await app().request(
       path(),
@@ -352,7 +355,34 @@ describe('worktree snapshot PUT route', () => {
       },
       requestEnv(env)
     );
+    expect(response.status).toBe(401);
+    expect(authorizeWorktreeSnapshot).not.toHaveBeenCalled();
+    expect(bucket.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects a rotated or wrong-allocation credential from the DO', async () => {
+    const { env, bucket, authorizeWorktreeSnapshot } = createEnv();
+    authorizeWorktreeSnapshot.mockResolvedValueOnce(false);
+    const bytes = new TextEncoder().encode('snapshot');
+    const response = await app().request(
+      path(),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token()}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': digest(bytes),
+        },
+        body: bytes,
+      },
+      requestEnv(env)
+    );
     expect(response.status).toBe(403);
+    expect(authorizeWorktreeSnapshot).toHaveBeenCalledWith({
+      allocationId: identity.allocationId,
+      worktreeId,
+      credential: rawCredential,
+    });
     expect(bucket.put).not.toHaveBeenCalled();
   });
 
@@ -491,8 +521,8 @@ describe('worktree snapshot PUT route', () => {
     const { env, authorizeWorktreeSnapshot } = createEnv({
       WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket,
     });
-    const oldIdentity = { ...identity, allocationId: 'allocation_old' };
-    const newIdentity = { ...identity, allocationId: 'allocation_new' };
+    const oldIdentity = { ...identity, allocationId: '22222222-2222-4222-8222-222222222222' };
+    const newIdentity = { ...identity, allocationId: '33333333-3333-4333-8333-333333333333' };
     const oldBytes = new TextEncoder().encode('old-state');
     const newBytes = new TextEncoder().encode('new-state');
     const server = app();
@@ -538,8 +568,8 @@ describe('worktree snapshot PUT route', () => {
     const conditional = createConditionalBucket();
     const { env } = createEnv({ WORKTREE_SNAPSHOTS_BUCKET: conditional.bucket });
     conditional.seedObject(new TextEncoder().encode('existing-state'));
-    const oldIdentity = { ...identity, allocationId: 'allocation_old' };
-    const newIdentity = { ...identity, allocationId: 'allocation_new' };
+    const oldIdentity = { ...identity, allocationId: '22222222-2222-4222-8222-222222222222' };
+    const newIdentity = { ...identity, allocationId: '33333333-3333-4333-8333-333333333333' };
     const newerBytes = new TextEncoder().encode('newer-state');
     const server = app();
     const gate = conditional.gateNextPut();
@@ -592,7 +622,7 @@ describe('worktree snapshot PUT route', () => {
     expect(missing.status).toBe(401);
 
     const invalid = await app().request(
-      `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/not-a-worktree`,
+      `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${identity.sandboxId}/not-a-worktree`,
       { method: 'PUT', headers: { Authorization: `Bearer ${token()}` } },
       requestEnv(env)
     );
@@ -684,76 +714,14 @@ describe('worktree snapshot GET route', () => {
     expect(bucket.get).not.toHaveBeenCalled();
   });
 
-  it('rejects an expired grant', async () => {
+  it('rejects an invalid launch credential', async () => {
     const { env } = createEnv();
-    const expired = jwt.sign({ type: 'worktree_snapshot', identity }, secret, {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: -1,
-    });
     const response = await app().request(
       path(),
-      { method: 'GET', headers: { Authorization: `Bearer ${expired}` } },
+      { method: 'GET', headers: { Authorization: 'Bearer not-a-launch-credential' } },
       requestEnv(env)
     );
     expect(response.status).toBe(401);
-  });
-});
-
-describe('worktree snapshot renew route', () => {
-  it('exchanges an unexpired grant for a fresh grant with the same identity', async () => {
-    const { env, authorizeWorktreeSnapshot } = createEnv();
-    const response = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${token()}` } },
-      requestEnv(env)
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { grant: string };
-    expect(validateWorktreeSnapshotGrant(`Bearer ${body.grant}`, secret)).toEqual(identity);
-    const decoded = jwt.decode(body.grant) as { iat?: number; exp?: number };
-    expect(decoded.iat).toBeTypeOf('number');
-    expect(decoded.exp).toBeTypeOf('number');
-    expect(decoded.exp! - decoded.iat!).toBe(4 * 60 * 60);
-    expect(authorizeWorktreeSnapshot).toHaveBeenCalledOnce();
-  });
-
-  it('rejects an expired, mismatched, or unauthorized renewal', async () => {
-    const { env, authorizeWorktreeSnapshot } = createEnv();
-    const expired = jwt.sign({ type: 'worktree_snapshot', identity }, secret, {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: -1,
-    });
-    const expiredResponse = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${expired}` } },
-      requestEnv(env)
-    );
-    expect(expiredResponse.status).toBe(401);
-
-    const mismatch = jwt.sign(
-      {
-        type: 'worktree_snapshot',
-        identity: { ...identity, wrapperInstanceId: crypto.randomUUID() },
-      },
-      secret,
-      { algorithm: 'HS256', audience: WORKTREE_SNAPSHOT_AUDIENCE, expiresIn: 60 }
-    );
-    const mismatchResponse = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${mismatch}` } },
-      requestEnv(env)
-    );
-    expect(mismatchResponse.status).toBe(403);
-
-    authorizeWorktreeSnapshot.mockResolvedValueOnce(false);
-    const unauthorized = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${token()}` } },
-      requestEnv(env)
-    );
-    expect(unauthorized.status).toBe(403);
   });
 
   it('returns 503 while the signing secret is unavailable and recovers on retry', async () => {
@@ -761,43 +729,21 @@ describe('worktree snapshot renew route', () => {
       .fn()
       .mockRejectedValueOnce(new Error('secrets store unavailable'))
       .mockResolvedValue(secret);
-    const { env } = createEnv({ NEXTAUTH_SECRET: { get } });
+    const { env, bucket } = createEnv({ NEXTAUTH_SECRET: { get } });
+    bucket.get.mockResolvedValueOnce(null);
 
     const unavailable = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${token()}` } },
+      path(),
+      { method: 'GET', headers: { Authorization: `Bearer ${token()}` } },
       requestEnv(env)
     );
     expect(unavailable.status).toBe(503);
 
     const recovered = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${token()}` } },
+      path(),
+      { method: 'GET', headers: { Authorization: `Bearer ${token()}` } },
       requestEnv(env)
     );
-    expect(recovered.status).toBe(200);
-    const body = (await recovered.json()) as { grant: string };
-    expect(validateWorktreeSnapshotGrant(`Bearer ${body.grant}`, secret)).toEqual(identity);
-  });
-
-  it('keeps 401 for an invalid grant while the secret resolves', async () => {
-    const get = vi.fn().mockResolvedValue(secret);
-    const { env } = createEnv({ NEXTAUTH_SECRET: { get } });
-    const response = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: 'Bearer not-a-grant' } },
-      requestEnv(env)
-    );
-    expect(response.status).toBe(401);
-  });
-
-  it('is not found while writes are disabled', async () => {
-    const { env } = createEnv({ WORKTREE_SNAPSHOT_WRITES_ENABLED: 'false' });
-    const response = await app().request(
-      path('/renew'),
-      { method: 'POST', headers: { Authorization: `Bearer ${token()}` } },
-      requestEnv(env)
-    );
-    expect(response.status).toBe(404);
+    expect(recovered.status).toBe(404);
   });
 });

@@ -1,6 +1,5 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
-import { mintWorktreeSnapshotGrant } from './worktree-snapshot-grant.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   type AgentSandboxProvider,
@@ -20,23 +19,35 @@ export type ControlWrapperLaunchEnvInput = {
   worktreeSnapshotWrites?: boolean;
 };
 
+function validWorkerUrl(workerUrl: string | undefined): string | undefined {
+  if (!workerUrl) return undefined;
+  try {
+    const base = new URL(workerUrl);
+    if (
+      !['http:', 'https:'].includes(base.protocol) ||
+      base.username ||
+      base.password ||
+      base.search ||
+      base.hash
+    ) {
+      return undefined;
+    }
+    return workerUrl;
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildControlWrapperLaunchEnv(
   input: ControlWrapperLaunchEnvInput
 ): Record<string, string> {
   const workerUrl = input.workerUrl?.replace(/\/$/, '') ?? '';
+  const snapshotBaseUrl = input.worktreeSnapshotWrites ? validWorkerUrl(workerUrl) : undefined;
   let diagnosticEnv: Record<string, string> = {};
   if (input.diagnostics?.signingSecret && workerUrl) {
     try {
-      const base = new URL(workerUrl);
-      if (
-        !['http:', 'https:'].includes(base.protocol) ||
-        base.username ||
-        base.password ||
-        base.search ||
-        base.hash
-      ) {
+      if (validWorkerUrl(workerUrl) === undefined)
         throw new Error('Invalid diagnostic upload origin');
-      }
       const identity = {
         sandboxId: input.sandboxId,
         allocationId: input.diagnostics.allocationId,
@@ -51,22 +62,17 @@ export function buildControlWrapperLaunchEnv(
         CONTROL_LOG_UPLOAD_GRANT: grant,
         CONTROL_WRAPPER_INSTANCE_ID: identity.wrapperInstanceId,
       };
-      if (input.worktreeSnapshotWrites) {
-        diagnosticEnv = {
-          ...diagnosticEnv,
-          CONTROL_WORKTREE_SNAPSHOT_URL: `${workerUrl}${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${path}`,
-          CONTROL_WORKTREE_SNAPSHOT_GRANT: mintWorktreeSnapshotGrant(
-            identity,
-            input.diagnostics.signingSecret
-          ),
-        };
-      }
     } catch {
       diagnosticEnv = {};
     }
   }
   return {
     ...diagnosticEnv,
+    ...(snapshotBaseUrl === undefined
+      ? {}
+      : {
+          CONTROL_WORKTREE_SNAPSHOT_URL: `${snapshotBaseUrl}${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${encodeURIComponent(input.sandboxId)}`,
+        }),
     // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
     // Supply the runtime path directly instead of reading a snapshot's login profile.
     ...(input.provider === 'vercel'

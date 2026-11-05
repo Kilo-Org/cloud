@@ -1,89 +1,34 @@
-import jwt from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
 import {
-  WORKTREE_SNAPSHOT_AUDIENCE,
-  WORKTREE_SNAPSHOT_GRANT_SECONDS,
   decideWorktreeSnapshotAuthorization,
-  mintWorktreeSnapshotGrant,
   purgeWorktreeSnapshot,
-  validateWorktreeSnapshotGrant,
+  worktreeSnapshotAuthorizationInputSchema,
   worktreeSnapshotObjectKey,
   worktreeSnapshotReadsEnabled,
   worktreeSnapshotTombstoneKey,
   worktreeSnapshotWritesEnabled,
-} from './worktree-snapshot-grant.js';
+} from './worktree-snapshot-authorization.js';
 
-const secret = 'worktree-snapshot-test-secret';
-const identity = {
-  sandboxId: 'sandbox_test',
-  allocationId: 'allocation_test',
-  wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
-};
+const allocationId = 'allocation_test';
 const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+const credential = 'a'.repeat(64);
 
-describe('worktree snapshot grants', () => {
-  it('round-trips the shared sandbox identity', () => {
-    const token = mintWorktreeSnapshotGrant(identity, secret);
-    expect(validateWorktreeSnapshotGrant(`Bearer ${token}`, secret)).toEqual(identity);
-  });
-
-  it('rejects a grant for another audience', () => {
-    const token = jwt.sign({ type: 'worktree_snapshot', identity }, secret, {
-      algorithm: 'HS256',
-      audience: 'cloud-agent-control-log-upload',
-      expiresIn: 60,
-    });
-    expect(validateWorktreeSnapshotGrant(`Bearer ${token}`, secret)).toBeUndefined();
-  });
-
-  it('rejects an expired grant', () => {
-    const token = jwt.sign({ type: 'worktree_snapshot', identity }, secret, {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: -1,
-    });
-    expect(validateWorktreeSnapshotGrant(`Bearer ${token}`, secret)).toBeUndefined();
-  });
-
-  it('rejects a grant longer than the four-hour half-life contract', () => {
-    const token = jwt.sign({ type: 'worktree_snapshot', identity }, secret, {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: WORKTREE_SNAPSHOT_GRANT_SECONDS + 1,
-    });
-    expect(validateWorktreeSnapshotGrant(`Bearer ${token}`, secret)).toBeUndefined();
-  });
-
-  it('rejects a grant issued in the future or with another type', () => {
-    const now = Math.floor(Date.now() / 1000);
-    const future = jwt.sign(
-      {
-        type: 'worktree_snapshot',
-        identity,
-        iat: now + 3600,
-        exp: now + 3600 + WORKTREE_SNAPSHOT_GRANT_SECONDS,
-      },
-      secret,
-      { algorithm: 'HS256', audience: WORKTREE_SNAPSHOT_AUDIENCE }
-    );
-    expect(validateWorktreeSnapshotGrant(`Bearer ${future}`, secret)).toBeUndefined();
-
-    const wrongType = jwt.sign({ type: 'control_log_upload', identity }, secret, {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: 60,
-    });
-    expect(validateWorktreeSnapshotGrant(`Bearer ${wrongType}`, secret)).toBeUndefined();
-  });
-
-  it('rejects a malformed authorization or missing secret', () => {
-    expect(validateWorktreeSnapshotGrant(null, secret)).toBeUndefined();
-    expect(validateWorktreeSnapshotGrant('Bearer', secret)).toBeUndefined();
-    expect(validateWorktreeSnapshotGrant('Bearer one two', secret)).toBeUndefined();
-    expect(validateWorktreeSnapshotGrant(`Bearer ${'x'.repeat(4097)}`, secret)).toBeUndefined();
+describe('worktree snapshot authorization input', () => {
+  it('requires the allocation, worktree, and current credential', () => {
     expect(
-      validateWorktreeSnapshotGrant(`Bearer ${mintWorktreeSnapshotGrant(identity, secret)}`, null)
-    ).toBeUndefined();
+      worktreeSnapshotAuthorizationInputSchema.safeParse({ allocationId, worktreeId, credential })
+        .success
+    ).toBe(true);
+    expect(
+      worktreeSnapshotAuthorizationInputSchema.safeParse({ allocationId, worktreeId }).success
+    ).toBe(false);
+    expect(
+      worktreeSnapshotAuthorizationInputSchema.safeParse({
+        allocationId,
+        worktreeId,
+        credential: 'short',
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -111,8 +56,8 @@ describe('worktree snapshot flags', () => {
 
 describe('worktree snapshot authorization', () => {
   const authorized = {
-    allocationId: identity.allocationId,
-    currentAllocationId: identity.allocationId,
+    allocationId,
+    currentAllocationId: allocationId,
     allocationKind: 'connected',
     routeScopeIds: ['workspace_other', worktreeId],
     worktreeId,

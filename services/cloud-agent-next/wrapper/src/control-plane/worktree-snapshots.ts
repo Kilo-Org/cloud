@@ -1,16 +1,8 @@
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  chmodSync,
-  createReadStream,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { mkdtemp, open, rm } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { WORKTREE_SNAPSHOT_RESTORE_MS } from '../../../src/shared/control-plane-timers.js';
 import {
   WORKTREE_SNAPSHOT_CAPTURE_MS,
@@ -26,12 +18,9 @@ const DEBOUNCE_MS = 1_000;
 const MAX_WAIT_MS = 15_000;
 const RETRY_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 60_000;
-const RENEW_TIMEOUT_MS = 60_000;
 const MAX_CONCURRENT_CAPTURES = 2;
 const DOWNLOAD_ATTEMPTS = 3;
 const DOWNLOAD_RETRY_DELAYS_MS = [250, 500];
-const RENEW_RETRY_MS = 30_000;
-const CACHE_VERSION = 1;
 
 export type WorktreeSnapshotClock = {
   now: () => number;
@@ -95,9 +84,8 @@ export type WorktreeSnapshots = {
 
 export type WorktreeSnapshotsOptions = {
   url?: string;
-  grant?: string;
+  credential?: string;
   log?: (message: string) => void;
-  cachePath?: string | null;
   capture?: (input: WorktreeSnapshotCaptureInput) => Promise<CapturedWorktreeSnapshot | null>;
   apply?: (input: WorktreeSnapshotApplyInput) => Promise<AppliedWorktreeSnapshot>;
   fetch?: WorktreeSnapshotFetch;
@@ -151,7 +139,7 @@ type WorktreeState = {
   due: boolean;
   queued: boolean;
   removed: boolean;
-  uploadBlocked?: 'grant' | 'worktree';
+  uploadBlocked?: 'revoked' | 'worktree';
   debounce?: TimerHandle;
   maxWait?: TimerHandle;
   retry?: TimerHandle;
@@ -177,10 +165,6 @@ const defaultClock: WorktreeSnapshotClock = {
   clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
@@ -196,74 +180,6 @@ function normalizeSha256(value: string): string | undefined {
     .replace(/^sha256:/, '')
     .replace(/^"|"$/g, '');
   return /^[0-9a-f]{64}$/.test(normalized) ? normalized : undefined;
-}
-
-function jwtPayload(token: string): Record<string, unknown> | undefined {
-  const payload = token.split('.')[1];
-  if (!payload) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    return isRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function jwtTimes(token: string): { iat?: number; exp?: number } | undefined {
-  const parsed = jwtPayload(token);
-  if (parsed === undefined) return undefined;
-  return {
-    ...(typeof parsed.iat === 'number' && Number.isFinite(parsed.iat) ? { iat: parsed.iat } : {}),
-    ...(typeof parsed.exp === 'number' && Number.isFinite(parsed.exp) ? { exp: parsed.exp } : {}),
-  };
-}
-
-type GrantIdentity = {
-  sandboxId: string;
-  allocationId: string;
-  wrapperInstanceId: string;
-};
-
-function jwtIdentity(token: string): GrantIdentity | undefined {
-  const parsed = jwtPayload(token);
-  if (parsed === undefined || !isRecord(parsed.identity)) return undefined;
-  const { sandboxId, allocationId, wrapperInstanceId } = parsed.identity;
-  if (
-    typeof sandboxId !== 'string' ||
-    typeof allocationId !== 'string' ||
-    typeof wrapperInstanceId !== 'string'
-  )
-    return undefined;
-  return { sandboxId, allocationId, wrapperInstanceId };
-}
-
-function urlIdentity(baseUrl: string): GrantIdentity | undefined {
-  try {
-    const segments = new URL(baseUrl).pathname.split('/').filter(Boolean);
-    if (segments.length < 3) return undefined;
-    const [sandboxId, allocationId, wrapperInstanceId] = segments.slice(-3);
-    if (sandboxId === undefined || allocationId === undefined || wrapperInstanceId === undefined)
-      return undefined;
-    return { sandboxId, allocationId, wrapperInstanceId };
-  } catch {
-    return undefined;
-  }
-}
-
-function sameIdentity(left: GrantIdentity, right: GrantIdentity): boolean {
-  return (
-    left.sandboxId === right.sandboxId &&
-    left.allocationId === right.allocationId &&
-    left.wrapperInstanceId === right.wrapperInstanceId
-  );
-}
-
-function defaultGrantCachePath(): string {
-  try {
-    return join(homedir(), '.kilo-control', 'worktree-snapshot', 'grant.json');
-  } catch {
-    return join('/home', '.kilo-control', 'worktree-snapshot', 'grant.json');
-  }
 }
 
 function isInvalidWorktreeSnapshotError(error: unknown): boolean {
@@ -349,113 +265,17 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
   const apply = options.apply ?? applyWorktreeSnapshot;
   const log = options.log ?? (() => undefined);
   const baseUrl = options.url?.trim().replace(/\/+$/, '') || undefined;
-  const launchGrant = options.grant?.trim() || undefined;
-  const cachePath = options.cachePath === undefined ? defaultGrantCachePath() : options.cachePath;
-  const ownsCacheDirectory = options.cachePath === undefined;
-
-  const launchFingerprint =
-    launchGrant === undefined ? undefined : createHash('sha256').update(launchGrant).digest('hex');
-  const launchIdentity = launchGrant === undefined ? undefined : jwtIdentity(launchGrant);
-  const grantUrlIdentity = baseUrl === undefined ? undefined : urlIdentity(baseUrl);
-  const configured = baseUrl !== undefined && launchGrant !== undefined;
-  let grant = launchGrant;
+  const credential = options.credential?.trim() || undefined;
+  const configured = baseUrl !== undefined && credential !== undefined;
 
   const states = new Map<string, WorktreeState>();
   const startQueue: WorktreeState[] = [];
   let globalActive = 0;
   let closed = false;
-  let renewalTimer: TimerHandle = undefined;
-  let renewalAbort: AbortController | undefined;
-  let renewing = false;
-  let renewalStopped = false;
 
   function snapshotUrl(worktreeId: string): string | undefined {
     if (baseUrl === undefined) return undefined;
     return `${baseUrl}/${encodeURIComponent(worktreeId)}`;
-  }
-
-  function loadCachedGrant(): string | undefined {
-    if (cachePath === null || baseUrl === undefined || launchFingerprint === undefined)
-      return undefined;
-    try {
-      const raw: unknown = JSON.parse(readFileSync(cachePath, 'utf8'));
-      if (
-        !isRecord(raw) ||
-        raw.version !== CACHE_VERSION ||
-        raw.url !== baseUrl ||
-        raw.launch !== launchFingerprint
-      )
-        return undefined;
-      if (typeof raw.grant !== 'string' || raw.grant.length === 0 || raw.grant.length > 4096)
-        return undefined;
-      const times = jwtTimes(raw.grant);
-      if (times?.exp === undefined || times.exp * 1000 <= clock.now()) return undefined;
-      const cachedIdentity = jwtIdentity(raw.grant);
-      if (
-        launchIdentity !== undefined &&
-        (cachedIdentity === undefined || !sameIdentity(cachedIdentity, launchIdentity))
-      )
-        return undefined;
-      if (
-        cachedIdentity !== undefined &&
-        grantUrlIdentity !== undefined &&
-        !sameIdentity(cachedIdentity, grantUrlIdentity)
-      )
-        return undefined;
-      return raw.grant;
-    } catch {
-      return undefined;
-    }
-  }
-
-  function saveCachedGrant(nextGrant: string): void {
-    if (cachePath === null || baseUrl === undefined || launchFingerprint === undefined) return;
-    const target = resolve(cachePath);
-    let temporary: string | undefined;
-    try {
-      const directory = dirname(target);
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      if (ownsCacheDirectory) {
-        try {
-          chmodSync(directory, 0o700);
-        } catch {
-          // The file mode still protects the token when the directory is not ours.
-        }
-      }
-      temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
-      writeFileSync(
-        temporary,
-        JSON.stringify({
-          version: CACHE_VERSION,
-          url: baseUrl,
-          launch: launchFingerprint,
-          grant: nextGrant,
-        }),
-        { encoding: 'utf8', mode: 0o600, flag: 'wx' }
-      );
-      renameSync(temporary, target);
-      temporary = undefined;
-      try {
-        chmodSync(target, 0o600);
-      } catch {
-        // Write mode already requested 0600; chmod is defense in depth.
-      }
-    } catch {
-      if (temporary !== undefined) {
-        try {
-          rmSync(temporary, { force: true });
-        } catch {
-          // Best effort; the temporary name is unguessable and contains no grant.
-        }
-      }
-      log('worktree snapshot credential cache write failed');
-    }
-  }
-
-  const cachedGrant = configured ? loadCachedGrant() : undefined;
-  if (cachedGrant !== undefined) {
-    grant = cachedGrant;
-    log('worktree snapshot credential cache loaded');
   }
 
   function clearTimer(handle: TimerHandle): undefined {
@@ -467,12 +287,6 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     state.debounce = clearTimer(state.debounce);
     state.maxWait = clearTimer(state.maxWait);
     state.retry = clearTimer(state.retry);
-  }
-
-  function clearRenewal(): void {
-    renewalTimer = clearTimer(renewalTimer);
-    renewalAbort?.abort();
-    renewalAbort = undefined;
   }
 
   function enqueue(state: WorktreeState): void {
@@ -524,14 +338,14 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     signal: AbortSignal
   ): Promise<{ digest: string; size: number }> {
     const url = snapshotUrl(worktreeId);
-    if (url === undefined || grant === undefined) throw new Error('snapshot transport unset');
+    if (url === undefined || credential === undefined) throw new Error('snapshot transport unset');
     const archive = await hashFile(archivePath, signal);
     if (archive.size !== size) throw new Error('capture archive size changed');
     const body = fileStream(archivePath);
     const response = await fetchImpl(url, {
       method: 'PUT',
       headers: {
-        authorization: `Bearer ${grant}`,
+        authorization: `Bearer ${credential}`,
         'content-length': String(archive.size),
         'x-kilo-sha256': archive.digest,
       },
@@ -673,8 +487,7 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
       if (error instanceof SnapshotUploadError) {
         if (error.status === 401 || error.status === 403) {
           uploadAuthorization = error.status;
-          state.uploadBlocked = error.status === 401 ? 'grant' : 'worktree';
-          if (error.status === 401) void renewGrant();
+          state.uploadBlocked = error.status === 401 ? 'revoked' : 'worktree';
         }
       }
       log(
@@ -697,8 +510,6 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
                 enqueue(state);
               }
             }, RETRY_MS);
-          } else if (state.uploadBlocked === undefined) {
-            requestCapture(state.directory);
           }
         } else if (state.trailing) {
           state.trailing = false;
@@ -757,7 +568,7 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     }
     const current = states.get(input.directory);
     if (current !== undefined) {
-      current.uploadBlocked = undefined;
+      if (current.uploadBlocked === 'worktree') current.uploadBlocked = undefined;
     } else {
       states.set(input.directory, {
         directory: input.directory,
@@ -770,7 +581,6 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
         removed: false,
       });
     }
-    ensureRenewalScheduled();
   }
 
   function unregister(directory: string): void {
@@ -784,149 +594,6 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     state.queued = false;
     const index = startQueue.indexOf(state);
     if (index >= 0) startQueue.splice(index, 1);
-    if (states.size === 0) clearRenewal();
-  }
-
-  function renewalDelay(now: number): number | undefined {
-    if (grant === undefined) return undefined;
-    const times = jwtTimes(grant);
-    if (times?.exp === undefined) return undefined;
-    const expires = times.exp * 1000;
-    if (expires <= now) return undefined;
-    const issued = times.iat === undefined ? now : times.iat * 1000;
-    const halfLife = issued + (expires - issued) / 2;
-    return Math.max(0, halfLife - now);
-  }
-
-  function scheduleRenewal(delayMs?: number): void {
-    if (closed || !configured || renewalStopped || renewalTimer !== undefined || states.size === 0)
-      return;
-    const delay = delayMs ?? renewalDelay(clock.now());
-    if (delay === undefined) return;
-    renewalTimer = clock.setTimeout(() => {
-      renewalTimer = undefined;
-      void renewGrant();
-    }, delay);
-  }
-
-  function ensureRenewalScheduled(): void {
-    if (renewalTimer === undefined && !renewing) scheduleRenewal();
-  }
-
-  function resumeGrantBlockedCaptures(): void {
-    for (const state of states.values()) {
-      if (state.uploadBlocked !== 'grant') continue;
-      state.uploadBlocked = undefined;
-      requestCapture(state.directory);
-    }
-  }
-
-  async function renewGrant(): Promise<void> {
-    if (closed || !configured || renewalStopped || renewing || grant === undefined) return;
-    const worktreeIds = [...new Set([...states.values()].map(state => state.worktreeId))];
-    if (worktreeIds.length === 0) return;
-    const times = jwtTimes(grant);
-    if (times?.exp !== undefined && times.exp * 1000 <= clock.now()) {
-      renewalStopped = true;
-      log('worktree snapshot grant expired; captures resume after the wrapper relaunches');
-      return;
-    }
-
-    renewing = true;
-    renewalTimer = clearTimer(renewalTimer);
-    const abort = new AbortController();
-    renewalAbort = abort;
-    let status: number | undefined;
-    let renewed = false;
-    let authFailure = false;
-    let timedOut = false;
-    const renewDeadline = clock.now() + RENEW_TIMEOUT_MS;
-    try {
-      for (const worktreeId of worktreeIds) {
-        if (closed || abort.signal.aborted) break;
-        const remaining = renewDeadline - clock.now();
-        if (remaining <= 0) {
-          timedOut = true;
-          break;
-        }
-        const url = snapshotUrl(worktreeId);
-        if (url === undefined) continue;
-        let outcome: { status: number; body?: unknown };
-        try {
-          outcome = await runWithTimeout({
-            clock,
-            parent: abort.signal,
-            timeoutMs: remaining,
-            start: async signal => {
-              const response = await fetchImpl(`${url}/renew`, {
-                method: 'POST',
-                headers: { authorization: `Bearer ${grant}` },
-                signal,
-              });
-              if (!response.ok) {
-                await response.body?.cancel().catch(() => undefined);
-                return { status: response.status };
-              }
-              const body: unknown = await response.json().catch(() => undefined);
-              return {
-                status: response.status,
-                body,
-              };
-            },
-          });
-        } catch (error) {
-          if (error instanceof WorktreeSnapshotTimeoutError) timedOut = true;
-          status = undefined;
-          break;
-        }
-        status = outcome.status;
-        if (status >= 200 && status < 300) {
-          if (
-            isRecord(outcome.body) &&
-            typeof outcome.body.grant === 'string' &&
-            outcome.body.grant.length > 0
-          ) {
-            grant = outcome.body.grant;
-            renewed = true;
-            saveCachedGrant(grant);
-            log('worktree snapshot grant renewed');
-            break;
-          }
-          break;
-        }
-        if (status === 401) {
-          authFailure = true;
-          break;
-        }
-        if (status !== 403) break;
-      }
-    } finally {
-      renewing = false;
-      if (renewalAbort === abort) renewalAbort = undefined;
-    }
-
-    if (closed || states.size === 0) return;
-    if (abort.signal.aborted) {
-      ensureRenewalScheduled();
-      return;
-    }
-    if (renewed) {
-      resumeGrantBlockedCaptures();
-      const delay = renewalDelay(clock.now());
-      scheduleRenewal(delay === undefined ? undefined : Math.max(delay, RENEW_RETRY_MS));
-      return;
-    }
-    if (authFailure) {
-      renewalStopped = true;
-      log('worktree snapshot grant renewal stopped status=401');
-      return;
-    }
-    log(
-      `worktree snapshot grant renewal failed status=${
-        timedOut ? 'timeout' : status === undefined ? 'network' : status
-      }`
-    );
-    scheduleRenewal(RENEW_RETRY_MS);
   }
 
   async function downloadOnce(input: {
@@ -935,13 +602,13 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     signal: AbortSignal;
   }): Promise<DownloadOutcome> {
     const url = snapshotUrl(input.worktreeId);
-    if (url === undefined || grant === undefined) return { kind: 'persistent' };
+    if (url === undefined || credential === undefined) return { kind: 'persistent' };
 
     let response: Response;
     try {
       response = await fetchImpl(url, {
         method: 'GET',
-        headers: { authorization: `Bearer ${grant}` },
+        headers: { authorization: `Bearer ${credential}` },
         signal: input.signal,
       });
     } catch (error) {
@@ -1141,7 +808,6 @@ export function createWorktreeSnapshots(options: WorktreeSnapshotsOptions = {}):
     }
     states.clear();
     startQueue.length = 0;
-    clearRenewal();
   }
 
   return { register, unregister, requestCapture, restore, close };

@@ -93,7 +93,7 @@ import {
   worktreeSnapshotTombstoneInputSchema,
   worktreeSnapshotTombstoneKey,
   worktreeSnapshotWritesEnabled,
-} from '../../sandbox-control/worktree-snapshot-grant.js';
+} from '../../sandbox-control/worktree-snapshot-authorization.js';
 import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
 import { selectStartup } from '../../sandbox-control/startup-selection.js';
 import {
@@ -118,11 +118,7 @@ import {
 } from '../../sandbox-placement.js';
 import { sessionDoName } from '../../session-identity.js';
 import { logger } from '../../logger.js';
-import {
-  diagnosticCause,
-  logControlDiagnostic,
-  type ControlDiagnosticFields,
-} from '../../sandbox-control/diagnostics.js';
+import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import {
   getWorktreeCredentialContainment,
   type CredentialContainmentRequirements,
@@ -1124,17 +1120,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Whether the current allocation may read or write a worktree snapshot.
-   * Checked on every request: the grant identity alone cannot prove the
-   * sandbox still owns the allocation or that the worktree was not deleted.
+   * Checked on every request: the signed launch identity alone cannot prove the
+   * sandbox still owns the allocation, holds the current credential, or that
+   * the worktree was not deleted.
    */
   async authorizeWorktreeSnapshot(input: {
     allocationId: string;
     worktreeId: string;
+    credential: string;
   }): Promise<boolean> {
     await this.initialized;
     const parsed = worktreeSnapshotAuthorizationInputSchema.parse(input);
     return this.enqueue(async () => {
-      const state = await this.readAllocation();
+      const { state, failure } = await this.checkAllocationCredential(
+        parsed.allocationId,
+        parsed.credential
+      );
+      if (failure !== undefined) return false;
       const routes = await listRoutes(this.db);
       const tombstone = await this.ctx.storage.get(worktreeSnapshotTombstoneKey(parsed.worktreeId));
       return decideWorktreeSnapshotAuthorization({
@@ -5484,11 +5486,41 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
+  private async checkAllocationCredential(
+    allocationId: string,
+    credential: string | null
+  ): Promise<{
+    state: AllocationState;
+    failure?: { reason: string; credentialHashPresent?: boolean };
+  }> {
+    const state = await this.readAllocation();
+    if (this.currentProvider() === 'vercel' && this.providerPin?.byoc === undefined)
+      return { state, failure: { reason: 'byoc_credential_missing' } };
+    if (state.kind === 'stopped' || state.kind === 'stopping') {
+      return { state, failure: { reason: `allocation_${state.kind}` } };
+    }
+    if (state.allocationId === null || allocationId !== state.allocationId) {
+      return { state, failure: { reason: 'allocation_mismatch' } };
+    }
+    if (credential === null) return { state, failure: { reason: 'missing_credential' } };
+    const storedHash = await this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY);
+    if (typeof storedHash !== 'string' || storedHash.length === 0) {
+      return {
+        state,
+        failure: { reason: 'missing_credential_hash', credentialHashPresent: false },
+      };
+    }
+    if (!(await sandboxCredentialMatchesHash(credential, storedHash))) {
+      return { state, failure: { reason: 'credential_mismatch', credentialHashPresent: true } };
+    }
+    return { state };
+  }
+
   private async validateAllocationCredential(
     allocationId: string,
     credential: string | null
   ): Promise<boolean> {
-    const state = await this.readAllocation();
+    const { state, failure } = await this.checkAllocationCredential(allocationId, credential);
     const admission = {
       allocationName: this.providerPin?.allocationName ?? this.sandboxId,
       allocationKind: state.kind,
@@ -5496,25 +5528,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       receivedAllocationId: allocationId,
       credentialPresent: credential !== null,
     };
-    const reject = (reason: string, extra: ControlDiagnosticFields = {}): boolean => {
-      logControlDiagnostic('hello_admission', { ...admission, accepted: false, reason, ...extra });
+    if (failure !== undefined) {
+      logControlDiagnostic('hello_admission', {
+        ...admission,
+        accepted: false,
+        reason: failure.reason,
+        ...(failure.credentialHashPresent === undefined
+          ? {}
+          : { credentialHashPresent: failure.credentialHashPresent }),
+      });
       return false;
-    };
-    if (this.currentProvider() === 'vercel' && this.providerPin?.byoc === undefined)
-      return reject('byoc_credential_missing');
-    if (state.kind === 'stopped' || state.kind === 'stopping') {
-      return reject(`allocation_${state.kind}`);
-    }
-    if (state.allocationId === null || allocationId !== state.allocationId) {
-      return reject('allocation_mismatch');
-    }
-    if (credential === null) return reject('missing_credential');
-    const storedHash = await this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY);
-    if (typeof storedHash !== 'string' || storedHash.length === 0) {
-      return reject('missing_credential_hash', { credentialHashPresent: false });
-    }
-    if (!(await sandboxCredentialMatchesHash(credential, storedHash))) {
-      return reject('credential_mismatch', { credentialHashPresent: true });
     }
     logControlDiagnostic('hello_admission', { ...admission, accepted: true, reason: 'accepted' });
     return true;

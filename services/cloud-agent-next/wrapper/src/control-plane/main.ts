@@ -336,7 +336,6 @@ export async function runControlPlaneWrapper(
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
   const snapshotUrl = env.CONTROL_WORKTREE_SNAPSHOT_URL;
-  const snapshotGrant = env.CONTROL_WORKTREE_SNAPSHOT_GRANT;
   const projector = createControlDiagnosticProjector({
     enabled: nativeControlPlaneLogsEnabled(env),
   });
@@ -355,7 +354,6 @@ export async function runControlPlaneWrapper(
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
   delete env.CONTROL_WORKTREE_SNAPSHOT_URL;
-  delete env.CONTROL_WORKTREE_SNAPSHOT_GRANT;
   delete env.CONTROL_WRAPPER_INSTANCE_ID;
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
@@ -408,7 +406,7 @@ export async function runControlPlaneWrapper(
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
   const worktreeSnapshots = createWorktreeSnapshots({
     url: snapshotUrl,
-    grant: snapshotGrant,
+    credential,
     log: logToFile,
   });
   const host = createControlPlaneSessionHost({

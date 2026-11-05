@@ -1,36 +1,15 @@
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
-import {
-  controlLogAllocationIdSchema,
-  controlLogIdentitySchema,
-  type ControlLogIdentity,
-} from '../shared/control-diagnostics.js';
+import { controlLogAllocationIdSchema } from '../shared/control-diagnostics.js';
 
-export {
-  WORKTREE_SNAPSHOT_MAX_BYTES,
-  WORKTREE_SNAPSHOT_ROUTE_PREFIX,
-} from '../shared/worktree-snapshot.js';
-
-export const WORKTREE_SNAPSHOT_AUDIENCE = 'cloud-agent-worktree-snapshot';
-export const WORKTREE_SNAPSHOT_GRANT_SECONDS = 4 * 60 * 60;
 export const WORKTREE_SNAPSHOT_SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 export const WORKTREE_SNAPSHOT_TOMBSTONE_PREFIX = 'worktree_snapshot_tombstone/';
-
-const grantSchema = z
-  .object({
-    type: z.literal('worktree_snapshot'),
-    aud: z.literal(WORKTREE_SNAPSHOT_AUDIENCE),
-    identity: controlLogIdentitySchema,
-    iat: z.number().int().nonnegative(),
-    exp: z.number().int().nonnegative(),
-  })
-  .strict();
 
 export const worktreeSnapshotAuthorizationInputSchema = z
   .object({
     allocationId: controlLogAllocationIdSchema,
     worktreeId: cloudAgentWorktreeIdSchema,
+    credential: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 
@@ -48,43 +27,6 @@ export function worktreeSnapshotObjectKey(worktreeId: string): string {
 
 export function worktreeSnapshotTombstoneKey(worktreeId: string): string {
   return `${WORKTREE_SNAPSHOT_TOMBSTONE_PREFIX}${worktreeId}`;
-}
-
-export function mintWorktreeSnapshotGrant(identity: ControlLogIdentity, secret: string): string {
-  return jwt.sign(
-    { type: 'worktree_snapshot', identity: controlLogIdentitySchema.parse(identity) },
-    secret,
-    {
-      algorithm: 'HS256',
-      audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      expiresIn: WORKTREE_SNAPSHOT_GRANT_SECONDS,
-    }
-  );
-}
-
-export function validateWorktreeSnapshotGrant(
-  authorization: string | null,
-  secret: string | null
-): ControlLogIdentity | undefined {
-  if (!secret || !authorization || authorization.length > 4096) return undefined;
-  const match = /^Bearer (\S+)$/.exec(authorization);
-  if (!match) return undefined;
-  try {
-    const parsed = grantSchema.safeParse(
-      jwt.verify(match[1], secret, {
-        algorithms: ['HS256'],
-        audience: WORKTREE_SNAPSHOT_AUDIENCE,
-      })
-    );
-    if (!parsed.success) return undefined;
-    const { iat, exp, identity } = parsed.data;
-    if (exp <= iat || exp - iat > WORKTREE_SNAPSHOT_GRANT_SECONDS || iat > Date.now() / 1000 + 30) {
-      return undefined;
-    }
-    return identity;
-  } catch {
-    return undefined;
-  }
 }
 
 export function worktreeSnapshotWritesEnabled(env: {

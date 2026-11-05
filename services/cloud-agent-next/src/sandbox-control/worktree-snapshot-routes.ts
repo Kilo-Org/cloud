@@ -3,22 +3,19 @@ import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { resolveSecret } from '../auth.js';
 import type { HonoContext } from '../hono-context.js';
 import { logger } from '../logger.js';
-import {
-  controlLogIdentitySchema,
-  type ControlLogIdentity,
-} from '../shared/control-diagnostics.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { getSandboxControlStub } from './stub.js';
 import {
   WORKTREE_SNAPSHOT_MAX_BYTES,
   WORKTREE_SNAPSHOT_ROUTE_PREFIX,
+} from '../shared/worktree-snapshot.js';
+import { getSandboxControlStub, isSandboxControlId } from './stub.js';
+import {
   WORKTREE_SNAPSHOT_SHA256_PATTERN,
-  mintWorktreeSnapshotGrant,
-  validateWorktreeSnapshotGrant,
   worktreeSnapshotObjectKey,
   worktreeSnapshotReadsEnabled,
   worktreeSnapshotWritesEnabled,
-} from './worktree-snapshot-grant.js';
+} from './worktree-snapshot-authorization.js';
+import { parseSandboxLaunchBearer, verifySandboxLaunchCredential } from './credential.js';
 
 export { WORKTREE_SNAPSHOT_ROUTE_PREFIX };
 
@@ -34,35 +31,24 @@ function sha256Header(header: string | undefined): string | undefined {
   return header && WORKTREE_SNAPSHOT_SHA256_PATTERN.test(header) ? header.toLowerCase() : undefined;
 }
 
-type SnapshotRouteIdentity = {
-  identity: ControlLogIdentity;
+type AuthorizedSnapshotRoute = {
+  sandboxId: string;
+  allocationId: string;
   worktreeId: string;
+  credential: string;
 };
-
-type AuthorizedSnapshotRoute = SnapshotRouteIdentity & { secret: string };
-
-function routeIdentity(c: Context<HonoContext>): SnapshotRouteIdentity | undefined {
-  const identity = controlLogIdentitySchema.safeParse({
-    sandboxId: c.req.param('sandboxId'),
-    allocationId: c.req.param('allocationId'),
-    wrapperInstanceId: c.req.param('wrapperInstanceId'),
-  });
-  const worktreeId = cloudAgentWorktreeIdSchema.safeParse(c.req.param('worktreeId'));
-  if (!identity.success || !worktreeId.success) return undefined;
-  return { identity: identity.data, worktreeId: worktreeId.data };
-}
 
 async function authorizeSandbox(
   c: Context<HonoContext>,
-  identity: ControlLogIdentity,
-  worktreeId: string
+  input: AuthorizedSnapshotRoute
 ): Promise<boolean> {
   return withDORetry(
-    () => getSandboxControlStub(c.env, identity.sandboxId),
+    () => getSandboxControlStub(c.env, input.sandboxId),
     stub =>
       stub.authorizeWorktreeSnapshot({
-        allocationId: identity.allocationId,
-        worktreeId,
+        allocationId: input.allocationId,
+        worktreeId: input.worktreeId,
+        credential: input.credential,
       }),
     'authorizeWorktreeSnapshot'
   );
@@ -83,27 +69,30 @@ async function isSnapshotTombstoned(
 async function authorizeRequest(
   c: Context<HonoContext>
 ): Promise<AuthorizedSnapshotRoute | Response> {
-  const target = routeIdentity(c);
-  if (!target) return c.text('Invalid worktree snapshot identity', 400);
+  const sandboxId = c.req.param('sandboxId');
+  if (!sandboxId || !isSandboxControlId(sandboxId)) return c.text('Invalid sandboxId', 400);
+  const worktreeId = cloudAgentWorktreeIdSchema.safeParse(c.req.param('worktreeId'));
+  if (!worktreeId.success) return c.text('Invalid worktree snapshot identity', 400);
+  const token = parseSandboxLaunchBearer(c.req.header('Authorization') ?? null);
+  if (token === null) return c.text('Unauthorized', 401);
   const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
   if (!secret) return c.text('Authentication unavailable', 503);
-  const grant = validateWorktreeSnapshotGrant(c.req.header('Authorization') ?? null, secret);
-  if (!grant) return c.text('Unauthorized', 401);
-  if (
-    grant.sandboxId !== target.identity.sandboxId ||
-    grant.allocationId !== target.identity.allocationId ||
-    grant.wrapperInstanceId !== target.identity.wrapperInstanceId
-  ) {
-    return c.text('Worktree snapshot scope mismatch', 403);
-  }
+  const launch = verifySandboxLaunchCredential(token, secret);
+  if (launch === null || launch.sandboxId !== sandboxId) return c.text('Unauthorized', 401);
+  const target = {
+    sandboxId,
+    allocationId: launch.allocationId,
+    worktreeId: worktreeId.data,
+    credential: launch.credential,
+  };
   let authorized: boolean;
   try {
-    authorized = await authorizeSandbox(c, target.identity, target.worktreeId);
+    authorized = await authorizeSandbox(c, target);
   } catch {
     return c.text('Sandbox unavailable', 503);
   }
   if (!authorized) return c.text('Forbidden', 403);
-  return { ...target, secret };
+  return target;
 }
 
 function digestFromObject(object: R2Object): string | undefined {
@@ -122,7 +111,7 @@ async function discardIfCurrent(bucket: R2Bucket, key: string, etag: string): Pr
 }
 
 export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
-  const base = `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/:sandboxId/:allocationId/:wrapperInstanceId`;
+  const base = `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/:sandboxId`;
 
   app.put(`${base}/:worktreeId`, async c => {
     if (!worktreeSnapshotWritesEnabled(c.env)) return c.text('Not found', 404);
@@ -159,7 +148,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
 
     let reauthorized: boolean;
     try {
-      reauthorized = await authorizeSandbox(c, authorized.identity, authorized.worktreeId);
+      reauthorized = await authorizeSandbox(c, authorized);
     } catch {
       return c.text('Sandbox unavailable', 503);
     }
@@ -180,7 +169,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
       logger
         .withFields({
           event: 'worktree_snapshot_upload_failed',
-          sandboxId: authorized.identity.sandboxId,
+          sandboxId: authorized.sandboxId,
           worktreeId: authorized.worktreeId,
         })
         .warn('Worktree snapshot upload failed');
@@ -193,7 +182,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
         logger
           .withFields({
             event: 'worktree_snapshot_discard_failed',
-            sandboxId: authorized.identity.sandboxId,
+            sandboxId: authorized.sandboxId,
             worktreeId: authorized.worktreeId,
           })
           .warn('Worktree snapshot oversized upload discard failed');
@@ -203,11 +192,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
 
     let tombstoned: boolean;
     try {
-      tombstoned = await isSnapshotTombstoned(
-        c,
-        authorized.identity.sandboxId,
-        authorized.worktreeId
-      );
+      tombstoned = await isSnapshotTombstoned(c, authorized.sandboxId, authorized.worktreeId);
     } catch {
       return c.text('Sandbox unavailable', 503);
     }
@@ -219,7 +204,7 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
       logger
         .withFields({
           event: 'worktree_snapshot_discard_failed',
-          sandboxId: authorized.identity.sandboxId,
+          sandboxId: authorized.sandboxId,
           worktreeId: authorized.worktreeId,
         })
         .warn('Worktree snapshot discard failed');
@@ -250,12 +235,5 @@ export function registerWorktreeSnapshotRoutes(app: Hono<HonoContext>): void {
         'Cache-Control': 'no-store',
       },
     });
-  });
-
-  app.post(`${base}/:worktreeId/renew`, async c => {
-    if (!worktreeSnapshotWritesEnabled(c.env)) return c.text('Not found', 404);
-    const authorized = await authorizeRequest(c);
-    if (authorized instanceof Response) return authorized;
-    return c.json({ grant: mintWorktreeSnapshotGrant(authorized.identity, authorized.secret) });
   });
 }

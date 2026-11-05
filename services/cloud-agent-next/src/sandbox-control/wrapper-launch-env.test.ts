@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
 import { buildControlWrapperLaunchEnv } from './wrapper-launch-env.js';
-import { validateWorktreeSnapshotGrant } from './worktree-snapshot-grant.js';
 
 const secret = 'wrapper-launch-env-test-secret';
 const input = {
@@ -13,7 +12,7 @@ const input = {
 };
 
 describe('control wrapper launch environment', () => {
-  it('mints log and snapshot grants with the same wrapper identity', () => {
+  it('mints the log grant and keeps the snapshot URL independent of it', () => {
     const env = buildControlWrapperLaunchEnv({
       ...input,
       worktreeSnapshotWrites: true,
@@ -24,42 +23,41 @@ describe('control wrapper launch environment', () => {
       `https://worker.example.com/sandbox-logs/sandbox_test/allocation_test/${wrapperInstanceId}`
     );
     expect(env.CONTROL_WORKTREE_SNAPSHOT_URL).toBe(
-      `https://worker.example.com/sandbox-worktree-snapshots/sandbox_test/allocation_test/${wrapperInstanceId}`
+      'https://worker.example.com/sandbox-worktree-snapshots/sandbox_test'
     );
-    const identity = {
-      sandboxId: 'sandbox_test',
-      allocationId: 'allocation_test',
-      wrapperInstanceId,
-    };
+    expect(env.CONTROL_WORKTREE_SNAPSHOT_GRANT).toBeUndefined();
+    expect(env.SANDBOX_CONTROL_CREDENTIAL).toBe('launch-credential');
     expect(validateControlLogUploadGrant(`Bearer ${env.CONTROL_LOG_UPLOAD_GRANT}`, secret)).toEqual(
-      identity
+      {
+        sandboxId: 'sandbox_test',
+        allocationId: 'allocation_test',
+        wrapperInstanceId,
+      }
     );
-    expect(
-      validateWorktreeSnapshotGrant(`Bearer ${env.CONTROL_WORKTREE_SNAPSHOT_GRANT}`, secret)
-    ).toEqual(identity);
   });
 
-  it('leaves snapshot variables unset when writes are disabled', () => {
+  it('leaves the snapshot URL unset when writes are disabled', () => {
     const env = buildControlWrapperLaunchEnv(input);
     expect(env.CONTROL_LOG_UPLOAD_URL).toBeDefined();
     expect(env.CONTROL_LOG_UPLOAD_GRANT).toBeDefined();
     expect(env.CONTROL_WORKTREE_SNAPSHOT_URL).toBeUndefined();
-    expect(env.CONTROL_WORKTREE_SNAPSHOT_GRANT).toBeUndefined();
   });
 
-  it('emits no grants without a diagnostics signing secret', () => {
+  it('emits the snapshot URL without a diagnostics signing secret', () => {
     const env = buildControlWrapperLaunchEnv({
       ...input,
       diagnostics: undefined,
       worktreeSnapshotWrites: true,
     });
     expect(env.CONTROL_LOG_UPLOAD_URL).toBeUndefined();
-    expect(env.CONTROL_WORKTREE_SNAPSHOT_URL).toBeUndefined();
-    expect(env.CONTROL_WORKTREE_SNAPSHOT_GRANT).toBeUndefined();
+    expect(env.CONTROL_LOG_UPLOAD_GRANT).toBeUndefined();
     expect(env.CONTROL_WRAPPER_INSTANCE_ID).toBeUndefined();
+    expect(env.CONTROL_WORKTREE_SNAPSHOT_URL).toBe(
+      'https://worker.example.com/sandbox-worktree-snapshots/sandbox_test'
+    );
   });
 
-  it('emits no diagnostic grants for an invalid worker origin', () => {
+  it('emits no snapshot URL for an invalid worker origin', () => {
     const credentialedOrigin = new URL('https://worker.example.com');
     credentialedOrigin.username = 'user';
     credentialedOrigin.password = 'fixture';

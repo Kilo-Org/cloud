@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { InvalidWorktreeSnapshotError } from '../control/worktree-snapshot.js';
 import {
   createWorktreeSnapshots,
@@ -13,7 +13,7 @@ import {
   type WorktreeSnapshotFetch,
 } from './worktree-snapshots.js';
 
-const BASE_URL = 'https://control.example/sandbox-worktree-snapshots/sandbox/allocation/wrapper';
+const BASE_URL = 'https://control.example/sandbox-worktree-snapshots/sandbox';
 const WORKTREE = 'worktree_one';
 const DIRECTORY = '/workspace/one';
 
@@ -114,28 +114,10 @@ async function driveToSettlement<T>(
   return outcome.value;
 }
 
-function grant(iatSeconds: number, expSeconds: number): string {
-  const encode = (value: unknown): string =>
-    Buffer.from(JSON.stringify(value)).toString('base64url');
-  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ iat: iatSeconds, exp: expSeconds })}.signature`;
-}
+const CREDENTIAL = 'signed-launch-credential';
 
-function identityGrant(
-  iatSeconds: number,
-  expSeconds: number,
-  identity: { sandboxId: string; allocationId: string; wrapperInstanceId: string } = {
-    sandboxId: 'sandbox',
-    allocationId: 'allocation',
-    wrapperInstanceId: 'wrapper',
-  }
-): string {
-  const encode = (value: unknown): string =>
-    Buffer.from(JSON.stringify(value)).toString('base64url');
-  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({
-    iat: iatSeconds,
-    exp: expSeconds,
-    identity,
-  })}.signature`;
+function credential(..._args: number[]): string {
+  return CREDENTIAL;
 }
 
 function sha256(bytes: Uint8Array | string): string {
@@ -145,7 +127,7 @@ function sha256(bytes: Uint8Array | string): string {
 function createSnapshots(
   options: Parameters<typeof createWorktreeSnapshots>[0] = {}
 ): ReturnType<typeof createWorktreeSnapshots> {
-  return createWorktreeSnapshots({ cachePath: null, ...options });
+  return createWorktreeSnapshots(options);
 }
 
 async function readBody(body: BodyInit | null | undefined): Promise<Buffer> {
@@ -204,7 +186,7 @@ describe('worktree snapshot scheduler', () => {
     const firstStarts: number[] = [];
     const firstSnapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(1_000, 9_000_000),
+      credential: credential(1_000, 9_000_000),
       clock: first.clock,
       capture: async () => {
         firstStarts.push(first.clock.now());
@@ -224,7 +206,7 @@ describe('worktree snapshot scheduler', () => {
     const continuousStarts: number[] = [];
     const continuousSnapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(2_000, 9_000_000),
+      credential: credential(2_000, 9_000_000),
       clock: continuous.clock,
       capture: async () => {
         continuousStarts.push(continuous.clock.now());
@@ -251,7 +233,7 @@ describe('worktree snapshot scheduler', () => {
 
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(3_000, 9_000_000),
+      credential: credential(3_000, 9_000_000),
       clock: fake.clock,
       capture: async ({ worktreeId }) => {
         starts.push(worktreeId);
@@ -300,7 +282,7 @@ describe('worktree snapshot scheduler', () => {
     let retryAttempts = 0;
     const retrySnapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(4_000, 9_000_000),
+      credential: credential(4_000, 9_000_000),
       clock: retryClock.clock,
       capture: async () => {
         retryAttempts += 1;
@@ -323,7 +305,7 @@ describe('worktree snapshot scheduler', () => {
     let signalAttempts = 0;
     const signalSnapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(5_000, 9_000_000),
+      credential: credential(5_000, 9_000_000),
       clock: signalClock.clock,
       capture: async () => {
         signalAttempts += 1;
@@ -346,7 +328,7 @@ describe('worktree snapshot scheduler', () => {
     const starts: number[] = [];
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(6_000, 9_000_000),
+      credential: credential(6_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         starts.push(fake.clock.now());
@@ -382,7 +364,7 @@ describe('worktree snapshot scheduler', () => {
     let attempts = 0;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(7_000, 9_000_000),
+      credential: credential(7_000, 9_000_000),
       clock: fake.clock,
       capture: async ({ signal }) => {
         attempts += 1;
@@ -413,7 +395,7 @@ describe('worktree snapshot scheduler', () => {
     const { calls, fetch } = createFetch(() => new Response(null, { status: 204 }));
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(8_000, 9_000_000),
+      credential: credential(8_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         const contentDigest = contentDigests.shift();
@@ -440,7 +422,7 @@ describe('worktree snapshot scheduler', () => {
       expect(first?.init.method).toBe('PUT');
       expect(first?.init.duplex).toBe('half');
       expect(first?.init.headers).toMatchObject({
-        authorization: `Bearer ${grant(8_000, 9_000_000)}`,
+        authorization: `Bearer ${credential(8_000, 9_000_000)}`,
         'content-length': String(archive.size),
         'x-kilo-sha256': sha256(bytes),
       });
@@ -468,7 +450,7 @@ describe('worktree snapshot scheduler', () => {
     let abortedAt: number | undefined;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(9_000, 9_000_000),
+      credential: credential(9_000, 9_000_000),
       clock: fake.clock,
       capture: async ({ signal }) => {
         attempts += 1;
@@ -514,7 +496,7 @@ describe('worktree snapshot scheduler', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(10_000, 9_000_000),
+      credential: credential(10_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         attempts += 1;
@@ -553,7 +535,7 @@ describe('worktree snapshot scheduler', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(10_000, 9_000_000),
+      credential: credential(10_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         captures += 1;
@@ -593,7 +575,7 @@ describe('worktree snapshot scheduler', () => {
     const releases = new Map<string, () => void>();
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(20_000, 9_000_000),
+      credential: credential(20_000, 9_000_000),
       clock: fake.clock,
       capture: async ({ worktreeId }) => {
         starts.push(worktreeId);
@@ -643,7 +625,7 @@ describe('worktree snapshot scheduler', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(21_000, 9_000_000),
+      credential: credential(21_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         captures += 1;
@@ -678,36 +660,117 @@ describe('worktree snapshot scheduler', () => {
       await rm(archive.directory, { recursive: true, force: true });
     }
   });
+});
 
-  it('renews and resumes a single recapture after a 401 upload', async () => {
-    const bytes = Buffer.from('unauthorized upload');
-    const archive = await temporaryArchive(bytes);
-    const fake = createFakeClock(22_000_000);
-    const renewed = identityGrant(22_001, 9_000_000);
+describe('worktree snapshot credential lifecycle', () => {
+  it('stops captures as revoked after a 401 and resumes with a restarted wrapper credential', async () => {
+    const archive = await temporaryArchive(Buffer.from('revoked upload'));
+    const firstClock = createFakeClock(40_000_000);
+    let firstCaptures = 0;
+    let firstPuts = 0;
+    const firstFetch = createFetch(call => {
+      if (call.init.method === 'PUT') {
+        firstPuts += 1;
+        return new Response(null, { status: 401 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    const first = createSnapshots({
+      url: BASE_URL,
+      credential: credential(40_000, 9_000_000),
+      clock: firstClock.clock,
+      capture: async () => {
+        firstCaptures += 1;
+        return captureWith({
+          path: archive.path,
+          size: archive.size,
+          contentDigest: 'a'.repeat(64),
+        });
+      },
+      fetch: firstFetch.fetch,
+    });
+    try {
+      first.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      first.requestCapture(DIRECTORY);
+      await firstClock.advance(1_000);
+      await waitFor(() => firstPuts === 1);
+      expect(firstCaptures).toBe(1);
+
+      await firstClock.advance(40_000);
+      expect(firstCaptures).toBe(1);
+      first.requestCapture(DIRECTORY);
+      await firstClock.advance(5_000);
+      expect(firstCaptures).toBe(1);
+      first.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      first.requestCapture(DIRECTORY);
+      await firstClock.advance(5_000);
+      expect(firstCaptures).toBe(1);
+      expect(firstFetch.calls.every(call => call.init.method !== 'POST')).toBe(true);
+    } finally {
+      first.close();
+    }
+
+    const restartedCredential = 'restarted-signed-launch-credential';
+    const secondClock = createFakeClock(41_000_000);
+    let secondCaptures = 0;
+    let secondPuts = 0;
+    const secondFetch = createFetch(call => {
+      if (call.init.method === 'PUT') secondPuts += 1;
+      return new Response(null, { status: 204 });
+    });
+    const second = createSnapshots({
+      url: BASE_URL,
+      credential: restartedCredential,
+      clock: secondClock.clock,
+      capture: async () => {
+        secondCaptures += 1;
+        return captureWith({
+          path: archive.path,
+          size: archive.size,
+          contentDigest: 'b'.repeat(64),
+        });
+      },
+      fetch: secondFetch.fetch,
+    });
+    try {
+      second.register({ directory: DIRECTORY, worktreeId: WORKTREE });
+      second.requestCapture(DIRECTORY);
+      await secondClock.advance(1_000);
+      await waitFor(() => secondPuts === 1);
+      expect(secondCaptures).toBe(1);
+      const put = secondFetch.calls.find(call => call.init.method === 'PUT');
+      expect(put?.init.headers).toMatchObject({
+        authorization: `Bearer ${restartedCredential}`,
+      });
+      expect(secondFetch.calls.some(call => call.init.method === 'POST')).toBe(false);
+    } finally {
+      second.close();
+      await rm(archive.directory, { recursive: true, force: true });
+    }
+  });
+
+  it('retries a 503 upload after thirty seconds and recovers without an auth cycle', async () => {
+    const archive = await temporaryArchive(Buffer.from('outage upload'));
+    const fake = createFakeClock(42_000_000);
     let captures = 0;
     let puts = 0;
-    let renewals = 0;
     const { calls, fetch } = createFetch(call => {
       if (call.init.method === 'PUT') {
         puts += 1;
-        return new Response(null, { status: puts === 1 ? 401 : 204 });
-      }
-      if (call.init.method === 'POST') {
-        renewals += 1;
-        return Response.json({ grant: renewed });
+        return new Response(null, { status: puts === 1 ? 503 : 204 });
       }
       return new Response(null, { status: 204 });
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(22_000, 9_000_000),
+      credential: credential(42_000, 9_000_000),
       clock: fake.clock,
       capture: async () => {
         captures += 1;
         return captureWith({
           path: archive.path,
           size: archive.size,
-          contentDigest: 'f'.repeat(64),
+          contentDigest: 'c'.repeat(64),
         });
       },
       fetch,
@@ -717,501 +780,15 @@ describe('worktree snapshot scheduler', () => {
       snapshots.requestCapture(DIRECTORY);
       await fake.advance(1_000);
       await waitFor(() => puts === 1);
-      await waitFor(() => renewals === 1);
-      await fake.advance(1_000);
-      await waitFor(() => puts === 2);
-      expect(captures).toBe(2);
-
-      const putsCalls = calls.filter(call => call.init.method === 'PUT');
-      expect(putsCalls[1]?.init.headers).toMatchObject({
-        authorization: `Bearer ${renewed}`,
-      });
-
-      await fake.advance(40_000);
-      expect(captures).toBe(2);
-    } finally {
-      snapshots.close();
-      await rm(archive.directory, { recursive: true, force: true });
-    }
-  });
-
-  it('retries a transiently failed 401 renewal before the half-life timer fires', async () => {
-    const archive = await temporaryArchive(Buffer.from('retry renewal upload'));
-    const fake = createFakeClock(22_000_000);
-    const renewed = identityGrant(22_001, 9_000_000);
-    let puts = 0;
-    let renewals = 0;
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'PUT') {
-        puts += 1;
-        return new Response(null, { status: puts === 1 ? 401 : 204 });
-      }
-      renewals += 1;
-      return renewals === 1
-        ? new Response(null, { status: 503 })
-        : Response.json({ grant: renewed });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(22_000, 9_000_000),
-      clock: fake.clock,
-      capture: async () =>
-        captureWith({ path: archive.path, size: archive.size, contentDigest: 'a'.repeat(64) }),
-      fetch,
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      snapshots.requestCapture(DIRECTORY);
-      await fake.advance(1_000);
-      await waitFor(() => renewals === 1);
-      await fake.advance(30_000);
-      await waitFor(() => renewals === 2);
-      await fake.advance(1_000);
-      await waitFor(() => puts === 2);
-    } finally {
-      snapshots.close();
-      await rm(archive.directory, { recursive: true, force: true });
-    }
-  });
-
-  it('keeps the recapture when renewal succeeds while the failed capture cleans up', async () => {
-    const archive = await temporaryArchive(Buffer.from('slow cleanup upload'));
-    const fake = createFakeClock(22_000_000);
-    const renewed = identityGrant(22_001, 9_000_000);
-    let captures = 0;
-    let puts = 0;
-    let renewals = 0;
-    let releaseCleanup: (() => void) | undefined;
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'PUT') {
-        puts += 1;
-        return new Response(null, { status: puts === 1 ? 401 : 204 });
-      }
-      renewals += 1;
-      return Response.json({ grant: renewed });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(22_000, 9_000_000),
-      clock: fake.clock,
-      capture: async () => {
-        captures += 1;
-        const first = captures === 1;
-        return captureWith({
-          path: archive.path,
-          size: archive.size,
-          contentDigest: 'e'.repeat(64),
-          cleanup: first
-            ? () =>
-                new Promise<void>(resolve => {
-                  releaseCleanup = resolve;
-                })
-            : undefined,
-        });
-      },
-      fetch,
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      snapshots.requestCapture(DIRECTORY);
-      await fake.advance(1_000);
-      await waitFor(() => renewals === 1 && releaseCleanup !== undefined);
-      await fake.settle();
-      releaseCleanup?.();
-      await fake.settle();
-      await fake.advance(1_000);
-      await waitFor(() => puts === 2);
-      expect(captures).toBe(2);
-    } finally {
-      snapshots.close();
-      await rm(archive.directory, { recursive: true, force: true });
-    }
-  });
-
-  it('logs and stops renewal when the grant has already expired', async () => {
-    const archive = await temporaryArchive(Buffer.from('expired grant upload'));
-    const fake = createFakeClock(30_000_000);
-    const logs: string[] = [];
-    let posts = 0;
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'POST') posts += 1;
-      return new Response(null, { status: call.init.method === 'PUT' ? 401 : 204 });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(20_000, 29_000),
-      clock: fake.clock,
-      capture: async () =>
-        captureWith({ path: archive.path, size: archive.size, contentDigest: 'c'.repeat(64) }),
-      fetch,
-      log: message => logs.push(message),
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      snapshots.requestCapture(DIRECTORY);
-      await fake.advance(1_000);
-      await waitFor(() => logs.some(message => message.includes('grant expired')));
-      await fake.advance(60_000);
-      expect(posts).toBe(0);
-    } finally {
-      snapshots.close();
-      await rm(archive.directory, { recursive: true, force: true });
-    }
-  });
-});
-
-describe('worktree snapshot grant renewal', () => {
-  it('renews at half-life, swaps the grant, and stops on close', async () => {
-    const now = 1_700_000_000_000;
-    const firstGrant = grant(now / 1_000, now / 1_000 + 4_000);
-    const secondGrant = grant(now / 1_000 + 2_000, now / 1_000 + 6_000);
-    const fake = createFakeClock(now);
-    let renewals = 0;
-    const { calls, fetch } = createFetch(call => {
-      if (call.init.method === 'POST') {
-        renewals += 1;
-        return Response.json({ grant: secondGrant });
-      }
-      return new Response(null, { status: 204 });
-    });
-    const archive = await temporaryArchive(Buffer.from('renew upload'));
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: firstGrant,
-      clock: fake.clock,
-      capture: async () =>
-        captureWith({ path: archive.path, size: archive.size, contentDigest: 'd'.repeat(64) }),
-      fetch,
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      await fake.advance(1_999_000);
-      expect(renewals).toBe(0);
-      await fake.advance(1_000);
-      await waitFor(() => renewals === 1);
-      expect(calls[0]?.url).toBe(`${BASE_URL}/${WORKTREE}/renew`);
-      expect(calls[0]?.init.method).toBe('POST');
-      expect(calls[0]?.init.headers).toMatchObject({
-        authorization: `Bearer ${firstGrant}`,
-      });
-
-      snapshots.requestCapture(DIRECTORY);
-      await fake.advance(1_000);
-      await waitFor(() => calls.some(call => call.init.method === 'PUT'));
-      const put = calls.find(call => call.init.method === 'PUT');
-      expect(put?.init.headers).toMatchObject({ authorization: `Bearer ${secondGrant}` });
-    } finally {
-      snapshots.close();
-      await rm(archive.directory, { recursive: true, force: true });
-    }
-
-    const closedClock = createFakeClock(now);
-    const closed = createFetch(() => Response.json({ grant: secondGrant }));
-    const closedSnapshots = createSnapshots({
-      url: BASE_URL,
-      grant: firstGrant,
-      clock: closedClock.clock,
-      fetch: closed.fetch,
-    });
-    closedSnapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-    closedSnapshots.close();
-    await closedClock.advance(2_000_000);
-    expect(closed.calls).toHaveLength(0);
-  });
-
-  it('retries a scheduled renewal after a 503 and uploads with the renewed grant', async () => {
-    const now = 1_700_000_000_000;
-    const firstGrant = identityGrant(now / 1_000, now / 1_000 + 4_000);
-    const renewed = identityGrant(now / 1_000 + 2_030, now / 1_000 + 6_030);
-    const fake = createFakeClock(now);
-    let renewals = 0;
-    const { calls, fetch } = createFetch(call => {
-      if (call.init.method === 'POST') {
-        renewals += 1;
-        return renewals === 1
-          ? new Response(null, { status: 503 })
-          : Response.json({ grant: renewed });
-      }
-      return new Response(null, { status: 204 });
-    });
-    const archive = await temporaryArchive(Buffer.from('renew after outage'));
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: firstGrant,
-      clock: fake.clock,
-      capture: async () =>
-        captureWith({ path: archive.path, size: archive.size, contentDigest: 'd'.repeat(64) }),
-      fetch,
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      await fake.advance(2_000_000);
-      await waitFor(() => renewals === 1);
       await fake.advance(29_999);
-      expect(renewals).toBe(1);
+      expect(puts).toBe(1);
       await fake.advance(1);
-      await waitFor(() => renewals === 2);
-
-      snapshots.requestCapture(DIRECTORY);
-      await fake.advance(1_000);
-      await waitFor(() => calls.some(call => call.init.method === 'PUT'));
-      const put = calls.find(call => call.init.method === 'PUT');
-      expect(put?.init.headers).toMatchObject({ authorization: `Bearer ${renewed}` });
+      await waitFor(() => puts === 2);
+      expect(captures).toBe(2);
+      expect(calls.some(call => call.init.method === 'POST')).toBe(false);
     } finally {
       snapshots.close();
       await rm(archive.directory, { recursive: true, force: true });
-    }
-  });
-
-  it('tries other registered worktrees when renewal is forbidden for one', async () => {
-    const now = 1_700_100_000_000;
-    const firstGrant = identityGrant(now / 1_000, now / 1_000 + 4_000);
-    const secondGrant = identityGrant(now / 1_000 + 2_000, now / 1_000 + 6_000);
-    const thirdGrant = identityGrant(now / 1_000 + 4_000, now / 1_000 + 8_000);
-    const fake = createFakeClock(now);
-    const posts: FetchCall[] = [];
-    let successes = 0;
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'PUT') return new Response(null, { status: 204 });
-      posts.push(call);
-      if (call.url.includes('/worktree_a/renew')) return new Response(null, { status: 403 });
-      const grant = successes === 0 ? secondGrant : thirdGrant;
-      successes += 1;
-      return Response.json({ grant });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: firstGrant,
-      clock: fake.clock,
-      fetch,
-    });
-    snapshots.register({ directory: '/w/a', worktreeId: 'worktree_a' });
-    snapshots.register({ directory: '/w/b', worktreeId: 'worktree_b' });
-
-    await fake.advance(2_000_000);
-    await waitFor(() => posts.length === 2);
-    expect(posts.map(call => call.url)).toEqual([
-      `${BASE_URL}/worktree_a/renew`,
-      `${BASE_URL}/worktree_b/renew`,
-    ]);
-    expect(posts[0]?.init.headers).toMatchObject({
-      authorization: `Bearer ${firstGrant}`,
-    });
-
-    await fake.advance(2_000_000);
-    await waitFor(() => posts.length === 4);
-    expect(posts[2]?.init.headers).toMatchObject({
-      authorization: `Bearer ${secondGrant}`,
-    });
-    snapshots.close();
-  });
-
-  it('keeps retrying renewal when every registered worktree is forbidden', async () => {
-    const now = 1_700_200_000_000;
-    const fake = createFakeClock(now);
-    let posts = 0;
-    const { fetch } = createFetch(() => {
-      posts += 1;
-      return new Response(null, { status: 403 });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(now / 1_000, now / 1_000 + 4_000),
-      clock: fake.clock,
-      fetch,
-    });
-    snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-    await fake.advance(2_000_000);
-    await waitFor(() => posts === 1);
-    await fake.advance(30_000);
-    await waitFor(() => posts === 2);
-    await fake.advance(30_000);
-    await waitFor(() => posts === 3);
-    snapshots.close();
-  });
-
-  it('bounds a hanging renewal at sixty seconds and schedules a retry', async () => {
-    const now = 1_700_250_000_000;
-    const fake = createFakeClock(now);
-    let posts = 0;
-    const logs: string[] = [];
-    const { fetch } = createFetch(() => {
-      posts += 1;
-      return new Promise<Response>(() => undefined);
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(now / 1_000, now / 1_000 + 4_000),
-      clock: fake.clock,
-      fetch,
-      log: message => logs.push(message),
-    });
-    snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-    await fake.advance(2_000_000);
-    await waitFor(() => posts === 1);
-    await fake.advance(60_000);
-    await waitFor(() => logs.some(message => message.includes('status=timeout')));
-    await fake.advance(30_000);
-    await waitFor(() => posts === 2);
-    snapshots.close();
-  });
-
-  it('stops renewal only on a 401 authorization failure', async () => {
-    const now = 1_700_300_000_000;
-    const fake = createFakeClock(now);
-    let posts = 0;
-    const { fetch } = createFetch(() => {
-      posts += 1;
-      return new Response(null, { status: 401 });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: grant(now / 1_000, now / 1_000 + 4_000),
-      clock: fake.clock,
-      fetch,
-    });
-    snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-    await fake.advance(2_000_000);
-    await waitFor(() => posts === 1);
-    await fake.advance(4 * 60 * 60 * 1_000);
-    expect(posts).toBe(1);
-    snapshots.close();
-  });
-});
-
-describe('worktree snapshot grant cache', () => {
-  it('persists the renewed grant privately and reloads it after a restart', async () => {
-    const start = 1_700_400_000_000;
-    const cacheDirectory = await mkdtemp(join(tmpdir(), 'snapshot-grant-cache-'));
-    const cachePath = join(cacheDirectory, 'nested', 'grant.json');
-    const launch = identityGrant(start / 1_000, start / 1_000 + 14_400);
-    const renewed = identityGrant(start / 1_000 + 7_200, start / 1_000 + 21_600);
-    const fake = createFakeClock(start);
-    const logs: string[] = [];
-    let renewals = 0;
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'POST') {
-        renewals += 1;
-        return Response.json({ grant: renewed });
-      }
-      return new Response(null, { status: 204 });
-    });
-    const first = createSnapshots({
-      url: BASE_URL,
-      grant: launch,
-      clock: fake.clock,
-      cachePath,
-      log: message => logs.push(message),
-      fetch,
-      capture: async () => null,
-    });
-    try {
-      first.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      await fake.advance(7_200_000);
-      await waitFor(() => renewals === 1);
-      first.close();
-
-      const file = await stat(cachePath);
-      expect(file.mode & 0o777).toBe(0o600);
-      const directory = await stat(dirname(cachePath));
-      expect(directory.mode & 0o777).toBe(0o700);
-      expect(logs.join('\n')).not.toContain(launch);
-      expect(logs.join('\n')).not.toContain(renewed);
-
-      const later = createFakeClock(start + 5 * 60 * 60 * 1_000);
-      const laterPosts: FetchCall[] = [];
-      const laterGets: FetchCall[] = [];
-      const laterFetch = createFetch(call => {
-        if (call.init.method === 'POST') {
-          laterPosts.push(call);
-          return Response.json({
-            grant: identityGrant(later.clock.now() / 1_000 + 1, later.clock.now() / 1_000 + 14_401),
-          });
-        }
-        if (call.init.method === 'GET') {
-          laterGets.push(call);
-          return new Response(null, { status: 404 });
-        }
-        return new Response(null, { status: 204 });
-      });
-      const second = createSnapshots({
-        url: BASE_URL,
-        grant: launch,
-        clock: later.clock,
-        cachePath,
-        fetch: laterFetch.fetch,
-        capture: async () => null,
-      });
-      expect(
-        await second.restore({
-          directory: DIRECTORY,
-          worktreeId: WORKTREE,
-          signal: new AbortController().signal,
-        })
-      ).toEqual({ found: false });
-      expect(laterGets[0]?.init.headers).toMatchObject({
-        authorization: `Bearer ${renewed}`,
-      });
-      second.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      await later.advance(0);
-      await waitFor(() => laterPosts.length === 1);
-      expect(laterPosts[0]?.init.headers).toMatchObject({
-        authorization: `Bearer ${renewed}`,
-      });
-      second.close();
-    } finally {
-      await rm(cacheDirectory, { recursive: true, force: true });
-    }
-  });
-
-  it('ignores a cached grant for another allocation', async () => {
-    const start = 1_700_500_000_000;
-    const cacheDirectory = await mkdtemp(join(tmpdir(), 'snapshot-grant-stale-'));
-    const cachePath = join(cacheDirectory, 'grant.json');
-    const launch = identityGrant(start / 1_000, start / 1_000 + 14_400);
-    const stale = identityGrant(start / 1_000 + 7_200, start / 1_000 + 21_600, {
-      sandboxId: 'sandbox',
-      allocationId: 'other-allocation',
-      wrapperInstanceId: 'wrapper',
-    });
-    await mkdir(dirname(cachePath), { recursive: true, mode: 0o700 });
-    await writeFile(
-      cachePath,
-      JSON.stringify({
-        version: 1,
-        url: BASE_URL,
-        launch: sha256(launch),
-        grant: stale,
-      }),
-      { mode: 0o600 }
-    );
-
-    const fake = createFakeClock(start);
-    const posts: FetchCall[] = [];
-    const { fetch } = createFetch(call => {
-      if (call.init.method === 'POST') posts.push(call);
-      return Response.json({
-        grant: identityGrant(start / 1_000 + 7_200, start / 1_000 + 21_600),
-      });
-    });
-    const snapshots = createSnapshots({
-      url: BASE_URL,
-      grant: launch,
-      clock: fake.clock,
-      cachePath,
-      fetch,
-      capture: async () => null,
-    });
-    try {
-      snapshots.register({ directory: DIRECTORY, worktreeId: WORKTREE });
-      await fake.advance(7_200_000);
-      await waitFor(() => posts.length === 1);
-      expect(posts[0]?.init.headers).toMatchObject({
-        authorization: `Bearer ${launch}`,
-      });
-    } finally {
-      snapshots.close();
-      await rm(cacheDirectory, { recursive: true, force: true });
     }
   });
 });
@@ -1223,7 +800,7 @@ describe('worktree snapshot restore', () => {
     const { fetch } = createFetch(() => new Response(null, { status: 404 }));
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(10_500, 9_000_000),
+      credential: credential(10_500, 9_000_000),
       clock: fake.clock,
       fetch,
       capture: async () => {
@@ -1251,7 +828,7 @@ describe('worktree snapshot restore', () => {
     const { fetch } = createFetch(() => new Response(null, { status: 404 }));
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(10_750, 9_000_000),
+      credential: credential(10_750, 9_000_000),
       clock: fake.clock,
       fetch,
       capture: async ({ signal }) => {
@@ -1286,7 +863,7 @@ describe('worktree snapshot restore', () => {
     let applies = 0;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(11_000, 9_000_000),
+      credential: credential(11_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {
@@ -1321,7 +898,7 @@ describe('worktree snapshot restore', () => {
     let appliedPath: string | undefined;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(12_000, 9_000_000),
+      credential: credential(12_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async input => {
@@ -1343,7 +920,7 @@ describe('worktree snapshot restore', () => {
       partial: true,
     });
     expect(calls[0]?.init.headers).toMatchObject({
-      authorization: `Bearer ${grant(12_000, 9_000_000)}`,
+      authorization: `Bearer ${credential(12_000, 9_000_000)}`,
     });
     const cleanupError = await readFile(appliedPath ?? '').catch(error => error);
     expect(cleanupError).toBeInstanceOf(Error);
@@ -1366,7 +943,7 @@ describe('worktree snapshot restore', () => {
     let applies = 0;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(13_000, 9_000_000),
+      credential: credential(13_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {
@@ -1403,7 +980,7 @@ describe('worktree snapshot restore', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(13_500, 9_000_000),
+      credential: credential(13_500, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => ({ applied: 1, omitted: 0, conflicts: [], partial: false }),
@@ -1442,7 +1019,7 @@ describe('worktree snapshot restore', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(13_700, 9_000_000),
+      credential: credential(13_700, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => ({ applied: 1, omitted: 0, conflicts: [], partial: false }),
@@ -1480,7 +1057,7 @@ describe('worktree snapshot restore', () => {
     let applies = 0;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(14_000, 9_000_000),
+      credential: credential(14_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {
@@ -1513,7 +1090,7 @@ describe('worktree snapshot restore', () => {
     );
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(15_000, 9_000_000),
+      credential: credential(15_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {
@@ -1538,7 +1115,7 @@ describe('worktree snapshot restore', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(16_000, 9_000_000),
+      credential: credential(16_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => ({ applied: 0, omitted: 0, conflicts: [], partial: false }),
@@ -1582,7 +1159,7 @@ describe('worktree snapshot restore', () => {
     });
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(17_000, 9_000_000),
+      credential: credential(17_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => ({ applied: 1, omitted: 0, conflicts: [], partial: false }),
@@ -1608,7 +1185,7 @@ describe('worktree snapshot restore', () => {
     const denied = createFetch(() => new Response(null, { status: 401 }));
     const deniedSnapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(18_000, 9_000_000),
+      credential: credential(18_000, 9_000_000),
       clock: deniedClock.clock,
       fetch: denied.fetch,
       apply: async () => ({ applied: 0, omitted: 0, conflicts: [], partial: false }),
@@ -1645,7 +1222,7 @@ describe('worktree snapshot restore', () => {
     let releaseApply: (() => void) | undefined;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(19_000, 9_000_000),
+      credential: credential(19_000, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {
@@ -1692,7 +1269,7 @@ describe('worktree snapshot restore', () => {
     let releaseApply: (() => void) | undefined;
     const snapshots = createSnapshots({
       url: BASE_URL,
-      grant: grant(19_500, 9_000_000),
+      credential: credential(19_500, 9_000_000),
       clock: fake.clock,
       fetch,
       apply: async () => {

@@ -11,10 +11,14 @@ import {
 import type { Env } from '../../src/types.js';
 import type { HonoContext } from '../../src/hono-context.js';
 import {
-  mintWorktreeSnapshotGrant,
+  generateSandboxCredential,
+  hashSandboxCredential,
+  mintSandboxLaunchCredential,
+} from '../../src/sandbox-control/credential.js';
+import {
   worktreeSnapshotObjectKey,
   worktreeSnapshotTombstoneKey,
-} from '../../src/sandbox-control/worktree-snapshot-grant.js';
+} from '../../src/sandbox-control/worktree-snapshot-authorization.js';
 import {
   registerWorktreeSnapshotRoutes,
   WORKTREE_SNAPSHOT_ROUTE_PREFIX,
@@ -46,8 +50,8 @@ function ids() {
   const suffix = crypto.randomUUID().replaceAll('-', '');
   return {
     sandboxId: `sbx__snapshot_${suffix}`,
-    allocationId: `allocation_${suffix}`,
-    wrapperInstanceId: crypto.randomUUID(),
+    allocationId: crypto.randomUUID(),
+    credential: generateSandboxCredential(),
     worktreeId: `worktree_${crypto.randomUUID()}` as const,
     sessionId: `workspace_${crypto.randomUUID()}`,
     kiloSessionId: `ses_${suffix.slice(0, 26)}`,
@@ -68,6 +72,10 @@ async function seed(
     await instance.getAllocationState();
   });
   await runInDurableObject(sandbox, async (_instance, doState) => {
+    await doState.storage.put(
+      'wrapper_credential_hash',
+      await hashSandboxCredential(input.credential)
+    );
     const db = drizzle(doState.storage, { logger: false });
     db.update(allocationTable)
       .set({
@@ -109,15 +117,15 @@ async function seed(
 }
 
 function path(input: ReturnType<typeof ids>, suffix = ''): string {
-  return `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${input.sandboxId}/${input.allocationId}/${input.wrapperInstanceId}/${input.worktreeId}${suffix}`;
+  return `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${input.sandboxId}/${input.worktreeId}${suffix}`;
 }
 
-function grant(input: ReturnType<typeof ids>, allocationId = input.allocationId): string {
-  return mintWorktreeSnapshotGrant(
+function launchToken(input: ReturnType<typeof ids>, allocationId = input.allocationId): string {
+  return mintSandboxLaunchCredential(
     {
       sandboxId: input.sandboxId,
       allocationId,
-      wrapperInstanceId: input.wrapperInstanceId,
+      credential: input.credential,
     },
     secret
   );
@@ -198,7 +206,7 @@ async function runStaleUploadRace(existing: boolean): Promise<void> {
   const gated = gatedSnapshotBucket(bucket);
   const oldBytes = new TextEncoder().encode('old-allocation-state');
   const nextBytes = new TextEncoder().encode('new-allocation-state');
-  const nextAllocationId = `allocation_next_${crypto.randomUUID().replaceAll('-', '')}`;
+  const nextAllocationId = crypto.randomUUID();
   const nextInput = { ...input, allocationId: nextAllocationId };
   const gate = gated.gateNextPut();
 
@@ -207,7 +215,7 @@ async function runStaleUploadRace(existing: boolean): Promise<void> {
     {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${grant(input)}`,
+        Authorization: `Bearer ${launchToken(input)}`,
         'Content-Length': String(oldBytes.byteLength),
         'x-kilo-sha256': await sha256Hex(oldBytes),
       },
@@ -233,7 +241,7 @@ async function runStaleUploadRace(existing: boolean): Promise<void> {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(nextInput)}`,
+          Authorization: `Bearer ${launchToken(nextInput)}`,
           'Content-Length': String(nextBytes.byteLength),
           'x-kilo-sha256': await sha256Hex(nextBytes),
         },
@@ -277,7 +285,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(input)}`,
+          Authorization: `Bearer ${launchToken(input)}`,
           'Content-Length': String(bytes.byteLength),
           'x-kilo-sha256': digest,
         },
@@ -290,12 +298,103 @@ describe('worktree snapshot routes on the Workers runtime', () => {
 
     const get = await app().request(
       path(input),
-      { method: 'GET', headers: { Authorization: `Bearer ${grant(input)}` } },
+      { method: 'GET', headers: { Authorization: `Bearer ${launchToken(input)}` } },
       appEnv()
     );
     expect(get.status).toBe(200);
     expect(get.headers.get('x-kilo-sha256')).toBe(digest);
     expect(new Uint8Array(await get.arrayBuffer())).toEqual(bytes);
+  });
+
+  it('revokes a rotated credential within the same allocation', async () => {
+    const input = ids();
+    const { sandbox } = await seed('connected', input);
+    const rotated = generateSandboxCredential();
+    expect(
+      await sandbox.authorizeWorktreeSnapshot({
+        allocationId: input.allocationId,
+        worktreeId: input.worktreeId,
+        credential: input.credential,
+      })
+    ).toBe(true);
+
+    await runInDurableObject(sandbox, async (_instance, doState) => {
+      await doState.storage.put('wrapper_credential_hash', await hashSandboxCredential(rotated));
+    });
+
+    expect(
+      await sandbox.authorizeWorktreeSnapshot({
+        allocationId: input.allocationId,
+        worktreeId: input.worktreeId,
+        credential: input.credential,
+      })
+    ).toBe(false);
+    expect(
+      await sandbox.authorizeWorktreeSnapshot({
+        allocationId: input.allocationId,
+        worktreeId: input.worktreeId,
+        credential: rotated,
+      })
+    ).toBe(true);
+
+    const bytes = crypto.getRandomValues(new Uint8Array(128));
+    const headers = {
+      'Content-Length': String(bytes.byteLength),
+      'x-kilo-sha256': await sha256Hex(bytes),
+    };
+    const oldToken = launchToken(input);
+    const oldUpload = await app().request(
+      path(input),
+      { method: 'PUT', headers: { ...headers, Authorization: `Bearer ${oldToken}` }, body: bytes },
+      appEnv()
+    );
+    expect(oldUpload.status).toBe(403);
+
+    const rotatedToken = mintSandboxLaunchCredential(
+      {
+        sandboxId: input.sandboxId,
+        allocationId: input.allocationId,
+        credential: rotated,
+      },
+      secret
+    );
+    const rotatedUpload = await app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: { ...headers, Authorization: `Bearer ${rotatedToken}` },
+        body: bytes,
+      },
+      appEnv()
+    );
+    expect(rotatedUpload.status).toBe(204);
+  });
+
+  it('rejects a stopped allocation', async () => {
+    const input = ids();
+    const { sandbox } = await seed('stopped', input);
+    expect(
+      await sandbox.authorizeWorktreeSnapshot({
+        allocationId: input.allocationId,
+        worktreeId: input.worktreeId,
+        credential: input.credential,
+      })
+    ).toBe(false);
+    const bytes = crypto.getRandomValues(new Uint8Array(128));
+    const response = await app().request(
+      path(input),
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${launchToken(input)}`,
+          'Content-Length': String(bytes.byteLength),
+          'x-kilo-sha256': await sha256Hex(bytes),
+        },
+        body: bytes,
+      },
+      appEnv()
+    );
+    expect(response.status).toBe(403);
   });
 
   it('rejects a body whose bytes do not match the declared digest', async () => {
@@ -308,7 +407,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(input)}`,
+          Authorization: `Bearer ${launchToken(input)}`,
           'Content-Length': String(bytes.byteLength),
           'x-kilo-sha256': '0'.repeat(64),
         },
@@ -330,13 +429,12 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       'x-kilo-sha256': digest,
     };
 
-    const staleAllocation = `allocation_stale_${crypto.randomUUID().replaceAll('-', '')}`;
-    const stalePath = `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${input.sandboxId}/${staleAllocation}/${input.wrapperInstanceId}/${input.worktreeId}`;
+    const staleAllocation = crypto.randomUUID();
     const stale = await app().request(
-      stalePath,
+      path(input),
       {
         method: 'PUT',
-        headers: { ...headers, Authorization: `Bearer ${grant(input, staleAllocation)}` },
+        headers: { ...headers, Authorization: `Bearer ${launchToken(input, staleAllocation)}` },
         body: bytes,
       },
       appEnv()
@@ -344,21 +442,14 @@ describe('worktree snapshot routes on the Workers runtime', () => {
     expect(stale.status).toBe(403);
 
     const missing = ids();
-    const missingPath = `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${input.sandboxId}/${input.allocationId}/${input.wrapperInstanceId}/${missing.worktreeId}`;
+    const missingPath = `${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${input.sandboxId}/${missing.worktreeId}`;
     const noRoute = await app().request(
       missingPath,
       {
         method: 'PUT',
         headers: {
           ...headers,
-          Authorization: `Bearer ${mintWorktreeSnapshotGrant(
-            {
-              sandboxId: input.sandboxId,
-              allocationId: input.allocationId,
-              wrapperInstanceId: input.wrapperInstanceId,
-            },
-            secret
-          )}`,
+          Authorization: `Bearer ${launchToken(input)}`,
         },
         body: bytes,
       },
@@ -385,7 +476,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(input)}`,
+          Authorization: `Bearer ${launchToken(input)}`,
           'Content-Length': String(bytes.byteLength),
           'x-kilo-sha256': await sha256Hex(bytes),
         },
@@ -407,7 +498,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(input)}`,
+          Authorization: `Bearer ${launchToken(input)}`,
           'Content-Length': String(bytes.byteLength),
           'x-kilo-sha256': await sha256Hex(bytes),
         },
@@ -420,14 +511,14 @@ describe('worktree snapshot routes on the Workers runtime', () => {
     await runInDurableObject(sandbox, async (_instance, doState) => {
       const db = drizzle(doState.storage, { logger: false });
       db.update(allocationTable)
-        .set({ allocation_id: `allocation_next_${crypto.randomUUID().replaceAll('-', '')}` })
+        .set({ allocation_id: crypto.randomUUID() })
         .where(eq(allocationTable.id, 'current'))
         .run();
     });
 
     const get = await app().request(
       path(input),
-      { method: 'GET', headers: { Authorization: `Bearer ${grant(input)}` } },
+      { method: 'GET', headers: { Authorization: `Bearer ${launchToken(input)}` } },
       appEnv()
     );
     expect(get.status).toBe(403);
@@ -472,6 +563,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       sandbox.authorizeWorktreeSnapshot({
         allocationId: input.allocationId,
         worktreeId: input.worktreeId,
+        credential: input.credential,
       })
     ).resolves.toBe(false);
 
@@ -480,7 +572,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${grant(input)}`,
+          Authorization: `Bearer ${launchToken(input)}`,
           'Content-Length': String(bytes.byteLength),
           'x-kilo-sha256': await sha256Hex(bytes),
         },
@@ -567,6 +659,7 @@ describe('worktree snapshot routes on the Workers runtime', () => {
       sandbox.authorizeWorktreeSnapshot({
         allocationId: input.allocationId,
         worktreeId: input.worktreeId,
+        credential: input.credential,
       })
     ).resolves.toBe(false);
   });

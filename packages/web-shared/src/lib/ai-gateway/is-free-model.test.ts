@@ -28,6 +28,19 @@ describe('isFreeModel', () => {
     expect(isFreeModel('acme/custom-model-free')).toBe(true);
     expect(isFreeModel('stealth/custom-model')).toBe(true);
   });
+
+  test.each([
+    ['fake-deterministic', true, true],
+    ['fake-deterministic', false, false],
+    ['fake-transcribe-broken', true, true],
+    ['fake-transcribe-broken', false, false],
+    ['openrouter/free', false, true],
+    ['acme/x:free', false, true],
+    ['stealth/model-alpha', false, true],
+    ['anthropic/claude-haiku-4.5', false, false],
+  ])('%s with local fake LLM enabled=%s -> %s', (model, localFakeEnabled, expected) => {
+    expect(isFreeModel(model, localFakeEnabled)).toBe(expected);
+  });
 });
 
 describe('hasBestEffortGuessDataCollectionRequirement', () => {
@@ -60,5 +73,14 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     ['openai/gpt-4o', false],
   ])('%s -> %s', async (model, expected) => {
     await expect(hasBestEffortGuessDataCollectionRequirement(model)).resolves.toBe(expected);
+  });
+
+  test('judges the local fake LLM by the flag it is given', async () => {
+    await expect(
+      hasBestEffortGuessDataCollectionRequirement('fake-deterministic', true)
+    ).resolves.toBe(true);
+    await expect(
+      hasBestEffortGuessDataCollectionRequirement('fake-deterministic', false)
+    ).resolves.toBe(false);
   });
 });

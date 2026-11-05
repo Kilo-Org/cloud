@@ -21,6 +21,21 @@ export type ByokKmsContext = {
   provider_id: string;
 };
 
+/** Wall clock and wait behind the retry budget; production uses the globals. */
+export type ByokKmsTiming = {
+  now(): number;
+  sleep(ms: number): Promise<void>;
+};
+
+const defaultByokKmsTiming: ByokKmsTiming = {
+  now: () => Date.now(),
+  sleep: ms => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, ms);
+    return promise;
+  },
+};
+
 type ByokKmsClientConfig = {
   url: string;
   token: string;
@@ -88,13 +103,18 @@ async function attemptKmsRequest(
   }
 }
 
-async function sendToKms(config: ByokKmsClientConfig, url: string, init: RequestInit) {
-  const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
+async function sendToKms(
+  config: ByokKmsClientConfig,
+  url: string,
+  init: RequestInit,
+  timing: ByokKmsTiming = defaultByokKmsTiming
+) {
+  const deadline = timing.now() + KMS_TOTAL_BUDGET_MS;
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
     // A retry only gets the time that is left, so the whole sequence stays inside the budget,
     // and a slice too short to answer is not spent: the earlier error is the specific one.
-    const remainingMs = deadline - Date.now();
+    const remainingMs = deadline - timing.now();
     if (attempt > 1 && remainingMs < KMS_MIN_ATTEMPT_BUDGET_MS) throw failure;
     const timeoutMs = Math.min(KMS_REQUEST_TIMEOUT_MS, remainingMs);
     const outcome = await attemptKmsRequest(config, url, init, timeoutMs);
@@ -111,7 +131,7 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
       // 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns; every other 4xx
       // rejects the request itself, so a repeat would only add latency.
       retryable = status === 408 || status === 429 || status >= 500;
-      if (retryable) retryAfter = retryAfterMs(outcome.response, Date.now());
+      if (retryable) retryAfter = retryAfterMs(outcome.response, timing.now());
     } else {
       ({ error, retryable } = outcome);
     }
@@ -122,11 +142,10 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
       KMS_RETRY_BASE_DELAY_MS * attempt + Math.random() * KMS_RETRY_BASE_DELAY_MS,
       retryAfter ?? 0
     );
-    if (!retryable || attempt >= KMS_MAX_ATTEMPTS || Date.now() + delayMs >= deadline) throw error;
+    if (!retryable || attempt >= KMS_MAX_ATTEMPTS || timing.now() + delayMs >= deadline)
+      throw error;
     failure = error;
-    const { promise: slept, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, delayMs);
-    await slept;
+    await timing.sleep(delayMs);
   }
 }
 
@@ -140,19 +159,26 @@ export type ByokDataKey = z.infer<typeof CreatedDataKeySchema>;
 export async function createByokDataKey({
   context,
   actorUserId,
+  timing = defaultByokKmsTiming,
 }: {
   context: ByokKmsContext;
   actorUserId: string;
+  timing?: ByokKmsTiming;
 }): Promise<ByokDataKey | null> {
   const config = getByokKmsClientConfig();
   if (!config) return null;
 
   return CreatedDataKeySchema.parse(
-    await sendToKms(config, `${config.url}/data-key`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
-    })
+    await sendToKms(
+      config,
+      `${config.url}/data-key`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
+      },
+      timing
+    )
   );
 }
 
@@ -171,18 +197,21 @@ export async function encryptByokForStorage({
   apiKey,
   context,
   actorUserId,
+  timing,
 }: {
   apiKey: string;
   context: ByokKmsContext;
   actorUserId: string;
+  timing?: ByokKmsTiming;
 }): Promise<BYOKApiKeyEnvelope | null> {
-  const dataKey = await createByokDataKey({ context, actorUserId });
+  const dataKey = await createByokDataKey({ context, actorUserId, timing });
   return dataKey ? encryptByokWithDataKey(apiKey, dataKey) : null;
 }
 
 export async function decryptByokEnvelope(
   envelope: BYOKApiKeyEnvelope,
-  context: ByokKmsContext
+  context: ByokKmsContext,
+  timing: ByokKmsTiming = defaultByokKmsTiming
 ): Promise<string> {
   const config = getByokKmsClientConfig();
   if (!config) {
@@ -190,16 +219,21 @@ export async function decryptByokEnvelope(
   }
 
   const { data_key } = RetrievedDataKeySchema.parse(
-    await sendToKms(config, `${config.url}/decrypt`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...context,
-        wrapped_dek: envelope.wrapped_dek,
-        kms_key_id: envelope.kms_key_id,
-        kms_key_version: envelope.kms_key_version,
-      }),
-    })
+    await sendToKms(
+      config,
+      `${config.url}/decrypt`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...context,
+          wrapped_dek: envelope.wrapped_dek,
+          kms_key_id: envelope.kms_key_id,
+          kms_key_version: envelope.kms_key_version,
+        }),
+      },
+      timing
+    )
   );
   return decryptApiKey(envelope.encrypted_data, data_key);
 }

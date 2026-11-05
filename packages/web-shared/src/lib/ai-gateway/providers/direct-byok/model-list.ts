@@ -35,7 +35,7 @@ export function cachedEnhancedDirectByokModelList({
   );
 }
 
-function enhanceDirectByokModelList({
+export function enhanceDirectByokModelList({
   recommendedModels,
   remainingModels,
 }: {

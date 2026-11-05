@@ -4,7 +4,7 @@ import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
-import { cachedEnhancedDirectByokModelList } from './model-list';
+import { cachedEnhancedDirectByokModelList, enhanceDirectByokModelList } from './model-list';
 import { FAILURE_BACKOFF_MS as failureBackoffMs } from '@kilocode/web-shared/lib/cached-fetch';
 import type { DirectByokModel } from './types';
 
@@ -279,5 +279,75 @@ describe('cachedEnhancedDirectByokModelList', () => {
     expect((await getModels()).map(entry => entry.id)).toEqual(['recommended', 'recovered']);
     await expect(getKimi()).resolves.toBe(kimiRefreshed);
     expectProviderReads('codestral', 'kimi-coding', 'codestral', 'kimi-coding', 'codestral');
+  });
+});
+
+describe('enhanceDirectByokModelList', () => {
+  test('puts recommendations first and promotes their recommended flag', () => {
+    expect(
+      enhanceDirectByokModelList({
+        recommendedModels: [model('a', { flags: ['vision'] })],
+        remainingModels: [model('b')],
+      })
+    ).toStrictEqual([
+      {
+        ...model('a'),
+        flags: ['vision', 'recommended'],
+        reasoning_options: undefined,
+        catalog_model_id: undefined,
+      },
+      {
+        ...model('b'),
+        flags: undefined,
+        reasoning_options: undefined,
+        catalog_model_id: undefined,
+      },
+    ]);
+  });
+
+  test('keeps the first occurrence of a duplicated id', () => {
+    const merged = enhanceDirectByokModelList({
+      recommendedModels: [model('a', { name: 'Recommended a' })],
+      remainingModels: [
+        model('a', { name: 'Synced a' }),
+        model('b'),
+        model('b', { name: 'Second b' }),
+      ],
+    });
+
+    expect(merged.map(entry => entry.id)).toEqual(['a', 'b']);
+    expect(merged.map(entry => entry.name)).toEqual(['Recommended a', 'b']);
+  });
+
+  test('fills reasoning options and the catalog id from the synced row only when unset', () => {
+    const syncedOptions = [{ type: 'effort' as const, values: ['high' as const] }];
+    const merged = enhanceDirectByokModelList({
+      recommendedModels: [
+        model('bare'),
+        model('pinned', { reasoning_options: [], catalog_model_id: 'vendor/pinned' }),
+      ],
+      remainingModels: [
+        model('bare', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/bare' }),
+        model('pinned', { reasoning_options: syncedOptions, catalog_model_id: 'vendor/other' }),
+      ],
+    });
+
+    expect(merged[0]).toMatchObject({
+      reasoning_options: syncedOptions,
+      catalog_model_id: 'vendor/bare',
+    });
+    expect(merged[1]).toMatchObject({ reasoning_options: [], catalog_model_id: 'vendor/pinned' });
+  });
+
+  test('leaves the input arrays and their entries unchanged', () => {
+    const recommended = [model('a', { flags: ['vision'] })];
+    const synced = [model('b', { catalog_model_id: 'vendor/b' })];
+    const recommendedCopy = structuredClone(recommended);
+    const syncedCopy = structuredClone(synced);
+
+    enhanceDirectByokModelList({ recommendedModels: recommended, remainingModels: synced });
+
+    expect(recommended).toEqual(recommendedCopy);
+    expect(synced).toEqual(syncedCopy);
   });
 });

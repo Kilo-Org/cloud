@@ -13,6 +13,11 @@ export const MAX_TRACKED_FAILURES = 1_000;
 
 const reportedAt = new Map<string, number>();
 
+/** Clears every claim, so a test starts from an empty window. */
+export function resetFailureReportsForTest(): void {
+  reportedAt.clear();
+}
+
 /** True when `key` has not been reported within the window; records `now` as its report time. */
 export function claimFailureReport(key: string, now: number): boolean {
   const reported = reportedAt.get(key);

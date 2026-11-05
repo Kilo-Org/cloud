@@ -139,6 +139,11 @@ export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<Readon
 // empty snapshot reports an outage once per window instead of once per validated model id.
 let warnedMissingOpenRouterModelMetadataFor: ReadonlySet<string> | null = null;
 
+/** Tests clear the latch so one empty snapshot is judged again inside the same registry. */
+export function resetOpenRouterModelIdWarningForTest(): void {
+  warnedMissingOpenRouterModelMetadataFor = null;
+}
+
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
   if (legacyOpenRouterAliases.has(modelId)) {
     return true;

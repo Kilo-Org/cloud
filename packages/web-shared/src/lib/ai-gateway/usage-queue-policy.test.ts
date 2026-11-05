@@ -1,8 +1,7 @@
 import { isSfoUsageQueueSelected } from './usage-queue-policy';
-import { parseUsageQueueSfoExposure, parseUsageQueueSfoUserIds } from './usage-queue-config';
+import { parseUsageQueueSfoExposure } from './usage-queue-config';
 
-const eligible = { kiloUserId: 'oauth/synthetic' };
-const enabled = { enabled: true, exposure: 1, userIds: null };
+const enabled = { enabled: true, exposure: 1 };
 
 test.each([
   '',
@@ -40,30 +39,15 @@ test.each([
   ' 0.1 ',
 ])('accepts exposure %s', value => expect(parseUsageQueueSfoExposure(value)).toBe(Number(value)));
 
-test('allowlist is optional, exact and supports arbitrary string user IDs', () => {
-  expect(parseUsageQueueSfoUserIds('')).toBeNull();
-  expect(parseUsageQueueSfoUserIds('["oauth/github/alice","payer:日本語"," id "]')).toEqual(
-    new Set(['oauth/github/alice', 'payer:日本語', ' id '])
-  );
-});
-test.each(['bad-json', 'null', '{}', '"oauth/synthetic"', '[1]', '[""]', '["ok",null]'])(
-  'invalid allowlist %s selects nobody',
-  value => {
-    const userIds = parseUsageQueueSfoUserIds(value);
-    expect(userIds).toEqual(new Set());
-    expect(isSfoUsageQueueSelected({ ...enabled, userIds }, eligible)).toBe(false);
-  }
-);
-test('allowlist restricts selection and cannot bypass rollback switches', () => {
-  const userIds = new Set([eligible.kiloUserId]);
-  expect(isSfoUsageQueueSelected({ ...enabled, userIds }, eligible)).toBe(true);
-  expect(isSfoUsageQueueSelected({ ...enabled, userIds: new Set() }, eligible)).toBe(false);
-  expect(isSfoUsageQueueSelected({ ...enabled, userIds, enabled: false }, eligible)).toBe(false);
-  expect(isSfoUsageQueueSelected({ ...enabled, userIds, exposure: 0 }, eligible)).toBe(false);
-});
-
 test('missing user identity selects nobody', () => {
   expect(isSfoUsageQueueSelected(enabled, { kiloUserId: '' })).toBe(false);
+});
+
+test.each([
+  ['disabled', { enabled: false, exposure: 1 }],
+  ['zero exposure', { enabled: true, exposure: 0 }],
+] as const)('%s selects nobody', (_name, config) => {
+  expect(isSfoUsageQueueSelected(config, { kiloUserId: 'oauth/synthetic' })).toBe(false);
 });
 
 test.each([
@@ -107,18 +91,6 @@ test('organization cohort is stable across members and uses the organization pay
       isSfoUsageQueueSelected({ ...enabled, exposure: 0.4 }, { kiloUserId, organizationId })
     ).toBe(true);
   }
-  expect(
-    isSfoUsageQueueSelected(
-      { ...enabled, userIds: new Set(['member-a']) },
-      { kiloUserId: 'member-a', organizationId }
-    )
-  ).toBe(true);
-  expect(
-    isSfoUsageQueueSelected(
-      { ...enabled, userIds: new Set(['member-a']) },
-      { kiloUserId: 'member-b', organizationId }
-    )
-  ).toBe(false);
 });
 
 test('organization UUID casing preserves a monotonic cohort across members and spellings', () => {

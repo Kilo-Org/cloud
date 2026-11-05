@@ -278,6 +278,40 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.completed_at).toBeTruthy();
   });
 
+  it('reports that nothing changed when the review finished before the local cancel', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'queued', {
+          platform_integration_id: integration.id,
+          check_run_id: 777,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    // The status read that precedes the cancel saw a queued review; by the time
+    // the guarded cancel runs, the worker path has finished it.
+    mockCancelReview.mockImplementation(async () => {
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'completed', completed_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { success: false, reviewId: review.id };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Code review is no longer running' });
+    expect(storedReview?.status).toBe('completed');
+    expect(storedReview?.error_message).toBeNull();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
   it('cancels pending reviews locally without calling the Worker', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

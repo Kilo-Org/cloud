@@ -523,6 +523,7 @@ describe('sessionStatusErrorMessage', () => {
 function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
+    side: 'assistant',
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,
@@ -536,6 +537,7 @@ function assistantFailure(detail: string | null): MessageFailure {
 describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'user',
     titleKey: 'agentChat.messageFailure.deliveryTitle',
     title: 'Failed to deliver',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
@@ -550,6 +552,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   // failure a second time in either of its two copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'assistant',
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,

@@ -155,13 +155,19 @@ function MessageBubbleImpl({
     failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined;
-  // The footer is the failed row's status, so it sits under the row it names: a
-  // user row's bubble is end-aligned, so its title, detail and action row are
-  // too; an assistant row's stays on the leading edge. `items-end` is logical.
+  // The footer is the failed turn's status, so it sits in the column that turn
+  // occupies rather than the row that carries it: a message that never reached
+  // the agent is the user's own row, and its title, detail and action row stay
+  // under that bubble, which is end-aligned; a failed response — the
+  // assistant's own error, and an execution failure carried by the question —
+  // takes the assistant's leading edge like every other block of that turn.
+  // `items-end` is logical, so the user's column mirrors with the interface.
   // `text-right` is how a line end-aligns here: NativeWind drops
   // `text-align: end`, and RN resolves `right` against the interface direction,
-  // so the copy still ends on the trailing side in an RTL interface.
-  const trailingFailure = isUser;
+  // so the copy still ends on the trailing side in an RTL interface. The
+  // assistant's column names no alignment: its title and detail keep the
+  // interface's own start edge, as the assistant rows around them do.
+  const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
       <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>

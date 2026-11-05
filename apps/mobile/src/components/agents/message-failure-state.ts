@@ -96,6 +96,17 @@ function assistantDetailKey(errorName: string): string | null {
 export type MessageFailure = {
   kind: 'delivery' | 'assistant';
   /**
+   * The column the footer occupies, which is the column of the turn that
+   * failed rather than of the row that carries it. A delivery failure of the
+   * transport is the user's own message not arriving, so its footer sits under
+   * that bubble. Every failure of the response — the assistant's own error, and
+   * an agent-execution failure carried by the question, whose copy already
+   * names the response — takes the assistant's leading column (see
+   * `AGENT_EXECUTION_DELIVERY_REASON`). `kind` cannot carry this: the execution
+   * failure is a delivery record with the assistant's statement.
+   */
+  side: 'user' | 'assistant';
+  /**
    * The catalog key behind `title`. The duplicate check compares keys, not the
    * resolved copy: `selectMessageFailure` runs inside a memo keyed on the
    * message arrays, so an in-place language switch would otherwise leave a
@@ -205,6 +216,7 @@ export function selectMessageFailure(input: {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
       return {
         kind: 'delivery',
+        side: 'assistant',
         titleKey: 'agentChat.messageFailure.assistantTitle',
         title: i18n.t('agentChat.messageFailure.assistantTitle'),
         detailKey: null,
@@ -217,6 +229,7 @@ export function selectMessageFailure(input: {
     const detailKey = DELIVERY_DETAIL_KEY_BY_REASON[deliveryState.reason];
     return {
       kind: 'delivery',
+      side: 'user',
       titleKey: 'agentChat.messageFailure.deliveryTitle',
       title: i18n.t('agentChat.messageFailure.deliveryTitle'),
       detailKey,
@@ -236,6 +249,7 @@ export function selectMessageFailure(input: {
     const retryableByProvider = !assistantErrorMarkedNonRetryable(error);
     return {
       kind: 'assistant',
+      side: 'assistant',
       titleKey: 'agentChat.messageFailure.assistantTitle',
       title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detailKey,

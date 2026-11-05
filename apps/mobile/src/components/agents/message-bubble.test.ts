@@ -323,6 +323,14 @@ describe('MessageBubble failure footer', () => {
       assistantMessageWithError('m-align-asst', 'APIError'),
       { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
     );
+    // A question whose answer failed: the row is the user's, the statement is
+    // the assistant's, so the footer takes the assistant's column — the same
+    // layout an assistant error draws.
+    const executionTree = await renderBubbleWithHandlers(userMessage('m-align-exec'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
 
     const userFooter = footerOf(userTree);
     expect(String(userFooter?.props.className)).toBe('gap-1 px-4 py-1 items-end');
@@ -346,13 +354,30 @@ describe('MessageBubble failure footer', () => {
       )
     ).toEqual([]);
 
+    const executionFooter = footerOf(executionTree);
+    expect(String(executionFooter?.props.className)).toBe('gap-1 px-4 py-1');
+    expect(
+      classNamesIn(executionFooter?.props.children).filter(name =>
+        name.split(' ').includes('text-right')
+      )
+    ).toEqual([]);
+    // The failed response still offers both recovery actions.
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Retry')
+    ).not.toBeNull();
+    expect(
+      findElementByType(executionTree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+
     // No start/end text class: NativeWind drops `text-align: end`, and RN
     // already resolves `text-right` against the interface direction.
     const footerClasses = [
       ...classNamesIn(userFooter?.props.children),
       ...classNamesIn(assistantFooter?.props.children),
+      ...classNamesIn(executionFooter?.props.children),
       String(userFooter?.props.className),
       String(assistantFooter?.props.className),
+      String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
   });

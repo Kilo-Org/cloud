@@ -84,6 +84,7 @@ describe('selectMessageFailure', () => {
         });
         expect(result).not.toBeNull();
         expect(result?.kind).toBe('delivery');
+        expect(result?.side).toBe('user');
         expect(result?.title).toBe(title);
         expect(result?.detail).toBe(detail);
         expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
@@ -102,6 +103,9 @@ describe('selectMessageFailure', () => {
       });
       expect(result).not.toBeNull();
       expect(result?.kind).toBe('delivery');
+      // The row is the user's question, but the statement is the failed
+      // response: it takes the assistant's column, not the bubble's.
+      expect(result?.side).toBe('assistant');
       expect(result?.title).toBe('Response failed');
       expect(result?.detail).toBeNull();
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
@@ -142,6 +146,7 @@ describe('selectMessageFailure', () => {
         const result = selectMessageFailure({ info: assistantInfo(name) });
         expect(result, name).not.toBeNull();
         expect(result?.kind).toBe('assistant');
+        expect(result?.side).toBe('assistant');
         expect(result?.title).toBe('Response failed');
         expect(result?.detail, name).toBe(detail);
         expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');

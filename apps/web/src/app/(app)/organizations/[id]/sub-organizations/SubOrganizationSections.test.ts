@@ -28,7 +28,7 @@ const overview = {
 };
 
 describe('PeopleSection direct owners', () => {
-  it('distinguishes direct child owners from inherited parent owner permissions', () => {
+  it('distinguishes direct child owners from inherited administrative permissions', () => {
     const data: React.ComponentProps<typeof PeopleSection>['data'] = {
       children: [
         {
@@ -79,9 +79,10 @@ describe('PeopleSection direct owners', () => {
     expect(ownedChildRow).not.toContain('Parent owner');
     expect(emptyChildRow).toContain('No direct owner');
     expect(table).toContain('Direct owners');
-    expect(html).toContain('The owner list excludes service accounts.');
-    expect(html).toContain('Parent organization owners retain owner permissions');
-    expect(html).toContain('without a direct membership');
+    expect(html).toContain(
+      'Users with administrative permissions in the parent organization retain those permissions'
+    );
+    expect(html).toContain('regardless of whether they have a direct membership.');
   });
 });
 

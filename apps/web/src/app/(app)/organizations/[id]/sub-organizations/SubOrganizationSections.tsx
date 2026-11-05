@@ -218,9 +218,9 @@ export function PeopleSection({ data }: { data: People }) {
         <CardHeader>
           <CardTitle>People by sub-organization</CardTitle>
           <CardDescription>
-            Direct memberships remain independent in every organization. Parent organization owners
-            retain owner permissions in every direct sub-organization without a direct membership.
-            The owner list excludes service accounts.
+            Users with administrative permissions in the parent organization retain those
+            permissions in its sub-organizations, regardless of whether they have a direct
+            membership.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">

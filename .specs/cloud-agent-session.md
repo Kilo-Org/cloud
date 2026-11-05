@@ -23,7 +23,8 @@ sandbox size into it; revised 2026-10-22 to simplify environment editing and
 show profile conflicts before saving; revised 2026-10-29 to allow several
 repositories in one environment; revised 2026-10-31 to define worktree-owned
 shared runtime and MCP configuration; revised 2026-11-04 to state that one
-sandbox serves one workspace.
+sandbox serves one workspace; revised 2026-11-04 to add environment start
+commands and skip setup in a workspace started from an environment snapshot.
 
 ## Conventions
 
@@ -40,8 +41,8 @@ they appear in all capitals, as shown here.
   workspace only: the sibling chats of that workspace share it, and no other
   workspace uses it.
 - **Repository environment**: an optional saved setup for one or several
-  repositories -- setup commands, plaintext variables, secrets, and a sandbox
-  size -- distinct from the sandbox Environment. A repository MAY belong to
+  repositories -- setup commands, start commands, plaintext variables, secrets,
+  and a sandbox size -- distinct from the sandbox Environment. A repository MAY belong to
   several environments of one owner.
 - **Multi-repository environment** (V2): a repository environment that lists its
   repositories. Multi-repository environments are available to all personal and
@@ -51,6 +52,11 @@ they appear in all capitals, as shown here.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request
   or for a session, that later sessions of that environment start from.
+- **Start commands**: a repository environment's workspace start script. It
+  runs each time a workspace starts -- after setup, or alone when the workspace
+  starts from a snapshot -- and not when a chat joins a running workspace. It
+  is not a build input: a build never runs it, and changing it does not change
+  the configuration revision.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -166,9 +172,14 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild,
-   except when restoring a private workspace tail snapshot. A failing or timed-out
-   setup command MUST fail preparation and the turn.
+ 5. Setup commands MUST run on the first prepare and again on every rebuild,
+    except when restoring a private workspace tail snapshot. An environment snapshot
+    skips only the environment's setup; request-supplied commands MUST still run.
+    Start commands MUST run each time a workspace starts:
+    on the first prepare, on every rebuild, after an environment snapshot start
+    and after a private workspace tail snapshot restore. They MUST NOT run when a
+    chat joins a workspace that is already running. A failing or timed-out setup or start command
+    MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -195,9 +206,14 @@ repository.
    one repository. Otherwise, and when the lookup is unavailable, it MUST start from
    the base image. The lookup MUST NOT delay the start by more than 15 seconds
    and MUST NOT wait for a build.
-3. A session that starts from a snapshot MUST still run setup with the
-   configuration admitted for that session. Cached files MAY retain earlier
-   values, including secrets.
+3. A workspace that starts from an environment snapshot, at any revision, MUST
+   NOT run the environment's setup commands, because the build already ran them.
+   It MUST run any request-supplied setup commands, then the start commands.
+   A workspace that starts from the base image, or that is not
+   entirely restored from the snapshot, MUST run setup with the configuration
+   admitted for that session, then the start commands. Changed setup commands
+   take effect after the next build. Cached files MAY retain earlier values,
+   including secrets.
 4. When a session starts from an older snapshot revision, preparation MUST
    show the snapshot revision, the session's revision, and the actual
    replacement build status, including a skipped build or backoff.
@@ -690,6 +706,17 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-04 -- Environment start commands
+
+- Environments have a workspace start script that runs each time a workspace
+  starts, after setup or from a snapshot. It is not part of a build, and a chat
+  that joins a running workspace does not run it.
+- A workspace that starts from an environment snapshot, at any revision, skips
+  the environment's setup, but still runs request-supplied setup. Changed
+  environment setup commands take effect after the next build.
+- Start commands also run after a session disk snapshot restore, because no
+  process survives a snapshot.
 
 ### 2026-11-04 -- One sandbox per workspace
 

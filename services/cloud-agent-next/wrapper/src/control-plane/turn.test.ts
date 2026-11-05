@@ -6,6 +6,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { DEFAULT_CONDENSE_TIMEOUT_MS } from '../condense-on-complete.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import { runtimeKey } from './prepare.js';
@@ -1016,7 +1017,8 @@ describe('serialized command delivery wait', () => {
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
       undefined,
-      runtimeKey(spec)
+      runtimeKey(spec),
+      Promise.resolve(true)
     );
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_progress' }]);
@@ -3406,6 +3408,198 @@ describe('native session outcome transitions', () => {
     }
   );
 
+  it.each(['execution_limit', 'no_progress'] as const)(
+    'auto-commits after confirmed %s cancellation without delaying or changing the failure',
+    async reason => {
+      const stopped = Promise.withResolvers<boolean>();
+      const committed = Promise.withResolvers<{ success: boolean }>();
+      const calls: Parameters<NonNullable<TurnManagerDeps['runAutoCommit']>>[0][] = [];
+      let condenses = 0;
+      const h = createHarness({
+        runAutoCommit: async input => {
+          calls.push(input);
+          return committed.promise;
+        },
+        runCondense: async () => {
+          condenses++;
+          return { success: true, wasAborted: false };
+        },
+      });
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      h.manager.submit(
+        SESSION_ID,
+        promptPayload('m1', { finalization: { autoCommit: true, condenseOnComplete: true } })
+      );
+      await settle();
+      h.manager.onNativeDeadline(
+        runningState,
+        reason,
+        undefined,
+        runtimeKey(spec),
+        stopped.promise
+      );
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason, lastMessageId: 'm1' },
+      ]);
+      expect(h.manager.hasPendingWork()).toBe(true);
+      expect(h.manager.canRestartRuntime(runtimeKey(spec))).toBe(false);
+      await settle();
+      expect(calls).toHaveLength(0);
+      stopped.resolve(true);
+      await settle();
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ workspacePath: DIRECTORY, userMessageId: 'm1' });
+      expect(h.manager.hasPendingWork()).toBe(true);
+
+      h.manager.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m2'));
+      await settle();
+      h.advance(120_001);
+      h.manager.tick();
+      await settle();
+      expect(h.client(spec).prompts).toHaveLength(1);
+      expect(outcomeFrames(h.frames)).toHaveLength(1);
+
+      committed.resolve({ success: true });
+      await settle();
+      expect(h.client(spec).prompts).toHaveLength(2);
+      expect(condenses).toBe(0);
+      expect(outcomeFrames(h.frames)).toHaveLength(1);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason, lastMessageId: 'm1' },
+        { status: 'completed', lastMessageId: 'm2' },
+      ]);
+      expect(h.manager.hasPendingWork()).toBe(false);
+      h.manager.shutdown();
+    }
+  );
+
+  it.each(['unconfirmed', 'running-root', 'disabled'] as const)(
+    'skips interruption auto-commit when %s',
+    async condition => {
+      let commits = 0;
+      const h = createHarness({
+        runAutoCommit: async () => {
+          commits++;
+          return { success: true };
+        },
+      });
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      h.manager.submit(
+        SESSION_ID,
+        promptPayload('m1', { finalization: { autoCommit: condition !== 'disabled' } })
+      );
+      await settle();
+      if (condition === 'running-root') h.setState(KILO_SESSION, runningState);
+      h.manager.onNativeDeadline(
+        runningState,
+        'execution_limit',
+        undefined,
+        runtimeKey(spec),
+        Promise.resolve(condition !== 'unconfirmed')
+      );
+      await settle();
+      expect(commits).toBe(0);
+      expect(h.manager.hasPendingWork()).toBe(false);
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'execution_limit', lastMessageId: 'm1' },
+      ]);
+      if (condition !== 'disabled') {
+        expect(eventFrames(h.frames)).toContainEqual(
+          expect.objectContaining({
+            type: 'error',
+            properties: expect.objectContaining({ fatal: false }),
+          })
+        );
+      }
+      h.manager.shutdown();
+    }
+  );
+
+  it.each(['stop', 'release', 'shutdown', 'timeout', 'worktree-deletion'] as const)(
+    'cancels interruption auto-commit on %s even without a current turn',
+    async action => {
+      let signal: AbortSignal | undefined;
+      const h = createHarness({
+        runAutoCommit: async input => {
+          signal = input.signal;
+          return new Promise(resolve => {
+            input.signal?.addEventListener(
+              'abort',
+              () => resolve({ success: false, error: 'aborted' }),
+              {
+                once: true,
+              }
+            );
+          });
+        },
+      });
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+      await settle();
+      h.manager.onNativeDeadline(
+        runningState,
+        'execution_limit',
+        undefined,
+        runtimeKey(spec),
+        Promise.resolve(true)
+      );
+      await settle();
+      expect(signal).toBeDefined();
+      if (action === 'stop') h.manager.abort(SESSION_ID);
+      if (action === 'release') h.manager.release(SESSION_ID);
+      if (action === 'shutdown') h.manager.shutdown();
+      if (action === 'timeout') {
+        h.timeouts
+          .find(timer => !timer.cancelled && timer.ms === DEFAULT_CONDENSE_TIMEOUT_MS)
+          ?.handler();
+      }
+      if (action === 'worktree-deletion') await h.manager.cancelInterruptedFinalizations(DIRECTORY);
+      await settle();
+      expect(signal?.aborted).toBe(true);
+      expect(h.manager.hasPendingWork()).toBe(false);
+      expect(outcomeFrames(h.frames)).toHaveLength(1);
+      h.manager.shutdown();
+    }
+  );
+
+  it('bounds cleanup while waiting for cancellation and never commits after a late confirmation', async () => {
+    const stopped = Promise.withResolvers<boolean>();
+    let commits = 0;
+    const h = createHarness({
+      runAutoCommit: async () => {
+        commits++;
+        return { success: true };
+      },
+    });
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.onNativeDeadline(
+      runningState,
+      'execution_limit',
+      undefined,
+      runtimeKey(spec),
+      stopped.promise
+    );
+    h.timeouts
+      .find(timer => !timer.cancelled && timer.ms === DEFAULT_CONDENSE_TIMEOUT_MS)
+      ?.handler();
+    await settle();
+    expect(h.manager.hasPendingWork()).toBe(false);
+    stopped.resolve(true);
+    await settle();
+    expect(commits).toBe(0);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+    h.manager.shutdown();
+  });
+
   it('projects a no_progress failure with the parsed outcomeReason', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -3415,7 +3609,8 @@ describe('native session outcome transitions', () => {
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
       undefined,
-      runtimeKey(routeSpec())
+      runtimeKey(routeSpec()),
+      Promise.resolve(true)
     );
     await settle();
 
@@ -3425,9 +3620,15 @@ describe('native session outcome transitions', () => {
   });
 
   it('fails a no-progress stall in a model retry loop as the assistant failure Kilo was retrying', async () => {
-    const h = createHarness();
+    let commits = 0;
+    const h = createHarness({
+      runAutoCommit: async () => {
+        commits++;
+        return { success: true };
+      },
+    });
     h.registerRoute(routeSpec());
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
     await settle();
     h.manager.onNativeDeadline(
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
@@ -3436,7 +3637,8 @@ describe('native session outcome transitions', () => {
         message:
           '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
       },
-      runtimeKey(routeSpec())
+      runtimeKey(routeSpec()),
+      Promise.resolve(true)
     );
     await settle();
 
@@ -3450,6 +3652,7 @@ describe('native session outcome transitions', () => {
     expect(native?.fields.status).toBe('failed');
     expect(native?.fields).not.toHaveProperty('outcomeReason');
     expect(JSON.stringify(native?.fields)).not.toContain('API key');
+    expect(commits).toBe(1);
   });
 
   it('fails a retry stall with unrecognized retry text as a provider failure, never unknown', async () => {
@@ -3461,7 +3664,8 @@ describe('native session outcome transitions', () => {
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
       { message: 'Provider returned error' },
-      runtimeKey(routeSpec())
+      runtimeKey(routeSpec()),
+      Promise.resolve(true)
     );
     await settle();
 
@@ -3480,7 +3684,8 @@ describe('native session outcome transitions', () => {
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
       { message: 'Too Many Requests' },
-      runtimeKey(routeSpec())
+      runtimeKey(routeSpec()),
+      Promise.resolve(true)
     );
     await settle();
 

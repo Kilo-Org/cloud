@@ -780,9 +780,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * root has a stamp from this allocation needs nothing, a root with one from
    * another allocation is a restored environment snapshot to adopt, and anything
    * else is cloned. An adopt failure fails the preparation; it never clears the
-   * root to clone over the snapshot. Setup runs once, at the route directory,
-   * after every root is in place. It always runs after a clone or an adopt, with
-   * this session's admitted configuration. Repository stamps stay per root.
+   * root to clone over the snapshot. Setup and start commands run once, at the
+   * route directory, after every root is in place. A workspace restored entirely
+   * from the environment snapshot skips only the environment's setup; the
+   * session's setup and start commands still run. A workspace tail snapshot
+   * restore runs only start commands. Repository stamps stay per root.
    * Registered workspace identity is stamped after runtime preparation succeeds.
    */
   async function prepareWorkspace(
@@ -878,6 +880,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           );
         }
       });
+      // The restored workspace keeps every file setup produced, but no process
+      // survives it, so the start commands run again.
+      if ((spec.startCommands?.length ?? 0) > 0) setStep('setup');
+      await runPreparationCommands(
+        spec,
+        spec.startCommands ?? [],
+        env,
+        redact,
+        new AbortController().signal
+      );
       return {
         outcome: 'adopted',
         deferredStamps: [
@@ -917,7 +929,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (reconciled.kind === 'same') return { outcome: 'same', deferredStamps: null };
     const { adopted, cloning } = reconciled;
     setStep('setup');
-    await runSetupCommands(spec, spec.directory, env, redact, new AbortController().signal);
+    const fromEnvironmentSnapshot = reconciled.inspections.every(
+      inspection => inspection === 'foreign'
+    );
+    const skippedSetupCommands = fromEnvironmentSnapshot
+      ? (spec.environmentSetupCommandCount ?? 0)
+      : 0;
+    const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
+    log(
+      `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} setupCommands=${setupCommands.length} startCommands=${spec.startCommands?.length ?? 0}`
+    );
+    if (skippedSetupCommands > 0) {
+      emitProgress(spec.sessionId, 'setup', 'Setup already ran in the environment snapshot');
+    }
+    await runPreparationCommands(
+      spec,
+      [...setupCommands, ...(spec.startCommands ?? [])],
+      env,
+      redact,
+      new AbortController().signal
+    );
     // The callback reports whether the recovery steps actually applied. A clone
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
@@ -944,20 +975,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     return { outcome: adopted ? 'adopted' : 'cloned', deferredStamps: null };
   }
 
-  async function runSetupCommands(
+  /** Setup and start commands run as one list, at the route directory. */
+  async function runPreparationCommands(
     spec: ControlPlaneRouteSpec,
-    directory: string,
+    commands: readonly string[],
     env: Record<string, string>,
     redact: (text: string) => string,
     signal: AbortSignal
   ): Promise<void> {
-    const commands = spec.setupCommands ?? [];
     if (commands.length === 0) return;
     emitProgress(spec.sessionId, 'setup');
     // The Session renders the setup events as per-command preparation steps.
     await repository.runSetupCommands({
-      commands,
-      directory,
+      commands: [...commands],
+      directory: spec.directory,
       env,
       redact,
       signal,
@@ -1218,7 +1249,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       const needsWorkspace =
         spec.workspaceSnapshot !== undefined ||
         Boolean(spec.git) ||
-        (spec.setupCommands?.length ?? 0) > 0;
+        (spec.setupCommands?.length ?? 0) > 0 ||
+        (spec.startCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.

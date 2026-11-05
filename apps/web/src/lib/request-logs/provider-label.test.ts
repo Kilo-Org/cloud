@@ -13,15 +13,20 @@ describe('formatRequestLogProvider', () => {
     expect(formatRequestLogProvider('deepinfra')).toBe('DeepInfra');
     expect(formatRequestLogProvider('bedrock')).toBe('Amazon Bedrock');
     expect(formatRequestLogProvider('novita')).toBe('Novita AI');
+    expect(formatRequestLogProvider('meituan')).toBe('Meituan LongCat');
   });
 
   test('resolves known inference providers case-insensitively', () => {
     expect(formatRequestLogProvider('DEEPINFRA')).toBe('DeepInfra');
+    expect(formatRequestLogProvider('MEITUAN')).toBe('Meituan LongCat');
   });
 
-  test('title-cases an unknown inference provider', () => {
-    expect(formatRequestLogProvider('  acme labs  ')).toBe('Acme Labs');
-  });
+  test.each(['  acme labs  ', 'acme-labs', 'acme_labs', 'acme--__labs'])(
+    'title-cases the unknown inference provider %s with spaces',
+    inferenceProvider => {
+      expect(formatRequestLogProvider(inferenceProvider)).toBe('Acme Labs');
+    }
+  );
 
   test('does not treat Object.prototype names as known inference providers', () => {
     expect(formatRequestLogProvider('constructor')).toBe('Constructor');

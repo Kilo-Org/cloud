@@ -8453,6 +8453,10 @@ export const cloud_agent_environments = pgTable(
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
+    // Ordered start commands run in every session after setup, including a
+    // session whose snapshot already ran setup. Not a build input, so it never
+    // advances the revision.
+    start_commands: text().array().default([]).notNull(),
     // Monotonic build-input revision. Advances when commands, plaintext
     // variables or secrets change; a rename or an identical write keeps it.
     configuration_revision: integer().default(1).notNull(),

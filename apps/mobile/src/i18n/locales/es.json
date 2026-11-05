@@ -2038,6 +2038,7 @@
       "assistantStopped": "Se detuvo la generación de la respuesta.",
       "assistantContextOverflow": "La conversación es demasiado larga para el modelo.",
       "assistantProviderError": "El proveedor devolvió un error.",
+      "assistantProviderRefused": "El proveedor rechazó esta solicitud y no se puede reintentar.",
       "assistantOutputLimit": "La respuesta alcanzó el límite de salida del modelo.",
       "assistantStructuredOutput": "La respuesta no coincidió con el formato requerido.",
       "assistantFailed": "No se pudo generar la respuesta."

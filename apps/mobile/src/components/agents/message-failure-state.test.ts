@@ -69,15 +69,21 @@ describe('selectMessageFailure', () => {
   describe('delivery', () => {
     it('maps every delivery reason to fixed copy and never emits raw error text', () => {
       const cases = [
-        { reason: 'interrupted', title: 'Message not sent', detail: 'You stopped this message.' },
+        {
+          reason: 'interrupted',
+          title: 'You stopped this message.',
+          detail: null,
+          undelivered: false,
+        },
         {
           reason: 'exhausted',
           title: 'Message not sent',
           detail: 'We could not deliver this message after several attempts.',
+          undelivered: true,
         },
       ] as const;
 
-      for (const { reason, title, detail } of cases) {
+      for (const { reason, title, detail, undelivered } of cases) {
         const result = selectMessageFailure({
           info: userInfo(),
           deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason },
@@ -85,10 +91,11 @@ describe('selectMessageFailure', () => {
         expect(result).not.toBeNull();
         expect(result?.kind).toBe('delivery');
         expect(result?.side).toBe('user');
+        expect(result?.undelivered).toBe(undelivered);
         expect(result?.title).toBe(title);
         expect(result?.detail).toBe(detail);
         expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
-        expect(result?.detail).not.toContain('RAW_TRANSPORT_TEXT');
+        expect(result?.detail ?? '').not.toContain('RAW_TRANSPORT_TEXT');
         // The raw transport text stays reachable behind the copy action only.
         expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
         expect(result?.canRetry).toBe(true);
@@ -106,6 +113,7 @@ describe('selectMessageFailure', () => {
       // The row is the user's question, but the statement is the failed
       // response: it takes the assistant's column, not the bubble's.
       expect(result?.side).toBe('assistant');
+      expect(result?.undelivered).toBe(false);
       expect(result?.title).toBe('Response failed');
       expect(result?.detail).toBeNull();
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');

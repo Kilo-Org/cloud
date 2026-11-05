@@ -147,7 +147,7 @@ describe.each([
 });
 
 describe('MessageBubble failed message treatment', () => {
-  it('dims a message the transport gave up on and leaves an execution failure whole', async () => {
+  it('marks a message the transport gave up on and leaves a stopped one and a failed response whole', async () => {
     const { MessageBubble } = await import('./message-bubble');
     const retry = vi.fn<(message: StoredMessage) => void>();
     // eslint-disable-next-line new-cap
@@ -163,13 +163,24 @@ describe('MessageBubble failed message treatment', () => {
       onRetryMessage: retry,
     });
     // eslint-disable-next-line new-cap
+    const stopped = MessageBubble.type({
+      message: userMessage('m-stopped'),
+      deliveryState: { status: 'failed', error: '', reason: 'interrupted' },
+      onRetryMessage: retry,
+    });
+    // eslint-disable-next-line new-cap
     const unexplained = MessageBubble.type({
       message: userMessage('m-unexplained'),
       deliveryState: { status: 'failed', error: 'Delivery exhausted', reason: 'exhausted' },
     });
 
-    expect(findElementByType(undelivered, 'Bubble')?.props.className).toBe('opacity-60');
+    expect(findElementByType(undelivered, 'Bubble')?.props.className).toBe(
+      'border border-destructive'
+    );
     expect(findElementByType(execution, 'Bubble')?.props.className).toBeUndefined();
+    // A message the person stopped did reach the agent, so only its status
+    // line says what happened.
+    expect(findElementByType(stopped, 'Bubble')?.props.className).toBeUndefined();
     // Without a wired action the row states nothing, so the bubble stays whole.
     expect(findElementByType(unexplained, 'Bubble')?.props.className).toBeUndefined();
   });

@@ -8,15 +8,31 @@ import { i18n } from '@/i18n';
  */
 type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
 
-const DELIVERY_DETAIL_KEY_BY_REASON = {
-  interrupted: 'agentChat.messageFailure.deliveryInterrupted',
-  exhausted: 'agentChat.messageFailure.deliveryExhausted',
-  // `execution` is the response failure, not a delivery one (the message
-  // reached the agent): the row shows the assistant-failure title instead, so
-  // this line is never rendered. It stays in the record to keep the reason
-  // coverage complete.
-  execution: 'agentChat.messageFailure.deliveryExecution',
-} as const satisfies Record<DeliveryReason, string>;
+/**
+ * The statement a transport failure draws, keyed by its `reason`. A message the
+ * person stopped says so and nothing more. A message the transport gave up on
+ * says it was not sent, and a second line says how often it tried; that is also
+ * the one failure drawn on a failed bubble, because the message itself is what
+ * did not arrive.
+ *
+ * `execution` is absent: it is the response failing, and it draws the
+ * assistant-failure copy instead (see `AGENT_EXECUTION_DELIVERY_REASON`).
+ */
+const TRANSPORT_FAILURE_COPY = {
+  interrupted: {
+    titleKey: 'agentChat.messageFailure.deliveryInterrupted',
+    detailKey: null,
+    undelivered: false,
+  },
+  exhausted: {
+    titleKey: 'agentChat.messageFailure.deliveryTitle',
+    detailKey: 'agentChat.messageFailure.deliveryExhausted',
+    undelivered: true,
+  },
+} as const satisfies Record<
+  Exclude<DeliveryReason, 'execution'>,
+  { titleKey: string; detailKey: string | null; undelivered: boolean }
+>;
 
 /**
  * The one delivery reason that is an agent run failing, not the transport: the
@@ -27,7 +43,7 @@ const DELIVERY_DETAIL_KEY_BY_REASON = {
  * (UX-DEFECT session-detail failed turn). Retry and Copy-to-composer keep
  * working: the transport text stays reachable behind the copy action.
  */
-const AGENT_EXECUTION_DELIVERY_REASON: DeliveryReason = 'execution';
+const AGENT_EXECUTION_DELIVERY_REASON = 'execution' satisfies DeliveryReason;
 
 /**
  * Assistant error names that can never be retried. Pinned to the exact names
@@ -107,6 +123,13 @@ export type MessageFailure = {
    */
   side: 'user' | 'assistant';
   /**
+   * Whether the message itself never arrived. Only the transport giving up on a
+   * delivery says so, and only that failure draws the message as failed; a
+   * message the person stopped, and every failure of the response, leave the
+   * bubble whole.
+   */
+  undelivered: boolean;
+  /**
    * The catalog key behind `title`. The duplicate check compares keys, not the
    * resolved copy: `selectMessageFailure` runs inside a memo keyed on the
    * message arrays, so an in-place language switch would otherwise leave a
@@ -117,10 +140,10 @@ export type MessageFailure = {
   title: string;
   /**
    * The catalog key behind `detail`, or `null` when the title alone says it (an
-   * assistant failure with no classified reason, or an agent-execution delivery
-   * failure whose response-failure title is the whole statement). The footer
-   * then shows one statement plus the action rather than the same sentence
-   * twice.
+   * assistant failure with no classified reason, an agent-execution delivery
+   * failure whose response-failure title is the whole statement, or a message
+   * the person stopped). The footer then shows one statement plus the action
+   * rather than the same sentence twice.
    */
   detailKey: string | null;
   /**
@@ -217,6 +240,7 @@ export function selectMessageFailure(input: {
       return {
         kind: 'delivery',
         side: 'assistant',
+        undelivered: false,
         titleKey: 'agentChat.messageFailure.assistantTitle',
         title: i18n.t('agentChat.messageFailure.assistantTitle'),
         detailKey: null,
@@ -226,14 +250,21 @@ export function selectMessageFailure(input: {
         canCopy: true,
       };
     }
-    const detailKey = DELIVERY_DETAIL_KEY_BY_REASON[deliveryState.reason];
+    // The SDK maps every transport failure that is not a person stopping the
+    // message onto the give-up copy, so a state that names no known reason
+    // takes the same branch instead of drawing an unlabelled row.
+    const copy =
+      deliveryState.reason === 'interrupted'
+        ? TRANSPORT_FAILURE_COPY.interrupted
+        : TRANSPORT_FAILURE_COPY.exhausted;
     return {
       kind: 'delivery',
       side: 'user',
-      titleKey: 'agentChat.messageFailure.deliveryTitle',
-      title: i18n.t('agentChat.messageFailure.deliveryTitle'),
-      detailKey,
-      detail: i18n.t(detailKey),
+      undelivered: copy.undelivered,
+      titleKey: copy.titleKey,
+      title: i18n.t(copy.titleKey),
+      detailKey: copy.detailKey,
+      detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
       copyDetail: deliveryState.error,
       canRetry: true,
       canCopy: true,
@@ -250,6 +281,7 @@ export function selectMessageFailure(input: {
     return {
       kind: 'assistant',
       side: 'assistant',
+      undelivered: false,
       titleKey: 'agentChat.messageFailure.assistantTitle',
       title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detailKey,

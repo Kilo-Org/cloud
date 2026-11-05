@@ -470,7 +470,7 @@ describe('MessageBubble failure footer', () => {
 
   it('names the failure row on the title text without grouping the CTA buttons', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-a11y'), {
-      deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
@@ -495,7 +495,7 @@ describe('MessageBubble failure footer', () => {
     await i18n.changeLanguage('de');
     try {
       const tree = await renderBubbleWithHandlers(userMessage('m-a11y-de'), {
-        deliveryState: { status: 'failed', error: 'nope', reason: 'interrupted' },
+        deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
         onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       });
 

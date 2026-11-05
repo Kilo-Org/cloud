@@ -524,6 +524,7 @@ function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
     side: 'assistant',
+    undelivered: false,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,
@@ -538,6 +539,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
     side: 'user',
+    undelivered: true,
     titleKey: 'agentChat.messageFailure.deliveryTitle',
     title: 'Message not sent',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
@@ -553,6 +555,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   const executionFailure: MessageFailure = {
     kind: 'delivery',
     side: 'assistant',
+    undelivered: false,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,

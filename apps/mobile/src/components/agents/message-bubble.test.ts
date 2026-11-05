@@ -314,6 +314,29 @@ describe('MessageBubble failure footer', () => {
     expect(copy?.props.accessibilityRole).toBe('button');
   });
 
+  it('sets the failure detail at the transcript secondary body size under one uniform gap', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithError('m-scale', 'APIError'), {
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+    });
+
+    // The failed turn's detail line is the same secondary body copy as the
+    // collapsed reasoning row, not a smaller caption, so the block reads at the
+    // transcript's text size.
+    const footer = footerOf(tree);
+    const detail = classNamesIn(footer?.props.children).find(name =>
+      name.includes('text-muted-foreground')
+    );
+    expect(detail?.split(' ')).toEqual(
+      expect.arrayContaining(['text-sm', 'leading-[1.25rem]', 'text-muted-foreground'])
+    );
+
+    // One gap separates the title, the detail and the action row.
+    const gapClasses = String(footer?.props.className)
+      .split(' ')
+      .filter(name => /^gap-\d/.test(name));
+    expect(gapClasses).toHaveLength(1);
+  });
+
   it('end-aligns a failed user row’s footer under its bubble and leaves an assistant row’s on its leading edge', async () => {
     const userTree = await renderBubbleWithHandlers(userMessage('m-align-user'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },

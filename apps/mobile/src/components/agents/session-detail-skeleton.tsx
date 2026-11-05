@@ -66,10 +66,11 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  * session will not have. The footer then lands on its own geometry and the
  * transcript never moves under it.
  *
- * The bars take `bg-muted-soft`: the theme's `muted` equals `secondary` in both
- * palettes, so default-tone bars on this footer's own fill paint nothing and
- * the reserved area read as a blank tinted block. The line is the footer note's
- * `text-sm` line box and the bar its `action` button's 48pt floor.
+ * The bars take `bg-muted-soft`: the footer paints its own `bg-secondary`, and
+ * the placeholder fill matches that surface in the light palette, so
+ * default-tone bars on this fill paint nothing and the reserved area read as a
+ * blank tinted block. The line is the footer note's `text-sm` line box and the
+ * bar its `action` button's 48pt floor.
  */
 export function SessionReadOnlyFooterPlaceholder() {
   return (

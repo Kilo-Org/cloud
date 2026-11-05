@@ -31,6 +31,7 @@ import {
 } from '../protocol';
 import * as batches from './session-sync/batch';
 import { getTenantStub } from './SessionSyncTenantDO';
+import { getRelayStub } from './SessionRelayDO';
 import * as blob from './session-sync/blob';
 import * as erase from './session-sync/erase';
 import * as page from './session-sync/page';
@@ -120,6 +121,9 @@ export class SessionSyncDO extends DurableObject<Env> {
   private pendingBatchBytes = 0;
   private pendingBatches = 0;
   private purgeRetryAt = 0;
+  private relayUsed = false;
+  private relayPurged = false;
+  private relayPurgeRetryAt = 0;
   private leaseReconcilePending = false;
   private pendingRegistration:
     | { tenant: Tenant; sessionID: string; creatorID?: string }
@@ -132,6 +136,9 @@ export class SessionSyncDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.purgeRetryAt = (await ctx.storage.get<number>('purgeRetryAt')) ?? 0;
+      this.relayUsed = (await ctx.storage.get<boolean>('relayUsed')) ?? false;
+      this.relayPurged = (await ctx.storage.get<boolean>('relayPurged')) ?? false;
+      this.relayPurgeRetryAt = (await ctx.storage.get<number>('relayPurgeRetryAt')) ?? 0;
       this.leaseReconcilePending =
         (await ctx.storage.get<boolean>('leaseReconcilePending')) ?? false;
       this.pendingRegistration = await ctx.storage.get('pendingRegistration');
@@ -361,6 +368,25 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
   }
 
+  /** Live tickets can only be minted for a non-deleted, owner-authorized session. */
+  async authorizeLive(input: unknown): Promise<Result<{ role: 'owner' }>> {
+    const parsed = parse(stateInput, input);
+    if (!parsed.ok) return parsed;
+    const { principal, sessionID } = parsed.value;
+    return this.serial(async () => {
+      const authorized = this.tx(() => {
+        session.live(this.db, principal, sessionID);
+        return { role: 'owner' as const };
+      });
+      if (!authorized.ok || this.relayUsed) return authorized;
+      // Share the deletion gate while persisting activation: a successful ticket
+      // authorization must never race past a tombstone without a durable purge intent.
+      await this.ctx.storage.put('relayUsed', true);
+      this.relayUsed = true;
+      return authorized;
+    });
+  }
+
   async getState(input: unknown): Promise<Result<SessionState>> {
     const parsed = parse(stateInput, input);
     if (!parsed.ok) return parsed;
@@ -537,6 +563,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     let r2Ms = 0;
     try {
       await this.scheduleSweep();
+      const purged = await this.purgeRelay();
+      if (!purged.ok) return purged;
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) return reconciled;
     } finally {
@@ -567,9 +595,14 @@ export class SessionSyncDO extends DurableObject<Env> {
     });
     if (!erased.ok) return erased;
     await this.scheduleSweep();
-    const reconciled = await this.reconcileLease();
-    if (!reconciled.ok) return reconciled;
-    await this.cleanup();
+    try {
+      const purged = await this.purgeRelay();
+      if (!purged.ok) return purged;
+      const reconciled = await this.reconcileLease();
+      if (!reconciled.ok) return reconciled;
+    } finally {
+      await this.cleanup();
+    }
     return ok(null);
   }
 
@@ -590,13 +623,46 @@ export class SessionSyncDO extends DurableObject<Env> {
           if (!erased.ok) throw new Error(erased.error.message);
         }
       });
+      const purged = await this.purgeRelay();
       await this.cleanup();
+      if (!purged.ok) return;
       const reconciled = await this.reconcileLease();
       if (!reconciled.ok) await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
     } catch (error) {
       await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_MS);
       throw error;
     }
+  }
+
+  /** A used relay's sync tombstone is its purge intent; persist acknowledgement after cleanup. */
+  private async purgeRelay(): Promise<Result<null>> {
+    return this.serial(async () => {
+      const meta = session.load(this.db);
+      if (!meta || meta.deleted_at === null || !this.relayUsed || this.relayPurged) return ok(null);
+      if (Date.now() >= this.relayPurgeRetryAt) {
+        try {
+          await getRelayStub(
+            this.env,
+            { type: meta.tenant_type, id: meta.tenant_id },
+            meta.session_id
+          ).purge();
+          await this.ctx.storage.put({ relayPurged: true, relayPurgeRetryAt: 0 });
+          this.relayPurged = true;
+          this.relayPurgeRetryAt = 0;
+          return ok(null);
+        } catch (error) {
+          console.error('session-sync relay purge failed', {
+            error: error instanceof Error ? error.name : typeof error,
+          });
+          this.relayPurgeRetryAt = Date.now() + PURGE_RETRY_MS;
+          await this.ctx.storage.put('relayPurgeRetryAt', this.relayPurgeRetryAt);
+        }
+      }
+      await this.scheduleSweep();
+      return fail('tenant_unavailable', 'Live relay cleanup is temporarily unavailable', {
+        retryAt: this.relayPurgeRetryAt,
+      });
+    });
   }
 
   /** Claims at most one bounded page before yielding, then finalizes those exact attempts. */
@@ -647,13 +713,18 @@ export class SessionSyncDO extends DurableObject<Env> {
           meta.tenant_lease - meta.blob_bytes - meta.inline_bytes >= 2 * LIMITS.tenantLeaseBytes))
         ? Date.now() + PURGE_RETRY_MS
         : null;
-    const blobDue = blob.nextSweep(this.db);
+    const nextBlobSweep = blob.nextSweep(this.db);
+    const blobDue = nextBlobSweep === null ? null : Math.max(nextBlobSweep, this.purgeRetryAt);
+    const relayDue =
+      meta && meta.deleted_at !== null && this.relayUsed && !this.relayPurged
+        ? Math.max(Date.now() + 1, this.relayPurgeRetryAt)
+        : null;
     const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
-    const deadlines = [blobDue, leaseDue, retentionDue].filter(value => value !== null);
+    const deadlines = [blobDue, leaseDue, retentionDue, relayDue].filter(value => value !== null);
     if (deadlines.length === 0) return;
     const due = Math.min(...deadlines);
     const current = await this.ctx.storage.getAlarm();
-    const scheduled = Math.max(Date.now() + 1, due, this.purgeRetryAt);
+    const scheduled = Math.max(Date.now() + 1, due);
     if (current === null || current <= Date.now() || current > scheduled) {
       await this.ctx.storage.setAlarm(scheduled);
     }

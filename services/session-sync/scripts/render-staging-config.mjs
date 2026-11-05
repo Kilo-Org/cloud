@@ -59,7 +59,7 @@ try {
   requireValue(errors.length === 0, 'The source wrangler.jsonc is invalid');
   requireValue(
     source.main === 'src/index.ts' &&
-      source.durable_objects?.bindings?.length === 2 &&
+      source.durable_objects?.bindings?.length === 4 &&
       source.durable_objects.bindings[0].name === 'SESSION_SYNC_DO' &&
       source.durable_objects.bindings[0].class_name === 'SessionSyncDO' &&
       !source.durable_objects.bindings[0].script_name &&
@@ -67,7 +67,15 @@ try {
       source.durable_objects.bindings[1].name === 'SESSION_SYNC_TENANT_DO' &&
       source.durable_objects.bindings[1].class_name === 'SessionSyncTenantDO' &&
       !source.durable_objects.bindings[1].script_name &&
-      !source.durable_objects.bindings[1].environment,
+      !source.durable_objects.bindings[1].environment &&
+      source.durable_objects.bindings[2].name === 'SESSION_RELAY_DO' &&
+      source.durable_objects.bindings[2].class_name === 'SessionRelayDO' &&
+      !source.durable_objects.bindings[2].script_name &&
+      !source.durable_objects.bindings[2].environment &&
+      source.durable_objects.bindings[3].name === 'SESSION_PRESENCE_DO' &&
+      source.durable_objects.bindings[3].class_name === 'SessionPresenceDO' &&
+      !source.durable_objects.bindings[3].script_name &&
+      !source.durable_objects.bindings[3].environment,
     'Review the staging renderer when the entrypoint or Durable Object bindings change'
   );
   // Select only service code/runtime settings. Never inherit local credentials,

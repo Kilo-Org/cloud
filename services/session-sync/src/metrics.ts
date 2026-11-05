@@ -52,6 +52,12 @@ export async function timed<T>(
 export function requestRoute(request: Request): string {
   const path = new URL(request.url).pathname;
   if (path === '/v1/auth/exchange') return `${request.method} /v1/auth/exchange`;
+  if (path === '/v1/sessions') return `${request.method} /v1/sessions`;
+  if (path === '/v1/presence' || path === '/v1/presence/ticket') {
+    return `${request.method} ${path}`;
+  }
+  const live = /^\/v1\/sessions\/[^/]+\/(live|live-ticket|commands)(\/[^/]+)?$/.exec(path);
+  if (live) return `${request.method} /v1/sessions/:id/${live[1]}${live[2] ? '/:commandID' : ''}`;
   if (/^\/internal\/users\/[^/]+\/erase$/.test(path)) {
     return `${request.method} /internal/users/:id/erase`;
   }

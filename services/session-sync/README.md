@@ -6,10 +6,10 @@ This service synchronizes native v2 sessions from a Kilo CLI workspace.
 The CLI remains the execution owner and continues when the service is unavailable.
 The existing session-ingest service remains unchanged during migration.
 
-The first delivery includes authenticated incremental ingestion, durable acknowledgements,
-private assets, current-state reads, and producer restart recovery.
-It does not include mobile subscriptions, remote commands, ownership transfer, or legacy import.
-Those capabilities belong to the agreed design below, not to inactive API implementations.
+The service includes authenticated incremental ingestion, durable acknowledgements,
+private assets, current-state reads, producer recovery, live relay, opaque offline
+commands, and per-user CLI presence. Ownership transfer and legacy import remain
+outside this delivery. Live payload semantics belong to the runner, not the cloud.
 
 The producer contract and local capture design live in the CLI repository at
 [`specs/v2/session-sync.md`](https://github.com/Kilo-Org/kilocode/blob/v2/specs/v2/session-sync.md).
@@ -38,6 +38,13 @@ Never trust a user or organization ID supplied in session JSON as authorization.
 The first producer binds the session to its authenticated creator and source ID.
 Another source cannot overwrite that binding implicitly.
 A source ID survives normal producer restarts but does not authorize a takeover.
+
+Every session read and write requires a session ACL role. The role table includes
+`owner`, `viewer`, and `editor`; only the creator's `owner` grant is populated and
+accepted today, including within organizations. Tenant membership alone never
+permits state, entity, blob, tombstone, ticket, or command access. Existing creator
+bindings are migrated to owner grants. Future multiplayer can add explicit grants
+without treating organization membership as a session grant.
 
 The complete design separates ownership epochs from replica generations.
 Ownership epochs fence obsolete producers.
@@ -406,24 +413,143 @@ A missing asset remains explicit and cannot count as a complete portable checkpo
 Provider-bound replay information is retained, but another runner can need a fresh context.
 Never replay an ambiguous external tool effect automatically.
 
-## Live delivery and commands
+## Live delivery, commands, and presence
 
-Future live delivery uses hibernatable WebSockets and a bounded committed change feed.
-Commit before acknowledging the producer or broadcasting to viewers.
-Clients persist their projection and cursor in one local transaction.
-An expired cursor returns a reset; it does not return an incomplete success.
-A bootstrap snapshot pins its page versions and captured revision.
+The cloud is a thin relay: it authenticates, stamps sender/time/sequence, applies
+limits, keeps a short event replay ring, and stores opaque command payloads. It
+does not interpret approvals, aborts, slash commands, run IDs, or sync positions.
+The runner deduplicates command IDs, validates execution scope, and publishes
+semantic outcomes. The service does not promise exactly-once tool/provider effects.
 
-Remote commands use a durable service inbox and a runner receipt ledger.
-Queued, admitted, and model-delivered prompts are different states.
-An offline prompt has visible expiry and retains its command ID across retries.
-Live cancel and approval commands bind to their run, request, and runner incarnation.
-A stale control fails instead of applying to a later run.
-Remote permission grants are allow-once or reject.
-A transcript revert must not delete command deduplication evidence.
+### Endpoints and tickets
 
-The service does not promise exactly-once provider requests or external tool effects.
-A disconnected runner cannot be stopped through cloud fencing alone.
+All HTTP endpoints below use a `session-sync` bearer grant except WebSocket
+upgrades. CLI sockets use a bearer ticket; browser and React Native sockets use
+`new WebSocket(url, ["kilo-session-ticket."+ticket])` and the 101 echoes the selected
+subprotocol. Query tickets are rejected: ticket credentials must never appear
+in Logpush-visible URLs. Never log authorization or subprotocol headers.
+
+| Method | Path | Input / result |
+|---|---|---|
+| POST | `/v1/sessions/:id/live-ticket` | `{role:"runner"|"viewer"|"controller"}` → `{ticket,expiresAt}` |
+| GET | `/v1/sessions/:id/live` | WebSocket upgrade, session-relay ticket |
+| POST | `/v1/sessions/:id/commands` | Same command frame as the controller socket |
+| GET | `/v1/sessions/:id/commands/:commandID` | Command delivery status, never payload |
+| POST | `/v1/presence/ticket` | `{role:"runner"|"viewer"}` → `{ticket,expiresAt}` |
+| GET | `/v1/presence` | WebSocket upgrade, session-presence ticket |
+| GET | `/v1/sessions?limit=50&cursor=…` | Creator-index page `{version:1,items,cursor}` |
+
+Minting session tickets first checks the SyncDO ACL. Tickets are audience,
+environment, tenant, subject, role, and session/user bound; their lifetime is at
+most 120 seconds and never exceeds the parent grant. Relay and Presence verify
+tickets without account-database queries, allowing five seconds issued-at clock
+skew. Send `{type:"reauth",ticket}` before expiry. Reauthorization extends lifetime
+but cannot change identity or role. All `expiresAt`/`reauthAt` values are ISO8601
+strings; expired credentials never authorize frames. Idle session runners are
+fenced lazily on the next message/connect, without periodic/expiry alarms or a
+pushed `reauth_required`. Runners schedule renewal themselves from `reauthAt`.
+Viewer and presence deadlines use alarms. Expiry itself has no clock-skew grace.
+
+### Relay wire protocol
+
+Every server frame is `{v:1,channel,seq,from,at,type,body}`. `channel` is `events`,
+`commands`, or `control`; `at` is server Unix milliseconds and `from` is the
+authenticated subject (or `server` for control). Only runner events advance the
+monotonic event sequence. Durable sequence reservations are allocated in blocks
+of 1,024, so hibernation may produce a jump: never assume every integer exists.
+Steady runner events perform no SQLite writes or alarm resets. The ring is
+memory-only: 30 seconds or 1 MiB, whichever is smaller. A cold object never
+pretends its lost ring is complete.
+
+Runner input: `{channel:"events",type,body?}` (missing body defaults to null). The body, including any runner-owned
+`syncPosition`, is relayed without interpretation. Viewer/controller input:
+`{type:"subscribe",afterSeq}`. Available events replay in order; a gap, expired
+tail, unknown future cursor, or lost ring produces `reset_required` and pauses
+event delivery. Refetch the durable snapshot, then explicitly resubscribe from
+the supplied boundary.
+The `hello` control frame includes the current event sequence, runner connectivity,
+ticket lifetime, and a jittered `reconnectAfterMs`.
+
+Controller input:
+`{channel:"commands",type,body?,commandID,liveOnly?:boolean,ttlMs?:number}` (missing body defaults to null).
+Runner output commands preserve `type` and wrap the opaque body as
+`{commandID,payload,expiresAt,liveOnly}`. Runner acknowledgements are
+`{type:"ack",commandID}`. HTTP submission uses exactly the same handler, validation,
+rate budget, and mailbox as socket submission.
+
+`queued` means never handed to a runner; `delivered` means handed to one, not
+executed or acknowledged. Unacked payloads redeliver oldest-first on reconnect
+until ack or TTL. Ack deletes the payload. TTL removes any remaining payload,
+marks only never-delivered items `expired`, and preserves `delivered` once handed
+off. Semantic execution outcomes are runner events. Finished status tombstones
+last up to 24 hours and may be evicted to maintain bounds; unknown/evicted IDs
+return 404. Retries must keep command IDs; the runner retains its own dedupe
+evidence. Default TTL is 15 minutes, maximum 24 hours. `liveOnly` rejects without
+a runner; handed-off live-only payloads are discarded when that runner disconnects
+and never replay to its replacement.
+
+Limits: 64 KiB input frames; one runner and at most 100 combined viewers/controllers
+per session; 1,000 mailbox items and 10 MiB pending payloads. Per-minute role
+budgets are runner 6,000, controller 120, viewer 120. Command-status reads have an
+independent budget. Same-user runner reconnect replaces the old socket with close
+code 4009 without a false offline transition. Session runners treat 4009 as
+terminal for that session and never automatically reconnect; otherwise two
+processes can repeatedly evict one another. Overload uses `503 service_overloaded`
+and `Retry-After`. Other reconnects respect the independent 1–60 second jitter.
+
+### Presence and watch signals
+
+One hibernatable runner socket per CLI process advertises via
+`{type:"heartbeat",instanceID,advertisement}` every 30 seconds. Advertisement:
+`{name,projectName,version,kind:"cli"|"remote",startedAt,gitBranch,capabilities,sessions}`.
+`startedAt` is Unix milliseconds, `gitBranch` is string or null, capabilities and
+sessions are string arrays. Advertisements are bounded; no heartbeat means
+offline after 90 seconds. Presence viewer `{type:"subscribe"}` receives `instances`
+snapshots, including removals. Records include `{instanceID,tenant,advertisement,
+online,lastHeartbeatAt}`. Same-user/tenant/instance reconnect replaces the previous
+socket with code 4009; presence 4009 may retry, unlike session-relay 4009.
+No disconnected-instance history is retained. Ads are held
+in SQLite and written only when changed; socket attachments hold bounded identity,
+liveness and rate metadata below workerd's attachment limit.
+
+Presence control types: `hello`, `heartbeat_ack`, `instances`, `watch`,
+`reauthorized`, and `error`. `watch` body is `{tenant,sessionID,watching}` and reaches
+only matching, advertised runner sessions. First viewer/controller attach starts
+watching; last leave stops it. Watch leases survive hibernation, are refreshed
+while watched, and expire if the relay disappears. Reconnecting runners receive
+the current watch state. Presence caps are 32 advertised instances, eight separate
+provisional runner sockets (permitting reconnect-at-cap), 100 viewers, 128 watched
+sessions, bounded advertisements, and snapshots within the 64 KiB frame budget.
+New instance admission beyond 32 closes 1013; the ninth provisional connection
+receives 503 and Retry-After. Watch admission failures produce an explicit viewer error.
+
+Session discovery pages the user's personal creator index across all tenants,
+newest registration first with stable cursor ties, and merges matching presence
+into `live`. It may show a creator's session IDs after leaving an organization,
+but opening still requires a current grant and session ACL. The index is discovery,
+never authorization. Deletion removes entries and durably retries relay purge:
+live sockets, mailbox payloads/statuses, replay state, and presence watches are
+cleared, and a permanent fence prevents old tickets from reopening the relay.
+DELETE/account erasure returns `503 tenant_unavailable` while relay purge is
+pending: deletion was accepted, so retry rather than rolling back the local
+decision. The SyncDO tombstone retains intent until purge is acknowledged.
+Sessions never authorized for live access skip relay creation and purge.
+
+Relay/presence Analytics Engine points index the normalized live operation, with
+blobs `[route,role]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
+are excluded. HTTP request points retain the schema documented above.
+
+### Local end-to-end proof
+
+On an isolated work VM, install workspace dependencies and run
+`node scripts/live-e2e.mjs` from this service directory. It launches real
+`wrangler dev --local` with `wrangler.test.jsonc`, synthetic signing keys and
+temporary storage. A scripted presence runner/viewer and session runner/viewer/
+controller exercise watch signals, offline queue/replay/ack, live events,
+cursor replay, HTTP commands, reauthorization, and discovery over real
+WebSockets. No production secret, account, PostgreSQL connection, or Cloudflare
+deployment is needed. Durable Object regression suites additionally cover
+expiry, resets, caps, rate/size bounds, and stale heartbeat alarms.
 
 ## Future catalog and historical data
 

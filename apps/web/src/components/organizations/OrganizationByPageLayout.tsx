@@ -41,7 +41,7 @@ export async function OrganizationByPageLayout({
   const { user, organization } = result.data;
   const role = user.is_admin ? 'owner' : user.role;
   return (
-    <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
+    <OrganizationTrialWrapper organizationId={organization.id} role={role} fullBleed={fullBleed}>
       {render({ role, organization, isGlobalAdmin: user.is_admin })}
     </OrganizationTrialWrapper>
   );

@@ -5493,6 +5493,98 @@ export const passkey_sign_in_tickets = pgTable(
 export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;
 export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert;
 
+/**
+ * A one-time WebAuthn challenge for session-bound MFA step-up.
+ *
+ * `session_id_hash` is the SHA-256 of the server-only `webSessionId` claim, so
+ * a challenge minted for one browser session cannot be completed by another.
+ * `purpose:'operation'` additionally binds the challenge to one sensitive
+ * action through `action_binding_hash`; a plain session challenge leaves that
+ * column null.
+ */
+export const session_step_up_challenges = pgTable(
+  'session_step_up_challenges',
+  {
+    id: uuid().primaryKey(),
+    challenge: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    session_id_hash: text().notNull(),
+    purpose: text().notNull().$type<'session' | 'operation'>(),
+    action_binding_hash: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_session_step_up_challenges_expires_at').on(table.expires_at),
+    index('idx_session_step_up_challenges_kilo_user_id').on(table.kilo_user_id),
+    check(
+      'check_session_step_up_challenges_purpose',
+      sql`${table.purpose} IN ('session', 'operation')`
+    ),
+    check(
+      'check_session_step_up_challenges_action_binding',
+      sql`(${table.purpose} = 'operation') = (${table.action_binding_hash} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SessionStepUpChallenge = typeof session_step_up_challenges.$inferSelect;
+export type NewSessionStepUpChallenge = typeof session_step_up_challenges.$inferInsert;
+
+/**
+ * A verified, session-bound MFA proof. The row is opaque to clients: only its
+ * state (fresh, expired, revoked, consumed) is ever evaluated. A session proof
+ * authorizes ordinary privileged actions for `STEP_UP_ORDINARY_TTL`; an
+ * operation proof is single-use and bound to one action through
+ * `action_binding_hash`.
+ */
+export const session_step_up_proofs = pgTable(
+  'session_step_up_proofs',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    session_id_hash: text().notNull(),
+    method: text().notNull().$type<'webauthn_uv'>(),
+    passkey_credential_id: uuid()
+      .notNull()
+      .references(() => passkey_credentials.id, { onDelete: 'cascade' }),
+    purpose: text().notNull().$type<'session' | 'operation'>(),
+    action_binding_hash: text(),
+    verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_session_step_up_proofs_user_session_expires').on(
+      table.kilo_user_id,
+      table.session_id_hash,
+      table.expires_at
+    ),
+    index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
+    index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
+    check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
+    check(
+      'check_session_step_up_proofs_purpose',
+      sql`${table.purpose} IN ('session', 'operation')`
+    ),
+    check(
+      'check_session_step_up_proofs_action_binding',
+      sql`(${table.purpose} = 'operation') = (${table.action_binding_hash} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SessionStepUpProof = typeof session_step_up_proofs.$inferSelect;
+export type NewSessionStepUpProof = typeof session_step_up_proofs.$inferInsert;
+
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
 // ============ MODEL STATS ============

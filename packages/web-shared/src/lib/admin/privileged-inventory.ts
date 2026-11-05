@@ -150,6 +150,13 @@ const trpcEntries: PrivilegedInventoryEntry[] = [
   ...Object.entries(adminAreaPolicies).map(([area, policy]) =>
     adminEntry(`trpc.admin.${area}`, `admin.${area}.*`, policy)
   ),
+  {
+    id: 'trpc.stepUp.getStatus',
+    surface: 'trpc',
+    route: 'stepUp.getStatus',
+    read: 'platform_read',
+    target: 'none',
+  },
   adminEntry('trpc.organizations', 'organizations.*', support),
   adminEntry('trpc.organizations.admin', 'organizations.admin.*', support),
   adminEntry('trpc.organizations.sso', 'organizations.sso.*', support),
@@ -587,6 +594,20 @@ const restEntries: PrivilegedInventoryEntry[] = [
     write: 'support_write',
     target: 'organization',
   },
+  {
+    id: 'rest.stepUp',
+    surface: 'rest',
+    route: '/api/auth/step-up',
+    write: 'sensitive_write',
+    target: 'none',
+  },
+  {
+    id: 'rest.passkeyEnrollment',
+    surface: 'rest',
+    route: '/api/auth/passkey/register*',
+    write: 'sensitive_write',
+    target: 'user',
+  },
 ];
 
 const serverComponentEntries: PrivilegedInventoryEntry[] = [
@@ -736,6 +757,27 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/(app)/organizations/[id]/welcome/layout.tsx',
     actionClass: 'support_read',
     surface: 'server-component',
+    occurrences: 1,
+  },
+  {
+    id: 'internal.app.auth.passkeyRegister',
+    file: 'apps/web/src/app/api/auth/passkey/register/route.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
+    occurrences: 2,
+  },
+  {
+    id: 'internal.lib.admin.requirePrivilegedActor',
+    file: 'apps/web/src/lib/admin/require-privileged-actor.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    occurrences: 2,
+  },
+  {
+    id: 'internal.lib.auth.sessionStepUp',
+    file: 'apps/web/src/lib/auth/session-step-up.ts',
+    actionClass: 'sensitive_write',
+    surface: 'rest',
     occurrences: 1,
   },
   {

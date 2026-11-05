@@ -1,6 +1,13 @@
 import { describe, test, expect } from '@jest/globals';
 import { eq, and, isNull } from 'drizzle-orm';
-import { admin_action_audit_logs, kilocode_users, user_admin_notes } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  kilocode_users,
+  passkey_credentials,
+  session_step_up_proofs,
+  user_admin_notes,
+} from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -61,6 +68,38 @@ async function getUser(userId: string) {
   });
   if (!user) throw new Error(`Expected test user ${userId} to exist`);
   return user;
+}
+
+async function insertStepUpProof(userId: string, sessionId: string) {
+  const [credential] = await db
+    .insert(passkey_credentials)
+    .values({
+      kilo_user_id: userId,
+      credential_id: `admin-role-credential-${crypto.randomUUID()}`,
+      public_key: 'unused',
+    })
+    .returning();
+  const [proof] = await db
+    .insert(session_step_up_proofs)
+    .values({
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(sessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credential!.id,
+      purpose: 'session',
+      verified_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    })
+    .returning();
+  return proof!;
+}
+
+async function proofRevocation(userId: string, proofId: string) {
+  const [row] = await db
+    .select()
+    .from(session_step_up_proofs)
+    .where(eq(session_step_up_proofs.id, proofId));
+  return row;
 }
 
 describe('admin.users.listPlatformAdmins', () => {
@@ -868,5 +907,26 @@ describe('admin role change audit logging', () => {
     });
 
     expect(await getRoleAudits(admin.id)).toHaveLength(0);
+  });
+
+  test('role and permission changes revoke step-up proofs', async () => {
+    const superadmin = await insertQualifyingAdmin();
+    const candidate = await insertEligibleCandidate();
+    const caller = await createCallerForUser(superadmin.id);
+    const roleProof = await insertStepUpProof(candidate.id, 'role-change-session');
+
+    await caller.admin.users.setPlatformAdminAccess({ userId: candidate.id, isAdmin: true });
+
+    expect((await proofRevocation(candidate.id, roleProof.id))?.revoked_reason).toBe('role_change');
+
+    const permissionProof = await insertStepUpProof(candidate.id, 'permission-change-session');
+    await caller.admin.users.setAdminPermissions({
+      userId: candidate.id,
+      permissions: { canViewSessions: true },
+    });
+
+    expect((await proofRevocation(candidate.id, permissionProof.id))?.revoked_reason).toBe(
+      'permission_change'
+    );
   });
 });

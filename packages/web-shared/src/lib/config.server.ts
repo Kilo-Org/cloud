@@ -462,3 +462,16 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
+
+/**
+ * Binary session-bound MFA step-up switch.
+ *
+ * `'true'` enforces step-up on the admin surfaces; anything else, including
+ * unset, leaves the application exactly as it was before step-up. This is an
+ * environment variable rather than a release toggle so security posture does
+ * not depend on PostHog.
+ */
+export function isAdminStepUpEnabled(): boolean {
+  // Exact match: no trimming or casing variants, so a typo stays off.
+  return getEnvVariable('ADMIN_STEP_UP_ENABLED') === 'true';
+}

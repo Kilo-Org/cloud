@@ -5,6 +5,11 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store');
+  return { ...actual, evaluateStepUp: jest.fn(actual.evaluateStepUp) };
+});
+
 const mockGetServerSession = jest.fn();
 const mockRedirect = jest.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -879,6 +884,34 @@ describe('credential issuance authentication guards', () => {
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
   });
 
+  test('threads the server-only webSessionId and pepper from the session claim', async () => {
+    const user = await insertTestUser({ web_session_pepper: 'current-web-session-pepper' });
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+      webSessionId: 'per-session-id',
+    });
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBe('per-session-id');
+    expect(result.webSessionPepper).toBe('current-web-session-pepper');
+  });
+
+  test('a bearer credential carries no webSessionId', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+    expect(result.webSessionId).toBeUndefined();
+  });
+
   test('returns 401 when the session read throws on malformed cookies', async () => {
     mockHeaders.mockResolvedValue(new Headers());
     mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
@@ -1421,6 +1454,134 @@ describe('credential exchange bearer authentication guard', () => {
       { legacy: 'deny' }
     );
     expect(blocked.authFailedResponse?.status).toBe(403);
+  });
+});
+
+describe('binary step-up enforcement (REST)', () => {
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+  let evaluateStepUp: jest.Mock;
+
+  beforeAll(() => {
+    ({ evaluateStepUp } = jest.requireMock('@kilocode/web-shared/lib/admin/step-up-store') as {
+      evaluateStepUp: jest.Mock;
+    });
+  });
+
+  afterEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = originalSwitch;
+    evaluateStepUp.mockClear();
+    mockHeaders.mockReset();
+    mockGetServerSession.mockReset();
+  });
+
+  async function sessionAdmin() {
+    const admin = await insertTestUser({
+      google_user_email: `step-up-admin-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      web_session_pepper: 'step-up-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin/api/private-users' }));
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: admin.id,
+      webSessionPepper: 'step-up-session-pepper',
+      webSessionId: 'step-up-web-session',
+    });
+    return admin;
+  }
+
+  async function errorCode(result: { authFailedResponse: unknown }): Promise<unknown> {
+    return (await (result.authFailedResponse as Response).json()) as unknown;
+  }
+
+  it('does not evaluate or deny when the switch is off', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it('allows a session with a fresh proof when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(result.authFailedResponse).toBeNull();
+  });
+
+  it.each([
+    [{ status: 'not_enrolled' }, 'NOT_ENROLLED'],
+    [{ status: 'required' }, 'MFA_REQUIRED'],
+    [{ status: 'expired', verifiedAt: new Date().toISOString() }, 'MFA_EXPIRED'],
+    [{ status: 'session_unbound' }, 'SESSION_UNBOUND'],
+  ] as const)('denies %j with %s when on', async (state, code) => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({ state, proof: null, passkeyCount: 0 });
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: code });
+  });
+
+  it('denies a bearer credential with BEARER_NOT_ALLOWED when on', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await insertTestUser({
+      google_user_email: `step-up-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'step-up-bearer-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(admin)}`,
+        'x-pathname': '/admin/api/private-users',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'BEARER_NOT_ALLOWED' });
+  });
+
+  it('fails closed with STEP_UP_UNAVAILABLE when evaluation errors', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    await sessionAdmin();
+    evaluateStepUp.mockRejectedValueOnce(new Error('relation does not exist'));
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await errorCode(result)).toEqual({ success: false, error: 'STEP_UP_UNAVAILABLE' });
+  });
+
+  it('skips enforcement only for the layout escape hatch', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true, skipStepUpGuard: true });
+
+    expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user?.id).toBe(admin.id);
   });
 });
 

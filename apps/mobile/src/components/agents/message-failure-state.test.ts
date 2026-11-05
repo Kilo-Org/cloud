@@ -95,7 +95,7 @@ describe('selectMessageFailure', () => {
       }
     });
 
-    it('states an agent-execution failure in the assistant-failure title with its own detail line', () => {
+    it('states an agent-execution failure once, in the assistant-failure copy', () => {
       const result = selectMessageFailure({
         info: userInfo(),
         deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'execution' },
@@ -103,10 +103,7 @@ describe('selectMessageFailure', () => {
       expect(result).not.toBeNull();
       expect(result?.kind).toBe('delivery');
       expect(result?.title).toBe('Response failed');
-      expect(result?.detailKey).toBe('agentChat.messageFailure.deliveryExecution');
-      // The same shape the interrupted and exhausted states have: a title and
-      // one small line under it, so the two failure rows read alike.
-      expect(result?.detail).toBe('The agent could not run this message.');
+      expect(result?.detail).toBeNull();
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
       expect(result?.canRetry).toBe(true);
       expect(result?.canCopy).toBe(true);

@@ -12,21 +12,19 @@ const DELIVERY_DETAIL_KEY_BY_REASON = {
   interrupted: 'agentChat.messageFailure.deliveryInterrupted',
   exhausted: 'agentChat.messageFailure.deliveryExhausted',
   // `execution` is the response failure, not a delivery one (the message
-  // reached the agent): the row shows the assistant-failure title instead of the
-  // delivery one, and this line says the agent run itself failed.
+  // reached the agent): the row shows the assistant-failure title instead, so
+  // this line is never rendered. It stays in the record to keep the reason
+  // coverage complete.
   execution: 'agentChat.messageFailure.deliveryExecution',
 } as const satisfies Record<DeliveryReason, string>;
 
 /**
  * The one delivery reason that is an agent run failing, not the transport: the
  * message was delivered and the agent could not run it. The row states it in
- * the assistant-failure copy ("Response failed") with the execution line under
- * it, the same shape the interrupted and exhausted failures have (title, then
- * one small gray sentence). Switching the title to the delivery copy instead
- * would state the transport failure twice, once in the title and once in the
- * line (UX-DEFECT session-detail failed turn); the status indicator's
- * duplicate of the transport line is dropped in
- * `statusIndicatorDuplicatesMessageFailure`. Retry and Copy-to-composer keep
+ * the assistant-failure copy ("Response failed") with no second line — the
+ * session's own status line reports the same failure, so a delivery-flavoured
+ * title here plus the footer's line read as the failure stated three times
+ * (UX-DEFECT session-detail failed turn). Retry and Copy-to-composer keep
  * working: the transport text stays reachable behind the copy action.
  */
 const AGENT_EXECUTION_DELIVERY_REASON: DeliveryReason = 'execution';
@@ -117,11 +115,10 @@ export type MessageFailure = {
   title: string;
   /**
    * The catalog key behind `detail`, or `null` when the title alone says it (an
-   * assistant failure with no classified reason). The footer then shows one
-   * statement plus the action rather than the same sentence twice. An
-   * agent-execution delivery failure is not that case: its response-failure
-   * title carries the execution line under it, like every other delivery
-   * failure's, so the two failure states read the same way.
+   * assistant failure with no classified reason, or an agent-execution delivery
+   * failure whose response-failure title is the whole statement). The footer
+   * then shows one statement plus the action rather than the same sentence
+   * twice.
    */
   detailKey: string | null;
   /**
@@ -215,18 +212,12 @@ export function selectMessageFailure(input: {
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
     if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
-      // The response-failure title, then the line that says the run was the
-      // part that failed. A delivery reason with no title of its own would read
-      // as a transport failure; an execution failure with no line of its own
-      // reads as unfinished next to the interrupted/exhausted states, which do
-      // carry one.
-      const executionDetailKey = DELIVERY_DETAIL_KEY_BY_REASON[AGENT_EXECUTION_DELIVERY_REASON];
       return {
         kind: 'delivery',
         titleKey: 'agentChat.messageFailure.assistantTitle',
         title: i18n.t('agentChat.messageFailure.assistantTitle'),
-        detailKey: executionDetailKey,
-        detail: i18n.t(executionDetailKey),
+        detailKey: null,
+        detail: null,
         copyDetail: deliveryState.error,
         canRetry: true,
         canCopy: true,

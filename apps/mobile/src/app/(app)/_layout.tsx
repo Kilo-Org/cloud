@@ -146,9 +146,7 @@ export default function AppLayout() {
   // bounded. Searchable sheets keep the full detent below, because the IME
   // covers the half one.
   const pickerSheetOptions =
-    Platform.OS === 'android'
-      ? { ...sheetOptions, sheetAllowedDetents: [0.5] }
-      : sheetOptions;
+    Platform.OS === 'android' ? { ...sheetOptions, sheetAllowedDetents: [0.5] } : sheetOptions;
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
@@ -233,7 +231,7 @@ export default function AppLayout() {
               <Stack.Screen name="agent-briefing/settings" />
               <Stack.Screen name="share-gate" options={sheetOptions} />
               <Stack.Screen name="language-picker" options={searchSheetOptions} />
-              <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+              <Stack.Screen name="transcription-model-picker" options={pickerSheetOptions} />
               <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
               <Stack.Screen
                 name="kilo-pass"

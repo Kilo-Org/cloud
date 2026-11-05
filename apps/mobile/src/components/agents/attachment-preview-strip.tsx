@@ -48,6 +48,7 @@ import {
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { getDocumentPreviewTarget, previewLocalDocument } from '@/lib/document-preview';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -169,6 +170,10 @@ const AttachmentChip = memo(function AttachmentChip({
     mode: 'markdown' | 'text';
     text: string;
   } | null>(null);
+  // A device with no viewer keeps that verdict for the chip: its sheet drops the
+  // preview choice and leaves the text and share choices it always had.
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const documentTarget = getDocumentPreviewTarget(attachment.mimeType);
   const isImage = attachment.kind === 'image';
   const isUploading = attachment.status === 'pending' || attachment.status === 'uploading';
   const isErrored = attachment.status === 'error';
@@ -276,6 +281,21 @@ const AttachmentChip = memo(function AttachmentChip({
     }
   }
 
+  async function previewDocument() {
+    const outcome = await previewLocalDocument({
+      key: attachment.id,
+      uri: attachment.localUri,
+      mimeType: attachment.mimeType,
+      filename: attachment.filename,
+    });
+    if (outcome === 'unavailable') {
+      setPreviewUnavailable(true);
+      toast.error(t('agentChat.filePart.previewUnavailable'));
+    } else if (outcome === 'failed') {
+      toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
+    }
+  }
+
   function handleOpen() {
     if (attachment.kind === 'image') {
       setViewerVisible(true);
@@ -285,20 +305,28 @@ const AttachmentChip = memo(function AttachmentChip({
       void openLocalText('markdown');
       return;
     }
+    const offerPreview = documentTarget !== null && !previewUnavailable;
+    const previewIndex = offerPreview ? 0 : -1;
+    const textIndex = previewIndex + 1;
+    const shareIndex = textIndex + 1;
+    const cancelIndex = shareIndex + 1;
     showActionSheetWithOptions(
       {
         ...themedSheet,
         options: [
+          ...(offerPreview ? [t('agentChat.filePart.preview', { name: attachment.filename })] : []),
           t('agentChat.filePart.openAsText'),
           t('agentChat.filePart.openInExternalApp'),
           t('common.cancel'),
         ],
-        cancelButtonIndex: 2,
+        cancelButtonIndex: cancelIndex,
       },
       optionIndex => {
-        if (optionIndex === 0) {
+        if (optionIndex === previewIndex) {
+          void previewDocument();
+        } else if (optionIndex === textIndex) {
           void openLocalText('text');
-        } else if (optionIndex === 1) {
+        } else if (optionIndex === shareIndex) {
           void shareUnknown();
         }
       }

@@ -86,6 +86,7 @@ const CLONE_MS = 6 * MINUTE_MS;
 const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
 const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
 const KILO_SESSION_MS = 2 * MINUTE_MS;
+export const WORKTREE_SNAPSHOT_RESTORE_MS = MINUTE_MS;
 
 // Fixed preparation work includes one create retry and one retry each for
 // runtime start and session import. Setup retains its per-command bounds;
@@ -98,6 +99,7 @@ const ROUTE_PREPARATION_MS =
   WRAPPER_HELLO_MS +
   RESTORE_MS +
   CLONE_MS +
+  WORKTREE_SNAPSHOT_RESTORE_MS +
   2 * KILO_RUNTIME_START_MS +
   2 * KILO_SESSION_MS;
 

@@ -365,8 +365,9 @@ Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 `worktree-multi-chat`, `long-conversation`, `leave-and-return`, `large-stream`,
 `concurrent-chats`, `question-idle-resume`) and the `sandboxFaults` scenarios
 (`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`) are all in the
-registry, so the matrix runs them:
+`wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`,
+`worktree-snapshot-midturn-kill`, `worktree-snapshot-autocommit-kill`) are all in
+the registry, so the matrix runs them:
 the fault flows stop or freeze a real container, so they run last. They stay
 name-runnable (`run.ts <name> _`) for focused runs; the matrix marks the
 capability-gated ones `unsupported`. Long scenarios take
@@ -374,6 +375,46 @@ capability-gated ones `unsupported`. Long scenarios take
 (`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
 `FAKE_LLM_URL`, and `E2E_MODEL=kilo/fake-deterministic`; the new scenarios reject
 other models. They use the unified API and run on the control plane.
+
+### Worktree snapshot recovery
+
+Two focused scenarios exercise the continuous worktree snapshot plan. They are
+local Docker only and require the Worker's snapshot flags to be enabled in this
+service's `.dev.vars`; both default to off:
+
+```text
+WORKTREE_SNAPSHOT_WRITES_ENABLED=true
+WORKTREE_SNAPSHOT_READS_ENABLED=true
+```
+
+Restart `cloud-agent-next` after changing them. The harness reads the same
+`.dev.vars`, so leaving either flag off reports the scenarios `unsupported`
+rather than skipping an assertion.
+
+```bash
+WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
+  tsx services/cloud-agent-next/test/e2e/run.ts worktree-snapshot-midturn-kill _
+WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
+  E2E_USER_EMAIL=<seeded-github-account> E2E_GITHUB_REPO=<owner/repo> \
+  tsx services/cloud-agent-next/test/e2e/run.ts worktree-snapshot-autocommit-kill _
+```
+
+`worktree-snapshot-midturn-kill` seeds a file in a boot turn, edits it in a
+second in-flight turn that parks, waits for the wrapper's accepted snapshot
+upload, kills the owned container, then sends a `file:read` turn in the same
+chat. It requires a byte-for-byte read echo and a preparation message that
+names a snapshot restore.
+
+`worktree-snapshot-autocommit-kill` uses a gated `write-then-gate` tool so the
+edit is captured while the turn is gated and the snapshot's base is still the
+pre-push remote tip. It then releases the gate so finalization commits and
+pushes, freezes the wrapper as soon as the auto-commit event proves the push,
+and checks the accepted-upload sequence did not move. That prevents the
+post-push empty snapshot from satisfying the test. It kills the container and
+requires `Restored 0 ... conflicts 0`, the exact pushed bytes, and no
+`.git/kilo-recovered`. It therefore needs a push-capable repository; the
+default public clone cannot push. Without `E2E_GITHUB_REPO`/a writable remote
+the scenario fails with that explicit reason instead of passing.
 
 Matrix (runs the default regression suite):
 
@@ -665,6 +706,8 @@ Scenario matrix:
 | `auth-reject _` | Starts no session. Probes the fake Worker directly over HTTPS (every request timeout-bounded): each model route with no bearer → 401; `Bearer not-a-jwt` → 401; a JWT signed with the wrong secret → 401; positive control `GET /api/openrouter/models` with the real `config.bearerToken` → 200; each `/test/*` route without the admin bearer → 401 and with it → 2xx/400/404; crossover both ways (admin bearer on a model route → 401, model token on `/test/*` → 401). It proves the public HTTP auth boundary only: no sandbox credential propagation and no session path. |
 | `worktree-chat _` | Creates a worktree chat through the public tRPC surface. Requires the worktree id to correspond to the workspace identity (`workspace_<uuid>` → `worktree_<uuid>`), the session's own scope id, `parentSessionId` null and `autoCommit=false`, then a cold echo boot turn, an idempotent same-key replay (same identities, `replayed=true`), and one hot echo turn with no reported preparation, matching allocation references observed before and after the turn through the capability's bounded present-reference wait, and correlated content. The boot allocation reference is acquired **after** the boot turn completes through that bounded wait with a `240 s` budget, so the wait starts only after the boot turn has completed, not while the sandbox is still cold; the hot-turn read uses the same bounded wait (`waitForPresentAllocation`) with a `30 s` cap plus a `1 s` outer backstop slack, tolerates a transient `null` observation, and hard-fails only when no reference appears within the budget. It proves matching observed references before and after each turn, not uninterrupted presence between observations. It runs under the local Docker and deployed HTTP profiles from one definition and asserts only public-surface, per-chat outcomes. |
 | `worktree-multi-chat _` | Boots a root chat, then starts a paced `slow:90:1000:32` turn and waits (budget `60 s`) until that turn is underway: correlated-part liveness for the paced message (transient and empty initialization parts permitted) plus a bounded increase in the fake's aggregate `chatCompletions` counter. The counter is **not** an authoritative paced-request signal: it is attributed to the paced request only under the documented assumption that no auxiliary/title request is in flight in that window, and it cannot distinguish the paced primary request from an auxiliary one. A content-based predicate (correlated non-empty text) was tried and reverted: the paced child's only correlated part can be the empty transient init part, and its streamed content can lag past the wait budget, so the predicate never fired even though the fake had served the request. The laziness baseline is taken only after readiness. It then creates a sibling chat while the turn is still streaming. Requires the root still `queued`/`running` immediately after the create and completing afterwards, the sibling to share one non-null `worktreeId` and `sandboxId` while keeping a distinct workspace/`ses_` identity and its own scope, `chatCompletions` unchanged over a 15 s window (lazy create) and over a same-key replay, the sibling's first turn to report its own `preparing`, and interleaved root-second and sibling-second turns. It proves the shared checkout (the root writes an uncommitted file, the sibling reads it, the root overwrites it, a fresh sibling read echoes the second nonce), sequential question ownership (asked in the root while the sibling is idle, visible only on the root's stream, only the root can answer, and a reconnect replays the still-open question with no new model request), a targeted interrupt of the sibling while the root holds a paced `slow` turn (the root stays nonterminal and then completes, the sibling's turn fails `reason=interrupted`, and the root's allocation reference is unchanged), and a targeted delete of the sibling while the root is active (the sibling's `getSession` rejects and the root accepts and completes another turn). Chat-content isolation scans each chat's streams and a fresh replay stream for the other chat's message ids and, without the `parentID` filter, the other chat's markers. Honest limit: the worktree runtime serializes streaming model turns, so the scenario does not ask a question or start a model turn in one chat while the other streams, and it does not claim concurrent streaming; isolation is per-chat control/state. No `gate`/`hang` is used. |
+| `worktree-snapshot-midturn-kill _` | Boots a worktree chat whose first turn writes a baseline file, starts an in-flight `write-then-gate` edit, and waits for the wrapper log to report an accepted snapshot upload for that worktree. It then kills the owned container and requires the interrupted turn to reach a matching durable failure, a new `file:read` turn in the same chat to echo the edited bytes exactly, a preparation message naming a snapshot restore (not legacy recovery), and a distinct replacement allocation. Requires `sessionSandbox`, `sandboxFaults`, `gates`, `controlPlaneRuntime`, `controlPlaneV2`, and `worktreeSnapshots`; local Docker only. |
+| `worktree-snapshot-autocommit-kill _` | Uses a gated `write-then-gate` tool to edit a file while the turn is still running, waits for the wrapper's accepted snapshot of that edit with the pre-push base, then releases the gate so turn finalization commits and pushes it (`autocommit_completed` with `push command completed`). It freezes the wrapper immediately on that event and requires the accepted-upload sequence not to move, so a post-push empty snapshot cannot satisfy the test, then kills the container. A new `file:read` turn must echo the pushed bytes exactly, report `Restored 0 worktree changes` with `conflicts 0`, leave no `.git/kilo-recovered`, and land on a distinct allocation. Needs a push-capable repository; the default public clone is rejected with an explicit reason. Requires the same local-only capabilities as the mid-turn variant. |
 | `long-conversation [echo:cold]` | One cold `echo:cold` turn plus twelve hot turns (nine `echo:<token>` turns, one paced `slow:2:50` turn, and a real `file:write`/`file:read` pair). Requires the cold turn to complete with a reported preparation and its correlated content, every hot turn to complete without a reported preparation and with matching allocation references observed before and after through the bounded present-reference wait (not uninterrupted presence between observations), and each `echo:` turn's correlated content. Measured behaviour, not history restoration. |
 | `leave-and-return _` | Boots, completes a boot echo turn, then leaves the session with no demand. Samples the allocation reference targeting +60 s (must still be the baseline `P1`); the baseline read is the bounded present-reference wait, so it may take up to `30 s` to obtain a present reference and its measured timestamp can be later than +60 s. Then every 15 s for up to a 15-minute budget; it fails closed while `P1` remains and if a different non-null reference appears, and stops once the reference is absent. On resume it requires a reported preparation, a different non-null reference `P2`, a completed turn with its echo marker and — from a fresh replay stream — the boot turn's replayed correlated content. It never names a stop cause: a `null` reference is reported as "the allocation disappeared while unattended", not as a release. |
 

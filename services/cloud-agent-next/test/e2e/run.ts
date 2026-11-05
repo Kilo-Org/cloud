@@ -56,6 +56,7 @@ import { SHARED_SCENARIOS, type SharedScenario } from './scenarios-shared.js';
 import {
   createLocalScenarioEnvironment,
   credentialContainmentEnabled,
+  worktreeSnapshotsEnabled,
 } from './capabilities-local.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
@@ -415,6 +416,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
     api,
     env: createLocalScenarioEnvironment({
       credentialContainmentEnabled: credentialContainmentEnabled(devVars),
+      worktreeSnapshotsEnabled: worktreeSnapshotsEnabled(devVars),
     }),
     ...timeoutRequestArgs(definition, requestedTimeoutMs),
   });

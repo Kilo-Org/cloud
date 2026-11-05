@@ -1,9 +1,11 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
+import { mintWorktreeSnapshotGrant } from './worktree-snapshot-grant.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
   type AgentSandboxProvider,
 } from '../shared/sandbox-provider.js';
+import { WORKTREE_SNAPSHOT_ROUTE_PREFIX } from '../shared/worktree-snapshot.js';
 
 export type ControlWrapperLaunchEnvInput = {
   workerUrl?: string;
@@ -15,6 +17,7 @@ export type ControlWrapperLaunchEnvInput = {
     allocationId: string;
     signingSecret: string | null;
   };
+  worktreeSnapshotWrites?: boolean;
 };
 
 export function buildControlWrapperLaunchEnv(
@@ -48,6 +51,16 @@ export function buildControlWrapperLaunchEnv(
         CONTROL_LOG_UPLOAD_GRANT: grant,
         CONTROL_WRAPPER_INSTANCE_ID: identity.wrapperInstanceId,
       };
+      if (input.worktreeSnapshotWrites) {
+        diagnosticEnv = {
+          ...diagnosticEnv,
+          CONTROL_WORKTREE_SNAPSHOT_URL: `${workerUrl}${WORKTREE_SNAPSHOT_ROUTE_PREFIX}/${path}`,
+          CONTROL_WORKTREE_SNAPSHOT_GRANT: mintWorktreeSnapshotGrant(
+            identity,
+            input.diagnostics.signingSecret
+          ),
+        };
+      }
     } catch {
       diagnosticEnv = {};
     }

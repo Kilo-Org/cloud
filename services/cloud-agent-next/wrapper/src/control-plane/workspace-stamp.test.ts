@@ -98,3 +98,22 @@ describe('workspace stamp', () => {
     ).toBe('unstamped');
   });
 });
+
+describe('snapshot recovery stamp', () => {
+  it('round-trips snapshotRecovery and keeps a same-allocation workspace classified as same', async () => {
+    const stamp = { allocationId: 'now', commit: 'c1', snapshotRecovery: true as const };
+    await writeWorkspaceStamp(directory, true, stamp);
+
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
+    expect(classifyWorkspace({ allocationId: 'now', hasGit: true, stamp })).toBe('same');
+  });
+
+  it('rejects a snapshotRecovery value that is not literally true', async () => {
+    const file = workspaceStampPath(directory, true);
+    await fs.writeFile(
+      file,
+      JSON.stringify({ allocationId: 'now', commit: 'c1', snapshotRecovery: false })
+    );
+    expect(await readWorkspaceStamp(directory)).toBeNull();
+  });
+});

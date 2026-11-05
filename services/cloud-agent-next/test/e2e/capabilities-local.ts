@@ -47,6 +47,7 @@ import {
 } from './sandbox-fault-evidence.js';
 import { startCallbackServer, type CallbackRecord } from './callback-server.js';
 import { isReservedPreviewPort } from '../../src/shared/reserved-ports.js';
+import { CONTROL_WRAPPER_LOG_PATH } from '../../src/sandbox-control/container-paths.js';
 import { PREVIEW_FIXTURE_PORT_CANDIDATES, PREVIEW_FIXTURE_SCRIPT } from './preview-fixture.js';
 import type {
   CallbackObservation,
@@ -63,6 +64,7 @@ import type {
   SessionSandboxCurrentInput,
   SessionSandboxObservation,
   SessionSandboxWaitInput,
+  WorktreeSnapshotObservation,
 } from './scenario-capabilities.js';
 
 function callbackPayload(record: CallbackRecord): CallbackPayload {
@@ -875,6 +877,40 @@ export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation
       }
       return containerGitRemoteUrl(runtime.container.id, runtime.directory);
     },
+    workspacePathExists: async (allocation, input) => {
+      const container = await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      if (runtime.container.id !== container.id) {
+        throw new Error(
+          `controlPlaneRuntime: Kilo runtime container ${runtime.container.id} does not match owned ${container.id}`
+        );
+      }
+      if (
+        input.path.length === 0 ||
+        input.path.startsWith('/') ||
+        input.path.split('/').includes('..') ||
+        !/^[A-Za-z0-9._/-]+$/.test(input.path)
+      ) {
+        throw new Error(`controlPlaneRuntime: unsafe workspace path ${JSON.stringify(input.path)}`);
+      }
+      if (!/^[A-Za-z0-9._/-]+$/.test(runtime.directory)) {
+        throw new Error(
+          `controlPlaneRuntime: refusing to shell-quote unsafe workspace directory ${JSON.stringify(runtime.directory)}`
+        );
+      }
+      const target = `${runtime.directory}/${input.path}`;
+      const { stdout } = await executeDockerCommand([
+        'exec',
+        container.id,
+        'sh',
+        '-c',
+        `if [ -e '${target}' ]; then printf yes; else printf no; fi`,
+      ]);
+      return stdout.trim() === 'yes';
+    },
     summaryCount: async allocation => {
       await requireContainer(allocation);
       const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
@@ -941,8 +977,95 @@ export function credentialContainmentEnabled(_devVars: Record<string, string>): 
   return true;
 }
 
+/**
+ * Worktree snapshot reads require writes. The Worker's flags are default-off
+ * and the E2E scenario needs both, so this reads the same `.dev.vars` source
+ * the Worker reads instead of introducing a second harness-only switch.
+ */
+export function worktreeSnapshotsEnabled(devVars: Record<string, string>): boolean {
+  return (
+    devVars.WORKTREE_SNAPSHOT_WRITES_ENABLED === 'true' &&
+    devVars.WORKTREE_SNAPSHOT_READS_ENABLED === 'true'
+  );
+}
+
+const WORKTREE_ID_PATTERN = /^worktree_[0-9a-f-]{36}$/i;
+const SNAPSHOT_UPLOAD_POLL_MS = 250;
+
+/**
+ * Read accepted worktree-snapshot uploads from the owned container's wrapper
+ * log. The log line is written only after the Worker's PUT returned 2xx, so it
+ * is the harness's evidence that the snapshot the scenario wants to recover is
+ * already durable. No file contents or grants are read, and the returned record
+ * is a log line, not an artifact.
+ */
+export function createLocalWorktreeSnapshots(): WorktreeSnapshotObservation {
+  const requireContainer = async (
+    allocation: SandboxFaultAllocation
+  ): Promise<NonNullable<Awaited<ReturnType<typeof currentOwnedSandbox>>>> => {
+    if (!allocation.expectedAllocationRef) {
+      throw new Error(
+        `worktreeSnapshots: refusing to read without an observed allocation for ${allocation.cloudAgentSessionId}`
+      );
+    }
+    const container = await currentOwnedSandbox(
+      allocation.cloudAgentSessionId,
+      allocation.kiloSessionId
+    );
+    if (!container) {
+      throw new Error(
+        `worktreeSnapshots: no exclusively owned container for ${allocation.cloudAgentSessionId}`
+      );
+    }
+    if (container.id !== allocation.expectedAllocationRef) {
+      throw new Error(
+        `worktreeSnapshots: observed container ${container.id} does not match expected ${allocation.expectedAllocationRef}`
+      );
+    }
+    return container;
+  };
+
+  const uploadRecords = async (
+    allocation: SandboxFaultAllocation,
+    worktreeId: string
+  ): Promise<string[]> => {
+    if (!WORKTREE_ID_PATTERN.test(worktreeId)) {
+      throw new Error(`worktreeSnapshots: invalid worktree id ${JSON.stringify(worktreeId)}`);
+    }
+    const container = await requireContainer(allocation);
+    const needle = `worktree snapshot upload worktree=${worktreeId} `;
+    const { stdout } = await executeDockerCommand([
+      'exec',
+      container.id,
+      'sh',
+      '-c',
+      `grep -F '${needle}' '${CONTROL_WRAPPER_LOG_PATH}' 2>/dev/null || true`,
+    ]);
+    return stdout.split('\n').filter(line => line.includes(needle));
+  };
+
+  return {
+    uploadCount: async input => (await uploadRecords(input.allocation, input.worktreeId)).length,
+    waitForUpload: async input => {
+      const until = Date.now() + Math.max(1, input.timeoutMs);
+      while (Date.now() < until) {
+        if (input.signal?.aborted) throw input.signal.reason;
+        const records = await uploadRecords(input.allocation, input.worktreeId);
+        if (records.length > input.afterCount) {
+          return { count: records.length, record: records[records.length - 1] ?? '' };
+        }
+        await sleep(SNAPSHOT_UPLOAD_POLL_MS);
+      }
+      throw new Error(
+        `worktreeSnapshots: no accepted upload for ${input.worktreeId} after ${input.afterCount} within ${input.timeoutMs}ms`
+      );
+    },
+  };
+}
+
 export function createLocalScenarioEnvironment(options?: {
   credentialContainmentEnabled?: boolean;
+  worktreeSnapshotsEnabled?: boolean;
 }): ScenarioEnvironment {
   const sandbox: SandboxObservation = {
     snapshotContainerIds: () => snapshotSandboxIds(),
@@ -1011,5 +1134,11 @@ export function createLocalScenarioEnvironment(options?: {
     // Containment is a Worker `.dev.vars` setting; the harness reads the same
     // source (passed in by the driver) instead of a second env flag.
     ...(options?.credentialContainmentEnabled ? { credentialContainment: { enabled: true } } : {}),
+    // Worktree snapshot reads require writes. Providing this capability only
+    // when both Worker flags are on makes the gated scenarios `unsupported`
+    // under the default-off configuration instead of failing a real run.
+    ...(options?.worktreeSnapshotsEnabled
+      ? { worktreeSnapshots: createLocalWorktreeSnapshots() }
+      : {}),
   };
 }

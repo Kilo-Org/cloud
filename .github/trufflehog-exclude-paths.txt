@@ -38,3 +38,10 @@ apps/web/src/lib/organizations/guardrails/mcp-identity\.test\.ts
 apps/web/src/lib/organizations/guardrails/guardrails-policy\.test\.ts
 apps/web/src/routers/organizations/organization-mcp-guardrails-router\.test\.ts
 apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test\.ts
+
+# Wrapper launch environment fixtures. wrapper-launch-env.test.ts asserts that a
+# worker origin with embedded credentials mints no diagnostic grants. The first
+# commit on the branch used a literal fixture that a later commit builds from
+# parts, and that commit stays in branch history. Exclude the fixture path so
+# the historical commit does not fail the scan.
+services/cloud-agent-next/src/sandbox-control/wrapper-launch-env\.test\.ts

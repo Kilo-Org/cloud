@@ -20,8 +20,9 @@ import type { ControlDiagnosticFields } from '../../../src/shared/control-diagno
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
 import * as processUtils from '../utils.js';
-import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { createPreparationManager, type PrepareDeps, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
+import type { WorktreeSnapshotRestoreResult } from './worktree-snapshots.js';
 import { directoryHome } from './workspace-home.js';
 
 const NOW = 1_800_000_000_000;
@@ -727,6 +728,7 @@ function createHarness(
     runtimes?: PrepareRuntimePort;
     runSkillInstall?: typeof processUtils.runProcess;
     spawnSetup?: ProcessSpawn;
+    worktreeSnapshots?: PrepareDeps['worktreeSnapshots'];
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -908,6 +910,9 @@ function createHarness(
     }) as never,
     seedRegistration: async () => undefined,
     recoverWorktree: options.recoverWorktree,
+    ...(options.worktreeSnapshots === undefined
+      ? {}
+      : { worktreeSnapshots: options.worktreeSnapshots }),
     sessionExists: async () => {
       if (sessionExistsHung) return new Promise<boolean>(() => undefined);
       return sessionExists;
@@ -4382,5 +4387,490 @@ describe('release cleanup with no live runtime client', () => {
     expect(() => manager.release('ses_a')).not.toThrow();
     await new Promise(resolve => setTimeout(resolve, 10));
     expect(abortCalls).toHaveLength(0);
+  });
+});
+
+type SnapshotRestoreInput = Parameters<NonNullable<PrepareDeps['worktreeSnapshots']>['restore']>[0];
+type SnapshotRegisterInput = Parameters<
+  NonNullable<PrepareDeps['worktreeSnapshots']>['register']
+>[0];
+
+function worktreeSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRouteSpec {
+  const spec = routeSpec(overrides);
+  return { ...spec, kilo: { ...spec.kilo!, scopeId: 'worktree_snapshot' } };
+}
+
+function createSnapshotFake(
+  options: {
+    restore?: (input: SnapshotRestoreInput) => Promise<WorktreeSnapshotRestoreResult>;
+    onRegister?: (input: SnapshotRegisterInput) => void;
+    onUnregister?: (directory: string) => void;
+  } = {}
+) {
+  const restoreCalls: SnapshotRestoreInput[] = [];
+  const registerCalls: SnapshotRegisterInput[] = [];
+  const unregisterCalls: string[] = [];
+  let restoreImpl = options.restore ?? (async () => ({ found: false }));
+  return {
+    restoreCalls,
+    registerCalls,
+    unregisterCalls,
+    setRestore(impl: (input: SnapshotRestoreInput) => Promise<WorktreeSnapshotRestoreResult>) {
+      restoreImpl = impl;
+    },
+    worktreeSnapshots: {
+      restore: async (input: SnapshotRestoreInput) => {
+        restoreCalls.push(input);
+        return restoreImpl(input);
+      },
+      register: (input: SnapshotRegisterInput) => {
+        registerCalls.push(input);
+        options.onRegister?.(input);
+      },
+      unregister: (directory: string) => {
+        unregisterCalls.push(directory);
+        options.onUnregister?.(directory);
+      },
+    } satisfies NonNullable<PrepareDeps['worktreeSnapshots']>,
+  };
+}
+
+function restoreOk() {
+  return {
+    ok: true,
+    downloaded: true,
+    imported: true,
+    diffs: { applied: 1, skipped: 0, total: 1 },
+  };
+}
+
+describe('worktree snapshot preparation lifecycle', () => {
+  const legacyRecovery = {
+    files: [{ path: 'lost.txt', status: 'added' as const, patch: 'saved patch' }],
+  };
+
+  it.each([
+    ['empty', { found: true, applied: 0, omitted: 0, conflicts: [], partial: false }],
+    ['partial', { found: true, applied: 2, omitted: 1, conflicts: [], partial: true }],
+    ['conflicting', { found: true, applied: 1, omitted: 0, conflicts: ['a.txt', 'b.txt'] }],
+  ])(
+    'treats a found %s snapshot as authoritative over legacy recovery and ingest',
+    async (_name, snapshot) => {
+      const snapshots = createSnapshotFake({ restore: async () => snapshot });
+      let legacyCalls = 0;
+      const harness = createHarness(FAST_TIMERS, {
+        worktreeSnapshots: snapshots.worktreeSnapshots,
+        recoverWorktree: async () => {
+          legacyCalls += 1;
+          return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+        },
+      });
+      harness.setSessionExists(false);
+      harness.setRestore(async () => restoreOk());
+      const spec = worktreeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: legacyRecovery,
+      });
+
+      await harness.manager.prepare(spec);
+
+      expect(snapshots.restoreCalls).toHaveLength(1);
+      expect(snapshots.restoreCalls[0]).toMatchObject({
+        directory: spec.directory,
+        worktreeId: 'worktree_snapshot',
+      });
+      expect(legacyCalls).toBe(0);
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      expect(harness.stamp()).toMatchObject({
+        allocationId: 'alloc-current',
+        snapshotRecovery: true,
+      });
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+      expect(snapshots.registerCalls).toHaveLength(1);
+    }
+  );
+
+  it('falls back to legacy worktree recovery when the snapshot is unreadable', async () => {
+    const snapshots = createSnapshotFake({ restore: async () => ({ found: true, invalid: true }) });
+    let legacyCalls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+      recoverWorktree: async () => {
+        legacyCalls += 1;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(
+      worktreeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: legacyRecovery,
+      })
+    );
+
+    expect(legacyCalls).toBe(1);
+    expect(harness.stamp()?.snapshotRecovery).toBeUndefined();
+    expect(
+      harness.frames.some(
+        frame =>
+          frame.type === 'session.progress' &&
+          frame.detail === 'Saved worktree snapshot could not be read; trying older saved changes'
+      )
+    ).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('keeps ingest restoration when an unreadable snapshot has no legacy recovery', async () => {
+    const snapshots = createSnapshotFake({ restore: async () => ({ found: true, invalid: true }) });
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(
+      worktreeSpec({ git: { url: 'https://github.com/acme/repo.git' } })
+    );
+
+    expect(harness.stamp()?.snapshotRecovery).toBeUndefined();
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+  });
+
+  it('falls back to legacy worktree recovery unchanged when the snapshot is missing', async () => {
+    const snapshots = createSnapshotFake({ restore: async () => ({ found: false }) });
+    let legacyCalls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+      recoverWorktree: async (_directory, saved) => {
+        expect(saved).toEqual(legacyRecovery);
+        legacyCalls += 1;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(
+      worktreeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: legacyRecovery,
+      })
+    );
+
+    expect(snapshots.restoreCalls).toHaveLength(1);
+    expect(legacyCalls).toBe(1);
+    expect(harness.stamp()?.snapshotRecovery).toBeUndefined();
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+    expect(
+      harness.frames.some(
+        frame =>
+          frame.type === 'session.progress' && frame.detail === 'Restoring saved worktree changes'
+      )
+    ).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('blocks ready and capture registration when the snapshot download fails persistently', async () => {
+    const downloadFailure = new Error('worktree snapshot download failed with status 403');
+    const snapshots = createSnapshotFake({
+      restore: async () => {
+        throw downloadFailure;
+      },
+    });
+    let legacyCalls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+      recoverWorktree: async () => {
+        legacyCalls += 1;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+
+    await harness.manager.prepare(
+      worktreeSpec({
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: legacyRecovery,
+      })
+    );
+
+    expect(snapshots.restoreCalls).toHaveLength(1);
+    expect(legacyCalls).toBe(0);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+    expect(harness.frames.filter(frame => frame.type === 'session.failed')).toMatchObject([
+      { sessionId: routeSpec().sessionId, reason: 'workspace_setup_failed', step: 'restore' },
+    ]);
+    expect(
+      harness.frames.some(
+        frame =>
+          frame.type === 'session.progress' &&
+          frame.detail ===
+            'Saved worktree changes could not be downloaded or restored. Send another message to retry.'
+      )
+    ).toBe(true);
+    expect(snapshots.registerCalls).toHaveLength(0);
+    expect(harness.stamp()).toBeNull();
+  });
+
+  it('restores a snapshot on the retry that finds an unstamped workspace after a setup failure', async () => {
+    const snapshots = createSnapshotFake({
+      restore: async () => ({ found: true, applied: 3, omitted: 0, conflicts: [], partial: false }),
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+    const spec = worktreeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      setupCommands: ['echo install'],
+    });
+
+    harness.setSetupResult(result(1, 'install failed'));
+    await harness.manager.prepare(spec);
+    expect(snapshots.restoreCalls).toHaveLength(0);
+    expect(harness.stamp()).toBeNull();
+    expect(harness.frames.filter(frame => frame.type === 'session.failed')).toMatchObject([
+      { reason: 'workspace_setup_failed', step: 'setup' },
+    ]);
+
+    harness.setSetupResult(result(0));
+    await harness.manager.prepare(spec);
+
+    expect(snapshots.restoreCalls).toHaveLength(1);
+    expect(snapshots.restoreCalls[0]).toMatchObject({ worktreeId: 'worktree_snapshot' });
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+    expect(harness.stamp()).toMatchObject({ snapshotRecovery: true });
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(snapshots.registerCalls).toHaveLength(1);
+  });
+
+  it('skips the snapshot overlay for a surviving same-allocation workspace', async () => {
+    const snapshots = createSnapshotFake();
+    const harness = createHarness(FAST_TIMERS, {
+      hasGit: true,
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setStamp({ allocationId: 'alloc-current', commit: 'c1' });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(worktreeSpec({ setupCommands: ['echo install'] }));
+
+    expect(snapshots.restoreCalls).toHaveLength(0);
+    expect(snapshots.unregisterCalls).toHaveLength(0);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(snapshots.registerCalls).toHaveLength(1);
+  });
+
+  it.each([false, true])(
+    'skips the disk snapshot overlay, retaining snapshot authority=%s',
+    async snapshotRecovery => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-session-snapshot-'));
+      const directory = path.join(root, 'workspace');
+      try {
+        await fs.mkdir(directory);
+        const snapshots = createSnapshotFake();
+        const harness = createHarness(FAST_TIMERS, {
+          hasGit: true,
+          worktreeSnapshots: snapshots.worktreeSnapshots,
+        });
+        harness.setStamp({
+          allocationId: 'alloc-source',
+          commit: 'c1',
+          ...(snapshotRecovery ? { snapshotRecovery: true } : {}),
+        });
+        harness.setSessionExists(false);
+        harness.setRestore(async () => restoreOk());
+
+        await harness.manager.prepare(
+          worktreeSpec({
+            directory,
+            sessionSnapshot: { sourceAllocationId: 'alloc-source' },
+          })
+        );
+
+        expect(snapshots.restoreCalls).toHaveLength(0);
+        expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+        expect(harness.stamp()).toMatchObject({ allocationId: 'alloc-current' });
+        expect(harness.stamp()?.snapshotRecovery).toBe(snapshotRecovery ? true : undefined);
+        expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+        expect(snapshots.registerCalls).toHaveLength(1);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('registers only after ready, snapshot restore and session import', async () => {
+    let importDone = false;
+    let restoreDone = false;
+    const fixture: { harness?: ReturnType<typeof createHarness> } = {};
+    let observed: { ready: boolean; imported: boolean; restored: boolean } | undefined;
+    const snapshots = createSnapshotFake({
+      restore: async () => {
+        restoreDone = true;
+        return { found: true, applied: 1, omitted: 0, conflicts: [], partial: false };
+      },
+      onRegister: () => {
+        observed = {
+          ready: (fixture.harness?.frames ?? []).some(frame => frame.type === 'session.ready'),
+          imported: importDone,
+          restored: restoreDone,
+        };
+      },
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    fixture.harness = harness;
+    harness.setSessionExists(false);
+    harness.setRestore(async () => {
+      importDone = true;
+      return restoreOk();
+    });
+
+    await harness.manager.prepare(
+      worktreeSpec({ git: { url: 'https://github.com/acme/repo.git' } })
+    );
+
+    expect(snapshots.restoreCalls).toHaveLength(1);
+    expect(observed).toEqual({ ready: true, imported: true, restored: true });
+  });
+
+  it('aborts an in-flight snapshot restore on release without ready or registration', async () => {
+    const entered = Promise.withResolvers<void>();
+    const snapshots = createSnapshotFake({
+      restore: input =>
+        new Promise((_resolve, reject) => {
+          entered.resolve();
+          const abort = () => reject(input.signal.reason ?? new Error('aborted'));
+          if (input.signal.aborted) abort();
+          else input.signal.addEventListener('abort', abort, { once: true });
+        }),
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(false);
+    const spec = worktreeSpec({ git: { url: 'https://github.com/acme/repo.git' } });
+
+    const preparing = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    await preparing;
+
+    expect(snapshots.restoreCalls).toHaveLength(1);
+    expect(snapshots.restoreCalls[0]?.signal.aborted).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+    expect(snapshots.registerCalls).toHaveLength(0);
+  });
+
+  it('keeps a directory registered while a sibling chat on it is still prepared', async () => {
+    const snapshots = createSnapshotFake();
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(true);
+    const first = worktreeSpec({ sessionId: 'ses_snapshot_a', setupCommands: ['echo install'] });
+    const second = worktreeSpec({
+      sessionId: 'ses_snapshot_b',
+      directory: first.directory,
+      setupCommands: ['echo install'],
+    });
+
+    await harness.manager.prepare(first);
+    await harness.manager.prepare(second);
+    expect(snapshots.registerCalls).toHaveLength(2);
+
+    harness.manager.release(first.sessionId);
+    expect(snapshots.unregisterCalls).toEqual([]);
+
+    harness.manager.release(second.sessionId);
+    expect(snapshots.unregisterCalls).toEqual([first.directory]);
+  });
+
+  it('keeps the directory registered for per-session runtimes until the last route leaves', async () => {
+    const snapshots = createSnapshotFake();
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(true);
+    const first = worktreeSpec({
+      sessionId: 'ses_isolated_a',
+      runtimeIsolation: 'per-session',
+      setupCommands: ['echo install'],
+    });
+    const second = worktreeSpec({
+      sessionId: 'ses_isolated_b',
+      directory: first.directory,
+      runtimeIsolation: 'per-session',
+      setupCommands: ['echo install'],
+    });
+
+    await harness.manager.prepare(first);
+    await harness.manager.prepare(second);
+
+    harness.manager.release(first.sessionId);
+    expect(harness.releaseCalls).toContain('ses_isolated_a');
+    expect(snapshots.unregisterCalls).toEqual([]);
+
+    harness.manager.release(second.sessionId);
+    expect(snapshots.unregisterCalls).toEqual([first.directory]);
+  });
+
+  it('unregisters only the released per-session directory', async () => {
+    const snapshots = createSnapshotFake();
+    const harness = createHarness(FAST_TIMERS, {
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setSessionExists(true);
+    const first = worktreeSpec({
+      sessionId: 'ses_directory_a',
+      directory: '/tmp/prepare-test-worktree-a',
+      runtimeIsolation: 'per-session',
+      setupCommands: ['echo install'],
+    });
+    const second = worktreeSpec({
+      sessionId: 'ses_directory_b',
+      directory: '/tmp/prepare-test-worktree-b',
+      runtimeIsolation: 'per-session',
+      setupCommands: ['echo install'],
+    });
+
+    await harness.manager.prepare(first);
+    await harness.manager.prepare(second);
+
+    harness.manager.release(first.sessionId);
+    expect(snapshots.unregisterCalls).toEqual(['/tmp/prepare-test-worktree-a']);
+
+    harness.manager.release(second.sessionId);
+    expect(snapshots.unregisterCalls).toEqual([
+      '/tmp/prepare-test-worktree-a',
+      '/tmp/prepare-test-worktree-b',
+    ]);
+  });
+
+  it('suppresses ingest on a restart whose persisted stamp records snapshot recovery', async () => {
+    const snapshots = createSnapshotFake();
+    const harness = createHarness(FAST_TIMERS, {
+      hasGit: true,
+      worktreeSnapshots: snapshots.worktreeSnapshots,
+    });
+    harness.setStamp({ allocationId: 'alloc-current', commit: 'c1', snapshotRecovery: true });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => restoreOk());
+
+    await harness.manager.prepare(worktreeSpec({ setupCommands: ['echo install'] }));
+
+    expect(snapshots.restoreCalls).toHaveLength(0);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+    expect(harness.stamp()).toMatchObject({ snapshotRecovery: true });
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(snapshots.registerCalls).toHaveLength(1);
   });
 });

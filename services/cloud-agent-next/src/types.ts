@@ -493,6 +493,12 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for per-worktree cold-restore snapshots. */
+  WORKTREE_SNAPSHOTS_BUCKET?: R2Bucket;
+  /** Enables wrapper capture uploads and grant renewal while `true`. */
+  WORKTREE_SNAPSHOT_WRITES_ENABLED?: string;
+  /** Enables snapshot restore reads while `true`; writes must also be enabled. */
+  WORKTREE_SNAPSHOT_READS_ENABLED?: string;
   /** Optional until a downloaded target provisions its private artifact bucket. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;

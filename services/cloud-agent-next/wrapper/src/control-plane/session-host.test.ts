@@ -24,6 +24,7 @@ async function hostFixture() {
   const summaryRequested = Promise.withResolvers<void>();
   const promptRequested = Promise.withResolvers<void>();
   const feeds: Array<{ source: KiloEventFeedSource; callbacks: KiloFeedCallbacks }> = [];
+  const captures: string[] = [];
   const intervals = new Map<symbol, () => void>();
   const stopped: number[] = [];
   let terminalSocket: Bun.ServerWebSocket<string> | undefined;
@@ -122,6 +123,9 @@ async function hostFixture() {
       },
     },
     turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined },
+    worktreeSnapshots: {
+      requestCapture: directory => captures.push(directory),
+    },
     isPreparing: () => preparing,
   });
   const terminals = createControlPlaneTerminals({
@@ -139,20 +143,26 @@ async function hostFixture() {
     aborts,
     prompts,
     summaries,
+    captures,
     summaryRequested: summaryRequested.promise,
     promptRequested: promptRequested.promise,
     stopped,
-    async runtime(key: string) {
-      await host.runtimes.ensure({ key, directory: '/workspace', env: {} });
+    async runtime(key: string, directory = '/workspace') {
+      await host.runtimes.ensure({ key, directory, env: {} });
       await host.runtimes.get(key)?.refreshActivity();
       return feeds.length - 1;
     },
-    event(feed: number, type: string, properties: Record<string, unknown>) {
+    event(
+      feed: number,
+      type: string,
+      properties: Record<string, unknown>,
+      directory = feeds[feed]?.source.directory
+    ) {
       const { source, callbacks } = feeds[feed];
       callbacks.onEvent({
         type,
         properties,
-        directory: source.directory,
+        directory,
         nativeRuntimeId: source.nativeRuntimeId,
       });
     },
@@ -755,6 +765,102 @@ describe('production session host composition', () => {
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
         { status: 'completed', lastMessageId: 'm1' },
       ]);
+    } finally {
+      await f.dispose();
+    }
+  });
+});
+
+function toolPart(status: string, tool = 'bash') {
+  return {
+    id: 'part_tool',
+    sessionID: 'ses_any_chat',
+    messageID: 'assistant',
+    type: 'tool',
+    tool,
+    callID: 'call_tool',
+    state: { status },
+  };
+}
+
+describe('worktree capture tool events', () => {
+  it.each([
+    ['completed', 'bash'],
+    ['completed', 'edit'],
+    ['error', 'webfetch'],
+  ])('requests a capture for a %s %s tool in any chat', async (status, tool) => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace-key', '/trusted/worktree');
+      f.event(
+        feed,
+        'message.part.updated',
+        { part: toolPart(status, tool) },
+        '/untrusted/event-directory'
+      );
+      await settle();
+      expect(f.captures).toEqual(['/trusted/worktree']);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('maps the runtime key to the runtime directory, not the event directory', async () => {
+    const f = await hostFixture();
+    try {
+      const first = await f.runtime('/workspace-a', '/trusted/a');
+      const second = await f.runtime('/workspace-b', '/trusted/b');
+      f.event(second, 'message.part.updated', { part: toolPart('completed') }, '/trusted/a');
+      await settle();
+      expect(f.captures).toEqual(['/trusted/b']);
+
+      f.event(first, 'message.part.updated', { part: toolPart('completed') }, '/trusted/b');
+      await settle();
+      expect(f.captures).toEqual(['/trusted/b', '/trusted/a']);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('ignores a running tool', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.event(feed, 'message.part.updated', { part: toolPart('running') });
+      await settle();
+      expect(f.captures).toEqual([]);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('ignores a non-tool part', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.event(feed, 'message.part.updated', {
+        part: {
+          id: 'text',
+          sessionID: 'ses_any_chat',
+          messageID: 'assistant',
+          type: 'text',
+          text: 'hi',
+        },
+      });
+      await settle();
+      expect(f.captures).toEqual([]);
+    } finally {
+      await f.dispose();
+    }
+  });
+
+  it('ignores tool parts on events other than message.part.updated', async () => {
+    const f = await hostFixture();
+    try {
+      const feed = await f.runtime('/workspace');
+      f.event(feed, 'message.updated', { part: toolPart('completed') });
+      await settle();
+      expect(f.captures).toEqual([]);
     } finally {
       await f.dispose();
     }

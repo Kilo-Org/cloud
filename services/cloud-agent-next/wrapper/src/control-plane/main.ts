@@ -35,6 +35,7 @@ import { createTurnManager, type TurnManager, type TurnManagerDeps } from './tur
 import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
+import { createWorktreeSnapshots, type WorktreeSnapshots } from './worktree-snapshots.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
@@ -179,11 +180,26 @@ export function createControlPlaneSessionHost(options: {
     'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange' | 'onMemoryHold'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
+  worktreeSnapshots?: Pick<WorktreeSnapshots, 'requestCapture'>;
   isPreparing(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
-    onEvent: event => turns?.observeKiloEvent(event),
+    onEvent: event => {
+      turns?.observeKiloEvent(event);
+      if (event.type !== 'message.part.updated' || event.runtimeKey === undefined) return;
+      const part = event.properties.part;
+      if (typeof part !== 'object' || part === null || !('type' in part) || part.type !== 'tool')
+        return;
+      if (!('state' in part) || typeof part.state !== 'object' || part.state === null) return;
+      if (
+        !('status' in part.state) ||
+        (part.state.status !== 'completed' && part.state.status !== 'error')
+      )
+        return;
+      const directory = runtimes.get(event.runtimeKey)?.directory;
+      if (directory !== undefined) options.worktreeSnapshots?.requestCapture(directory);
+    },
     onActivityChange: key => turns?.refreshActivity(key),
     onDeadline: (identity, reason, retry, key) =>
       turns?.onNativeDeadline(identity, reason, retry, key),
@@ -319,6 +335,8 @@ export async function runControlPlaneWrapper(
 ): Promise<ControlPlaneLifecycle | undefined> {
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
+  const snapshotUrl = env.CONTROL_WORKTREE_SNAPSHOT_URL;
+  const snapshotGrant = env.CONTROL_WORKTREE_SNAPSHOT_GRANT;
   const projector = createControlDiagnosticProjector({
     enabled: nativeControlPlaneLogsEnabled(env),
   });
@@ -336,6 +354,8 @@ export async function runControlPlaneWrapper(
   delete env.SANDBOX_CONTROL_CREDENTIAL;
   delete env.CONTROL_LOG_UPLOAD_URL;
   delete env.CONTROL_LOG_UPLOAD_GRANT;
+  delete env.CONTROL_WORKTREE_SNAPSHOT_URL;
+  delete env.CONTROL_WORKTREE_SNAPSHOT_GRANT;
   delete env.CONTROL_WRAPPER_INSTANCE_ID;
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
@@ -386,6 +406,11 @@ export async function runControlPlaneWrapper(
     current?: ReturnType<typeof createControlPlaneKiloRequests>;
   } = {};
   const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
+  const worktreeSnapshots = createWorktreeSnapshots({
+    url: snapshotUrl,
+    grant: snapshotGrant,
+    log: logToFile,
+  });
   const host = createControlPlaneSessionHost({
     runtime: {
       timers,
@@ -394,11 +419,13 @@ export async function runControlPlaneWrapper(
       workload,
       onNativeDiagnostic: projector,
     },
+    worktreeSnapshots,
     turn: {
       emit: frame => connection.send(frame),
       log: logToFile,
       onDiagnostic: diagnostics.onDiagnostic,
       onNativeDiagnostic: projector,
+      requestWorktreeCapture: directory => worktreeSnapshots.requestCapture(directory),
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
   });
@@ -454,6 +481,7 @@ export async function runControlPlaneWrapper(
     log: logToFile,
     inheritedEnv: env,
     spawnSetup: createSetupSpawn(workload),
+    worktreeSnapshots,
   });
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),
@@ -467,7 +495,10 @@ export async function runControlPlaneWrapper(
       runtimes
         .runtimesForDirectory(directory)
         .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
-    retireDirectory: directory => runtimes.retireDirectory(directory),
+    retireDirectory: directory => {
+      worktreeSnapshots.unregister(directory);
+      return runtimes.retireDirectory(directory);
+    },
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
     onDiagnostic: diagnostics.onDiagnostic,
@@ -525,6 +556,7 @@ export async function runControlPlaneWrapper(
     exit: code => process.exit(code),
     log: logToFile,
     stop: async () => {
+      worktreeSnapshots.close();
       nativeStatus.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();

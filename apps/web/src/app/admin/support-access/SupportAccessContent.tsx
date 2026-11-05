@@ -19,6 +19,14 @@ import {
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
 import { maxSupportDurationMinutes, parseSupportDurationMinutes } from './duration';
+import {
+  missingSupportRequestRequirements,
+  SUPPORT_REASON_MIN_LENGTH,
+} from './request-requirements';
+import {
+  SupportOrganizationPicker,
+  type SelectedSupportOrganization,
+} from './SupportOrganizationPicker';
 
 type ActionClass = 'support_read' | 'support_write';
 
@@ -32,7 +40,8 @@ export function SupportAccessContent() {
   const { data: session } = useSession();
   const currentUserId = session?.kiloUserId;
   const [revokeReasons, setRevokeReasons] = useState<Record<string, string>>({});
-  const [organizationId, setOrganizationId] = useState('');
+  const [organization, setOrganization] = useState<SelectedSupportOrganization | null>(null);
+  const organizationId = organization?.id ?? '';
   const [actionClass, setActionClass] = useState<ActionClass>('support_read');
   const [durationMinutes, setDurationMinutes] = useState('');
   const [ticketReference, setTicketReference] = useState('');
@@ -135,6 +144,15 @@ export function SupportAccessContent() {
       ? parsedDuration.minutes * 60
       : undefined;
   const maxDurationMinutes = maxSupportDurationMinutes(actionClass);
+  const missingRequirements = missingSupportRequestRequirements({
+    organizationId,
+    reason,
+    durationError: parsedDuration.valid ? undefined : parsedDuration.error,
+  });
+  const missingEmergencyRequirements = missingSupportRequestRequirements({
+    organizationId,
+    reason: emergencyReason,
+  });
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -147,15 +165,7 @@ export function SupportAccessContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="support-org-id">Organization ID</Label>
-            <Input
-              id="support-org-id"
-              value={organizationId}
-              onChange={event => setOrganizationId(event.target.value.trim())}
-              placeholder="00000000-0000-0000-0000-000000000000"
-            />
-          </div>
+          <SupportOrganizationPicker selected={organization} onSelect={setOrganization} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="support-action-class">Action class</Label>
             <select
@@ -200,7 +210,9 @@ export function SupportAccessContent() {
             />
           </div>
           <div className="flex flex-col gap-2 md:col-span-2">
-            <Label htmlFor="support-reason">Reason</Label>
+            <Label htmlFor="support-reason">
+              Reason (at least {SUPPORT_REASON_MIN_LENGTH} characters)
+            </Label>
             <Textarea
               id="support-reason"
               value={reason}
@@ -209,14 +221,13 @@ export function SupportAccessContent() {
               rows={3}
             />
           </div>
-          <div className="md:col-span-2">
+          <div className="flex flex-col gap-2 md:col-span-2">
             <Button
-              disabled={
-                request.isPending ||
-                !organizationId ||
-                reason.trim().length < 10 ||
-                !parsedDuration.valid
+              className="self-start"
+              aria-describedby={
+                missingRequirements.length > 0 ? 'support-request-missing' : undefined
               }
+              disabled={request.isPending || missingRequirements.length > 0}
               onClick={() =>
                 request.mutate({
                   organizationId,
@@ -229,6 +240,16 @@ export function SupportAccessContent() {
             >
               {actionClass === 'support_read' ? 'Start read access' : 'Request write access'}
             </Button>
+            {missingRequirements.length > 0 && (
+              <ul
+                id="support-request-missing"
+                className="text-muted-foreground list-disc pl-5 text-xs"
+              >
+                {missingRequirements.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -428,7 +449,13 @@ export function SupportAccessContent() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="support-emergency-reason">Reason</Label>
+            <Label htmlFor="support-emergency-reason">
+              Reason (at least {SUPPORT_REASON_MIN_LENGTH} characters)
+            </Label>
+            <p className="text-muted-foreground text-xs">
+              Uses the organization selected under Request access
+              {organization ? `: ${organization.name}` : ''}.
+            </p>
             <Textarea
               id="support-emergency-reason"
               value={emergencyReason}
@@ -436,12 +463,14 @@ export function SupportAccessContent() {
               rows={2}
             />
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Button
               variant="destructive"
-              disabled={
-                emergency.isPending || !organizationId || emergencyReason.trim().length < 10
+              className="self-start"
+              aria-describedby={
+                missingEmergencyRequirements.length > 0 ? 'support-emergency-missing' : undefined
               }
+              disabled={emergency.isPending || missingEmergencyRequirements.length > 0}
               onClick={() =>
                 emergency.mutate({
                   organizationId,
@@ -452,6 +481,16 @@ export function SupportAccessContent() {
             >
               Issue emergency write access
             </Button>
+            {missingEmergencyRequirements.length > 0 && (
+              <ul
+                id="support-emergency-missing"
+                className="text-muted-foreground list-disc pl-5 text-xs"
+              >
+                {missingEmergencyRequirements.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
           {emergencies.error && (
             <p className="text-muted-foreground text-sm">

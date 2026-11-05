@@ -10,6 +10,7 @@ import {
   isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { loadEffectiveMembershipRows } from '@kilocode/web-shared/routers/organizations/utils';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import {
@@ -269,6 +270,26 @@ export const adminSupportAccessRouter = createTRPCRouter({
     return grants.map(toSupportGrantSummary);
   }),
 
+  viewAccess: adminProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      if (!isSupportAccessEnabled()) return { grantRequired: false, expiresAt: null };
+      const [memberships, grants] = await Promise.all([
+        loadEffectiveMembershipRows(ctx.user.id, input.organizationId),
+        getActiveSupportGrantsForOrganization(input.organizationId),
+      ]);
+      if (memberships.length > 0) return { grantRequired: false, expiresAt: null };
+      const now = Date.now();
+      const ownGrant = grants.find(
+        grant =>
+          grant.actor_kilo_user_id === ctx.user.id &&
+          grant.expires_at !== null &&
+          new Date(grant.expires_at).getTime() > now
+      );
+      return ownGrant
+        ? { grantRequired: false, expiresAt: ownGrant.expires_at }
+        : { grantRequired: true, expiresAt: null };
+    }),
   getActiveForOrganization: adminProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ input }) => {

@@ -3,9 +3,11 @@ import {
   organization_membership_removals,
   organization_memberships,
   organizations,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { randomUUID } from 'node:crypto';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   resolveEffectiveOrganizationSsoPolicy,
@@ -20,6 +22,7 @@ import { and, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
 
 import type {
@@ -273,44 +276,20 @@ export async function upsertDirectorySubOrganization(
     return { id: existing.id, created: false };
   }
 
-  // A retry adopts the child a previous attempt left behind instead of adding
-  // another. `createChildOrganization` commits the row in its own transaction
-  // and then provisions a Stripe customer outside it, so a failure after the
-  // commit leaves a live, unbound sub-organization that the
-  // `directory_group_id` lookup above cannot see. Each retry would otherwise
-  // add one more.
-  //
-  // `directory_idp_id` is the adoption key: it is the identity provider's own
-  // group id, which survives the disconnect/reconnect that mints a new
-  // `directory_group_id`, and it is written in the same statement as the name.
-  // The match is scoped to this parent and to rows with no
-  // `directory_group_id`, so it can only ever pick up a half-bound row from a
-  // failed attempt at this same group.
-  const orphanRows = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(
-      and(
-        eq(organizations.parent_organization_id, parent.id),
-        eq(organizations.directory_idp_id, input.directoryIdpId),
-        isNull(organizations.directory_group_id),
-        liveOrganization
-      )
-    )
-    .limit(1);
+  // Created already bound, in one statement. `createChildOrganization` commits
+  // its own transaction and then provisions a Stripe customer outside it, so a
+  // binding written afterwards would leave a live sub-organization carrying no
+  // `directory_group_id` whenever that provisioning failed — invisible to the
+  // lookup above, and duplicated by every retry. Passing the binding into the
+  // insert means the row is either absent or fully bound, so a retry either
+  // finds it above or creates it cleanly.
+  const child = await createChildOrganization(input.name, parent.id, undefined, {
+    directory_id: input.directoryId,
+    directory_group_id: directoryGroupId,
+    directory_idp_id: input.directoryIdpId,
+  });
 
-  const childId = orphanRows.at(0)?.id ?? (await createChildOrganization(input.name, parent.id)).id;
-  await db
-    .update(organizations)
-    .set({
-      name: input.name,
-      directory_id: input.directoryId,
-      directory_group_id: directoryGroupId,
-      directory_idp_id: input.directoryIdpId,
-    })
-    .where(eq(organizations.id, childId));
-
-  return { id: childId, created: true };
+  return { id: child.id, created: true };
 }
 
 /**
@@ -449,11 +428,23 @@ export async function upsertDirectoryUser(
  * sign-in and the takeover gate both rely on.
  *
  * An address change is a takeover in its own right — it moves the account onto
- * a new mailbox — so it runs the same two checks as a first bind: the
- * organization must have captured the new domain, and no other account may
- * already hold the address. `normalized_email` and `email_domain` are written
- * alongside, because `findUserByNormalizedEmail` and the signup dedup read
- * them rather than `google_user_email`.
+ * a new mailbox — so it carries the same protections as a first bind:
+ *
+ * - the organization must have captured the new domain, and no other account
+ *   may already hold the address;
+ * - `web_session_pepper` is rotated, because the sessions issued before the
+ *   move were issued to the previous holder of that mailbox. An identity
+ *   provider that recycles an address to a different person would otherwise
+ *   leave the previous holder authenticated against the moved account
+ *   (`isWebSessionCurrent` compares exactly this column);
+ * - `user_auth_provider.email` is moved too. It is a separate source for
+ *   address lookups — `getEmailAccountCandidates` matches on it — so leaving it
+ *   behind keeps the old address resolving to this account.
+ *
+ * `normalized_email` is written because `findUserByNormalizedEmail` and the
+ * signup dedup read it rather than `google_user_email`, and `email_domain`
+ * through `extractEmailDomain`, which is the registrable domain the insert path
+ * stores — the full host would skew the abuse grouping that reads the column.
  */
 async function applyDirectoryUserChanges(
   bound: { id: string; email: string; name: string | null },
@@ -462,6 +453,7 @@ async function applyDirectoryUserChanges(
 ): Promise<void> {
   const displayName = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
   const changes: Partial<typeof kilocode_users.$inferInsert> = {};
+  let movedMailbox = false;
 
   if (displayName !== '' && displayName !== bound.name) {
     changes.google_user_name = displayName;
@@ -479,14 +471,30 @@ async function applyDirectoryUserChanges(
       );
     }
 
+    movedMailbox = true;
     changes.google_user_email = input.email;
     changes.normalized_email = normalizeEmail(input.email);
-    changes.email_domain = getLowerDomainFromEmail(input.email);
+    changes.email_domain = extractEmailDomain(input.email);
+    changes.web_session_pepper = randomUUID();
   }
 
   if (Object.keys(changes).length === 0) return;
 
-  await db.update(kilocode_users).set(changes).where(eq(kilocode_users.id, bound.id));
+  await db.transaction(async tx => {
+    await tx.update(kilocode_users).set(changes).where(eq(kilocode_users.id, bound.id));
+
+    if (movedMailbox) {
+      await tx
+        .update(user_auth_provider)
+        .set({ email: input.email })
+        .where(
+          and(
+            eq(user_auth_provider.kilo_user_id, bound.id),
+            eq(user_auth_provider.provider, 'workos')
+          )
+        );
+    }
+  });
 }
 
 /**

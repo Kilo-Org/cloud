@@ -30,6 +30,10 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
+const organizationBilling = jest.requireMock<{
+  getOrCreateStripeCustomerIdForOrganization: jest.Mock;
+}>('@/lib/organizations/organization-billing');
+
 import {
   addDirectoryMembership,
   deleteDirectoryOrganization,
@@ -390,38 +394,43 @@ describe('upsertDirectorySubOrganization', () => {
     expect(replay).toEqual({ id: parentId, created: false });
   });
 
-  test('a retry adopts a half-created group instead of adding a second one', async () => {
+  test('a Stripe failure leaves no unbound child for a retry to duplicate', async () => {
     const parentId = await seedOrganization();
 
-    // `createChildOrganization` commits the row in its own transaction and then
-    // provisions a Stripe customer outside it, so a failure after the commit
-    // leaves a live child with no `directory_group_id` — invisible to the group
-    // lookup. Each retry used to add another.
-    const orphan = await createChildOrganization(`kilo-users-${suffix}`, parentId);
-    trackOrganization(orphan.id);
-    await db
-      .update(organizations)
-      .set({ directory_id: directoryId, directory_idp_id: directoryIdpId })
-      .where(eq(organizations.id, orphan.id));
+    // The real failure: `createChildOrganization` commits the row in its own
+    // transaction and provisions the Stripe customer after it. Binding the
+    // group in a later statement left a live child carrying no
+    // `directory_group_id` whenever that provisioning failed — invisible to the
+    // group lookup, so every retry added another.
+    organizationBilling.getOrCreateStripeCustomerIdForOrganization.mockRejectedValueOnce(
+      new Error('stripe is down')
+    );
+
+    await expect(
+      upsertDirectorySubOrganization(directoryGroupId, {
+        directoryId,
+        directoryIdpId,
+        name: `kilo-users-${suffix}`,
+      })
+    ).rejects.toThrow('stripe is down');
 
     const retried = await upsertDirectorySubOrganization(directoryGroupId, {
       directoryId,
       directoryIdpId,
       name: `kilo-users-${suffix}`,
     });
+    trackOrganization(retried.id);
 
-    expect(retried.id).toBe(orphan.id);
-
+    // The row is either absent or fully bound, so the retry resolves exactly
+    // one group under the parent.
     const children = await db
-      .select({ id: organizations.id })
+      .select({ id: organizations.id, groupId: organizations.directory_group_id })
       .from(organizations)
       .where(
         and(eq(organizations.parent_organization_id, parentId), isNull(organizations.deleted_at))
       );
     expect(children).toHaveLength(1);
-
-    const [row] = await db.select().from(organizations).where(eq(organizations.id, orphan.id));
-    expect(row.directory_group_id).toBe(directoryGroupId);
+    expect(children[0].groupId).toBe(directoryGroupId);
   });
 });
 
@@ -781,7 +790,9 @@ describe('upsertDirectoryUser', () => {
 
   test('applies a changed name and address to a bound directory user', async () => {
     const organizationId = await seedOrganization();
-    const domain = `captured-${suffix}.test`;
+    // A subdomain, so the registrable-domain write is distinguishable from the
+    // full host: `email_domain` holds eTLD+1 on the insert path.
+    const domain = `mail.captured-${suffix}.test`;
     await db
       .update(organizations)
       .set({ sso_domain: domain })
@@ -794,6 +805,10 @@ describe('upsertDirectoryUser', () => {
       lastName: 'Name',
     });
     createdUserIds.push(created.id);
+    const [before] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, created.id));
 
     // `dsync.user.updated` maps to this route. Ignoring the payload would leave
     // a stale address, which desynchronizes the address matching that SSO
@@ -809,9 +824,56 @@ describe('upsertDirectoryUser', () => {
     const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
     expect(row.google_user_email).toBe(`new-${suffix}@${domain}`);
     expect(row.google_user_name).toBe('New Name');
-    // The dedup and the takeover gate read these rather than `google_user_email`.
+    // `findUserByNormalizedEmail` and the signup dedup read this rather than
+    // `google_user_email`.
     expect(row.normalized_email).toBe(`new-${suffix}@${domain}`);
-    expect(row.email_domain).toBe(domain);
+    // The registrable domain, matching what the insert path stores — the full
+    // host would skew the abuse grouping that reads this column.
+    expect(row.email_domain).toBe(`captured-${suffix}.test`);
+    // Sessions issued before the move belonged to the previous holder of that
+    // mailbox, so they must not survive it.
+    expect(row.web_session_pepper).not.toBe(before.web_session_pepper);
+
+    // The provider row is a separate source for address lookups, so the old
+    // address must not keep resolving to this account.
+    const providers = await db
+      .select({ email: user_auth_provider.email })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, created.id));
+    expect(providers.map(provider => provider.email)).toEqual([`new-${suffix}@${domain}`]);
+  });
+
+  test('a name-only change leaves sessions and the address alone', async () => {
+    const organizationId = await seedOrganization();
+    const domain = `captured-${suffix}.test`;
+    await db
+      .update(organizations)
+      .set({ sso_domain: domain })
+      .where(eq(organizations.id, organizationId));
+
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: `holder-${suffix}@${domain}`,
+      firstName: 'Old',
+      lastName: 'Name',
+    });
+    createdUserIds.push(created.id);
+    const [before] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, created.id));
+
+    await upsertDirectoryUser(externalId, {
+      directoryId,
+      email: `holder-${suffix}@${domain}`,
+      firstName: 'New',
+      lastName: 'Name',
+    });
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
+    expect(row.google_user_name).toBe('New Name');
+    // No mailbox move, so no reason to sign anyone out.
+    expect(row.web_session_pepper).toBe(before.web_session_pepper);
   });
 
   test('refuses to move a bound user onto a domain the organization never captured', async () => {

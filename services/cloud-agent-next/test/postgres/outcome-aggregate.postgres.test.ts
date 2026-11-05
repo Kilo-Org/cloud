@@ -459,7 +459,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
 
   it('splits runs by the reported runtime harness and buckets the rest as unknown', async () => {
     const window = nextWindow();
-    const container = (runtimeHarness?: string) => ({
+    const container = (runtimeHarness?: 'kilo' | 'kilo2') => ({
       provider: 'cloudflare-containers' as const,
       sandboxId: `sandbox_${randomUUID()}`,
       ...(runtimeHarness === undefined ? {} : { runtimeHarness }),
@@ -492,7 +492,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
       messageId: foreignInitial,
       status: 'completed',
       terminalAt: window.start,
-      container: container('kilo3'),
+      container: { ...container(), runtimeHarness: 'kilo3' },
     });
 
     const result = await aggregate(window);

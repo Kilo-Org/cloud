@@ -5491,15 +5491,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'history.page':
         // Off the serial queue: a Session DO read must not hold other frames.
         if (current)
-          void serveHistoryPage({
-            frame,
-            readRoute: sessionId => readRoute(this.db, sessionId),
-            session: async sessionId => {
-              const owner = await this.requireOwner();
-              return owner === null ? null : this.sessionPeerFor(owner, sessionId);
-            },
-            send: result => this.trySendFrame(ws, result),
-          });
+          this.ctx.waitUntil(
+            serveHistoryPage({
+              frame,
+              readRoute: sessionId => readRoute(this.db, sessionId),
+              session: async sessionId => {
+                const owner = await this.requireOwner();
+                return owner === null ? null : this.sessionPeerFor(owner, sessionId);
+              },
+              send: result => this.trySendFrame(ws, result),
+            })
+          );
         return;
       default:
         return;

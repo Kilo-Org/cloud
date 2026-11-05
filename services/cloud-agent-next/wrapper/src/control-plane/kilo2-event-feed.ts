@@ -93,6 +93,7 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
   // Each projection re-reads recent messages; forward only assistant messages that changed.
   // A digest keeps change detection from retaining every full native message.
   const projected = new Map<string, string>();
+  const emittedPermissions = new Map<string, string>();
   function changed(sessionId: string, message: Kilo2Message) {
     const key = `${sessionId}/${message.id}`;
     const value = createHash('sha256').update(JSON.stringify(message)).digest('hex');
@@ -160,17 +161,27 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
     if (event.type === 'permission.asked') {
       // Envelope IDs do not identify permission requests. V2's event schema
       // omits the request ID; the pending list owns that identity.
+      const permissionDirectory = directory ?? options.source.directory;
       const pending = z
         .array(kilo2PermissionSchema)
         .parse(
-          await api.data(
-            `/api/permission/request?${kilo2LocationQuery(directory ?? options.source.directory)}`,
-            { signal }
-          )
+          await api.data(`/api/permission/request?${kilo2LocationQuery(permissionDirectory)}`, {
+            signal,
+          })
         );
+      const pendingIds = new Set(pending.map(request => request.id));
+      for (const [requestId, requestDirectory] of emittedPermissions)
+        if (requestDirectory === permissionDirectory && !pendingIds.has(requestId))
+          emittedPermissions.delete(requestId);
       for (const request of pending) {
-        if (request.sessionID === id && request.action === event.data.action)
+        if (
+          request.sessionID === id &&
+          request.action === event.data.action &&
+          !emittedPermissions.has(request.id)
+        ) {
+          emittedPermissions.set(request.id, permissionDirectory);
           emit('permission.asked', projectKilo2Permission(request), directory);
+        }
       }
       return;
     }
@@ -271,7 +282,10 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
             (event.type !== 'session.inbox.delivered' || message.id !== event.data.inboxID)
           )
             continue;
-          // A step start omits parts, so it neither records nor suppresses a full read.
+          // A step start reports only its assistant message and omits parts.
+          // It neither records nor suppresses a later full read.
+          if (event.type === 'session.step.started' && message.id !== event.data.assistantMessageID)
+            continue;
           if (
             summary.role === 'assistant' &&
             event.type !== 'session.step.started' &&

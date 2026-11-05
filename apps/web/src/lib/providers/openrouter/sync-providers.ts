@@ -34,11 +34,7 @@ import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/providers/openrouter/free-endpoint-data-policy';
-import {
-  injectExtraProviderModels,
-  injectVercelOnlyModels,
-  injectVercelOnlyProviders,
-} from '@/lib/providers/openrouter/inject-extra-provider-models';
+import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import {
@@ -220,9 +216,7 @@ async function syncProviders(params: {
     unavailableModelIds
   );
 
-  injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
-  injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
-  injectVercelOnlyModels({
+  injectVercelModels({
     vercelModels,
     openRouterCatalogModels,
     openRouterModelIds: [

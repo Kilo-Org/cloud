@@ -752,6 +752,51 @@ describe('collectSystemSearchDocuments session catalog', () => {
     expect(sessions).toEqual([{ id: 'named', title: 'Deploy review' }]);
   });
 
+  it('orders the catalog by each row’s update time across cached queries', async () => {
+    // The cache insertion order is not recency: the older organization's query
+    // can be cached first. The cap and the picker must still see the newest
+    // session first.
+    const client = new QueryClient();
+    client.setQueryData(
+      [['cliSessionsV2', 'list'], { type: 'infinite', input: { organizationId: 'org-1' } }],
+      {
+        pages: [
+          {
+            cliSessions: [
+              {
+                session_id: 'sess-old',
+                title: 'Older session',
+                updated_at: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        ],
+      }
+    );
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        {
+          cliSessions: [
+            {
+              session_id: 'sess-new',
+              title: 'Newer session',
+              updated_at: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'sess-new', title: 'Newer session' },
+      { id: 'sess-old', title: 'Older session' },
+    ]);
+  });
+
   it('keeps the newest titles and drops the rest past the cap', async () => {
     const client = new QueryClient();
     client.setQueryData(SESSION_LIST_KEY, {

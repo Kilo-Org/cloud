@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import {
   applySystemSearchUpdate,
@@ -6,7 +6,7 @@ import {
 } from '@/lib/native-system-search';
 import { replaceNativeSessionCatalog } from '@/lib/app-actions/native-bridge';
 import { clearSessionCatalogBestEffort } from '@/lib/app-actions/session-catalog';
-import { isAppLocked, setAppLocked } from '@/lib/app-lock-state';
+import { isCatalogPublishAllowed, setAppLockStatus } from '@/lib/app-lock-state';
 import { useAppUnlock } from '@/lib/app-unlock-context';
 import { queryClient } from '@/lib/query-client';
 import {
@@ -33,12 +33,12 @@ async function applyIndexUpdate(update: SystemSearchIndexUpdate): Promise<void> 
 }
 
 /**
- * The mount's catalog dep. A locked app keeps no titles outside the lock: the
- * lock already wiped them, so a publish that runs while it is up must not put
- * them back.
+ * The mount's catalog dep. Only a known-unlocked app publishes: the lock
+ * surface covers every other status, so a publish then would put titles back
+ * behind it.
  */
 function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<boolean> {
-  if (isAppLocked()) {
+  if (!isCatalogPublishAllowed()) {
     return Promise.resolve(false);
   }
   return replaceNativeSessionCatalog(sessions);
@@ -61,18 +61,7 @@ function applySessionCatalog(sessions: readonly SessionCatalogEntry[]): Promise<
  */
 export function SystemSearchIndexMount(): null {
   const { status } = useAppUnlock();
-  const locked = status === 'locked';
-
-  // The catalog follows the one gate that hides content. A locked app must not
-  // keep offering session titles to Siri, so entering the lock wipes them, and
-  // the publish below refuses while the flag stands. Publishing the flag first
-  // is what makes the wipe and the gate agree.
-  useEffect(() => {
-    setAppLocked(locked);
-    if (locked) {
-      clearSessionCatalogBestEffort();
-    }
-  }, [locked]);
+  const syncRef = useRef<SystemSearchIndexSync | null>(null);
 
   useEffect(() => {
     const sync = new SystemSearchIndexSync({
@@ -86,8 +75,8 @@ export function SystemSearchIndexMount(): null {
       },
       isEnabled: isSystemSearchSyncEnabled,
     });
+    syncRef.current = sync;
     const detach = sync.attach();
-    void sync.syncNow();
     const appStateSubscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
         void sync.syncNow();
@@ -96,7 +85,25 @@ export function SystemSearchIndexMount(): null {
     return () => {
       appStateSubscription.remove();
       detach();
+      syncRef.current = null;
     };
   }, []);
+
+  // The catalog follows the one gate that hides content. Entering the lock wipes
+  // the titles, and the publish above refuses while any status other than
+  // `unlocked` stands — including the launch that is still reading the
+  // preference, where the lock surface is already covering the app.
+  //
+  // The unlock edge is also the retry for a publish that the gate refused: the
+  // run that would have carried the titles happened while the lock stood, so
+  // nothing else would re-publish them until an unrelated cache write.
+  useEffect(() => {
+    if (setAppLockStatus(status)) {
+      clearSessionCatalogBestEffort();
+    }
+    if (status === 'unlocked') {
+      void syncRef.current?.syncNow();
+    }
+  }, [status]);
   return null;
 }

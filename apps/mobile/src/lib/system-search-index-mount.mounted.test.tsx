@@ -1,15 +1,13 @@
 /* eslint-disable require-await -- the mocks settle without awaiting because they resolve immediately */
-import { type QueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
-
 // The provider is the lock's only source of truth; this suite moves its status
-// the way a background return and a successful unlock do.
+// the way a cold start, a background return and a successful unlock do.
 const unlock = vi.hoisted(() => ({
-  status: 'unlocked' as 'locked' | 'unlocked',
+  status: 'unlocked' as 'locked' | 'preference-loading' | 'unlocked',
   useAppUnlock: () => ({ status: unlock.status }),
 }));
 
@@ -62,12 +60,15 @@ const hoisted = vi.hoisted(() => ({ queryClient: null as unknown }));
 // The mount reads the app's one client at call time, so the fake is created
 // once for the whole suite and handed back through the module factory.
 vi.mock('@/lib/query-client', async () => {
-  const { QueryClient } = await import('@tanstack/react-query');
-  hoisted.queryClient ??= new QueryClient();
+  const { QueryClient: Client } = await import('@tanstack/react-query');
+  hoisted.queryClient ??= new Client();
   return { queryClient: hoisted.queryClient };
 });
 
 function client(): QueryClient {
+  if (hoisted.queryClient === null) {
+    hoisted.queryClient = new QueryClient();
+  }
   return hoisted.queryClient as QueryClient;
 }
 
@@ -80,27 +81,57 @@ function seedSession(title: string): void {
   client().setQueryData(SESSION_LIST_KEY, {
     pages: [
       {
-        cliSessions: [{ session_id: 'sess-1', title, organization_id: null, git_branch: null }],
+        cliSessions: [
+          {
+            session_id: 'sess-1',
+            title,
+            organization_id: null,
+            git_branch: null,
+            updated_at: new Date().toISOString(),
+          },
+        ],
         nextCursor: null,
       },
     ],
   });
 }
 
+type Mounted = {
+  update: (status: 'locked' | 'preference-loading' | 'unlocked') => Promise<void>;
+  unmount: () => void;
+};
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-/** Mounts the sync through one of its own retry triggers, and lets it settle. */
-async function mountAndSync(): Promise<void> {
+/**
+ * Mounts a fresh copy of the module graph, so the lock state starts from its
+ * process default instead of the previous case's status.
+ */
+async function mountSync(): Promise<Mounted> {
+  vi.resetModules();
+  const { SystemSearchIndexMount } = await import('@/lib/system-search-index-mount');
   act(() => {
-    renderer ??= TestRenderer.create(createElement(SystemSearchIndexMount));
+    renderer = TestRenderer.create(createElement(SystemSearchIndexMount));
   });
   await act(async () => {
-    for (const listener of appState.listeners) {
-      listener('active');
-    }
-    // The sync coalesces nothing here: `syncNow` awaits its own run queue.
+    // The sync awaits its own run queue on the unlock edge.
     await Promise.resolve();
   });
+  return {
+    update: async status => {
+      unlock.status = status;
+      await act(async () => {
+        renderer?.update(createElement(SystemSearchIndexMount));
+        await Promise.resolve();
+      });
+    },
+    unmount: () => {
+      act(() => {
+        renderer?.unmount();
+      });
+      renderer = undefined;
+    },
+  };
 }
 
 beforeEach(() => {
@@ -114,56 +145,69 @@ beforeEach(() => {
 });
 
 describe('the App Intents catalog and the privacy lock', () => {
-  it('publishes the account’s titles while the app is unlocked', async () => {
+  it('publishes the account’s titles once the app is known to be unlocked', async () => {
     seedSession('Fix login bug');
 
-    await mountAndSync();
+    const mounted = await mountSync();
 
     expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
       { id: 'sess-1', title: 'Fix login bug' },
     ]);
+    mounted.unmount();
+  });
+
+  it('publishes nothing while the launch is still reading the lock preference', async () => {
+    seedSession('Fix login bug');
+    unlock.status = 'preference-loading';
+
+    const mounted = await mountSync();
+
+    expect(nativeBridge.replaceNativeSessionCatalog).not.toHaveBeenCalled();
+
+    // The unlock edge is the retry for a publish the gate refused.
+    await mounted.update('unlocked');
+
+    expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
+      { id: 'sess-1', title: 'Fix login bug' },
+    ]);
+    mounted.unmount();
   });
 
   it('wipes the titles when the lock closes and refuses to republish them', async () => {
     seedSession('Fix login bug');
-    await mountAndSync();
+    const mounted = await mountSync();
     nativeBridge.replaceNativeSessionCatalog.mockClear();
 
     // The app goes to the background past the lock interval: the provider
     // publishes `locked`, and the mount follows it.
-    unlock.status = 'locked';
-    await act(async () => {
-      renderer?.update(createElement(SystemSearchIndexMount));
-    });
+    await mounted.update('locked');
 
     expect(nativeBridge.clearNativeSessionCatalog).toHaveBeenCalledOnce();
 
-    // A cache write and a return to the foreground while the lock stands must
-    // not put the titles back.
-    seedSession('Another title');
-    await mountAndSync();
+    // A return to the foreground while the lock stands must not put the titles
+    // back.
+    await act(async () => {
+      for (const listener of appState.listeners) {
+        listener('active');
+      }
+      await Promise.resolve();
+    });
 
     expect(nativeBridge.replaceNativeSessionCatalog).not.toHaveBeenCalled();
+    mounted.unmount();
   });
 
-  it('publishes again once the lock opens', async () => {
+  it('publishes again after the lock opens', async () => {
     seedSession('Fix login bug');
-    await mountAndSync();
-
-    unlock.status = 'locked';
-    await act(async () => {
-      renderer?.update(createElement(SystemSearchIndexMount));
-    });
+    const mounted = await mountSync();
+    await mounted.update('locked');
     nativeBridge.replaceNativeSessionCatalog.mockClear();
 
-    unlock.status = 'unlocked';
-    await act(async () => {
-      renderer?.update(createElement(SystemSearchIndexMount));
-    });
-    await mountAndSync();
+    await mounted.update('unlocked');
 
     expect(nativeBridge.replaceNativeSessionCatalog).toHaveBeenCalledWith([
       { id: 'sess-1', title: 'Fix login bug' },
     ]);
+    mounted.unmount();
   });
 });

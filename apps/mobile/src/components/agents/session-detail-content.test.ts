@@ -185,6 +185,11 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/lib/app-actions/native-bridge', () => ({
   setNativeVisibleSession: vi.fn(() => Promise.resolve()),
 }));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
+}));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,

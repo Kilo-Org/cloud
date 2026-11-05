@@ -1,25 +1,34 @@
 /**
- * Whether the app's own privacy lock is covering the screen.
+ * The app's own privacy lock, as the App Intents catalog sees it.
  *
- * A module-level flag rather than a hook, because one reader is not a React
- * component: the App Intents catalog publish checks it immediately before it
- * writes, and a component's state cannot be read from there. It carries no
- * imports on purpose — the auth provider imports this module, and every module
- * it reached would load the native bridge and the whole Expo runtime into the
- * provider's own tests.
+ * Two readers, neither a React component: the catalog publish checks the gate
+ * immediately before it writes, and the lock's own clear runs from the one
+ * place that observes the transition. A module-level value is what lets both
+ * work without a render. It carries no imports on purpose — the unlock provider
+ * is above everything, and every module it reached would load the native bridge
+ * and the whole Expo runtime into the provider's own tests.
+ *
+ * The value is the provider's status, not a boolean, because "not yet known" is
+ * a third state: `AppUnlockScene` hides the tree for every status except
+ * `'unlocked'`, so a launch that is still reading the preference is showing the
+ * lock surface. Treating that as unlocked is exactly how a catalog persisted by
+ * the previous process stays readable for the length of the keychain read.
  */
-let locked = false;
+export type AppLockStatus = 'preference-loading' | 'locked' | 'unlocked';
 
-export function isAppLocked(): boolean {
-  return locked;
+let status: AppLockStatus = 'preference-loading';
+
+/** Whether the app is known to be unlocked, which is the only state that publishes. */
+export function isCatalogPublishAllowed(): boolean {
+  return status === 'unlocked';
 }
 
 /**
- * Publishes the lock state. `AppUnlockProvider` is the only source of truth,
- * and its consumer inside the signed-in group (`SystemSearchIndexMount`) is the
- * one writer: it also wipes the catalog on the lock, so the flag and the wipe
- * cannot drift apart.
+ * Publishes the provider's status and reports whether this call entered the
+ * lock, which is the edge the catalog clear belongs to.
  */
-export function setAppLocked(value: boolean): void {
-  locked = value;
+export function setAppLockStatus(next: AppLockStatus): boolean {
+  const enteredLock = next === 'locked' && status !== 'locked';
+  status = next;
+  return enteredLock;
 }

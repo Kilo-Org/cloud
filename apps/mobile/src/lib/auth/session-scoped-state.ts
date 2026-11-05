@@ -57,6 +57,13 @@ function clearSearchIndexBestEffort(): void {
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
+  // The intent catalog is the same titles in another place, and its clear has
+  // the same one-shot problem: the teardown fired it without awaiting, so a
+  // process killed before it landed would leave the previous account's sessions
+  // named by Siri for the whole signed-out window. The signed-out launch is that
+  // retry, and running it while signed out cannot re-publish anything because
+  // the sync is gated off.
+  clearSessionCatalogBestEffort();
 }
 
 /**

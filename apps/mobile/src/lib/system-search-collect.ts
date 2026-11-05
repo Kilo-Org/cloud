@@ -44,6 +44,7 @@ const storedSessionRowSchema = z.object({
   title: z.string().nullish(),
   organization_id: z.string().nullish(),
   git_branch: z.string().nullish(),
+  updated_at: z.string().nullish(),
 });
 
 const storedSessionsDataSchema = z.object({
@@ -55,6 +56,7 @@ const activeSessionRowSchema = z.object({
   title: z.string().nullish(),
   organizationId: z.string().nullish(),
   gitBranch: z.string().nullish(),
+  updatedAt: z.string().nullish(),
 });
 
 const activeSessionsDataSchema = z.object({ sessions: z.array(z.unknown()) });
@@ -133,14 +135,15 @@ export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
   observedSources: Set<string>;
   /**
-   * The named sessions this run could see, newest first, for the App Intents
-   * entity catalog.
+   * The named sessions this run could see, most recently updated first, for the
+   * App Intents entity catalog.
    *
    * The Siri and Shortcuts picker offers the same rows the index carries, but
    * keyed by session id instead of by the route the index opens, because an
    * intent names a session and the app's own pipeline builds the destination.
-   * The list is deduped and capped; `KiloSessionCatalogStore` applies the same
-   * bound on the device.
+   * The list is ordered by the row's own update time across every query, then
+   * deduped and capped; `KiloSessionCatalogStore` applies the same bound on the
+   * device.
    */
   sessions: SessionCatalogEntry[];
 };
@@ -149,9 +152,16 @@ export type SystemSearchCollection = {
 export type SessionCatalogEntry = { id: string; title: string };
 
 /**
- * How many sessions the catalog keeps. The collector is newest first, so the
- * cap drops the oldest titles — the ones least likely to be spoken. The native
- * store carries the same bound.
+ * A catalog entry with the row's own update time, so the merge across queries
+ * can order by recency instead of by the order the cache happened to insert
+ * the queries in. The time never leaves this module.
+ */
+type SessionCatalogCandidate = SessionCatalogEntry & { updatedAt: number | null };
+
+/**
+ * How many sessions the catalog keeps. The list is ordered by recency first, so
+ * the cap drops the oldest titles — the ones least likely to be spoken. The
+ * native store carries the same bound.
  */
 const SESSION_CATALOG_MAX_ENTRIES = 50;
 
@@ -166,7 +176,7 @@ type QueryCollectionMemo = {
   status: Query['state']['status'];
   maxPages: unknown;
   documents: SystemSearchDocument[];
-  sessions: SessionCatalogEntry[];
+  sessions: SessionCatalogCandidate[];
   observedSource: string | null;
 };
 
@@ -182,7 +192,7 @@ export async function collectSystemSearchDocuments(
   queryClient: QueryClient
 ): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
-  const sessions: SessionCatalogEntry[] = [];
+  const sessions: SessionCatalogCandidate[] = [];
   const observedSources = new Set<string>();
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
@@ -218,8 +228,24 @@ export async function collectSystemSearchDocuments(
   return {
     documents: dedupeBy(documents, document => document.id),
     observedSources,
-    sessions: dedupeBy(sessions, session => session.id).slice(0, SESSION_CATALOG_MAX_ENTRIES),
+    sessions: dedupeBy(sortedByRecency(sessions), session => session.id)
+      .slice(0, SESSION_CATALOG_MAX_ENTRIES)
+      .map(session => ({ id: session.id, title: session.title })),
   };
+}
+
+/**
+ * The candidates by their own update time, newest first, with a row that
+ * carries no time after the rows that do. The sort is stable, so two rows that
+ * share a time keep the order their query produced — the stored history before
+ * the live list — which is what makes the cap drop the oldest titles instead of
+ * whichever query the cache happened to insert last.
+ */
+function sortedByRecency(sessions: readonly SessionCatalogCandidate[]): SessionCatalogCandidate[] {
+  return [...sessions].sort(
+    (left, right) =>
+      (right.updatedAt ?? Number.NEGATIVE_INFINITY) - (left.updatedAt ?? Number.NEGATIVE_INFINITY)
+  );
 }
 
 /** The query memo belonging to one client, created on first use. */
@@ -278,7 +304,7 @@ function collectOrReuse(
 type QueryDocuments = {
   documents: SystemSearchDocument[];
   /** The named sessions this query enumerates, for the intent catalog. */
-  sessions: SessionCatalogEntry[];
+  sessions: SessionCatalogCandidate[];
   observedSource: string | null;
 };
 
@@ -335,7 +361,9 @@ function documentsFromQuery(query: Query): QueryDocuments {
     const rows = collectUnfilteredPages(pages);
     return {
       documents: rows.flatMap(row => presentOrEmpty(storedSessionSearchDocument(row))),
-      sessions: namedSessions(rows.map(row => ({ id: row.session_id, title: row.title }))),
+      sessions: namedSessions(
+        rows.map(row => ({ id: row.session_id, title: row.title, updatedAt: row.updated_at }))
+      ),
       observedSource: sessionObservedSource(query),
     };
   }
@@ -350,7 +378,9 @@ function documentsFromQuery(query: Query): QueryDocuments {
     const rows = decodedRows(parsed.data.sessions, activeSessionRowSchema);
     return {
       documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
-      sessions: namedSessions(rows.map(row => ({ id: row.id, title: row.title }))),
+      sessions: namedSessions(
+        rows.map(row => ({ id: row.id, title: row.title, updatedAt: row.updatedAt }))
+      ),
       observedSource: null,
     };
   }
@@ -618,11 +648,18 @@ async function recentPrDocuments(): Promise<{
  * search index offering the same names.
  */
 function namedSessions(
-  rows: readonly { id: string; title: string | null | undefined }[]
-): SessionCatalogEntry[] {
+  rows: readonly { id: string; title: string | null | undefined; updatedAt?: string | null }[]
+): SessionCatalogCandidate[] {
   return rows.flatMap(row => {
     const title = sessionDisplayTitle(row.title);
-    return title === undefined ? [] : [{ id: row.id, title }];
+    if (title === undefined) {
+      return [];
+    }
+    const updatedAt =
+      row.updatedAt === null || row.updatedAt === undefined
+        ? Number.NaN
+        : Date.parse(row.updatedAt);
+    return [{ id: row.id, title, updatedAt: Number.isNaN(updatedAt) ? null : updatedAt }];
   });
 }
 

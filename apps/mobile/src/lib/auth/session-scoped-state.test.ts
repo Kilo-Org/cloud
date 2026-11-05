@@ -307,6 +307,14 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
+  it('re-runs the App Intents catalog clear for the signed-out launch', () => {
+    // The teardown fired its clear without awaiting it; a process killed before
+    // it landed would otherwise leave the previous account's sessions named by
+    // Siri for the whole signed-out window.
+    clearSystemSearchIndexOnSignedOutLaunch();
+    expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a failed re-clear through telemetry and never throws', async () => {
     const failure = new Error('The system search index failed with code 2.');
     nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(failure);

@@ -16,6 +16,13 @@ vi.mock('expo-router', async () => {
   };
 });
 
+const unlock = vi.hoisted(() => ({
+  status: 'unlocked' as 'locked' | 'preference-loading' | 'unlocked',
+  useAppUnlock: () => ({ status: unlock.status }),
+}));
+
+vi.mock('@/lib/app-unlock-context', () => ({ useAppUnlock: unlock.useAppUnlock }));
+
 const nativeBridge = vi.hoisted(() => ({
   setNativeVisibleSession: vi.fn<(sessionId: string | null) => Promise<void>>(),
 }));
@@ -32,12 +39,21 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  unlock.status = 'unlocked';
   nativeBridge.setNativeVisibleSession.mockResolvedValue(undefined);
 });
 
 function renderSession(sessionId: KiloSessionId): void {
   act(() => {
     renderer = TestRenderer.create(createElement(VisibleSessionPublisher, { sessionId }));
+  });
+}
+
+/** Re-renders after the provider published `status`. */
+function setStatus(status: 'locked' | 'preference-loading' | 'unlocked'): void {
+  unlock.status = status;
+  act(() => {
+    renderer?.update(createElement(VisibleSessionPublisher, { sessionId: SESSION }));
   });
 }
 
@@ -67,6 +83,42 @@ describe('the visible session publisher', () => {
     // The old session is cleared before the new one is published, so the
     // on-screen entity never names a session the person already left.
     expect(calls).toEqual([SESSION, null, 'sess-2']);
+  });
+
+  it('clears the cue when the lock covers the screen, and publishes nothing while it does', () => {
+    renderSession(SESSION);
+
+    setStatus('locked');
+
+    const calls = nativeBridge.setNativeVisibleSession.mock.calls.map(([id]) => id);
+    // The lock surface keeps this tree mounted behind it, so the cue must be
+    // withdrawn rather than left naming a session the person cannot see.
+    expect(calls).toEqual([SESSION, null]);
+
+    setStatus('locked');
+    expect(nativeBridge.setNativeVisibleSession.mock.calls.map(([id]) => id)).toEqual([
+      SESSION,
+      null,
+    ]);
+  });
+
+  it('holds the cue back while the launch is still reading the lock preference', () => {
+    unlock.status = 'preference-loading';
+
+    renderSession(SESSION);
+
+    expect(nativeBridge.setNativeVisibleSession).not.toHaveBeenCalled();
+  });
+
+  it('publishes again once the lock opens', () => {
+    renderSession(SESSION);
+    setStatus('locked');
+    nativeBridge.setNativeVisibleSession.mockClear();
+
+    setStatus('unlocked');
+
+    // The locked effect's cleanup clears first, then the cue is published again.
+    expect(nativeBridge.setNativeVisibleSession).toHaveBeenLastCalledWith(SESSION);
   });
 
   it('reports a failed publish without breaking the screen', async () => {

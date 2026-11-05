@@ -21471,6 +21471,86 @@
     ],
     "searchBlob": "organizations.kiloPass.cancel Schedule cancellation of an organization's Kilo Pass subscription. Use to cancel Kilo Pass. organizations kilopass cancel organizationid organizationId"
   },
+  "organizations.kiloPass.cancelTierChange": {
+    "path": "organizations.kiloPass.cancelTierChange",
+    "kind": "mutation",
+    "summary": "Cancel a pending scheduled tier change for an organization's Kilo Pass subscription, keeping the current plan. Use to undo a previously scheduled Kilo Pass upgrade or downgrade.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "kilopass",
+      "canceltierchange",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.kiloPass.cancelTierChange Cancel a pending scheduled tier change for an organization's Kilo Pass subscription, keeping the current plan. Use to undo a previously scheduled Kilo Pass upgrade or downgrade. organizations kilopass canceltierchange organizationid organizationId"
+  },
+  "organizations.kiloPass.changeTier": {
+    "path": "organizations.kiloPass.changeTier",
+    "kind": "mutation",
+    "summary": "Schedule a change to an organization's Kilo Pass subscription tier, effective at the next billing cycle. Use to upgrade or downgrade an org's Kilo Pass plan.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "tier": {
+              "type": "string",
+              "enum": [
+                "tier_19",
+                "tier_49",
+                "tier_199"
+              ]
+            }
+          },
+          "required": [
+            "organizationId",
+            "tier"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "kilopass",
+      "changetier",
+      "organizationid",
+      "tier"
+    ],
+    "searchBlob": "organizations.kiloPass.changeTier Schedule a change to an organization's Kilo Pass subscription tier, effective at the next billing cycle. Use to upgrade or downgrade an org's Kilo Pass plan. organizations kilopass changetier organizationid tier organizationId tier"
+  },
   "organizations.kiloPass.createCheckout": {
     "path": "organizations.kiloPass.createCheckout",
     "kind": "mutation",

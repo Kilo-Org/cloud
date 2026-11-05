@@ -183,8 +183,13 @@ export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domai
 // from a web deployment older than that key, can go unnoticed.
 const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
 
+// Every process parses the stored list and builds a lookup index from it, and the admin
+// editor round-trips the whole list through one save. 100k entries covers multi-megabyte
+// imported lists while keeping the payload and the in-process index bounded.
+export const MAX_BLACKLIST_DOMAINS = 100_000;
+
 export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()),
+  domains: z.array(z.string()).max(MAX_BLACKLIST_DOMAINS),
   // TLDs whose new signups are refused. Optional because configs written
   // before this field existed must keep parsing; readers fall back to the
   // deployment default in that case. An empty array means "no TLD blocked".

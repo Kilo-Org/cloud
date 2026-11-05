@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import {
   blacklistedDomainsFromConfig,
   blockedSignupTldsFromConfig,
+  MAX_BLACKLIST_DOMAINS,
   refreshBlacklistDomainsConfig,
   type BlacklistDomainsConfig,
   type BlacklistDomainsConfigSnapshot,
@@ -32,7 +33,7 @@ export const DEFAULT_BLACKLIST_DOMAINS_CONFIG: BlacklistDomainsConfig = {
 };
 
 export const BlacklistDomainsInputSchema = z.object({
-  domains: z.array(z.string().min(1).trim()),
+  domains: z.array(z.string().min(1).trim()).max(MAX_BLACKLIST_DOMAINS),
   blocked_tlds: z.array(z.string().min(1).trim()).optional(),
 });
 

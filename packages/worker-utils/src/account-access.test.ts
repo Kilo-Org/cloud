@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BLACKLISTED_DOMAINS_REDIS_KEY,
   BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
+  BlacklistDomainsConfigSchema,
+  MAX_BLACKLIST_DOMAINS,
   blacklistedDomainsFromConfig,
   blockedSignupTldsFromConfig,
   canSpendPaidUsage,
@@ -229,5 +231,26 @@ describe('refreshBlacklistDomainsConfig', () => {
     expect(
       (await refreshBlacklistDomainsConfig(redis.get, first, FULL_READ_INTERVAL_MS)).config?.domains
     ).toEqual(['junk.org']);
+  });
+});
+
+describe('BlacklistDomainsConfigSchema domain bound', () => {
+  const domains = (count: number) =>
+    Array.from({ length: count }, (_, index) => `bulk-${index}.example`);
+
+  it('parses a stored list at the cap', () => {
+    const parsed = BlacklistDomainsConfigSchema.safeParse(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS) })
+    );
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects a stored list one entry over the cap', () => {
+    const parsed = BlacklistDomainsConfigSchema.safeParse(
+      blocklistConfig({ domains: domains(MAX_BLACKLIST_DOMAINS + 1) })
+    );
+
+    expect(parsed.success).toBe(false);
   });
 });

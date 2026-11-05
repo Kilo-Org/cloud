@@ -156,3 +156,31 @@ describe('getBlacklistedDomains', () => {
     expect(captureException.mock.calls[0]?.[0]).toBeInstanceOf(SyntaxError);
   });
 });
+
+describe('BlacklistDomainsInputSchema', () => {
+  async function loadInputSchema() {
+    jest.resetModules();
+    const [config, accountAccess] = await Promise.all([
+      import('@kilocode/web-shared/lib/blacklist-domains-config'),
+      import('@kilocode/worker-utils/account-access'),
+    ]);
+    return {
+      schema: config.BlacklistDomainsInputSchema,
+      max: accountAccess.MAX_BLACKLIST_DOMAINS,
+    };
+  }
+
+  test('accepts an admin save at the cap', async () => {
+    const { schema, max } = await loadInputSchema();
+    const domains = Array.from({ length: max }, (_, index) => `bulk-${index}.example`);
+
+    expect(schema.safeParse({ domains }).success).toBe(true);
+  });
+
+  test('rejects an admin save one entry over the cap', async () => {
+    const { schema, max } = await loadInputSchema();
+    const domains = Array.from({ length: max + 1 }, (_, index) => `bulk-${index}.example`);
+
+    expect(schema.safeParse({ domains }).success).toBe(false);
+  });
+});

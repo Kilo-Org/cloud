@@ -20,7 +20,8 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { eq, inArray } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
-import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
+import { computeBlacklistStats } from '@/lib/abuse/blacklist-domain-stats';
+import { isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
 import {

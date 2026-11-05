@@ -651,6 +651,34 @@ const workerEntries: PrivilegedInventoryEntry[] = [
     actionClass: 'worker_admin',
     target: 'service',
   },
+  {
+    id: 'worker.gastown.ownershipBypass',
+    surface: 'worker',
+    route: 'trpc:gastown.* ownership bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.gastown.townRestBypass',
+    surface: 'worker',
+    route: 'rest:/api/towns/:townId/* admin bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.gastown.userRestAdminRead',
+    surface: 'worker',
+    route: 'rest:GET /api/users/:userId/* admin read',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
+  {
+    id: 'worker.wasteland.ownershipBypass',
+    surface: 'worker',
+    route: 'trpc:wasteland.* ownership bypass',
+    actionClass: 'worker_admin',
+    target: 'service',
+  },
 ];
 
 export const privilegedInventory: readonly PrivilegedInventoryEntry[] = [
@@ -806,14 +834,14 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/app/api/gastown/token/route.ts',
     actionClass: 'worker_admin',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.app.wastelandToken',
     file: 'apps/web/src/app/api/wasteland/token/route.ts',
     actionClass: 'worker_admin',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.abuse.blockBlacklistedDomains',
@@ -849,13 +877,6 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'support_write',
     surface: 'trpc',
     occurrences: 1,
-  },
-  {
-    id: 'internal.auth.resourceDelegation',
-    file: 'apps/web/src/lib/auth/resource-delegation.ts',
-    actionClass: 'worker_admin',
-    surface: 'rest',
-    occurrences: 3,
   },
   {
     id: 'internal.codeIndexing.util',
@@ -898,6 +919,27 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     actionClass: 'sensitive_write',
     surface: 'rest',
     occurrences: 2,
+  },
+  {
+    id: 'internal.user.nextAuthOptions',
+    file: 'apps/web/src/lib/user/next-auth-options.ts',
+    actionClass: 'platform_read',
+    surface: 'server-component',
+    occurrences: 3,
+  },
+  {
+    id: 'internal.workerAdmin.actorGuard',
+    file: 'apps/web/src/lib/worker-admin/actor-guard.ts',
+    actionClass: 'worker_admin',
+    surface: 'rest',
+    occurrences: 1,
+  },
+  {
+    id: 'internal.workerAdmin.capabilityIntrospection',
+    file: 'apps/web/src/app/api/internal/worker-admin-capabilities/introspect/route.ts',
+    actionClass: 'worker_admin',
+    surface: 'rest',
+    occurrences: 1,
   },
   {
     id: 'internal.wasteland.serverResolve',

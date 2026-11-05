@@ -25,8 +25,9 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 /**
  * The four ranked state counts, in the order every glanceable surface draws
  * them: what the user must act on, then what is making progress, then what will
- * wake later, then what is only connected. Zero rows still draw, so every
- * state remains visible even when no session currently occupies it.
+ * wake later, then what is only connected. Every row draws while a session is
+ * live, so a state stays visible even when nothing occupies it; an entirely
+ * empty card draws the one line of its zero state instead.
  */
 const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
   { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
@@ -42,6 +43,13 @@ const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
+/**
+ * The zero state's one line, drawn in the frame the counts block, the divider
+ * and the newest block make together. The counts rows, their gaps and padding,
+ * the divider and the newest block measure 195 dp on the loaded card, so the
+ * card keeps one height from the skeleton through the first live session.
+ */
+const EMPTY_BLOCK_CLASS = 'min-h-[195px] items-center justify-center px-4 py-3';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
   return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
@@ -58,8 +66,9 @@ type GlanceableActiveCardProps = {
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index. With no sessions it is the zero state: every
- * count reads 0 and the newest block centers `Nothing running`.
+ * header opens the live index. With no sessions it is the zero state: the card
+ * keeps its frame and speaks once, centering `Nothing running` in the space the
+ * counts would repeat as four zeros.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -95,31 +104,37 @@ export function GlanceableActiveCard({
 
   return (
     <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
-      <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => {
-          const isPrimary = line.kind === primaryKind;
-          return (
-            <View key={line.kind} className={COUNT_ROW_CLASS}>
-              <SessionStatusIcon kind={line.kind} />
-              <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
-              <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
-                <Text
-                  className={cn(
-                    'shrink text-sm',
-                    isPrimary ? 'text-foreground' : 'text-muted-foreground'
-                  )}
-                >
-                  {t(line.labelKey)}
-                </Text>
-                {line.kind === 'scheduled' && scheduledWake !== null ? (
-                  <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
-                ) : null}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-      <View className={DIVIDER_CLASS} />
+      {newestSession === null ? null : (
+        <>
+          <View className={COUNTS_CLASS}>
+            {COUNT_LINES.map(line => {
+              const isPrimary = line.kind === primaryKind;
+              return (
+                <View key={line.kind} className={COUNT_ROW_CLASS}>
+                  <SessionStatusIcon kind={line.kind} />
+                  <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
+                  <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                    <Text
+                      className={cn(
+                        'shrink text-sm',
+                        isPrimary ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                    >
+                      {t(line.labelKey)}
+                    </Text>
+                    {line.kind === 'scheduled' && scheduledWake !== null ? (
+                      <Text className="max-w-full text-xs text-muted-foreground">
+                        {scheduledWake}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <View className={DIVIDER_CLASS} />
+        </>
+      )}
       {/* Keyed by the newest session: the zero state has to be its own host
           view. React Native copies the previous props and applies only the keys
           it receives, so a label this component stops passing keeps its old
@@ -137,7 +152,12 @@ export function GlanceableActiveCard({
         accessibilityRole={newestSession === null ? undefined : 'button'}
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
       >
-        <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
+        <View
+          className={cn(
+            newestSession === null ? EMPTY_BLOCK_CLASS : NEWEST_BLOCK_CLASS,
+            newestSession === null && 'items-center'
+          )}
+        >
           {newestTitle !== null && newestKind !== null ? (
             <>
               <Text className="text-sm text-foreground">{newestTitle}</Text>

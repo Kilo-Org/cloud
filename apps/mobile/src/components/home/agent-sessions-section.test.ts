@@ -298,10 +298,22 @@ describe('Home live section', () => {
 
   it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
     await render();
-    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
-      expect(text()).toContain(`0\n${label}`);
-    }
+    // The zero state speaks once: the line replaces the counts, so the four
+    // zero rows never repeat it.
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).not.toContain(label);
+    }
+    // The frame the counts and the newest block make stays reserved, so the
+    // card keeps one height from the skeleton through the first live session.
+    const zero = nodes('Pressable').find(
+      pressable =>
+        pressable.findAll(
+          child =>
+            Object.is(child.type, 'Text') && child.children.includes(i18n.t('home.noLiveSessions'))
+        ).length > 0
+    );
+    expect(zero).toBeDefined();
     // Nothing to open: the newest block is not a button.
     expect(
       nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')

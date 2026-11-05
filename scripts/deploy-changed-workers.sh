@@ -24,15 +24,20 @@ set -euo pipefail
 BASE_SHA="${BASE_SHA:?BASE_SHA is required}"
 TARGET_ENVIRONMENT="${TARGET_ENVIRONMENT:?TARGET_ENVIRONMENT is required}"
 
-# Built by the Docker image in deploy-kiloclaw.yml, not by the Wrangler upload.
+# Workers outside this workflow's automatic deployment.
 EXCLUDED=(
   services/kiloclaw   # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
   services/gastown    # Deployed separately
   services/wasteland  # Deployed separately
   services/user-data-export # Automatic deploy suspended
 )
-# Markdown these Workers ship to the running Worker.
-RUNTIME_MARKDOWN=('services/kiloclaw/container')
+# Deployable Worker directories that ship Markdown to the running Worker, as
+# whole directory paths. A Markdown edit under one of them deploys that Worker.
+# None qualifies today: `services/kiloclaw` stages `container/TOOLS.md`, but the
+# Docker image in deploy-kiloclaw.yml builds it, and kiloclaw is excluded here.
+# Add a Worker when it starts reading a committed Markdown file at runtime. A
+# generated Markdown file is not covered, because git diff never sees it.
+RUNTIME_MARKDOWN=()
 # Paths whose change redeploys every Worker through the broad rule.
 SHARED_PATHS=(packages pnpm-lock.yaml pnpm-workspace.yaml patches)
 
@@ -116,17 +121,30 @@ done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" -not
 # when its paths are Markdown and the directory is not one the Worker reads at
 # runtime. A deletion always deploys, because a runtime asset can leave the tree
 # that way, and so does a rename that involves any other path.
+#
+# The diff runs first, on its own, so its exit status is visible: a fatal
+# `git diff` deploys, exactly as `! git diff --quiet` did before. A failed
+# comparison must never be reported as "no change".
 dir_changed() {
   local dir="$1"
   local runtime=false
   local markdown
   for markdown in "${RUNTIME_MARKDOWN[@]}"; do
-    if [[ "$dir" == "$markdown" ]]; then runtime=true; break; fi
+    if [[ "$dir" == "$markdown" || "$dir" == "$markdown"/* ]]; then runtime=true; break; fi
   done
+  if [[ "$runtime" == true ]]; then return 0; fi
+
+  local changes
+  if ! changes=$(git diff -z --name-status "$BASE_SHA" HEAD -- "$dir/"); then
+    echo "Cannot diff $dir against $BASE_SHA; deploying it" >&2
+    return 0
+  fi
+  # Command substitution drops the trailing NUL, so an empty diff is no output.
+  if [[ -z "$changes" ]]; then return 1; fi
 
   local status path markdown_paths=0
   while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-    if [[ "$runtime" == true || "$status" == D* ]]; then return 0; fi
+    if [[ "$status" == D* ]]; then return 0; fi
     markdown_paths=0
     [[ "$path" == *.md ]] && markdown_paths=$((markdown_paths + 1))
     if [[ "$status" == R* || "$status" == C* ]]; then
@@ -140,8 +158,6 @@ dir_changed() {
     return 0
   done < <(git diff -z --name-status "$BASE_SHA" HEAD -- "$dir/")
 
-  # The base revision is not in this clone: keep the broad, always-deploy result.
-  if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then return 0; fi
   return 1
 }
 

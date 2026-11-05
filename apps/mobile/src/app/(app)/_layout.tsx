@@ -213,7 +213,12 @@ export default function AppLayout() {
               <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
               <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
               <Stack.Screen name="agent-chat/branch-picker" options={pickerSheetOptions} />
-              <Stack.Screen name="agent-chat/mode-picker" options={pickerSheetOptions} />
+              {/* The mode picker has always pinned its one detent on both
+                  platforms; only the other pickers move to it on Android. */}
+              <Stack.Screen
+                name="agent-chat/mode-picker"
+                options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
+              />
               <Stack.Screen name="agent-chat/instance-picker" options={pickerSheetOptions} />
               <Stack.Screen name="agent-chat/folder-picker" options={pickerSheetOptions} />
               <Stack.Screen name="agent-chat/profile-picker" options={pickerSheetOptions} />

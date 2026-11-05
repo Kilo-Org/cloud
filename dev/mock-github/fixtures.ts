@@ -108,6 +108,17 @@ const FILE_PATCH = [
   '+const after = 2;',
 ];
 
+/** A removed file has no added line, and an added file has no removed one. */
+function patchForStatus(status: string): string {
+  if (status === 'added') {
+    return ['@@ -0,0 +1 @@', '+const after = 2;'].join('\n');
+  }
+  if (status === 'removed') {
+    return ['@@ -1 +0,0 @@', '-const before = 2;'].join('\n');
+  }
+  return FILE_PATCH.join('\n');
+}
+
 export function pullRequestFilesFixture() {
   return Array.from({ length: PULL_REQUEST_FILE_COUNT }, (_unused, index) => {
     const labelled = LABELLED_FILES[index];
@@ -126,7 +137,7 @@ export function pullRequestFilesFixture() {
       additions,
       deletions,
       changes: additions + deletions,
-      patch: FILE_PATCH.join('\n'),
+      patch: patchForStatus(status),
     };
   });
 }

@@ -29,7 +29,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -479,12 +479,22 @@ export async function updateUserRoleInOrganization(
       return { success: false, updated: 'none' };
     }
 
-    await tx
+    const invitationUpdateResult = await tx
       .update(organization_invitations)
       .set({ role })
-      .where(inArray(organization_invitations.id, invitationIds));
+      .where(
+        and(
+          inArray(organization_invitations.id, invitationIds),
+          isNull(organization_invitations.accepted_at),
+          gt(organization_invitations.expires_at, sql`NOW()`)
+        )
+      );
 
-    return successResult({ updated: 'invitation' as const });
+    if (invitationUpdateResult.rowCount && invitationUpdateResult.rowCount > 0) {
+      return successResult({ updated: 'invitation' as const });
+    }
+
+    return { success: false, updated: 'none' };
   };
 
   return txn ? run(txn) : db.transaction(run);
@@ -523,15 +533,28 @@ function invitationAddressesAccount(
 }
 
 /**
- * The account row for `invitationAddressesAccount` above, as a query predicate.
- * A row without a stored normalized form falls back to a case-insensitive exact
- * match.
+ * The account-matching relation for member rows, applied when the rows are read.
+ * A row without a stored normalized form still matches through its address, so
+ * `invitationAddressesAccount` covers aliases for every row here.
  */
-function userMatchesEmailAddress(email: string) {
-  return or(
-    eq(kilocode_users.normalized_email, normalizeEmail(email)),
-    sql`lower(${kilocode_users.google_user_email}) = ${email.trim().toLowerCase()}`
-  );
+async function organizationMembersMatchingEmail(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  email: string
+) {
+  const candidates = await tx
+    .select({
+      membershipId: organization_memberships.id,
+      userId: kilocode_users.id,
+      isBot: kilocode_users.is_bot,
+      email: kilocode_users.google_user_email,
+      normalizedEmail: kilocode_users.normalized_email,
+    })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(eq(organization_memberships.organization_id, organizationId));
+
+  return candidates.filter(candidate => invitationAddressesAccount(email, candidate));
 }
 
 async function parentOrganizationMemberIdForEmail(
@@ -539,21 +562,18 @@ async function parentOrganizationMemberIdForEmail(
   parentOrganizationId: Organization['id'],
   email: string
 ): Promise<User['id'] | null> {
-  const [member] = await tx
-    .select({ userId: kilocode_users.id })
+  const members = await organizationMembersMatchingEmail(tx, parentOrganizationId, email);
+  const member = members.find(candidate => !candidate.isBot);
+  if (!member) return null;
+
+  // Keep the parent membership from disappearing before this transaction commits.
+  await tx
+    .select({ id: organization_memberships.id })
     .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, parentOrganizationId),
-        eq(kilocode_users.is_bot, false),
-        userMatchesEmailAddress(email)
-      )
-    )
-    .limit(1)
+    .where(eq(organization_memberships.id, member.membershipId))
     .for('share');
 
-  return member?.userId ?? null;
+  return member.userId;
 }
 
 export async function inviteUserToOrganization(
@@ -623,19 +643,9 @@ export async function inviteUserToOrganization(
       throw new Error('User already has a pending invitation');
     }
 
-    const existingMember = await tx
-      .select()
-      .from(organization_memberships)
-      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-      .where(
-        and(
-          eq(organization_memberships.organization_id, organizationId),
-          userMatchesEmailAddress(email)
-        )
-      )
-      .limit(1);
+    const existingMembers = await organizationMembersMatchingEmail(tx, organizationId, email);
 
-    if (existingMember.length > 0) {
+    if (existingMembers.length > 0) {
       throw new Error('User is already a member of this organization');
     }
 

@@ -1112,6 +1112,26 @@ describe('Organizations', () => {
       ).rejects.toThrow('User is already a member of this organization');
     });
 
+    test('should reject an alias of a member without a stored normalized email', async () => {
+      const owner = await insertTestUser();
+      const existingMember = await insertTestUser({
+        google_user_email: 'legacy-member@example.com',
+        normalized_email: null,
+      });
+      const organization = await createOrganization('Test Org', owner.id);
+
+      await addUserToOrganization(organization.id, existingMember.id, 'member');
+
+      await expect(
+        inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          'legacy-member+alias@example.com',
+          'member'
+        )
+      ).rejects.toThrow('User is already a member of this organization');
+    });
+
     test('should allow inviting same email after previous invitation expired', async () => {
       const owner = await insertTestUser();
       const organization = await createOrganization('Test Org', owner.id);

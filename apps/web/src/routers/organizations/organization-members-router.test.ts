@@ -230,10 +230,10 @@ describe('organizations members trpc router', () => {
         memberId: member.id,
         role: 'owner',
       });
-      const [localPart, domain] = kiloAdmin.google_user_email.split('@');
+      const [, domain] = kiloAdmin.google_user_email.split('@');
       await caller.organizations.members.invite({
         organizationId: organization.id,
-        email: `${localPart}+alias@${domain}`,
+        email: `new-owner-${crypto.randomUUID()}@${domain}`,
         role: 'owner',
       });
 
@@ -243,7 +243,7 @@ describe('organizations members trpc router', () => {
       ).toMatchObject({ role: 'owner', heldRoles: ['admin'] });
       expect(audits.find(a => a.action === 'organization.member.invite')?.metadata).toMatchObject({
         role: 'owner',
-        invitedSelf: true,
+        invitedSelf: false,
       });
     });
 

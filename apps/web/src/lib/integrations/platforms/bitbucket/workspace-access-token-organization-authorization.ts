@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
+
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { buildBitbucketOrganizationCredentialLockKey } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
@@ -64,7 +66,7 @@ export async function requireBitbucketWorkspaceAccessTokenOrganizationManager(
     throw new BitbucketWorkspaceAccessTokenOrganizationAuthorizationError('unauthorized');
   }
 
-  if (!actor.isAdmin) {
+  if (!actor.isAdmin || isSupportAccessEnabled()) {
     const [membership] = await tx
       .select({ id: organization_memberships.id })
       .from(organization_memberships)

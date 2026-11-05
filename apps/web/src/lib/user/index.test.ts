@@ -47,6 +47,8 @@ import {
   kiloclaw_image_catalog,
   security_findings,
   security_finding_notifications,
+  support_access_grants,
+  support_access_grant_events,
   security_remediation_attempts,
   security_remediations,
   security_analysis_queue,
@@ -351,6 +353,8 @@ describe('User', () => {
     await db.delete(github_app_installations);
     await db.delete(byoc_connections);
     await db.delete(enkrypt_usage);
+    await db.delete(support_access_grant_events);
+    await db.delete(support_access_grants);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -2510,6 +2514,48 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('revokes the actor open support access grants and records events', async () => {
+      const admin = await insertTestUser({
+        is_admin: true,
+      });
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createTestOrganization(
+        `soft-delete-support-${crypto.randomUUID()}`,
+        owner.id,
+        0
+      );
+      const now = new Date();
+      const [grant] = await db
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: admin.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          status: 'active',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          issued_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        })
+        .returning();
+
+      await softDeleteUser(admin.id);
+
+      const [revoked] = await db
+        .select()
+        .from(support_access_grants)
+        .where(eq(support_access_grants.id, grant.id));
+      expect(revoked).toMatchObject({
+        status: 'revoked',
+        revoke_reason: 'actor account soft-deleted',
+      });
+      const events = await db
+        .select()
+        .from(support_access_grant_events)
+        .where(eq(support_access_grant_events.grant_id, grant.id));
+      expect(events).toEqual([expect.objectContaining({ event_type: 'revoked' })]);
+    });
+
     it('removes session step-up rows', async () => {
       const user = await insertTestUser();
       const [credential] = await db

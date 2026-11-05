@@ -10,6 +10,7 @@ import {
   userCanViewSessions,
   userIsSuperadmin,
 } from '@/lib/admin/admin-permissions';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -86,6 +87,7 @@ import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
+import { adminSupportAccessRouter } from '@/routers/admin/admin-support-access-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
@@ -2023,6 +2025,13 @@ export const adminRouter = createTRPCRouter({
               });
             }
 
+            if (!input.isAdmin) {
+              await revokeOpenSupportGrants(tx, {
+                actorKiloUserId: target.id,
+                reason: 'platform admin access revoked',
+                performedByKiloUserId: actor.id,
+              });
+            }
             // The session pepper and API pepper rotated above, so every step-up
             // proof bound to the old credentials is no longer usable.
             await revokeStepUpProofs(target.id, 'role_change', tx);
@@ -2802,4 +2811,5 @@ export const adminRouter = createTRPCRouter({
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,
+  supportAccess: adminSupportAccessRouter,
 });

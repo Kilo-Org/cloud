@@ -59,12 +59,12 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
 
 /**
  * Holds the read-only footer's place while the session's transcript and
- * transport are still resolving. Until the transport answers, the screen cannot
- * know whether the bottom slot ends in the composer or in the read-only footer,
- * so the loading state reserves the footer's area — a line and a button bar in
- * the footer's own container — instead of offering a composer that a read-only
- * session will not have. The footer then lands on its own geometry and the
- * transcript never moves under it.
+ * transport are still resolving. Until the transport answers, neither the route
+ * nor the screen knows whether the bottom slot ends in the composer or in the
+ * read-only footer, so both loading states reserve the footer's area — a line
+ * and a button bar in the footer's own container — instead of offering a
+ * composer that a read-only session will not have. The footer then lands on its
+ * own geometry and the transcript never moves under it.
  *
  * The bars take `bg-muted-soft`: the footer paints its own `bg-secondary`, and
  * the placeholder fill matches that surface in the light palette, so
@@ -87,10 +87,12 @@ const COMPOSER_FIELD_PADDING = 24;
 const COMPOSER_FIELD_BORDER = 2;
 
 /**
- * Holds the composer's place while the session loads: the route paints it
- * before the session's metadata arrives, and the session screen paints it while
- * an open that will end in a composer still has nothing to show. Without it the
- * composer pops in on resolve and shoves the transcript up by its own height.
+ * Holds the composer's place while the session loads: the route paints it only
+ * once its metadata names a cloud-agent session, and the session screen paints
+ * it while an open resolved to a writable kind still has nothing to show. An
+ * unresolved open reserves the read-only footer instead, because the composer
+ * is the one shape that kind may never get. Without it the composer pops in on
+ * resolve and shoves the transcript up by its own height.
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
  * `p-2.5 px-3`, the field's own box at `rounded-[20px]` and the two trailing

@@ -1888,8 +1888,11 @@ export function SessionDetailContent({
   // holds: a stored session with no messages has nowhere to write either, so it
   // must not mount a composer under the read-only line. `activeSessionType` is
   // set only by a successful resolve, so a failed open (which may also read
-  // `isReadOnly`) keeps its composer beside the error's Retry.
+  // `isReadOnly`) keeps its composer beside the error's Retry. An unresolved
+  // open (`activeSessionType === null`) counts as not writable: the pending
+  // slot below then holds the read-only footer's shape until the kind lands.
   const isReadOnlySession = activeSessionType === 'read-only';
+  const isWritableResolved = activeSessionType !== null && activeSessionType !== 'read-only';
   const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
@@ -2029,9 +2032,14 @@ export function SessionDetailContent({
   const isComposerVisible = !hasBlockingInteraction && !isReadOnlySession && !isSessionStatePending;
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
+  // The pending slot holds the shape its session will end in. The kind is only
+  // known once the transport answers, so the unresolved open reserves the
+  // read-only footer — the bar and the continue control a stored session ends
+  // in — and never paints the interactive composer a session may not get.
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionStatePending && !hasBlockingInteraction && isReadOnly;
-  const isComposerSkeletonVisible = isSessionStatePending && !hasBlockingInteraction && !isReadOnly;
+    isSessionStatePending && !hasBlockingInteraction && !isWritableResolved;
+  const isComposerSkeletonVisible =
+    isSessionStatePending && !hasBlockingInteraction && isWritableResolved;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2680,13 +2688,23 @@ export function SessionDetailContent({
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
             </Text>
+            {/* The footer's one action, and the only control on this screen:
+                a filled primary. Light already fills it with the palette's
+                muted olive; dark's primary (#ffdd00) is the full brand accent
+                and glares as a full-width fill under the near-black page. Dark
+                takes `--selection` instead — the same olive hue lifted to stand
+                off the page — with its own label tone, so the control keeps the
+                light mode's weight in both schemes. */}
             <Button
               variant="default"
               size="action"
+              className="bg-primary dark:bg-selection"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('agentChat.session.continueInNewSession')}</Text>
+              <Text className="text-primary-foreground dark:text-selection-foreground">
+                {t('agentChat.session.continueInNewSession')}
+              </Text>
             </Button>
           </View>
         ) : null}

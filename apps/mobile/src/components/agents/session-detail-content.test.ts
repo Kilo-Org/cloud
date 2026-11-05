@@ -2135,6 +2135,36 @@ describe('session detail slow load', () => {
     );
   });
 
+  it('holds the read-only footer area while the open has not resolved the kind', async () => {
+    const view = await mountDetails(null);
+    // The transport has not answered, so no kind is known and the read-only
+    // fact is not set: the bottom slot must not offer a composer the session
+    // may never get.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The stored session resolves read-only, so the footer lands on the area
+    // the loading state held instead of replacing a composer.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'resolved read-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('resolved read-only row');
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+  });
+
   it('holds the composer area, not the read-only footer, while a writable open has nothing to show', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails(null);
@@ -4417,6 +4447,24 @@ describe('session detail read-only composer', () => {
     expect(renderedText(continueControl)).toContain(
       i18n.t('agentChat.session.continueInNewSession')
     );
+  });
+
+  it('fills the continue control with the muted tone in dark mode', async () => {
+    // The footer's action is the only control on the screen: light fills it
+    // with the palette's olive, and dark must not fill it with the full brand
+    // accent, which glares as a full-width bar under the near-black page. Dark
+    // takes the lifted olive and its own label tone.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(String(continueControl.props.className)).toContain('bg-primary');
+    expect(String(continueControl.props.className)).toContain('dark:bg-selection');
+    const label = continueControl.find(node => Object.is(node.type, 'Text'));
+    expect(String(label.props.className)).toContain('text-primary-foreground');
+    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
   });
 
   it('opens the new-session composer once on a repeated continue press', async () => {

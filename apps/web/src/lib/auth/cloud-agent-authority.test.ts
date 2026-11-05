@@ -272,8 +272,9 @@ describe('verified scoped web authentication', () => {
     headers.set('cookie', 'next-auth.session-token=fixture');
     headers.set('x-pathname', '/api/user');
     mockHeaders.mockResolvedValue(headers);
-    expect((await mintGastownToken()).status).toBe(401);
-    expect((await mintWastelandToken()).status).toBe(401);
+    const directMintRequest = new Request('https://kilo.ai/api/gastown/token', { method: 'POST' });
+    expect((await mintGastownToken(directMintRequest)).status).toBe(401);
+    expect((await mintWastelandToken(directMintRequest)).status).toBe(401);
     expect(mockOrgMemberships).not.toHaveBeenCalled();
     expect(mockGastownEnabled).not.toHaveBeenCalled();
     expect(mockGetServerSession).not.toHaveBeenCalled();
@@ -419,7 +420,6 @@ describe('scope-preserving control token exchange', () => {
     const result = await createControlTokenForRequest(user, 'cloud-agent-next', {
       headers: bearer(),
       expiresIn: 100_000,
-      extra: { isAdmin: true },
     });
     const claims = jwt.verify(result.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({

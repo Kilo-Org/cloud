@@ -72,7 +72,7 @@ export function pullRequestFixture(number: number) {
       repo: { id: 1001, full_name: `${FIXTURE_OWNER}/${FIXTURE_REPO}` },
     },
     commits: 3,
-    changed_files: 2,
+    changed_files: PULL_REQUEST_FILE_COUNT,
     additions: 12,
     deletions: 4,
     comments: 0,
@@ -83,6 +83,42 @@ export function pullRequestFixture(number: number) {
     merged_at: null,
     merged_by: null,
   };
+}
+
+/**
+ * The pull-request files: more than one REST page, and one row per status the
+ * Files tab labels, so the list, the status chips and the pagination row all
+ * have something to render. The first page carries every labelled status; the
+ * rest fill the second page so `nextCursor` is not null.
+ */
+export const PULL_REQUEST_FILE_COUNT = 60;
+
+const LABELLED_FILES = [
+  { filename: 'src/feature/alpha.ts', status: 'modified' },
+  { filename: 'src/feature/beta.ts', status: 'changed' },
+  { filename: 'src/feature/gamma.ts', status: 'renamed', previous: 'src/feature/gamma-old.ts' },
+  { filename: 'src/feature/delta.ts', status: 'copied' },
+  { filename: 'src/feature/epsilon.ts', status: 'added' },
+  { filename: 'src/feature/zeta.ts', status: 'removed' },
+] as const;
+
+const FILE_PATCH = ['@@ -1,2 +1,2 @@', ' const context = 1;', '-const before = 2;', '+const after = 2;'];
+
+export function pullRequestFilesFixture() {
+  return Array.from({ length: PULL_REQUEST_FILE_COUNT }, (_unused, index) => {
+    const labelled = LABELLED_FILES[index];
+    const filename = labelled?.filename ?? `src/generated/file-${index}.ts`;
+    return {
+      sha: `${index}`.padStart(40, 'd'),
+      filename,
+      previous_filename: labelled !== undefined && 'previous' in labelled ? labelled.previous : null,
+      status: labelled?.status ?? 'modified',
+      additions: 1,
+      deletions: 1,
+      changes: 2,
+      patch: FILE_PATCH.join('\n'),
+    };
+  });
 }
 
 /** The overview enrichment query: review decision, reviewers, viewer. */

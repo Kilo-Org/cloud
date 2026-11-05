@@ -45,7 +45,7 @@ export function InviteSignOutButton({ callbackPath, requireSso }: InviteSignOutB
             : 'Sign in with another account'}
       </Button>
       {signOutFailed && (
-        <p role="alert" className="mt-3 text-sm">
+        <p role="alert" className="mt-3 text-sm text-red-700">
           We couldn&apos;t sign you out. Check your connection and try again.
         </p>
       )}

@@ -3,9 +3,14 @@
 Polls the [WorkOS Events API](https://workos.com/docs/events/data-syncing/events-api)
 for Directory Sync (SCIM) events and logs each one.
 
-**Observe-only, for now.** This Worker still only logs: nothing here writes to
-Postgres, and no users, organizations, or memberships are mutated. The cursor is
-configuration, not state — see "Cursor" below.
+**Observe-only, for now.** This Worker still only logs: no directory state is
+applied yet, and no users, organizations, or memberships are mutated. The cursor
+is configuration, not state — see "Cursor" below.
+
+It holds **no database binding**. Directory state is applied by calling the Kilo
+app's internal REST endpoints, so the app keeps the advisory locks, the depth
+check, the soft-delete side effects and the removal tombstone in one place
+rather than growing a second, divergent copy here.
 
 The write path it will call already exists, in the Kilo app rather than here:
 see "Mutation endpoints".
@@ -53,7 +58,7 @@ case.
 | Route | Purpose |
 |---|---|
 | `GET /health` | Worker liveness. Does not touch the Durable Object. |
-| `GET /status` | Interval, cursor, next alarm time, the last poll result, and PostgreSQL reachability. |
+| `GET /status` | Environment, interval, cursor, next alarm time, and the last poll result. |
 
 Both routes are unauthenticated, so the Worker has no *HTTP* ingress: no
 `workers_dev` hostname, no `routes`, and no service binding. Neither route is
@@ -242,37 +247,57 @@ across several attempts and hide the failure — the alarm interval is the retry
 
 The SDK costs about 500 KiB of bundle (93 KiB gzipped) against a 3 MiB limit.
 
+## Environments
+
+| | Production | Staging |
+|---|---|---|
+| Worker | `cloudflare-scim-sync` | `cloudflare-scim-sync-staging` |
+| `wrangler` env | base config | `--env staging` |
+| WorkOS stream | `WORKOS_API_KEY` / `WORKOS_CLIENT_ID` | `WORKOS_API_KEY_STAGING` / `WORKOS_CLIENT_ID_STAGING` |
+| `BACKEND_API_URL` | `https://app.kilo.ai` | `https://staging-app.kilo.ai` |
+
+The environment is named `staging` because that is the only non-production
+`target_environment` `deploy-workers.yml` passes, and it skips any Worker whose
+config lacks an `env` of exactly that name. Any other name is a hand-deploy
+only.
+
+`vars`, `secrets_store_secrets` and `durable_objects` are not inherited by a
+named environment, so `env.staging` restates each one in full;
+`compatibility_date`, `triggers`, `migrations`, `observability`, `logpush` and
+`workers_dev` are inherited and must stay environment-neutral.
+
+Each environment is a separate Worker script, so each gets its own Durable
+Object namespace and its own `v1` SQLite class — there is no shared instance and
+no migration-tag conflict between them.
+
+**The WorkOS keys are what separate the environments, not `ENVIRONMENT`.** The
+Events API is scoped to whichever WorkOS environment issued the key. Two
+deployments holding the same key both consume one stream, and once the write
+path lands they would both apply the same events: the cursor is configuration,
+not a lease. `ENVIRONMENT` is reported by `/status` and otherwise decides
+nothing.
+
 ## Secrets
 
 `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` come from the shared Cloudflare Secrets
-Store. A single key per name, not per environment: the Events API is scoped to
-whichever WorkOS environment issued the key, so that environment's stream is the
-only one any deployment reads.
+Store (`342a86d9e3a94da698e82d0c6e2a36f0`, the account's only store), one pair
+per WorkOS environment under the names in the table above.
 
-For local work, create the same two names in the local store — omit `--remote`
-and wrangler writes to `.wrangler/`:
+For local work, create the names the target environment binds — omit `--remote`
+and wrangler writes to `.wrangler/` instead of the account:
 
 ```sh
 npx wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 \
-  --name WORKOS_API_KEY --scopes workers
+  --name WORKOS_API_KEY_STAGING --scopes workers
 ```
 
-## Database
+A binding for a secret that does not exist fails the deploy, so create both
+staging names before the first `--env staging` deploy.
 
-Reads the shared PostgreSQL through the `HYPERDRIVE` binding — the same
-instance and Hyperdrive config as every other service in this repo. Workers
-cannot hold long-lived connections, so Hyperdrive owns the regional pool and
-`getPgDb` opens a `max: 1` pool per call against the string it hands out.
+## Data model
 
-**Read-only, and meant to stay that way.** The query modules under `src/db/`
-only select; nothing here writes. The poll loop does not use them yet, so
-`/status` is their only caller. Mutations go through the app's endpoints, which
-own the advisory locks, the depth check, the soft-delete side effects, Stripe
-customer creation, and the removal tombstone — reimplementing any of that
-against raw tables from a Worker would be a second, divergent copy of the
-rules.
-
-The WorkOS directory hierarchy maps onto the organization hierarchy:
+The WorkOS directory hierarchy maps onto the organization hierarchy, and the
+app's endpoints are what resolve each identifier:
 
 | WorkOS | Kilo | Binding |
 |---|---|---|
@@ -282,49 +307,18 @@ The WorkOS directory hierarchy maps onto the organization hierarchy:
 | group membership | membership on that sub-organization | — |
 
 The binding columns live on every `organizations` row, parent or child, which is
-what makes a sub-organization the thing a directory group resolves to. So
-`findOrganizationByDirectoryGroupId` is the group-resolution query and
-`findDirectoryBoundChildOrganizations` lists a directory's groups.
+what makes a sub-organization the thing a directory group resolves to. Note that
+`directory_id` alone does not identify the organization: a sub-organization
+inherits its parent's, so once one group exists a directory matches several live
+rows, and the organization is the one with `parent_organization_id IS NULL`.
 
-Not every sub-organization is a directory group: `createChildOrganization`
-makes children with no directory binding, so a parent can hold a mix.
-`findChildOrganizations` returns all of them and
-`findDirectoryBoundChildOrganizations` only the bound ones — enumerating groups
-with the former would treat a hand-made sub-organization as a directory group.
-
-`getPgDb` must be called per operation and never cached in module scope. A
-cached client outlives the request or Durable Object context that created it,
-and its I/O then fails in whatever context picks it up next. Calling per use is
-also why the probe recovers on its own after a database restart.
-
-Five schema facts the query modules encode, each easy to get wrong:
-
-- **`organizations.deleted_at IS NULL` on every org query.** The unique indexes
-  on `directory_group_id` and `external_org_id` are *partial*, scoped to live
-  rows, so a soft-deleted organization can hold the same binding as a live one.
-  Omit the filter and those lookups stop being deterministic.
-- **`directory_id` alone does not identify the organization.** A
-  sub-organization inherits its parent's `directory_id`, so once one group
-  exists a directory matches several live rows. The organization is the row with
-  `parent_organization_id IS NULL`; a `LIMIT 1` without that filter resolves to
-  whichever row the planner returns, and an update that rewrites the parent's
-  tuple is enough to move a group ahead of it.
-- **`organization_memberships` has no foreign keys** on either column, so a row
-  does not prove the organization or user exists, and neither side is cleaned
-  up when the other goes away.
-- **`kilocode_users.external_id` is not unique**, so `findUsersByExternalId`
-  returns an array. A caller needing exactly one must decide what a duplicate
-  means rather than taking the first row.
-- **User IDs are `text`, not `uuid`** — OAuth IDs look like `oauth/…`. Never
-  validate, parse, or cast one as a UUID.
-
-Kilo's `organization_groups` table is unrelated to WorkOS directory groups and
-is not read here. A group is a named bundle of policies scoped to one
-organization, and the only policy type is `model_access` — modes `all`, `none`,
-or `selected` with model and provider allow-lists
-(`packages/db/src/schema-types.ts:1457-1466`). It decides which models a member
-may call: the policies a member's groups carry are unioned over the org-wide
-default and enforced in the AI gateway, which denies the request
+Kilo's `organization_groups` table is unrelated to WorkOS directory groups. A
+group there is a named bundle of policies scoped to one organization, and the
+only policy type is `model_access` — modes `all`, `none`, or `selected` with
+model and provider allow-lists (`packages/db/src/schema-types.ts:1457-1466`). It
+decides which models a member may call: the policies a member's groups carry are
+unioned over the org-wide default and enforced in the AI gateway, which denies
+the request
 (`packages/web-shared/src/lib/ai-gateway/handlers/llm-proxy.ts:1065-1070`).
 Groups are enterprise-only, administered by an owner or admin, and nothing
 populates them from directory sync.
@@ -334,7 +328,7 @@ sub-organization is a tenant boundary with its own members, credits, and seats,
 while a group is a model allow-list inside one organization. A directory group
 maps to a sub-organization, not to a row in `organization_groups`.
 
-**A write path has to account for one cascade.**
+**One cascade the write path has to account for.**
 `organization_group_memberships` holds a composite foreign key into
 `organization_memberships` with `ON DELETE CASCADE`, so deleting a membership
 also destroys that user's group assignments in that organization — their
@@ -342,44 +336,37 @@ model-access grants. Re-adding the membership later does not restore them. A
 `dsync.group.user_removed` followed by a re-add therefore loses configuration
 that no directory event describes and that WorkOS cannot replay.
 
-Timestamps come back as strings shaped `2026-04-29 01:16:12.945+00`, which
-strict ISO validators such as `z.string().datetime()` reject. Normalize before
-sending them across a strict boundary.
-
 ## Commands
 
 ```sh
-pnpm dev         # wrangler dev --env dev, port 8819
+pnpm dev              # wrangler dev --env staging, port 8819
+pnpm deploy:staging   # wrangler deploy --env staging
+pnpm deploy:prod      # wrangler deploy --env=""
 pnpm typecheck
-pnpm types       # regenerate worker-configuration.d.ts after config changes
+pnpm types            # regenerate worker-configuration.d.ts after config changes
 ```
 
-`wrangler dev` does not fire cron triggers, so arm the loop by hand:
+`wrangler dev` does not fire cron triggers, so arm the loop by hand. The handler
+runs `ensureScheduled`, and the alarm then polls within the second:
 
 ```sh
-curl http://127.0.0.1:8819/cdn-cgi/local/scheduled
+curl http://127.0.0.1:8819/cdn-cgi/handler/scheduled
+curl http://127.0.0.1:8819/status
 ```
 
-```sh
-pnpm test:postgres   # query modules against a real database
-```
-
-Needs a running local PostgreSQL (`dev/docker-compose.yml`) with migrations
-applied. If a query fails on a missing column, the local database is behind the
-schema:
-
-```sh
-POSTGRES_URL='postgres://postgres:postgres@localhost:5432/postgres' \
-  NODE_ENV=development pnpm drizzle migrate
-```
-
-The poll loop itself has no tests: its one branch worth asserting is the
-interval clamp, and everything else is the SDK's behavior or WorkOS's.
+There are no tests. The poll loop's one branch worth asserting is the interval
+clamp; everything else is the SDK's behavior or WorkOS's, and the directory
+rules are covered where they are implemented, in `apps/web`
+(`src/app/api/internal/scim/scim-routes.test.ts`,
+`src/lib/scim/directory-sync.integration.test.ts`).
 
 ## Deployment
 
 Deployed by `deploy-workers.yml`, which auto-discovers any `services/*` folder
 containing a `wrangler.jsonc`. The scheduled `deploy-production.yml` run
-(`7,27,47 * * * *`) picks up changes once the merge commit is green in CI. No
-`env.staging` block, so `deploy-staging.yml` skips this Worker, matching every
-other Worker except `usage-ingest`.
+(`7,27,47 * * * *`) deploys the base config, and `deploy-staging.yml` deploys
+`--env staging` on the same cadence ahead of it. Both pick up changes once the
+merge commit is green in CI.
+
+A merge therefore starts the 5-minute cron and the self-rescheduling alarm in
+both environments; there is no separate enablement switch.

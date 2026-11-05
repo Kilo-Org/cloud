@@ -121,7 +121,8 @@ export const unstable_settings = {
   // screen's own retryable state instead of replacing the app: expo-router
   // wraps each screen in this boundary inside its navigator, so the header, the
   // back stack and every other screen survive. Nested layouts inherit it; the
-  // tab stacks opt out (`(tabs)/_layout.tsx`) and keep their own boundary.
+  // tab stacks that own `TabStackErrorBoundary` opt out in their own layouts
+  // and keep that recovery.
   screenErrorBoundary: ScreenErrorBoundary,
 };
 

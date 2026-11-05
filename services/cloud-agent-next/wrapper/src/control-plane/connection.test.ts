@@ -25,7 +25,7 @@ import {
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
 
-// The hello accepted by the Worker before sessionSnapshots was added. Its schema is strict,
+// The hello accepted by the Worker before workspaceSnapshots was added. Its schema is strict,
 // so the extra field is rejected and the wrapper must retry without it.
 const previousWorkerHelloSchema = z
   .object({
@@ -160,6 +160,7 @@ async function withTestSocket(
     }),
     random: () => 0,
     onDisconnected: reason => disconnected.push(reason),
+    getHeartbeat: () => ({ active: false, degraded: false, workspaceBusy: true }),
   });
   try {
     connection.start();
@@ -187,7 +188,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
-      sessionSnapshots: true,
+      workspaceSnapshots: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
     });
@@ -266,7 +267,25 @@ describe('acknowledged heartbeat', () => {
     });
   });
 
-  it('keeps prior capabilities when the peer only predates sessionSnapshots', async () => {
+  it.each([false, true])(
+    'sends snapshot-only busy state only after capability confirmation: %s',
+    async supported => {
+      await withTestSocket(async (_connection, socket) => {
+        socket.receive({
+          type: 'welcome',
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          ...(supported ? { workspaceSnapshots: true } : {}),
+        });
+        await waitFor(() => socket.frames.some(frame => frame.type === 'heartbeat'));
+        const heartbeat = socket.frames.find(frame => frame.type === 'heartbeat');
+        expect(heartbeat?.active).toBe(false);
+        if (supported) expect(heartbeat?.workspaceBusy).toBe(true);
+        else expect(heartbeat).not.toHaveProperty('workspaceBusy');
+      });
+    }
+  );
+
+  it('keeps prior capabilities when the peer only predates workspaceSnapshots', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
       await waitFor(() => socket.frames.length === 2);
       expect(previousWorkerHelloSchema.safeParse(socket.frames[1]).success).toBe(true);
@@ -275,7 +294,7 @@ describe('acknowledged heartbeat', () => {
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });
-      expect(socket.frames[1]).not.toHaveProperty('sessionSnapshots');
+      expect(socket.frames[1]).not.toHaveProperty('workspaceSnapshots');
       socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(connection.snapshot().phase).toBe('connected');
@@ -934,7 +953,7 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
-        sessionSnapshots: true,
+        workspaceSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });

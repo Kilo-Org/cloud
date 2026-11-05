@@ -866,7 +866,8 @@ describe('production SFO queued accounting', () => {
       await new Promise(resolve => setImmediate(resolve));
       expect(drained).toBe(false);
       config.USAGE_QUEUE_SFO_CONFIG = { enabled: false };
-      expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+      // The lifetime keeps running through the longer first confirmation, still off the response path.
+      expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
       accepted.resolve(new Response(null, { status }));
       await drain;
       expect(result).toEqual(status === 202 ? expect.objectContaining({ status: 'queued' }) : null);

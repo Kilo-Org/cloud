@@ -180,6 +180,7 @@ export function createControlPlaneSessionHost(options: {
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
+  isWorkspaceBusy?(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
@@ -198,6 +199,7 @@ export function createControlPlaneSessionHost(options: {
     turns: manager,
     getHeartbeat: () => ({
       active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      workspaceBusy: options.isWorkspaceBusy?.() ?? false,
       degraded: runtimes.suspected(),
     }),
   };
@@ -239,7 +241,6 @@ export function createControlPlaneFrameDispatcher(
         return;
       }
       case 'session.prepare':
-        deps.turns.current?.registerRoute(frame.spec);
         void deps.preparation.current
           ?.prepare(frame.spec, frame.credentials)
           .then(() => {
@@ -401,6 +402,7 @@ export async function runControlPlaneWrapper(
       onNativeDiagnostic: projector,
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
+    isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -435,6 +437,7 @@ export async function runControlPlaneWrapper(
     timers,
     onNativeDiagnostic: projector,
     allocationId,
+    onPreparedRoute: spec => turnsRef.current?.registerRoute(spec),
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv, cloudAgentMcp) => {

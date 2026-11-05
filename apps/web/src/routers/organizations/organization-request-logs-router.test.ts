@@ -9,6 +9,7 @@ import {
   type User,
   ai_gateway_config,
   api_kind,
+  auto_model,
   enkrypt_usage,
   enkrypt_usage_decision,
   enkrypt_usage_guardrail,
@@ -20,13 +21,18 @@ import {
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { REQUEST_LOGS_LIMIT } from './organization-request-logs-router';
+import { REQUEST_LOGS_LIMIT } from '@/lib/request-logs/filters';
 
 type UsageInsert = typeof microdollar_usage.$inferInsert;
 type MetadataInsert = typeof microdollar_usage_metadata.$inferInsert;
 type EnkryptUsageInsert = typeof enkrypt_usage.$inferInsert;
 type ApiKind = (typeof api_kind.$inferInsert)['api_kind'];
 type EnkryptDecision = (typeof enkrypt_usage_decision.$inferInsert)['decision'];
+type ListFilters = { startTime?: string; userId?: string; modelPrefix?: string };
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 let owner: User;
 let admin: User;
@@ -67,6 +73,18 @@ async function finishReasonId(name: string): Promise<number> {
   return row.id;
 }
 
+async function autoModelId(name: string): Promise<number> {
+  await db
+    .insert(auto_model)
+    .values({ auto_model: name })
+    .onConflictDoNothing({ target: auto_model.auto_model });
+  const [row] = await db
+    .select({ id: auto_model.auto_model_id })
+    .from(auto_model)
+    .where(eq(auto_model.auto_model, name));
+  return row.id;
+}
+
 async function apiKindId(name: ApiKind): Promise<number> {
   await db
     .insert(api_kind)
@@ -80,10 +98,24 @@ async function apiKindId(name: ApiKind): Promise<number> {
 }
 
 function hoursAgo(hours: number): string {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  return new Date(Date.now() - hours * HOUR_MS).toISOString();
 }
 
-function usageRow(overrides: Partial<UsageInsert> & { organization_id: string }): UsageInsert {
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * MINUTE_MS).toISOString();
+}
+
+function isoAt(ms: number): string {
+  return new Date(ms).toISOString();
+}
+
+function isoWithPlusTwoOffset(ms: number): string {
+  return `${new Date(ms + 2 * HOUR_MS).toISOString().slice(0, -1)}+02:00`;
+}
+
+function usageRow(
+  overrides: Partial<UsageInsert> & { organization_id: string }
+): UsageInsert & { id: string; created_at: string } {
   return {
     id: randomUUID(),
     kilo_user_id: owner.id,
@@ -92,7 +124,7 @@ function usageRow(overrides: Partial<UsageInsert> & { organization_id: string })
     output_tokens: 50,
     cache_write_tokens: 0,
     cache_hit_tokens: 0,
-    created_at: hoursAgo(1),
+    created_at: minutesAgo(5),
     provider: 'openrouter',
     model: 'anthropic/claude-sonnet-4.6',
     requested_model: 'anthropic/claude-sonnet-4.6',
@@ -103,6 +135,15 @@ function usageRow(overrides: Partial<UsageInsert> & { organization_id: string })
 
 function metadataRow(id: string, overrides: Partial<MetadataInsert> = {}): MetadataInsert {
   return { id, message_id: `msg-${id}`, ...overrides };
+}
+
+async function listIds(filters: ListFilters = {}): Promise<string[]> {
+  const caller = await createCallerForUser(owner.id);
+  const rows = await caller.organizations.requestLogs.list({
+    organizationId: organization.id,
+    ...filters,
+  });
+  return rows.map(row => row.id);
 }
 
 async function enkryptDecisionId(decision: EnkryptDecision): Promise<number> {
@@ -235,9 +276,17 @@ describe('organizations.requestLogs trpc router', () => {
         caller.organizations.requestLogs.list({ organizationId: organization.id })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       await expect(
+        caller.organizations.requestLogs.list({
+          organizationId: organization.id,
+          startTime: minutesAgo(10),
+          userId: owner.id,
+          modelPrefix: 'anthropic/',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
         caller.organizations.requestLogs.getDetails({
           organizationId: organization.id,
-          usageId: usage.id ?? '',
+          usageId: usage.id,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
@@ -287,6 +336,12 @@ describe('organizations.requestLogs trpc router', () => {
         message: 'You do not have the required organizational role to access this feature',
       });
       await expect(
+        caller.organizations.requestLogs.list({
+          organizationId: organization.id,
+          userId: member.id,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
         caller.organizations.requestLogs.isAvailable({ organizationId: organization.id })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
@@ -313,18 +368,24 @@ describe('organizations.requestLogs trpc router', () => {
 
       const rows = await caller.organizations.requestLogs.list({ organizationId: organization.id });
       expect(rows).toHaveLength(1);
+      const filtered = await caller.organizations.requestLogs.list({
+        organizationId: organization.id,
+        userId: owner.id,
+        modelPrefix: 'anthropic/',
+      });
+      expect(filtered).toHaveLength(1);
     });
   });
 
   describe('list', () => {
-    it("returns the organization's requests from the last 24 hours, newest first", async () => {
+    it("returns the organization's requests from the last hour, newest first", async () => {
       await enableRequestLogs([organization.id, otherOrganization.id]);
       const vscodeFeatureId = await featureId('vscode-extension');
 
       const openRouter = usageRow({
         organization_id: organization.id,
         kilo_user_id: member.id,
-        created_at: hoursAgo(1),
+        created_at: minutesAgo(10),
         provider: 'openrouter',
         inference_provider: 'deepinfra',
         model: 'moonshotai/kimi-k2',
@@ -338,41 +399,41 @@ describe('organizations.requestLogs trpc router', () => {
       });
       const vercel = usageRow({
         organization_id: organization.id,
-        created_at: hoursAgo(2),
+        created_at: minutesAgo(30),
         provider: 'vercel',
         inference_provider: 'amazon-bedrock',
         model: 'anthropic/claude-sonnet-4.6',
         requested_model: null,
         has_error: true,
       });
+      const withoutMetadata = usageRow({
+        organization_id: organization.id,
+        created_at: minutesAgo(45),
+        inference_provider: null,
+      });
       const custom = usageRow({
         organization_id: organization.id,
-        created_at: hoursAgo(3),
+        created_at: minutesAgo(59),
         provider: 'custom',
         inference_provider: 'novita',
       });
-      const withoutMetadata = usageRow({
-        organization_id: organization.id,
-        created_at: hoursAgo(23),
-        inference_provider: null,
-      });
-      const tooOld = usageRow({ organization_id: organization.id, created_at: hoursAgo(25) });
+      const tooOld = usageRow({ organization_id: organization.id, created_at: minutesAgo(61) });
       const otherOrgRow = usageRow({
         organization_id: otherOrganization.id,
-        created_at: hoursAgo(1),
+        created_at: minutesAgo(10),
       });
       await db
         .insert(microdollar_usage)
         .values([custom, tooOld, openRouter, otherOrgRow, withoutMetadata, vercel]);
       await db.insert(microdollar_usage_metadata).values([
-        metadataRow(openRouter.id ?? '', {
+        metadataRow(openRouter.id, {
           is_user_byok: true,
           feature_id: vscodeFeatureId,
           latency: 123.5,
           generation_time: 4567,
         }),
-        metadataRow(vercel.id ?? '', { is_user_byok: false, latency: 50, generation_time: 900 }),
-        metadataRow(custom.id ?? '', { is_user_byok: false }),
+        metadataRow(vercel.id, { is_user_byok: false, latency: 50, generation_time: 900 }),
+        metadataRow(custom.id, { is_user_byok: false }),
       ]);
 
       const caller = await createCallerForUser(owner.id);
@@ -381,15 +442,15 @@ describe('organizations.requestLogs trpc router', () => {
       expect(rows.map(row => row.id)).toEqual([
         openRouter.id,
         vercel.id,
-        custom.id,
         withoutMetadata.id,
+        custom.id,
       ]);
       expect(rows[0]).toEqual({
         id: openRouter.id,
-        created_at: new Date(openRouter.created_at ?? '').toISOString(),
+        created_at: new Date(openRouter.created_at).toISOString(),
         user: { id: member.id, name: member.google_user_name, email: member.google_user_email },
         model: 'kilo-auto/balanced',
-        provider: 'OpenRouter -> DeepInfra',
+        provider: 'DeepInfra',
         cost_microdollars: 1234,
         input_tokens: 1000,
         output_tokens: 200,
@@ -403,7 +464,7 @@ describe('organizations.requestLogs trpc router', () => {
       });
       expect(rows[1]).toMatchObject({
         model: 'anthropic/claude-sonnet-4.6',
-        provider: 'Vercel AI Gateway -> Amazon Bedrock',
+        provider: 'Amazon Bedrock',
         user: { id: owner.id, name: owner.google_user_name, email: owner.google_user_email },
         is_user_byok: false,
         has_error: true,
@@ -411,14 +472,14 @@ describe('organizations.requestLogs trpc router', () => {
         latency_ms: 50,
         generation_time_ms: 900,
       });
-      expect(rows[2]).toMatchObject({ provider: 'Novita AI' });
-      expect(rows[3]).toMatchObject({
+      expect(rows[2]).toMatchObject({
         provider: null,
         is_user_byok: null,
         feature: null,
         latency_ms: null,
         generation_time_ms: null,
       });
+      expect(rows[3]).toMatchObject({ provider: 'Novita AI' });
       for (const row of rows) {
         expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       }
@@ -444,7 +505,7 @@ describe('organizations.requestLogs trpc router', () => {
       const rows = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
         usageRow({
           organization_id: organization.id,
-          created_at: new Date(Date.now() - (index + 1) * 60_000).toISOString(),
+          created_at: isoAt(Date.now() - (index + 1) * 10_000),
         })
       );
       await db.insert(microdollar_usage).values(rows);
@@ -457,6 +518,330 @@ describe('organizations.requestLogs trpc router', () => {
       expect(result).toHaveLength(REQUEST_LOGS_LIMIT);
       expect(result.map(row => row.id)).toEqual(
         rows.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
+      );
+    });
+
+    describe('startTime', () => {
+      it('returns the hour leading up to the start time, including the start and excluding the hour boundary', async () => {
+        await enableRequestLogs([organization.id]);
+        const start = Date.now() - 3 * HOUR_MS - 123;
+        const atStart = usageRow({ organization_id: organization.id, created_at: isoAt(start) });
+        const justAfterStart = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start + 1),
+        });
+        const atHourBoundary = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start - HOUR_MS),
+        });
+        const justInsideHourBoundary = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start - HOUR_MS + 1),
+        });
+        const middle = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start - 30 * MINUTE_MS),
+        });
+        const recent = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(Date.now()),
+        });
+        await db
+          .insert(microdollar_usage)
+          .values([
+            atHourBoundary,
+            recent,
+            justInsideHourBoundary,
+            atStart,
+            middle,
+            justAfterStart,
+          ]);
+
+        await expect(listIds({ startTime: isoAt(start) })).resolves.toEqual([
+          atStart.id,
+          middle.id,
+          justInsideHourBoundary.id,
+        ]);
+        await expect(listIds()).resolves.toEqual([recent.id]);
+      });
+
+      it('interprets a start time with a non-UTC offset as the same instant', async () => {
+        await enableRequestLogs([organization.id]);
+        const start = Date.now() - 4 * HOUR_MS;
+        const inside = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start - 30 * MINUTE_MS),
+        });
+        const atStart = usageRow({ organization_id: organization.id, created_at: isoAt(start) });
+        const after = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start + 30 * MINUTE_MS),
+        });
+        const before = usageRow({
+          organization_id: organization.id,
+          created_at: isoAt(start - 90 * MINUTE_MS),
+        });
+        await db.insert(microdollar_usage).values([inside, atStart, after, before]);
+
+        const startTime = isoWithPlusTwoOffset(start);
+        expect(startTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+02:00$/);
+        expect(new Date(startTime).getTime()).toBe(start);
+        await expect(listIds({ startTime })).resolves.toEqual([atStart.id, inside.id]);
+      });
+
+      it.each([
+        ['is not an ISO timestamp', () => 'yesterday'],
+        ['has no offset', () => new Date(Date.now() - HOUR_MS).toISOString().slice(0, -1)],
+        ['is older than 365 days', () => isoAt(Date.now() - 366 * DAY_MS)],
+        ['is more than 5 minutes in the future', () => isoAt(Date.now() + HOUR_MS)],
+      ])('rejects a start time that %s with BAD_REQUEST', async (_case, startTime) => {
+        await enableRequestLogs([organization.id]);
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.organizations.requestLogs.list({
+            organizationId: organization.id,
+            startTime: startTime(),
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+
+      it('accepts a start time slightly in the future and close to the 365-day limit', async () => {
+        await enableRequestLogs([organization.id]);
+        const row = usageRow({ organization_id: organization.id, created_at: minutesAgo(1) });
+        await db.insert(microdollar_usage).values(row);
+
+        await expect(listIds({ startTime: isoAt(Date.now() + MINUTE_MS) })).resolves.toEqual([
+          row.id,
+        ]);
+        await expect(listIds({ startTime: isoAt(Date.now() - 364 * DAY_MS) })).resolves.toEqual([]);
+      });
+    });
+
+    describe('userId', () => {
+      it("returns only the given user's requests", async () => {
+        await enableRequestLogs([organization.id]);
+        const memberNewer = usageRow({
+          organization_id: organization.id,
+          kilo_user_id: member.id,
+          created_at: minutesAgo(5),
+        });
+        const memberOlder = usageRow({
+          organization_id: organization.id,
+          kilo_user_id: member.id,
+          created_at: minutesAgo(20),
+        });
+        const ownerRow = usageRow({
+          organization_id: organization.id,
+          kilo_user_id: owner.id,
+          created_at: minutesAgo(10),
+        });
+        await db.insert(microdollar_usage).values([memberOlder, ownerRow, memberNewer]);
+
+        await expect(listIds({ userId: member.id })).resolves.toEqual([
+          memberNewer.id,
+          memberOlder.id,
+        ]);
+        await expect(listIds({ userId: owner.id })).resolves.toEqual([ownerRow.id]);
+      });
+
+      it("does not return another organization's requests for the user", async () => {
+        await enableRequestLogs([organization.id, otherOrganization.id]);
+        await db
+          .insert(microdollar_usage)
+          .values([
+            usageRow({ organization_id: otherOrganization.id, kilo_user_id: admin.id }),
+            usageRow({ organization_id: organization.id, kilo_user_id: owner.id }),
+          ]);
+
+        await expect(listIds({ userId: admin.id })).resolves.toEqual([]);
+      });
+
+      it('rejects an empty user id with BAD_REQUEST', async () => {
+        await enableRequestLogs([organization.id]);
+
+        await expect(listIds({ userId: '' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+    });
+
+    describe('modelPrefix', () => {
+      it('matches the requested model, falling back to the model when none was requested', async () => {
+        await enableRequestLogs([organization.id]);
+        const anthropic = usageRow({
+          organization_id: organization.id,
+          requested_model: 'anthropic/claude-sonnet-4.6',
+          model: 'anthropic/claude-sonnet-4.6',
+          created_at: minutesAgo(5),
+        });
+        const openAiFallback = usageRow({
+          organization_id: organization.id,
+          requested_model: null,
+          model: 'openai/gpt-5',
+          created_at: minutesAgo(10),
+        });
+        const auto = usageRow({
+          organization_id: organization.id,
+          requested_model: 'kilo-auto/balanced',
+          model: 'moonshotai/kimi-k2',
+          created_at: minutesAgo(15),
+        });
+        await db.insert(microdollar_usage).values([anthropic, openAiFallback, auto]);
+
+        await expect(listIds({ modelPrefix: 'anthropic/' })).resolves.toEqual([anthropic.id]);
+        await expect(listIds({ modelPrefix: 'openai/' })).resolves.toEqual([openAiFallback.id]);
+        await expect(listIds({ modelPrefix: 'kilo-auto/' })).resolves.toEqual([auto.id]);
+        await expect(listIds({ modelPrefix: 'moonshotai/' })).resolves.toEqual([]);
+        await expect(listIds({ modelPrefix: 'anthropic/claude-sonnet-4.6' })).resolves.toEqual([
+          anthropic.id,
+        ]);
+      });
+
+      it('trims the prefix and treats a blank prefix as no filter', async () => {
+        await enableRequestLogs([organization.id]);
+        const anthropic = usageRow({
+          organization_id: organization.id,
+          requested_model: 'anthropic/claude-sonnet-4.6',
+          created_at: minutesAgo(5),
+        });
+        const openAi = usageRow({
+          organization_id: organization.id,
+          requested_model: 'openai/gpt-5',
+          created_at: minutesAgo(10),
+        });
+        await db.insert(microdollar_usage).values([anthropic, openAi]);
+
+        await expect(listIds({ modelPrefix: '  anthropic/  ' })).resolves.toEqual([anthropic.id]);
+        await expect(listIds({ modelPrefix: '   ' })).resolves.toEqual([anthropic.id, openAi.id]);
+        await expect(listIds({ modelPrefix: '' })).resolves.toEqual([anthropic.id, openAi.id]);
+      });
+
+      it('matches LIKE wildcards and the escape character literally', async () => {
+        await enableRequestLogs([organization.id]);
+        const percent = usageRow({
+          organization_id: organization.id,
+          requested_model: 'a%b/model',
+          created_at: minutesAgo(5),
+        });
+        const underscore = usageRow({
+          organization_id: organization.id,
+          requested_model: 'a_b/model',
+          created_at: minutesAgo(10),
+        });
+        const backslash = usageRow({
+          organization_id: organization.id,
+          requested_model: 'a\\b/model',
+          created_at: minutesAgo(15),
+        });
+        const plain = usageRow({
+          organization_id: organization.id,
+          requested_model: 'axb/model',
+          created_at: minutesAgo(20),
+        });
+        await db.insert(microdollar_usage).values([percent, underscore, backslash, plain]);
+
+        await expect(listIds({ modelPrefix: 'a%' })).resolves.toEqual([percent.id]);
+        await expect(listIds({ modelPrefix: 'a_' })).resolves.toEqual([underscore.id]);
+        await expect(listIds({ modelPrefix: 'a\\' })).resolves.toEqual([backslash.id]);
+        await expect(listIds({ modelPrefix: '%' })).resolves.toEqual([]);
+        await expect(listIds({ modelPrefix: '_' })).resolves.toEqual([]);
+        await expect(listIds({ modelPrefix: 'a' })).resolves.toEqual([
+          percent.id,
+          underscore.id,
+          backslash.id,
+          plain.id,
+        ]);
+      });
+
+      it('matches case-sensitively', async () => {
+        await enableRequestLogs([organization.id]);
+        const anthropic = usageRow({
+          organization_id: organization.id,
+          requested_model: 'anthropic/claude-sonnet-4.6',
+        });
+        await db.insert(microdollar_usage).values(anthropic);
+
+        await expect(listIds({ modelPrefix: 'Anthropic/' })).resolves.toEqual([]);
+        await expect(listIds({ modelPrefix: 'anthropic/' })).resolves.toEqual([anthropic.id]);
+      });
+
+      it('accepts a 200-character prefix and rejects a longer one with BAD_REQUEST', async () => {
+        await enableRequestLogs([organization.id]);
+        const longModel = 'x'.repeat(200);
+        const row = usageRow({
+          organization_id: organization.id,
+          requested_model: `${longModel}/model`,
+        });
+        await db.insert(microdollar_usage).values(row);
+
+        await expect(listIds({ modelPrefix: longModel })).resolves.toEqual([row.id]);
+        await expect(listIds({ modelPrefix: `${longModel}x` })).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+        });
+      });
+    });
+
+    it('combines the start time, user, and model prefix filters', async () => {
+      await enableRequestLogs([organization.id]);
+      const start = Date.now() - 2 * HOUR_MS;
+      const match = usageRow({
+        organization_id: organization.id,
+        kilo_user_id: member.id,
+        requested_model: 'openai/gpt-5',
+        created_at: isoAt(start - 10 * MINUTE_MS),
+      });
+      const wrongUser = usageRow({
+        organization_id: organization.id,
+        kilo_user_id: owner.id,
+        requested_model: 'openai/gpt-5',
+        created_at: isoAt(start - 10 * MINUTE_MS),
+      });
+      const wrongModel = usageRow({
+        organization_id: organization.id,
+        kilo_user_id: member.id,
+        requested_model: 'anthropic/claude-sonnet-4.6',
+        created_at: isoAt(start - 10 * MINUTE_MS),
+      });
+      const outsideWindow = usageRow({
+        organization_id: organization.id,
+        kilo_user_id: member.id,
+        requested_model: 'openai/gpt-5',
+        created_at: minutesAgo(5),
+      });
+      const otherOrgMatch = usageRow({
+        organization_id: otherOrganization.id,
+        kilo_user_id: member.id,
+        requested_model: 'openai/gpt-5',
+        created_at: isoAt(start - 10 * MINUTE_MS),
+      });
+      await db
+        .insert(microdollar_usage)
+        .values([match, wrongUser, wrongModel, outsideWindow, otherOrgMatch]);
+
+      await expect(
+        listIds({ startTime: isoAt(start), userId: member.id, modelPrefix: 'openai/' })
+      ).resolves.toEqual([match.id]);
+    });
+
+    it(`returns at most ${REQUEST_LOGS_LIMIT} filtered requests, newest first`, async () => {
+      await enableRequestLogs([organization.id]);
+      const matching = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
+        usageRow({
+          organization_id: organization.id,
+          requested_model: 'openai/gpt-5',
+          created_at: isoAt(Date.now() - (index + 1) * 10_000),
+        })
+      );
+      const newerNonMatching = Array.from({ length: 5 }, (_, index) =>
+        usageRow({
+          organization_id: organization.id,
+          requested_model: 'anthropic/claude-sonnet-4.6',
+          created_at: isoAt(Date.now() - (index + 1) * 1_000),
+        })
+      );
+      await db.insert(microdollar_usage).values([...matching, ...newerNonMatching]);
+
+      await expect(listIds({ modelPrefix: 'openai/' })).resolves.toEqual(
+        matching.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
       );
     });
   });
@@ -483,27 +868,16 @@ describe('organizations.requestLogs trpc router', () => {
       });
     });
 
-    it('returns an empty list and a zero summary without usage', async () => {
+    it('returns an empty list without usage', async () => {
       await enableRequestLogs([organization.id]);
       const caller = await createCallerForUser(owner.id);
 
       await expect(
         caller.organizations.requestLogs.listEnkryptUsage({ organizationId: organization.id })
-      ).resolves.toEqual({
-        rows: [],
-        summary: {
-          total_calls: 0,
-          allowed: 0,
-          blocked: 0,
-          errors: 0,
-          total_charged_microdollars: 0,
-          avg_input_added_latency_ms: null,
-          avg_output_added_latency_ms: null,
-        },
-      });
+      ).resolves.toEqual([]);
     });
 
-    it("returns the organization's guardrail calls from the last 24 hours, newest first, with a summary", async () => {
+    it("returns the organization's guardrail calls from the last 24 hours, newest first", async () => {
       await enableRequestLogs([organization.id, otherOrganization.id]);
       const lookups = await enkryptLookups();
       const tooOldAt = hoursAgo(25);
@@ -562,7 +936,8 @@ describe('organizations.requestLogs trpc router', () => {
         organizationId: organization.id,
       });
 
-      expect(result.rows).toEqual([
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([
         {
           id: errored.id,
           created_at: errored.created_at,
@@ -597,32 +972,18 @@ describe('organizations.requestLogs trpc router', () => {
           added_latency_ms: 40,
         },
       ]);
-      for (const row of result.rows) {
+      for (const row of result) {
         expect(row).not.toHaveProperty('enkrypt_credits_cost');
       }
-      expect(result.summary).toEqual({
-        total_calls: 3,
-        allowed: 1,
-        blocked: 1,
-        errors: 1,
-        total_charged_microdollars: 350,
-        avg_input_added_latency_ms: 40,
-        avg_output_added_latency_ms: 60,
-      });
-      expect(result.summary).not.toHaveProperty('total_credits');
     });
 
-    it(`returns at most ${REQUEST_LOGS_LIMIT} calls while the summary counts every call in the window`, async () => {
+    it(`returns at most ${REQUEST_LOGS_LIMIT} calls, newest first`, async () => {
       await enableRequestLogs([organization.id]);
       const lookups = await enkryptLookups();
       const rows = Array.from({ length: REQUEST_LOGS_LIMIT + 1 }, (_, index) =>
         enkryptRow(lookups, {
           organization_id: organization.id,
-          decision_id:
-            index === REQUEST_LOGS_LIMIT ? lookups.decision.blocked : lookups.decision.allowed,
-          charged_microdollars: 10,
-          added_latency_ms: index === REQUEST_LOGS_LIMIT ? 1_010 : 0,
-          created_at: new Date(Date.now() - (index + 1) * 60_000).toISOString(),
+          created_at: isoAt(Date.now() - (index + 1) * MINUTE_MS),
         })
       );
       await db.insert(enkrypt_usage).values(rows);
@@ -632,18 +993,9 @@ describe('organizations.requestLogs trpc router', () => {
         organizationId: organization.id,
       });
 
-      expect(result.rows.map(row => row.id)).toEqual(
+      expect(result.map(row => row.id)).toEqual(
         rows.slice(0, REQUEST_LOGS_LIMIT).map(row => row.id)
       );
-      expect(result.summary).toEqual({
-        total_calls: REQUEST_LOGS_LIMIT + 1,
-        allowed: REQUEST_LOGS_LIMIT,
-        blocked: 1,
-        errors: 0,
-        total_charged_microdollars: (REQUEST_LOGS_LIMIT + 1) * 10,
-        avg_input_added_latency_ms: 1_010 / (REQUEST_LOGS_LIMIT + 1),
-        avg_output_added_latency_ms: null,
-      });
     });
   });
 
@@ -657,23 +1009,32 @@ describe('organizations.requestLogs trpc router', () => {
       await expect(
         caller.organizations.requestLogs.getDetails({
           organizationId: organization.id,
-          usageId: otherOrgRow.id ?? '',
+          usageId: otherOrgRow.id,
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
-    it('returns NOT_FOUND for a request older than 24 hours', async () => {
+    it('returns a request older than 24 hours', async () => {
       await enableRequestLogs([organization.id]);
-      const oldRow = usageRow({ organization_id: organization.id, created_at: hoursAgo(25) });
+      const oldRow = usageRow({
+        organization_id: organization.id,
+        created_at: hoursAgo(3 * 24),
+        model: 'openai/gpt-5',
+        requested_model: 'openai/gpt-5',
+      });
       await db.insert(microdollar_usage).values(oldRow);
 
       const caller = await createCallerForUser(owner.id);
-      await expect(
-        caller.organizations.requestLogs.getDetails({
-          organizationId: organization.id,
-          usageId: oldRow.id ?? '',
-        })
-      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      const result = await caller.organizations.requestLogs.getDetails({
+        organizationId: organization.id,
+        usageId: oldRow.id,
+      });
+
+      expect(result.request).toMatchObject({
+        model: 'openai/gpt-5',
+        requested_model: 'openai/gpt-5',
+        auto_model: null,
+      });
     });
 
     it('returns NOT_FOUND for an unknown request', async () => {
@@ -707,12 +1068,12 @@ describe('organizations.requestLogs trpc router', () => {
         provider: 'openrouter',
         inference_provider: 'deepinfra',
         model: 'moonshotai/kimi-k2',
-        requested_model: 'kilo-auto/balanced',
+        requested_model: 'moonshotai/kimi-k2',
         cache_write_tokens: 42,
       });
       await db.insert(microdollar_usage).values(usage);
       await db.insert(microdollar_usage_metadata).values(
-        metadataRow(usage.id ?? '', {
+        metadataRow(usage.id, {
           status_code: 200,
           finish_reason_id: await finishReasonId('stop'),
           api_kind_id: await apiKindId('chat_completions'),
@@ -726,13 +1087,13 @@ describe('organizations.requestLogs trpc router', () => {
       const caller = await createCallerForUser(owner.id);
       const result = await caller.organizations.requestLogs.getDetails({
         organizationId: organization.id,
-        usageId: usage.id ?? '',
+        usageId: usage.id,
       });
 
       expect(result).toEqual({
         request: {
           model: 'moonshotai/kimi-k2',
-          requested_model: 'kilo-auto/balanced',
+          requested_model: 'moonshotai/kimi-k2',
           provider: 'openrouter',
           inference_provider: 'deepinfra',
           cache_write_tokens: 42,
@@ -740,14 +1101,38 @@ describe('organizations.requestLogs trpc router', () => {
           finish_reason: 'stop',
           api_kind: 'chat_completions',
           streamed: true,
-          cancelled: false,
-          is_free: false,
+          auto_model: null,
           session_id: 'ses_request_logs_test',
           editor_name: null,
           mode: null,
           inference_region: null,
         },
         metadata: { status: 'not-configured' },
+      });
+    });
+
+    it('returns the auto model of an auto request', async () => {
+      await enableRequestLogs([organization.id]);
+      const usage = usageRow({
+        organization_id: organization.id,
+        model: 'moonshotai/kimi-k2',
+        requested_model: 'kilo-auto/balanced',
+      });
+      await db.insert(microdollar_usage).values(usage);
+      await db
+        .insert(microdollar_usage_metadata)
+        .values(metadataRow(usage.id, { auto_model_id: await autoModelId('kilo-auto/balanced') }));
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.requestLogs.getDetails({
+        organizationId: organization.id,
+        usageId: usage.id,
+      });
+
+      expect(result.request).toMatchObject({
+        model: 'moonshotai/kimi-k2',
+        requested_model: 'kilo-auto/balanced',
+        auto_model: 'kilo-auto/balanced',
       });
     });
   });

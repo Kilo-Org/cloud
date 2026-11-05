@@ -15,7 +15,7 @@ import {
   KiloPassOrgAgreementState,
   KiloPassOrgProcessingCondition,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
@@ -1827,7 +1827,10 @@ describe('Kilo Pass organization agreement service', () => {
   });
 
   describe('organization tier change', () => {
-    async function activeAgreement(options: { purchaseChannel?: 'manual'; cadence?: 'monthly' }) {
+    async function activeAgreement(options: {
+      purchaseChannel?: 'manual';
+      cadence?: 'monthly' | 'yearly';
+    }) {
       const owner = await insertTestUser();
       const parent = await createOrganization(`kpo-tier-${crypto.randomUUID()}`, owner.id);
       organizationIds.push(parent.id);
@@ -1920,6 +1923,40 @@ describe('Kilo Pass organization agreement service', () => {
           provider
         )
       ).rejects.toMatchObject({ reason: 'manual_agreement' });
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('rejects downgrades and any change on a yearly agreement', async () => {
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      const yearly = await activeAgreement({ cadence: 'yearly' });
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: yearly.parent.id, actorUserId: yearly.owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'yearly_cadence' });
+      const detail = await organizationKiloPassService.getDetail({
+        organizationId: yearly.parent.id,
+      });
+      expect(detail.tierChangeBlockedReason).toContain('monthly billing only');
+      expect(provider).not.toHaveBeenCalled();
+    });
+
+    it('offers only higher tiers and rejects a downgrade', async () => {
+      const { owner, parent, agreementId } = await activeAgreement({});
+      const provider = jest.fn(async () => ({ effectiveAt: window.end }));
+      const detail = await organizationKiloPassService.getDetail({ organizationId: parent.id });
+      expect(detail.availableTierTerms.map(terms => terms.tier)).toEqual(['tier_49', 'tier_199']);
+
+      await db.execute(
+        sql`UPDATE kilo_pass_org_agreements SET term_version_id = (SELECT id FROM kilo_pass_org_term_versions WHERE version_key = 'standard-tier_199-monthly-v1') WHERE id = ${agreementId}`
+      );
+      await expect(
+        organizationKiloPassService.scheduleTierChange(
+          { organizationId: parent.id, actorUserId: owner.id, tier: 'tier_49' },
+          provider
+        )
+      ).rejects.toMatchObject({ reason: 'downgrade' });
       expect(provider).not.toHaveBeenCalled();
     });
 

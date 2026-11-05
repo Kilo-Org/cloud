@@ -43,8 +43,8 @@ export function OrgKiloPassTierChangeCard({
         <div>
           <CardTitle>Kilo Pass tier</CardTitle>
           <p className="mt-1 type-body text-muted-foreground">
-            A new tier applies to every paid seat at the next renewal. Credits already added keep
-            their terms.
+            Upgrades apply to every paid seat at the next monthly renewal. Credits already added
+            keep their terms.
           </p>
         </div>
         {pending ? (
@@ -66,7 +66,7 @@ export function OrgKiloPassTierChangeCard({
               setSelected(null);
               setOpen(true);
             }}
-            disabled={blockedReason !== undefined}
+            disabled={blockedReason !== undefined || availableTerms.length === 0}
           >
             Change tier
           </Button>
@@ -83,6 +83,9 @@ export function OrgKiloPassTierChangeCard({
               . Until then you stay on {current?.tierName ?? 'your current tier'}.
             </AlertDescription>
           </Alert>
+        ) : null}
+        {!pending && !blockedReason && availableTerms.length === 0 ? (
+          <p className="type-body text-muted-foreground">You are on the highest Kilo Pass tier.</p>
         ) : null}
         {!pending && blockedReason ? (
           <p className="type-body text-muted-foreground">{blockedReason}</p>

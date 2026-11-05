@@ -214,7 +214,10 @@ function rethrowTierChangeError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
   if (error instanceof OrganizationKiloPassTierChangeBlockedError) {
     throw new TRPCError({
-      code: error.reason === 'same_tier' ? 'BAD_REQUEST' : 'PRECONDITION_FAILED',
+      code:
+        error.reason === 'same_tier' || error.reason === 'downgrade'
+          ? 'BAD_REQUEST'
+          : 'PRECONDITION_FAILED',
       message: error.message,
     });
   }

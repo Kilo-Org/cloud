@@ -241,6 +241,8 @@ export type OrganizationKiloPassTierChangeBlockReason =
   | 'cancellation_pending'
   | 'ended'
   | 'payment_review'
+  | 'yearly_cadence'
+  | 'downgrade'
   | 'same_tier';
 
 export class OrganizationKiloPassTierChangeBlockedError extends Error {
@@ -254,9 +256,11 @@ export class OrganizationKiloPassTierChangeBlockedError extends Error {
 }
 
 const tierChangeBlockMessages: Record<
-  Exclude<OrganizationKiloPassTierChangeBlockReason, 'same_tier'>,
+  Exclude<OrganizationKiloPassTierChangeBlockReason, 'same_tier' | 'downgrade'>,
   string
 > = {
+  yearly_cadence:
+    'Tier upgrades are available on monthly billing only. Annual Kilo Pass tiers cannot be changed here.',
   manual_agreement:
     'This Kilo Pass agreement is managed by your Kilo account team. Contact them to change tiers.',
   no_provider_subscription:
@@ -296,6 +300,7 @@ function tierChangeBlock(
   if (agreement.state === KiloPassOrgAgreementState.PendingPayment || !agreement.paid_until) {
     return 'not_active';
   }
+  if (agreement.cadence !== KiloPassCadence.Monthly) return 'yearly_cadence';
   if (agreement.state === KiloPassOrgAgreementState.CancelAtPeriodEnd) {
     return 'cancellation_pending';
   }
@@ -309,7 +314,9 @@ function tierChangeBlockedReason(
   agreement: typeof kilo_pass_org_agreements.$inferSelect
 ): string | null {
   const reason = tierChangeBlock(agreement);
-  return reason === null || reason === 'same_tier' ? null : tierChangeBlockMessages[reason];
+  return reason === null || reason === 'same_tier' || reason === 'downgrade'
+    ? null
+    : tierChangeBlockMessages[reason];
 }
 
 const iso = (value: string | Date | null) =>
@@ -1910,6 +1917,8 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
       tierChangeBlockedReason: tierChangeBlockedReason(row.agreement),
       availableTierTerms: standardDisplayTerms(
         row.agreement.cadence === KiloPassCadence.Yearly ? 'yearly' : 'monthly'
+      ).filter(
+        terms => terms.pricePerPassUsd * 1_000_000 > row.term.billing_price_microdollars_per_pass
       ),
       state: commercialState(row.agreement),
       commercialState: commercialState(row.agreement),
@@ -2178,7 +2187,7 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
     if (!row) throw new Error('Kilo Pass organization agreement not found');
     const { agreement } = row;
     const block = tierChangeBlock(agreement);
-    if (block && block !== 'same_tier') {
+    if (block && block !== 'same_tier' && block !== 'downgrade') {
       throw new OrganizationKiloPassTierChangeBlockedError(block, tierChangeBlockMessages[block]);
     }
     const providerSubscriptionId = agreement.provider_subscription_id;
@@ -2201,6 +2210,12 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
         agreement.next_term_version_id
           ? 'Your Kilo Pass is already on this tier. Cancel the scheduled change to keep it.'
           : 'Your Kilo Pass is already on this tier.'
+      );
+    }
+    if (target.billing_price_microdollars_per_pass < row.term.billing_price_microdollars_per_pass) {
+      throw new OrganizationKiloPassTierChangeBlockedError(
+        'downgrade',
+        'Only upgrades to a higher tier can be scheduled here.'
       );
     }
     if (agreement.next_term_version_id === target.id && agreement.next_term_effective_at !== null) {

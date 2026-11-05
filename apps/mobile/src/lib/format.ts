@@ -117,7 +117,9 @@ export function formatFileSize(bytes: number, locale: string): string {
   return formatNumber(value, locale, {
     style: 'unit',
     unit: units[unit],
-    unitDisplay: 'short',
+    // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
+    // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
+    unitDisplay: unit === 0 ? 'long' : 'short',
     maximumFractionDigits: unit === 0 ? 0 : 2,
   });
 }

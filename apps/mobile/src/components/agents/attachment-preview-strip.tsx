@@ -502,7 +502,7 @@ const AttachmentChip = memo(function AttachmentChip({
                 filename: attachment.filename,
               })}
             >
-              <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
+              <View className="h-7 w-7 items-center justify-center rounded-full bg-secondary">
                 <RotateCcw size={14} color={colors.foreground} />
               </View>
             </Pressable>
@@ -514,7 +514,7 @@ const AttachmentChip = memo(function AttachmentChip({
                 onRemove(attachment.id);
               }}
               hitSlop={removeHitSlop()}
-              className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-background active:opacity-70"
+              className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-secondary active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
                 filename: attachment.filename,

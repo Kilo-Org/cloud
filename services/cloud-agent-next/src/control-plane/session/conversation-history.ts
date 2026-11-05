@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
 import {
   kilo2ConversationMessageSchema,
   kilo2ConversationSourceSchema,
@@ -12,6 +12,7 @@ import {
   type readSessionMessagesPage,
   type HistoryCursor,
 } from './history.js';
+import { isKilocodeRow } from './event-queries.js';
 import { events } from './sqlite-schema.js';
 
 export type Kilo2MessagesPage = {
@@ -59,9 +60,12 @@ export function readKilo2MessagesPage(
     throw new Error('Conversation source belongs to another session');
   const createdAt = sql<number>`json_extract(${events.payload}, '$.properties.message.time.created')`;
   const messageId = sql<string>`json_extract(${events.payload}, '$.properties.message.id')`;
+  // Keep the read on the message entity range, as the v1 history reader does.
   const scope = and(
     eq(events.session_id, sessionId),
-    eq(events.stream_event_type, 'kilocode'),
+    isKilocodeRow,
+    gte(events.entity_id, 'message/'),
+    lt(events.entity_id, 'message0'),
     eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'conversation.message.updated'),
     eq(sql<string>`json_extract(${events.payload}, '$.properties.sessionID')`, kiloSessionId)
   );

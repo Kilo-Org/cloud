@@ -104,6 +104,35 @@ function bufferFor(queries: SessionEventQueries) {
   });
 }
 
+/** History and session reads must stay on an indexed `entity_id` range. */
+async function expectIndexedEventReads(stub: DurableObjectStub<SandboxSessionV2>) {
+  await runInDurableObject(stub, async (instance, state) => {
+    const exec = state.storage.sql.exec.bind(state.storage.sql);
+    const reads = new Map<string, unknown[]>();
+    state.storage.sql.exec = ((query: string, ...params: unknown[]) => {
+      if (/^select/i.test(query) && query.includes('"events"')) reads.set(query, params);
+      return exec(query, ...params);
+    }) as typeof exec;
+    try {
+      await instance.getSessionMessagesPage();
+      await instance.getSession();
+    } finally {
+      state.storage.sql.exec = exec;
+    }
+    const plans = [...reads].map(([query, params]) =>
+      [...exec<{ detail: string }>(`EXPLAIN QUERY PLAN ${query}`, ...params)]
+        .map(row => row.detail)
+        .join(' | ')
+    );
+    expect(plans.some(plan => plan.includes('entity_id>? AND entity_id<?'))).toBe(true);
+    // `stream_event_type` matches nearly every row, so its index is a full-table read.
+    for (const plan of plans) {
+      expect(plan).not.toContain('idx_events_type');
+      expect(plan).not.toMatch(/SCAN events\b/);
+    }
+  });
+}
+
 async function publish(
   stub: DurableObjectStub<SandboxSessionV2>,
   type: string,
@@ -160,31 +189,27 @@ describe('workspace DO history and mutation cursors', () => {
     await publish(stub, 'message.part.updated', {
       part: part(kiloSessionId, 'msg_plan', 'prt_plan'),
     });
-    await runInDurableObject(stub, async (instance, state) => {
-      const exec = state.storage.sql.exec.bind(state.storage.sql);
-      const reads = new Map<string, unknown[]>();
-      state.storage.sql.exec = ((query: string, ...params: unknown[]) => {
-        if (/^select/i.test(query) && query.includes('"events"')) reads.set(query, params);
-        return exec(query, ...params);
-      }) as typeof exec;
-      try {
-        await instance.getSessionMessagesPage();
-        await instance.getSession();
-      } finally {
-        state.storage.sql.exec = exec;
-      }
-      const plans = [...reads].map(([query, params]) =>
-        [...exec<{ detail: string }>(`EXPLAIN QUERY PLAN ${query}`, ...params)]
-          .map(row => row.detail)
-          .join(' | ')
-      );
-      expect(plans.some(plan => plan.includes('entity_id>? AND entity_id<?'))).toBe(true);
-      // `stream_event_type` matches nearly every row, so its index is a full-table read.
-      for (const plan of plans) {
-        expect(plan).not.toContain('idx_events_type');
-        expect(plan).not.toMatch(/SCAN events\b/);
-      }
+    await expectIndexedEventReads(stub);
+  });
+
+  it('keeps native v2 history pages on indexed entity ranges', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+    await publish(stub, 'conversation.message.updated', {
+      sessionID: kiloSessionId,
+      source,
+      message: { id: 'msg_native_plan', type: 'user', time: { created: 1 }, content: [] },
     });
+    expect((await stub.getSessionMessagesPage())?.source).toMatchObject({ version: 'v2' });
+    await expectIndexedEventReads(stub);
   });
 
   it('uses the same assistant-only native cost total in history and session metadata', async () => {

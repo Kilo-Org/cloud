@@ -1789,7 +1789,7 @@
         "dismiss": "Wepụ",
         "manualReview": "Nyocha aka",
         "monitor": "Lekọta",
-        "openPr": "Meghee arịrịọ ndọtị"
+        "openPr": "Meghee arịrịọ ijikọ koodu"
       }
     },
     "dashboard": {
@@ -2044,7 +2044,7 @@
         "remediationCancelled": "A kagbuola",
         "remediationFailed": "Ndozi dara",
         "remediationNoChangesNeeded": "Ọ dịghị mgbanwe achọrọ",
-        "remediationPrOpened": "Emeghere arịrịọ ndọtị",
+        "remediationPrOpened": "Emeghere arịrịọ ijikọ koodu",
         "remediationQueued": "A rịọrọ ndozi"
       }
     },

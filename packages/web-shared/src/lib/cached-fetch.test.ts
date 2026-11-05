@@ -76,7 +76,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 1_000, 'default', {
       name: 'test-cache',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('good');
@@ -109,7 +111,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 10_000, 'default', {
       name: 'openRouterProviders',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('default');
@@ -134,7 +138,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 1_000, 'default', {
       name: 'runtimeGatewayRoutingConfig',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('good');
@@ -162,7 +168,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 1_000, 'default', {
       name: 'test-cache',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('good');
@@ -193,7 +201,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 1_000, 'default', {
       name: 'test-cache',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('default');
@@ -233,7 +243,9 @@ describe('createCachedFetch', () => {
     const get = createCachedFetch(fetcher, 10, 'default', {
       name: 'test-cache',
       now: clock.now,
-      onRefreshFailure: info => reported.push(info),
+      onRefreshFailure: info => {
+        reported.push(info);
+      },
     });
 
     expect(await get()).toBe('default');
@@ -245,6 +257,21 @@ describe('createCachedFetch', () => {
         failureBackoffMs: FAILURE_BACKOFF_MS,
       },
     ]);
+  });
+
+  test('refreshes a stale value whatever origin the clock has', async () => {
+    const fetcher = jest
+      .fn<() => Promise<number>>()
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(2);
+    const clock = createClock(-10_000);
+    const get = createCachedFetch(fetcher, 1_000, 0, { name: 'test-cache', now: clock.now });
+
+    expect(await get()).toBe(1);
+
+    clock.set(-8_000);
+    expect(await get()).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   test('serves the fallback when the failure reporter throws', async () => {
@@ -261,5 +288,22 @@ describe('createCachedFetch', () => {
     });
 
     await expect(get()).resolves.toBe('default');
+  });
+
+  test('serves the fallback when an async failure reporter rejects', async () => {
+    const clock = createClock(0);
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('connection refused'));
+    const get = createCachedFetch(fetcher, 10, 'default', {
+      name: 'test-cache',
+      now: clock.now,
+      onRefreshFailure: async () => {
+        throw new Error('reporter down');
+      },
+    });
+
+    await expect(get()).resolves.toBe('default');
+    await new Promise(resolve => setImmediate(resolve));
   });
 });

@@ -29,7 +29,7 @@ type CacheWrite<T> = {
   value: T;
   /** When the value was stored; `-Infinity` for a fallback, which is never fresh. */
   at: number;
-  /** Earliest time at which the next refresh may start. */
+  /** Earliest time at which the next refresh may start; `-Infinity` after a success. */
   retryAfterMs: number;
   /** Whether `value` came from a successful fetch rather than a failure fallback. */
   knownGood: boolean;
@@ -62,9 +62,9 @@ export type CreateCachedFetchOptions = {
   now?: () => number;
   /**
    * Called once per failed refresh window, after the fallback value is stored.
-   * A reporter that throws cannot change what callers receive.
+   * A report that throws or rejects cannot change what callers receive.
    */
-  onRefreshFailure?: (info: RefreshFailureInfo) => void;
+  onRefreshFailure?: (info: RefreshFailureInfo) => void | Promise<void>;
 };
 
 export function createCachedFetch<T>(
@@ -96,7 +96,12 @@ export function createCachedFetch<T>(
     const refresh = (async (): Promise<T> => {
       try {
         const value = await fetcher();
-        cached = { value, at: now(), retryAfterMs: 0, knownGood: true };
+        cached = {
+          value,
+          at: now(),
+          retryAfterMs: Number.NEGATIVE_INFINITY,
+          knownGood: true,
+        };
         return value;
       } catch (error) {
         // Concurrent callers share this promise, so the refresh never rejects.
@@ -122,10 +127,14 @@ export function createCachedFetch<T>(
         };
         if (onRefreshFailure) {
           try {
-            onRefreshFailure({ name, error, served, failureBackoffMs });
+            // The fallback is already stored, so a report that throws or rejects
+            // must not reject the shared refresh every concurrent caller awaits,
+            // nor become an unhandled rejection.
+            void Promise.resolve(onRefreshFailure({ name, error, served, failureBackoffMs })).catch(
+              () => {}
+            );
           } catch {
-            // The fallback is already stored, so a reporter that throws must not
-            // reject the shared refresh every concurrent caller awaits.
+            // A synchronous throw is swallowed for the same reason.
           }
         }
         return value;

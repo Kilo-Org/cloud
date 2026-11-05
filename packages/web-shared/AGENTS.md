@@ -23,7 +23,7 @@ The usage wire contract lives in `@kilocode/usage-contracts`. Import it directly
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
 
-## AI gateway database access
+## AI gateway database and Redis access
 
 AI gateway handlers (`src/lib/ai-gateway/**` and everything they call) also run
 in `sfo1`, but the read-write `db` from `lib/drizzle` always connects to the
@@ -56,6 +56,8 @@ work, work after the upstream request starts, and exceptional paths may use it.
   ambiguous failure, because the event may already be queued.
 - For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
+- Redis (`lib/redis`) has its primary in `fra1` and a read replica in `sfo1`:
+  reads are local, but treat writes like database writes.
 - Where correctness needs the primary on a rare path (read-after-write, a row
   lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so

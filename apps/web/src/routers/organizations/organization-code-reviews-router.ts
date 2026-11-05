@@ -397,6 +397,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           thinkingEffort: input.thinkingEffort,
           instructions: input.instructions,
           council: input.council,
+          operationKey: input.operationKey,
         },
       });
     }),

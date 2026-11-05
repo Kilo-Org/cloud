@@ -918,3 +918,105 @@ for (const [miscased, name] of [
     );
   });
 }
+
+const ARMENIAN_TERMINATORS = {
+  work: {
+    empty: 'Nothing to do.',
+    waiting: 'Waiting...',
+    retry: 'Try again',
+    host: 'Open kilo.ai',
+    note: 'Contact support',
+  },
+};
+const ARMENIAN_TERMINATORS_SOURCE =
+  "t('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');";
+
+test('accepts Armenian copy that closes its sentences with «։»', context => {
+  const result = runChecker(context, {
+    language: 'hy',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Անելիք չկա։',
+        waiting: 'Սպասում ենք...',
+        retry: 'Կրկին փորձել',
+        host: 'Բացել kilo.ai',
+        note: 'Էլ. հասցե',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+for (const [name, value, mark] of [
+  ['a terminal period', 'Անելիք չկա.', '.'],
+  ['a period before the next sentence', 'Չհաջողվեց. Կրկին փորձեք', '.'],
+  ['a terminal colon', 'Չհաջողվեց պատասխանել:', ':'],
+]) {
+  test(`rejects Armenian copy with ${name}`, context => {
+    const result = runChecker(context, {
+      language: 'hy',
+      english: ARMENIAN_TERMINATORS,
+      translated: {
+        work: {
+          empty: value,
+          waiting: 'Սպասում ենք...',
+          retry: 'Կրկին փորձել',
+          host: 'Բացել kilo.ai',
+          note: 'Էլ. հասցե',
+        },
+      },
+      source: ARMENIAN_TERMINATORS_SOURCE,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `mobile/hy: "work\\.empty" ends a sentence with the ASCII "${mark}"; Armenian writes «։»`
+      )
+    );
+  });
+}
+
+test('rejects Armenian copy with a period that joins two sentences', context => {
+  const result = runChecker(context, {
+    language: 'hy',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Մուտքագրեք հասցեն. այն պահպանվում է',
+        waiting: 'Սպասում ենք...',
+        retry: 'Կրկին փորձել',
+        host: 'Բացել kilo.ai',
+        note: 'Էլ. հասցե',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/hy: "work\.empty" joins two sentences with the ASCII "\."; Armenian writes «։» and «՝»/
+  );
+});
+
+test('leaves another locale’s ASCII sentence terminator alone', context => {
+  const result = runChecker(context, {
+    language: 'ru',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Нечего делать.',
+        waiting: 'Ждём...',
+        retry: 'Повторить',
+        host: 'Открыть kilo.ai',
+        note: 'Эл. адрес',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});

@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
+import {
+  cacheByokDataKey,
+  evictCachedByokDataKey,
+  getCachedByokDataKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/data-key-cache';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -13,28 +19,6 @@ const KMS_TOTAL_BUDGET_MS = 8000;
 /** A retry is worth issuing only with a slice of budget this large left: a shorter one can
  * only abort and would replace the specific error of the attempt before it with a timeout. */
 const KMS_MIN_ATTEMPT_BUDGET_MS = 500;
-
-export type ByokKmsContext = {
-  key_id: string;
-  owner_type: 'user' | 'organization';
-  owner_id: string;
-  provider_id: string;
-};
-
-/** Wall clock and wait behind the retry budget; production uses the globals. */
-export type ByokKmsTiming = {
-  now(): number;
-  sleep(ms: number): Promise<void>;
-};
-
-const defaultByokKmsTiming: ByokKmsTiming = {
-  now: () => Date.now(),
-  sleep: ms => {
-    const { promise, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, ms);
-    return promise;
-  },
-};
 
 type ByokKmsClientConfig = {
   url: string;
@@ -103,18 +87,13 @@ async function attemptKmsRequest(
   }
 }
 
-async function sendToKms(
-  config: ByokKmsClientConfig,
-  url: string,
-  init: RequestInit,
-  timing: ByokKmsTiming = defaultByokKmsTiming
-) {
-  const deadline = timing.now() + KMS_TOTAL_BUDGET_MS;
+async function sendToKms(config: ByokKmsClientConfig, url: string, init: RequestInit) {
+  const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
   let failure: unknown;
   for (let attempt = 1; ; attempt++) {
     // A retry only gets the time that is left, so the whole sequence stays inside the budget,
     // and a slice too short to answer is not spent: the earlier error is the specific one.
-    const remainingMs = deadline - timing.now();
+    const remainingMs = deadline - Date.now();
     if (attempt > 1 && remainingMs < KMS_MIN_ATTEMPT_BUDGET_MS) throw failure;
     const timeoutMs = Math.min(KMS_REQUEST_TIMEOUT_MS, remainingMs);
     const outcome = await attemptKmsRequest(config, url, init, timeoutMs);
@@ -131,7 +110,7 @@ async function sendToKms(
       // 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns; every other 4xx
       // rejects the request itself, so a repeat would only add latency.
       retryable = status === 408 || status === 429 || status >= 500;
-      if (retryable) retryAfter = retryAfterMs(outcome.response, timing.now());
+      if (retryable) retryAfter = retryAfterMs(outcome.response, Date.now());
     } else {
       ({ error, retryable } = outcome);
     }
@@ -142,10 +121,11 @@ async function sendToKms(
       KMS_RETRY_BASE_DELAY_MS * attempt + Math.random() * KMS_RETRY_BASE_DELAY_MS,
       retryAfter ?? 0
     );
-    if (!retryable || attempt >= KMS_MAX_ATTEMPTS || timing.now() + delayMs >= deadline)
-      throw error;
+    if (!retryable || attempt >= KMS_MAX_ATTEMPTS || Date.now() + delayMs >= deadline) throw error;
     failure = error;
-    await timing.sleep(delayMs);
+    const { promise: slept, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, delayMs);
+    await slept;
   }
 }
 
@@ -159,26 +139,19 @@ export type ByokDataKey = z.infer<typeof CreatedDataKeySchema>;
 export async function createByokDataKey({
   context,
   actorUserId,
-  timing = defaultByokKmsTiming,
 }: {
   context: ByokKmsContext;
   actorUserId: string;
-  timing?: ByokKmsTiming;
 }): Promise<ByokDataKey | null> {
   const config = getByokKmsClientConfig();
   if (!config) return null;
 
   return CreatedDataKeySchema.parse(
-    await sendToKms(
-      config,
-      `${config.url}/data-key`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
-      },
-      timing
-    )
+    await sendToKms(config, `${config.url}/data-key`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
+    })
   );
 }
 
@@ -197,43 +170,53 @@ export async function encryptByokForStorage({
   apiKey,
   context,
   actorUserId,
-  timing,
 }: {
   apiKey: string;
   context: ByokKmsContext;
   actorUserId: string;
-  timing?: ByokKmsTiming;
 }): Promise<BYOKApiKeyEnvelope | null> {
-  const dataKey = await createByokDataKey({ context, actorUserId, timing });
+  const dataKey = await createByokDataKey({ context, actorUserId });
   return dataKey ? encryptByokWithDataKey(apiKey, dataKey) : null;
 }
 
 export async function decryptByokEnvelope(
   envelope: BYOKApiKeyEnvelope,
-  context: ByokKmsContext,
-  timing: ByokKmsTiming = defaultByokKmsTiming
+  context: ByokKmsContext
 ): Promise<string> {
   const config = getByokKmsClientConfig();
   if (!config) {
     throw new Error('BYOK_KMS_SERVICE_URL is required to decrypt an envelope-encrypted BYOK key');
   }
 
-  const { data_key } = RetrievedDataKeySchema.parse(
-    await sendToKms(
-      config,
-      `${config.url}/decrypt`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          ...context,
-          wrapped_dek: envelope.wrapped_dek,
-          kms_key_id: envelope.kms_key_id,
-          kms_key_version: envelope.kms_key_version,
-        }),
-      },
-      timing
-    )
-  );
-  return decryptApiKey(envelope.encrypted_data, data_key);
+  // The KMS request is always sent, in parallel with the cache read, so every decrypt reaches the
+  // service. A cache hit does not wait for it and ignores its result; a miss uses it.
+  const kmsRequest = sendToKms(config, `${config.url}/decrypt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ...context,
+      wrapped_dek: envelope.wrapped_dek,
+      kms_key_id: envelope.kms_key_id,
+      kms_key_version: envelope.kms_key_version,
+    }),
+  }).then(response => RetrievedDataKeySchema.parse(response));
+  // Marks a failure as handled while the cache read is pending; a miss still awaits it below.
+  kmsRequest.catch(() => {});
+
+  const cachedDataKey = await getCachedByokDataKey(envelope, context);
+  if (cachedDataKey) {
+    try {
+      return decryptApiKey(envelope.encrypted_data, cachedDataKey);
+    } catch {
+      // An entry that no longer opens the ciphertext is damaged; the KMS response decides.
+      void evictCachedByokDataKey(envelope, context);
+    }
+  }
+
+  const { data_key } = await kmsRequest;
+  const apiKey = decryptApiKey(envelope.encrypted_data, data_key);
+  // Cached only once it has opened the ciphertext. Not awaited, so a slow Redis never delays
+  // the request that already has its key.
+  void cacheByokDataKey(envelope, context, data_key);
+  return apiKey;
 }

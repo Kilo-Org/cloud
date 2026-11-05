@@ -10,7 +10,6 @@ import {
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { resetFailureReportsForTest } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -36,7 +35,6 @@ describe('custom LLM catalog', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     resetCustomLlmCacheForTest();
-    resetFailureReportsForTest();
   });
 
   test('finds custom LLMs by id regardless of case', async () => {

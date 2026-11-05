@@ -4830,6 +4830,34 @@ describe('Enkrypt output guardrail', () => {
     }
   );
 
+  it('associates input and output guardrail usage with the same inference accounting id', async () => {
+    mockRedisValues.clear();
+    const settings = outputGuardrailSettings('block');
+    setOrganization({
+      ...settings,
+      enkrypt: { ...settings.enkrypt, input_guardrail: { enabled: true } },
+    });
+    enkryptAnswers(nothingDetected);
+
+    const response = await sendRequest('chat_completions', false);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(upstreamBody('chat_completions', false));
+    await runAfterTasks();
+
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
+    expect(usageId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(
+      mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.microdollarUsageId)
+    ).toEqual([usageId, usageId, usageId]);
+    expect(
+      mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.guardrail ?? 'input')
+    ).toEqual(expect.arrayContaining(['input', 'output']));
+  });
+
   it.each(cases)(
     'replaces a blocked $kind response (stream: $stream) with a rejection',
     async ({ kind, stream }) => {

@@ -31,7 +31,7 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { observePrWebhook } from './pr-observations-webhook';
-import { getPrObservationSummary } from './pr-observations';
+import { createEmptyPrObservations, getPrObservationSummary } from './pr-observations';
 const head = 'a'.repeat(40);
 const payload = {
   installation: { id: 10 },
@@ -74,6 +74,11 @@ describe('passive PR webhook observer', () => {
     expect(getPrObservationSummary(value.pr_observations, head)?.checks).toEqual({
       total: 1,
       failed: 1,
+      passed: 0,
+      pending: 0,
+      skipped: 0,
+      unknown: 0,
+      complete: false,
     });
     const query = new PgDialect().sqlToQuery(condition);
     expect(query.params).toEqual(
@@ -96,6 +101,40 @@ describe('passive PR webhook observer', () => {
     expect(mockAuthorize).toHaveBeenCalledTimes(2);
     expect(mockUpdate).toHaveBeenCalledTimes(2);
     expect(new PgDialect().sqlToQuery(mockUpdate.mock.calls[1][1]).params).toContain('org-2');
+  });
+  it('persists resolution/reopening actions against a previously fetched thread without GitHub reads', async () => {
+    let observations = {
+      ...createEmptyPrObservations(),
+      threadsObserved: true,
+      threadsComplete: true,
+      threads: [{ rootId: '100', threadId: 'PRRT_100', state: 'unresolved' as const }],
+    };
+    for (const [action, count] of [
+      ['resolved', 0],
+      ['unresolved', 1],
+      ['resolved', 0],
+    ] as const) {
+      mockLock.mockResolvedValueOnce([{ ...cache, pr_observations: observations }]);
+      await observePrWebhook({
+        eventType: 'pull_request_review_thread',
+        appType: 'standard',
+        payload: {
+          installation: { id: 10 },
+          repository: payload.repository,
+          action,
+          pull_request: { number: 7 },
+          thread: { node_id: 'PRRT_100', comments: [{ id: 100 }] },
+        },
+      });
+      observations = mockUpdate.mock.calls.at(-1)?.[0].pr_observations;
+      expect(getPrObservationSummary(observations, head)).toMatchObject({
+        unresolvedThreads: count,
+        threadsComplete: true,
+        truncated: false,
+      });
+      expect(observations.threads).toHaveLength(1);
+    }
+    expect(mockAuthorize).toHaveBeenCalledTimes(3);
   });
   it('rejects repository ID/name mismatches and unavailable associations', async () => {
     mockIntegrations.mockResolvedValue([

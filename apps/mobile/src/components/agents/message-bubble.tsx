@@ -182,7 +182,7 @@ function MessageBubbleImpl({
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
+      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
         <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
           {failure.error ? (
             // Every failure that reports an error carries the same marker; a
@@ -202,7 +202,12 @@ function MessageBubbleImpl({
           </Text>
         </View>
         {failure.detail !== null ? (
-          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
             {failure.detail}
           </Text>
         ) : null}

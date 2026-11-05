@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
@@ -20,7 +22,7 @@ export function UserAdminPaymentMethods({ id }: UserDetailProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-user-payment-methods', id],
     queryFn: async (): Promise<{ payment_methods: AdminPaymentMethod[] }> => {
-      const response = await fetch(`/admin/api/users/payment-methods?kilo_user_id=${id}`);
+      const response = await adminFetch(`/admin/api/users/payment-methods?kilo_user_id=${id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch payment methods');
       }

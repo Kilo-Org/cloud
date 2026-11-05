@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Նատիվ հեռավար ցուցադրություն",
+    "sessionsEmpty": "Դեռ չկան նատիվ աշխատաշրջաններ",
+    "hosts": "Առցանց հոսթեր",
+    "hostsEmpty": "Առցանց հոսթեր չկան",
+    "directory": "Աշխատանքային պանակ",
+    "createSession": "Ստեղծել նատիվ աշխատաշրջան",
+    "queueIfOffline": "Հերթագրել հարցումը, եթե հոսթն անցանց է",
+    "prompt": "Հարցում կամ /command",
+    "localClear": "Մաքրել տեղային տեսքը",
+    "abort": "Ընդհատել ընթացիկ քայլը",
+    "failed": "Նատիվ հեռավար գործողությունը չհաջողվեց",
+    "creationUnknown": "Ստեղծման արդյունքն անհայտ է։ Կրկին փորձելուց առաջ թարմացրեք աշխատաշրջանները։",
+    "commandFailed": "Չհաջողվեց կատարել գործարկիչի հրամանը",
+    "invalidReply": "Գործարկիչի անվավեր պատասխան",
+    "unsafeCommand": "Օգտագործեք /compact, /new, /skill, /models, /agents կամ /clear (միայն տեղային)։",
+    "status": "Կապ՝ {{connection}} · Գործարկիչ՝ {{runner}}",
+    "presenceStatus": "Հոսթեր՝ {{connection}}",
+    "commandStatus": "Հրամանի առաքում՝ {{status}}",
+    "delivered": "Առաքված",
+    "expired": "Ժամկետանց"
+  },
   "common": {
     "cancel": "Չեղարկել",
     "done": "Պատրաստ",

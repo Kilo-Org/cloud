@@ -315,6 +315,29 @@ describe('MessageBubble failure footer', () => {
     expect(copy?.props.accessibilityRole).toBe('button');
   });
 
+  it('sets the failure detail at the transcript secondary body size under one uniform gap', async () => {
+    const tree = await renderBubbleWithHandlers(assistantMessageWithError('m-scale', 'APIError'), {
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+    });
+
+    // The failed turn's detail line is the same secondary body copy as the
+    // collapsed reasoning row, not a smaller caption, so the block reads at the
+    // transcript's text size.
+    const footer = footerOf(tree);
+    const detail = classNamesIn(footer?.props.children).find(name =>
+      name.includes('text-muted-foreground')
+    );
+    expect(detail?.split(' ')).toEqual(
+      expect.arrayContaining(['text-sm', 'leading-[1.25rem]', 'text-muted-foreground'])
+    );
+
+    // One gap separates the title, the detail and the action row.
+    const gapClasses = String(footer?.props.className)
+      .split(' ')
+      .filter(name => /^gap-\d/.test(name));
+    expect(gapClasses).toHaveLength(1);
+  });
+
   it('end-aligns a failed user row’s footer under its bubble and leaves an assistant row’s on its leading edge', async () => {
     const userTree = await renderBubbleWithHandlers(userMessage('m-align-user'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
@@ -335,21 +358,28 @@ describe('MessageBubble failure footer', () => {
     });
 
     const userFooter = footerOf(userTree);
-    expect(String(userFooter?.props.className)).toBe('gap-1 px-4 py-1 items-end');
+    const userFooterClasses = String(userFooter?.props.className).split(' ');
+    expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1', 'items-end']));
     // The title and the detail line end-align with the bubble's trailing edge,
     // so a wrapped line does not fall back to the leading edge, and each keeps
-    // its own size and colour. The action row is unchanged: the column places it.
-    expect(classNamesIn(userFooter?.props.children)).toEqual(
-      expect.arrayContaining([
-        'text-sm text-destructive text-right',
-        'text-xs text-muted-foreground text-right',
-        'flex-row gap-2',
-      ])
-    );
+    // its own colour. The action row is unchanged: the column places it.
+    const userFooterChildren = classNamesIn(userFooter?.props.children);
+    expect(
+      userFooterChildren.some(
+        name => name.includes('text-destructive') && name.includes('text-right')
+      )
+    ).toBe(true);
+    expect(
+      userFooterChildren.some(
+        name => name.includes('text-muted-foreground') && name.includes('text-right')
+      )
+    ).toBe(true);
+    expect(userFooterChildren).toContain('flex-row gap-2');
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
-    expect(String(assistantFooter?.props.className)).toBe('gap-1 px-4 py-1');
+    const assistantFooterClasses = String(assistantFooter?.props.className).split(' ');
+    expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1']));
     expect(
       classNamesIn(assistantFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -523,9 +553,7 @@ describe('MessageBubble failure footer', () => {
 
     // The footer container is a plain View: no accessible, no role, no label,
     // so Retry and Copy stay individually focusable.
-    const footer = findElementByType(tree, 'View', p =>
-      String(p.className).startsWith('gap-1 px-4 py-1')
-    );
+    const footer = footerOf(tree);
     expect(footer).not.toBeNull();
     expect(footer?.props.accessible).toBeUndefined();
     expect(footer?.props.accessibilityRole).toBeUndefined();
@@ -1269,7 +1297,7 @@ function findElementByLabel(
 
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
-  return findElementByType(tree, 'View', p => String(p.className).startsWith('gap-1 px-4 py-1'));
+  return findElementByType(tree, 'View', p => /^gap-\d+ px-4 py-1/.test(String(p.className)));
 }
 
 /** Every className in an unrendered element tree, in document order. */

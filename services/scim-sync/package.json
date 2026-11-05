@@ -7,18 +7,16 @@
   "scripts": {
     "preinstall": "node ../../scripts/check-pnpm.mjs",
     "deploy:prod": "wrangler deploy --env=\"\"",
-    "deploy:dev": "wrangler deploy --env dev",
-    "dev": "wrangler dev --env dev",
-    "start": "wrangler dev --env dev",
+    "deploy:staging": "wrangler deploy --env staging",
+    "dev": "wrangler dev --env staging",
+    "start": "wrangler dev --env staging",
     "types": "wrangler types --include-runtime false",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/scim-sync/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
-    "typecheck": "tsgo --noEmit",
-    "test:postgres": "vitest run --config vitest.postgres.config.ts"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@kilocode/db": "workspace:*",
     "@workos-inc/node": "catalog:",
     "workers-tagged-logger": "catalog:"
   },
@@ -27,7 +25,6 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

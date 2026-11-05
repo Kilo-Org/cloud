@@ -2,20 +2,20 @@ const mockGetAuthenticated = jest.fn();
 const mockPullsGet = jest.fn();
 const mockPullsListCommits = jest.fn();
 const mockPaginate = jest.fn();
+const mockInstallationAuth = jest.fn();
+const mockOctokitRequest = jest.fn();
 
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     rest: { users: { getAuthenticated: mockGetAuthenticated } },
     pulls: { get: mockPullsGet, listCommits: mockPullsListCommits },
     paginate: mockPaginate,
+    request: mockOctokitRequest,
   })),
 }));
 
 jest.mock('@octokit/auth-app', () => ({
-  createAppAuth: jest.fn(() => async () => ({
-    token: 'installation-token',
-    expiresAt: '2099-01-01T00:00:00.000Z',
-  })),
+  createAppAuth: jest.fn(() => mockInstallationAuth),
 }));
 
 jest.mock('../../github/runtime-authorization', () => ({
@@ -31,8 +31,15 @@ jest.mock('./app-selector', () => ({
   }),
 }));
 
-import { exchangeGitHubOAuthCode, fetchPullRequestByNumber } from './adapter';
+import {
+  exchangeGitHubOAuthCode,
+  fetchPullRequestByNumber,
+  GitHubRateLimitError,
+  toGitHubRateLimitError,
+} from './adapter';
 import { verifySessionPullRequestLink } from './pr-link-identity';
+import { createAppAuth } from '@octokit/auth-app';
+import { Octokit } from '@octokit/rest';
 
 function tokenResponse() {
   return Response.json({ access_token: 'gho_access-token' });
@@ -154,9 +161,113 @@ const fetchParams = {
   appType: 'standard' as const,
 };
 
+function httpError(status: number, message: string, headers?: Record<string, string>) {
+  return Object.assign(new Error(message), {
+    status,
+    ...(headers ? { response: { headers } } : {}),
+  });
+}
+
+describe('toGitHubRateLimitError', () => {
+  const NOW = Date.parse('2026-01-01T00:00:00.000Z');
+
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('returns an already typed error unchanged so its deadline is preserved', () => {
+    const typed = new GitHubRateLimitError(new Date(NOW + 5_000));
+
+    expect(toGitHubRateLimitError(typed)).toBe(typed);
+  });
+
+  it('classifies a 403 with Retry-After delta seconds', () => {
+    const result = toGitHubRateLimitError(
+      httpError(403, 'You have exceeded a secondary rate limit', { 'retry-after': '120' })
+    );
+
+    expect(result).toBeInstanceOf(GitHubRateLimitError);
+    expect(result?.resetAt.getTime()).toBe(NOW + 120_000);
+  });
+
+  it('classifies a 403 with Retry-After even when the message is not a rate message', () => {
+    const result = toGitHubRateLimitError(
+      httpError(403, 'Forbidden', { 'retry-after': new Date(NOW + 90_000).toUTCString() })
+    );
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 90_000);
+  });
+
+  it('classifies a 429 with an HTTP-date Retry-After', () => {
+    const result = toGitHubRateLimitError(
+      httpError(429, 'Too Many Requests', { 'retry-after': new Date(NOW + 45_000).toUTCString() })
+    );
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 45_000);
+  });
+
+  it('uses x-ratelimit-reset for a primary limit and the later of both signals', () => {
+    const reset = String(Math.floor((NOW + 300_000) / 1000));
+    const result = toGitHubRateLimitError(
+      httpError(429, 'rate limit exceeded', {
+        'retry-after': '60',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': reset,
+      })
+    );
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 300_000);
+  });
+
+  it('ignores x-ratelimit-reset while the quota is still available', () => {
+    const reset = String(Math.floor((NOW + 3_600_000) / 1000));
+    const result = toGitHubRateLimitError(
+      httpError(403, 'secondary rate limit', {
+        'retry-after': '60',
+        'x-ratelimit-remaining': '4999',
+        'x-ratelimit-reset': reset,
+      })
+    );
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 60_000);
+  });
+
+  it('falls back to at least 60 seconds when no deadline is specified', () => {
+    const result = toGitHubRateLimitError(httpError(429, 'rate limit exceeded'));
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 60_000);
+  });
+
+  it('treats an invalid HTTP-date Retry-After as unspecified', () => {
+    const result = toGitHubRateLimitError(
+      httpError(403, 'rate limit exceeded', { 'retry-after': 'not-a-date' })
+    );
+
+    expect(result?.resetAt.getTime()).toBe(NOW + 60_000);
+  });
+
+  it('does not treat a genuine 403 permission denial as a rate limit', () => {
+    expect(
+      toGitHubRateLimitError(httpError(403, 'Resource not accessible by integration'))
+    ).toBeNull();
+  });
+});
+
 describe('fetchPullRequestByNumber', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInstallationAuth.mockReset().mockResolvedValue({
+      token: 'installation-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('returns the base/head repo, head ref and head sha needed to verify identity', async () => {
@@ -177,6 +288,26 @@ describe('fetchPullRequestByNumber', () => {
     expect(mockPullsGet).toHaveBeenCalledWith({ owner: 'kilo', repo: 'repo', pull_number: 7 });
     expect(mockPaginate).not.toHaveBeenCalled();
   });
+
+  it.each([true, false, null])(
+    'includes mergeability %s from the existing PR GET',
+    async mergeable => {
+      mockPullsGet.mockResolvedValue({
+        data: githubPrPayload({
+          base: { sha: 'b'.repeat(40), ref: 'main', repo: { full_name: 'kilo/repo' } },
+          mergeable,
+          mergeable_state: mergeable === false ? 'dirty' : 'unknown',
+        }),
+      });
+      expect(await fetchPullRequestByNumber(fetchParams)).toMatchObject({
+        baseSha: 'b'.repeat(40),
+        baseRef: 'main',
+        mergeable,
+        mergeableState: mergeable === false ? 'dirty' : 'unknown',
+      });
+      expect(mockPullsGet).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('reports an empty head repo when the head repository is gone (deleted fork)', async () => {
     mockPullsGet.mockResolvedValue({
@@ -252,6 +383,82 @@ describe('fetchPullRequestByNumber', () => {
 
     await expect(fetchPullRequestByNumber(fetchParams)).rejects.toMatchObject({
       name: 'GitHubRateLimitError',
+    });
+  });
+
+  it('classifies a rate-limited install token mint instead of failing generically', async () => {
+    const now = Date.parse('2026-01-01T00:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    mockInstallationAuth.mockRejectedValue(
+      httpError(403, 'rate limit exceeded', { 'retry-after': '120' })
+    );
+
+    const result = fetchPullRequestByNumber(fetchParams);
+    await expect(result).rejects.toMatchObject({
+      name: 'GitHubRateLimitError',
+      resetAt: new Date(now + 120_000),
+    });
+    expect(mockPullsGet).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an installation-token 404 as proof that the PR is missing', async () => {
+    const error = httpError(404, 'Installation no longer exists');
+    mockInstallationAuth.mockRejectedValue(error);
+    await expect(fetchPullRequestByNumber(fetchParams)).rejects.toBe(error);
+    expect(mockPullsGet).not.toHaveBeenCalled();
+  });
+
+  it('makes no token or PR requests after the shared deadline has already expired', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      fetchPullRequestByNumber({ ...fetchParams, signal: controller.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mockInstallationAuth).not.toHaveBeenCalled();
+    expect(mockPullsGet).not.toHaveBeenCalled();
+  });
+
+  it('preserves the Retry-After deadline from a rate-limited PR read', async () => {
+    const now = Date.parse('2026-01-01T00:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    mockPullsGet.mockRejectedValue(httpError(403, 'secondary rate limit', { 'retry-after': '90' }));
+
+    await expect(fetchPullRequestByNumber(fetchParams)).rejects.toMatchObject({
+      name: 'GitHubRateLimitError',
+      resetAt: new Date(now + 90_000),
+    });
+  });
+
+  it('passes the shared abort signal through every core request', async () => {
+    mockPullsGet.mockResolvedValue({ data: githubPrPayload() });
+    mockPullsListCommits.mockResolvedValue({ data: [{ sha: 'head-sha' }] });
+    const controller = new AbortController();
+
+    await fetchPullRequestByNumber({
+      ...fetchParams,
+      includeCommits: true,
+      expectedHeadSha: 'different-sha',
+      signal: controller.signal,
+    });
+
+    expect(Octokit).toHaveBeenCalledWith({ request: { signal: controller.signal } });
+    expect(createAppAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ request: mockOctokitRequest })
+    );
+
+    expect(mockPullsGet).toHaveBeenCalledWith({
+      owner: 'kilo',
+      repo: 'repo',
+      pull_number: 7,
+      request: { signal: controller.signal },
+    });
+    expect(mockPullsListCommits).toHaveBeenCalledWith({
+      owner: 'kilo',
+      repo: 'repo',
+      pull_number: 7,
+      per_page: 100,
+      page: 1,
+      request: { signal: controller.signal },
     });
   });
 

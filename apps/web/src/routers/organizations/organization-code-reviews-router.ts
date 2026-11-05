@@ -34,6 +34,7 @@ import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/git
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
   CodeReviewCouncilConfigSchema,
@@ -582,6 +583,11 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const platform = input.platform ?? 'github';
       const config = await getAgentConfig(input.organizationId, 'code_review', platform);
+      // GitLab has no 'all' repository mode either: the webhook handler reviews
+      // only selected or manually added projects, so neither the stored value
+      // nor the default may report 'all' for it.
+      const isBitbucket = platform === PLATFORM.BITBUCKET;
+      const isGitLab = platform === PLATFORM.GITLAB;
 
       if (!config) {
         // Return default configuration
@@ -594,7 +600,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
           repositorySelectionMode:
-            platform === 'bitbucket' ? ('selected' as const) : ('all' as const),
+            isBitbucket || isGitLab ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
@@ -608,7 +614,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       }
 
       const cfg = config.config as CodeReviewAgentConfig;
-      const isBitbucket = platform === PLATFORM.BITBUCKET;
       const selectedRepositoryIds = isBitbucket
         ? (cfg.selected_repository_ids ?? []).filter(
             (repositoryId): repositoryId is string => typeof repositoryId === 'string'
@@ -624,9 +629,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: isBitbucket ? ('off' as const) : (cfg.gate_threshold ?? 'off'),
-        repositorySelectionMode: isBitbucket
-          ? ('selected' as const)
-          : cfg.repository_selection_mode || 'all',
+        repositorySelectionMode:
+          isBitbucket || isGitLab ? ('selected' as const) : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds,
         manuallyAddedRepositories: isBitbucket ? [] : cfg.manually_added_repositories || [],
         repositoryModelOverrides: (cfg.repository_model_overrides ?? [])
@@ -660,6 +664,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       try {
         const platform = input.platform ?? 'github';
         const isBitbucket = platform === PLATFORM.BITBUCKET;
+
+        // GitLab code review has no 'all' repository mode: the webhook handler
+        // reviews only selected or manually added projects. The same rule settles
+        // the stored mode and the GitLab hook-sync decision below.
+        const repositorySelectionMode = isBitbucket
+          ? 'selected'
+          : repositoryModeForPlatform(platform, input.repositorySelectionMode);
 
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         const previousRepoIds =
@@ -727,9 +738,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
             gate_threshold: isBitbucket ? 'off' : (input.gateThreshold ?? 'off'),
-            repository_selection_mode: isBitbucket
-              ? 'selected'
-              : input.repositorySelectionMode || 'all',
+            repository_selection_mode: repositorySelectionMode,
             selected_repository_ids: selectedRepositoryIds,
             manually_added_repositories: isBitbucket ? [] : input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
@@ -750,7 +759,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         if (
           platform === PLATFORM.GITLAB &&
           input.autoConfigureWebhooks !== false &&
-          input.repositorySelectionMode === 'selected'
+          repositorySelectionMode === 'selected'
         ) {
           const integration = await getIntegrationForOrganization(
             input.organizationId,

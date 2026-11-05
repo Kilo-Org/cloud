@@ -28,7 +28,12 @@ const RECONNECT_JITTER_DIVISOR = 4;
  * with the original hello that every supported Worker accepts.
  */
 const FALLBACK_HELLO_CAPABILITIES = [
-  { heartbeatAck: true, sessionSnapshots: true, redactsNamedSecrets: true, installsSkillsSh: true },
+  {
+    heartbeatAck: true,
+    workspaceSnapshots: true,
+    redactsNamedSecrets: true,
+    installsSkillsSh: true,
+  },
   { heartbeatAck: true, redactsNamedSecrets: true, installsSkillsSh: true },
   {},
 ] as const;
@@ -56,7 +61,7 @@ type WebSocketWithHeadersCtor = new (
   options?: { headers?: Record<string, string> }
 ) => WebSocket;
 
-export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean };
+export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
 
 /** The live connection phase, derived from the shared tuple so it cannot drift. */
 export type ControlPlaneConnectionPhase = NativeConnectionPhase;
@@ -282,7 +287,11 @@ export function createControlPlaneConnection(
     ackTimer = deadline;
   }
 
-  function startHeartbeat(target: WebSocket, acknowledged: boolean): void {
+  function startHeartbeat(
+    target: WebSocket,
+    acknowledged: boolean,
+    workspaceSnapshots: boolean
+  ): void {
     stopHeartbeat();
     heartbeatAck = acknowledged;
     if (heartbeatAck) armAckDeadline(target);
@@ -292,6 +301,7 @@ export function createControlPlaneConnection(
       writeRaw(target, {
         type: 'heartbeat',
         active: heartbeat.active,
+        ...(workspaceSnapshots ? { workspaceBusy: heartbeat.workspaceBusy ?? false } : {}),
         degraded: heartbeat.degraded,
       });
     }, options.timers.wrapper.heartbeatIntervalMs);
@@ -378,7 +388,7 @@ export function createControlPlaneConnection(
       phase = 'connected';
       disconnectEpisodeReported = false;
       attempt = 0;
-      startHeartbeat(target, frame.heartbeatAck === true);
+      startHeartbeat(target, frame.heartbeatAck === true, frame.workspaceSnapshots === true);
       options.onConnected?.();
       return;
     }
@@ -435,7 +445,7 @@ export function createControlPlaneConnection(
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
-          sessionSnapshots: true,
+          workspaceSnapshots: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
           startCommands: true,

@@ -1,5 +1,5 @@
 {
-  "id": "e6e844cf-b5bf-4fb5-ad64-1112d318d830",
+  "id": "4e1c3b50-aa94-4950-a072-688395654104",
   "prevId": "26a582ed-0052-4c76-adb9-20586b77ed1b",
   "version": "7",
   "dialect": "postgresql",
@@ -5938,13 +5938,6 @@
         },
         "commands": {
           "name": "commands",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'"
-        },
-        "start_commands": {
-          "name": "start_commands",
           "type": "text[]",
           "primaryKey": false,
           "notNull": true,
@@ -12677,6 +12670,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "microdollar_usage_id": {
+          "name": "microdollar_usage_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "api_kind_id": {
           "name": "api_kind_id",
           "type": "integer",
@@ -12754,6 +12753,21 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_enkrypt_usage_microdollar_usage_id": {
+          "name": "IDX_enkrypt_usage_microdollar_usage_id",
+          "columns": [
+            {
+              "expression": "microdollar_usage_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

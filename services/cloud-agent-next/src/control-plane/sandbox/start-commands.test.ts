@@ -14,7 +14,11 @@ const spec: ControlPlaneRouteSpec = {
 
 const snapshotSpec: ControlPlaneRouteSpec = {
   ...spec,
-  sessionSnapshot: { sourceAllocationId: 'alloc-source' },
+  workspaceSnapshot: {
+    sourceAllocationId: 'alloc-source',
+    workspaceId: 'worktree_00000000-0000-4000-8000-000000000001' as const,
+    directory: '/workspace',
+  },
 };
 
 describe('startCommandsForWrapper', () => {
@@ -36,21 +40,21 @@ describe('startCommandsForWrapper', () => {
     expect(result).not.toHaveProperty('environmentSetupCommandCount');
   });
 
-  it('fails instead of dropping start commands when an older wrapper restores a session snapshot', () => {
+  it('fails instead of dropping start commands when an older wrapper restores a workspace tail snapshot', () => {
     expect(() => startCommandsForWrapper(snapshotSpec, false)).toThrow(
       WrapperStartCommandsUnsupportedError
     );
   });
 
-  it('keeps start commands apart for a wrapper that runs them during a session snapshot restore', () => {
+  it('keeps start commands apart for a wrapper that runs them during a workspace tail snapshot restore', () => {
     expect(startCommandsForWrapper(snapshotSpec, true)).toBe(snapshotSpec);
   });
 
-  it('leaves a session snapshot restore without start commands unchanged for an older wrapper', () => {
+  it('leaves a workspace tail snapshot restore without start commands unchanged for an older wrapper', () => {
     const result = startCommandsForWrapper({ ...snapshotSpec, startCommands: undefined }, false);
     expect(result.setupCommands).toEqual(['install']);
     expect(result).not.toHaveProperty('startCommands');
     expect(result).not.toHaveProperty('environmentSetupCommandCount');
-    expect(result.sessionSnapshot).toEqual({ sourceAllocationId: 'alloc-source' });
+    expect(result.workspaceSnapshot).toEqual(snapshotSpec.workspaceSnapshot);
   });
 });

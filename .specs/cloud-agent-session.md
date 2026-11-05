@@ -172,14 +172,14 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild,
-    except when restoring a private session disk snapshot. An environment snapshot
+ 5. Setup commands MUST run on the first prepare and again on every rebuild,
+    except when restoring a private workspace tail snapshot. An environment snapshot
     skips only the environment's setup; request-supplied commands MUST still run.
     Start commands MUST run each time a workspace starts:
-   on the first prepare, on every rebuild, after an environment snapshot start
-   and after a private session disk snapshot restore. They MUST NOT run when a
-   chat joins a workspace that is already running. A failing or timed-out setup or start command
-   MUST fail preparation and the turn.
+    on the first prepare, on every rebuild, after an environment snapshot start
+    and after a private workspace tail snapshot restore. They MUST NOT run when a
+    chat joins a workspace that is already running. A failing or timed-out setup or start command
+    MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -196,7 +196,7 @@ repository.
 ### Environment snapshots
 
 1. Only an environment build MAY create a reusable environment snapshot.
-   Private session disk snapshots MUST follow the separate session snapshot
+   Private workspace tail snapshots MUST follow the separate workspace snapshot
    rules below and MUST NOT be published as environment snapshots.
 2. A session that uses a repository environment MAY start from that
    environment's published snapshot when the owner, repository, sandbox image
@@ -230,42 +230,50 @@ repository.
 9. Automatic builds started by sessions MUST back off after repeated failures
    of one revision. A manual build MUST stay available during backoff.
 
-### Session disk snapshots
+### Workspace tail snapshots
 
-1. Session disk snapshots MUST be disabled by default and enabled only for
-   explicitly enrolled users or organizations. Capture and restore MUST both
-   check enrollment independently of environment snapshot enrollment.
-2. An enrolled session MAY capture its container disk after two minutes idle,
-   using the existing wrapper heartbeat and sandbox alarm. Capture MUST NOT
-   delay turn completion or Stop and MUST run at most once per idle period.
-3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
-   owner. Only isolated, single-session native Cloudflare Containers at
-   `/workspace/app` with an interactive origin (`cloud-agent-web`, `desktop` or
-   `agent-manager`) MAY capture or restore. Allocations that hosted another
-   session MUST NOT produce a session snapshot.
-4. Capture publication MUST reject changed allocation, connection, preparation,
-   activity or session identity. Active heartbeats, new delivery, Stop and
-   release MUST invalidate older disk state. Capture failure MUST be best effort
-   without repeatedly retrying in the same idle period.
-5. A cold start MAY prefer its own compatible session snapshot over an
-   environment snapshot or base image. Selection MUST use the Sandbox DO's
-   local metadata and MUST NOT consume the snapshot before work is delivered.
-   Runtime release changes MUST NOT disqualify a checkpoint with compatible
-   startup mode and image. Downloaded startup MUST install the currently selected
-   Kilo and wrapper runtime over the restored disk.
-6. Restore MUST preserve local branches, unpushed commits, the Git index,
-   dirty, untracked and ignored files, and session home state. It MUST NOT run
-   environment-template adoption, checkout, setup replay, or older file recovery
-   over the restored disk. It MUST refresh current credentials and configuration,
-   reuse the restored session history with ordinary ingest fallback, and validate
-   workspace provenance before reporting ready.
-7. Unsupported runtimes, failed restore, or failed restored preparation MUST
-   use the bounded fresh-start fallback without silently hanging the session.
-   Existing history and worktree recovery MUST remain available on that fallback.
-8. A private disk snapshot MAY contain session credentials, caches, and user
-   secrets. It MUST NOT be shared with another session or an environment build.
-   Invalidation or session release MUST NOT claim physical deletion where the
-   provider offers no delete API.
+1. `WORKSPACE_SNAPSHOT_ORG_IDS` and `WORKSPACE_SNAPSHOT_USER_IDS` MUST use explicit
+   enrolled IDs. Empty or unset is off. `*` MUST NOT enable snapshots.
+2. Only a trusted registered `worktree_*` workspace MAY capture or restore a tail
+   snapshot. Standalone sessions MUST NOT capture or restore one.
+3. A snapshot MUST belong to one workspace, user, organization, sandbox binding,
+   and canonical directory. The source allocation is provenance, not session ownership.
+   Only isolated native Cloudflare Containers with interactive origins qualify.
+   A sandbox serves one workspace only. Other providers retain ordinary recovery.
+4. All sibling sessions in that workspace MUST share one current snapshot.
+   A sibling joining or leaving MUST NOT permanently disable future capture.
+5. Capture MAY run once after one minute of aggregate workspace inactivity.
+   Preparation, native child executions, terminals and admitted filesystem mutations MUST
+   fence capture. Provider capture MUST run outside the Sandbox DO queue and MUST NOT delay Stop.
+6. Publication MUST reject changed allocation, connection, workspace binding, preparation,
+   membership, activity or mutation generation. New admitted work MUST invalidate older disk
+   state before dispatch. A capture failure MUST NOT retry repeatedly within the idle period.
+7. Session deletion MUST invalidate stale disk state and allow another idle capture for survivors.
+   Workspace deletion MUST invalidate selection and pending publication before resource teardown.
+   Restored disks MUST NOT restore deleted-session authorization or recreate a deleted workspace.
+8. Cold startup MUST select a compatible private workspace snapshot before the existing
+   environment snapshot and base image. Selection MUST validate ownership, enrollment,
+   provider, startup mode and image compatibility from durable Sandbox DO metadata.
+   A compatible downloaded runtime release MAY update the restored disk.
+9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
+   Every authorized sibling, including later joins, MUST receive it.
+   Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.
+10. The wrapper MUST validate workspace identity, directory and source allocation stamp.
+    It MUST preserve branches, local commits, index, dirty, untracked and ignored files,
+    HOME and native databases. It MUST NOT replay checkout, setup, environment adoption
+    or older file recovery over a valid tail snapshot.
+11. A snapshot MUST contain only the disk. Restore MUST apply the current credentials and
+    runtime configuration from the route, as a fresh start does, and reconcile current
+    authorization before exposing native sessions. Existing native sessions are reused.
+    Missing sessions use history recovery without replacing workspace files.
+    New chats MUST attach without resetting files.
+12. Missing artifacts, incompatible peers and failed restored preparation MUST use bounded
+    startup fallback while preserving queued message identity. Diagnostics MUST identify
+    workspace, requesting session, allocation, capture time, selected source and fallback reason.
+    Logs MUST NOT contain snapshot handles, credentials or file contents.
+13. Superseded descriptors MUST remain unselectable. Provider artifacts expire 30 days after
+    creation or their last restore; each restore resets this TTL. Snapshots preserve disk,
+    not running processes, terminals or memory.
 
 ### Turn
 
@@ -449,7 +457,10 @@ repository.
     learns its own session id from the `cloud-agent-context` line in its turns.
     A `workspace:new-chat` callback starts the new chat with the child result as
     its first message, and every workspace callback MUST be idempotent for the
-    persisted callback message ID.
+    persisted callback message ID. A child completion callback MUST render as a
+    distinct child session message that identifies the child session, shows its
+    reported result or failure, and links to that session. It MUST NOT render
+    the serialized callback envelope as the user's message.
 
 ### Watch PR (Observation-Only Pilot)
 

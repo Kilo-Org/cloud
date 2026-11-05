@@ -165,6 +165,7 @@ type GetAuthResponse =
        * false.
        */
       credentialsRejected?: boolean;
+      rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
@@ -177,6 +178,7 @@ type GetAuthResponse =
       user: User;
       authFailedResponse: null;
       credentialsRejected?: undefined;
+      rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -453,13 +455,17 @@ function authError(
   status: number,
   error: string,
   kiloUserId: string,
-  options?: { credentialsRejected?: boolean }
+  options?: {
+    credentialsRejected?: boolean;
+    rejectionReason?: 'empty_organization_context';
+  }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
+    ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
   };
 }
 
@@ -518,10 +524,12 @@ async function validateUserAuthorization({
     }
   }
 
-  if (organizationId) {
+  if (organizationId !== undefined) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
-      return authError(400, 'Invalid organization ID format', kiloUserId);
+      return authError(400, 'Invalid organization ID format', kiloUserId, {
+        ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
+      });
     }
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
     if (!isMember) {

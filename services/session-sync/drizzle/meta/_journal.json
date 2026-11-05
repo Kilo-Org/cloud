@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793198084582,
+      "tag": "0000_rapid_thanos",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793222402451,
+      "tag": "0001_lean_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793806317648,
+      "tag": "0002_nosy_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793841923646,
+      "tag": "0003_slimy_doctor_spectrum",
+      "breakpoints": true
+    }
+  ]
+}

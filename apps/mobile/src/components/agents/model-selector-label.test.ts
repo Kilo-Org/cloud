@@ -30,6 +30,19 @@ describe('resolveModelSelectorLabel', () => {
     ).toBe('DeepSeek V4 Flash 0731');
   });
 
+  it('shows the readable segment of an unmatched model reference', () => {
+    // The session composer chip read `deepseek/deepseek-v4.1-flash-1017` while
+    // the picker named the same model `DeepSeek V4.1 Flash 1017`.
+    expect(
+      resolveModelSelectorLabel({
+        selectedName: undefined,
+        value: 'deepseek/deepseek-v4.1-flash-1017',
+        providerAware: false,
+        fallbackLabel: FALLBACK,
+      })
+    ).toBe('deepseek v4.1 flash 1017');
+  });
+
   it('keeps an unmatched value that carries no vendor prefix', () => {
     expect(
       resolveModelSelectorLabel({

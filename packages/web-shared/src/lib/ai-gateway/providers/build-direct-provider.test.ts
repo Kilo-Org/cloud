@@ -185,10 +185,10 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       kind: 'responses',
       body: { model: 'public-model', input: 'hello', prompt_cache_key: 'task-cache-key' },
     },
-  ])('includes the prompt cache key for $kind when enabled', async request => {
+  ])('includes the prefixed prompt cache key for $kind when enabled', async request => {
     const headers = await transformRequest(request, { prompt_cache_key_as_mt_user_id: true });
 
-    expect(headers['Mt-User-Id']).toBe('task-cache-key');
+    expect(headers['Mt-User-Id']).toBe('kilo:task-cache-key');
     expect(request.body).toHaveProperty('prompt_cache_key', 'task-cache-key');
   });
 
@@ -222,7 +222,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
       remove_from_body: ['prompt_cache_key'],
     });
 
-    expect(headers['Mt-User-Id']).toBe('task-cache-key');
+    expect(headers['Mt-User-Id']).toBe('kilo:task-cache-key');
     expect(request.body).not.toHaveProperty('prompt_cache_key');
   });
 
@@ -236,7 +236,7 @@ describe('buildDirectProvider Mt-User-Id header', () => {
     });
 
     expect(Object.fromEntries(new Headers(headers))).toEqual({
-      'mt-user-id': 'task-cache-key',
+      'mt-user-id': 'kilo:task-cache-key',
       'x-custom': 'kept',
     });
   });

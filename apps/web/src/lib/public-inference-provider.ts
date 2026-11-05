@@ -30,6 +30,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   inception: 'Inception',
   inceptron: 'Inceptron',
   ionet: 'IO.net',
+  meituan: 'Meituan LongCat',
   minimax: 'MiniMax',
   modelrun: 'ModelRun',
   moonshotai: 'Moonshot AI',

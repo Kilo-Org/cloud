@@ -20,6 +20,8 @@ import {
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
 
+const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
+
 export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
 /**
@@ -337,8 +339,12 @@ const routeSpecObjectSchema = z
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
-    sessionSnapshot: z
-      .object({ sourceAllocationId: z.string().min(1).max(256) })
+    workspaceSnapshot: z
+      .object({
+        sourceAllocationId: z.string().min(1).max(256),
+        workspaceId: cloudAgentWorktreeIdSchema,
+        directory: z.string().min(1).max(1024),
+      })
       .strict()
       .optional(),
     /**
@@ -464,10 +470,10 @@ export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
  */
 export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
   (spec, context) => {
-    if (spec.sessionSnapshot !== undefined) {
+    if (spec.workspaceSnapshot !== undefined) {
       context.addIssue({
         code: 'custom',
-        path: ['sessionSnapshot'],
+        path: ['workspaceSnapshot'],
         message: 'session snapshot provenance is frame-only',
       });
     }
@@ -559,6 +565,7 @@ export const controlPlaneCredentialSourceSchema = z
     encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
   })
   .strict();
 
@@ -575,10 +582,10 @@ export const controlPlanePrepareInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.spec.sessionSnapshot !== undefined) {
+    if (value.spec.workspaceSnapshot !== undefined) {
       context.addIssue({
         code: 'custom',
-        path: ['spec', 'sessionSnapshot'],
+        path: ['spec', 'workspaceSnapshot'],
         message: 'session snapshot provenance is frame-only',
       });
     }
@@ -950,6 +957,12 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    workspaceSnapshots: z.literal(true).optional(),
+    /**
+     * Retired capability from wrappers built before workspace snapshots. The
+     * schema is strict, so it stays accepted until those wrappers retire; the
+     * Worker ignores it and treats the wrapper as not snapshot-capable.
+     */
     sessionSnapshots: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper redacts a value by each named secret key
@@ -978,6 +991,7 @@ const controlPlaneWelcomeFrameSchema = z
     type: z.literal('welcome'),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    workspaceSnapshots: z.literal(true).optional(),
   })
   .strict();
 
@@ -991,6 +1005,7 @@ const controlPlaneShutdownFrameSchema = z
 const controlPlaneHeartbeatFrameSchema = z
   .object({
     type: z.literal('heartbeat'),
+    workspaceBusy: z.boolean().optional(),
     active: z.boolean(),
     degraded: z.boolean(),
   })
@@ -1207,7 +1222,7 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
  */
 export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({
-    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    worktreeId: cloudAgentWorktreeIdSchema,
     directory: z.string().min(1).max(1024),
     sessionIds: z.array(z.string().startsWith('ses_').length(30)),
   })

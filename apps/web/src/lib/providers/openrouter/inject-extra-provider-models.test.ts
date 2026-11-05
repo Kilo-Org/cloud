@@ -255,6 +255,30 @@ describe('injectVercelOnlyProviders', () => {
     });
   });
 
+  test.each([
+    ['meituan', 'Meituan LongCat'],
+    ['deepinfra', 'DeepInfra'],
+  ])('beautifies the synthesized provider %s', (providerId, displayName) => {
+    const providerModelData = nvidiaProviderModelData();
+    const vercelModels: Record<string, StoredModel> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [{ provider_name: providerId }],
+      },
+    };
+
+    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+
+    const synthesized = providerModelData.find(({ provider }) => provider.slug === providerId);
+    expect(synthesized?.provider).toMatchObject({
+      name: displayName,
+      displayName,
+      slug: providerId,
+    });
+    expect(synthesized?.models[0]?.endpoint?.provider_display_name).toBe(displayName);
+  });
+
   test('derives a display name without policy links for unknown providers', () => {
     const providerModelData = nvidiaProviderModelData();
     const vercelModels: Record<string, StoredModel> = {

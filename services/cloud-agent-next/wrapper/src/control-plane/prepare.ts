@@ -124,6 +124,7 @@ export type PrepareDeps = {
   allocationId: string;
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
+  onPreparedRoute?: (spec: ControlPlaneRouteSpec) => void;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -569,7 +570,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       env,
       redact,
       signal,
-      onProgress: detail => emitProgress(spec.sessionId, 'clone', rootProgressDetail(root, detail)),
+      onProgress: detail =>
+        emitProgress(
+          spec.sessionId,
+          'clone',
+          rootProgressDetail(root, detail, 'Cloning repository')
+        ),
     });
     if (!spec.git) return;
     onCheckout();
@@ -588,7 +594,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     startRef?: string
   ): Promise<void> {
     const { spec, directory } = root;
-    emitProgress(spec.sessionId, 'checkout', rootProgressDetail(root, undefined));
+    emitProgress(
+      spec.sessionId,
+      'checkout',
+      rootProgressDetail(root, undefined, 'Checking out branch')
+    );
     const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
       runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
@@ -680,7 +690,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           emitProgress(
             spec.sessionId,
             'checkout',
-            rootProgressDetail(root, `Checking out branch... ${progressText}`)
+            rootProgressDetail(
+              root,
+              `Checking out branch... ${progressText}`,
+              'Checking out branch'
+            )
           )
         ),
       });
@@ -720,7 +734,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     await restoreBudget.spend(remainingMs =>
       withinStep('restore', remainingMs, async signal => {
-        emitProgress(spec.sessionId, 'restore', rootProgressDetail(root, undefined));
+        emitProgress(
+          spec.sessionId,
+          'restore',
+          rootProgressDetail(root, undefined, 'Updating repository')
+        );
         const startRef = await refreshAdoptedRepository({
           remoteUrl: credentialFreeGitUrl(git.url),
           route: git.token ? 'managed' : 'direct',
@@ -764,10 +782,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
    * else is cloned. An adopt failure fails the preparation; it never clears the
    * root to clone over the snapshot. Setup and start commands run once, at the
    * route directory, after every root is in place. A workspace restored entirely
-   * from the environment snapshot skips the environment's setup, but still runs
-   * the session's setup and start commands. A session disk snapshot restore runs
-   * only start commands. Each root is
-   * stamped, never the route directory. A session never captures.
+   * from the environment snapshot skips only the environment's setup; the
+   * session's setup and start commands still run. A workspace tail snapshot
+   * restore runs only start commands. Repository stamps stay per root.
+   * Registered workspace identity is stamped after runtime preparation succeeds.
    */
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
@@ -785,17 +803,25 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const workspaceStartedAt = Date.now();
     let sessionInspection: WorkspaceInspection | undefined;
     let sessionStamp: WorkspaceStamp | null = null;
-    if (spec.sessionSnapshot !== undefined) {
+    if (spec.workspaceSnapshot !== undefined) {
       setStep('restore');
       const inspected = await inspectWorkspace(spec.directory);
       sessionInspection = inspected.inspection;
       sessionStamp = inspected.stamp;
-      const sourceAllocationId = spec.sessionSnapshot.sourceAllocationId;
+      const sourceAllocationId = spec.workspaceSnapshot.sourceAllocationId;
       if (
         sessionStamp === null ||
+        sessionStamp.workspaceId !== spec.workspaceSnapshot.workspaceId ||
+        sessionStamp.directory !== spec.directory ||
+        spec.workspaceSnapshot.directory !== spec.directory ||
+        spec.kilo?.scopeId !== spec.workspaceSnapshot.workspaceId ||
         (sessionStamp.allocationId !== sourceAllocationId &&
           sessionStamp.allocationId !== deps.allocationId) ||
-        (spec.git !== undefined && !(await hasGit(spec.directory))) ||
+        (
+          await Promise.all(
+            roots.filter(root => root.spec.git !== undefined).map(root => hasGit(root.directory))
+          )
+        ).some(present => !present) ||
         !(await fs.stat(spec.directory).then(
           stat => stat.isDirectory(),
           () => false
@@ -803,7 +829,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ) {
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
-          message: 'Session snapshot workspace provenance does not match the prepared session',
+          message: 'Workspace snapshot provenance does not match the prepared workspace',
           retryable: false,
         });
       }
@@ -833,29 +859,29 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         });
       }
     }
-    // A session disk snapshot is restored as a whole: it keeps the refs, index
-    // and dirty files it was captured with and never re-clones or adopts a root.
-    // It is eligible only for the isolated workspace, whose one root is the route
-    // directory itself, so its stamp is read and written there.
-    if (spec.sessionSnapshot !== undefined) {
+    // A workspace tail restores every root without checkout or environment adoption.
+    // The workspace stamp binds the route directory; repository stamps remain per root.
+    if (spec.workspaceSnapshot !== undefined) {
       log(
         `control-plane workspace inspect session=${spec.sessionId} inspection=${sessionInspection} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       if (sessionInspection === 'same' || sessionStamp?.allocationId === deps.allocationId)
         return { outcome: 'same', deferredStamps: null };
-      emitProgress(spec.sessionId, 'restore', 'Restoring session disk snapshot');
-      if (spec.git) {
-        await withinStep('restore', timers.restoreMs, signal =>
-          configureGitAuthor(
-            spec.directory,
+      emitProgress(spec.sessionId, 'restore', 'Restoring workspace tail snapshot');
+      await withinStep('restore', timers.restoreMs, async signal => {
+        for (const root of roots) {
+          if (!root.spec.git) continue;
+          await configureGitAuthor(
+            root.directory,
             (args, options) =>
-              runGit(args, { ...options, cwd: spec.directory, env, inheritEnv: false }),
-            spec.git?.author,
+              runGit(args, { ...options, cwd: root.directory, env, inheritEnv: false }),
+            root.spec.git.author,
             signal
-          )
-        );
-      }
-      // The disk keeps every file setup produced, but no process survives it.
+          );
+        }
+      });
+      // The restored workspace keeps every file setup produced, but no process
+      // survives it, so the start commands run again.
       if ((spec.startCommands?.length ?? 0) > 0) setStep('setup');
       await runPreparationCommands(
         spec,
@@ -1221,7 +1247,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         spec.secretEnvKeys ?? []
       );
       const needsWorkspace =
-        spec.sessionSnapshot !== undefined ||
+        spec.workspaceSnapshot !== undefined ||
         Boolean(spec.git) ||
         (spec.setupCommands?.length ?? 0) > 0 ||
         (spec.startCommands?.length ?? 0) > 0;
@@ -1247,7 +1273,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // of truth. `spec.continuation` is the server-only marker for that case;
       // transcript import still runs for the message history.
       const restoreFilesFor = (): boolean =>
-        spec.sessionSnapshot === undefined &&
+        spec.workspaceSnapshot === undefined &&
         spec.continuation !== true &&
         !(replacementWorkspace && localRecoveryApplied) &&
         !(recovery !== undefined && workspace === 'same');
@@ -1402,11 +1428,27 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           if (await readStamp(directory)) return;
           await writeStamp(directory, {
             allocationId: deps.allocationId,
+            ...(spec.kilo?.scopeId.startsWith('worktree_')
+              ? { workspaceId: spec.kilo.scopeId, directory }
+              : {}),
             commit: '',
             workspacePrepared: false,
           });
         });
       }
+      if (spec.kilo?.scopeId.startsWith('worktree_')) {
+        await withWorkspaceLock(directory, async () => {
+          const stamp = await readStamp(directory);
+          await writeStamp(directory, {
+            allocationId: deps.allocationId,
+            commit: await headCommit(directory, builtEnv),
+            workspaceId: spec.kilo?.scopeId,
+            directory,
+            ...(stamp?.workspacePrepared === false ? { workspacePrepared: false } : {}),
+          });
+        });
+      }
+      if (owner.released) return;
       prepared.set(sessionId, {
         key,
         spec,
@@ -1445,6 +1487,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         }
       }
       if (owner.released) return;
+      deps.onPreparedRoute?.(spec);
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
@@ -1587,6 +1630,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
+              deps.onPreparedRoute?.(route.spec);
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }

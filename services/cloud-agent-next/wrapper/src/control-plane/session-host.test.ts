@@ -123,6 +123,7 @@ async function hostFixture() {
     },
     turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined },
     isPreparing: () => preparing,
+    isWorkspaceBusy: () => terminals.hasActivePty(),
   });
   const terminals = createControlPlaneTerminals({
     controlUrl: server.url.toString(),
@@ -247,7 +248,7 @@ describe('production session host composition', () => {
     }
   });
 
-  it('does not make a heartbeat active for an open terminal, even with recent input', async () => {
+  it('blocks workspace capture for a terminal without extending compute activity', async () => {
     const f = await hostFixture();
     const session = {
       sessionId: 'workspace_terminal',
@@ -280,6 +281,7 @@ describe('production session host composition', () => {
       ).toMatchObject({ ok: true, result: { connected: true } });
       expect(f.terminals.recentInputCount()).toBe(0);
       expect(f.host.getHeartbeat().active).toBe(false);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(true);
 
       const socket = f.terminalSocket();
       if (!socket) throw new Error('terminal socket was not opened');
@@ -288,6 +290,10 @@ describe('production session host composition', () => {
       expect(f.terminals.recentInputCount()).toBe(1);
       expect(f.host.runtimes.needsCompute()).toBe(false);
       expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(true);
+      await f.terminals.forgetSession(session.sessionId);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(false);
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.terminals.forgetSession(session.sessionId);

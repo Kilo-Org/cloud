@@ -96,14 +96,34 @@ export function formatList(values: readonly string[], locale: string): string {
 }
 
 export function formatDuration(seconds: number, locale: string): string {
+  return durationFormat(locale, { style: 'short' }).format(durationFields(seconds));
+}
+
+/**
+ * A duration that always names its value. `Intl.DurationFormat` omits every
+ * zero field, so `formatDuration` writes an empty string for a zero duration and
+ * a line that appends it ends in a bare separator. Asking the same formatter to
+ * keep the seconds field writes the zero one — `0 sec`, `0 Sek.`, `٠ s` — in the
+ * reader's own catalog, so a counter that starts at zero never has an empty slot.
+ */
+export function formatDurationIncludingZero(seconds: number, locale: string): string {
+  const formatted = formatDuration(seconds, locale);
+  if (formatted.length > 0) {
+    return formatted;
+  }
+  return durationFormat(locale, { style: 'short', secondsDisplay: 'always' }).format(
+    durationFields(seconds)
+  );
+}
+
+/** The fields `DurationFormat` reads, split from a whole number of seconds. */
+function durationFields(seconds: number) {
   const wholeSeconds = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(wholeSeconds / 3600);
-  const minutes = Math.floor((wholeSeconds % 3600) / 60);
-  return durationFormat(locale, { style: 'short' }).format({
-    hours,
-    minutes,
+  return {
+    hours: Math.floor(wholeSeconds / 3600),
+    minutes: Math.floor((wholeSeconds % 3600) / 60),
     seconds: wholeSeconds % 60,
-  });
+  };
 }
 
 export function formatFileSize(bytes: number, locale: string): string {

@@ -2542,6 +2542,9 @@ importers:
       fuzzysort:
         specifier: 3.1.0
         version: 3.1.0
+      tar-stream:
+        specifier: 3.1.7
+        version: 3.1.7
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -2552,6 +2555,9 @@ importers:
       '@types/node':
         specifier: 20.19.41
         version: 20.19.41
+      '@types/tar-stream':
+        specifier: 3.1.4
+        version: 3.1.4
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2

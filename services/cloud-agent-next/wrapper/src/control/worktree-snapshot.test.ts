@@ -134,6 +134,13 @@ function tarEntry(name: string, data: Buffer, type = '0', mode = 0o644): Buffer[
   return [tarHeader(name, data.length, type, mode), data, Buffer.alloc(padding)];
 }
 
+function tarGnuLongNameEntry(name: string, data: Buffer, mode = 0o644): Buffer[] {
+  return [
+    ...tarEntry('././@LongLink', Buffer.from(name, 'utf8'), 'L'),
+    ...tarEntry(name.slice(0, 100), data, '0', mode),
+  ];
+}
+
 function tarArchive(entries: Buffer[][]): Buffer {
   return Buffer.concat([...entries.flat(), Buffer.alloc(1024)]);
 }
@@ -305,6 +312,145 @@ describe('worktree snapshot capture', () => {
         });
         expect(result.applied).toBe(1);
         expect(await fs.readFile(path.join(target, name), 'utf8')).toBe('long path content\n');
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('reads a v1 archive with a GNU long path written by the previous implementation', async () => {
+    const fixture = await createFixture('snapshot-v1-gnu-');
+    const target = await clone(fixture, 'target');
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-v1-gnu-archive-'));
+    try {
+      const name = `${'g'.repeat(120)}.txt`;
+      const archivePath = path.join(directory, 'snapshot.tar.gz');
+      await fs.writeFile(
+        archivePath,
+        gzipSync(
+          tarArchive([
+            tarEntry(
+              'snapshot.json',
+              manifestBytes({ base: git(fixture.work, ['rev-parse', 'origin/main']) })
+            ),
+            tarGnuLongNameEntry(`files/${name}`, Buffer.from('legacy long path\n')),
+          ])
+        )
+      );
+
+      const result = await applyWorktreeSnapshot({
+        directory: target,
+        worktreeId: 'worktree_test',
+        archivePath,
+        signal: signal(),
+      });
+      expect(result).toEqual({ applied: 1, omitted: 0, conflicts: [], partial: false });
+      expect(await fs.readFile(path.join(target, name), 'utf8')).toBe('legacy long path\n');
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+      await fixture.cleanup();
+    }
+  });
+
+  it('applies an archive written by system tar', async () => {
+    const fixture = await createFixture('snapshot-system-tar-');
+    const target = await clone(fixture, 'target');
+    const staging = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-system-tar-source-'));
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-system-tar-archive-'));
+    try {
+      await fs.mkdir(path.join(staging, 'files'));
+      await fs.mkdir(path.join(staging, 'recovery', 'stamp'), { recursive: true });
+      await fs.writeFile(
+        path.join(staging, 'snapshot.json'),
+        manifestBytes({ base: git(fixture.work, ['rev-parse', 'origin/main']) })
+      );
+      await fs.writeFile(path.join(staging, 'files', 'interop.txt'), 'system tar bytes\n');
+      await fs.writeFile(
+        path.join(staging, 'recovery', 'stamp', 'recovered.txt'),
+        'recovered bytes\n'
+      );
+      const archivePath = path.join(directory, 'snapshot.tar.gz');
+      execFileSync('tar', [
+        '-czf',
+        archivePath,
+        '-C',
+        staging,
+        'snapshot.json',
+        'files/interop.txt',
+        'recovery/stamp/recovered.txt',
+      ]);
+
+      const result = await applyWorktreeSnapshot({
+        directory: target,
+        worktreeId: 'worktree_test',
+        archivePath,
+        signal: signal(),
+      });
+      expect(result).toEqual({ applied: 1, omitted: 0, conflicts: [], partial: false });
+      expect(await fs.readFile(path.join(target, 'interop.txt'), 'utf8')).toBe(
+        'system tar bytes\n'
+      );
+      expect(
+        await fs.readFile(
+          path.join(target, '.git', 'kilo-recovered', 'stamp', 'recovered.txt'),
+          'utf8'
+        )
+      ).toBe('recovered bytes\n');
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+      await fs.rm(staging, { recursive: true, force: true });
+      await fixture.cleanup();
+    }
+  });
+
+  it('writes an archive readable by system tar, including a PAX long path', async () => {
+    const fixture = await createFixture('snapshot-system-tar-read-');
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'snapshot-system-tar-read-'));
+    try {
+      const name = `${'p'.repeat(120)}.txt`;
+      await fs.writeFile(path.join(fixture.work, name), 'long path bytes\n');
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        const listing = execFileSync('tar', ['-tzf', snapshot.archivePath], {
+          encoding: 'utf8',
+        });
+        expect(listing).toContain('snapshot.json');
+        expect(listing).toContain(`files/${name}`);
+
+        execFileSync('tar', ['-xzf', snapshot.archivePath, '-C', directory]);
+        expect(await fs.readFile(path.join(directory, 'files', name), 'utf8')).toBe(
+          'long path bytes\n'
+        );
+      } finally {
+        await snapshot.cleanup();
+      }
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+      await fixture.cleanup();
+    }
+  });
+
+  it('derives contentDigest from the timestamp-independent manifest and file bytes', async () => {
+    const fixture = await createFixture('snapshot-digest-algorithm-');
+    try {
+      const bytes = Buffer.from('digest bytes\n');
+      await fs.writeFile(path.join(fixture.work, 'base.txt'), bytes);
+      const snapshot = await capture(fixture.work);
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) throw new Error('expected snapshot');
+      try {
+        const { version, worktreeId, branch, base, deleted, omitted, partial } = snapshot.manifest;
+        const expected = createHash('sha256');
+        expected.update(
+          JSON.stringify({ version, worktreeId, branch, base, deleted, omitted, partial })
+        );
+        expected.update(`\0file\0base.txt\0${(0o644).toString(8)}\0${bytes.length.toString(10)}\0`);
+        expected.update(bytes);
+        expect(snapshot.contentDigest).toBe(expected.digest('hex'));
       } finally {
         await snapshot.cleanup();
       }
@@ -1770,6 +1916,26 @@ describe('worktree snapshot apply', () => {
           tarArchive([
             tarEntry('snapshot.json', manifestBytes()),
             tarEntry('recovery/stamp/link', Buffer.alloc(0), '2'),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('files/a.txt', Buffer.from('first')),
+            tarEntry('files/a.txt', Buffer.from('second')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('files/a', Buffer.from('file')),
+            tarEntry('files/a/b.txt', Buffer.from('nested')),
+          ])
+        ),
+        gzipSync(
+          tarArchive([
+            tarEntry('snapshot.json', manifestBytes()),
+            tarEntry('files/a.txt', Buffer.from('mode'), '0', 0o600),
           ])
         ),
         gzipSync(tarArchive([tarEntry('snapshot.json', manifestBytes({ version: 2 }))])),

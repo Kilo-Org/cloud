@@ -18,9 +18,10 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
+import { extract as tarExtract, pack as tarPack } from 'tar-stream';
 import { WORKTREE_SNAPSHOT_RESTORE_MS } from '../../../src/shared/control-plane-timers.js';
 import {
   WORKTREE_SNAPSHOT_CAPTURE_MS,
@@ -42,7 +43,6 @@ export const MAX_WORKTREE_SNAPSHOT_TOTAL_BYTES = 50 * 1024 * 1024;
 export const MAX_WORKTREE_SNAPSHOT_ARCHIVE_BYTES = WORKTREE_SNAPSHOT_MAX_BYTES;
 
 const MAX_SNAPSHOT_MANIFEST_BYTES = 4 * 1024 * 1024;
-const MAX_SNAPSHOT_LONG_NAME_BYTES = 1024 * 1024;
 const MAX_SNAPSHOT_OMISSIONS = MAX_WORKTREE_SNAPSHOT_FILES;
 const MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_GIT_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -157,6 +157,13 @@ class WorktreeTypeClashError extends Error {
   }
 }
 
+class WorktreeSnapshotDeadlineError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorktreeSnapshotDeadlineError';
+  }
+}
+
 type Clock = {
   remaining(): number;
 };
@@ -228,7 +235,7 @@ function deadline(signal: AbortSignal, timeoutMs: number, message: string): Cloc
     remaining() {
       signal.throwIfAborted();
       const remaining = deadlineAt - Date.now();
-      if (remaining <= 0) throw new Error(message);
+      if (remaining <= 0) throw new WorktreeSnapshotDeadlineError(message);
       return remaining;
     },
   };
@@ -360,61 +367,20 @@ function tarPadding(size: number): number {
   return remainder === 0 ? 0 : TAR_BLOCK_BYTES - remainder;
 }
 
-function writeOctal(buffer: Buffer, offset: number, length: number, value: number): void {
-  const text = value.toString(8).padStart(length - 1, '0');
-  buffer.write(text, offset, length - 1, 'ascii');
-  buffer[offset + length - 1] = 0;
+function paxPayloadBytes(name: string): number {
+  const payload = Buffer.byteLength(` path=${name}\n`, 'utf8');
+  let digits = Math.floor(Math.log10(payload)) + 1;
+  if (payload + digits >= 10 ** digits) digits += 1;
+  return payload + digits;
 }
 
-function tarHeader(name: string, mode: number, size: number, type: string, prefix = ''): Buffer {
-  const header = Buffer.alloc(TAR_BLOCK_BYTES);
-  header.write(name, 0, 100, 'utf8');
-  writeOctal(header, 100, 8, mode);
-  writeOctal(header, 108, 8, 0);
-  writeOctal(header, 116, 8, 0);
-  writeOctal(header, 124, 12, size);
-  writeOctal(header, 136, 12, 0);
-  header.write(type, 156, 1, 'ascii');
-  header.write('ustar\0', 257, 6, 'ascii');
-  header.write('00', 263, 2, 'ascii');
-  if (prefix) header.write(prefix, 345, 155, 'utf8');
-  header.fill(32, 148, 156);
-  let checksum = 0;
-  for (const byte of header) checksum += byte;
-  const checksumText = checksum.toString(8).padStart(6, '0');
-  header.write(checksumText, 148, 6, 'ascii');
-  header[154] = 0;
-  header[155] = 32;
-  return header;
-}
-
-function splitUstarPath(name: string): { name: string; prefix: string } | undefined {
-  if (Buffer.byteLength(name, 'utf8') <= 100) return { name, prefix: '' };
-  for (let index = name.length - 1; index > 0; index -= 1) {
-    if (name[index] !== '/') continue;
-    const prefix = name.slice(0, index);
-    const base = name.slice(index + 1);
-    if (
-      base.length > 0 &&
-      Buffer.byteLength(prefix, 'utf8') <= 155 &&
-      Buffer.byteLength(base, 'utf8') <= 100
-    ) {
-      return { name: base, prefix };
-    }
-  }
-  return undefined;
-}
-
-function tarEntryHeader(name: string, mode: number, size: number): Buffer[] {
-  const split = splitUstarPath(name);
-  if (split) return [tarHeader(split.name, mode, size, '0', split.prefix)];
-  const longName = Buffer.from(name, 'utf8');
-  return [
-    tarHeader('././@LongLink', 0o644, longName.length, 'L'),
-    longName,
-    Buffer.alloc(tarPadding(longName.length)),
-    tarHeader(name.slice(0, 100), mode, size, '0'),
-  ];
+function tarEntryBytes(name: string, size: number): number {
+  const nameBytes = Buffer.byteLength(name, 'utf8');
+  const needsPax = nameBytes > 100 || nameBytes !== name.length;
+  const headerBytes = needsPax
+    ? TAR_BLOCK_BYTES * 2 + paxPayloadBytes(name) + tarPadding(paxPayloadBytes(name))
+    : TAR_BLOCK_BYTES;
+  return headerBytes + size + tarPadding(size);
 }
 
 function canonicalManifest(manifest: WorktreeSnapshotManifest): string {
@@ -448,15 +414,28 @@ async function writeArchive(
   const digest = createHash('sha256');
   digest.update(canonicalManifest(manifest));
   const manifestBytes = Buffer.from(JSON.stringify(manifest), 'utf8');
+  const archive = tarPack();
+  const completion = pipeline(
+    archive,
+    createGzip(),
+    createWriteStream(archivePath, { mode: 0o600, flags: 'wx' })
+  );
 
-  async function* chunks(): AsyncGenerator<Buffer> {
+  try {
     clock.remaining();
-    for (const header of tarEntryHeader('snapshot.json', 0o644, manifestBytes.length)) {
-      yield header;
-    }
-    yield manifestBytes;
-    const manifestPadding = tarPadding(manifestBytes.length);
-    if (manifestPadding > 0) yield Buffer.alloc(manifestPadding);
+    await new Promise<void>((resolve, reject) => {
+      archive.entry(
+        {
+          name: 'snapshot.json',
+          mode: 0o644,
+          size: manifestBytes.length,
+          mtime: new Date(0),
+          type: 'file',
+        },
+        manifestBytes,
+        error => (error ? reject(error) : resolve())
+      );
+    });
 
     for (const file of files) {
       clock.remaining();
@@ -464,53 +443,71 @@ async function writeArchive(
       digest.update(
         `\0${file.kind}\0${file.path}\0${file.mode.toString(8)}\0${file.size.toString(10)}\0`
       );
-      for (const header of tarEntryHeader(memberName, file.mode, file.size)) {
-        yield header;
-      }
-
       const expected = file.state.stat;
       if (!expected) throw new Error('worktree file identity was not captured');
       await verifyWorktreeFile(file.state);
-      const handle = await open(
-        file.state.path,
-        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
-      );
-      let offset = 0;
-      try {
-        if (!sameFile(expected, await handle.stat())) {
-          throw new Error('worktree file changed during capture');
-        }
-        while (offset < file.size) {
-          clock.remaining();
-          const chunk = await readFileChunk(handle, offset, file.size - offset);
-          if (chunk.bytesRead === 0) {
+
+      async function* chunks(): AsyncGenerator<Buffer> {
+        const handle = await open(
+          file.state.path,
+          constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+        );
+        let offset = 0;
+        try {
+          if (!sameFile(expected, await handle.stat())) {
             throw new Error('worktree file changed during capture');
           }
-          digest.update(chunk.bytes);
-          yield chunk.bytes;
-          offset += chunk.bytesRead;
+          while (offset < file.size) {
+            clock.remaining();
+            const chunk = await readFileChunk(handle, offset, file.size - offset);
+            if (chunk.bytesRead === 0) {
+              throw new Error('worktree file changed during capture');
+            }
+            digest.update(chunk.bytes);
+            yield chunk.bytes;
+            offset += chunk.bytesRead;
+          }
+          if (!sameFile(expected, await handle.stat())) {
+            throw new Error('worktree file changed during capture');
+          }
+          await verifyWorktreeFile(file.state);
+        } finally {
+          await handle.close();
         }
-        if (!sameFile(expected, await handle.stat())) {
-          throw new Error('worktree file changed during capture');
-        }
-        await verifyWorktreeFile(file.state);
-      } finally {
-        await handle.close();
       }
 
-      const padding = tarPadding(file.size);
-      if (padding > 0) yield Buffer.alloc(padding);
+      const source = Readable.from(chunks());
+      await new Promise<void>((resolve, reject) => {
+        const sink = archive.entry(
+          {
+            name: memberName,
+            mode: file.mode,
+            size: file.size,
+            mtime: new Date(0),
+            type: 'file',
+          },
+          error => {
+            if (error) {
+              source.destroy();
+              reject(error);
+            } else {
+              resolve();
+            }
+          }
+        );
+        source.on('error', error => sink.destroy(error));
+        source.pipe(sink);
+      });
     }
 
-    yield Buffer.alloc(TAR_BLOCK_BYTES * 2);
+    archive.finalize();
+    await completion;
+    return digest.digest('hex');
+  } catch (error) {
+    archive.destroy(error instanceof Error ? error : new Error(String(error)));
+    await completion.catch(() => undefined);
+    throw error;
   }
-
-  await pipeline(
-    Readable.from(chunks(), { objectMode: false }),
-    createGzip(),
-    createWriteStream(archivePath, { mode: 0o600, flags: 'wx' })
-  );
-  return digest.digest('hex');
 }
 
 async function isNonDirectoryOnDisk(path: string): Promise<boolean> {
@@ -603,14 +600,6 @@ async function collectCapturePaths(
   deleted.sort(compareStrings);
   submodules.sort(compareStrings);
   return { tracked, untracked, deleted, submodules };
-}
-
-function tarFileEntryBytes(name: string, mode: number, size: number): number {
-  const headerBytes = tarEntryHeader(name, mode, size).reduce(
-    (total, chunk) => total + chunk.length,
-    0
-  );
-  return headerBytes + size + tarPadding(size);
 }
 
 async function collectRecoveryDirectory(
@@ -709,12 +698,12 @@ async function captureRecoveryFiles(
   }
 
   const tarBytes = files.reduce(
-    (total, file) => total + tarFileEntryBytes(`recovery/${file.path}`, file.mode, file.size),
+    (total, file) => total + tarEntryBytes(`recovery/${file.path}`, file.size),
     0
   );
   const manifestLimit = Math.min(limits.manifestBytes, MAX_SNAPSHOT_MANIFEST_BYTES);
   const uncompressedLimit = Math.min(limits.uncompressedBytes, MAX_DECOMPRESSED_BYTES);
-  const manifestReserve = tarFileEntryBytes('snapshot.json', 0o644, manifestLimit);
+  const manifestReserve = tarEntryBytes('snapshot.json', manifestLimit);
   if (manifestReserve + tarBytes + TAR_BLOCK_BYTES * 2 > uncompressedLimit) {
     throw new Error('worktree snapshot recovery payload exceeded the decompressed limit');
   }
@@ -882,10 +871,10 @@ async function captureFilesAndManifest(
 
   const manifestLimit = Math.min(limits.manifestBytes, MAX_SNAPSHOT_MANIFEST_BYTES);
   const uncompressedLimit = Math.min(limits.uncompressedBytes, MAX_DECOMPRESSED_BYTES);
-  const manifestReserve = tarFileEntryBytes('snapshot.json', 0o644, manifestLimit);
+  const manifestReserve = tarEntryBytes('snapshot.json', manifestLimit);
   const fileBudget = uncompressedLimit - manifestReserve - retained.tarBytes - TAR_BLOCK_BYTES * 2;
   let fileEntryBytes = files.reduce(
-    (total, file) => total + tarFileEntryBytes(`files/${file.path}`, file.mode, file.size),
+    (total, file) => total + tarEntryBytes(`files/${file.path}`, file.size),
     0
   );
   let droppedCount = 0;
@@ -893,7 +882,7 @@ async function captureFilesAndManifest(
     if ((droppedCount++ & 0xff) === 0) clock.remaining();
     const dropped = files.pop();
     if (!dropped) break;
-    fileEntryBytes -= tarFileEntryBytes(`files/${dropped.path}`, dropped.mode, dropped.size);
+    fileEntryBytes -= tarEntryBytes(`files/${dropped.path}`, dropped.size);
     omit(dropped.path, 'budget_exhausted');
   }
 
@@ -1039,136 +1028,6 @@ export async function captureWorktreeSnapshotWithLimits(
   }
 }
 
-class ByteReader {
-  private readonly iterator: AsyncIterator<Buffer>;
-  private chunk: Buffer | undefined;
-  private offset = 0;
-  private totalBytes = 0;
-
-  constructor(stream: AsyncIterable<Buffer>) {
-    this.iterator = stream[Symbol.asyncIterator]();
-  }
-
-  private async ensure(): Promise<boolean> {
-    while (!this.chunk || this.offset >= this.chunk.length) {
-      const next = await this.iterator.next();
-      if (next.done) return false;
-      this.chunk = next.value;
-      this.offset = 0;
-      this.totalBytes += next.value.length;
-      if (this.totalBytes > MAX_DECOMPRESSED_BYTES) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive exceeded the decompressed limit');
-      }
-    }
-    return true;
-  }
-
-  async readExactly(size: number): Promise<Buffer> {
-    const output = Buffer.alloc(size);
-    let written = 0;
-    while (written < size) {
-      if (!(await this.ensure())) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      }
-      const chunk = this.chunk;
-      if (!chunk) throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      const take = Math.min(size - written, chunk.length - this.offset);
-      chunk.copy(output, written, this.offset, this.offset + take);
-      this.offset += take;
-      written += take;
-    }
-    return output;
-  }
-
-  async writeTo(handle: FileHandle, size: number): Promise<void> {
-    let remaining = size;
-    let position = 0;
-    while (remaining > 0) {
-      if (!(await this.ensure())) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      }
-      const chunk = this.chunk;
-      if (!chunk) throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      const take = Math.min(remaining, chunk.length - this.offset);
-      let written = 0;
-      while (written < take) {
-        const result = await handle.write(chunk, this.offset + written, take - written, position);
-        if (result.bytesWritten === 0)
-          throw new Error('snapshot extraction write made no progress');
-        written += result.bytesWritten;
-        position += result.bytesWritten;
-      }
-      this.offset += take;
-      remaining -= take;
-    }
-  }
-
-  async skip(size: number): Promise<void> {
-    let remaining = size;
-    while (remaining > 0) {
-      if (!(await this.ensure())) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      }
-      const chunk = this.chunk;
-      if (!chunk) throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
-      const take = Math.min(remaining, chunk.length - this.offset);
-      this.offset += take;
-      remaining -= take;
-    }
-  }
-
-  async finish(): Promise<void> {
-    while (await this.ensure()) {
-      const chunk = this.chunk;
-      if (!chunk) return;
-      for (let index = this.offset; index < chunk.length; index += 1) {
-        if (chunk[index] !== 0) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has trailing data');
-        }
-      }
-      this.offset = chunk.length;
-    }
-  }
-}
-
-function readTarString(header: Buffer, offset: number, length: number): string {
-  const end = header.indexOf(0, offset);
-  const limit = offset + length;
-  return header.subarray(offset, end === -1 || end > limit ? limit : end).toString('utf8');
-}
-
-function parseTarOctal(header: Buffer, offset: number, length: number): number {
-  const text = readTarString(header, offset, length).trim();
-  if (text !== '' && !/^[0-7]+$/.test(text)) {
-    throw new InvalidWorktreeSnapshotError('snapshot archive has an invalid numeric field');
-  }
-  const value = text === '' ? 0 : Number.parseInt(text, 8);
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new InvalidWorktreeSnapshotError('snapshot archive has an invalid numeric field');
-  }
-  return value;
-}
-
-function validateTarChecksum(header: Buffer): void {
-  if (header.subarray(257, 262).toString('ascii') !== 'ustar') {
-    throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported header');
-  }
-  const stored = parseTarOctal(header, 148, 8);
-  let actual = 0;
-  for (let index = 0; index < header.length; index += 1) {
-    actual += index >= 148 && index < 156 ? 32 : header[index];
-  }
-  if (stored !== actual) {
-    throw new InvalidWorktreeSnapshotError('snapshot archive has an invalid header checksum');
-  }
-}
-
-function tarMemberName(header: Buffer): string {
-  const name = readTarString(header, 0, 100);
-  const prefix = readTarString(header, 345, 155);
-  return prefix === '' ? name : `${prefix}/${name}`;
-}
-
 function classifyArchiveMember(name: string): ArchiveMember {
   if (name === 'snapshot.json') return { kind: 'manifest' };
   if (name.startsWith('files/')) {
@@ -1210,6 +1069,42 @@ function parseManifest(bytes: Buffer): WorktreeSnapshotManifest {
   return result.data;
 }
 
+function archiveError(error: unknown): Error {
+  if (
+    error instanceof InvalidWorktreeSnapshotError ||
+    error instanceof WorktreeSnapshotDeadlineError ||
+    (error instanceof Error &&
+      (error.name === 'AbortError' || error.name === 'WorktreeSnapshotTimeoutError'))
+  ) {
+    return error;
+  }
+  const converted = asInvalid(error, 'snapshot archive is corrupt');
+  if (converted instanceof Error) return converted;
+  return new InvalidWorktreeSnapshotError('snapshot archive is corrupt', { cause: error });
+}
+
+function decompressionLimiter(clock: Clock): Transform {
+  let totalBytes = 0;
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      try {
+        clock.remaining();
+      } catch (error) {
+        callback(archiveError(error));
+        return;
+      }
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_DECOMPRESSED_BYTES) {
+        callback(
+          new InvalidWorktreeSnapshotError('snapshot archive exceeded the decompressed limit')
+        );
+        return;
+      }
+      callback(null, chunk);
+    },
+  });
+}
+
 async function extractArchive(
   archivePath: string,
   worktreeId: string,
@@ -1225,147 +1120,151 @@ async function extractArchive(
   await chmod(temporaryDirectory, 0o700);
   const input = createReadStream(archivePath);
   const gunzip = createGunzip();
-  input.on('error', error => gunzip.destroy(error));
+  const decompressed = decompressionLimiter(clock);
+  const extractor = tarExtract({ filenameEncoding: 'utf8' });
+  input.on('error', error => gunzip.destroy(archiveError(error)));
+  gunzip.on('error', error => decompressed.destroy(archiveError(error)));
+  decompressed.on('error', error => extractor.destroy(archiveError(error)));
+  input.pipe(gunzip).pipe(decompressed).pipe(extractor);
   let complete = false;
 
   try {
-    const reader = new ByteReader(input.pipe(gunzip));
     const files = new Map<string, ExtractedFile>();
     const recovery = new Map<string, ExtractedFile>();
     let manifest: WorktreeSnapshotManifest | undefined;
-    let longName: string | undefined;
-    let ended = false;
     let totalFileBytes = 0;
 
-    while (!ended) {
+    const iterator = extractor[Symbol.asyncIterator]();
+    while (true) {
       clock.remaining();
-      let header: Buffer;
+      let next;
       try {
-        header = await reader.readExactly(TAR_BLOCK_BYTES);
+        next = await iterator.next();
       } catch (error) {
-        throw asInvalid(error, 'snapshot archive is corrupt');
+        throw archiveError(error);
       }
-      if (header.every(byte => byte === 0)) {
-        const second = await reader.readExactly(TAR_BLOCK_BYTES);
-        if (!second.every(byte => byte === 0)) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has an invalid trailer');
-        }
-        ended = true;
-        break;
-      }
+      if (next.done) break;
+      clock.remaining();
 
-      validateTarChecksum(header);
-      const type = String.fromCharCode(header[156]);
-      const size = parseTarOctal(header, 124, 12);
-      const padding = tarPadding(size);
-
-      if (type === 'L') {
-        if (size > MAX_SNAPSHOT_LONG_NAME_BYTES) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has an oversized long name');
-        }
-        try {
-          longName = (await reader.readExactly(size)).toString('utf8').replace(/\0+$/, '');
-          await reader.skip(padding);
-        } catch (error) {
-          throw asInvalid(error, 'snapshot archive is corrupt');
-        }
-        continue;
-      }
-      if (type !== '0' && type !== '\0') {
-        throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported entry type');
-      }
-
-      const name = longName ?? tarMemberName(header);
-      longName = undefined;
-      const member = classifyArchiveMember(name);
-
-      if (member.kind === 'manifest') {
-        if (manifest) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has duplicate manifests');
-        }
-        if (size > MAX_SNAPSHOT_MANIFEST_BYTES) {
-          throw new InvalidWorktreeSnapshotError('snapshot manifest exceeded the size limit');
-        }
-        try {
-          manifest = parseManifest(await reader.readExactly(size));
-          await reader.skip(padding);
-        } catch (error) {
-          throw asInvalid(error, 'snapshot manifest is corrupt');
-        }
-        continue;
-      }
-
-      const target = member.kind === 'recovery' ? recovery : files;
-      if (target.has(member.path)) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive has duplicate file entries');
-      }
-      if (files.size + recovery.size >= MAX_WORKTREE_SNAPSHOT_FILES) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive has too many file entries');
-      }
-      if (size > MAX_WORKTREE_SNAPSHOT_FILE_BYTES) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive file exceeded the size limit');
-      }
-      if (totalFileBytes + size > MAX_DECOMPRESSED_BYTES) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive exceeded the decompressed limit');
-      }
-      const mode = parseTarOctal(header, 100, 8);
-      if (mode !== 0o644 && mode !== 0o755) {
-        throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported file mode');
-      }
-
-      const destination =
-        member.kind === 'recovery'
-          ? join(temporaryDirectory, 'recovery', ...member.path.split('/'))
-          : join(temporaryDirectory, 'files', ...member.path.split('/'));
+      const entry = next.value;
       try {
-        await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+        if (entry.header.type !== 'file') {
+          throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported entry type');
+        }
+        const member = classifyArchiveMember(entry.header.name);
+        const size = entry.header.size ?? 0;
+        if (!Number.isSafeInteger(size) || size < 0) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive has an invalid entry size');
+        }
+
+        if (member.kind === 'manifest') {
+          if (manifest) {
+            throw new InvalidWorktreeSnapshotError('snapshot archive has duplicate manifests');
+          }
+          if (size > MAX_SNAPSHOT_MANIFEST_BYTES) {
+            throw new InvalidWorktreeSnapshotError('snapshot manifest exceeded the size limit');
+          }
+          const chunks: Buffer[] = [];
+          let manifestBytes = 0;
+          for await (const chunk of entry) {
+            clock.remaining();
+            manifestBytes += chunk.length;
+            if (manifestBytes > MAX_SNAPSHOT_MANIFEST_BYTES) {
+              throw new InvalidWorktreeSnapshotError('snapshot manifest exceeded the size limit');
+            }
+            chunks.push(chunk);
+          }
+          if (manifestBytes !== size) {
+            throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
+          }
+          manifest = parseManifest(Buffer.concat(chunks, manifestBytes));
+          continue;
+        }
+
+        const target = member.kind === 'recovery' ? recovery : files;
+        if (target.has(member.path)) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive has duplicate file entries');
+        }
+        if (files.size + recovery.size >= MAX_WORKTREE_SNAPSHOT_FILES) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive has too many file entries');
+        }
+        if (size > MAX_WORKTREE_SNAPSHOT_FILE_BYTES) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive file exceeded the size limit');
+        }
+        if (totalFileBytes + size > MAX_DECOMPRESSED_BYTES) {
+          throw new InvalidWorktreeSnapshotError(
+            'snapshot archive exceeded the decompressed limit'
+          );
+        }
+        const mode = entry.header.mode ?? 0;
+        if (mode !== 0o644 && mode !== 0o755) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive has an unsupported file mode');
+        }
+
+        const destination =
+          member.kind === 'recovery'
+            ? join(temporaryDirectory, 'recovery', ...member.path.split('/'))
+            : join(temporaryDirectory, 'files', ...member.path.split('/'));
+        try {
+          await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+        } catch (error) {
+          if (
+            error !== null &&
+            typeof error === 'object' &&
+            'code' in error &&
+            (error.code === 'ENOTDIR' || error.code === 'EEXIST' || error.code === 'EISDIR')
+          ) {
+            throw new InvalidWorktreeSnapshotError('snapshot archive has conflicting paths');
+          }
+          throw error;
+        }
+        let handle: FileHandle;
+        try {
+          handle = await open(destination, 'wx', 0o600);
+        } catch (error) {
+          if (
+            error !== null &&
+            typeof error === 'object' &&
+            'code' in error &&
+            (error.code === 'ENOTDIR' || error.code === 'EEXIST' || error.code === 'EISDIR')
+          ) {
+            throw new InvalidWorktreeSnapshotError('snapshot archive has conflicting paths');
+          }
+          throw error;
+        }
+        let written = 0;
+        try {
+          for await (const chunk of entry) {
+            clock.remaining();
+            written += chunk.length;
+            if (written > size) {
+              throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
+            }
+            let offset = 0;
+            while (offset < chunk.length) {
+              const result = await handle.write(chunk, offset, chunk.length - offset);
+              if (result.bytesWritten === 0) {
+                throw new Error('snapshot extraction write made no progress');
+              }
+              offset += result.bytesWritten;
+            }
+          }
+        } finally {
+          await handle.close();
+        }
+        if (written !== size) {
+          throw new InvalidWorktreeSnapshotError('snapshot archive is truncated');
+        }
+        await chmod(destination, mode);
+        target.set(member.path, { path: member.path, tempPath: destination, mode, size });
+        totalFileBytes += size;
       } catch (error) {
-        if (
-          error !== null &&
-          typeof error === 'object' &&
-          'code' in error &&
-          (error.code === 'ENOTDIR' || error.code === 'EEXIST')
-        ) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has conflicting paths');
-        }
-        throw error;
+        throw archiveError(error);
       }
-      let handle: FileHandle;
-      try {
-        handle = await open(destination, 'wx', 0o600);
-      } catch (error) {
-        if (
-          error !== null &&
-          typeof error === 'object' &&
-          'code' in error &&
-          (error.code === 'ENOTDIR' || error.code === 'EEXIST')
-        ) {
-          throw new InvalidWorktreeSnapshotError('snapshot archive has conflicting paths');
-        }
-        throw error;
-      }
-      try {
-        try {
-          await reader.writeTo(handle, size);
-          await reader.skip(padding);
-        } catch (error) {
-          throw asInvalid(error, 'snapshot archive is corrupt');
-        }
-      } finally {
-        await handle.close();
-      }
-      await chmod(destination, mode);
-      target.set(member.path, { path: member.path, tempPath: destination, mode, size });
-      totalFileBytes += size;
     }
 
     if (!manifest) {
       throw new InvalidWorktreeSnapshotError('snapshot archive has no manifest');
-    }
-    try {
-      await reader.finish();
-    } catch (error) {
-      throw asInvalid(error, 'snapshot archive is corrupt');
     }
     if (manifest.worktreeId !== worktreeId) {
       throw new InvalidWorktreeSnapshotError('snapshot archive belongs to another worktree');
@@ -1375,6 +1274,8 @@ async function extractArchive(
   } finally {
     input.destroy();
     gunzip.destroy();
+    decompressed.destroy();
+    extractor.destroy();
     if (!complete) await rm(temporaryDirectory, { recursive: true, force: true });
   }
 }

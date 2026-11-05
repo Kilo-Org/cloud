@@ -518,7 +518,7 @@ async function validateUserAuthorization({
     }
   }
 
-  if (organizationId) {
+  if (organizationId !== undefined) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
       return authError(400, 'Invalid organization ID format', kiloUserId);

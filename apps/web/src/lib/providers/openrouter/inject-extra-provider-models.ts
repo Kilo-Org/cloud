@@ -12,6 +12,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { Endpoint, StoredModel } from '@kilocode/db/schema-types';
+import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
 
@@ -77,14 +78,6 @@ export function injectExtraProviderModels(
   }
 }
 
-function toDisplayName(providerId: string) {
-  return providerId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 type VercelOnlyProviderMetadata = {
   displayName: string;
   termsOfServiceURL: string;
@@ -119,7 +112,9 @@ const vercelOnlyProviderMetadata = new Map<string, VercelOnlyProviderMetadata>(
 
 function createVercelOnlyProvider(providerId: string): OpenRouterProvider {
   const metadata = vercelOnlyProviderMetadata.get(providerId);
-  const displayName = metadata?.displayName ?? toDisplayName(providerId);
+  const displayName =
+    metadata?.displayName ??
+    normalizePublicInferenceProvider(providerId.replace(/[-_]+/g, ' ')).name;
   return {
     name: displayName,
     displayName,

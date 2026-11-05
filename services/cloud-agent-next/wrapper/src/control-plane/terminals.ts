@@ -27,6 +27,7 @@ export type ControlPlaneTerminalRuntime = {
   detachDirectory(directory: string): Promise<void>;
   /** Attached sessions with input in the last 30 seconds, for diagnostics only. */
   recentInputCount(): number;
+  hasActivePty(): boolean;
   handle(frame: ControlPlaneTerminalRequestFrame): Promise<ControlPlaneWrapperFrame>;
   shutdown(): void;
 };
@@ -200,6 +201,8 @@ export function createControlPlaneTerminals(options: {
     forgetSession,
     detachDirectory,
     recentInputCount,
+    hasActivePty: () =>
+      [...attached.values()].some(session => runtime.hasActivePty(session.identity)),
     handle,
     shutdown: () => runtime.shutdown(),
   };

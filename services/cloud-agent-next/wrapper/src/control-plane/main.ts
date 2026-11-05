@@ -180,13 +180,14 @@ export function createControlPlaneSessionHost(options: {
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
+  isWorkspaceBusy?(): boolean;
 }) {
   const runtimes = createKiloRuntimes({
     ...options.runtime,
     onEvent: event => turns?.observeKiloEvent(event),
     onActivityChange: key => turns?.refreshActivity(key),
-    onDeadline: (identity, reason, retry, key) =>
-      turns?.onNativeDeadline(identity, reason, retry, key),
+    onDeadline: (identity, reason, retry, key, stopped) =>
+      turns?.onNativeDeadline(identity, reason, retry, key, stopped),
     onRestart: info => turns?.onRuntimeRestart(info),
     onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
     onMemoryHold: info => turns?.onRuntimeMemoryHold(info),
@@ -198,6 +199,7 @@ export function createControlPlaneSessionHost(options: {
     turns: manager,
     getHeartbeat: () => ({
       active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      workspaceBusy: options.isWorkspaceBusy?.() ?? false,
       degraded: runtimes.suspected(),
     }),
   };
@@ -239,7 +241,6 @@ export function createControlPlaneFrameDispatcher(
         return;
       }
       case 'session.prepare':
-        deps.turns.current?.registerRoute(frame.spec);
         void deps.preparation.current
           ?.prepare(frame.spec, frame.credentials)
           .then(() => {
@@ -290,7 +291,10 @@ export function createControlPlaneFrameDispatcher(
         return;
       case 'worktree.prepareDeletion':
       case 'worktree.delete':
-        void deps.worktreeDeletion.current?.handle(frame);
+        void (
+          deps.turns.current?.cancelInterruptedFinalizations(frame.payload.directory) ??
+          Promise.resolve()
+        ).then(() => deps.worktreeDeletion.current?.handle(frame));
         return;
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
@@ -401,6 +405,7 @@ export async function runControlPlaneWrapper(
       onNativeDiagnostic: projector,
     },
     isPreparing: () => preparationRef.current?.isPreparing() ?? false,
+    isWorkspaceBusy: () => terminalsRef.current?.hasActivePty() ?? false,
   });
   const { runtimes } = host;
   turnsRef.current = host.turns;
@@ -435,6 +440,7 @@ export async function runControlPlaneWrapper(
     timers,
     onNativeDiagnostic: projector,
     allocationId,
+    onPreparedRoute: spec => turnsRef.current?.registerRoute(spec),
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv, cloudAgentMcp) => {
@@ -467,7 +473,10 @@ export async function runControlPlaneWrapper(
       runtimes
         .runtimesForDirectory(directory)
         .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
-    retireDirectory: directory => runtimes.retireDirectory(directory),
+    retireDirectory: async directory => {
+      await turnsRef.current?.cancelInterruptedFinalizations(directory);
+      await runtimes.retireDirectory(directory);
+    },
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
     onDiagnostic: diagnostics.onDiagnostic,

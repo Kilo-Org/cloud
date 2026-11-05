@@ -24,7 +24,8 @@ export type RuntimeActivityOptions = {
   onDeadline(
     identity: ExecutionIdentity,
     reason: ExecutionFailure,
-    retry: ExecutionRetry | undefined
+    retry: ExecutionRetry | undefined,
+    stopped: Promise<boolean>
   ): void;
   /** False when the runtime holds the fault (memory pressure); it is raised again next check. */
   onFault(reason: ActivityFault): boolean;

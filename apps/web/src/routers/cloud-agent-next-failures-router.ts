@@ -232,7 +232,7 @@ async function loadSessionFailureDetail(
     .where(
       and(
         eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId),
-        sql`coalesce(${cloud_agent_session_runs.queued_at}, ${cloud_agent_session_runs.terminal_at}) >= now() - interval '90 days'`
+        sql`coalesce(${cloud_agent_session_runs.queued_at}, ${cloud_agent_session_runs.terminal_at}) >= now() - make_interval(days => ${RUN_RETENTION_DAYS})`
       )
     )
     .orderBy(desc(cloud_agent_session_runs.queued_at), desc(cloud_agent_session_runs.terminal_at))

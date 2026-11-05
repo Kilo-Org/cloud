@@ -9,6 +9,7 @@
       "lowBalance": "Sinu saldo vajab tähelepanu",
       "spendAlert": "Sinu kulutused vajavad tähelepanu",
       "securityFinding": "Turbetuvastus vajab tähelepanu",
+      "securityUpdate": "Turvakontrollil on uuendus",
       "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Turbetuvastus vajab tähelepanu"
+      "body": "Turvakontrollil on uuendus"
     }
   },
   "instanceLifecycle": {

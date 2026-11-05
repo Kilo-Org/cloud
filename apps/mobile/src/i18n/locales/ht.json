@@ -189,6 +189,7 @@
     "resendCode": "Voye kòd la ankò",
     "termsPrefix": "Lè ou kontinye, ou dakò ak ",
     "terms": "Kondisyon nou yo",
+    "termsInSentence": "Kondisyon nou yo",
     "termsConnector": " ak ",
     "termsSuffix": ".",
     "moreSignInOptions": "Plis opsyon koneksyon",
@@ -297,6 +298,7 @@
     "toolSummaryTranslation": "Tradui rezime zouti yo",
     "toolSummaryTranslationSubtitle": "Voye chak rezime zouti bay yon modèl pou tradui li nan lang aplikasyon w lan. Yo montre orijinal la si tradiksyon an echwe.",
     "toolSummaryTranslationModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(common.model) pou chwazi yon lòt.",
+    "translateSummaries": "Tradui rezime",
     "autoExpandThinkingInactiveSubtitle": "Pa gen okenn efè lè detay refleksyon yo kache."
   },
   "prReview": {
@@ -441,7 +443,6 @@
         "rebase": "Chanjman baz"
       },
       "terminal": {
-        "alreadyMerged": "Deja fizyonnen",
         "closed": "Demann fizyon sa a fèmen",
         "closedMergeRequest": "Merge request sa a fèmen"
       },
@@ -458,7 +459,6 @@
         "requiredReviewsTitle": "Gen revizyon obligatwa ki manke",
         "requiredReviewsDetail": "Moun ki dwe revize yo poko bay tout apwobasyon ki nesesè yo.",
         "failingChecksTitle": "Verifikasyon obligatwa ki echwe",
-        "failingChecksDetail": "Verifikasyon estati obligatwa yo ap echwe.",
         "unstableTitle": "Kèk verifikasyon ap echwe",
         "unstableDetail": "Verifikasyon ki pa obligatwa yo ap echwe. Yo p ap bloke fizyon an.",
         "draftTitle": "Demann fizyon an bwouyon",
@@ -680,8 +680,13 @@
       "checkFailedTitleBitbucket": "Pa t ka tcheke koneksyon Bitbucket la.",
       "providerCheckFailedMessage": "Estati koneksyon an pa disponib jiskaske li chaje.",
       "reconnectTitle": "Rekonekte GitHub",
+      "reconnectTitleGitLab": "Rekonekte GitLab",
+      "reconnectTitleBitbucket": "Rekonekte Bitbucket",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a.",
       "gitlabDescription": "Revize merge request yo sou mobil",
+      "gitlabInstanceMismatchTitle": "Koneksyon GitLab la se pou yon lòt enstans",
+      "gitlabInstanceMismatchDescription": "Koneksyon GitLab ou a se pou {{connected}}, men demann fizyon sa a sou {{requested}}. Konekte GitLab sou enstans sa a pou w revize li.",
+      "checkActiveConnection": "Koneksyon an aktif, men eleman sa a pa ka chaje toujou.",
       "bitbucketOrgOnlyDescription": "Chanje kont ki anwo a pou yon òganizasyon pou w revize demann fizyon Bitbucket li.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
@@ -704,7 +709,12 @@
       "pendingComment_other": "kòmantè an atant",
       "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon an",
-      "partialPostedMessage": "{{displayFreshCount}} kòmantè pibliye. {{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedFresh": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedFresh_other": "{{displayFreshCount}} kòmantè pibliye. ",
+      "partialPostedStale": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_one": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
+      "partialPostedStale_other": "{{displayStaleCount}} kòmantè fè referans ak yon komit ki pi ansyen epi yo rete nan lis atant ou a.",
       "blockedRequestChanges": "Ajoute yon rezime oswa omwen yon kòmantè pou mande chanjman.",
       "blockedComment": "Ajoute yon rezime oswa omwen yon kòmantè pou pibliye yon revizyon kòm kòmantè."
     },
@@ -1523,6 +1533,7 @@
       "prOpened": "Pull request pou REVIEW.md ouvri",
       "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
       "status": {
+        "open": "Louvri",
         "edited": "Modifye",
         "opening_change_request": "Ap ouvri PR",
         "change_request_failed": "Ouvèti PR la echwe",
@@ -1610,6 +1621,8 @@
       "set": "Konfigire",
       "notSet": "Pa konfigire",
       "nSelected": "{{displayCount}} chwazi",
+      "nSelected_one": "{{displayCount}} chwazi",
+      "nSelected_other": "{{displayCount}} chwazi",
       "proposedReviewMdGuidance": "Direktiv ki pwopoze pou REVIEW.md"
     },
     "decision": {
@@ -1744,6 +1757,8 @@
       "exploitabilityReasoning": "Rezon ki jistifye si li ka eksplwate",
       "suggestedFix": "Koreksyon ki rekòmande",
       "whereFound": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_one": "Kote yo jwenn sa ({{displayCount}})",
+      "whereFound_other": "Kote yo jwenn sa ({{displayCount}})",
       "fullReport": "Rapò konplè ki pwodui a",
       "yes": "Wi",
       "no": "Non",
@@ -1791,6 +1806,7 @@
       "priorityFindingsPending": "Konsta priyorite yo ap parèt apre premye senkronizasyon an.",
       "refreshFailed": "Nou pa t ka rafrechi done yo. N ap montre done ki te senkronize dènye fwa yo.",
       "settings": "Paramèt",
+      "syncing": "N ap senkronize…",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
       "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",
@@ -1821,6 +1837,8 @@
       "breakdownMediumLow_other": "{{displayCount}} mwayen ak ba",
       "dueThisWeek": "Dat limit semèn sa a",
       "dueThisWeekDetail": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_one": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
+      "dueThisWeekDetail_other": "Pami yo, {{exploitable}} konfime kòm eksplwatab",
       "noDeadline": "Pa gen dat limit",
       "reviewSlaAssignment": "Revize SLA ki asiyen yo",
       "allOpenFindingsTracked": "Tout konsta ouvè yo gen swivi"
@@ -2032,6 +2050,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Enstale aplikasyon GitHub Kilo a pou senkronize alèt Dependabot yo otomatikman epi jere konsta sekirite nan tout depo ou yo.",
+      "connectOwnerOnly": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou konekte {{platform}}.",
       "connectTitle": "Konekte GitHub pou kòmanse",
       "couldNotLoad": "Nou pa t ka chaje Ajan sekirite a.",
       "installApp": "Enstale aplikasyon GitHub la",
@@ -2064,6 +2083,7 @@
       "actionFailed": "Pa t ka fini aksyon sa a. Tanpri eseye ankò.",
       "actionBlocked": "Pa t ka fini aksyon sa a. Fòk ou repare pwoblèm nan anvan ou ka eseye ankò.",
       "syncNoRepositories": "Pa gen okenn depo nan sijè senkronizasyon an. Chwazi depo Ajan sekirite siveye yo, epi senkronize ankò.",
+      "syncNoRepositoriesNoManage": "Pa gen okenn depo nan sijè senkronizasyon an. Yon pwopriyetè òganizasyon, yon administratè oswa yon responsab faktirasyon dwe konekte depo yo anvan li ka senkronize.",
       "syncIntegrationInactive": "Koneksyon GitHub pou Ajan sekirite a pa aktif. Rekonekte GitHub App Kilo a, epi senkronize ankò.",
       "syncMissingPermission": "Kilo GitHub App pa ka li alèt vilnerabilite yo. Bay pèmisyon sa a nan GitHub, epi senkronize ankò.",
       "configConflict": "Paramèt Ajan sekirite a chanje yon lòt kote. Revize paramèt ki pi resan yo epi anrejistre ankò."
@@ -2220,6 +2240,8 @@
       "cannotCompleteTitle": "Pa ka fini enstalasyon an",
       "notAdminMessage": "Se sèlman yon administratè GitHub kont sa a ki ka konekte li. Mande yon administratè òganizasyon an pou enstale Kilo.",
       "alreadyClaimedMessage": "Enstalasyon GitHub sa a deja konekte ak yon lòt kont Kilo. Dekonekte li nan kont sa a anvan.",
+      "installationUnavailableMessage": "Enstalasyon GitHub App sa a sispann oswa li pa disponib ankò. Retabli oswa reenstale li nan GitHub, epi rekòmanse.",
+      "multipleInstallationsMessage": "Oganizasyon Kilo sa a ka konekte sèlman yon sèl oganizasyon GitHub pou kounye a.",
       "didNotCompleteTitle": "Enstalasyon an pa fini",
       "didNotCompleteMessage": "Enstalasyon aplikasyon GitHub la pa fini. Eseye ankò nan aplikasyon an."
     },
@@ -2362,7 +2384,7 @@
       "discardDraftMessage": "Ou ap pèdi enstriksyon ou yo.",
       "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardFailed": "Nou pa t ka jete bouyon an. Tanpri eseye ankò.",
-      "remoteHint": "Egzekite `kilo remote` sou òdinatè ou a, oswa `/remote` nan yon sesyon CLI ki aktif, pou kontwole yon pwosesis kilo lokal.",
+      "remoteHint": "Pou egzekite sou òdinatè w la, lanse Kilo la epi kite li ap mache.",
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
@@ -2376,7 +2398,6 @@
       "defaultProfileResolvesTo": "Koresponn a {{name}}",
       "defaultProfileResolvesToAccessibility": "Default pwofil: {{name}}",
       "manageProfiles": "Jere pwofil yo",
-      "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
       "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
@@ -2531,6 +2552,7 @@
       "assistantStopped": "Repons lan te sispann.",
       "assistantContextOverflow": "Konvèsasyon an twò long pou modèl la.",
       "assistantProviderError": "Founisè a retounen yon erè.",
+      "assistantProviderRefused": "Founisè a rejte demann lan epi li pa ka reeseye.",
       "assistantOutputLimit": "Repons lan rive limit sòti modèl la.",
       "assistantStructuredOutput": "Repons lan pa t koresponn ak fòma ki obligatwa a.",
       "assistantFailed": "Repons lan echwe."
@@ -3062,7 +3084,8 @@
     "newSessionOn": "Nouvo sesyon sou {{name}}",
     "noMatchingSessions": "Pa gen sesyon ki koresponn.",
     "onlyFirstFilesAttached": "Se sèlman premye {{displayCount}} fichye yo k ap tache.",
-    "staleMessage": "Kontni pou pataje a pa disponib ankò.",
+    "staleMessage": "Voye l ankò nan aplikasyon ou te pataje a.",
+    "staleTitle": "Pataj pa disponib",
     "retryableMessage": "Pa t ka chaje sesyon ou yo.",
     "emptyMessage": "Poko gen sesyon — kòmanse yon nouvo sesyon pou voye sa a.",
     "cliNotConnectedTitle": "Sesyon an pa konekte",
@@ -3776,9 +3799,9 @@
   "spendAlerts": {
     "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
     "thresholdTitle": "Depasman papòt",
-    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "thresholdSubtitle": "Depans aktyèl la pou sektè sa a nan fenèt ou chwazi a depase limit ou",
     "anomalyTitle": "Ogmantasyon chak èdtan",
-    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "anomalySubtitle": "Vitès chak èdtan sektè sa a byen pi wo pase bazliy p95 pa li menm",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Fenèt",
     "window24h": "24 èdtan",
@@ -3788,14 +3811,14 @@
     "saved": "Paramèt alèt depans yo anrejistre",
     "loadError": "Pa t kapab chaje alèt depans yo.",
     "saveError": "Pa t kapab anrejistre alèt depans yo.",
-    "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
-    "noSpend": "Poko gen depans ki anrejistre",
+    "sendAlerts": "Voye alèt depans",
+    "noSpend": "Poko gen depans",
     "spend24h": "Depans nan 24 èdtan ki sot pase yo",
     "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
     "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
     "pushOffByCategory": "Fèmen nan Notifikasyon",
     "multiplierMaxError": "Antre yon miltiplikatè {{max}} oswa mwens",
-    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens."
+    "thresholdMaxError": "Antre yon montan {{max}} oswa mwens"
   },
   "profiles": {
     "title": "Pwofil yo",

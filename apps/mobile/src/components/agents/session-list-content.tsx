@@ -208,13 +208,10 @@ export function AgentSessionListContent({
   // message.
   const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
 
-  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. On return, each row re-reads the ack
-  // store via its own `useSyncExternalStore` subscription
-  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
-  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
-  // pass it as `extraData` so visible cells re-render without remounting the
-  // list — preserving scroll.
+  // Each row re-reads the ack store through its own `useSyncExternalStore`
+  // subscription (`useSessionAttentionRevision`). The snapshot taken when the
+  // tab regains focus passes back down as `extraData`, so visible cells
+  // re-render on return without remounting the list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {

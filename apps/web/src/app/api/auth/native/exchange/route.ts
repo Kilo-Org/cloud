@@ -93,7 +93,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
   // session, so a key id the client stored always names a server row. Android
   // verification and the non-production sentinel carry no key id, so they
   // persist nothing and take the plain session path.
-  if (verification.keyId) {
+  if (verification.keyId !== undefined) {
     try {
       const combined = await createDeviceSessionWithAttestedKey({
         userId: auth.user.id,

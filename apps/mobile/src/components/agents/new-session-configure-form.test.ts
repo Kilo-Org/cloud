@@ -12,6 +12,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import '@/i18n';
@@ -415,6 +416,35 @@ describe('NewSessionConfigureForm', () => {
     expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 
+  it('shows the plan refusal in the scroll body under the composer, not the footer', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: 'The organization trial has ended.',
+    }) as Node;
+
+    // A three-line explanation in the pinned footer shrinks the scroll frame
+    // and cuts the launch folder on a compact screen, so the body carries it.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, NewSessionPlanRefusal)).toMatchObject({
+      message: 'The organization trial has ended.',
+    });
+    // The footer keeps only the start-blocked reason (its own component): the
+    // refusal must not take height from the form a second time. The pinned
+    // footer is the KeyboardAvoidingView's second child, after the scroll body,
+    // and it must be found for the negative assertion to mean anything.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    const footer = (lift?.children as Node[] | undefined)?.[1] as Node | undefined;
+    expect(lift).not.toBeNull();
+    expect(footer).toBeDefined();
+    expect(findElementByType(footer, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByComponent(footer, NewSessionPlanRefusal)).toBeNull();
+  });
+
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -433,9 +463,36 @@ describe('NewSessionConfigureForm', () => {
     });
   });
 
-  it('renders the account section above the run-target block', async () => {
+  it('keeps the run-target block while every provider asks to be connected', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    // The first-run form with no Git provider connected: the repository section
+    // renders its connect cards, and the run target must stay next to them so a
+    // Cloud Agent pick can still be switched back to a connected computer.
+    const connectGroups: RepositoryGroup[] = [
+      { key: 'github', status: 'connect', repositories: [] },
+      { key: 'gitlab', status: 'connect', repositories: [] },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+      groups: connectGroups,
+    }) as Node;
+
+    expect(findElementByType(element, 'NewSessionRepositorySection')).toMatchObject({
+      groups: connectGroups,
+    });
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      disabled: false,
+    });
+  });
+
+  it('renders the account section above the run-target block', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),

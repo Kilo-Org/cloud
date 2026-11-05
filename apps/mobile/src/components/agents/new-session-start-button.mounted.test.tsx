@@ -11,6 +11,7 @@ import { NewSessionStartButton } from './new-session-start-button';
 // call-to-action keeps a visible label while starting (button.tsx draws the
 // inline spinner, so an empty child renders as a bare brand-coloured bar).
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -54,6 +55,7 @@ async function mountButton(props: {
   isStarting?: boolean;
   startBlockedReason?: string | null;
   startBlockedAction?: { label: string; onPress: () => void; isBusy?: boolean } | null;
+  blockedByPlan?: boolean;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -65,6 +67,7 @@ async function mountButton(props: {
         isStarting: props.isStarting ?? false,
         startBlockedReason: props.startBlockedReason ?? null,
         startBlockedAction: props.startBlockedAction ?? null,
+        blockedByPlan: props.blockedByPlan ?? false,
         onStartSession: vi.fn<() => void>(),
       })
     );
@@ -240,5 +243,29 @@ describe('NewSessionStartButton', () => {
     expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
 
     renderer.unmount();
+  });
+
+  // The plan explanation keeps Start disabled. On a dark screen the disabled
+  // primary fill is a light neutral that reads as an enabled plate, so this
+  // state takes the inactive control fill and an ink that still contrasts on
+  // it; a Start disabled for any other reason keeps the disabled primary pair.
+  it('draws a plan-blocked Start in the inactive fill on a dark screen', async () => {
+    const blocked = await mountButton({ blockedByPlan: true, isStartDisabled: true });
+    const blockedButton = hostByType(blocked.root, 'Pressable')[0];
+    const blockedClasses = String(blockedButton?.props.className).split(' ');
+    expect(blockedClasses).toContain('bg-primary-disabled');
+    expect(blockedClasses).toContain('dark:bg-control-idle');
+    const blockedLabel = hostByType(blocked.root, 'Text')[0];
+    expect(blockedLabel?.props.className).toContain('dark:text-ink2');
+    blocked.unmount();
+
+    const ordinary = await mountButton({ isStartDisabled: true });
+    const ordinaryButton = hostByType(ordinary.root, 'Pressable')[0];
+    const ordinaryClasses = String(ordinaryButton?.props.className).split(' ');
+    expect(ordinaryClasses).toContain('bg-primary-disabled');
+    expect(ordinaryClasses).not.toContain('dark:bg-control-idle');
+    const ordinaryLabel = hostByType(ordinary.root, 'Text')[0];
+    expect(ordinaryLabel?.props.className).toBeUndefined();
+    ordinary.unmount();
   });
 });

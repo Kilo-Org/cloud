@@ -81,7 +81,6 @@ export function genericPushContentForPushData(
         ),
       };
     case 'security_finding':
-    case 'security_lifecycle':
       return {
         title: genericTitle(),
         body: translatePush(
@@ -89,6 +88,18 @@ export function genericPushContentForPushData(
           'generic.body.securityFinding',
           undefined,
           'A security finding needs attention'
+        ),
+      };
+    case 'security_lifecycle':
+      // A status change (analysis finished, remediation queued, …) is not an
+      // outstanding finding, so it must not reuse the finding body.
+      return {
+        title: genericTitle(),
+        body: translatePush(
+          locale,
+          'generic.body.securityUpdate',
+          undefined,
+          'A security check has an update'
         ),
       };
     case 'agent_briefing':

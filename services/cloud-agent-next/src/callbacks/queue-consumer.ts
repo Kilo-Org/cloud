@@ -1,9 +1,13 @@
 import type { CallbackJob } from './types.js';
 import { deliverCallbackJob } from './delivery.js';
 import { logger } from '../logger.js';
-import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  PARENT_WORKSPACE_CALLBACK_URL,
+  parseWorkspaceSessionCallbackTarget,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import type { Env } from '../types.js';
-import { deliverParentSessionCallback } from './parent-session.js';
+import { deliverWorkspaceSessionCallback } from './parent-session.js';
+import { deliverParentWorkspaceCallback } from './parent-workspace.js';
 
 export function createCallbackQueueConsumer(env: Env) {
   return async function callbackQueueConsumer(batch: MessageBatch<CallbackJob>): Promise<void> {
@@ -17,9 +21,11 @@ async function processMessage(message: Message<CallbackJob>, env: Env): Promise<
   const job = message.body;
 
   const result =
-    job.target.url === PARENT_SESSION_CALLBACK_URL
-      ? await deliverParentSessionCallback(env, job, message.attempts)
-      : await deliverCallbackJob(job.target, job.payload, message.attempts);
+    job.target.url === PARENT_WORKSPACE_CALLBACK_URL
+      ? await deliverParentWorkspaceCallback(env, job, message.attempts)
+      : parseWorkspaceSessionCallbackTarget(job.target.url) !== null
+        ? await deliverWorkspaceSessionCallback(env, job, message.attempts)
+        : await deliverCallbackJob(job.target, job.payload, message.attempts);
 
   switch (result.type) {
     case 'success':

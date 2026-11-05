@@ -89,6 +89,8 @@ type ChatSidebarProps = {
   selectedWorktreeId?: string | null;
   organizationId?: string;
   onOpenSession?: (sessionId: string) => void;
+  /** Opens a worktree; its chats are listed most recently updated first. */
+  onOpenWorktree?: (worktreeId: string, sessionIdsByRecency: readonly string[]) => void;
   onDeleteSession?: (sessionId: string) => void;
   deletingSessionIds?: string[];
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
@@ -298,7 +300,7 @@ function WorktreeGroupRow({
   group,
   currentSessionId,
   selectedWorktreeId,
-  onOpenSession,
+  onOpenWorktree,
   onCreateWorktreeChat,
   onRenameWorktree,
   onDeleteWorktree,
@@ -311,7 +313,7 @@ function WorktreeGroupRow({
   group: SidebarWorktreeGroup;
   currentSessionId?: string;
   selectedWorktreeId?: string | null;
-  onOpenSession: (sessionId: string) => void;
+  onOpenWorktree: (group: SidebarWorktreeGroup) => void;
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
@@ -453,7 +455,7 @@ function WorktreeGroupRow({
                   ref={openButtonRef}
                   type="button"
                   disabled={isDeleting}
-                  onClick={() => onOpenSession(group.latestSession.sessionId)}
+                  onClick={() => onOpenWorktree(group)}
                   aria-label={`Open worktree ${label}`}
                   aria-current={isActive ? 'page' : undefined}
                   className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
@@ -660,6 +662,7 @@ export function ChatSidebar({
   selectedWorktreeId,
   organizationId,
   onOpenSession,
+  onOpenWorktree,
   onDeleteSession,
   deletingSessionIds,
   onRenameSession,
@@ -760,6 +763,21 @@ export function ChatSidebar({
       onMobileSheetOpenChange?.(false);
     },
     [chatPath, pathname, router, onOpenSession, onMobileSheetOpenChange]
+  );
+
+  const handleWorktreeClick = useCallback(
+    (group: SidebarWorktreeGroup) => {
+      if (!onOpenWorktree) {
+        handleSessionClick(group.latestSession.sessionId);
+        return;
+      }
+      onOpenWorktree(
+        group.worktreeId,
+        group.sessions.map(session => session.sessionId)
+      );
+      onMobileSheetOpenChange?.(false);
+    },
+    [handleSessionClick, onMobileSheetOpenChange, onOpenWorktree]
   );
 
   const toggleSearch = useCallback(() => {
@@ -949,7 +967,7 @@ export function ChatSidebar({
       isLoadingDetails={loadingWorktreeIds.includes(group.worktreeId)}
       currentSessionId={currentSessionId}
       selectedWorktreeId={selectedWorktreeId}
-      onOpenSession={handleSessionClick}
+      onOpenWorktree={handleWorktreeClick}
       onCreateWorktreeChat={onCreateWorktreeChat}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}

@@ -26,12 +26,15 @@ type PrReviewTabSelectorProps = {
    */
   discussionCount?: number;
   /**
-   * Disables every tab while the PR body is in a failed load state: the
-   * tabs' own reads cannot succeed while the overview that gates them
-   * failed, so the row stays at its size but stops switching.
+   * Tabs whose own reads cannot succeed while the request fails to load, so
+   * the row keeps its size but those entries stop switching. The caller
+   * leaves out the tab that hosts the failure and its recovery, because that
+   * entry is the way back to it.
    */
-  disabled?: boolean;
+  disabledTabs?: readonly PrReviewTabId[];
 };
+
+const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 /**
  * Horizontal pill row at the top of the PR review surface that picks
@@ -43,13 +46,14 @@ export function PrReviewTabSelector({
   activeTab,
   onChange,
   discussionCount,
-  disabled = false,
+  disabledTabs = NO_DISABLED_TABS,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
     <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
+        const disabled = disabledTabs.includes(tab.id);
         const badge =
           tab.id === 'discussion' && discussionCount && discussionCount > 0
             ? formatNumber(discussionCount, i18n.language)

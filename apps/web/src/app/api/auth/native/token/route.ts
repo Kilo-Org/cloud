@@ -217,8 +217,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   // ── Step 0: Client-address rate limit ────────────────────────────────────
   // Counted before the admission gate so one address cannot spend the provider
-  // calls that admission and identity verification make. A firewall rule that
-  // is not configured fails open and is reported; it never refuses a sign-in.
+  // calls that admission and identity verification make. Only a rule that
+  // answered may let the exchange through: a rule that is not configured
+  // refuses here, before any of that work, and is reported.
   if (await isNativeTokenAddressRateLimited(request)) {
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
@@ -483,9 +484,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
       // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
       // For assertion (existing key) and attestation (keyId already bound to
-      // another user): enforce → refuse without consuming the code so a
-      // legitimate retry remains possible. Report → log, skip persistence,
-      // and issue credentials.
+      // another user): refuse without consuming the code so a legitimate retry
+      // remains possible.
       if (
         admissionVerification.existingKeyUserId &&
         admissionVerification.existingKeyUserId !== result.user.id

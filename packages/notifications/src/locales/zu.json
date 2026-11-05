@@ -9,6 +9,7 @@
       "lowBalance": "Ibhalansi yakho idinga ukunakwa",
       "spendAlert": "Izindleko zakho zidinga ukunakwa",
       "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa",
+      "securityUpdate": "Ukuhlola kokuphepha kunokubuyekezwa",
       "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "I-Kilo",
-      "body": "Okutholakele kokuphepha kudinga ukunakwa"
+      "body": "Ukuhlola kokuphepha kunokubuyekezwa"
     }
   },
   "instanceLifecycle": {

@@ -20,7 +20,7 @@ import {
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
@@ -62,7 +62,7 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'openrouter',
+    type: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
     disableUrlSuffix: false,
@@ -92,8 +92,8 @@ describe('removeUnsupportedRequestServiceTier', () => {
       reason: 'non-fallback custom pricing',
     },
     {
-      model: gemma_4_26b_a4b_it_free_model.public_id,
-      reason: 'Kilo-exclusive model',
+      model: GEMMA_4_26B_A4B_IT_FREE_ID,
+      reason: 'auto small free model',
     },
   ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
     const request = makeRequest(model);
@@ -200,7 +200,8 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     return request.body.messages.find(message => message.role === 'tool')?.content;
@@ -257,7 +258,8 @@ describe('applyProviderSpecificLogic recursive tool schemas', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     const tool = request.body.tools?.[0];
@@ -305,7 +307,8 @@ describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     return request.body.tools[0];
@@ -374,7 +377,8 @@ describe('applyProviderSpecificLogic untyped tool schema enums', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     const tool = request.body.tools?.[0];
@@ -521,6 +525,113 @@ describe('applyReasoningDetailsTransform', () => {
 
     expect(assistant).not.toHaveProperty('reasoning');
     expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details hold only encrypted entries', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details fold to no text for reasoning upstreams', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [{ type: 'reasoning.encrypted', data: 'opaque-blob' }];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning).toBe('legacy thinking');
+  });
+
+  it('keeps a legacy reasoning string when reasoning_details are blank', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [
+      { type: 'reasoning.text', text: '' },
+      { type: 'reasoning.summary', summary: '' },
+    ];
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps an empty target field for a legacy reasoning string when reasoning_details is empty', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = '';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps a set target field when reasoning_details is an empty array', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning_details = [];
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('prefers folded reasoning_details over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
   it('drops the legacy reasoning string for Gemini', () => {
@@ -762,7 +873,8 @@ describe('removeModelsFallback', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     expect(request.body).not.toHaveProperty('fallbacks');
@@ -795,7 +907,8 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       null,
       null,
       null,
-      true
+      true,
+      null
     );
     return request;
   }
@@ -806,7 +919,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
       createUserVercelAiGatewayProvider('user-key')
     );
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null, null);
   });
 
   it('passes inference provider keys to the Vercel settings', async () => {
@@ -814,7 +927,7 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 
     const request = await apply(userByok, VERCEL_AI_GATEWAY);
 
-    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok, null);
   });
 
   it.each(['openrouter', 'vercel-ai-gateway'] as const)(
@@ -857,7 +970,8 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
         null,
         null,
         null,
-        true
+        true,
+        null
       );
 
       expect(request.body).toMatchObject(serverFeatures);
@@ -883,7 +997,8 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return { thinking: request.body.thinking, extraHeaders };
   }
@@ -905,10 +1020,76 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
   });
 
   it('leaves upstreams without verified support untouched', async () => {
-    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), id: 'custom' });
+    const { thinking, extraHeaders } = await apply({ ...makeProvider(null), type: 'custom' });
 
     expect(thinking).toEqual({ type: 'adaptive', display: 'summarized' });
     expect(extraHeaders['anthropic-beta']).toBe('fine-grained-tool-streaming-2025-05-14');
+  });
+});
+
+describe('applyProviderSpecificLogic whitespace-only messages', () => {
+  const model = 'anthropic/claude-opus-5.5';
+
+  it.each([
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
+    { name: 'OpenRouter', provider: OPENROUTER },
+    { name: 'a direct provider', provider: { ...makeProvider(null), type: 'custom' as const } },
+  ])('removes a whitespace-only assistant turn on $name', async ({ provider }) => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const toolUse = { type: 'tool_use' as const, id: 'toolu_1', name: 'read', input: {} };
+    const toolResult = { type: 'tool_result' as const, tool_use_id: 'toolu_1', content: 'ok' };
+    const request = makeMessagesRequest(model);
+    request.body.thinking = { type: 'adaptive' };
+    request.body.messages = [
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      provider,
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false,
+      null
+    );
+
+    expect(request.body.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'Read the file.' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Use the read tool.', signature: 'sig-1' },
+          { type: 'text', text: '\n\n' },
+          toolUse,
+        ],
+      },
+      { role: 'user', content: [toolResult] },
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'Continue.', cache_control: { type: 'ephemeral' } }],
+      },
+    ]);
+    jest.restoreAllMocks();
   });
 });
 
@@ -937,7 +1118,8 @@ describe('applyProviderSpecificLogic paid server features', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
     return request.body;
   }
@@ -992,7 +1174,8 @@ describe('applyProviderSpecificLogic paid server features', () => {
       null,
       null,
       null,
-      false
+      false,
+      null
     );
 
     expect(request.body.tools).toEqual([fields.tools[1]]);
@@ -1143,7 +1326,8 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
       'org-1',
       null,
       null,
-      isNonTrialEnterprise
+      isNonTrialEnterprise,
+      null
     );
 
     return request.body.provider;
@@ -1161,6 +1345,26 @@ describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
     expect(
       (await applyToClaude(false, [{ providerId: 'anthropic', decryptedAPIKey: 'key' }]))?.ignore
     ).toBeUndefined();
+  });
+  it("adds no Kilo provider order to a request served by the user's own provider key", async () => {
+    const request = makeRequest(USER_GATEWAY_TEST_MODEL);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      USER_GATEWAY_TEST_MODEL,
+      request,
+      {},
+      [{ providerId: 'bedrock', decryptedAPIKey: 'key' }],
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      'org-1',
+      null,
+      null,
+      false,
+      null
+    );
+
+    expect(request.body.provider).toBeUndefined();
   });
 });
 

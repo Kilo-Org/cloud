@@ -127,6 +127,9 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
     case 'autocommit_started': {
       const out: Record<string, unknown> = { message: safeString(data.message, 1000) ?? '' };
       if (typeof data.messageId === 'string') out.messageId = data.messageId;
+      // The repository is part of the event's identity, so two repositories stay apart.
+      const repository = safeString(data.repository, 500);
+      if (repository !== undefined) out.repository = repository;
       return out;
     }
     case 'autocommit_completed': {
@@ -137,6 +140,8 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
       if (typeof data.messageId === 'string') out.messageId = data.messageId;
       if (typeof data.skipped === 'boolean') out.skipped = data.skipped;
       if (typeof data.commitHash === 'string') out.commitHash = data.commitHash;
+      const repository = safeString(data.repository, 500);
+      if (repository !== undefined) out.repository = repository;
       // Drop commitMessage (may be large) on compaction.
       return out;
     }

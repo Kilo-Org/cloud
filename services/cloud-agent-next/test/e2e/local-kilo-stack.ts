@@ -4,11 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
 import { signKiloToken } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { loadRepoEnvFiles, type TestUser } from './auth.js';
+import type { TestUser } from './auth.js';
 import type { DriverConfig } from './client.js';
+import { discoverLocalStack } from './fixture-stack.js';
 import { openKiloSse, type KiloEvent, type startLocalKilo } from './local-kilo.js';
 import { createMessageId } from '../../src/session/message-id.js';
 
@@ -124,8 +124,6 @@ export type Stack = {
 };
 
 export async function discoverStack(input: { kiloRepo: string; bun?: string }): Promise<Stack> {
-  const service = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  const root = path.resolve(service, '../..');
   const kiloRepo = path.resolve(input.kiloRepo);
   const manifest = z
     .object({ packageManager: z.string() })
@@ -137,83 +135,19 @@ export async function discoverStack(input: { kiloRepo: string; bun?: string }): 
     manifest.packageManager,
     'Use the Kilo repository-pinned Bun version'
   );
-  const statusSchema = z.object({
-    services: z.array(z.object({ name: z.string(), port: z.number(), status: z.string() })),
-  });
-  const required = [
-    'nextjs',
-    'cloud-agent-next',
-    'ai-gateway',
-    'fake-llm',
-    'postgres',
-    // Sandbox preparation calls this service; a down meter fails a cold start late.
-    'container-usage-meter',
-  ];
-  // The status probe intermittently reports the whole stack down under load.
-  const status = await (async () => {
-    let lastError: unknown;
-    for (let attempt = 0; attempt < 6; attempt++) {
-      try {
-        const parsed = statusSchema.parse(
-          JSON.parse(
-            execFileSync('pnpm', ['-s', 'dev:status', '--json'], {
-              cwd: root,
-              encoding: 'utf8',
-              timeout: 30_000,
-            })
-          )
-        );
-        if (
-          required.every(name =>
-            parsed.services.some(entry => entry.name === name && entry.status === 'up')
-          )
-        ) {
-          return parsed;
-        }
-      } catch (error) {
-        lastError = error;
-      }
-      await delay(2_000);
-    }
-    throw new Error(
-      `Local stack is not ready: ${lastError instanceof Error ? lastError.message : String(lastError)}`
-    );
-  })();
-  const port = (name: string) => {
-    const entry = status.services.find(item => item.name === name && item.status === 'up');
-    assert(entry && entry.port > 0, `Local service ${name} is not running`);
-    return entry.port;
-  };
-  const web = `http://localhost:${port('nextjs')}`;
-  const worker = `http://localhost:${port('cloud-agent-next')}`;
-  const gateway = `http://localhost:${port('ai-gateway')}`;
-  const fake = `http://localhost:${port('fake-llm')}`;
-  const postgres = port('postgres');
-  assert(
-    (await fetch(`${worker}/health`, { signal: AbortSignal.timeout(10_000) })).ok,
-    'Cloud Worker health failed'
-  );
-  loadRepoEnvFiles(service);
-  const database = process.env.POSTGRES_URL;
-  assert(database, 'POSTGRES_URL is required');
-  const target = new URL(database);
-  assert(
-    ['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) &&
-      Number(target.port) === postgres,
-    'Database does not belong to the discovered local stack'
-  );
+  const stack = await discoverLocalStack();
   return {
-    service,
-    root,
+    service: stack.service,
+    root: stack.root,
     kiloRepo,
     bun,
     bunVersion,
-    web,
-    worker,
-    gateway,
-    fake,
-    postgres,
-    database,
+    web: stack.web,
+    worker: stack.worker,
+    gateway: stack.gateway,
+    fake: stack.fake,
+    postgres: stack.postgres,
+    database: stack.database,
   };
 }
 

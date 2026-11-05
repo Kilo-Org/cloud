@@ -342,18 +342,30 @@ export function buildPrOverviewQueryOptions(trpc: Trpc, scope: ProviderPrScope) 
   );
 }
 
-function githubChecksOptions(trpc: Trpc, input: { owner: string; repo: string; ref: string }) {
-  return trpc.githubPrReview.listChecks.queryOptions(input);
+function githubChecksOptions(
+  trpc: Trpc,
+  input: { owner: string; repo: string; ref: string },
+  enabled: boolean
+) {
+  return trpc.githubPrReview.listChecks.queryOptions(input, { enabled });
 }
 
-export function buildPrChecksQueryOptions(trpc: Trpc, scope: ProviderPrScope, headSha: string) {
+export function buildPrChecksQueryOptions(
+  trpc: Trpc,
+  scope: ProviderPrScope,
+  input: { readonly headSha: string; readonly enabled: boolean }
+) {
   const triple = providerPrTriple(scope.ref);
   if (scope.ref.platform === 'github') {
-    return githubChecksOptions(trpc, { owner: triple.owner, repo: triple.repo, ref: headSha });
+    return githubChecksOptions(
+      trpc,
+      { owner: triple.owner, repo: triple.repo, ref: input.headSha },
+      input.enabled
+    );
   }
   return asGithubOptions<ReturnType<typeof githubChecksOptions>>(
     trpc.providerReview.listChecks.queryOptions(providerIdentity(scope), {
-      enabled: isProviderScopeReady(scope),
+      enabled: input.enabled && isProviderScopeReady(scope),
       select: normalizeProviderChecks,
     })
   );
@@ -513,7 +525,8 @@ export function useProviderPrQueries(fallback: { owner: string; repo: string; nu
       capabilities: providerPrCapabilities(scope.ref.platform),
       isReady: isProviderScopeReady(scope),
       overviewOptions: () => buildPrOverviewQueryOptions(trpc, scope),
-      checksOptions: (headSha: string) => buildPrChecksQueryOptions(trpc, scope, headSha),
+      checksOptions: (headSha: string, enabled: boolean) =>
+        buildPrChecksQueryOptions(trpc, scope, { headSha, enabled }),
       mergeStateOptions: () => buildPrMergeStateQueryOptions(trpc, scope),
     }),
     [trpc, scope]

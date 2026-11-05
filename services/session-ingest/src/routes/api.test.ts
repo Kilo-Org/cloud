@@ -1471,7 +1471,7 @@ describe('api routes', () => {
     vi.mocked(getWorkerDb).mockReturnValue(db);
 
     const app = makeApiApp();
-    const invalid = 'not-a-session';
+    const invalid = 'not%20a%20session';
     const res = await app.fetch(
       new Request(`http://local/session/${invalid}/export`, {
         method: 'GET',
@@ -1481,6 +1481,28 @@ describe('api routes', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/export serves a session created before the canonical id shape', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'xmw2l780h18' }]);
+
+    const payload = JSON.stringify({ success: true, events: [] });
+    const ingestStub = {
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/xmw2l780h18/export', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
   });
 
   it('GET /session/:sessionId/export returns 404 when access is denied', async () => {
@@ -1617,11 +1639,39 @@ describe('api routes', () => {
   it('GET /session/:sessionId/messages returns 400 for invalid sessionId', async () => {
     const app = makeApiApp();
     const res = await app.fetch(
-      new Request('http://local/session/not-a-session/messages', { method: 'GET' }),
+      new Request('http://local/session/not%20a%20session/messages', { method: 'GET' }),
       makeTestEnv()
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/messages serves the page of a session created before the canonical id shape', async () => {
+    // The store still holds sessions minted before `ses_` + 26 became the only
+    // issued shape. Its row and its transcript are addressed by that id, and
+    // the access check — not the id shape — decides who may read it.
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'xmw2l780h18' }]);
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/xmw2l780h18/messages?limit=50', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      kiloSessionId: 'xmw2l780h18',
+      history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
   it('GET /session/:sessionId/messages returns 400 for an invalid limit', async () => {
@@ -3836,6 +3886,56 @@ describe('api routes', () => {
           data: expect.objectContaining({ changedAt: existingUpdatedAt }),
         })
       );
+    });
+
+    it('non-generated placeholder does not clobber a real title', async () => {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: 'Generated Title' })]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.update).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('non-generated placeholder cannot win against a concurrently committed real title', async () => {
+      // The select still sees the placeholder, but a real title commits before
+      // this UPDATE; the write predicate must refuse rather than clobber it.
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([fullRow({ title: defaultTitle })]);
+      fns.updateResult.mockResolvedValueOnce([]);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: defaultTitle, generated: false }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ applied: false });
+      expect(fns.updateWhere).toHaveBeenCalled();
+      const whereArg = fns.updateWhere.mock.calls[0]?.[0] as SQL | undefined;
+      expect(whereArg).toBeInstanceOf(SQL);
+      const compiled = new PgDialect().sqlToQuery(whereArg!);
+      expect(compiled.sql).toMatch(/"title"\s+is\s+null/i);
+      expect(compiled.sql).toContain('~');
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('preserves existing updated_at on title writes', async () => {

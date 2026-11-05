@@ -8,6 +8,7 @@ import { user_github_app_tokens } from '@kilocode/db/schema';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   claimRefreshLease,
   newRefreshLeaseAttemptId,
@@ -110,6 +111,7 @@ export class GitHubUserAuthorizationService {
   async selectUserAuthorization(params: {
     userId: string;
     githubRepo: string;
+    strictRepositoryLookup?: boolean;
   }): Promise<UserAuthorizationSelection> {
     if (!this.env.HYPERDRIVE) {
       return { selected: false, reason: 'refresh_failed' };
@@ -167,6 +169,12 @@ export class GitHubUserAuthorizationService {
       let response: Response;
       try {
         response = await fetch(endpoint, {
+          ...(params.strictRepositoryLookup
+            ? {
+                redirect: 'manual' as const,
+                signal: AbortSignal.timeout(GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS),
+              }
+            : {}),
           headers: {
             Accept: 'application/vnd.github+json',
             Authorization: `Bearer ${token}`,
@@ -178,11 +186,26 @@ export class GitHubUserAuthorizationService {
       }
       if (response.status === 401) {
         await this.revokeCurrentGeneration(db, authorization, 'github_token_rejected');
+        if (params.strictRepositoryLookup) {
+          await response.body?.cancel().catch(() => undefined);
+        }
         return { selected: false, reason: 'revoked' };
+      }
+      if (params.strictRepositoryLookup && response.status !== 200) {
+        try {
+          await response.body?.cancel();
+        } catch {
+          return { selected: false, reason: 'insufficient_user_access' };
+        }
+        return { selected: false, reason: 'insufficient_user_access' };
       }
       if (!response.ok) return { selected: false, reason: 'insufficient_user_access' };
 
-      const repositoryAccess = RepositoryAccessSchema.safeParse(await response.json());
+      const repositoryAccess = RepositoryAccessSchema.safeParse(
+        params.strictRepositoryLookup
+          ? response.body && (await readBoundedJsonBody(response.body, 64 * 1024))
+          : await response.json()
+      );
       if (!repositoryAccess.success || !repositoryAccess.data.permissions.push) {
         return { selected: false, reason: 'insufficient_user_access' };
       }

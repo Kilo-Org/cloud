@@ -342,3 +342,46 @@ describe('organization creation limit', () => {
     expect(active).toHaveLength(1);
   });
 });
+
+describe('child organization plan inheritance', () => {
+  async function createParentWithPlan(plan: 'enterprise' | 'teams') {
+    const user = await insertTestUser();
+    const parent = await createOrganization(`${plan} parent`, user.id);
+    await db.update(organizations).set({ plan }).where(eq(organizations.id, parent.id));
+    return { user, parent };
+  }
+
+  async function getPersistedPlan(organizationId: string) {
+    const organization = await db.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+    });
+    return organization?.plan;
+  }
+
+  test.each(['enterprise', 'teams'] as const)(
+    'creates a self-service child of a %s parent on the parent plan',
+    async plan => {
+      const { user, parent } = await createParentWithPlan(plan);
+      const caller = await createCallerForUser(user.id);
+
+      const child = await caller.organizations.createChild({
+        organizationId: parent.id,
+        name: `${plan} child`,
+      });
+
+      expect(await getPersistedPlan(child.organization.id)).toBe(plan);
+    }
+  );
+
+  test.each(['enterprise', 'teams'] as const)(
+    'creates a helper-created child of a %s parent on the parent plan',
+    async plan => {
+      const { parent } = await createParentWithPlan(plan);
+
+      const child = await createChildOrganization(`${plan} helper child`, parent.id);
+
+      expect(child.plan).toBe(plan);
+      expect(await getPersistedPlan(child.id)).toBe(plan);
+    }
+  );
+});

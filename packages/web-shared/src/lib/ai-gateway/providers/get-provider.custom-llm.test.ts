@@ -3,6 +3,7 @@ import type { User } from '@kilocode/db/schema';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -36,15 +37,17 @@ function resolveProvider(
   user: User | AnonymousUserContext = { id: 'user-id' } as User,
   organizationId: string | null = ORG_ID
 ) {
-  return getProvider({
-    requestedModel: PUBLIC_ID,
-    request: {
-      kind: 'chat_completions',
-      body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
-    },
-    user,
-    organizationId: organizationId ?? undefined,
-  });
+  return getProvider(
+    getProviderInput({
+      requestedModel: PUBLIC_ID,
+      request: {
+        kind: 'chat_completions',
+        body: { model: PUBLIC_ID, messages: [{ role: 'user', content: 'hi' }] },
+      },
+      user,
+      organizationId: organizationId ?? undefined,
+    })
+  );
 }
 
 describe('getProvider custom LLM credentials', () => {
@@ -67,9 +70,9 @@ describe('getProvider custom LLM credentials', () => {
     expect(result).toMatchObject({
       kind: 'provider',
       bypassAccessCheck: true,
-      isFree: true,
+      isFree: false,
       provider: {
-        id: 'custom',
+        type: 'custom',
         apiUrl: 'https://llm.example.com/v1/chat/completions',
         disableUrlSuffix: true,
         apiKey: 'proxy-secret',
@@ -88,7 +91,7 @@ describe('getProvider custom LLM credentials', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
-      isFree: true,
+      isFree: false,
       provider: {
         apiUrl: 'https://secure-proxy.example.com/api/proxy',
         apiKey: 'upstream-key',

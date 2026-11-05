@@ -189,6 +189,7 @@
     "resendCode": "コードを再送信",
     "termsPrefix": "続行すると、",
     "terms": "利用規約",
+    "termsInSentence": "利用規約",
     "termsConnector": "および",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
@@ -297,6 +298,7 @@
     "toolSummaryTranslation": "ツールの概要を翻訳",
     "toolSummaryTranslationSubtitle": "各ツールの概要をモデルに送信して、アプリの言語に翻訳します。翻訳に失敗した場合は元のテキストが表示されます。",
     "toolSummaryTranslationModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(common.model)をタップしてください。",
+    "translateSummaries": "概要を翻訳",
     "autoExpandThinkingInactiveSubtitle": "思考の詳細が非表示の場合は効果がありません。"
   },
   "notifications": {
@@ -1048,6 +1050,7 @@
       "prOpened": "REVIEW.mdのプルリクエストを作成しました",
       "alreadyPresent": "指針はすでにREVIEW.mdに記載されています",
       "status": {
+        "open": "オープン",
         "edited": "編集済み",
         "opening_change_request": "PRを作成中",
         "change_request_failed": "PR作成失敗",
@@ -1083,6 +1086,8 @@
     "overview": {
       "allAreas": "すべての領域",
       "nSelected": "{{displayCount}}件選択中",
+      "nSelected_one": "{{displayCount}}件選択中",
+      "nSelected_other": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",
       "set": "設定済み",
       "notSet": "未設定"
@@ -1182,6 +1187,8 @@
       "triageReasoning": "トリアージの判断根拠",
       "watchInCloudAgent": "クラウドエージェントで確認",
       "whereFound": "検出場所（{{displayCount}}）",
+      "whereFound_one": "検出場所（{{displayCount}}）",
+      "whereFound_other": "検出場所（{{displayCount}}）",
       "yes": "はい",
       "action": {
         "analyzeCodebase": "コードベースを分析",
@@ -1310,6 +1317,7 @@
       "repoSummaryHigh_other": "高{{displayCount}}件",
       "repositoryActionPlan": "リポジトリの対応計画",
       "settings": "設定",
+      "syncing": "同期中…",
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",
@@ -1340,6 +1348,8 @@
       "breakdownMediumLow_other": "中・低：{{displayCount}}件",
       "dueThisWeek": "今週が期限",
       "dueThisWeekDetail": "このうち{{exploitable}}件が悪用可能と確認済み",
+      "dueThisWeekDetail_one": "このうち{{exploitable}}件が悪用可能と確認済み",
+      "dueThisWeekDetail_other": "このうち{{exploitable}}件が悪用可能と確認済み",
       "noDeadline": "期限なし",
       "reviewSlaAssignment": "SLA期限の設定を確認",
       "allOpenFindingsTracked": "未解決の検出結果はすべて追跡中"
@@ -1458,6 +1468,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub Appをインストールすると、Dependabotアラートを自動で同期し、各リポジトリのセキュリティの検出結果をまとめて管理できます。",
+      "connectOwnerOnly": "組織のオーナーまたは管理者に{{platform}}の接続を依頼してください。",
       "connectTitle": "GitHubを接続して始める",
       "couldNotLoad": "セキュリティエージェントを読み込めませんでした。",
       "installApp": "GitHub Appをインストール",
@@ -1533,6 +1544,7 @@
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
       "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
       "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncNoRepositoriesNoManage": "同期対象にリポジトリがありません。同期するには、組織のオーナー、管理者、または請求管理者がリポジトリを接続する必要があります。",
       "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
       "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。",
       "configConflict": "セキュリティエージェントの設定が別の場所で変更されました。最新の設定を確認して、もう一度保存してください。"
@@ -1689,6 +1701,8 @@
       "cannotCompleteTitle": "インストールを完了できません",
       "notAdminMessage": "接続できるのは、そのGitHubアカウントの管理者だけです。組織の管理者にKiloのインストールを依頼してください。",
       "alreadyClaimedMessage": "インストール済みのGitHub Appは、すでに別のKiloアカウントに接続されています。先にそのアカウントで接続を解除してください。",
+      "installationUnavailableMessage": "このGitHub Appのインストールは停止されているか、利用できなくなっています。GitHubで復元または再インストールしてから、もう一度やり直してください。",
+      "multipleInstallationsMessage": "このKilo組織は、現在接続できるGitHub組織が一つのみです。",
       "didNotCompleteTitle": "インストールが完了しませんでした",
       "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"
     },
@@ -1831,7 +1845,7 @@
       "discardDraftMessage": "入力したプロンプトが削除されます。",
       "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
-      "remoteHint": "ローカルのkiloプロセスを操作するには、コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行してください。",
+      "remoteHint": "お使いのコンピューターで実行するには、そのコンピューターでKiloを起動し、起動したままにしておいてください。",
       "continueFrom": "{{title}}を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
@@ -1845,7 +1859,6 @@
       "defaultProfileResolvesTo": "{{name}}に対応",
       "defaultProfileResolvesToAccessibility": "デフォルトのプロフィール：{{name}}",
       "manageProfiles": "プロフィールの管理",
-      "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
       "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",
@@ -2000,6 +2013,7 @@
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
+      "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
@@ -2531,7 +2545,8 @@
     "newSessionOn": "{{name}}の新しいセッション",
     "noMatchingSessions": "一致するセッションはありません。",
     "onlyFirstFilesAttached": "最初の{{displayCount}}件のファイルのみが添付されます。",
-    "staleMessage": "この共有コンテンツは利用できなくなりました。",
+    "staleMessage": "共有元のアプリからもう一度送信してください。",
+    "staleTitle": "共有は利用できません",
     "retryableMessage": "セッションを読み込めませんでした。",
     "emptyMessage": "セッションがまだありません。送信するには新しいセッションを開始してください。",
     "cliNotConnectedTitle": "セッションが接続されていません",
@@ -2709,8 +2724,13 @@
       "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
       "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
       "reconnectTitle": "GitHubに再接続",
+      "reconnectTitleGitLab": "GitLabに再接続",
+      "reconnectTitleBitbucket": "Bitbucketに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。",
       "gitlabDescription": "モバイルでマージリクエストをレビュー",
+      "gitlabInstanceMismatchTitle": "GitLabの接続先が別のインスタンスです",
+      "gitlabInstanceMismatchDescription": "GitLabの接続先は{{connected}}ですが、このマージリクエストは{{requested}}にあります。レビューするには、そのインスタンスでGitLabに接続してください。",
+      "checkActiveConnection": "接続は有効ですが、この項目はまだ読み込めません。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
@@ -2985,7 +3005,6 @@
         "squash": "スカッシュ"
       },
       "terminal": {
-        "alreadyMerged": "マージ済み",
         "closed": "プルリクエストはクローズ済み",
         "closedMergeRequest": "マージリクエストはクローズ済み"
       },
@@ -3002,7 +3021,6 @@
         "requiredReviewsTitle": "必須レビューが未完了",
         "requiredReviewsDetail": "必須レビュアーからの承認がまだそろっていません。",
         "failingChecksTitle": "必須チェックが失敗しています",
-        "failingChecksDetail": "必須のステータスチェックが失敗しています。",
         "unstableTitle": "一部のチェックが失敗しています",
         "unstableDetail": "必須ではないチェックが失敗していますが、マージは可能です。",
         "draftTitle": "下書きのプルリクエスト",
@@ -3109,7 +3127,12 @@
       "pendingComment_other": "未送信のコメント",
       "pendingComment_one": "未送信のコメント",
       "summaryOptional": "総評（任意）",
-      "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedFresh": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedFresh_one": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedFresh_other": "{{displayFreshCount}}件のコメントを投稿しました。",
+      "partialPostedStale": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedStale_one": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "partialPostedStale_other": "{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
       "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
@@ -3776,9 +3799,9 @@
   "spendAlerts": {
     "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
     "thresholdTitle": "しきい値の超過",
-    "thresholdSubtitle": "累計支出が上限を超えています",
+    "thresholdSubtitle": "このスコープの選択した期間の累計支出が上限を超えています",
     "anomalyTitle": "毎時の急増",
-    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "anomalySubtitle": "このスコープの1時間あたりのレートが、自身のp95ベースラインを大きく上回っています",
     "limitLabel": "上限 (USD)",
     "windowLabel": "期間",
     "window24h": "24時間",
@@ -3788,14 +3811,14 @@
     "saved": "支出アラートの設定を保存しました",
     "loadError": "支出アラートを読み込めませんでした。",
     "saveError": "支出アラートを保存できませんでした。",
-    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
-    "noSpend": "まだ支出が記録されていません",
+    "sendAlerts": "アラートを送信",
+    "noSpend": "まだ支出なし",
     "spend24h": "過去24時間の支出",
     "multiplierError": "1以上の倍率を入力してください",
     "permissionDenied": "支出アラートを管理する権限がありません。",
     "pushOffByCategory": "通知でオフ",
     "multiplierMaxError": "{{max}}以下の倍率を入力してください",
-    "thresholdMaxError": "{{max}}以下の金額を入力してください。"
+    "thresholdMaxError": "{{max}}以下の金額を入力してください"
   },
   "profiles": {
     "title": "プロフィール",

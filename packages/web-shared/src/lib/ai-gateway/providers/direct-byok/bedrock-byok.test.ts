@@ -122,7 +122,7 @@ describe('awsBedrock definition', () => {
   ): TransformRequestContext {
     return {
       provider: {
-        id: 'direct-byok',
+        type: 'direct-byok',
         apiUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,

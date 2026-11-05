@@ -424,16 +424,11 @@ test('successful main CI selects the tested deployment SHA', () => {
   );
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
-  for (const job of ['check-production-db-startup', 'run-migrations', 'stage-app']) {
+  for (const job of ['db-gate', 'stage-app']) {
     assert.equal(production.jobs[job].needs, 'check-changes');
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
-  for (const job of [
-    'check-staging-db-startup',
-    'run-migrations',
-    'deploy-app',
-    'deploy-workers',
-  ]) {
+  for (const job of ['db-gate', 'deploy-app', 'deploy-workers']) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
     assert.ok([staging.jobs[job].needs].flat().includes('check-changes'));
   }
@@ -452,11 +447,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
   );
 
   const promoteAiGateway = production.jobs['promote-ai-gateway'];
-  assert.deepEqual(promoteAiGateway.needs, [
-    'stage-ai-gateway',
-    'check-production-db-startup',
-    'run-migrations',
-  ]);
+  assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate']);
   assert.deepEqual(promoteAiGateway.with, {
     deployment_url: '${{ needs.stage-ai-gateway.outputs.deployment_url }}',
     axiom_annotation_dataset: 'vercel',
@@ -468,11 +459,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
   );
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
-  assert.deepEqual(deployAiGateway.needs, [
-    'check-changes',
-    'check-staging-db-startup',
-    'run-migrations',
-  ]);
+  assert.deepEqual(deployAiGateway.needs, ['check-changes', 'db-gate']);
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
@@ -499,6 +486,62 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
       assert.match(record.if, new RegExp(`needs\\.${job}\\.result == 'success'`));
     }
   }
+});
+
+test('one database gate per deployment checks out, installs and migrates once', () => {
+  for (const [name, deployment, startupStep, migrateStep, environment] of [
+    [
+      'production',
+      production,
+      'Check production DB startup path',
+      'Run Drizzle migrations',
+      'production',
+    ],
+    ['staging', staging, 'Check staging DB startup path', 'Run Drizzle migrations', 'staging'],
+  ]) {
+    const dbJobs = Object.keys(deployment.jobs).filter(
+      job => !deployment.jobs[job].uses && deployment.jobs[job].env?.POSTGRES_URL
+    );
+    assert.deepEqual(dbJobs, ['db-gate'], `${name} must gate the database with one job`);
+
+    const job = deployment.jobs['db-gate'];
+    assert.equal(job.environment, environment);
+    assert.equal(job.env.POSTGRES_URL, '${{ secrets.POSTGRES_URL }}');
+    assert.equal(job.env.DATABASE_CA, '${{ secrets.DATABASE_CA }}');
+
+    const steps = job.steps;
+    assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
+    assert.equal(steps.filter(step => step.run === 'pnpm install --frozen-lockfile').length, 1);
+    assert.equal(
+      steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
+      '${{ needs.check-changes.outputs.target_sha }}'
+    );
+
+    const startupIndex = steps.findIndex(step => step.name === startupStep);
+    const migrateIndex = steps.findIndex(step => step.name === migrateStep);
+    const installIndex = steps.findIndex(step => step.run === 'pnpm install --frozen-lockfile');
+    assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
+    assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
+    assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
+    assert.equal(steps[migrateIndex].if, undefined);
+  }
+
+  assert.equal(production.jobs['db-gate']['timeout-minutes'], 45);
+
+  for (const [deployment, jobs] of [
+    [production, ['promote-app', 'promote-ai-gateway', 'deploy-workers', 'record-deployment']],
+    [staging, ['deploy-app', 'deploy-ai-gateway', 'deploy-workers', 'record-deployment']],
+  ]) {
+    for (const job of jobs) {
+      assert.ok(deployment.jobs[job].needs.includes('db-gate'), `${job} must wait for db-gate`);
+    }
+  }
+  // Production also tolerates skipped staging jobs, so its Worker deploy names the
+  // gate result explicitly; staging relies on the default needs-success behaviour.
+  for (const job of ['deploy-workers', 'record-deployment']) {
+    assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
+  }
+  assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
 });
 
 test('staging and production Worker changes use independent deployment baselines', () => {
@@ -819,6 +862,20 @@ test('production deploys cloud-agent-next after a changed session-ingest contrac
   const prepare = ordered.steps.findIndex(step => step.id === 'runtime');
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
+
+  // Only the deploy steps depend on session-ingest: the install and the runtime
+  // preparation must run while the sibling deployment is still in flight.
+  const setup = ordered.steps.findIndex(step => step.name === 'Setup Bun');
+  const install = ordered.steps.findIndex(
+    step => step.name === 'Install cloud-agent-next dependencies'
+  );
+  const gate = ordered.steps.indexOf(wait);
+  assert.ok(
+    setup >= 0 && setup < install && install < prepare && prepare < gate,
+    'the setup steps must precede the session-ingest gate'
+  );
+  assert.equal(gate + 1, deploy, 'the session-ingest gate must immediately precede the deploy');
+
   assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
   assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
 });

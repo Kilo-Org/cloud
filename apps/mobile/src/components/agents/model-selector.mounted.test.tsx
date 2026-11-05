@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TestRenderer } from '@/test/renderer';
 
+import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { modelPickerSlot } from '@/lib/route-registry';
 import { i18n } from '@/i18n';
 
 import {
@@ -16,6 +18,7 @@ import {
   cliCatalogOption,
   countWithAccessibilityLabel,
   isInstance,
+  radioChoices,
   renderRow,
   renderSelector,
   rowContainer,
@@ -394,6 +397,61 @@ describe('openModelPicker sheet anchoring', () => {
   });
 });
 
+// The row only offers a thinking effort where the picker's caller keeps one. A
+// chip under a caller that stores only the model id closes the sheet and drops
+// the pick, so those callers get a plain model row instead.
+describe('ModelPickerOptionRow thinking effort availability', () => {
+  const effortOptions = cliCatalogOption({ variants: ['low', 'high'] });
+
+  it('offers one chip per effort on the selected multi-variant row a caller can keep', () => {
+    const renderer = renderRow(effortOptions, { selected: true });
+
+    expect(radioChoices(renderer)).toHaveLength(2);
+  });
+
+  it('leaves the chips out when the picker caller keeps no variant', () => {
+    const renderer = renderRow(effortOptions, { selected: true, acceptsVariant: false });
+
+    expect(radioChoices(renderer)).toHaveLength(0);
+  });
+});
+
+describe('ModelSelector picker effort availability', () => {
+  it('opens the picker as a model-only selection when its caller keeps no variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      acceptsVariant: false,
+    });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(false);
+  });
+
+  it('opens the picker with the effort kept when its caller stores a variant', () => {
+    const option = cliCatalogOption({ variants: ['low', 'high'] });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+
+    TestRenderer.act(() => {
+      (chip.props as { onPress?: () => void }).onPress?.();
+    });
+
+    expect(modelPickerSlot.get('unscoped')?.acceptsVariant).toBe(true);
+  });
+});
+
 describe('ModelSelector loading chip', () => {
   it('labels the chip while the catalog loads instead of rendering a blank skeleton', () => {
     const renderer = renderSelector({ isLoading: true });
@@ -428,5 +486,31 @@ describe('ModelSelector loading chip', () => {
     const renderer = renderSelector({ value: option.id, options: [option] });
 
     expect(textStrings(renderer.root)).toContain(option.name);
+  });
+});
+
+// The chip's own node is its visual surface (28.3pt on device), so the touch
+// region has to come from hit slop, and only from the vertical axis: the chip
+// on the same line and the paste button beside it each own the space next to
+// it.
+describe('ModelSelector pill touch target', () => {
+  it('reaches the design target from its own frame plus vertical hit slop', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    const pill = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+    )[0];
+    if (pill === undefined) {
+      throw new Error('model pill not found');
+    }
+    const slop = pill.props.hitSlop as { top?: number; bottom?: number };
+    const reach = CHIP_FRAME_DP + (slop.top ?? 0) + (slop.bottom ?? 0);
+
+    expect(reach).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(slop).not.toHaveProperty('left');
+    expect(slop).not.toHaveProperty('right');
+
+    renderer.unmount();
   });
 });

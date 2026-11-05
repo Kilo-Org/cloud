@@ -49,20 +49,15 @@ PREVIEW_ENABLED_IDS=*
 CLI_TIMEOUT_SECONDS=900
 REAPER_INTERVAL_MS=300000
 
-# Per-session Cloudflare sandbox org IDs (optional)
-# Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
-PER_SESSION_SANDBOX_ORG_IDS=
-
 # Code Reviewer sessions use the Cloudflare Containers runtime for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-CODE_REVIEW_CONTAINERS_ORG_IDS=
+CODE_REVIEW_CONTAINERS_ORG_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
 # Non-secret rollout control for per-session Kilo runtime isolation.
 RUNTIME_ISOLATION_ENABLED=true
 
-CREDENTIAL_CONTAINMENT_ENABLED=false
 
 # Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
@@ -75,9 +70,12 @@ BYOC_VERCEL_IDS=
 
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.
-CLOUDFLARE_CONTAINERS_ORG_IDS=
-# Explicit organization IDs allowed to build and restore snapshots. Empty is off; no wildcard.
-ENVIRONMENT_SNAPSHOT_ORG_IDS=
+CLOUDFLARE_CONTAINERS_ORG_IDS=*
+# Organization IDs allowed to build and restore snapshots. Empty is off; `*` includes personal.
+ENVIRONMENT_SNAPSHOT_ORG_IDS=*
+# Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
+WORKSPACE_SNAPSHOT_ORG_IDS=
+WORKSPACE_SNAPSHOT_USER_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
@@ -110,10 +108,6 @@ R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 # Sandbox containers reach the host via `host.docker.internal`.
 # @url cloudflare-session-ingest
 KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
-
-# Local debugging only. Set to 1 to log full URLs rejected during Kilo capability
-# redemption. Those URLs can contain tokens; never enable this in a deployed Worker.
-LOG_REJECTED_KILO_URLS=0
 
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next

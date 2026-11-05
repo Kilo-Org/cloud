@@ -50,3 +50,13 @@ export const scopeGrants = sqliteTable('scope_grants', {
   id: text('id').primaryKey(),
   grant: text('grant').notNull(),
 });
+
+export const workspaceDiskSnapshots = sqliteTable('workspace_disk_snapshots', {
+  workspace_id: text('workspace_id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
+});
+
+export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', {
+  id: text('id').primaryKey(),
+  data: text('data', { mode: 'json' }).notNull(),
+});

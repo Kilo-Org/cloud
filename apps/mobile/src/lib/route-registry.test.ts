@@ -2,14 +2,21 @@ import { createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { type ModelPickerBridge } from './picker-bridge';
-import { modelPickerSlot, useRouteRegistry } from './route-registry';
+import { type DiffSelection } from './pr-review/diff-selection-bridge';
+import { type ModelPickerBridge, type ModePickerBridge } from './picker-bridge';
+import {
+  modelPickerSlot,
+  modePickerSlot,
+  prDiffSelectionSlot,
+  useRouteRegistry,
+} from './route-registry';
 
 function makeBridge(sessionId: string): ModelPickerBridge {
   return {
     options: [],
     currentValue: '',
     currentVariant: '',
+    acceptsVariant: true,
     selectionScope: {
       sessionId,
       ownerConnectionId: null,
@@ -18,6 +25,22 @@ function makeBridge(sessionId: string): ModelPickerBridge {
     },
     isSelectionCurrent: () => true,
     onSelect: vi.fn<() => void>(),
+  };
+}
+
+function makeModeBridge(): ModePickerBridge {
+  return { currentValue: 'code', onSelect: vi.fn<() => void>() };
+}
+
+function makeDiffSelection(): DiffSelection {
+  return {
+    owner: 'acme',
+    repo: 'widgets',
+    number: 7,
+    path: 'src/index.ts',
+    side: 'RIGHT',
+    line: 12,
+    selectedText: 'export const x = 1;',
   };
 }
 
@@ -51,5 +74,23 @@ describe('route registry', () => {
     });
 
     expect(modelPickerSlot.get('session-a')).toBeUndefined();
+  });
+
+  it('clears every slot kind when the route unmounts', () => {
+    const modelBridge = makeBridge('session-b');
+    const modeBridge = makeModeBridge();
+    const selection = makeDiffSelection();
+    const renderer = mountRegistrar('session-b');
+    modelPickerSlot.set('session-b', modelBridge);
+    modePickerSlot.set('session-b', modeBridge);
+    prDiffSelectionSlot.set('session-b', selection);
+
+    TestRenderer.act(() => {
+      renderer.unmount();
+    });
+
+    expect(modelPickerSlot.get('session-b')).toBeUndefined();
+    expect(modePickerSlot.get('session-b')).toBeUndefined();
+    expect(prDiffSelectionSlot.get('session-b')).toBeUndefined();
   });
 });

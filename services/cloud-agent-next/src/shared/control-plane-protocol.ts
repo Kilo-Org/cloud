@@ -1,4 +1,4 @@
-import { setupCommandsSchema } from './setup-script.js';
+import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -19,6 +19,8 @@ import {
   sessionTerminalResizePayloadSchema,
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
+
+const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 
 export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
@@ -107,10 +109,12 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
   'credential_upgrade_required',
+  'repository_access_failed',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
   'container_limit_reached',
+  'account_blocked',
   'invalid_configuration',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
@@ -131,6 +135,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'byoc_vercel_forbidden',
   'byoc_vercel_capacity',
   'byoc_vercel_snapshot_missing',
+  'provider_identity_mismatch',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 
@@ -288,7 +293,26 @@ export const controlPlaneRouteKiloSchema = z
 export const CONTROL_PLANE_WORKSPACE_OUTCOMES = ['cloned', 'same', 'adopted'] as const;
 export type ControlPlaneWorkspaceOutcome = (typeof CONTROL_PLANE_WORKSPACE_OUTCOMES)[number];
 
-export const controlPlaneRouteSpecSchema = z
+/** One repository checkout of a V2 session workspace. */
+export const controlPlaneWorkspaceRootSchema = z
+  .object({
+    /** The git root: `/workspace/<leaf>`. */
+    directory: z.string().min(1).max(1024),
+    repoFullName: z.string().min(1).max(500),
+    git: z
+      .object({
+        url: z.string().min(1).max(2048),
+        platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+      })
+      .strict(),
+    branch: z.string().min(1).max(256),
+    /** The branch is the session's generated one: create it when the remote has none. */
+    branchMode: z.literal('working').optional(),
+  })
+  .strict();
+export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;
+
+const routeSpecObjectSchema = z
   .object({
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
@@ -315,7 +339,29 @@ export const controlPlaneRouteSpecSchema = z
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
+    workspaceSnapshot: z
+      .object({
+        sourceAllocationId: z.string().min(1).max(256),
+        workspaceId: cloudAgentWorktreeIdSchema,
+        directory: z.string().min(1).max(1024),
+      })
+      .strict()
+      .optional(),
+    /**
+     * Server-only continuation marker. When set, the wrapper does not restore
+     * ingest transcript files over the workspace: the pushed branch already
+     * carries the source state. It is projected from session metadata.
+     */
+    continuation: z.literal(true).optional(),
     git: controlPlaneRouteGitSchema.optional(),
+    /**
+     * The git roots of a V2 environment session: each repository checkout
+     * and the branch it runs on. `directory` is the cwd. Only a V2 route carries
+     * this; a route without it has one root at `directory` and clones `git`, as
+     * every route did before V2. It holds no credential: each root's alias comes
+     * from the grant by host.
+     */
+    roots: z.array(controlPlaneWorkspaceRootSchema).min(1).max(100).optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
@@ -326,6 +372,20 @@ export const controlPlaneRouteSpecSchema = z
      */
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: setupCommandsSchema.optional(),
+    /**
+     * The environment's workspace start commands. The wrapper runs them each
+     * time it starts a workspace: after remaining setup, or alone when the workspace
+     * comes from a session snapshot. Only a wrapper that advertised
+     * `startCommands` receives them; for an older one the Sandbox DO appends
+     * them to `setupCommands`, or fails a session snapshot restore that cannot run them.
+     */
+    startCommands: setupCommandsSchema.optional(),
+    /**
+     * How many leading `setupCommands` are the repository environment's own.
+     * An adopted environment snapshot already ran them; the rest are the
+     * session's own setup commands.
+     */
+    environmentSetupCommandCount: environmentSetupCommandCountSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -351,13 +411,35 @@ export const controlPlaneRouteSpecSchema = z
   })
   .strict();
 
+// The wrapper empties and clones into a root, so a root must lie inside the cwd.
+function checkRootsInsideDirectory(
+  spec: { directory: string; roots?: readonly { directory: string }[] },
+  context: z.RefinementCtx
+): void {
+  const outside = spec.roots?.findIndex(
+    root => root.directory !== spec.directory && !root.directory.startsWith(`${spec.directory}/`)
+  );
+  if (outside !== undefined && outside >= 0) {
+    context.addIssue({
+      code: 'custom',
+      path: ['roots', outside, 'directory'],
+      message: 'workspace root must be the route directory or inside it',
+    });
+  }
+}
+
+export const controlPlaneRouteSpecSchema =
+  routeSpecObjectSchema.superRefine(checkRootsInsideDirectory);
+
 /** Fields that one shared runtime applies once, from its first live attachment. */
-export const workspaceConfigSchema = controlPlaneRouteSpecSchema
+export const workspaceConfigSchema = routeSpecObjectSchema
   .pick({
     mcp: true,
     env: true,
     secretEnvKeys: true,
     setupCommands: true,
+    startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
@@ -365,17 +447,20 @@ export const workspaceConfigSchema = controlPlaneRouteSpecSchema
   .strict();
 export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
 
-export const attachmentSpecSchema = controlPlaneRouteSpecSchema
+export const attachmentSpecSchema = routeSpecObjectSchema
   .omit({
     mcp: true,
     env: true,
     secretEnvKeys: true,
     setupCommands: true,
+    startCommands: true,
+    environmentSetupCommandCount: true,
     runtimeSkills: true,
     runtimeAgents: true,
     kiloCommands: true,
   })
-  .strict();
+  .strict()
+  .superRefine(checkRootsInsideDirectory);
 export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
 
 /**
@@ -385,6 +470,13 @@ export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
  */
 export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
   (spec, context) => {
+    if (spec.workspaceSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['workspaceSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (spec.secretEnvKeys !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -473,6 +565,7 @@ export const controlPlaneCredentialSourceSchema = z
     encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
   })
   .strict();
 
@@ -489,6 +582,13 @@ export const controlPlanePrepareInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.spec.workspaceSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'workspaceSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (value.spec.git?.token !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -532,6 +632,44 @@ export type ControlPlaneCredentialRepository = z.infer<
 export type ControlPlaneCredentialSource = z.infer<typeof controlPlaneCredentialSourceSchema>;
 export type ControlPlanePrepareInput = z.infer<typeof controlPlanePrepareInputSchema>;
 
+export const controlPlaneScmForwardAdmissionSchema = z
+  .object({
+    oidcToken: z.string().min(1).max(8192),
+    target: z
+      .object({
+        url: z
+          .string()
+          .url()
+          .max(16 * 1024),
+        method: z
+          .string()
+          .regex(/^[A-Z]+$/)
+          .max(32),
+      })
+      .strict(),
+    authorization: z
+      .object({
+        authorization: z.string().max(8192).optional(),
+        privateToken: z.string().max(8192).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type ControlPlaneScmForwardAdmission = z.infer<typeof controlPlaneScmForwardAdmissionSchema>;
+export type ControlPlaneScmForwardAdmissionResult =
+  | {
+      ok: true;
+      authority:
+        | { type: 'unmanaged' }
+        | {
+            type: 'managed';
+            provider: ControlPlaneGitPlatform;
+            capability: string;
+            outboundContainerId: string;
+          };
+    }
+  | { ok: false; status: 401 | 403 | 503; code: string; retryAfter?: number };
+
 export const controlPlanePromptTurnSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -574,6 +712,8 @@ const controlPlanePromptAgentSchema = z
 const controlPlanePromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
+    /** Server-owned context injected as a synthetic prompt part. */
+    context: z.string().max(2000).optional(),
     attachments: z
       .array(
         z
@@ -675,7 +815,13 @@ export const controlPlaneEventSchema = z
   .strict();
 
 export const controlPlaneEventsNotificationSchema = z
-  .object({ events: z.array(controlPlaneEventSchema).min(1) })
+  .object({
+    events: z.array(controlPlaneEventSchema).min(1),
+    delivery: z
+      .object({ id: z.uuid(), expiresAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+      .strict()
+      .optional(),
+  })
   .strict();
 
 export const controlPlaneOutcomeSchema = z
@@ -752,6 +898,20 @@ export const controlPlaneStatusResultSchema = z
   })
   .strict();
 
+/**
+ * The Git credential of one host that a V2 environment adds to the launch
+ * repository's host. The wrapper writes one record for each host: the alias is
+ * the same for every repository of a host, and the proxy tells repositories
+ * apart by the request path.
+ */
+export const controlPlaneGitHostCredentialSchema = z
+  .object({
+    url: z.string().min(1).max(2048),
+    token: z.string().min(1).max(4096),
+    platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+  })
+  .strict();
+
 export const controlPlaneSessionCredentialsPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -762,6 +922,11 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * The credential of each host a V2 environment uses besides the launch
+     * repository's host, which `git` serves.
+     */
+    gitCredentials: z.array(controlPlaneGitHostCredentialSchema).min(1).optional(),
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
     cloudAgentMcp: z
       .object({
@@ -798,6 +963,13 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    workspaceSnapshots: z.literal(true).optional(),
+    /**
+     * Retired capability from wrappers built before workspace snapshots. The
+     * schema is strict, so it stays accepted until those wrappers retire; the
+     * Worker ignores it and treats the wrapper as not snapshot-capable.
+     */
+    sessionSnapshots: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper redacts a value by each named secret key
      * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.
@@ -810,6 +982,13 @@ const controlPlaneHelloFrameSchema = z
      * sent to a wrapper that did not advertise it.
      */
     installsSkillsSh: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper runs `startCommands` when it starts a
+     * workspace, and skips only the environment's setup commands when all roots
+     * came from its snapshot. Older wrappers receive start commands appended to
+     * `setupCommands`; session disk restores that cannot run them fail preparation.
+     */
+    startCommands: z.literal(true).optional(),
   })
   .strict();
 
@@ -818,6 +997,7 @@ const controlPlaneWelcomeFrameSchema = z
     type: z.literal('welcome'),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    workspaceSnapshots: z.literal(true).optional(),
   })
   .strict();
 
@@ -831,6 +1011,7 @@ const controlPlaneShutdownFrameSchema = z
 const controlPlaneHeartbeatFrameSchema = z
   .object({
     type: z.literal('heartbeat'),
+    workspaceBusy: z.boolean().optional(),
     active: z.boolean(),
     degraded: z.boolean(),
   })
@@ -1047,7 +1228,7 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
  */
 export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({
-    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    worktreeId: cloudAgentWorktreeIdSchema,
     directory: z.string().min(1).max(1024),
     sessionIds: z.array(z.string().startsWith('ses_').length(30)),
   })
@@ -1232,6 +1413,40 @@ const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
     .strict(),
 ]);
 
+/**
+ * Wrapper -> Sandbox DO: one page of a native v2 session's Cloud history, so the
+ * wrapper restores a lost native database from the Session DO over this socket.
+ * The Sandbox DO answers with `history.result` on the same socket.
+ */
+const controlPlaneHistoryPageFrameSchema = z
+  .object({
+    type: z.literal('history.page'),
+    requestId: z.string().min(1).max(128),
+    sessionId: z.string().min(1),
+    kiloSessionId: z.string().min(1),
+    cursor: z.string().min(1).max(2048).optional(),
+  })
+  .strict();
+
+const controlPlaneHistoryResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('history.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      page: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('history.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
 export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneHelloFrameSchema,
   controlPlaneWelcomeFrameSchema,
@@ -1265,6 +1480,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlaneHistoryPageFrameSchema,
+  controlPlaneHistoryResultFrameSchema,
 ]);
 
 export type ControlPlaneRouteGit = z.infer<typeof controlPlaneRouteGitSchema>;
@@ -1357,4 +1574,6 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
+export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

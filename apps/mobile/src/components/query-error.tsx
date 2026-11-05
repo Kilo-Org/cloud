@@ -78,6 +78,12 @@ type QueryErrorProps = {
    */
   action?: ReactNode;
   className?: string;
+  /**
+   * Constrains the description's own box. A caller whose copy is long enough to
+   * leave one word alone on its last line caps the measure here so the text
+   * breaks into balanced lines instead.
+   */
+  descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
 };
@@ -94,6 +100,7 @@ export function QueryError({
   isRetrying = false,
   action,
   className,
+  descriptionClassName,
   placement = 'center',
   refreshControl,
 }: Readonly<QueryErrorProps>) {
@@ -109,7 +116,15 @@ export function QueryError({
       icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
-        <AccessibleStatus message={descriptionText} tone="status" className="text-center text-sm" />
+        <AccessibleStatus
+          message={descriptionText}
+          tone="status"
+          className={
+            descriptionClassName === undefined
+              ? 'text-center text-sm'
+              : `text-center text-sm ${descriptionClassName}`
+          }
+        />
       }
       className={className}
       placement={placement}

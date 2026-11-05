@@ -1,6 +1,7 @@
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { unfilteredKiloEvents } from '../control/feed.js';
 import { logToFile } from '../utils.js';
+import type { HarnessActivityEvent } from './harness-activity.js';
 import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
 
 export type KiloFeedEvent = {
@@ -34,6 +35,8 @@ export type KiloEventFeedOptions = {
   /** The runtime's abort signal; aborting it ends the connection. */
   signal: AbortSignal;
   onEvent: (event: KiloFeedEvent) => void;
+  /** CLI-neutral model work, for harnesses whose events do not carry it. */
+  onHarnessActivity?: (event: HarnessActivityEvent) => void;
   /** The connection ended or failed after `open()` resolved. */
   onFailure: () => void;
   log?: (message: string) => void;

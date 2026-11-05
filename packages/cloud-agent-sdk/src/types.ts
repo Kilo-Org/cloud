@@ -24,6 +24,8 @@ export type {
 } from '@kilocode/app-shared/opencode';
 
 import type { UserMessage, AssistantMessage, Part } from '@kilocode/app-shared/opencode';
+import type * as z from 'zod';
+import type { cloudSessionMetadataSchema } from './schemas';
 
 export type {
   KiloSdkMessageHistory,
@@ -77,6 +79,7 @@ export type SessionGoal = {
 export type SessionInfo = {
   id: string;
   parentID?: string | undefined;
+  title?: string | undefined;
   model?:
     | {
         providerID: string;
@@ -229,6 +232,7 @@ export type MessageDeliveryState =
     };
 
 export type SessionCommit = {
+  repository?: string | undefined;
   commitHash: string;
   commitMessage: string;
   messageId: string;
@@ -333,19 +337,25 @@ export type SessionSnapshot = {
  * existing `replay=false` behaviour.
  */
 export type SessionSnapshotPage = {
+  sourceVersion?: 'v1' | 'v2';
   info: SessionInfo;
   messages: SessionSnapshot['messages'];
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  updateCursor?: number;
+  totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[];
 };
 
-/**
- * A caller-cached transcript page plus the rows the transcript draws from
- * service state, so a cached repaint matches the live transcript's layout.
- */
+export type CloudSessionMetadata = z.infer<typeof cloudSessionMetadataSchema>;
+
+export type CloudSessionSnapshotPage = SessionSnapshotPage & {
+  kind: 'success';
+  updateCursor: number;
+};
+
 export type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
   repository: string;
@@ -353,17 +363,24 @@ export type SessionConfig = {
   model: string;
   providerID?: string | null | undefined;
   variant?: string | null | undefined;
-  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  /** Installed custom agents, including picker visibility and model overrides. */
   runtimeAgents?:
     | Array<{
         slug: string;
         name: string;
+        mode?: 'primary' | 'subagent' | 'all' | undefined;
+        hidden?: boolean | undefined;
+        disable?: boolean | undefined;
         model?: string | undefined;
         variant?: string | undefined;
       }>
     | undefined;
 };
 
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
 export type CachedSessionSnapshotPage = SessionSnapshotPage & {
   commits?: readonly SessionCommit[];
   /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */

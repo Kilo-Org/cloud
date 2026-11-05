@@ -153,6 +153,11 @@ const financialItems: MenuItem[] = [
     icon: () => <Coins />,
   },
   {
+    title: () => 'Service Fee Refunds',
+    url: '/admin/service-fee-refunds',
+    icon: () => <Coins />,
+  },
+  {
     title: () => 'Disputes',
     url: '/admin/disputes',
     icon: () => <Scale />,

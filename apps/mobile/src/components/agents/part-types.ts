@@ -14,13 +14,37 @@ export function isTextPart(part: Part): part is TextPart {
 }
 
 /**
- * Returns the first text part's text, or '' when there is none.
- * The human-authored prompt is always the first text part, so only `ignored`
- * parts are skipped. A file-only message yields an empty string.
+ * Server-injected routing context. The wrapper prepends this synthetic part to
+ * every prompt, so it is present even on an attachment-only row.
+ */
+function isCloudAgentContextPart(part: TextPart): boolean {
+  return part.synthetic === true && part.text.includes('<cloud-agent-context');
+}
+
+/**
+ * The human-authored text parts of a message.
+ *
+ * The server may prepend a synthetic `cloud-agent-context` part to a user
+ * message. When a non-synthetic text part exists it is the human prompt, so
+ * synthetic parts are transcript chrome and are left out. A row whose only
+ * text parts are synthetic is an optimistic or queued prompt, which still
+ * belongs to the human; server context is never part of that fallback.
+ */
+export function humanTextParts(parts: readonly Part[]): TextPart[] {
+  const textParts = parts.filter(
+    (part): part is TextPart =>
+      isTextPart(part) && part.ignored !== true && !isCloudAgentContextPart(part)
+  );
+  const nonSynthetic = textParts.filter(part => part.synthetic !== true);
+  return nonSynthetic.length > 0 ? nonSynthetic : textParts;
+}
+
+/**
+ * Returns the first human-authored text part's text, or '' when there is none.
+ * A file-only message yields an empty string.
  */
 export function firstHumanText(parts: readonly Part[]): string {
-  const part = parts.find((p): p is TextPart => isTextPart(p) && p.ignored !== true);
-  return part?.text ?? '';
+  return humanTextParts(parts)[0]?.text ?? '';
 }
 
 /** CLI snapshot-init progress injected as a synthetic text part (matches kilo-vscode). */

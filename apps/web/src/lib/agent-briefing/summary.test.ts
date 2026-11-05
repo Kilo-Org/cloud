@@ -11,10 +11,11 @@ import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/req
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import {
-  kiloExclusiveModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-import { briefingPriceBound } from './summary';
+  KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_SMALL_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { briefingPriceBound, briefingPrompt } from './summary';
+import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -47,8 +48,6 @@ function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRout
 }
 
 describe('briefing model pricing', () => {
-  useKiloExclusiveModel();
-
   const aion = catalogModel('aion-labs/aion-3.5-mini', {
     prompt: '0.0000007',
     completion: '0.0000014',
@@ -228,29 +227,29 @@ describe('briefing model pricing', () => {
   });
 
   it('quotes a picker-built entry at its own price, ignoring a same-id catalog row and snapshot route', async () => {
-    const exclusive = catalogModel(kiloExclusiveModelFixture.public_id, {
+    const autoSmall = catalogModel(KILO_AUTO_SMALL_MODEL.id, {
       prompt: '0.00001',
       completion: '0.00002',
     });
     jest
       .mocked(getRawOpenRouterModels)
-      .mockResolvedValue({ data: [exclusive] } satisfies OpenRouterModelsResponse);
+      .mockResolvedValue({ data: [autoSmall] } satisfies OpenRouterModelsResponse);
 
-    const withCatalogRow = await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000);
+    const withCatalogRow = await briefingPriceBound(autoSmall.id, 'Overnight activity', 2_000_000);
 
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [] });
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
-      [exclusive.id]: {
-        id: exclusive.id,
-        name: exclusive.name,
+      [autoSmall.id]: {
+        id: autoSmall.id,
+        name: autoSmall.name,
         endpoints: [{ tag: 'alibaba', pricing: { prompt: '0.001', completion: '0.002' } }],
       } satisfies StoredModel,
     });
 
     expect(withCatalogRow).toEqual(
-      await briefingPriceBound(exclusive.id, 'Overnight activity', 2_000_000)
+      await briefingPriceBound(autoSmall.id, 'Overnight activity', 2_000_000)
     );
-    expect(withCatalogRow.inputRate).toBeLessThan(Number(exclusive.pricing.prompt));
+    expect(withCatalogRow.inputRate).toBeLessThan(Number(autoSmall.pricing.prompt));
   });
 
   it('rejects a picker price with unknown rates', async () => {
@@ -260,7 +259,7 @@ describe('briefing model pricing', () => {
   });
 
   it('quotes a free picker model at zero and admits it without a route price cap', async () => {
-    const freeModel = 'google/gemma-4-26b-a4b-it:free';
+    const freeModel = KILO_AUTO_FREE_MODEL.id;
     const quote = await briefingPriceBound(freeModel, 'Overnight activity', 2_000_000);
 
     expect(quote.inputRate).toBe(0);
@@ -345,5 +344,71 @@ describe('briefing model pricing', () => {
       refusal: expect.stringMatching(/pricing/),
       providerConfig: null,
     });
+  });
+});
+
+function reportRow(excerpt: string, title = 'Captured session'): BriefingReportRow {
+  const source = {
+    id: 'activity:ses_prompt',
+    sessionId: 'ses_prompt',
+    kind: 'activity' as const,
+    title,
+    url: '/cloud/sessions/ses_prompt',
+    occurredAt: '2026-10-28T06:30:00.000Z',
+    excerpt,
+  };
+  return {
+    id: 'report',
+    captured_at: '2026-10-28T07:00:00.000Z',
+    night_start_at: '2026-10-27T22:00:00.000Z',
+    cutoff_at: '2026-10-28T06:00:00.000Z',
+    timezone: 'UTC',
+    language: 'English',
+    facts: {
+      scorecard: { sessions: 1, pullRequests: 0, blockers: 0 },
+      coverage: { activity: 'partial', blockers: 'partial', pullRequests: 'partial' },
+      truncated: false,
+      sessions: [
+        {
+          sessionId: 'ses_prompt',
+          title: 'Captured session',
+          url: '/cloud/sessions/ses_prompt',
+          status: 'idle',
+          sources: [source],
+        },
+      ],
+      sources: [source],
+    },
+  } as unknown as BriefingReportRow;
+}
+
+describe('briefing prompt evidence', () => {
+  const secretKey = 'wJalrXUtnFEMI/' + 'K7MDENG/bPxRfiCYEXAMPLEKEY';
+
+  it('sends no credential material from stored facts to the model', () => {
+    const prompt = briefingPrompt(
+      reportRow('Deploy used AWS_SECRET_' + `ACCESS_KEY=${secretKey} from the shell.`),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).toContain('[redacted credential]');
+  });
+
+  it('sends only excerpts that screening clears', () => {
+    const prompt = briefingPrompt(
+      reportRow('Stopped at client_' + 'secret: "' + secretKey),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).not.toContain('Stopped at');
+  });
+
+  it('sends only titles that screening clears', () => {
+    const prompt = briefingPrompt(
+      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey),
+      'English'
+    );
+    expect(prompt).not.toContain(secretKey);
+    expect(prompt).toContain('Agent session');
   });
 });

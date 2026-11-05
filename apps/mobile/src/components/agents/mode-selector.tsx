@@ -13,6 +13,7 @@ import {
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
+import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -63,6 +64,9 @@ export function ModeSelector({
     <Pressable
       onPress={handlePress}
       disabled={disabled}
+      // The pill's own 27.81pt frame is the visual; the vertical slop carries
+      // its touch region past the 44pt design target without growing the row.
+      hitSlop={CHIP_HIT_SLOP}
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}

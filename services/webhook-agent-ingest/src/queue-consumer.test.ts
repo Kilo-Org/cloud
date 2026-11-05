@@ -642,8 +642,14 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       } else {
         expect(prepareBody).toHaveProperty('variant', variant);
       }
-      if (sandboxAllocation === undefined) {
+      if (
+        sandboxAllocation === undefined ||
+        sandboxAllocation === 'cloudflare-shared' ||
+        sandboxAllocation === 'isolated-standard'
+      ) {
         expect(prepareBody).not.toHaveProperty('sandboxAllocation');
+      } else if (sandboxAllocation === 'cloudflare-single') {
+        expect(prepareBody).toHaveProperty('sandboxAllocation', 'cloudflare-containers-standard-3');
       } else {
         expect(prepareBody).toHaveProperty('sandboxAllocation', sandboxAllocation);
       }

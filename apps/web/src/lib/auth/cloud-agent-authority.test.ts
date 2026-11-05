@@ -197,6 +197,20 @@ describe('verified scoped web authentication', () => {
     expect(auth.cloudAgentAuthority).toEqual(scope);
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+  it('allows models.list discovery on scoped HTTP paths for personal and signed-org authority', async () => {
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+    const orgScope = { ...scope, organizationId };
+    mockHeaders.mockResolvedValue(
+      bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }))
+    );
+    expect(
+      (await getUserFromAuth({ adminOnly: false, requestPathname: '/api/trpc/models.list' })).user
+        ?.id
+    ).toBe(user.id);
+  });
   it.each([
     undefined,
     '/api/gastown/token',
@@ -204,6 +218,8 @@ describe('verified scoped web authentication', () => {
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
+    '/api/trpc/models.preferred',
+    '/api/trpc/models.list,user.getMe',
   ])('denies direct REST and unrelated procedure paths %s', async requestPathname => {
     const headers = bearer();
     headers.set('x-pathname', '/api/user');
@@ -470,15 +486,18 @@ describe('scope-preserving control token exchange', () => {
 });
 
 describe('ordinary prepare schema', () => {
-  it('preserves the parent callback through personal and organization web prepare schemas', () => {
-    const input = { ...launch, callbackTarget: { url: 'session:parent' } };
-    expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
-      input.callbackTarget
-    );
-    expect(
-      organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
-    ).toEqual(input.callbackTarget);
-  });
+  it.each(['workspace:new-chat', 'workspace:workspace_22345678-1234-4234-8234-123456789abc'])(
+    'preserves the %s callback through personal and organization web prepare schemas',
+    url => {
+      const input = { ...launch, callbackTarget: { url } };
+      expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
+        input.callbackTarget
+      );
+      expect(
+        organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
+      ).toEqual(input.callbackTarget);
+    }
+  );
   it('strips the retired spawn opt-in through prepare parsing', () => {
     expect(
       personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: true })

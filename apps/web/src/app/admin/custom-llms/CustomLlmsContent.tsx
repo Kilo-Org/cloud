@@ -123,6 +123,7 @@ type EditorState = {
   mode: 'create' | 'edit';
   publicId: string;
   wasPublic: boolean;
+  wasPriced: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -131,6 +132,7 @@ type EditorState = {
 type CopyState = {
   sourcePublicId: string;
   sourceIsPublic: boolean;
+  sourceIsPriced: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -168,14 +170,18 @@ type CopyInput = {
   internal_id: string | undefined;
 };
 
-/** A save that makes a custom LLM public, which needs confirmation. */
-type PendingChange = { kind: 'upsert'; input: UpsertInput } | { kind: 'copy'; input: CopyInput };
+/** A save that makes a custom LLM public, or starts charging for a public one, which needs confirmation. */
+type PendingChange = { priced: boolean; alreadyPublic: boolean } & (
+  | { kind: 'upsert'; input: UpsertInput }
+  | { kind: 'copy'; input: CopyInput }
+);
 
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
   wasPublic: false,
+  wasPriced: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -196,6 +202,7 @@ export function CustomLlmsContent() {
       mode: 'create',
       publicId: '',
       wasPublic: false,
+      wasPriced: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -208,6 +215,7 @@ export function CustomLlmsContent() {
       mode: 'edit',
       publicId,
       wasPublic: definition.public !== undefined,
+      wasPriced: definition.pricing !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -222,6 +230,7 @@ export function CustomLlmsContent() {
     setCopy({
       sourcePublicId,
       sourceIsPublic: source.public !== undefined,
+      sourceIsPriced: source.pricing !== undefined,
       publicId: sourcePublicId,
       displayName: source.display_name,
       internalId: source.internal_id ?? '',
@@ -317,7 +326,7 @@ export function CustomLlmsContent() {
       internal_id: internalId || undefined,
     };
     if (copy.sourceIsPublic) {
-      setPendingChange({ kind: 'copy', input });
+      setPendingChange({ kind: 'copy', input, priced: copy.sourceIsPriced, alreadyPublic: false });
       return;
     }
     await submitCopy(input);
@@ -392,8 +401,10 @@ export function CustomLlmsContent() {
       definition: defResult.data,
       credentials: parsedCredentials,
     };
-    if (input.definition.public !== undefined && !editor.wasPublic) {
-      setPendingChange({ kind: 'upsert', input });
+    const priced = input.definition.pricing !== undefined;
+    const startsCharging = editor.wasPublic && priced && !editor.wasPriced;
+    if (input.definition.public !== undefined && (!editor.wasPublic || startsCharging)) {
+      setPendingChange({ kind: 'upsert', input, priced, alreadyPublic: editor.wasPublic });
       return;
     }
     await submitUpsert(input);
@@ -461,11 +472,6 @@ export function CustomLlmsContent() {
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
                 <TableCell>
-                  {item.shadowedByKiloExclusiveModel && (
-                    <Badge variant="beta" className="mr-2">
-                      Kilo-exclusive model serves this ID
-                    </Badge>
-                  )}
                   {item.definition.public ? (
                     <Badge variant="new">
                       <Globe />
@@ -621,10 +627,7 @@ export function CustomLlmsContent() {
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>. A
-                Kilo-exclusive model ID may be used to replace that model, as long as it has no{' '}
-                <code>:</code> variant: the Kilo-exclusive model keeps serving it until its
-                definition is removed from the code.
+                OpenRouter model.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Set <code>api_kinds</code> to a subset of <code>chat_completions</code>,{' '}
@@ -635,8 +638,16 @@ export function CustomLlmsContent() {
                 otherwise. Without it, only that API is served.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Custom LLMs are always free for users. To make the model available to every user,
-                replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                A custom LLM is free when its public ID ends in <code>-free</code> or starts with{' '}
+                <code>stealth/</code>. Such a definition must not set <code>pricing</code>, and a
+                public one is available to signed-out users. Other custom LLMs should set{' '}
+                <code>pricing</code>, a list of tiers in the same format as a custom pricing
+                entry&apos;s <code>pricing</code>, and bill users like other paid models. Without it
+                they charge nothing, but still need a signed-in user with credits. Alongside{' '}
+                <code>pricing</code>, set <code>&quot;may_train_on_prompts&quot;: false</code> only
+                for an upstream with zero data retention; otherwise the model is assumed to train on
+                prompts. To make the model available to every eligible user, replace{' '}
+                <code>organization_ids</code> and <code>group_ids</code> with{' '}
                 <code>
                   &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
                   &quot;description&quot;: &quot;…&quot; {'}'}
@@ -675,14 +686,34 @@ export function CustomLlmsContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingChange?.alreadyPublic
+                ? 'Start charging for this public custom LLM?'
+                : 'Make this custom LLM public?'}
+            </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
-                <p>
-                  Every Kilo user, including signed-out users, will be able to use{' '}
-                  <code className="font-mono">{pendingChange?.input.public_id}</code> for free. Kilo
-                  pays for all usage.
-                </p>
+                {pendingChange?.alreadyPublic ? (
+                  <p>
+                    Signed-in Kilo users will be billed for{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing.
+                  </p>
+                ) : pendingChange?.priced ? (
+                  <p>
+                    Every signed-in Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> at the
+                    definition&apos;s pricing.
+                  </p>
+                ) : (
+                  <p>
+                    Every Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange?.input.public_id}</code> without
+                    being charged. Kilo pays for all usage. Unless the public ID ends in{' '}
+                    <code>-free</code> or starts with <code>stealth/</code>, only signed-in users
+                    with credits can use it.
+                  </p>
+                )}
                 <p>
                   Test this definition with a local web app before saving it. A broken definition
                   fails requests for everyone who can use it.
@@ -692,7 +723,9 @@ export function CustomLlmsContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPendingChange}>Make public</AlertDialogAction>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              {pendingChange?.alreadyPublic ? 'Start charging' : 'Make public'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

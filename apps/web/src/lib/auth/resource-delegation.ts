@@ -11,6 +11,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
@@ -158,10 +159,7 @@ export async function canIssueLegacyOrganizationToken(
 }
 
 function tokenFromHeaders(requestHeaders: Headers): string | null {
-  const value = requestHeaders.get('authorization');
-  if (!value || !value.toLowerCase().startsWith('bearer ')) return null;
-  const token = value.slice(7).trim();
-  return token || null;
+  return extractBearerToken(requestHeaders.get('authorization'));
 }
 
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {

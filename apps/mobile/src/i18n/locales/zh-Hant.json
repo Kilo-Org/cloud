@@ -189,6 +189,7 @@
     "resendCode": "重新傳送驗證碼",
     "termsPrefix": "繼續即表示你同意我們的",
     "terms": "條款",
+    "termsInSentence": "條款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登入選項",
@@ -297,6 +298,7 @@
     "toolSummaryTranslation": "翻譯工具摘要",
     "toolSummaryTranslationSubtitle": "將每個工具摘要傳送給模型，翻譯成你的應用程式語言。翻譯失敗時會顯示原文。",
     "toolSummaryTranslationModelUnavailableNotice": "這個模型已不再提供。點一下$t(common.model)選擇另一個。",
+    "translateSummaries": "翻譯摘要",
     "autoExpandThinkingInactiveSubtitle": "隱藏思考詳情時，此設定不會有任何效果。"
   },
   "notifications": {
@@ -1048,6 +1050,7 @@
       "prOpened": "已建立 REVIEW.md PR",
       "alreadyPresent": "REVIEW.md 中已有此指引",
       "status": {
+        "open": "開啟",
         "edited": "已編輯",
         "opening_change_request": "正在建立 PR",
         "change_request_failed": "PR 建立失敗",
@@ -1083,6 +1086,8 @@
     "overview": {
       "allAreas": "所有面向",
       "nSelected": "已選取 {{displayCount}} 項",
+      "nSelected_one": "已選取 {{displayCount}} 項",
+      "nSelected_other": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
       "set": "已設定",
       "notSet": "未設定"
@@ -1182,6 +1187,8 @@
       "triageReasoning": "初步評估依據",
       "watchInCloudAgent": "在雲端代理中檢視",
       "whereFound": "發現位置（{{displayCount}}）",
+      "whereFound_one": "發現位置（{{displayCount}}）",
+      "whereFound_other": "發現位置（{{displayCount}}）",
       "yes": "是",
       "action": {
         "analyzeCodebase": "分析程式碼庫",
@@ -1310,6 +1317,7 @@
       "repoSummaryHigh_other": "{{displayCount}} 項高風險",
       "repositoryActionPlan": "存放庫處理計畫",
       "settings": "設定",
+      "syncing": "同步中…",
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",
@@ -1340,6 +1348,8 @@
       "breakdownMediumLow_other": "中低：{{displayCount}} 項",
       "dueThisWeek": "本週到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 項已確認可遭利用",
+      "dueThisWeekDetail_one": "其中 {{exploitable}} 項已確認可遭利用",
+      "dueThisWeekDetail_other": "其中 {{exploitable}} 項已確認可遭利用",
       "noDeadline": "無期限",
       "reviewSlaAssignment": "檢視 SLA 期限設定",
       "allOpenFindingsTracked": "所有未解決的資安問題均已納入追蹤"
@@ -1458,6 +1468,7 @@
     },
     "scopeEntry": {
       "connectDescription": "安裝 Kilo GitHub App，即可自動同步 Dependabot 警報，並管理各個存放庫的資安問題。",
+      "connectOwnerOnly": "請組織擁有者或管理員連結 {{platform}}。",
       "connectTitle": "連結 GitHub 即可開始使用",
       "couldNotLoad": "無法載入資安代理程式。",
       "installApp": "安裝 GitHub App",
@@ -1533,6 +1544,7 @@
       "actionFailed": "無法完成此操作。請再試一次。",
       "actionBlocked": "無法完成此操作。必須先修正此問題，才能重試。",
       "syncNoRepositories": "同步範圍內沒有任何存放庫。請選擇資安代理程式要監控的存放庫，然後再次同步。",
+      "syncNoRepositoriesNoManage": "同步範圍內沒有任何存放庫。組織擁有者、管理員或帳單管理員必須先連結存放庫，才能進行同步。",
       "syncIntegrationInactive": "資安代理程式的 GitHub 連線未啟用。請重新連線 Kilo GitHub App，然後再次同步。",
       "syncMissingPermission": "Kilo GitHub App 無法讀取 vulnerability alerts。請在 GitHub 中授予該權限，然後再次同步。",
       "configConflict": "資安代理程式的設定已在其他地方變更。請檢視最新設定並重新儲存。"
@@ -1689,6 +1701,8 @@
       "cannotCompleteTitle": "無法完成安裝",
       "notAdminMessage": "只有該 GitHub 帳戶的管理員能建立連結。請組織管理員安裝 Kilo。",
       "alreadyClaimedMessage": "此 GitHub 安裝項目已連結到另一個 Kilo 帳戶。請先到該帳戶中斷連結。",
+      "installationUnavailableMessage": "此 GitHub App 安裝項目已暫停或已無法使用。請在 GitHub 中還原或重新安裝，然後再試一次。",
+      "multipleInstallationsMessage": "此 Kilo 組織目前只能連結一個 GitHub 組織。",
       "didNotCompleteTitle": "安裝未完成",
       "didNotCompleteMessage": "GitHub App 尚未完成安裝。請回到應用程式再試一次。"
     },
@@ -1831,7 +1845,7 @@
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
       "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
-      "remoteHint": "在電腦上執行 `kilo remote`，或在執行中的 CLI 工作階段執行 `/remote`，即可控制本機的 kilo 程序。",
+      "remoteHint": "若要在你的電腦上執行，請在該電腦上啟動 Kilo 並讓它保持執行。",
       "continueFrom": "正在接續 {{title}}。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
@@ -1845,7 +1859,6 @@
       "defaultProfileResolvesTo": "目前對應 {{name}}",
       "defaultProfileResolvesToAccessibility": "預設設定檔：{{name}}",
       "manageProfiles": "管理個人資料",
-      "noProfiles": "還沒有個人資料。建立一個以新增環境變數、MCP 伺服器和技能。",
       "advancedConfig": "進階配置",
       "advancedConfigDescription": "僅對本次工作階段生效。另存為設定檔可供下次使用。",
       "saveAsProfile": "另存為設定檔",
@@ -2000,6 +2013,7 @@
       "assistantStopped": "回覆已停止。",
       "assistantContextOverflow": "對話長度超出模型可處理的範圍。",
       "assistantProviderError": "供應商傳回錯誤。",
+      "assistantProviderRefused": "供應商拒絕了此請求，且無法重試。",
       "assistantOutputLimit": "回覆已達到模型的輸出上限。",
       "assistantStructuredOutput": "回覆與所需格式不符。",
       "assistantFailed": "回覆失敗。"
@@ -2531,7 +2545,8 @@
     "newSessionOn": "{{name}} 上的新工作階段",
     "noMatchingSessions": "沒有相符的工作階段。",
     "onlyFirstFilesAttached": "只會附加前 {{displayCount}} 個檔案。",
-    "staleMessage": "此分享內容已無法使用。",
+    "staleMessage": "請從你分享時使用的應用程式重新傳送。",
+    "staleTitle": "無法分享",
     "retryableMessage": "無法載入你的工作階段。",
     "emptyMessage": "目前沒有工作階段。建立新工作階段即可傳送此內容。",
     "cliNotConnectedTitle": "工作階段未連線",
@@ -2709,8 +2724,13 @@
       "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
       "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
       "reconnectTitle": "重新連線至 GitHub",
+      "reconnectTitleGitLab": "重新連線至 GitLab",
+      "reconnectTitleBitbucket": "重新連線至 Bitbucket",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。",
       "gitlabDescription": "在行動裝置上審查合併請求",
+      "gitlabInstanceMismatchTitle": "GitLab 連線屬於另一個執行個體",
+      "gitlabInstanceMismatchDescription": "您的 GitLab 連線是用於 {{connected}}，但此合併請求位於 {{requested}}。請在該執行個體上連線 GitLab 以進行審查。",
+      "checkActiveConnection": "連線已啟用，但此項目仍無法載入。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
@@ -2985,7 +3005,6 @@
         "squash": "壓縮"
       },
       "terminal": {
-        "alreadyMerged": "已合併",
         "closed": "此提取請求已關閉",
         "closedMergeRequest": "此合併請求已關閉"
       },
@@ -3002,7 +3021,6 @@
         "requiredReviewsTitle": "尚未完成必要審查",
         "requiredReviewsDetail": "尚未取得必要審查者的核准。",
         "failingChecksTitle": "必要檢查未通過",
-        "failingChecksDetail": "必要狀態檢查未通過。",
         "unstableTitle": "部分檢查未通過",
         "unstableDetail": "部分非必要檢查未通過，但不影響合併。",
         "draftTitle": "提取要求草稿",
@@ -3109,7 +3127,12 @@
       "pendingComment_other": "則待送出的留言",
       "pendingComment_one": "則待送出留言",
       "summaryOptional": "摘要（非必填）",
-      "partialPostedMessage": "已發佈 {{displayFreshCount}} 則留言。另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedFresh": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedFresh_one": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedFresh_other": "已發佈 {{displayFreshCount}} 則留言。",
+      "partialPostedStale": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedStale_one": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "partialPostedStale_other": "另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
       "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
       "submitReview": "送出審查",
       "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
@@ -3788,14 +3811,14 @@
     "saved": "支出提醒設定已儲存",
     "loadError": "無法載入支出提醒。",
     "saveError": "無法儲存支出提醒。",
-    "empty": "支出提醒已關閉。開啟後會通知此範圍的帳單聯絡人。",
-    "noSpend": "尚無支出記錄",
+    "sendAlerts": "發送支出提醒",
+    "noSpend": "尚無支出",
     "spend24h": "過去 24 小時的支出",
     "multiplierError": "請輸入 1 或更大的倍數",
     "permissionDenied": "你沒有管理支出提醒的權限。",
     "pushOffByCategory": "已在通知中關閉",
     "multiplierMaxError": "請輸入 {{max}} 或更小的倍數",
-    "thresholdMaxError": "請輸入不超過 {{max}} 的金額。"
+    "thresholdMaxError": "請輸入不超過 {{max}} 的金額"
   },
   "profiles": {
     "title": "設定檔",

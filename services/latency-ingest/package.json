@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

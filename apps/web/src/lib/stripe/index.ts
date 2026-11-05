@@ -144,6 +144,7 @@ import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/dr
 import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
 import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
+  isServiceFeeOnlyRefundedCharge,
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,
 } from '@/lib/service-fees/refunds';
@@ -1743,11 +1744,21 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       }
 
       const invoice = await getStripeChargeInvoice(client, charge);
-      await observeServiceFeeChargeRefunded({
+      const feeRefund = await observeServiceFeeChargeRefunded({
         store: createServiceFeeStores().assessments,
         charge: { ...charge, invoice: invoice?.id ?? null },
         stripe: client,
       });
+      if (
+        feeRefund.assessment &&
+        (await isServiceFeeOnlyRefundedCharge({
+          charge,
+          chargedFeeMinor: feeRefund.assessment.chargedFeeMinor,
+          stripe: client,
+        }))
+      ) {
+        break;
+      }
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);
       const referralAdverseCharge = await getAffiliateDisputeChargeContext(charge.id);
       if (!referralAdverseCharge) {

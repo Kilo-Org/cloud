@@ -9,6 +9,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -53,6 +55,7 @@ import {
 import { useManager } from './CloudAgentProvider';
 import type { StoredSession } from './types';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
+import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -140,6 +143,11 @@ const UNTITLED_WORKTREE_DETAILS: SidebarWorktreeDetails = {
   prSession: null,
   sessions: [],
 };
+
+const SESSIONS_SIDEBAR_MIN_WIDTH = 320;
+const SESSIONS_SIDEBAR_MAX_WIDTH = 480;
+const SESSIONS_SIDEBAR_KEYBOARD_STEP = 16;
+const SESSIONS_SIDEBAR_STORAGE_KEY = 'cloud-agent:sessions-sidebar-width';
 
 type SidebarLayoutContextValue = WorktreeChatTabs & {
   toggleMobileSidebar: () => void;
@@ -314,6 +322,37 @@ function CloudSidebarLayoutContent({
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
+  const {
+    width: sessionsSidebarWidth,
+    startDrag: startSessionsSidebarDrag,
+    resizeTo: resizeSessionsSidebar,
+  } = useResizableSidebar(
+    SESSIONS_SIDEBAR_MIN_WIDTH,
+    SESSIONS_SIDEBAR_MIN_WIDTH,
+    SESSIONS_SIDEBAR_MAX_WIDTH,
+    SESSIONS_SIDEBAR_STORAGE_KEY
+  );
+  const handleSessionsSidebarKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    let nextWidth: number;
+    switch (event.key) {
+      case 'ArrowLeft':
+        nextWidth = sessionsSidebarWidth - SESSIONS_SIDEBAR_KEYBOARD_STEP;
+        break;
+      case 'ArrowRight':
+        nextWidth = sessionsSidebarWidth + SESSIONS_SIDEBAR_KEYBOARD_STEP;
+        break;
+      case 'Home':
+        nextWidth = SESSIONS_SIDEBAR_MIN_WIDTH;
+        break;
+      case 'End':
+        nextWidth = SESSIONS_SIDEBAR_MAX_WIDTH;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    resizeSessionsSidebar(nextWidth);
+  };
   const {
     localSessions,
     createLocalSession,
@@ -1071,7 +1110,10 @@ function CloudSidebarLayoutContent({
         </Sheet>
 
         {/* Desktop Sidebar */}
-        <div className="hidden w-80 shrink-0 border-r lg:block">
+        <div
+          className="relative hidden max-w-[max(20rem,calc(100%_-_28rem))] w-(--sessions-sidebar-width) shrink-0 border-r lg:block"
+          style={{ '--sessions-sidebar-width': `${sessionsSidebarWidth}px` } as CSSProperties}
+        >
           <ChatSidebar
             key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
             workspaceFolders={sidebarWorkspaceFolders}
@@ -1100,6 +1142,19 @@ function CloudSidebarLayoutContent({
             projectFilter={projectFilter}
             onProjectChange={setProjectFilter}
             recentProjects={recentProjects}
+          />
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sessions sidebar"
+            aria-valuemin={SESSIONS_SIDEBAR_MIN_WIDTH}
+            aria-valuemax={SESSIONS_SIDEBAR_MAX_WIDTH}
+            aria-valuenow={sessionsSidebarWidth}
+            aria-valuetext={`Preferred width ${sessionsSidebarWidth} pixels`}
+            tabIndex={0}
+            className="before:bg-border hover:before:bg-ring focus-visible:before:bg-ring absolute inset-y-0 -right-1.5 z-10 w-3 cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:content-[''] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            onMouseDown={startSessionsSidebarDrag}
+            onKeyDown={handleSessionsSidebarKeyDown}
           />
         </div>
 

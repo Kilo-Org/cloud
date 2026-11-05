@@ -113,6 +113,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `agentProfiles`
 - `appReportedMessages`
 - `byok`
+- `claudeBilling`
 - `cliSessions`
 - `cliSessionsV2`
 - `cloudAgentNext`

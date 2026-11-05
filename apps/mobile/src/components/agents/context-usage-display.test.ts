@@ -550,8 +550,14 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
   it('never puts two sentence terminators side by side in any supported locale', async () => {
     expect(SUPPORTED_LANGUAGES.length).toBeGreaterThan(50);
     const usages = [
-      { tag: 'full', info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }) },
-      { tag: 'unknown-window', info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }) },
+      {
+        tag: 'full',
+        info: info({ contextTokens: 64_000, contextWindow: 200_000, percentage: 32 }),
+      },
+      {
+        tag: 'unknown-window',
+        info: info({ contextTokens: 100, contextWindow: undefined, percentage: undefined }),
+      },
       { tag: 'none', info: undefined },
     ];
     for (const language of SUPPORTED_LANGUAGES) {

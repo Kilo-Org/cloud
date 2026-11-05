@@ -192,6 +192,7 @@ function createHarness() {
     timers: TEST_TIMERS,
     emit: send,
     allocationId: 'alloc_directory_key_flip',
+    onPreparedRoute: spec => turns.registerRoute(spec),
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv) => {
@@ -210,6 +211,7 @@ function createHarness() {
     inheritedEnv: {},
     mkdir: async () => undefined,
     hasGit: async () => false,
+    runGit: async () => ({ stdout: '', stderr: 'not a repository', exitCode: 128 }),
     readStamp: async directory => stamps.get(directory) ?? null,
     writeStamp: async (directory, stamp) => {
       stamps.set(directory, stamp);

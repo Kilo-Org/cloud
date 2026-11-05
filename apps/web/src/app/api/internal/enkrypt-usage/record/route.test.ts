@@ -35,6 +35,7 @@ async function usageWriteForNewOrganization(): Promise<EnkryptUsageWrite> {
     organizationId: organization.id,
     kiloUserId: user.id,
     sessionId: 'ses_guardrail',
+    microdollarUsageId: randomUUID(),
     apiKind: 'messages',
     decision: 'blocked',
     creditsCost: 7,
@@ -92,6 +93,10 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
   test.each([
     ['a body that is not JSON', () => 'not json'],
     ['a non-UUID id', (write: EnkryptUsageWrite) => ({ ...write, id: 'usage-1' })],
+    [
+      'a non-UUID inference usage id',
+      (write: EnkryptUsageWrite) => ({ ...write, microdollarUsageId: 'usage-1' }),
+    ],
     ['an unknown decision', (write: EnkryptUsageWrite) => ({ ...write, decision: 'maybe' })],
     ['an unknown guardrail', (write: EnkryptUsageWrite) => ({ ...write, guardrail: 'both' })],
     ['negative credits', (write: EnkryptUsageWrite) => ({ ...write, creditsCost: -1 })],
@@ -127,6 +132,7 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
         id: usageWrite.id,
         kilo_user_id: usageWrite.kiloUserId,
         session_id: 'ses_guardrail',
+        microdollar_usage_id: usageWrite.microdollarUsageId,
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
@@ -138,14 +144,22 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     );
   });
 
-  test('records a write from a gateway that does not send the guardrail as an input call', async () => {
-    const { guardrail: _guardrail, ...usageWrite } = await usageWriteForNewOrganization();
+  test('records a legacy input call without an inference association', async () => {
+    const {
+      guardrail: _guardrail,
+      microdollarUsageId: _microdollarUsageId,
+      ...usageWrite
+    } = await usageWriteForNewOrganization();
 
     const response = await post(usageWrite);
 
     expect(response.status).toBe(200);
     expect(await ledgerRows(usageWrite.organizationId)).toEqual([
-      expect.objectContaining({ id: usageWrite.id, guardrail: 'input' }),
+      expect.objectContaining({
+        id: usageWrite.id,
+        guardrail: 'input',
+        microdollar_usage_id: null,
+      }),
     ]);
   });
 

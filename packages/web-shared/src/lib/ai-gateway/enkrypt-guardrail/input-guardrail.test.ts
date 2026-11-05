@@ -358,25 +358,34 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
   });
 
-  it('scans log-only detectors in a second call that the verdict never waits for', async () => {
+  it('preserves the inference association across blocking retries and a nonblocking log-only scan', async () => {
+    const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
+    const request = { ...mixedScan, microdollarUsageId };
     const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
     mockedScanRequest.mockImplementation(async resolved =>
       isLogOnly(resolved)
         ? logOnlyResult.promise
-        : { verdict: { action: 'allow' }, report: scanReport, usageRecords: [call()] }
+        : {
+            verdict: { action: 'allow' },
+            report: scanReport,
+            usageRecords: [
+              call({ microdollarUsageId, decision: 'error', creditsCost: null }),
+              call({ microdollarUsageId }),
+            ],
+          }
     );
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(mixedScan), signal);
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
 
     expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
     expect(mockedScanRequest.mock.calls).toEqual([
       [
-        scanOf({ ...mixedScan, config: scan.config }),
+        scanOf({ ...request, config: scan.config }),
         expect.objectContaining({ timeoutMs: 30_000, signal }),
       ],
       [
-        scanOf({ ...mixedScan, config: logOnlyScan.config }),
+        scanOf({ ...request, config: logOnlyScan.config }),
         expect.objectContaining({ timeoutMs: 30_000, signal }),
       ],
     ]);
@@ -384,13 +393,24 @@ describe('startEnkryptInputGuardrail', () => {
     logOnlyResult.resolve({
       verdict: { action: 'unavailable', reason: 'timeout' },
       report: scanReport,
-      usageRecords: [call({ decision: 'error', creditsCost: 1 })],
+      usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: 1 })],
     });
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call(), addedLatencyMs: 237 }],
-      [{ ...call({ decision: 'error', creditsCost: 1 }), addedLatencyMs: null }],
+      [
+        {
+          ...call({ microdollarUsageId, decision: 'error', creditsCost: null }),
+          addedLatencyMs: null,
+        },
+      ],
+      [{ ...call({ microdollarUsageId }), addedLatencyMs: 237 }],
+      [
+        {
+          ...call({ microdollarUsageId, decision: 'error', creditsCost: 1 }),
+          addedLatencyMs: null,
+        },
+      ],
     ]);
   });
 

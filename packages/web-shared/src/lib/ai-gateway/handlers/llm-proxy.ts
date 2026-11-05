@@ -225,6 +225,7 @@ export async function handleLlmProxyRequest(
   void organizationGroupPolicyPromise.catch(() => {});
 
   const headers = readLlmProxyHeaders(request);
+  const usageId = randomUUID();
 
   const [guardrailCaller, guardrailAccount] = await Promise.all([
     callerPromise,
@@ -280,6 +281,7 @@ export async function handleLlmProxyRequest(
       }
       return {
         sessionId: headers.sessionId,
+        microdollarUsageId: usageId,
         organizationId: guardrailCaller.organizationId,
         kiloUserId: guardrailCaller.user.id,
         apiKind: requestBodyParsed.kind,
@@ -419,7 +421,6 @@ export async function handleLlmProxyRequest(
   const autoModel = modelResolution.kind === 'routed' ? modelResolution.autoModel : null;
 
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
-  const usageId = randomUUID();
   const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
   providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
   const providerPolicy = await resolveProviderAndPolicy({
@@ -567,6 +568,7 @@ export async function handleLlmProxyRequest(
         ? resolveEnkryptOutputScan(
             {
               sessionId: usageContext.session_id,
+              microdollarUsageId: usageId,
               organizationId,
               kiloUserId: user.id,
               apiKind: requestBodyParsed.kind,

@@ -102,7 +102,12 @@ const LABELLED_FILES = [
   { filename: 'src/feature/zeta.ts', status: 'removed' },
 ] as const;
 
-const FILE_PATCH = ['@@ -1,2 +1,2 @@', ' const context = 1;', '-const before = 2;', '+const after = 2;'];
+const FILE_PATCH = [
+  '@@ -1,2 +1,2 @@',
+  ' const context = 1;',
+  '-const before = 2;',
+  '+const after = 2;',
+];
 
 export function pullRequestFilesFixture() {
   return Array.from({ length: PULL_REQUEST_FILE_COUNT }, (_unused, index) => {
@@ -111,7 +116,8 @@ export function pullRequestFilesFixture() {
     return {
       sha: `${index}`.padStart(40, 'd'),
       filename,
-      previous_filename: labelled !== undefined && 'previous' in labelled ? labelled.previous : null,
+      previous_filename:
+        labelled !== undefined && 'previous' in labelled ? labelled.previous : null,
       status: labelled?.status ?? 'modified',
       additions: 1,
       deletions: 1,

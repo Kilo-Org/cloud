@@ -3865,7 +3865,6 @@
     "saved": "Setările alertelor de cheltuieli au fost salvate",
     "loadError": "Alertele de cheltuieli nu au putut fi încărcate.",
     "saveError": "Alertele de cheltuieli nu au putut fi salvate.",
-    "empty": "Alertele de cheltuieli sunt oprite. Activează-le pentru a-i avertiza pe contactele de facturare ale acestui domeniu.",
     "sendAlerts": "Trimite alerte",
     "noSpend": "Încă nicio cheltuială",
     "spend24h": "Cheltuieli din ultimele 24 de ore",

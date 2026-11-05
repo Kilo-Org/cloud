@@ -3809,7 +3809,6 @@
     "saved": "Stillingar útgjaldaviðvarana vistaðar",
     "loadError": "Ekki tókst að hlaða útgjaldaviðvörunum.",
     "saveError": "Ekki tókst að vista útgjaldaviðvaranir.",
-    "empty": "Útgjaldaviðvaranir eru af. Kveiktu á þeim til að vara innheimtutengiliði þessa svæðis við.",
     "sendAlerts": "Senda viðvaranir",
     "noSpend": "Engin útgjöld",
     "spend24h": "Útgjöld síðustu 24 klukkustundir",

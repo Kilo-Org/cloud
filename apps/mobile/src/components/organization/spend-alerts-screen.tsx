@@ -559,10 +559,9 @@ function SpendAlertsForm({
         </>
       ) : (
         <>
-          <Text variant="muted" className="text-sm">
-            {t('spendAlerts.empty')}
-          </Text>
-          {/* A disable save lands with the stored value now false, so
+          {/* The switch row above is the whole off state: it already says alerts
+              are off, and the subtitle names who they reach. A disable save
+              lands with the stored value now false, so
               `masterDirty` clears on its own refetch. Keep the controls while a
               confirmation is live, or the saved line (and its reserved slot)
               would vanish the moment the save settles. An edit clears `saved`

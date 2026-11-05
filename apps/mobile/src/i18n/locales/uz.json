@@ -3809,7 +3809,6 @@
     "saved": "Xarajat bildirishnomasi sozlamalari saqlandi",
     "loadError": "Xarajat bildirishnomalarini yuklab bo'lmadi.",
     "saveError": "Xarajat bildirishnomalarini saqlab bo'lmadi.",
-    "empty": "Xarajat bildirishnomalari o'chirilgan. Bu sohaning to'lov kontaktlarini ogohlantirish uchun ularni yoqing.",
     "sendAlerts": "Xarajat bildirishnomalarini yuborish",
     "noSpend": "Hozircha xarajat yo'q",
     "spend24h": "Oxirgi 24 soatdagi xarajat",

@@ -3809,7 +3809,6 @@
     "saved": "Indstillinger for forbrugsadvarsler er gemt",
     "loadError": "Forbrugsadvarsler kunne ikke indlæses.",
     "saveError": "Forbrugsadvarsler kunne ikke gemmes.",
-    "empty": "Forbrugsadvarsler er slået fra. Slå dem til for at advare dette områdes faktureringskontakter.",
     "sendAlerts": "Send advarsler",
     "noSpend": "Endnu intet forbrug",
     "spend24h": "Forbrug de seneste 24 timer",

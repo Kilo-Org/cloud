@@ -3809,7 +3809,6 @@
     "saved": "Harcama uyarısı ayarları kaydedildi",
     "loadError": "Harcama uyarıları yüklenemedi.",
     "saveError": "Harcama uyarıları kaydedilemedi.",
-    "empty": "Harcama uyarıları kapalı. Bu kapsamın faturalandırma kişilerini uyarmak için aç.",
     "sendAlerts": "Uyarı gönder",
     "noSpend": "Henüz harcama yok",
     "spend24h": "Son 24 saatteki harcama",

@@ -520,22 +520,25 @@ describe('ScreenHeader mounted', () => {
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
   });
 
-  it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
+  it('keeps the title touch area out of the row gap beside it', () => {
+    // The heading's free side is the gap to the trailing slot, and a trailing
+    // control can carry a slop that reaches into that gap. A title slop there
+    // made the same strip two tap targets: measured on the session screen at
+    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
-  it('mirrors the title hit slop onto the free side in RTL', () => {
-    // RN does not mirror hitSlop under RTL: an unchanged physical right slop
-    // reaches across the visually mirrored back control and the title (the
-    // later sibling) wins those taps, so Back opens the title action instead.
+  it('keeps the title touch area identical in both directions', () => {
+    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
+    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
-    expect(title.props.hitSlop).toEqual({ top: 13, right: 0, bottom: 13, left: 13 });
+    expect(title.props.hitSlop).toEqual({ top: 13, bottom: 13 });
   });
 
   it('gives the interactive title at least a 44-point reachable target', () => {

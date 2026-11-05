@@ -1,35 +1,37 @@
 import { and, asc, sql } from 'drizzle-orm';
 
 import { entities } from '../../db/sqlite-schema';
-import {
-  LIMITS,
-  encodeCursor,
-  jsonSchema,
-  kindSchema,
-  type Cursor,
-  type Entity,
-  type Page,
-  type Principal,
-} from '../../protocol';
+import { LIMITS, encodeCursor, kindSchema, type Cursor, type Principal } from '../../protocol';
 import { live, raise, type Db } from './session';
 
 type Row = typeof entities.$inferSelect;
 
-function toEntity(row: Row): Entity {
-  const kind = kindSchema.parse(row.kind);
-  if (row.value !== null) {
-    const value: unknown = JSON.parse(row.value);
-    return { kind, id: row.id, revision: row.revision, value: jsonSchema.parse(value) };
+/**
+ * Values are validated and canonically serialized on write. Forward their stored
+ * text verbatim instead of building a second object graph on every page read.
+ */
+function* pageChunks(
+  sessionID: string,
+  revision: number,
+  position: number,
+  rows: Row[],
+  next: string | null
+): Generator<string> {
+  yield `{"version":1,"sessionID":${JSON.stringify(sessionID)},"revision":${revision},"position":${position},"entities":[`;
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (index > 0) yield ',';
+    const header = JSON.stringify({ kind: row.kind, id: row.id, revision: row.revision });
+    yield header.slice(0, -1);
+    if (row.value !== null) {
+      yield ',"value":';
+      yield row.value;
+    } else {
+      yield `,"blob":${JSON.stringify({ hash: row.blob_hash, bytes: row.blob_bytes })}`;
+    }
+    yield '}';
   }
-  if (row.blob_hash === null || row.blob_bytes === null) {
-    throw new Error(`Stored entity ${row.kind}/${row.id} has neither a value nor a blob`);
-  }
-  return {
-    kind,
-    id: row.id,
-    revision: row.revision,
-    blob: { hash: row.blob_hash, bytes: row.blob_bytes },
-  };
+  yield `],"next":${JSON.stringify(next)}}`;
 }
 
 /**
@@ -42,7 +44,7 @@ export function read(
   principal: Principal,
   sessionID: string,
   input: { cursor?: Cursor; limit: number; revision?: number }
-): Page {
+): ReadableStream<Uint8Array> {
   const meta = live(db, principal, sessionID);
   if (input.revision !== undefined && input.revision !== meta.revision) {
     raise('revision_changed', 'The session changed after the first page; restart the read', {
@@ -86,14 +88,27 @@ export function read(
     : [];
 
   const last = selected.at(-1);
-  return {
-    version: 1,
-    sessionID,
-    revision: meta.revision,
-    entities: values.map(toEntity),
-    next:
-      last && selected.length < rows.length
-        ? encodeCursor({ kind: kindSchema.parse(last.kind), id: last.id })
-        : null,
-  };
+  for (const row of values) {
+    kindSchema.parse(row.kind);
+    if (row.value === null && (row.blob_hash === null || row.blob_bytes === null)) {
+      throw new Error(`Stored entity ${row.kind}/${row.id} has neither a value nor a blob`);
+    }
+  }
+  const next =
+    last && selected.length < rows.length
+      ? encodeCursor({ kind: kindSchema.parse(last.kind), id: last.id })
+      : null;
+  const chunks = pageChunks(sessionID, meta.revision, meta.position, values, next);
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    type: 'bytes',
+    pull(controller) {
+      const chunk = chunks.next();
+      if (chunk.done) controller.close();
+      else controller.enqueue(encoder.encode(chunk.value));
+    },
+    cancel() {
+      chunks.return(undefined);
+    },
+  });
 }

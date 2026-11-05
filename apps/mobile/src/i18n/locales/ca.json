@@ -3865,7 +3865,6 @@
     "saved": "S'ha desat la configuració de les alertes de despesa",
     "loadError": "No s'han pogut carregar les alertes de despesa.",
     "saveError": "No s'han pogut desar les alertes de despesa.",
-    "empty": "Les alertes de despesa estan desactivades. Activa-les per avisar els contactes de facturació d'aquest àmbit.",
     "sendAlerts": "Envia alertes",
     "noSpend": "Cap despesa",
     "spend24h": "Despesa de les últimes 24 hores",

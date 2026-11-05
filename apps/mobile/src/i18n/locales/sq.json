@@ -3809,7 +3809,6 @@
     "saved": "Cilësimet e njoftimeve për shpenzimet u ruajtën",
     "loadError": "Njoftimet për shpenzimet nuk u ngarkuan dot.",
     "saveError": "Njoftimet për shpenzimet nuk u ruajtën dot.",
-    "empty": "Njoftimet për shpenzimet janë të fikura. Ndizni ato për të paralajmëruar kontaktet e faturimit të këtij fushëveprimi.",
     "sendAlerts": "Dërgo njoftime",
     "noSpend": "Ende asnjë shpenzim",
     "spend24h": "Shpenzimet në 24 orët e fundit",

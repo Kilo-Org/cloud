@@ -9,6 +9,7 @@ This spec defines the security and membership rules for organization SSO, includ
 Active.
 
 - Added 2026-06-23 for parent organization SSO enforcement.
+- Updated for explicitly authorized, WorkOS-required invitations to join or restore membership.
 
 ## Definitions
 
@@ -48,9 +49,13 @@ Active.
 
 1. An External user MAY receive and accept an ordinary organization invitation.
 2. A Same-domain user MUST NOT receive or accept an ordinary invitation to a Direct SSO organization or SSO child organization.
-3. Invitation creation and acceptance MUST resolve the current Effective SSO policy on the server.
-4. A policy change after invitation creation MUST be enforced during acceptance. A legacy ordinary invitation MUST NOT bypass newly active SSO.
-5. Client-side invitation checks are advisory and MUST NOT replace server enforcement.
+3. An authorized organization owner or other actor with permission to invite members MAY explicitly invite a Same-domain user to join or restore membership in the target Direct SSO organization or SSO child organization. This invitation MUST require WorkOS authentication and be bound to the Effective SSO policy's authority; it is not an ordinary invitation.
+4. Invitation creation and acceptance MUST resolve the current Effective SSO policy on the server. Acceptance of a WorkOS-required invitation MUST require a matching invitee email and authentication through the currently effective WorkOS authority. If the policy is no longer required, its authority has changed, or its domain no longer matches, acceptance MUST fail closed.
+5. A policy change after invitation creation MUST be enforced during acceptance. A legacy ordinary invitation MUST NOT bypass newly active SSO.
+6. A child organization invitation MUST require the invitee to be a current human member of its live parent both when the invitation is created and when it is accepted. A pending parent invitation is not parent membership.
+7. An invitation MUST NOT restore membership if it was created at or before the target organization's latest Removal tombstone. A newer, explicitly authorized invitation MAY restore membership only upon valid acceptance; creating or sending it MUST NOT clear the tombstone or grant membership. Successful restoration MUST clear the target organization's tombstone without changing tombstones or membership in other organizations.
+8. Successful WorkOS-required invitation creation and membership admission, including restoration, MUST be audited as explicit actions identifying the actor, target organization, and invitee, without recording tokens, cookies, credentials, or authentication headers.
+9. Client-side invitation checks are advisory and MUST NOT replace server enforcement.
 
 ### Membership Admission
 
@@ -58,7 +63,7 @@ Active.
 2. Parent membership MUST NOT grant child membership, and child membership MUST NOT grant parent or sibling membership.
 3. Ordinary SSO JIT provisioning MAY add a user only to the SSO authority organization.
 4. Ordinary SSO JIT provisioning MUST NOT restore a membership when a Removal tombstone exists.
-5. A platform administrator MAY restore or add a Same-domain user only through an explicit audited action after verifying a matching WorkOS identity.
+5. A platform administrator MAY restore or add a Same-domain user through an explicit audited action after verifying a matching WorkOS identity. An authorized invitation MAY instead add or restore that user under the WorkOS-required invitation rules above.
 6. Bot users are exempt from human SSO requirements and MUST be admitted only through explicit bot/service-account paths.
 
 ### Isolation

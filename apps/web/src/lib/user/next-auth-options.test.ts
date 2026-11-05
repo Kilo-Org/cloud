@@ -7,9 +7,12 @@ import {
   profileProvesEmailOwnership,
   authOptions,
   parseSignInRedirectContext,
+  getInvitationTokenFromCallbackPath,
+  preserveSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import {
   openai_chatgpt_connections,
   organizations,
@@ -492,6 +495,57 @@ describe('parseSignInRedirectContext', () => {
     expect(parseSignInRedirectContext(cookie)).toEqual({
       callbackPath: '/device-auth?code=xyz',
     });
+  });
+});
+
+describe('getInvitationTokenFromCallbackPath', () => {
+  test('extracts an invitation token from the WorkOS sign-in callback URL', () => {
+    const callbackUrl = getSignInCallbackUrl({ callbackPath: '/users/accept-invite/invite-token' });
+    const context = parseSignInRedirectContext(callbackUrl);
+    expect(getInvitationTokenFromCallbackPath(context.callbackPath)).toBe('invite-token');
+  });
+
+  test('decodes the token and ignores the query and fragment', () => {
+    expect(getInvitationTokenFromCallbackPath('/users/accept-invite/invite%2Dtoken?x=1#next')).toBe(
+      'invite-token'
+    );
+  });
+
+  test.each([
+    undefined,
+    '/users/accept-invite',
+    '/users/accept-invite/',
+    '/users/accept-invite/token/more',
+    '/users/accept-invited/token',
+    'https://example.com/users/accept-invite/token',
+    '/users/accept-invite/%invalid',
+  ])('ignores non-invitation or malformed callback %s', callback => {
+    expect(getInvitationTokenFromCallbackPath(callback)).toBeUndefined();
+  });
+});
+
+describe('preserveSignInRedirectContext', () => {
+  test('preserves the invitation when SSO sign-in fails or is enforced', () => {
+    for (const url of [
+      '/users/sign_in?error=OAUTH_ERROR',
+      '/users/sign_in?sso=true&domain=example.com',
+    ]) {
+      const result = new URL(
+        preserveSignInRedirectContext(url, {
+          callbackPath: '/users/accept-invite/invite-token',
+        }),
+        'https://example.com'
+      );
+      expect(result.searchParams.get('callbackPath')).toBe('/users/accept-invite/invite-token');
+    }
+  });
+
+  test('does not preserve an unsafe callback', () => {
+    expect(
+      preserveSignInRedirectContext('/users/sign_in?error=OAUTH_ERROR', {
+        callbackPath: 'https://evil.example.com',
+      })
+    ).toBe('/users/sign_in?error=OAUTH_ERROR');
   });
 });
 

@@ -85,11 +85,11 @@ describe('BedrockCredentialsSchema', () => {
 });
 
 describe('inference provider ids', () => {
-  test('registers Meituan as a Vercel-only inference provider', () => {
+  test('keeps Vercel-only Meituan in the shared provider registry', () => {
     expect(VercelNonUserByokInferenceProviderIdSchema.parse('meituan')).toBe('meituan');
     expect(VercelInferenceProviderIdSchema.safeParse('longcat').success).toBe(false);
     expect(OpenRouterInferenceProviderIdSchema.safeParse('longcat').success).toBe(false);
-    expect(OpenRouterInferenceProviderIdSchema.safeParse('meituan').success).toBe(false);
+    expect(OpenRouterInferenceProviderIdSchema.parse('meituan')).toBe('meituan');
     expect(UserByokProviderIdSchema.safeParse('meituan').success).toBe(false);
     expect(openRouterToVercelInferenceProviderId('meituan')).toBe('meituan');
     expect(normalizeVercelInferenceProviderIdForRouting('meituan')).toBe('meituan');

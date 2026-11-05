@@ -39,6 +39,8 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ionstream',
   'mancer',
   'mara',
+  // Not an OpenRouter provider: served by Vercel AI Gateway.
+  'meituan',
   'meta',
   'minimax',
   'mistral',

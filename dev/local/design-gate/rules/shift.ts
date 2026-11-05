@@ -86,25 +86,14 @@ function sameCause(a: Shift, b: Shift): boolean {
 export function checkShift(timeline: readonly LayoutTree[], intervalMs: number): Finding[] {
   const byKey = timeline.map(tree => {
     const textCounts = new Map<string, number>();
-    const labelCounts = new Map<string, number>();
     for (const node of tree.nodes) {
       if (node.ref.text !== undefined)
         textCounts.set(node.ref.text, (textCounts.get(node.ref.text) ?? 0) + 1);
-      if (node.ref.label !== undefined)
-        labelCounts.set(node.ref.label, (labelCounts.get(node.ref.label) ?? 0) + 1);
     }
     const unique = tree.nodes.flatMap(node => {
-      /* A label on more than one element of the sample names none of them: two
-         mounted screens can each carry the same control, and the tabs keep the
-         blurred one in the tree, so its duplicate can take over the key between
-         two samples and report a move that never happened on screen. */
-      const identified = node.ref.testID !== undefined;
+      const identified = node.ref.testID !== undefined || node.ref.label !== undefined;
       const text = node.ref.text;
-      const label = node.ref.label;
-      const ambiguous =
-        !identified &&
-        ((text !== undefined && (textCounts.get(text) ?? 0) > 1) ||
-          (label !== undefined && (labelCounts.get(label) ?? 0) > 1));
+      const ambiguous = !identified && text !== undefined && (textCounts.get(text) ?? 0) > 1;
       return node.key && !ambiguous ? [[node.key, node] as const] : [];
     });
     return new Map(unique);

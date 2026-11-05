@@ -1,0 +1,21 @@
+diff --git a/build/commandUtils/new/projectFiles.js b/build/commandUtils/new/projectFiles.js
+--- a/build/commandUtils/new/projectFiles.js
++++ b/build/commandUtils/new/projectFiles.js
+@@ -11,7 +11,7 @@ const tslib_1 = require("tslib");
+ const eas_json_1 = require("@expo/eas-json");
+ const fs_extra_1 = tslib_1.__importDefault(require("fs-extra"));
+ const path_1 = tslib_1.__importDefault(require("path"));
+-const ts_deepmerge_1 = tslib_1.__importDefault(require("ts-deepmerge"));
++const ts_deepmerge_1 = require("ts-deepmerge");
+ const api_1 = require("../../api");
+ const easCli_1 = require("../../utils/easCli");
+ // Android package names must start with a lowercase letter
+@@ -57,7 +57,7 @@ async function generateAppConfigAsync(projectDir, app) {
+             package: bundleIdentifier,
+         },
+     };
+-    const mergedConfig = (0, ts_deepmerge_1.default)(baseExpoConfig, expoConfig);
++    const mergedConfig = (0, ts_deepmerge_1.merge)(baseExpoConfig, expoConfig);
+     const appJsonPath = path_1.default.join(projectDir, 'app.json');
+     await fs_extra_1.default.writeJson(appJsonPath, { expo: mergedConfig }, { spaces: 2 });
+ }

@@ -29,6 +29,7 @@ import {
   BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
 } from '@kilocode/web-shared/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
+import { MAX_BLACKLIST_DOMAINS } from '@kilocode/worker-utils/account-access';
 
 type BackfillBatch = (params: {
   actorId: string;
@@ -560,5 +561,35 @@ describe('admin.blacklistDomains.get', () => {
     const config = await caller.admin.blacklistDomains.get();
 
     expect(config.blocked_signup_tlds).toEqual(['shop', 'top']);
+  });
+
+  it('reports zero dropped entries for a stored list', async () => {
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['mailinator.com', 'spam.org'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.domains).toEqual(['mailinator.com', 'spam.org']);
+    expect(config.dropped_domains).toBe(0);
+  });
+
+  it('returns the capped prefix and its dropped-entry count', async () => {
+    const domains = Array.from({ length: MAX_BLACKLIST_DOMAINS + 5 }, (_, i) => `bulk${i}.example`);
+    mockedRedisGet.mockResolvedValue(
+      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const config = await caller.admin.blacklistDomains.get();
+
+    expect(config.domains).toHaveLength(MAX_BLACKLIST_DOMAINS);
+    expect(config.dropped_domains).toBe(5);
   });
 });

@@ -1714,7 +1714,11 @@ describe('POST /api/v1/chat/completions request handling', () => {
   });
 
   describe('organization gateway settings', () => {
-    const vercelProvider = { ...provider, type: 'vercel' } satisfies Provider;
+    const vercelProvider = {
+      ...provider,
+      type: 'vercel',
+      apiUrl: 'https://ai-gateway.vercel.sh/v1',
+    } satisfies Provider;
 
     afterEach(() => {
       mockedGetRuntimeOrganizationFeatures.mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
@@ -1780,6 +1784,112 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(response.status).toBe(200);
       expect(mockedUpstreamRequest).toHaveBeenCalled();
     });
+
+    it.each([
+      ['custom', 'https://openrouter.ai/api/v1', { disable_openrouter: true }, 'OpenRouter'],
+      ['custom-public', 'https://api.openrouter.ai/v1', { disable_openrouter: true }, 'OpenRouter'],
+      [
+        'direct-byok',
+        'https://OPENROUTER.AI.:8443/api/v1',
+        { disable_openrouter: true },
+        'OpenRouter',
+      ],
+      [
+        'custom',
+        'https://ai-gateway.vercel.sh/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+      [
+        'custom-public',
+        'https://vercel.sh/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+      [
+        'direct-byok',
+        'https://other.VERCEL.SH.:8443/v1',
+        { disable_vercel_ai_gateway: true },
+        'the Vercel AI Gateway',
+      ],
+    ] as const)(
+      'rejects a %s provider targeting the disabled gateway at %s',
+      async (type, apiUrl, settings, gatewayName) => {
+        setOrganization(settings, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type, apiUrl },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error: `This request would be routed through ${gatewayName}, which your organization has disabled.`,
+          error_type: 'provider_not_allowed',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['https://api.example.com/v1', { chat_completions: 'https://openrouter.ai/api/v1' }, 403],
+      ['https://openrouter.ai/api/v1', { chat_completions: 'https://api.example.com/v1' }, 200],
+      ['https://api.example.com/v1', { messages: 'https://openrouter.ai/api/v1' }, 200],
+    ] as const)(
+      'checks the effective upstream URL for %s with overrides %j',
+      async (apiUrl, apiUrlOverrides, expectedStatus) => {
+        setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type: 'custom', apiUrl, apiUrlOverrides },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(expectedStatus);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(expectedStatus === 200 ? 1 : 0);
+      }
+    );
+
+    it.each([
+      ['https://openrouter.ai.attacker.example/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://notopenrouter.ai/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://openrouter.ai@api.example.com/v1', { disable_openrouter: true }, ['org-1']],
+      [
+        'https://ai-gateway.vercel.sh.attacker.example/v1',
+        { disable_vercel_ai_gateway: true },
+        ['org-1'],
+      ],
+      ['https://notvercel.sh/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
+      ['https://openrouter.ai/api/v1', { disable_vercel_ai_gateway: true }, ['org-1']],
+      ['https://ai-gateway.vercel.sh/v1', { disable_openrouter: true }, ['org-1']],
+      ['https://openrouter.ai/api/v1', {}, ['org-1']],
+      ['https://openrouter.ai/api/v1', { disable_openrouter: true }, []],
+    ] as const)(
+      'allows a custom provider at %s with settings %j and feature organizations %j',
+      async (apiUrl, settings, organizationIds) => {
+        setOrganization(settings, { gateway_settings: [...organizationIds] });
+        mockedGetProvider.mockResolvedValue({
+          kind: 'provider',
+          provider: { ...provider, type: 'custom', apiUrl },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: true,
+        });
+
+        const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalled();
+      }
+    );
 
     it('rejects a BYOK route through a disabled Vercel AI Gateway', async () => {
       setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-1'] });

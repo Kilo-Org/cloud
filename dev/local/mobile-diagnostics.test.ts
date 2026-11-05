@@ -65,7 +65,12 @@ test('port comes from the running dev session, not the Metro default', () => {
   assert.equal(resolvePort({ manifest: undefined, defaultPort: 8081, override: null }), 8081);
   assert.equal(resolvePort({ manifest: MANIFEST, defaultPort: 8081, override: 8300 }), 8300);
   assert.throws(
-    () => resolvePort({ manifest: { ...MANIFEST, services: [] }, defaultPort: undefined, override: null }),
+    () =>
+      resolvePort({
+        manifest: { ...MANIFEST, services: [] },
+        defaultPort: undefined,
+        override: null,
+      }),
     /no mobile dev session/
   );
 });
@@ -77,23 +82,35 @@ test('every runtime read names the resolved port and asks for the project platfo
     '--dev-server-url',
     'http://127.0.0.1:8281',
   ]);
-  assert.deepEqual(cliArgsFor(parseArgs(['errors', '--ios', '--duration', '5s']), 'http://127.0.0.1:8281'), [
-    'runtime:errors',
-    '--json',
-    '--dev-server-url',
-    'http://127.0.0.1:8281',
-    '--platform',
-    'ios',
-    '--duration',
-    '5000ms',
-  ]);
+  assert.deepEqual(
+    cliArgsFor(parseArgs(['errors', '--ios', '--duration', '5s']), 'http://127.0.0.1:8281'),
+    [
+      'runtime:errors',
+      '--json',
+      '--dev-server-url',
+      'http://127.0.0.1:8281',
+      '--platform',
+      'ios',
+      '--duration',
+      '5000ms',
+    ]
+  );
 });
 
 test('a dev server that is not this project is refused', () => {
   gateStatus(statusReport() as never);
-  assert.throws(() => gateStatus(statusReport({ projectRootMatched: false }) as never), /another project/);
-  assert.throws(() => gateStatus(statusReport({ projectRootMatched: null }) as never), /another project/);
-  assert.throws(() => gateStatus(statusReport({ running: false }) as never), /No dev server answered/);
+  assert.throws(
+    () => gateStatus(statusReport({ projectRootMatched: false }) as never),
+    /another project/
+  );
+  assert.throws(
+    () => gateStatus(statusReport({ projectRootMatched: null }) as never),
+    /another project/
+  );
+  assert.throws(
+    () => gateStatus(statusReport({ running: false }) as never),
+    /No dev server answered/
+  );
 });
 
 test('telemetry stays off in the CLI child environment', () => {
@@ -158,7 +175,10 @@ test('a refused dev server stops before the runtime is read', () => {
       }),
     (error: unknown) => error instanceof RefusedError
   );
-  assert.deepEqual(calls.map(args => args[0]), ['status']);
+  assert.deepEqual(
+    calls.map(args => args[0]),
+    ['status']
+  );
 });
 
 test('a failing CLI status is reported, not treated as an empty answer', () => {

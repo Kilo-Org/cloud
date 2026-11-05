@@ -71,7 +71,8 @@ export function parseArgs(argv: string[]): DiagnosticsArgs {
       args.json = true;
     } else if (flag === '--port' || flag === '--duration') {
       const value = rest.shift();
-      if (value == null || value.startsWith('-')) throw new DiagnosticsError(`${flag} needs a value`);
+      if (value == null || value.startsWith('-'))
+        throw new DiagnosticsError(`${flag} needs a value`);
       if (flag === '--port') args.port = parsePort(value);
       else args.durationMs = parseDuration(value);
     } else if (flag === '--android' || flag === '--ios') {
@@ -237,7 +238,11 @@ export function runDiagnostics(
   }
 ): number {
   const args = parseArgs(argv);
-  const port = resolvePort({ manifest: deps.manifest, defaultPort: deps.defaultPort, override: args.port });
+  const port = resolvePort({
+    manifest: deps.manifest,
+    defaultPort: deps.defaultPort,
+    override: args.port,
+  });
   const url = devServerUrl(port);
 
   const status = deps.runCli(['status', '--json', '--dev-server-url', url]);

@@ -254,7 +254,9 @@ export async function resetCodeReviewConfigForOwner(
       ...existingConfig,
       selected_repository_ids: [],
       manually_added_repositories: [],
-      repository_selection_mode: 'all',
+      // GitLab code review has no 'all' repository mode, so the reset keeps the
+      // platform's only valid mode rather than writing an unsupported one.
+      repository_selection_mode: platform === 'gitlab' ? 'selected' : 'all',
     },
     isEnabled: false,
     createdBy: 'system',

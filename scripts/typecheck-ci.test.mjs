@@ -281,11 +281,6 @@ const harnessBuildGuards = [
     'lint-groups',
     "matrix.group == 'trpc' && contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')",
   ],
-  ...['typecheck', 'lint', 'check-unused', 'mobile-test'].map(name => [
-    'kilo-app-ci.yml',
-    name,
-    undefined,
-  ]),
   ...['ios', 'android'].map(name => [
     'mobile-native-build.yml',
     name,
@@ -327,6 +322,82 @@ test('every consumer job restores or builds the harness SDK through the action',
       assert.equal(plain[0].if, "hashFiles('.github/actions/harness-sdk-build/action.yml') == ''");
     }
   }
+});
+
+// The mobile suite needs one harness SDK build, not one per job: the build
+// resolves the SDK's whole program and, on a miss, compiles the typia
+// transform. Eleven jobs did that concurrently, and actions/cache saves at the
+// end of a job, so the eight shards could not hit each other's save. The shared
+// `prepare` job builds once and every suite job downloads the result.
+const sdkDist = 'packages/harness-sdk/dist';
+const sdkArtifact = 'harness-sdk-dist';
+
+test('kilo-app CI builds the harness SDK once and every suite downloads it', () => {
+  const jobs = workflows['kilo-app-ci.yml'].jobs;
+  const prepare = jobs.prepare;
+  assert.ok(prepare, 'the shared build job exists');
+  assert.equal(prepare.needs, 'mobile-changes', 'the shared build waits for change detection');
+  assert.equal(prepare.if, "needs.mobile-changes.outputs.mobile == 'true'");
+  const prepareSteps = prepare.steps;
+  const prepareInstall = prepareSteps.findIndex(step =>
+    /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+  );
+  const actionIndex = prepareSteps.findIndex(
+    step => step.uses === './.github/actions/harness-sdk-build'
+  );
+  const uploadIndex = prepareSteps.findIndex(step =>
+    step.uses?.startsWith('actions/upload-artifact@')
+  );
+  assert.ok(prepareInstall >= 0 && actionIndex > prepareInstall, 'prepare builds after install');
+  assert.ok(uploadIndex > actionIndex, 'prepare uploads what it built');
+  const upload = prepareSteps[uploadIndex];
+  assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
+  assert.equal(upload.with.name, sdkArtifact);
+  assert.equal(upload.with.path, sdkDist, 'the artifact root is the dist directory');
+  assert.equal(upload.with['if-no-files-found'], 'error', 'an empty build must fail');
+
+  for (const name of ['typecheck', 'lint', 'check-unused', 'mobile-test']) {
+    const job = jobs[name];
+    assert.ok([job.needs ?? []].flat().includes('prepare'), `${name} waits for the build`);
+    const steps = job.steps;
+    assert.deepEqual(
+      steps
+        .filter(step => step.uses === './.github/actions/harness-sdk-build')
+        .map(step => step.name),
+      [],
+      `${name} never rebuilds the harness SDK`
+    );
+    assert.deepEqual(
+      steps.filter(step => step.run === harnessBuild).map(step => step.name),
+      [],
+      `${name} never builds the harness SDK outside the action`
+    );
+    const installIndex = steps.findIndex(step =>
+      /^pnpm install --frozen-lockfile\b/.test(step.run ?? '')
+    );
+    const downloadIndex = steps.findIndex(step =>
+      step.uses?.startsWith('actions/download-artifact@')
+    );
+    assert.ok(
+      installIndex >= 0 && downloadIndex > installIndex,
+      `${name} downloads the build after install`
+    );
+    const download = steps[downloadIndex];
+    assert.match(
+      download.uses,
+      /^actions\/download-artifact@[0-9a-f]{40}$/,
+      'immutable download pin'
+    );
+    assert.equal(download.with.name, sdkArtifact, `${name} takes the shared artifact`);
+    assert.equal(download.with.path, sdkDist, `${name} restores it where the build writes`);
+  }
+
+  // A failed build leaves the suite jobs skipped, and a skipped required check
+  // passes, so the aggregator must carry the failure.
+  assert.ok(
+    [jobs.test.needs].flat().includes('prepare'),
+    'the required test job fails with the shared build'
+  );
 });
 
 test('the harness SDK action restores dist and builds only on a miss', () => {

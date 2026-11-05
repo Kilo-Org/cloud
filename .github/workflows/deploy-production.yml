@@ -110,15 +110,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   deploy-workers:
-    needs:
-      [
-        db-gate,
-        check-changes,
-        stage-app,
-        stage-ai-gateway,
-        promote-app,
-        promote-ai-gateway,
-      ]
+    needs: [db-gate, check-changes, stage-app, stage-ai-gateway, promote-app, promote-ai-gateway]
     if: >-
       ${{
         !cancelled() &&

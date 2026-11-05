@@ -92,14 +92,7 @@ jobs:
     secrets: inherit
 
   record-deployment:
-    needs:
-      [
-        check-changes,
-        db-gate,
-        deploy-app,
-        deploy-ai-gateway,
-        deploy-workers,
-      ]
+    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, deploy-workers]
     if: >-
       ${{
         !cancelled() &&

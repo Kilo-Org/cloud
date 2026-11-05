@@ -490,7 +490,13 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
 
 test('one database gate per deployment checks out, installs and migrates once', () => {
   for (const [name, deployment, startupStep, migrateStep, environment] of [
-    ['production', production, 'Check production DB startup path', 'Run Drizzle migrations', 'production'],
+    [
+      'production',
+      production,
+      'Check production DB startup path',
+      'Run Drizzle migrations',
+      'production',
+    ],
     ['staging', staging, 'Check staging DB startup path', 'Run Drizzle migrations', 'staging'],
   ]) {
     const dbJobs = Object.keys(deployment.jobs).filter(

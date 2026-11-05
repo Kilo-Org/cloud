@@ -404,7 +404,7 @@
     },
     "connectionExpired": "GitHub-ի հետ կապի ժամկետը լրացել է։",
     "merge": {
-      "merge": "Միավորում",
+      "merge": "Միավորել",
       "mergeTitle": "Միավորում",
       "mergeNow": "Միավորել հիմա",
       "mergePullRequest": "Միավորման հարցման միավորում",
@@ -452,7 +452,7 @@
       },
       "loadFailedTitle": "Չհաջողվեց բեռնել միավորման տարբերակները։",
       "blocked": {
-        "unknownStateTitle": "GitHub-ը դեռ չի հայտնել, որ միավորումը հնարավոր է",
+        "unknownStateTitle": "GitHub-ը դեռ չի հայտնել միավորման հնարավորության կարգավիճակը",
         "unknownStateDetail": "Քիչ անց փորձիր թարմացնել ակնարկը։",
         "conflictsTitle": "Միավորման կոնֆլիկտներ",
         "conflictsDetail": "Միավորելուց առաջ լուծիր այս ճյուղի միավորման կոնֆլիկտները։",

@@ -4181,7 +4181,7 @@
     "historyHint": "A na-edobe akụkọ ruo ụbọchị 30, gụnyere ndị ewepụrụ.",
     "settings": "Ntọala akụkọ",
     "empty": "Enweghị ọrụ n'oge akụkọ a",
-    "emptyHint": "Nnọkọ koodu gị nke cloud na CLI na-apụta ebe a mgbe akụkọ a haziri ahazi nwere ọrụ.",
+    "emptyHint": "Nnọkọ koodu gị nke cloud na CLI na-apụta ebe a mgbe akụkọ a haziri oge ya nwere ọrụ.",
     "loadError": "Enweghị ike ibunye akụkọ",
     "view": "Gụọ akụkọ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",

@@ -80,6 +80,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 // The briefing card reaches the native SQLCipher dismissal journal; these

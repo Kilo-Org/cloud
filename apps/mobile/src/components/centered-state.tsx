@@ -75,8 +75,22 @@ export function CenteredState({
     requestRef.current += 1;
     const request = requestRef.current;
     const node = scrollRef.current?.getNativeScrollRef();
-    if (!frame || !node) {
+    if (!frame) {
       setViewport(null);
+      return;
+    }
+    if (!node) {
+      // The scroller's native node is briefly absent while a screen that owned
+      // this surface comes back and re-attaches its host view. The geometry it
+      // had is the geometry it still has, so the placement it already carries
+      // stays: dropping it here is what made a returning state re-center and
+      // then jump back to its measured position. The measurement publishes a
+      // fresh object each run, so compare the band, not the identity.
+      setViewport(previous =>
+        previous !== null && previous.surface.top === frame.top && previous.surface.bottom === frame.bottom
+          ? previous
+          : null
+      );
       return;
     }
     node.measureInWindow((...bounds) => {
@@ -90,11 +104,13 @@ export function CenteredState({
         return;
       }
       setViewport(previous =>
-        previous?.surface === frame &&
+        previous !== null &&
+        previous.surface.top === frame.top &&
+        previous.surface.bottom === frame.bottom &&
         previous.frame.top === top &&
         previous.frame.bottom === bottom
           ? previous
-          : { surface: frame, frame: { top, bottom } }
+          : { surface: { top: frame.top, bottom: frame.bottom }, frame: { top, bottom } }
       );
     });
   }, [frame]);
@@ -117,22 +133,33 @@ export function CenteredState({
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
-  const layout = useMemo(
-    () =>
-      surface?.frame && viewport?.surface === surface.frame && contentHeight !== null
-        ? getCenteredStateLayout({
-            surface: surface.frame,
-            viewport: viewport.frame,
-            contentHeight,
-            topInset: surface.topInset,
-            bottomInset: surface.bottomInset,
-            nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
-            nativeViewportBottom: surface.bounds?.bottom,
-            roundToPixel: value => PixelRatio.roundToNearestPixel(value),
-          })
-        : undefined,
-    [surface, viewport, contentHeight]
-  );
+  const layout = useMemo(() => {
+    // The stored viewport carries the band it was measured against, and the
+    // surface publishes a fresh frame object on every measurement, so compare
+    // the band itself: a state whose surface has not moved keeps its placement
+    // instead of dropping back to the pending one and jumping when it returns.
+    const measured = viewport;
+    if (
+      !frame ||
+      !measured ||
+      measured.surface.top !== frame.top ||
+      measured.surface.bottom !== frame.bottom ||
+      contentHeight === null
+    ) {
+      return undefined;
+    }
+    const measuredFrame = measured.frame;
+    return getCenteredStateLayout({
+      surface: frame,
+      viewport: measuredFrame,
+      contentHeight,
+      topInset: surface.topInset,
+      bottomInset: surface.bottomInset,
+      nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
+      nativeViewportBottom: surface.bounds?.bottom,
+      roundToPixel: value => PixelRatio.roundToNearestPixel(value),
+    });
+  }, [surface, frame, viewport, contentHeight]);
   const ready = layout !== undefined;
   // While the measured layout is pending, the fallback must still keep the band
   // the surface reserved (the fixed tab bar) free: without it the body centers
@@ -166,7 +193,20 @@ export function CenteredState({
       clearTimeout(timer);
     };
   }, [ready]);
-  const visible = ready || fallbackElapsed;
+  // The placement is hidden until it is known, but only once: a screen that
+  // leaves and comes back re-registers its surface, and the re-measure that
+  // follows nulls the viewport for a frame or two. Re-hiding on that reading
+  // would flash the state empty — the tab that a blurred screen unmounts from
+  // is exactly the one the user is looking at when it comes back. Once the
+  // state has been placed on screen it stays, and the later measurement only
+  // moves it.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (ready) {
+      setRevealed(true);
+    }
+  }, [ready]);
+  const visible = revealed || ready || fallbackElapsed;
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');

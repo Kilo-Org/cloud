@@ -14,12 +14,14 @@ import {
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { pickNewestSession } from '@/lib/glanceable/newest-session';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -44,12 +46,15 @@ const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 /**
- * The zero state's one line, drawn in the frame the counts block, the divider
- * and the newest block make together. The counts rows, their gaps and padding,
- * the divider and the newest block measure 195 dp on the loaded card, so the
- * card keeps one height from the skeleton through the first live session.
+ * The zero state, drawn in the frame the counts block, the divider and the
+ * newest block make together. The counts rows, their gaps and padding, the
+ * divider and the newest block measure 195 dp on the loaded card, so the card
+ * keeps one height from the skeleton through the first live session. It speaks
+ * in the same shape as the Agents list's empty state — the icon bubble over the
+ * title — so the two surfaces read as one pattern for one condition.
  */
-const EMPTY_BLOCK_CLASS = 'min-h-[195px] items-center justify-center px-4 py-3';
+const EMPTY_BLOCK_CLASS = 'min-h-[195px] items-center justify-center gap-4 px-4 py-3';
+const EMPTY_ICON_CLASS = 'h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
   return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
@@ -76,6 +81,7 @@ export function GlanceableActiveCard({
   embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   // A minute-bucketed clock keeps the relative age fresh without reading
   // `Date.now()` behind a memoized render (see `useNowTicker`).
   const now = useNowTicker(10_000);
@@ -152,12 +158,7 @@ export function GlanceableActiveCard({
         accessibilityRole={newestSession === null ? undefined : 'button'}
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
       >
-        <View
-          className={cn(
-            newestSession === null ? EMPTY_BLOCK_CLASS : NEWEST_BLOCK_CLASS,
-            newestSession === null && 'items-center'
-          )}
-        >
+        <View className={newestSession === null ? EMPTY_BLOCK_CLASS : NEWEST_BLOCK_CLASS}>
           {newestTitle !== null && newestKind !== null ? (
             <>
               <Text className="text-sm text-foreground">{newestTitle}</Text>
@@ -172,7 +173,14 @@ export function GlanceableActiveCard({
               </View>
             </>
           ) : (
-            <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
+            <>
+              <View className={EMPTY_ICON_CLASS}>
+                <Bot size={24} color={colors.mutedForeground} strokeWidth={1.5} />
+              </View>
+              <Text variant="large" className="text-center text-muted-foreground">
+                {t('home.noLiveSessions')}
+              </Text>
+            </>
           )}
         </View>
       </CardControl>

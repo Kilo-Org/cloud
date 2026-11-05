@@ -189,6 +189,7 @@
     "resendCode": "Επαναποστολή κωδικού",
     "termsPrefix": "Συνεχίζοντας, αποδέχεσαι τους ",
     "terms": "όρους μας",
+    "termsInSentence": "όρους μας",
     "termsConnector": " και ",
     "termsSuffix": ".",
     "moreSignInOptions": "Περισσότερες επιλογές σύνδεσης",

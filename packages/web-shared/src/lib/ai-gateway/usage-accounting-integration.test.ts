@@ -35,7 +35,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
+  USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0 },
   USAGE_QUEUE_FRA_CONFIG: { enabled: false },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
@@ -259,7 +259,7 @@ beforeEach(() => {
 
   process.env.VERCEL_TARGET_ENV = 'preview';
   process.env.VERCEL_ENV = 'preview';
-  config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
+  config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0 };
   config.USAGE_QUEUE_FRA_CONFIG = { enabled: false };
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
   config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
@@ -324,7 +324,6 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
   try {
     for (const [key, value] of Object.entries({
       USAGE_QUEUE_SFO_EXPOSURE: '1',
-      USAGE_QUEUE_SFO_USER_IDS: '',
       VERCEL_ENV: 'production',
       VERCEL_TARGET_ENV: 'production',
       VERCEL_REGION: 'sfo1',
@@ -391,8 +390,6 @@ describe('production FRA queued accounting', () => {
       env: { USAGE_QUEUE_SFO_EXPOSURE: '1' },
       queued: true,
     },
-    { name: 'SFO allowlist ignored', env: { USAGE_QUEUE_SFO_USER_IDS: '[]' }, queued: true },
-    { name: 'SFO malformed list ignored', env: { USAGE_QUEUE_SFO_USER_IDS: 'bad' }, queued: true },
     { name: 'SFO', env: { VERCEL_REGION: 'sfo1' }, queued: false },
     { name: 'unknown region', env: { VERCEL_REGION: 'iad1' }, queued: false },
     { name: 'absent region', env: { VERCEL_REGION: undefined }, queued: false },
@@ -454,16 +451,14 @@ describe('production FRA queued accounting', () => {
     expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
-  test('SFO cohort and allowlist boundaries are unchanged', async () => {
-    for (const [sfoExposure, userIds, queued] of [
-      ['0.3', '', false],
-      ['0.31', '', true],
-      ['1', '[]', false],
+  test('SFO cohort boundaries are unchanged', async () => {
+    for (const [sfoExposure, queued] of [
+      ['0.3', false],
+      ['0.31', true],
     ] as const) {
       jest.clearAllMocks();
       configureQueueEnvironment({
         USAGE_QUEUE_SFO_EXPOSURE: sfoExposure,
-        USAGE_QUEUE_SFO_USER_IDS: userIds,
       });
       const lifecycle = requestLifetime();
       const result = await lifecycle.run(() =>
@@ -604,18 +599,22 @@ describe('production SFO queued accounting', () => {
     { name: 'missing target', env: { VERCEL_TARGET_ENV: undefined }, queued: false },
     { name: 'mismatched target', env: { VERCEL_TARGET_ENV: 'staging' }, queued: false },
     {
-      name: 'internal allowlist',
-      env: { USAGE_QUEUE_SFO_USER_IDS: '["oauth/synthetic"]' },
+      name: 'retired allowlist nonmatching value is ignored',
+      env: { USAGE_QUEUE_SFO_USER_IDS: '["someone-else"]' },
       queued: true,
     },
     {
-      name: 'unlisted payer',
-      env: { USAGE_QUEUE_SFO_USER_IDS: '["someone-else"]' },
-      queued: false,
+      name: 'retired allowlist empty array is ignored',
+      env: { USAGE_QUEUE_SFO_USER_IDS: '[]' },
+      queued: true,
     },
-    { name: 'malformed list', env: { USAGE_QUEUE_SFO_USER_IDS: 'not-json' }, queued: false },
     {
-      name: 'list cannot override zero',
+      name: 'retired allowlist malformed value is ignored',
+      env: { USAGE_QUEUE_SFO_USER_IDS: 'not-json' },
+      queued: true,
+    },
+    {
+      name: 'retired allowlist matching value with zero exposure stays direct',
       env: { USAGE_QUEUE_SFO_USER_IDS: '["oauth/synthetic"]', USAGE_QUEUE_SFO_EXPOSURE: '0' },
       queued: false,
     },
@@ -921,7 +920,7 @@ describe('production SFO queued accounting', () => {
       });
       await new Promise(resolve => setImmediate(resolve));
       expect(drained).toBe(false);
-      config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
+      config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0 };
       expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
       accepted.resolve(new Response(null, { status }));
       await drain;
@@ -1986,7 +1985,6 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
 
   test.each([
     { name: 'zero exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0' } },
-    { name: 'unlisted SFO payer', env: { USAGE_QUEUE_SFO_USER_IDS: '["other"]' } },
     {
       name: 'preview FRA',
       env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview', VERCEL_REGION: 'fra1' },

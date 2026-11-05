@@ -10,8 +10,7 @@ missing writer configuration retry and can exhaust into the DLQ.
 The gateway selects queued accounting for staging (`VERCEL_TARGET_ENV=staging`
 and `VERCEL_ENV` not `production`), for eligible production Frankfurt
 deployments, or for the production SFO cohort controlled by
-`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). The optional
-`USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Production Frankfurt accounting
+`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`, default `0`). Production Frankfurt accounting
 has no exposure control; it queues every payer with an identity. FRA deployments
 other than staging and production `fra1`, and SFO payers outside the cohort,
 keep direct accounting or the existing SFO handoff. Background shadow

@@ -30,10 +30,9 @@ type StackNavigation = {
  * was opened from, back to the screen that opened it, or past a pushed list
  * when it is the only route of its stack (`staleProfileScopeExit`).
  *
- * Focus is part of the decision, not only of the call: the tabs freeze a
- * blurred scene (`freezeOnBlur`), so a switch made from another tab settles
- * here when the Profile tab is shown again, and an unfocused screen never
- * navigates the tab that happens to be on screen.
+ * Focus is part of the decision, not only of the call: a switch made from
+ * another tab settles here when this screen regains focus, and an unfocused
+ * screen never navigates the tab that happens to be on screen.
  */
 export function useLeaveStaleProfileScope(
   routeOrganizationId: string | undefined,

@@ -189,6 +189,7 @@
     "resendCode": "Bidali kodea berriro",
     "termsPrefix": "Jarraitzean, onartzen dituzu gure ",
     "terms": "Baldintzak",
+    "termsInSentence": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",

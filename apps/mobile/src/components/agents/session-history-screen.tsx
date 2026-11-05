@@ -139,8 +139,9 @@ export function SessionHistoryScreen() {
   );
 
   // App-foreground refresh for stored history. `navigation.isFocused()` is
-  // read live because a frozen (unfocused) tab does not re-render. History
-  // shows no tray, so only stored queries are touched.
+  // read live because a focus value carried through React state or a ref lags
+  // the navigation state. History shows no tray, so only stored queries are
+  // touched.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {

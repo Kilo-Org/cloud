@@ -1889,8 +1889,9 @@ export function SessionDetailContent({
   // must not mount a composer under the read-only line. `activeSessionType` is
   // set only by a successful resolve, so a failed open (which may also read
   // `isReadOnly`) keeps its composer beside the error's Retry. An unresolved
-  // open (`activeSessionType === null`) counts as not writable: the pending
-  // slot below then holds the read-only footer's shape until the kind lands.
+  // open (`activeSessionType === null`) counts as not writable here; the
+  // pending slot below also reads the metadata that names a cloud-agent
+  // session, which lands before the resolve.
   const isReadOnlySession = activeSessionType === 'read-only';
   const isWritableResolved = activeSessionType !== null && activeSessionType !== 'read-only';
   const sessionFooterItem = resolveSessionFooterRowItem({
@@ -2033,13 +2034,20 @@ export function SessionDetailContent({
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionStatePending;
   // The pending slot holds the shape its session will end in. The kind is only
-  // known once the transport answers, so the unresolved open reserves the
-  // read-only footer — the bar and the continue control a stored session ends
-  // in — and never paints the interactive composer a session may not get.
+  // set once the transport answers, but the metadata read lands before that and
+  // names a cloud-agent session, which is writable by construction; the id
+  // check keeps another session's cached row out of this open's slot. An open
+  // that will end in the composer holds the composer's placeholder, and every
+  // other open holds the read-only footer's — the bar and the continue control
+  // a stored session ends in — so the footer lands on the area already held
+  // rather than replacing a composer the session may not get.
+  const isPendingComposer =
+    isWritableResolved ||
+    (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionStatePending && !hasBlockingInteraction && !isWritableResolved;
+    isSessionStatePending && !hasBlockingInteraction && !isPendingComposer;
   const isComposerSkeletonVisible =
-    isSessionStatePending && !hasBlockingInteraction && isWritableResolved;
+    isSessionStatePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.

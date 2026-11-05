@@ -15,6 +15,7 @@ import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
+  type CloudAgentSessionId,
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
@@ -639,6 +640,8 @@ let goalMountOptions: {
 } = {};
 /** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
 let associatedPrMountOption: AssociatedPrData | null = null;
+/** The cloud-agent id `fetchSession` reports; `null` keeps the metadata kindless. */
+let fetchedCloudAgentSessionId: CloudAgentSessionId | null = null;
 const ASSOCIATED_PR: AssociatedPrData = {
   url: 'https://github.com/acme/repo/pull/42',
   number: 42,
@@ -810,6 +813,7 @@ beforeEach(() => {
   hideThinking.loaded = true;
   goalMountOptions = {};
   associatedPrMountOption = null;
+  fetchedCloudAgentSessionId = null;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
@@ -927,7 +931,7 @@ async function mountDetails(
       await metadataReady;
       return {
         kiloSessionId: id,
-        cloudAgentSessionId: null,
+        cloudAgentSessionId: fetchedCloudAgentSessionId,
         title: sessionTitleOverride ?? `Root ${id}`,
         organizationId: options.sessionOrganizationId ?? null,
         profileId: options.sessionProfileId ?? null,
@@ -2133,6 +2137,26 @@ describe('session detail slow load', () => {
     expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
       0
     );
+  });
+
+  it('holds the composer while the metadata names a cloud-agent session', async () => {
+    // The metadata read lands before the transport resolves, and it names the
+    // one kind that is writable by construction. The slot then holds the
+    // composer the screen ends in instead of the read-only footer it would
+    // replace.
+    fetchedCloudAgentSessionId = cloudAgentId('cag-fixture');
+    const view = await mountDetails(null);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
   });
 
   it('holds the read-only footer area while the open has not resolved the kind', async () => {

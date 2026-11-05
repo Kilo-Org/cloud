@@ -87,11 +87,7 @@ const queryState = vi.hoisted(() => ({
   // will not run. The route holds its skeleton only for the first.
   fetchStatus: 'fetching' as 'fetching' | 'paused' | 'idle',
   error: null as { data?: { code?: string } } | null,
-  data: null as {
-    organization_id?: string | null;
-    id?: string;
-    cloud_agent_session_id?: string | null;
-  } | null,
+  data: null as { organization_id?: string | null; id?: string } | null,
   // Epoch ms of the successful read, or 0 before one. The route's
   // rendered-session guard reads this to tell a fresh open's data from a
   // previous mount's cached row.
@@ -1602,21 +1598,6 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(queryEnabled()).toBe(false);
     }
   );
-
-  it('holds the composer while cached metadata names a cloud-agent session', async () => {
-    // A cloud-agent row is writable by construction, so the account window can
-    // hold the composer the screen ends in instead of the footer's shape.
-    queryState.data = { cloud_agent_session_id: 'agent_12345678901234567890123456' };
-    useLocalSearchParamsMock.mockReturnValue({
-      'session-id': 'ses_12345678901234567890123456',
-    });
-    const renderer = await mountRoute(
-      createElement('RouteAndSibling', null, createElement(SessionDetailScreen))
-    );
-
-    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
-    expect(findByType(renderer.root, 'SessionReadOnlyFooterPlaceholder')).toHaveLength(0);
-  });
 
   it('holds the composer while the remote-spawn open waits for its new session', async () => {
     // A `kilo remote` spawn has no row to read yet (the ingest one the retry

@@ -259,15 +259,13 @@ export default function SessionDetailScreen() {
     return <NewSessionRoute />;
   }
 
-  // Metadata naming a cloud-agent session is the one kind this route knows to
-  // be writable before any transport answers; the remote-spawn params mark
-  // opens the spawn itself created for a writer (`kilo remote`, and the clone
-  // onto its live CLI). Every other open stays unknown, so its bottom slot
-  // reserves the read-only footer's shape — the bar and the continue control a
-  // stored session ends in — rather than painting a composer the session may
-  // not get.
-  const isPendingWritable =
-    sessionQuery.data?.cloud_agent_session_id != null || spawned === '1' || cloned === '1';
+  // The remote-spawn params mark the opens the spawn itself created for a
+  // writer (`kilo remote`, and the clone onto its live CLI). Every other open
+  // here has no metadata row yet (this window implies `sessionQuery` has no
+  // data) and no resolved kind, so its bottom slot reserves the read-only
+  // footer's shape — the bar and the continue control a stored session ends in
+  // — rather than painting a composer the session may not get.
+  const isPendingWritable = spawned === '1' || cloned === '1';
 
   if (
     !identityFailed &&

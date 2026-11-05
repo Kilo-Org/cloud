@@ -2416,8 +2416,17 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionWithPr });
       expect(result.associatedPr?.observations).toEqual({
-        checks: { total: 1, failed: 1 },
+        checks: {
+          total: 1,
+          failed: 1,
+          passed: 0,
+          pending: 0,
+          skipped: 0,
+          unknown: 0,
+          complete: false,
+        },
         unresolvedThreads: 1,
+        threadsComplete: false,
         truncated: false,
       });
       expect(result).not.toHaveProperty('pr_observations');

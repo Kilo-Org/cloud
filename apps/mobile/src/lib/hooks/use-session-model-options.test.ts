@@ -59,6 +59,80 @@ function build(state: RemoteModelState) {
   });
 }
 
+// The app catalogue the picker lists, reduced to the model the explorer's
+// session reported: the gateway names it `DeepSeek: DeepSeek V4.1 Flash 1017`,
+// and the chip read the bare reference `deepseek/deepseek-v4.1-flash-1017`.
+const REPORTED_MODEL_ID = 'deepseek/deepseek-v4.1-flash-1017';
+const REPORTED_MODEL_NAME = 'DeepSeek V4.1 Flash 1017';
+
+const GATEWAY_CATALOG = [
+  { id: REPORTED_MODEL_ID, name: REPORTED_MODEL_NAME, variants: [], isPreferred: false },
+  {
+    id: 'deepseek/deepseek-v4.1-flash',
+    name: 'DeepSeek V4.1 Flash',
+    variants: [],
+    isPreferred: false,
+  },
+];
+
+function reportedSelection() {
+  return { model: { providerID: 'kilo', modelID: REPORTED_MODEL_ID } };
+}
+
+describe('buildSessionModelOptions unavailable remote model names', () => {
+  it('names an unlisted model from the app catalogue while the CLI protocol is unknown', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: remoteState({ protocol: 'unknown' }),
+      observedModel: reportedSelection(),
+      remoteModelOverride: null,
+      gatewayModels: GATEWAY_CATALOG,
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    expect(result.selectedValue).toBe('remote-unavailable-model');
+    expect(result.options[0]).toMatchObject({
+      unavailable: true,
+      displayId: REPORTED_MODEL_ID,
+      name: REPORTED_MODEL_NAME,
+    });
+  });
+
+  it('names a model the CLI catalogue dropped from the app catalogue', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: remoteState({ catalog: POPULATED_CATALOG }),
+      observedModel: reportedSelection(),
+      remoteModelOverride: null,
+      gatewayModels: GATEWAY_CATALOG,
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    expect(result.source).toBe('remote-cli-catalog');
+    expect(result.selectedValue).toBe('remote-unavailable-model');
+    expect(result.options[0]).toMatchObject({
+      unavailable: true,
+      name: REPORTED_MODEL_NAME,
+    });
+  });
+
+  it('keeps a readable segment for a model no catalogue carries', () => {
+    const unknown = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: remoteState({ protocol: 'unknown' }),
+      observedModel: { model: { providerID: 'kilo', modelID: 'deepseek/deepseek-v4.9-unknown' } },
+      remoteModelOverride: null,
+      gatewayModels: GATEWAY_CATALOG,
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    expect(unknown.options[0]).toMatchObject({ name: 'deepseek v4.9 unknown' });
+  });
+});
+
 describe('buildSessionModelOptions empty v1 catalog', () => {
   it('routes an empty catalog through the unavailable projection instead of an enabled empty picker', () => {
     const result = build(remoteState({ catalog: EMPTY_CATALOG }));

@@ -31,6 +31,7 @@ export default defineConfig({
   ],
   test: {
     globals: true,
+    env: { SESSION_SYNC_MEASURE_URL: process.env.SESSION_SYNC_MEASURE_URL ?? '' },
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     exclude: [...configDefaults.exclude, 'test/postgres/**'],
   },

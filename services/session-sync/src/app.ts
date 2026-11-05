@@ -8,6 +8,7 @@ import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
 import { internal } from './internal';
+import { overloaded, rpcError, ServiceOverloaded } from './overload';
 import {
   ERROR_STATUS,
   LIMITS,
@@ -23,7 +24,7 @@ import {
   type SyncError,
 } from './protocol';
 import { rateLimit } from './rate-limit';
-import { jsonResponse, requestMetrics, requestRoute, textResponse, timed } from './metrics';
+import { jsonResponse, requestMetrics, requestRoute, timed } from './metrics';
 
 type AppContext = { Bindings: Env; Variables: { principal: Principal } };
 type C = Context<AppContext>;
@@ -36,6 +37,7 @@ function failure(error: SyncError): Response {
   const response = json(errorBody(error), ERROR_STATUS[error.code]);
   if (error.code === 'tenant_unavailable') response.headers.set('Retry-After', '60');
   if (error.code === 'rate_limited') response.headers.set('Retry-After', '60');
+  if (error.code === 'service_overloaded') response.headers.set('Retry-After', '3');
   return response;
 }
 
@@ -51,16 +53,31 @@ function invalid(error: z.ZodError): SyncError {
 async function call<T>(
   c: C,
   sessionID: string,
-  operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<T>,
+  operation: (stub: DurableObjectStub<SessionSyncDO>) => Promise<Result<T>>,
   name: string
-): Promise<T> {
+): Promise<Result<T>> {
   const tenant = c.get('principal').tenant;
   return timed(c.req.raw, 'doMs', async () => {
     const result = await withDORetry(
-      () => getSessionSyncDOStub(c.env, { tenant, sessionID }),
-      operation,
+      () => {
+        try {
+          return getSessionSyncDOStub(c.env, { tenant, sessionID });
+        } catch (error) {
+          throw rpcError(error);
+        }
+      },
+      async stub => {
+        try {
+          return await operation(stub);
+        } catch (error) {
+          throw rpcError(error);
+        }
+      },
       `SessionSyncDO.${name}`
-    );
+    ).catch((error: unknown) => {
+      if (error instanceof ServiceOverloaded) return overloaded();
+      throw error;
+    });
     const metrics = requestMetrics(c.req.raw);
     if (
       metrics &&
@@ -219,7 +236,7 @@ app.get('/v1/sessions/:id/entities', async c => {
     'readEntities'
   );
   if (!result.ok) return failure(result.error);
-  return textResponse(result.value, {
+  return new Response(result.value, {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 });

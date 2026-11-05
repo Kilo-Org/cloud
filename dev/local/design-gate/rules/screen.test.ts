@@ -188,14 +188,27 @@ test('touch-overlap: runs of one wrapped paragraph share the text owner, separat
     [2]
   );
 
-  // An inline link inside that paragraph is still measured against a control
-  // outside the text.
+  // Two inline links are their own tap owners even inside one text, so their
+  // overlap is still measured, and either is measured against a control
+  // outside it.
+  const [linksFinding] = run('touch-overlap', [
+    ...wrapped(1).map((node, index) => (index === 2 ? { ...node, role: 'link' } : node)),
+    { parent: 1, tag: 'View', rect: [0, 156, 60, 30], pressable: true, role: 'link', text: 'more' },
+  ]);
+  assert.equal(linksFinding?.element?.index, 3);
   const [linkFinding] = run('touch-overlap', [
     ...wrapped(1),
-    { parent: 1, tag: 'View', rect: [370, 146, 40, 60], pressable: true, text: 'link' },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [370, 146, 40, 60],
+      pressable: true,
+      role: 'link',
+      text: 'link',
+    },
     { parent: 0, tag: 'View', rect: [350, 150, 60, 48], pressable: true, text: 'Done' },
   ]);
-  assert.equal(linkFinding?.element?.index, 5);
+  assert.equal(linkFinding?.element?.index, 4);
 });
 
 test('overlap: text siblings collide, tolerance, absolute sibling', () => {

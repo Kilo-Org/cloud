@@ -8,6 +8,7 @@ import {
   intersection,
   layoutRect,
   right,
+  tags,
   type LayoutNode,
   type LayoutTree,
   type Rect,
@@ -138,12 +139,16 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
       // A sheet the platform presents in its own window takes the tap first, so
       // a control behind it never competes with one on it.
       if (a.presented?.space !== b.presented?.space) continue;
-      // Runs of one laid-out text never compete: two boxes of one paragraph
-      // intersect wherever the text wraps, and the text's own tap owner takes
-      // the press. An inline link inside that text is still measured against
-      // everything outside it.
+      // Role-less runs of one laid-out text never compete: two boxes of one
+      // paragraph intersect wherever the text wraps, and the text's own tap
+      // owner takes the press. A node with a control role is its own tap owner,
+      // so two inline links in one text are still measured against each other,
+      // and any of them against a control outside.
+      const isRun = (node: LayoutNode) => !tags.isControlRole(node.probe.role);
       const sharedText = nearestText(a);
-      if (sharedText !== undefined && sharedText === nearestText(b)) continue;
+      if (isRun(a) && isRun(b) && sharedText !== undefined && sharedText === nearestText(b)) {
+        continue;
+      }
       if (nearestScroll(a) !== nearestScroll(b)) continue;
       if (!intersects(a.visibleRect, b.visibleRect)) continue;
       if (contains(a.rect, b.rect, TOLERANCE_DP) || contains(b.rect, a.rect, TOLERANCE_DP))

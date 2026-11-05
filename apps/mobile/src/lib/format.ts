@@ -80,16 +80,21 @@ const CLOCK_TIME: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-dig
 /**
  * Time of day in `locale` (`"2:40 AM"`), for a clock beside another.
  *
- * Asking for a numeric hour is not enough: Gujarati, Swahili and a few other
- * locales pad it to two digits even then, because their short time pattern
- * carries a padded hour, so the same clock reads `02:40` next to `11:40` in the
- * next locale. The padded hour loses its leading zero; every other character
- * keeps the locale's own text, order and digits.
+ * Asking for a numeric hour is not enough: a locale whose short time pattern
+ * carries a padded hour pads it to two digits even then, so Gujarati reads
+ * `02:40 AM` beside the `11:40 AM` that English and Arabic print. On a
+ * twelve-hour clock the padded hour loses its leading zero; every other
+ * character keeps the locale's own text, order and digits. A twenty-four-hour
+ * clock keeps the padded hour, which is its uniform-width convention.
  */
 export function formatClockTime(date: Date, locale: string): string {
   const formatter = dateTimeFormat(locale, CLOCK_TIME);
   const formatted = formatter.format(date);
-  const hour = formatter.formatToParts(date).find(part => part.type === 'hour')?.value;
+  const parts = formatter.formatToParts(date);
+  if (!parts.some(part => part.type === 'dayPeriod')) {
+    return formatted;
+  }
+  const hour = parts.find(part => part.type === 'hour')?.value;
   const zero = numberFormat(locale, { useGrouping: false }).format(0);
   if (hour === undefined || hour.length !== zero.length + 1 || !hour.startsWith(zero)) {
     return formatted;

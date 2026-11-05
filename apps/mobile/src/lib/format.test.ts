@@ -37,10 +37,14 @@ describe('formatMoney', () => {
 });
 
 describe('localized format helpers', () => {
-  it('drops the leading zero a locale pads its hour with', () => {
+  it('keeps the padded hour of a twenty-four-hour locale', () => {
     const twoForty = new Date(2026, 0, 1, 2, 40);
     expect(formatDate(twoForty, 'yo', { hour: 'numeric', minute: '2-digit' })).toBe('02:40');
-    expect(formatClockTime(twoForty, 'yo')).toBe('2:40');
+    expect(formatClockTime(twoForty, 'yo')).toBe('02:40');
+  });
+
+  it('leaves an unpadded clock untouched', () => {
+    const twoForty = new Date(2026, 0, 1, 2, 40);
     expect(formatClockTime(twoForty, 'en')).toBe(
       formatDate(twoForty, 'en', { hour: 'numeric', minute: '2-digit' })
     );

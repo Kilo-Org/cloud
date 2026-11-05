@@ -129,7 +129,7 @@ describe('worktree deletion PostgreSQL membership boundary', () => {
       )
     ).rejects.toMatchObject({
       cause: {
-        code: '23503',
+        code: '23001',
         constraint: 'cli_sessions_v2_parent_session_id_kilo_user_id_fk',
       },
     });

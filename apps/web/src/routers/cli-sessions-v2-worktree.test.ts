@@ -540,6 +540,16 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
   });
 
   describe('legacy runtime deletion', () => {
+    async function readLegacySession() {
+      const [session] = await db
+        .select()
+        .from(cli_sessions_v2)
+        .where(
+          and(eq(cli_sessions_v2.session_id, SESSION_ID), eq(cli_sessions_v2.kilo_user_id, USER_ID))
+        );
+      return session;
+    }
+
     async function makeLegacySession() {
       await db
         .update(cli_sessions_v2)
@@ -570,7 +580,7 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
       expect(mockRuntimeDelete).toHaveBeenCalledWith(WORKSPACE_ID);
       expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
       expect(mockCaptureException).toHaveBeenCalled();
-      expect(await readSessions()).toHaveLength(0);
+      expect(await readLegacySession()).toBeUndefined();
     });
 
     it('reports complete cleanup when legacy runtime deletion succeeds', async () => {
@@ -631,7 +641,10 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
           createCaller({ user }).delete({ session_id: SESSION_ID })
         ).rejects.toMatchObject({ code });
 
-        expect(await readSessions()).toHaveLength(1);
+        expect(await readLegacySession()).toMatchObject({
+          session_id: SESSION_ID,
+          cloud_agent_worktree_id: null,
+        });
         expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
         expect(mockCaptureException).not.toHaveBeenCalled();
       }

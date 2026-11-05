@@ -903,6 +903,7 @@ describe('a question with images', () => {
       model: 'kilo/one',
       effort: null,
       images: [image],
+      failureKey: null,
     });
   });
 
@@ -992,6 +993,39 @@ describe('a send the account cannot pay for', () => {
     await settled();
     expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
   });
+
+  it('still says why after the chat is opened again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+
+    /* The reason is kept with the question that waits, so a chat opened again —
+       after a restart, or after the app reloads to switch language — still says
+       the balance stopped the send instead of reading as a message the person
+       stopped. The banner and its Add credits control hang off this key. */
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      asked: 'first',
+      askedModel: 'kilo/one',
+      failureKey: CREDITS_FAILURE_KEY,
+    });
+    expect(await askedIn(opened)).toMatchObject({ failureKey: CREDITS_FAILURE_KEY });
+
+    creditsFailureFor = undefined;
+    await retryChat(opened);
+    await settled();
+    finish?.();
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, failureKey: null });
+  });
 });
 
 describe('a question a later send took the slot from', () => {
@@ -1032,6 +1066,30 @@ describe('a question a later send took the slot from', () => {
     ]);
     // Written down with the chat, so reopening it keeps the bubble.
     expect(await keptIn(held.sessionId)).toEqual(held.displaced);
+  });
+
+  it('says why the newest question failed after a reopen, with the kept one still above it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+
+    /* Both records are read back: the words of the question a later send took
+       the slot from, and why the question now in the slot has no answer. The
+       banner and its Add credits control hang off the second. */
+    const held = snapshotOf(opened);
+    expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
+    expect(held.displaced.map(one => one.text)).toEqual(['first']);
+    const kept = held.displaced[0];
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:${kept?.id}`,
+      `${held.sessionId}:asked`,
+    ]);
   });
 
   it('is on screen above the answer that came after it', async () => {
@@ -1649,6 +1707,8 @@ describe('a question a later send took the slot from', () => {
       images: [],
       // The answer in front of it is a turn the store already holds.
       after: 1,
+      // Nothing says why an answer still arriving failed.
+      failureKey: null,
     });
 
     // The answer in front of it lands, so the retry is asked and becomes the slot's.
@@ -2193,6 +2253,7 @@ describe('custom backend question targets', () => {
         effort: null,
         images: [],
         after: 1,
+        failureKey: errorKey,
       });
 
       await retryChat(opened);
@@ -2302,6 +2363,7 @@ describe('custom backend question targets', () => {
         effort: null,
         images: [],
         after: 1,
+        failureKey: errorKey,
       });
       await retryChat(opened);
       expect(asked).toHaveLength(2);
@@ -2386,6 +2448,7 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      failureKey: 'common.somethingWentWrong',
     });
 
     // The route still names s1; Retry must follow the installed custom session.
@@ -2426,6 +2489,7 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      failureKey: 'common.somethingWentWrong',
     });
 
     backendState.profiles = [];
@@ -2456,6 +2520,7 @@ describe('custom backend question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
     finish?.();
     await settled();
@@ -2472,10 +2537,16 @@ describe('custom backend question targets', () => {
     await enterChat(place, opened);
 
     expect(snapshotOf(opened)).toMatchObject({ asked: text, askedModel: 'kilo/one' });
-    expect(await askedIn(opened)).toEqual({ text, model: 'kilo/one', effort: null, images: [] });
+    expect(await askedIn(opened)).toEqual({
+      text,
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      failureKey: null,
+    });
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(storedQuestions.get(`chat-asked-target:${opened}`)).toBe(
-      JSON.stringify({ text, model: 'kilo/one', effort: null, images: [] })
+      JSON.stringify({ text, model: 'kilo/one', effort: null, images: [], failureKey: null })
     );
   });
 
@@ -2497,6 +2568,7 @@ describe('custom backend question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      failureKey: null,
     });
     expect(storedQuestions.has('chat-asked:s1')).toBe(false);
   });

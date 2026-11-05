@@ -474,6 +474,7 @@ export function createSessionManagementHandlers() {
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
+            environmentId: sessionMetadata.environment?.environmentId,
             sandboxId,
 
             ...(worktreeId
@@ -482,6 +483,9 @@ export function createSessionManagementHandlers() {
                   parentSessionId: worktreeOwnership?.parentSessionId ?? null,
                   cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
                 }
+              : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
               : {}),
 
             githubRepo: repositoryFields.githubRepo,

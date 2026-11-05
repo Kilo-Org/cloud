@@ -181,6 +181,10 @@ describe('selectMessageFailure', () => {
       const result = selectMessageFailure({ info });
 
       expect(result?.canRetry).toBe(false);
+      // The row has no recovery action left, so the detail line states that the
+      // refusal is final instead of repeating the transient-failure line.
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
+      expect(result?.detail).toBe('The provider refused this request and it cannot be retried.');
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
@@ -191,7 +195,10 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       };
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('keeps Retry for a session written before the retryability flag existed', () => {
@@ -201,7 +208,10 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT' },
       } as unknown as AssistantError;
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('never sets canCopy true for an assistant row', () => {

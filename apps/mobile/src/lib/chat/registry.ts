@@ -48,6 +48,7 @@ import {
   migrateAsked,
   moveQuestions,
   newKeptId,
+  recordAskedFailure,
   rememberAsked,
   rememberFirstQuestion,
   replaceKept,
@@ -557,7 +558,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       displaced: kept,
       status: 'idle',
       failed: null,
-      failureKey: null,
+      failureKey: asked?.failureKey ?? null,
       record: recordOfChat(database, current),
     });
     return;
@@ -596,6 +597,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
+      failureKey: asked?.failureKey ?? null,
     });
   } catch (error) {
     /* Reading the history or the pending question failed after the session
@@ -773,6 +775,8 @@ export async function say(
        as one whose answer never arrived. */
     /* onto may have installed the new session before its cleanup failed. */
     current = snapshotOf(current).sessionId;
+    const failureKey = backendFailureKey(error, model);
+    await keepAskedFailure(current, failureKey);
     change(current, {
       status: 'idle',
       answering: [],
@@ -782,8 +786,24 @@ export async function say(
       askedEffort: effort,
       askedFrom: question.from ?? null,
       failed: reason(error),
-      failureKey: backendFailureKey(error, model),
+      failureKey,
     });
+  }
+}
+
+/**
+ * Keeps why the waiting question failed beside the question, so a chat opened
+ * again says it instead of reading as a message the person stopped.
+ *
+ * Only for the screen's copy: the failure itself is already on screen, so a
+ * store that refuses the write costs the reason after a restart and nothing
+ * that a send reports.
+ */
+async function keepAskedFailure(sessionId: string, failureKey: string): Promise<void> {
+  try {
+    await recordAskedFailure(sessionId, failureKey);
+  } catch {
+    /* Nothing holds it: it stays on screen for as long as this chat is open. */
   }
 }
 
@@ -1114,23 +1134,26 @@ async function settle(
     answeredFrom,
     Math.max(0, turns.length - held.turns.length)
   );
-  if (failed === null) {
+  if (failure !== null) {
+    /* The question keeps its place in the slot, so the reason it failed is
+       written beside it: a chat opened again then says why, instead of reading
+       as a message the person stopped. */
+    await keepAskedFailure(sessionId, failure.key);
+  } else if (kept !== held.displaced) {
     /* The list is written before the slot's record goes: a refused write leaves
        both records, and an open folds the pair into the one bubble it already
        drew. Dropping the slot first would leave the answered question with no
        way back, drawn beside the answer for good. */
-    if (kept !== held.displaced) {
-      try {
-        await replaceKept(sessionId, kept);
-        await forgetAsked(sessionId);
-      } catch {
-        /* The written list still counts the answered question, and the slot's
-           record still names it, so an open folds the two into the bubble it
-           drew. The next write of the list leaves one record behind. */
-      }
-    } else {
+    try {
+      await replaceKept(sessionId, kept);
       await forgetAsked(sessionId);
+    } catch {
+      /* The written list still counts the answered question, and the slot's
+         record still names it, so an open folds the two into the bubble it
+         drew. The next write of the list leaves one record behind. */
     }
+  } else {
+    await forgetAsked(sessionId);
   }
   chat.answering = undefined;
   change(sessionId, {

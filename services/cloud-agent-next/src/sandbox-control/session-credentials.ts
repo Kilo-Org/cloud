@@ -1031,6 +1031,10 @@ function preparedPayload(input: {
           }
         : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands.map(sanitize) } : {}),
+    ...(payload.startCommands ? { startCommands: payload.startCommands.map(sanitize) } : {}),
+    ...(payload.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: payload.environmentSetupCommandCount }),
     kilo: {
       scopeId: grant.scopeId,
       token: kiloToken,
@@ -1413,6 +1417,9 @@ export function credentialSourceFromMetadata(
   const repository = credentialRepositoryFromMetadata(metadata.repository);
   return {
     userId,
+    ...(metadata.workspace?.worktreeId === undefined
+      ? {}
+      : { workspaceId: metadata.workspace.worktreeId }),
     kiloSessionId,
     kiloToken,
     ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),

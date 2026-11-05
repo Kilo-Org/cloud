@@ -100,6 +100,7 @@ describe('describeTerminalFailure', () => {
       variant,
       message: i18n.t(key),
       retryable,
+      retryWith: 'session',
       detail: message,
       title: expect.any(String),
     });
@@ -185,6 +186,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: true,
+      retryWith: 'session',
       detail: 'boom',
     });
   });
@@ -198,6 +200,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection failed. Please retry in a moment.',
     });
   });
@@ -210,6 +213,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Access denied',
       message: "You don't have permission to view this.",
       retryable: false,
+      retryWith: 'session',
       detail: 'You are not authorized to use the Cloud Agent.',
     });
   });
@@ -226,6 +230,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection lost. Please retry in a moment.',
     });
   });
@@ -238,8 +243,69 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: false,
+      retryWith: 'session',
       detail: 'Session terminated',
     });
+  });
+
+  // The SDK's own lost-transport code is a retryable failure whatever type the
+  // indicator carries: a screen that kept the skeleton beside the status line
+  // showed a loading state and a failure in the same frame.
+  it.each(['error', 'info', 'progress', 'warning'] as const)(
+    'resolves the lost-transport code carried by a %s indicator',
+    type => {
+      expect(
+        resolveSessionTerminalError({
+          error: null,
+          statusIndicator: {
+            type,
+            message: 'Agent connection lost',
+            code: 'agent-connection-lost',
+          },
+          messageCount: 0,
+        })
+      ).toEqual({
+        variant: 'server',
+        title: "Couldn't load this session",
+        message: 'Connection trouble. Please retry in a moment.',
+        retryable: true,
+        retryWith: 'session',
+        detail: 'Agent connection lost',
+      });
+    }
+  );
+
+  it('resolves an exhausted app-wide leg while the open still has nothing to show', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        messageCount: 0,
+        connectionLost: true,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      retryWith: 'connection',
+      detail: '',
+    });
+  });
+
+  it('leaves a loaded transcript to its own status line when the connection is lost', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: {
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+        },
+        messageCount: 2,
+        connectionLost: true,
+      })
+    ).toBeNull();
   });
 
   it.each([
@@ -272,6 +338,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: "This model isn't available for Cloud Agent. Choose another model and try again.",
       retryable: false,
+      retryWith: 'session',
       detail:
         'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
     });
@@ -285,6 +352,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Not found',
       message: 'This item may have been removed or is no longer available.',
       retryable: false,
+      retryWith: 'session',
       detail: 'This session is no longer available.',
     });
   });

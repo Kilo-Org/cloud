@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -193,6 +193,54 @@ test('every workflow install job restores a pnpm dependency cache', () => {
   assert.deepEqual(uncached, [], 'an install job must restore a pnpm cache before it installs');
 });
 
+// The apt-get behind `playwright install --with-deps` runs to the job timeout
+// whenever the runner fleet's apt egress degrades, and the runner images
+// already ship the Chromium system libraries. A browser build that the
+// version-keyed cache does not satisfy is downloaded, never apt-installed.
+// chromatic.yml is disabled in the repository's Actions settings, so its jobs
+// run nowhere; it is left as it is until the workflow is re-enabled.
+const disabledWorkflows = new Set(['chromatic.yml']);
+
+test('every Chromium install skips apt and restores the browser cache first', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const cacheKey =
+    '${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}';
+  const installs = [];
+  for (const file of readdirSync(directory)
+    .filter(name => /\.ya?ml$/.test(name))
+    .sort()) {
+    if (disabledWorkflows.has(file)) continue;
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
+      steps.forEach((step, index) => {
+        if (!/\bplaywright\b.*\binstall\b/.test(step.run ?? '')) return;
+        installs.push(`${file}:${jobName}`);
+        assert.doesNotMatch(
+          step.run,
+          /--with-deps/,
+          `${file}:${jobName} must install Chromium without apt`
+        );
+        const cacheIndex = steps.findIndex(
+          candidate =>
+            String(candidate.uses).startsWith('actions/cache@') &&
+            candidate.with?.path === '~/.cache/ms-playwright'
+        );
+        assert.ok(
+          cacheIndex >= 0 && cacheIndex < index,
+          `${file}:${jobName} must restore the browser cache before it installs`
+        );
+        assert.equal(steps[cacheIndex].with.key, cacheKey, `${file}:${jobName} cache key`);
+      });
+    }
+  }
+  assert.deepEqual(
+    installs,
+    ['ci.yml:mobile-diagram-host', 'extension-ci.yml:e2e-chrome', 'setup-smoke.yml:setup-smoke'],
+    'every Chromium install in a live workflow is covered'
+  );
+});
+
 for (const [file, name, command, condition] of [
   ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
@@ -307,7 +355,7 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
 
 function runTypecheck(
   t,
-  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '' } = {}
+  { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'typecheck-ci-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -315,6 +363,11 @@ function runTypecheck(
   mkdirSync(bin, { recursive: true });
   mkdirSync(join(dir, 'apps/extension'), { recursive: true });
   writeFileSync(join(dir, 'apps/extension/package.json'), JSON.stringify(extension));
+  mkdirSync(join(dir, 'services/cloud-agent-next'), { recursive: true });
+  writeFileSync(
+    join(dir, 'services/cloud-agent-next/package.json'),
+    JSON.stringify({ name: 'cloud-agent-next', private: true })
+  );
   const cli = `#!/usr/bin/env node
 const { appendFileSync } = require('node:fs');
 const { basename } = require('node:path');
@@ -326,7 +379,12 @@ if (name === 'git') {
   if (args[0] === 'merge-base') console.log('base');
   else if (args.includes('packages/trpc/src/**') && changes.includes('trpc')) console.log('packages/trpc/src/index.ts');
   else if (args.includes('pnpm-workspace.yaml') && changes.includes('workspace')) console.log('pnpm-workspace.yaml');
+  else if (args.includes('*.ts') && changes.includes('cloud-agent-next')) console.log('services/cloud-agent-next/src/shared/protocol.ts');
   else if (args.includes('*.ts')) console.log('apps/extension/package.json');
+} else if (name === 'pnpm' && args[0] === 'ls') {
+  appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
+  const selected = process.env.SELECTED.split(',').filter(Boolean);
+  console.log(JSON.stringify(selected.map(entry => ({ name: entry }))));
 } else if (name === 'pnpm' && args[0] === '-r') {
   appendFileSync(process.env.COMMAND_LOG, name + ' ' + args.join(' ') + '\\n');
   const result = spawnSync('sh', ['-c', process.env.EXTENSION_TYPECHECK], { stdio: 'inherit' });
@@ -356,6 +414,7 @@ if (name === 'git') {
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
+        SELECTED: selected,
         BUILD_EXIT: String(buildExit),
         CHECK_EXIT: String(checkExit),
         COMMAND_LOG: log,
@@ -417,4 +476,111 @@ test('a failed root tRPC build stops the typecheck', t => {
   const result = runTypecheck(t, { root: true, buildExit: 7 });
   assert.equal(result.status, 7);
   assert.deepEqual(result.commands, ['pnpm --filter @kilocode/trpc run build']);
+});
+
+// The wrapper compiles the service's own shared sources (its tsconfig includes
+// ../src/shared), which a package filter does not follow. A changes-only run
+// selects the wrapper whenever the service lands in the selection, once.
+test('a changes-only run selects the wrapper when the service is selected', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'cloud-agent-next',
+    selected: 'cloud-agent-next',
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command.startsWith('pnpm -r')),
+    [
+      `pnpm -r --filter cloud-agent-next... --filter @kilocode/cloud-agent-wrapper ${workspaceFilters} run typecheck`,
+    ]
+  );
+});
+
+test('a changes-only run leaves the wrapper out when the service is not selected', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    changes: 'cloud-agent-next',
+    selected: '@kilocode/worker-utils',
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(
+    result.commands.filter(command => command.startsWith('pnpm -r')),
+    [`pnpm -r --filter cloud-agent-next... ${workspaceFilters} run typecheck`]
+  );
+});
+
+// `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
+// (services/cloud-agent-next/wrapper is one). Both the full and the affected
+// group runs select members with `pnpm -r ... run typecheck`, which starts
+// every selected member's own script, so a member script that also starts
+// another member's typecheck compiles that member twice per run.
+const workspaces = (() => {
+  const patterns = load(
+    readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8')
+  ).packages;
+  const dirs = [];
+  for (const pattern of patterns) {
+    if (!pattern.endsWith('/*')) {
+      dirs.push(pattern);
+      continue;
+    }
+    const parent = posix.dirname(pattern);
+    for (const entry of readdirSync(new URL(`../${parent}/`, import.meta.url))) {
+      const dir = posix.join(parent, entry);
+      if (existsSync(new URL(`../${dir}/package.json`, import.meta.url))) dirs.push(dir);
+    }
+  }
+  return dirs.map(dir => ({
+    dir,
+    manifest: JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')),
+  }));
+})();
+
+const workspaceDirByName = new Map(workspaces.map(({ dir, manifest }) => [manifest.name, dir]));
+
+// The workspace members whose `typecheck` one script of `dir` starts.
+function typecheckedWorkspaces(dir, script) {
+  const targets = new Set();
+  for (const [command] of script.matchAll(/pnpm\s[^&|;\n]*\brun\s+typecheck\b/g)) {
+    for (const [, flag, quoted] of command.matchAll(
+      /(-C|--dir|--filter|-F)(?:=|\s+)('[^']*'|"[^"]*"|\S+)/g
+    )) {
+      const value = quoted.replace(/^['"]|['"]$/g, '').replace(/\.\.\.$/, '');
+      const target =
+        flag === '-C' || flag === '--dir'
+          ? posix.normalize(posix.join(dir, value))
+          : workspaceDirByName.get(value);
+      if (target) targets.add(target);
+    }
+  }
+  return [...targets];
+}
+
+test('no workspace typecheck starts another workspace typecheck', () => {
+  const duplicates = [];
+  for (const { dir, manifest } of workspaces) {
+    const script = manifest.scripts?.typecheck;
+    if (!script) continue;
+    for (const target of typecheckedWorkspaces(dir, script)) {
+      if (target !== dir) duplicates.push(`${manifest.name} also typechecks ${target}`);
+    }
+  }
+  assert.deepEqual(duplicates, [], 'a recursive workspace run already typechecks every member');
+});
+
+// Dropping the nested call leaves a standalone `typecheck` covering only this
+// program, so the service keeps a script that covers both for a caller outside
+// the recursive workspace run.
+test('cloud-agent-next keeps a standalone typecheck that covers its wrapper', () => {
+  const service = workspaces.find(({ manifest }) => manifest.name === 'cloud-agent-next');
+  const wrapper = workspaces.find(
+    ({ manifest }) => manifest.name === '@kilocode/cloud-agent-wrapper'
+  );
+  assert.ok(service && wrapper);
+  assert.equal(wrapper.dir, posix.join(service.dir, 'wrapper'));
+  const combined = Object.entries(service.manifest.scripts)
+    .filter(([, script]) => /\btsgo\b|\btsc\b/.test(script))
+    .filter(([, script]) => typecheckedWorkspaces(service.dir, script).includes(wrapper.dir))
+    .map(([name]) => name);
+  assert.notEqual(combined.length, 0, 'a script typechecks the service and its wrapper');
 });

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { findAll, info, render } from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
 

@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  askedIn,
+  forgetAsked,
   keptIn,
   newKeptId,
+  recordAskedFailure,
   rememberAsked,
   rememberFirstQuestion,
   replaceKept,
@@ -36,6 +39,53 @@ const row = (sessionId: string, title: string) => ({
 
 beforeEach(() => {
   stored.clear();
+});
+
+describe('the reason a question failed', () => {
+  const question = { text: 'what is a monad', model: 'kilo/one', effort: null, images: [] };
+
+  it('is kept with the question that waits', async () => {
+    await rememberAsked('failed', question);
+    await recordAskedFailure('failed', 'modelChat.creditsRequired');
+
+    expect(await askedIn('failed')).toMatchObject({
+      text: 'what is a monad',
+      failureKey: 'modelChat.creditsRequired',
+    });
+  });
+
+  it('is cleared when the question is asked again', async () => {
+    await rememberAsked('asked-again', question);
+    await recordAskedFailure('asked-again', 'modelChat.creditsRequired');
+
+    await rememberAsked('asked-again', question);
+
+    expect(await askedIn('asked-again')).toMatchObject({ failureKey: null });
+  });
+
+  it('is dropped with the question', async () => {
+    await rememberAsked('answered', question);
+    await recordAskedFailure('answered', 'modelChat.creditsRequired');
+
+    await forgetAsked('answered');
+
+    expect(await askedIn('answered')).toBeNull();
+  });
+
+  it('has nowhere to stay without a remembered question', async () => {
+    await recordAskedFailure('unknown', 'modelChat.creditsRequired');
+
+    expect(await askedIn('unknown')).toBeNull();
+  });
+
+  it('reads a question remembered before failures were kept as one with none', async () => {
+    stored.set(
+      'chat-asked-target:older',
+      JSON.stringify({ text: 'older question', model: 'kilo/one', effort: null, images: [] })
+    );
+
+    expect(await askedIn('older')).toMatchObject({ text: 'older question', failureKey: null });
+  });
 });
 
 describe('titledByAsked', () => {

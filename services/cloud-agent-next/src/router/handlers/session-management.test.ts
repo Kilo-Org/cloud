@@ -42,9 +42,9 @@ const storedMetadata: SessionMetadata = {
 
 const router = t.router({ getSession: createSessionManagementHandlers().getSession });
 
-function setup() {
+function setup(metadata: SessionMetadata = storedMetadata) {
   const stub = {
-    getMetadata: vi.fn().mockResolvedValue(storedMetadata),
+    getMetadata: vi.fn().mockResolvedValue(metadata),
     getSession: vi.fn().mockResolvedValue({ type: 'session-not-found' }),
   };
   const sandboxSessions = {
@@ -92,5 +92,48 @@ describe('getSession runtime agents', () => {
       hidden: true,
       disable: true,
     });
+  });
+
+  it('returns the trusted parent Cloud Agent session id when present', async () => {
+    const parentCloudAgentSessionId = 'workspace_87654321-4321-4321-8321-cba987654321';
+    const { caller } = setup({ ...storedMetadata, parentCloudAgentSessionId });
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result.parentCloudAgentSessionId).toBe(parentCloudAgentSessionId);
+  });
+
+  it('returns only the environment ID from the stored environment reference', async () => {
+    const environmentId = '11111111-1111-4111-8111-111111111111';
+    const { caller } = setup({
+      ...storedMetadata,
+      environment: {
+        environmentId,
+        owner: { type: 'user', id: USER_ID },
+        configurationRevision: 3,
+        repository: { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+      },
+    });
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result.environmentId).toBe(environmentId);
+    expect(result).not.toHaveProperty('environment');
+  });
+
+  it('leaves the environment ID undefined for sessions without an environment', async () => {
+    const { caller } = setup();
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result.environmentId).toBeUndefined();
+  });
+
+  it('omits the parent Cloud Agent session id when the metadata has none', async () => {
+    const { caller } = setup();
+
+    const result = await caller.getSession({ cloudAgentSessionId: SESSION_ID });
+
+    expect(result).not.toHaveProperty('parentCloudAgentSessionId');
   });
 });

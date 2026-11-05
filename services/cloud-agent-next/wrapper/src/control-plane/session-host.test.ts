@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'bun:test';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
-import { createControlPlaneSessionHost } from './main.js';
+import { createControlPlaneFrameDispatcher, createControlPlaneSessionHost } from './main.js';
 import type { KiloFeedCallbacks } from './kilo-runtime.js';
 import type { KiloEventFeedSource } from './kilo-event-feed.js';
 import type { SessionObservation } from './session-supervisor.js';
 import { createControlPlaneTerminals } from './terminals.js';
+import { git } from '../utils.js';
+import type { TurnManagerDeps } from './turn.js';
 
 async function settle() {
   for (let index = 0; index < 40; index++) await Promise.resolve();
   await Bun.sleep(5);
 }
 
-async function hostFixture() {
+async function hostFixture(turn: Pick<TurnManagerDeps, 'runAutoCommit'> = {}) {
   let now = Date.now();
   let preparing = false;
   let abortReply: () => Promise<boolean> = async () => true;
@@ -23,6 +28,7 @@ async function hostFixture() {
   const summaries: string[] = [];
   const summaryRequested = Promise.withResolvers<void>();
   const promptRequested = Promise.withResolvers<void>();
+  const autoCommitReported = Promise.withResolvers<void>();
   const feeds: Array<{ source: KiloEventFeedSource; callbacks: KiloFeedCallbacks }> = [];
   const intervals = new Map<symbol, () => void>();
   const stopped: number[] = [];
@@ -121,8 +127,21 @@ async function hostFixture() {
         };
       },
     },
-    turn: { emit: frame => frames.push(frame), now: () => now, log: () => undefined },
+    turn: {
+      ...turn,
+      emit: frame => {
+        frames.push(frame);
+        if (
+          frame.type === 'session.events' &&
+          frame.events.some(event => event.type === 'autocommit_completed')
+        )
+          autoCommitReported.resolve();
+      },
+      now: () => now,
+      log: () => undefined,
+    },
     isPreparing: () => preparing,
+    isWorkspaceBusy: () => terminals.hasActivePty(),
   });
   const terminals = createControlPlaneTerminals({
     controlUrl: server.url.toString(),
@@ -141,9 +160,10 @@ async function hostFixture() {
     summaries,
     summaryRequested: summaryRequested.promise,
     promptRequested: promptRequested.promise,
+    autoCommitReported: autoCommitReported.promise,
     stopped,
-    async runtime(key: string) {
-      await host.runtimes.ensure({ key, directory: '/workspace', env: {} });
+    async runtime(key: string, directory = '/workspace', env: Record<string, string> = {}) {
+      await host.runtimes.ensure({ key, directory, env });
       await host.runtimes.get(key)?.refreshActivity();
       return feeds.length - 1;
     },
@@ -247,7 +267,7 @@ describe('production session host composition', () => {
     }
   });
 
-  it('does not make a heartbeat active for an open terminal, even with recent input', async () => {
+  it('blocks workspace capture for a terminal without extending compute activity', async () => {
     const f = await hostFixture();
     const session = {
       sessionId: 'workspace_terminal',
@@ -280,6 +300,7 @@ describe('production session host composition', () => {
       ).toMatchObject({ ok: true, result: { connected: true } });
       expect(f.terminals.recentInputCount()).toBe(0);
       expect(f.host.getHeartbeat().active).toBe(false);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(true);
 
       const socket = f.terminalSocket();
       if (!socket) throw new Error('terminal socket was not opened');
@@ -288,6 +309,10 @@ describe('production session host composition', () => {
       expect(f.terminals.recentInputCount()).toBe(1);
       expect(f.host.runtimes.needsCompute()).toBe(false);
       expect(f.host.turns.hasPendingWork()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(false);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(true);
+      await f.terminals.forgetSession(session.sessionId);
+      expect(f.host.getHeartbeat().workspaceBusy).toBe(false);
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.terminals.forgetSession(session.sessionId);
@@ -621,6 +646,195 @@ describe('production session host composition', () => {
       await f.dispose();
     }
   });
+
+  it('commits and pushes dirty work to a real remote after an execution-limit interruption', async () => {
+    const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'deadline-auto-commit-'));
+    const directory = path.join(temporary, 'worktree');
+    const remote = path.join(temporary, 'remote.git');
+    const home = path.join(temporary, 'home');
+    await fs.mkdir(directory);
+    await fs.mkdir(home);
+    const env = {
+      PATH: process.env.PATH ?? '',
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+    };
+    const run = (args: string[]) => git(args, { cwd: directory, env, inheritEnv: false });
+    const f = await hostFixture();
+    const stopped = Promise.withResolvers<boolean>();
+    try {
+      for (const args of [
+        ['init', '--bare', remote],
+        ['init', '--initial-branch=kilo/interrupted'],
+        ['config', 'user.name', 'Test'],
+        ['config', 'user.email', 'test@example.com'],
+        ['config', 'commit.gpgsign', 'false'],
+        ['remote', 'add', 'origin', remote],
+      ])
+        expect((await run(args)).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'changes.txt'), 'preserved after the time limit\n');
+      const feed = await f.runtime(directory, directory, env);
+      f.host.turns.registerRoute({
+        sessionId: 'workspace_chat',
+        kiloSessionId: 'ses_root',
+        directory,
+        attemptId: 'a',
+      });
+      f.host.turns.submit('workspace_chat', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'test' },
+        agent: { mode: 'code', model: 'test/model' },
+        finalization: { autoCommit: true, condenseOnComplete: true },
+      });
+      await settle();
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.setAbort(() => stopped.promise);
+      await f.advance(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'execution_limit', lastMessageId: 'm1' },
+      ]);
+      expect(
+        (await run(['--git-dir', remote, 'rev-parse', '--verify', 'refs/heads/kilo/interrupted']))
+          .exitCode
+      ).not.toBe(0);
+      expect(f.host.getHeartbeat().active).toBe(true);
+      stopped.resolve(true);
+      await f.autoCommitReported;
+      await settle();
+      const saved = await run([
+        '--git-dir',
+        remote,
+        'show',
+        'refs/heads/kilo/interrupted:changes.txt',
+      ]);
+      expect(saved.exitCode).toBe(0);
+      expect(saved.stdout).toBe('preserved after the time limit\n');
+      expect((await run(['status', '--porcelain'])).stdout).toBe('');
+      expect(f.summaries).toEqual([]);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toHaveLength(1);
+      expect(f.host.getHeartbeat().active).toBe(false);
+    } finally {
+      stopped.resolve(true);
+      await f.dispose();
+      await fs.rm(temporary, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps heartbeat active and follow-ups parked until interruption auto-commit finishes', async () => {
+    const committed = Promise.withResolvers<{ success: boolean }>();
+    const f = await hostFixture({ runAutoCommit: () => committed.promise });
+    try {
+      const feed = await f.runtime('/workspace');
+      f.host.turns.registerRoute({
+        sessionId: 'workspace_chat',
+        kiloSessionId: 'ses_root',
+        directory: '/workspace',
+        attemptId: 'a',
+      });
+      const submit = (id: string, autoCommit = false) =>
+        f.host.turns.submit('workspace_chat', {
+          messageId: id,
+          turn: { type: 'prompt', prompt: 'test' },
+          agent: { mode: 'code', model: 'test/model' },
+          finalization: { autoCommit },
+        });
+      submit('m1', true);
+      await settle();
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      await f.advance(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs);
+      expect(f.host.runtimes.needsCompute()).toBe(false);
+      expect(f.host.getHeartbeat().active).toBe(true);
+      submit('m2');
+      await settle();
+      expect(f.prompts).toHaveLength(1);
+      await f.advance(120_001);
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toHaveLength(1);
+      committed.resolve({ success: true });
+      await settle();
+      expect(f.prompts).toHaveLength(2);
+      f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+      f.event(feed, 'session.status', { sessionID: 'ses_root', status: { type: 'idle' } });
+      f.event(feed, 'session.turn.close', { sessionID: 'ses_root', reason: 'completed' });
+      await settle();
+      expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
+        { status: 'failed', reason: 'execution_limit', lastMessageId: 'm1' },
+        { status: 'completed', lastMessageId: 'm2' },
+      ]);
+      expect(f.host.getHeartbeat().active).toBe(false);
+    } finally {
+      committed.resolve({ success: true });
+      await f.dispose();
+    }
+  });
+
+  it.each(['worktree.prepareDeletion', 'worktree.delete'] as const)(
+    'cancels and awaits interruption auto-commit before handling %s',
+    async type => {
+      const committed = Promise.withResolvers<{ success: boolean }>();
+      let signal: AbortSignal | undefined;
+      let deleted = false;
+      const f = await hostFixture({
+        runAutoCommit: input => {
+          signal = input.signal;
+          return committed.promise;
+        },
+      });
+      try {
+        const feed = await f.runtime('/workspace');
+        f.host.turns.registerRoute({
+          sessionId: 'workspace_chat',
+          kiloSessionId: 'ses_root',
+          directory: '/workspace',
+          attemptId: 'a',
+        });
+        f.host.turns.submit('workspace_chat', {
+          messageId: 'm1',
+          turn: { type: 'prompt', prompt: 'test' },
+          agent: { mode: 'code', model: 'test/model' },
+          finalization: { autoCommit: true },
+        });
+        await settle();
+        f.event(feed, 'session.turn.open', { sessionID: 'ses_root' });
+        await f.advance(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs);
+        expect(signal).toBeDefined();
+        const dispatch = createControlPlaneFrameDispatcher({
+          preparation: {},
+          turns: { current: f.host.turns },
+          terminals: {},
+          worktreeChanges: {},
+          worktreeDeletion: {
+            current: {
+              handle: async () => {
+                deleted = true;
+              },
+            },
+          },
+          kiloRequests: {},
+          send: () => undefined,
+          log: () => undefined,
+        });
+        dispatch({
+          type,
+          requestId: 'delete-request',
+          payload: {
+            worktreeId: 'worktree_test',
+            directory: '/workspace',
+            sessionIds: ['ses_root'],
+          },
+        });
+        await settle();
+        expect(signal?.aborted).toBe(true);
+        expect(deleted).toBe(false);
+        committed.resolve({ success: false });
+        await settle();
+        expect(deleted).toBe(true);
+      } finally {
+        committed.resolve({ success: false });
+        await f.dispose();
+      }
+    }
+  );
 
   it('settles a deadline once, retains compute through abort, and fences cancellation from a newly accepted prompt', async () => {
     const f = await hostFixture();

@@ -103,6 +103,7 @@ import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/pi
 import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { remoteStartPlanRefusal } from '@/lib/remote-spawn-admission';
 import {
+  followLiveRunOn,
   PRESELECT_CLOUD_RUN_ON,
   PRESELECT_COMPUTER_RUN_ON,
   readPreselectRunOn,
@@ -630,6 +631,22 @@ export function NewSessionScreenBody() {
     preselectConnectionId,
     preselectRunOn,
   ]);
+
+  // The chosen target is a snapshot of the row, not a durable identity: a host
+  // that reboots reconnects its CLI with the same name and project under a new
+  // connectionId. Follow the live row so the launch folder, the model catalog
+  // and the CLI agents keep reading a connected instance, and so the picker
+  // marks the row the form actually shows. A target the live list no longer
+  // represents keeps its value here; the spawn path reports that case.
+  useEffect(() => {
+    if (instancesData === undefined || runOnInstance === null) {
+      return;
+    }
+    const live = followLiveRunOn(runOnInstance, instanceList);
+    if (live !== null && live.connectionId !== runOnInstance.connectionId) {
+      setRunOnInstance(live);
+    }
+  }, [instanceList, instancesData, runOnInstance]);
 
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via

@@ -23,6 +23,19 @@ export function memberMatchesRepository(
   return member.platform === repository.platform && member.repoFullName.toLowerCase() === fullName;
 }
 
+/**
+ * Repositories to list under an environment: none when it holds a single
+ * repository, otherwise only the extras beyond the selected repository.
+ */
+export function additionalEnvironmentMembers(
+  environment: EnvironmentSummary,
+  repository: EnvironmentRepository
+): EnvironmentMemberResponse[] {
+  const members = environmentMembers(environment);
+  if (members.length <= 1) return [];
+  return members.filter(member => !memberMatchesRepository(member, repository));
+}
+
 /** Every environment of the owner that contains the repository. */
 export function findRepositoryEnvironments(
   environments: readonly EnvironmentSummary[],

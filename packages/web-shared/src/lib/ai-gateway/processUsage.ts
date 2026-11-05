@@ -4,15 +4,10 @@ import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import {
-  USAGE_QUEUE_SFO_CONFIG,
-  USAGE_QUEUE_FRA_CONFIG,
-} from '@kilocode/web-shared/lib/config.server';
-import {
   enqueueUsage,
   getUsagePublisherExecutionRegion,
   type UsageEnqueueOutcome,
 } from './usage-publisher';
-import { isFraUsageQueueSelected, isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -350,12 +345,12 @@ async function enqueueUsageWithinLifetime(
 
 type UsageAccountingTransport = 'queue' | 'direct';
 
-function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
-  return (process.env.VERCEL_TARGET_ENV === 'staging' && process.env.VERCEL_ENV !== 'production') ||
-    isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext) ||
-    isFraUsageQueueSelected(USAGE_QUEUE_FRA_CONFIG, usageContext)
-    ? 'queue'
-    : 'direct';
+function usageAccountingTransport(): UsageAccountingTransport {
+  const vercelEnv = process.env.VERCEL_ENV;
+  const targetEnv = process.env.VERCEL_TARGET_ENV;
+  const staging = targetEnv === 'staging' && vercelEnv !== 'production';
+  const production = vercelEnv === 'production' && targetEnv === 'production';
+  return staging || production ? 'queue' : 'direct';
 }
 
 export async function logMicrodollarUsage(
@@ -367,7 +362,7 @@ export async function logMicrodollarUsage(
     usageStats,
     usageContext,
     bouncerUsageEvent,
-    usageAccountingTransport(usageContext)
+    usageAccountingTransport()
   );
 }
 
@@ -1635,7 +1630,7 @@ export async function logMicrodollarUsageAndReportToBouncer(
   usageContext: MicrodollarUsageContext
 ): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
-  const transport = usageAccountingTransport(usageContext);
+  const transport = usageAccountingTransport();
   if (!event || usageContext.bouncer?.spendWatch !== true) {
     const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
     if (event && transport === 'queue') {

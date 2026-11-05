@@ -22,7 +22,10 @@ import {
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
@@ -100,7 +103,7 @@ import { localSessionsStorageKey } from './local-sessions/local-session-storage'
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
   currentSessionId: string | null;
-  selectedWorktreeId: string | null;
+  selectedWorktreeId: CloudAgentWorktreeId | null;
   worktreeChats: StoredSession[];
   openWorktreeChats: StoredSession[];
   closedWorktreeChats: StoredSession[];
@@ -892,6 +895,7 @@ function CloudSidebarLayoutContent({
     async (sessionId: string, title: string) => {
       await renameCliSessionV2({ session_id: sessionId, title });
       renameSessionLocally(sessionId, title);
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
@@ -908,6 +912,7 @@ function CloudSidebarLayoutContent({
         organizationId: organizationId ?? null,
       });
       await Promise.all([
+        queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
         queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
       ]);

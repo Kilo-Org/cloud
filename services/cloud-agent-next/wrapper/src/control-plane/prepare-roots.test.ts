@@ -43,6 +43,7 @@ function rootSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneR
     branch: 'kilo/generated',
     branchMode: 'working',
     setupCommands: ['npm install'],
+    environmentSetupCommandCount: 1,
     roots: [
       {
         directory: API,
@@ -253,6 +254,10 @@ describe('preparing a route with several git roots', () => {
       'origin/feature/web',
     ]);
     expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(progressDetails(harness.frames, 'clone')).toEqual([
+      'acme/api: Cloning repository',
+      'acme/web: Cloning repository',
+    ]);
     expect([...harness.stamps]).toEqual([
       [API, { allocationId: 'alloc-current', commit: 'commit-api' }],
       [WEB, { allocationId: 'alloc-current', commit: 'commit-web' }],
@@ -424,7 +429,24 @@ describe('preparing a route with several git roots', () => {
     }
     expect(harness.clones()).toEqual([]);
     expect([...harness.repos]).toEqual([API, WEB]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
+    expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
+  });
+
+  it('runs inline setup once at the cwd after adopting all environment roots', async () => {
+    const harness = rootsHarness({
+      repos: [API, WEB],
+      stamps: { [API]: FOREIGN, [WEB]: FOREIGN },
+    });
+
+    await harness.manager.prepare(
+      rootSpec({ setupCommands: ['npm install', 'inline extra'], startCommands: ['serve'] })
+    );
+
+    expect(harness.setups).toEqual([
+      { command: 'inline extra', directory: CWD },
+      { command: 'serve', directory: CWD },
+    ]);
     expect(harness.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'adopted' });
   });
 
@@ -567,8 +589,8 @@ describe('preparing a route with several git roots', () => {
 
     expect(failure(harness.frames)).toMatchObject({ step: 'checkout' });
     const lastCheckout = progressDetails(harness.frames, 'checkout').at(-1);
-    expect(lastCheckout).toContain('acme/web');
-    expect(progressDetails(harness.frames, 'checkout')).toContain('acme/api');
+    expect(lastCheckout).toContain('acme/web: Checking out branch');
+    expect(progressDetails(harness.frames, 'checkout')).toContain('acme/api: Checking out branch');
     expect(harness.setups).toEqual([]);
 
     const { roots: _roots, ...legacy } = rootSpec();
@@ -585,7 +607,10 @@ describe('preparing a route with several git roots', () => {
 
     await harness.manager.prepare(rootSpec());
 
-    expect(progressDetails(harness.frames, 'restore')).toEqual(['acme/api', 'acme/web']);
+    expect(progressDetails(harness.frames, 'restore')).toEqual([
+      'acme/api: Updating repository',
+      'acme/web: Updating repository',
+    ]);
   });
 
   it('does not clone a finished root again when a retry follows a failed clone of another', async () => {
@@ -650,6 +675,10 @@ describe('preparing a route with one git root', () => {
     expect(harness.clones()).toEqual([{ url: API_URL, directory: API }]);
     expect(harness.setups).toEqual([{ command: 'npm install', directory: API }]);
     expect([...harness.stamps.keys()]).toEqual([API]);
+    // The route names one repository, so its name adds nothing to the phase
+    // progress: the step's own message names the work.
+    expect(progressDetails(harness.frames, 'clone')).toEqual([null]);
+    expect(progressDetails(harness.frames, 'checkout')).toEqual([null]);
   });
 });
 

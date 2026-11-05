@@ -121,6 +121,12 @@ Compact, default, and large button sizes remain unchanged for other controls.
 Verify Android targets using the clickable accessibility node bounds, not
 hitSlop alone; keep the translated label fully visible.
 
+## Loading buttons
+
+The shared `Button` uses the native iOS spinner without an additional ring.
+Android keeps its circular track while the native indicator animates.
+Both platforms preserve the button dimensions, accessible busy name, and disabled state during loading.
+
 ## Mounted query tests
 
 A mutation promise can settle before React Query publishes its observer state.

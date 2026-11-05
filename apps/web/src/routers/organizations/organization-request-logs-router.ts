@@ -1,5 +1,6 @@
 import {
   api_kind,
+  auto_model,
   editor_name,
   enkrypt_usage,
   enkrypt_usage_decision,
@@ -21,9 +22,17 @@ import {
   organizationBillingProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, lte, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { isRequestLogsEnabled } from '@/lib/request-logs/availability';
+import {
+  REQUEST_LOGS_LIMIT,
+  REQUEST_LOGS_MODEL_PREFIX_MAX_LENGTH,
+  REQUEST_LOGS_START_TIME_MAX_AGE_DAYS,
+  REQUEST_LOGS_WINDOW_HOURS,
+  isRequestLogStartTimeInBounds,
+} from '@/lib/request-logs/filters';
+import { microdollarUsageModelStartsWith } from '@/lib/request-logs/model-prefix';
 import { formatRequestLogProvider } from '@/lib/request-logs/provider-label';
 import {
   parseRoutingDetails,
@@ -31,10 +40,21 @@ import {
 } from '@/lib/request-logs/routing-details';
 import { timedUsageQuery } from '@/lib/usage-query';
 
-export const REQUEST_LOGS_LIMIT = 100;
-export const REQUEST_LOGS_MAX_AGE_HOURS = 24;
+export const ENKRYPT_USAGE_MAX_AGE_HOURS = 24;
 
 const LOG_SOURCE = 'request-logs';
+
+const StartTimeSchema = z.iso
+  .datetime({ offset: true })
+  .refine(value => isRequestLogStartTimeInBounds(Date.parse(value), Date.now()), {
+    message: `Start time must be within the past ${REQUEST_LOGS_START_TIME_MAX_AGE_DAYS} days and not in the future.`,
+  });
+
+const RequestLogsListInputSchema = OrganizationIdInputSchema.extend({
+  startTime: StartTimeSchema.optional(),
+  userId: z.string().min(1).max(256).optional(),
+  modelPrefix: z.string().trim().max(REQUEST_LOGS_MODEL_PREFIX_MAX_LENGTH).optional(),
+});
 
 export type RequestLogMetadata =
   | { status: 'available'; routing: RequestLogRoutingDetails }
@@ -49,10 +69,15 @@ async function assertRequestLogsEnabled(organizationId: string): Promise<void> {
   }
 }
 
-function withinRequestLogWindow() {
-  return gte(
-    microdollar_usage.created_at,
-    sql`NOW() - make_interval(hours => ${REQUEST_LOGS_MAX_AGE_HOURS})`
+/** The table lists newest first, so the window covers the hour leading up to the start time. */
+function withinRequestLogWindow(startTime: string | undefined) {
+  const windowEnd = startTime === undefined ? sql`NOW()` : sql`${startTime}::timestamptz`;
+  return and(
+    lte(microdollar_usage.created_at, windowEnd),
+    gt(
+      microdollar_usage.created_at,
+      sql`${windowEnd} - make_interval(hours => ${REQUEST_LOGS_WINDOW_HOURS})`
+    )
   );
 }
 
@@ -62,7 +87,7 @@ const enkryptGuardrail = sql<EnkryptGuardrailDirection>`coalesce(${enkrypt_usage
 function withinEnkryptUsageWindow() {
   return gte(
     enkrypt_usage.created_at,
-    sql`NOW() - make_interval(hours => ${REQUEST_LOGS_MAX_AGE_HOURS})`
+    sql`NOW() - make_interval(hours => ${ENKRYPT_USAGE_MAX_AGE_HOURS})`
   );
 }
 
@@ -90,7 +115,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
     return { available: await isRequestLogsEnabled(input.organizationId) };
   }),
 
-  list: organizationBillingProcedure.query(async ({ input }) => {
+  list: organizationBillingProcedure.input(RequestLogsListInputSchema).query(async ({ input }) => {
     await assertRequestLogsEnabled(input.organizationId);
     const rows = await timedUsageQuery(
       {
@@ -98,7 +123,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
         route: 'organizations.requestLogs.list',
         queryLabel: 'org_latest_requests',
         scope: 'org',
-        period: `${REQUEST_LOGS_MAX_AGE_HOURS}h`,
+        period: `${REQUEST_LOGS_WINDOW_HOURS}h`,
       },
       tx =>
         tx
@@ -133,7 +158,11 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           .where(
             and(
               eq(microdollar_usage.organization_id, input.organizationId),
-              withinRequestLogWindow()
+              withinRequestLogWindow(input.startTime),
+              input.userId === undefined
+                ? undefined
+                : eq(microdollar_usage.kilo_user_id, input.userId),
+              input.modelPrefix ? microdollarUsageModelStartsWith(input.modelPrefix) : undefined
             )
           )
           .orderBy(desc(microdollar_usage.created_at))
@@ -145,7 +174,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       created_at: toIsoTimestamp(row.created_at),
       user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
       model: row.requested_model ?? row.model,
-      provider: formatRequestLogProvider(row.provider, row.inference_provider),
+      provider: formatRequestLogProvider(row.inference_provider),
       cost_microdollars: row.cost,
       input_tokens: row.input_tokens,
       output_tokens: row.output_tokens,
@@ -161,89 +190,58 @@ export const organizationRequestLogsRouter = createTRPCRouter({
 
   listEnkryptUsage: organizationBillingProcedure.query(async ({ input }) => {
     await assertRequestLogsEnabled(input.organizationId);
-    const where = and(
-      eq(enkrypt_usage.organization_id, input.organizationId),
-      withinEnkryptUsageWindow()
-    );
-    const [rows, [summary]] = await timedUsageQuery(
+    const rows = await timedUsageQuery(
       {
         db: readDb,
         route: 'organizations.requestLogs.listEnkryptUsage',
         queryLabel: 'org_latest_enkrypt_usage',
         scope: 'org',
-        period: `${REQUEST_LOGS_MAX_AGE_HOURS}h`,
+        period: `${ENKRYPT_USAGE_MAX_AGE_HOURS}h`,
       },
       tx =>
-        Promise.all([
-          tx
-            .select({
-              id: enkrypt_usage.id,
-              created_at: enkrypt_usage.created_at,
-              kilo_user_id: enkrypt_usage.kilo_user_id,
-              user_name: kilocode_users.google_user_name,
-              user_email: kilocode_users.google_user_email,
-              session_id: enkrypt_usage.session_id,
-              api_kind: api_kind.api_kind,
-              decision: enkrypt_usage_decision.decision,
-              guardrail: enkryptGuardrail,
-              charged_microdollars: enkrypt_usage.charged_microdollars,
-              added_latency_ms: enkrypt_usage.added_latency_ms,
-            })
-            .from(enkrypt_usage)
-            .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
-            .innerJoin(
-              enkrypt_usage_decision,
-              eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
-            )
-            .leftJoin(
-              enkrypt_usage_guardrail,
-              eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
-            )
-            .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
-            .where(where)
-            .orderBy(desc(enkrypt_usage.created_at))
-            .limit(REQUEST_LOGS_LIMIT),
-          tx
-            .select({
-              total_calls: sql<number>`count(*)::int`,
-              allowed: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'allowed')::int`,
-              blocked: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'blocked')::int`,
-              errors: sql<number>`count(*) filter (where ${enkrypt_usage_decision.decision} = 'error')::int`,
-              total_charged_microdollars: sql<number>`coalesce(sum(${enkrypt_usage.charged_microdollars}), 0)::float8`,
-              avg_input_added_latency_ms: sql<
-                number | null
-              >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkryptGuardrail} = 'input'))::float8`,
-              avg_output_added_latency_ms: sql<
-                number | null
-              >`(avg(${enkrypt_usage.added_latency_ms}) filter (where ${enkryptGuardrail} = 'output'))::float8`,
-            })
-            .from(enkrypt_usage)
-            .innerJoin(
-              enkrypt_usage_decision,
-              eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
-            )
-            .leftJoin(
-              enkrypt_usage_guardrail,
-              eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
-            )
-            .where(where),
-        ])
+        tx
+          .select({
+            id: enkrypt_usage.id,
+            created_at: enkrypt_usage.created_at,
+            kilo_user_id: enkrypt_usage.kilo_user_id,
+            user_name: kilocode_users.google_user_name,
+            user_email: kilocode_users.google_user_email,
+            session_id: enkrypt_usage.session_id,
+            api_kind: api_kind.api_kind,
+            decision: enkrypt_usage_decision.decision,
+            guardrail: enkryptGuardrail,
+            charged_microdollars: enkrypt_usage.charged_microdollars,
+            added_latency_ms: enkrypt_usage.added_latency_ms,
+          })
+          .from(enkrypt_usage)
+          .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+          .innerJoin(
+            enkrypt_usage_decision,
+            eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
+          )
+          .leftJoin(
+            enkrypt_usage_guardrail,
+            eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+          )
+          .leftJoin(kilocode_users, eq(kilocode_users.id, enkrypt_usage.kilo_user_id))
+          .where(
+            and(eq(enkrypt_usage.organization_id, input.organizationId), withinEnkryptUsageWindow())
+          )
+          .orderBy(desc(enkrypt_usage.created_at))
+          .limit(REQUEST_LOGS_LIMIT)
     );
 
-    return {
-      rows: rows.map(row => ({
-        id: row.id,
-        created_at: toIsoTimestamp(row.created_at),
-        user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
-        session_id: row.session_id,
-        api_kind: row.api_kind,
-        decision: row.decision,
-        guardrail: row.guardrail,
-        charged_microdollars: row.charged_microdollars,
-        added_latency_ms: row.added_latency_ms,
-      })),
-      summary,
-    };
+    return rows.map(row => ({
+      id: row.id,
+      created_at: toIsoTimestamp(row.created_at),
+      user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
+      session_id: row.session_id,
+      api_kind: row.api_kind,
+      decision: row.decision,
+      guardrail: row.guardrail,
+      charged_microdollars: row.charged_microdollars,
+      added_latency_ms: row.added_latency_ms,
+    }));
   }),
 
   getDetails: organizationBillingProcedure
@@ -261,8 +259,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           finish_reason: finish_reason.finish_reason,
           api_kind: api_kind.api_kind,
           streamed: microdollar_usage_metadata.streamed,
-          cancelled: microdollar_usage_metadata.cancelled,
-          is_free: microdollar_usage_metadata.is_free,
+          auto_model: auto_model.auto_model,
           session_id: microdollar_usage_metadata.session_id,
           editor_name: editor_name.editor_name,
           mode: mode.mode,
@@ -287,11 +284,14 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           inference_region,
           eq(inference_region.inference_region_id, microdollar_usage_metadata.inference_region_id)
         )
+        .leftJoin(
+          auto_model,
+          eq(auto_model.auto_model_id, microdollar_usage_metadata.auto_model_id)
+        )
         .where(
           and(
             eq(microdollar_usage.id, input.usageId),
-            eq(microdollar_usage.organization_id, input.organizationId),
-            withinRequestLogWindow()
+            eq(microdollar_usage.organization_id, input.organizationId)
           )
         )
         .limit(1);

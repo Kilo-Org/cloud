@@ -54,6 +54,8 @@ const askedSchema = z.object({
   effort: z.enum(EFFORTS).nullable().default(null),
   // A question remembered before images existed carries none.
   images: imagesSchema,
+  // A question remembered before failures were kept says nothing about one.
+  failureKey: z.string().nullable().default(null),
 });
 const keptEntrySchema = z.object({
   /* An identifier made by this version; an entry written while it was still a
@@ -83,17 +85,51 @@ export function newKeptId(): string {
   return `${Date.now().toString(36)}-${keptCounter.toString(36)}`;
 }
 
-/** A question with no answer, the target and effort it was asked of, and its images. */
+/**
+ * A question with no answer: the target and effort it was asked of, its images,
+ * and the fixed copy key for why its answer failed.
+ *
+ * The failure is kept with the question because it outlives the process. The
+ * registry holds a live failure until the next send, but a restart drops it
+ * while the question stays — and the one failure whose copy carries an action
+ * (the credits block and its Add credits control) would go with it.
+ */
 export type Asked = Question &
   ChatTarget & {
     readonly from?: string | null;
     /** How many stored turns came before it, so its answer is searched after them. */
     readonly after?: number;
+    /** Why the last answer ended without one, or null when nothing says why. */
+    readonly failureKey: string | null;
   };
 
-export async function rememberAsked(sessionId: string, asked: Asked): Promise<void> {
-  await setItem(SCOPE, sessionId, JSON.stringify(asked));
+/** A question as it is remembered: no failure is known yet when it is asked. */
+export type AskedToRemember = Omit<Asked, 'failureKey'> & {
+  readonly failureKey?: string | null;
+};
+
+export async function rememberAsked(sessionId: string, asked: AskedToRemember): Promise<void> {
+  await setItem(
+    SCOPE,
+    sessionId,
+    JSON.stringify({ ...asked, failureKey: asked.failureKey ?? null })
+  );
   await removeItem(LEGACY_SCOPE, sessionId);
+}
+
+/**
+ * Says why the remembered question failed, so a reopened chat still tells the
+ * reader instead of reading as a question the person stopped.
+ *
+ * A question nobody remembers has nowhere to keep it: the reason is then only
+ * on screen for as long as the chat stays open, which is all there was before.
+ */
+export async function recordAskedFailure(sessionId: string, failureKey: string): Promise<void> {
+  const asked = await askedIn(sessionId);
+  if (asked === null || asked.failureKey === failureKey) {
+    return;
+  }
+  await rememberAsked(sessionId, { ...asked, failureKey });
 }
 
 export async function forgetAsked(sessionId: string): Promise<void> {

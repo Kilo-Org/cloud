@@ -85,7 +85,7 @@ export function VoiceInputSettingsScreen() {
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-3 pt-4"
+        contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
         // The test field and its Clear control live in this scroll view. With
         // the keyboard up, the default ('never') spends the first tap outside

@@ -53,6 +53,13 @@ function issueMessages(input: unknown) {
     : result.error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message }));
 }
 
+function outputIssueMessages(input: unknown) {
+  const result = EnkryptOutputDetectorsSchema.safeParse(input);
+  return result.success
+    ? []
+    : result.error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message }));
+}
+
 describe('EnkryptInputDetectorsSchema', () => {
   it('accepts Kilo Default and a configuration with every detector enabled', () => {
     expect(issueMessages(createKiloDefaultEnkryptInputDetectors())).toEqual([]);
@@ -138,7 +145,7 @@ describe('EnkryptInputDetectorsSchema', () => {
     expect(issueMessages(detectors)).toEqual([]);
   });
 
-  it('bounds list sizes, string lengths, rule IDs, and total size', () => {
+  it('bounds list sizes, string lengths, and rule IDs', () => {
     const tooMany = allEnabled();
     tooMany.keyword_detector.banned_keywords = Array.from(
       { length: ENKRYPT_DETECTOR_LIMITS.keywords + 1 },
@@ -168,23 +175,29 @@ describe('EnkryptInputDetectorsSchema', () => {
     expect(issueMessages(duplicateRules)).toEqual([
       { path: 'policy_violation.rules.1.id', message: 'Rule IDs must be unique.' },
     ]);
+  });
 
-    const oversized = allEnabled();
-    oversized.policy_violation.rules = Array.from({ length: 50 }, (_, index) => ({
-      ...rule,
-      id: `rule-${index}`,
-      text: 'x'.repeat(ENKRYPT_DETECTOR_LIMITS.ruleTextLength),
-    }));
-    oversized.keyword_detector.banned_keywords = Array.from({ length: 200 }, (_, index) =>
-      `${index}`.padEnd(ENKRYPT_DETECTOR_LIMITS.keywordLength, 'k')
-    );
-    expect(issueMessages(oversized)).toEqual([
-      {
-        path: '',
-        message:
-          'This detector configuration is too large. Remove some keywords, topics, or rules.',
-      },
-    ]);
+  it('caps structured policy rules at five for input and output detectors', () => {
+    const rules = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ ...rule, id: `rule-${index}` }));
+
+    const input = allEnabled();
+    input.policy_violation.rules = rules(5);
+    expect(issueMessages(input)).toEqual([]);
+    input.policy_violation.rules = rules(6);
+    expect(issueMessages(input)).toContainEqual({
+      path: 'policy_violation.rules',
+      message: 'Add up to 5 rules.',
+    });
+
+    const output = allOutputEnabled();
+    output.policy_violation.rules = rules(5);
+    expect(outputIssueMessages(output)).toEqual([]);
+    output.policy_violation.rules = rules(6);
+    expect(outputIssueMessages(output)).toContainEqual({
+      path: 'policy_violation.rules',
+      message: 'Add up to 5 rules.',
+    });
   });
 });
 

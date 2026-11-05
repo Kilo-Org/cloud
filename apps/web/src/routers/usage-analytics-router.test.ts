@@ -28,6 +28,7 @@ import {
   costColumnFor,
   costSumExprSql,
   dimensionColumn,
+  resolveTier,
   usageAnalyticsRouter,
 } from './usage-analytics-router';
 
@@ -260,6 +261,65 @@ describe('usage analytics organization breakdown', () => {
 
   it('maps the organization dimension to the Snowflake organization column', () => {
     expect(dimensionColumn('organization')).toBe('organization_id');
+  });
+});
+
+describe('usage analytics date window', () => {
+  const dateWindowFilters = {
+    startDate: '2026-06-04T00:00:00.000Z',
+    endDate: '2026-06-05T00:00:00.000Z',
+    granularity: 'day' as const,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockResolveSnowflakeConfig.mockReturnValue(SNOWFLAKE_CONFIG);
+    mockExecuteSnowflakeStatement.mockResolvedValue([]);
+  });
+
+  it('requires an ordered date window on every procedure', async () => {
+    const unordered = {
+      ...dateWindowFilters,
+      startDate: dateWindowFilters.endDate,
+      endDate: dateWindowFilters.startDate,
+    };
+
+    await expect(caller().getSummary(unordered)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller().getTimeseries({ ...unordered, metric: 'cost' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(
+      caller().getBreakdown({ ...unordered, dimension: 'model', metric: 'cost' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller().getTable({ ...unordered, groupBy: [] })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    expect(mockExecuteSnowflakeStatement).not.toHaveBeenCalled();
+  });
+
+  it('accepts equal start and end timestamps', async () => {
+    const instant = {
+      ...dateWindowFilters,
+      endDate: dateWindowFilters.startDate,
+    };
+
+    expect(UsageAnalyticsFiltersSchema.safeParse(instant).success).toBe(true);
+    await expect(caller().getSummary(instant)).resolves.toMatchObject({ requestCount: 0 });
+  });
+
+  it('derives the aggregation tier from the window boundaries', () => {
+    const older = '2024-01-01T00:00:00.000Z';
+    const newer = '2026-11-05T00:00:00.000Z';
+    const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const current = new Date().toISOString();
+
+    expect(resolveTier('hour', older, newer)).toEqual(resolveTier('hour', newer, older));
+    expect(resolveTier('hour', older, newer).effectiveGranularity).toBe('day');
+    expect(resolveTier('hour', recent, current)).toEqual(resolveTier('hour', current, recent));
+    expect(resolveTier('hour', recent, current).effectiveGranularity).toBe('hour');
   });
 });
 

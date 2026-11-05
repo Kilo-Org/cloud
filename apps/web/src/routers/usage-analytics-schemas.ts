@@ -87,7 +87,16 @@ const FiltersShape = {
   excludedProjects: FilterValuesSchema,
 } as const;
 
-export const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
+/**
+ * The window is half-open: `startDate` is inclusive and `endDate` is exclusive.
+ * Equal boundaries therefore stay valid and describe a zero-width window.
+ */
+export const UsageAnalyticsFiltersSchema = z
+  .object(FiltersShape)
+  .refine(input => new Date(input.startDate).getTime() <= new Date(input.endDate).getTime(), {
+    message: 'Start date must not be after end date',
+    path: ['endDate'],
+  });
 export type UsageAnalyticsFilters = z.infer<typeof UsageAnalyticsFiltersSchema>;
 
 export const SummaryOutputSchema = z.object({

@@ -7,7 +7,11 @@ type Handler = (request: IncomingMessage, response: ServerResponse) => void;
 const openServers: Array<{ close(): Promise<void> }> = [];
 
 async function startServer(handler: Handler) {
-  const server = createServer(handler);
+  const server = createServer((request, response) => {
+    // A refused body is cancelled mid-stream, so a later write can fail on the fixture side.
+    response.on('error', () => undefined);
+    handler(request, response);
+  });
   const listening = Promise.withResolvers<void>();
   server.listen(0, '127.0.0.1', listening.resolve);
   await listening.promise;
@@ -202,7 +206,6 @@ describe('fetchModelListJson', () => {
 
   test('reports a body stream that fails after the headers', async () => {
     const server = await startServer((request, response) => {
-      response.on('error', () => undefined);
       response.writeHead(200, {
         'content-type': 'application/json',
         'transfer-encoding': 'chunked',

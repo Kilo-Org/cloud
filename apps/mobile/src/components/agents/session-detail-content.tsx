@@ -207,6 +207,7 @@ import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useKeepAwake } from '@/lib/keep-awake';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
@@ -458,6 +459,7 @@ export function SessionDetailContent({
   // above does not add it again (`containerReservesBottomInset`), so the space
   // is resolved once per screen instead of twice.
   const { bottom } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
@@ -2671,18 +2673,22 @@ export function SessionDetailContent({
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
 
         {isReadOnlyContinueVisible ? (
-          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-            <Text className="text-center text-sm text-muted-foreground">
-              {t('agentChat.session.readOnly')}
-            </Text>
-            <Button
-              variant="default"
-              size="action"
-              accessibilityLabel={t('agentChat.session.continueInNewSession')}
-              onPress={handleContinueInNewSession}
-            >
-              <Text>{t('agentChat.session.continueInNewSession')}</Text>
-            </Button>
+          <View className="border-t border-border bg-secondary">
+            <View style={sideInsetStyle}>
+              <View className="gap-3 px-4 py-3">
+                <Text className="text-center text-sm text-muted-foreground">
+                  {t('agentChat.session.readOnly')}
+                </Text>
+                <Button
+                  variant="default"
+                  size="action"
+                  accessibilityLabel={t('agentChat.session.continueInNewSession')}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text>{t('agentChat.session.continueInNewSession')}</Text>
+                </Button>
+              </View>
+            </View>
           </View>
         ) : null}
 

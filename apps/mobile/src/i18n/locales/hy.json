@@ -64,7 +64,7 @@
     "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",
     "notifications": "Ծանուցումներ",
-    "pullRequest": "միավորման հարցում",
+    "pullRequest": "pull request",
     "repositories": "Պահոցներ",
     "securityAgent": "Անվտանգության գործակալ",
     "unknown": "Անհայտ",
@@ -91,7 +91,7 @@
     "organization": "Կազմակերպություն",
     "platform": "Հարթակ",
     "prReview": "PR-ի վերանայում",
-    "prReviewSubtitle": "Վերանայել միավորման հարցումները բջջային սարքում",
+    "prReviewSubtitle": "Վերանայել pull request-ները բջջային սարքում",
     "queued": "Հերթագրված",
     "remove": "Հեռացնել",
     "repository": "Պահոց",
@@ -111,7 +111,7 @@
     "connect": "Միացնել",
     "connectBitbucket": "Միացնել Bitbucket-ը",
     "connectGitlab": "Միացնել GitLab-ը",
-    "connectProvider": "Մատակարարի միացում",
+    "connectProvider": "Միացնել մատակարար",
     "contentTruncated": "Բովանդակությունը կրճատված է",
     "copyLink": "Պատճենել հղումը",
     "couldNotLoadOrganizations": "Չհաջողվեց բեռնել կազմակերպությունները։",
@@ -136,7 +136,7 @@
     "notFound": "Չի գտնվել։",
     "online": "Առցանց",
     "open": "Բացել {{name}}-ը",
-    "openPullRequest": "Բաց միավորման հարցում",
+    "openPullRequest": "Բացել pull request-ը",
     "completed": "Ավարտված",
     "pending": "Սպասման մեջ",
     "running": "Ընթացքում է",
@@ -483,7 +483,7 @@
         "failingChecksTitle": "Պարտադիր ստուգումները ձախողվում են",
         "unstableTitle": "Որոշ ստուգումներ ձախողվում են",
         "unstableDetail": "Ոչ պարտադիր ստուգումները ձախողվում են։ Դրանք չեն խանգարի միավորմանը։",
-        "draftTitle": "Միավորման սևագիր հարցում",
+        "draftTitle": "Սևագիր pull request",
         "draftDetail": "Միավորելուց առաջ նշիր միավորման հարցումը որպես վերանայման պատրաստ։",
         "behindTitle": "Ճյուղը հնացած է",
         "behindDetailUpdatable": "Միավորելուց առաջ թարմացրու ճյուղը բազային ճյուղից կամ վերաբազավորիր այն։",
@@ -847,7 +847,7 @@
       }
     },
     "terms": {
-      "pullRequest": "Միավորման հարցում",
+      "pullRequest": "Pull request",
       "mergeRequest": "Միաձուլման հարցում",
       "mergeRequestNumber": "Միաձուլման հարցում !{{number}}",
       "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
@@ -1525,7 +1525,7 @@
       "statusWithValue": "Կարգավիճակ՝ {{status}}",
       "toolName": "Գործիք՝ {{name}}",
       "toolNameError": "Գործիքի սխալ՝ {{name}}։",
-      "cancelReasonSuperseded": "Հրապարակվել է ավելի նոր commit, ուստի այս ստուգումը փոխարինվել է։",
+      "cancelReasonSuperseded": "Ուղարկվել է ավելի նոր commit, ուստի այս ստուգումը փոխարինվել է։",
       "cancelReasonIntegrationDisconnected": "{{platform}}-ը անջատված է, ուստի այս ստուգումը չեղարկվել է։ Վերակապեք այն, ապա կրկին գործարկեք ստուգումը։",
       "cancelReasonBitbucketReviewerDisabled": "Code Reviewer-ը անջատվել է Bitbucket-ի համար, ուստի այս ստուգումը չեղարկվել է։ Կրկին միացրեք այն, ապա կրկին գործարկեք ստուգումը։",
       "cancelReasonBitbucketPullRequestChanged": "Bitbucket-ի pull request-ը փոխվել է, ուստի այս ստուգումը փոխարինվել է։",
@@ -1562,7 +1562,7 @@
         "superseded": "Արդեն առկա է"
       },
       "noProposalsDescription": "Ստուգման հիշողության առաջարկներն այստեղ կհայտնվեն, երբ Kilo-ն վերլուծի նախագծի պատասխանատուների պատասխանները։",
-      "changeRequestInProgress": "Kilo-ն արդեն իսկ փուլ ռեքվեսթ է բացում այս առաջարկի համար։ Փորձեք կրկին մի փոքր ուշ։",
+      "changeRequestInProgress": "Kilo-ն արդեն իսկ pull request է բացում այս առաջարկի համար։ Փորձիր կրկին մի փոքր ուշ։",
       "changeRequestNotActionable": "Այս առաջարկն այլևս հնարավոր չէ հաստատել։ Փակեք այն և թարմացրեք ցանկը։",
       "changeRequestNoGitHubAccess": "Այս պահոցին հասանելիություն չունի GitHub-ի ոչ մի կապ։ Վերամիացրեք GitHub-ը՝ դրան հասանելիություն տալով, ապա կրկին փորձեք։",
       "changeRequestMissingPermissions": "Kilo-ի GitHub հավելվածը չի կարող pull request-ներ բացել այս պահոցում։ Պահոցի սեփականատերը պետք է հավելվածին գրելու հասանելիություն տա բովանդակությանը և pull request-ներին, ապա նորից փորձի։",
@@ -1573,14 +1573,14 @@
     "manualReview": {
       "invalidMergeRequestUrl": "Մուտքագրիր միաձուլման հարցման վավեր URL։",
       "mergeRequestUrl": "Միաձուլման հարցման URL",
-      "instructionsAtLimit": "Հրահանգները սահմանափակված են {{max}} նիշով",
+      "instructionsAtLimit": "Հրահանգները սահմանափակված են {{max}} նիշով։",
       "title": "Ձեռքով ստուգում",
-      "invalidUrl": "Մուտքագրիր միավորման հարցման վավեր URL։",
-      "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը։",
+      "invalidUrl": "Մուտքագրիր pull request-ի վավեր URL։",
+      "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը",
       "couldNotLoadProviders": "Չհաջողվեց բեռնել քո միացրած մատակարարները։ Կրկին փորձիր։",
-      "pullRequestUrl": "Միավորման հարցման URL",
+      "pullRequestUrl": "Pull request-ի URL",
       "instructions": "Հրահանգներ (ըստ ցանկության)",
-      "instructionsPlaceholder": "Հատուկ ուշադրություն պահանջող հարցեր…",
+      "instructionsPlaceholder": "Ինչո՞վ պետք է ստուգիչը հատուկ զբաղվի…",
       "starting": "Սկսվում է ստուգումը…",
       "start": "Սկսել ստուգումը",
       "startNotFound": "Չհաջողվեց կարդալ այդ {{requestNoun}} {{provider}}-ից։ Ստուգիր URL-ը և համոզվիր, որ ռեպոզիտորիան մատչելի է։",
@@ -1594,10 +1594,10 @@
     },
     "notConnectedReadOnly": "{{platform}}-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը և ադմինիստրատորները կարող են այն միացնել։",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}}-ը միացված չէ։ Խնդրեք միավորման սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին միացնել այն։"
+      "notConnectedReadOnly": "{{platform}}-ը միացված չէ։ Խնդրիր կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին միացնել այն։"
     },
     "webhookSetup": "Վեբհուկի կարգավորումն անավարտ է։",
-    "webhookSetupDescription": "Որոշ պահոցներում ավտոմատ ստուգումները կարող են չաշխատել։",
+    "webhookSetupDescription": "Որոշ պահոցներ կարող են ավտոմատ ստուգումներ չստանալ։",
     "autoReviews": "Ավտոմատ ստուգումներ",
     "selectRepository": "Ընտրիր առնվազն մեկ պահոց՝ ավտոմատ ստուգումները միացնելու համար։",
     "followReviewMd": "Հետևել REVIEW.md-ին",
@@ -1609,7 +1609,7 @@
     },
     "bitbucketConnect": {
       "description": "Ստեղծիր աշխատանքային տարածքի հասանելիության տոկեն՝ անհրաժեշտ թույլտվություններով, և տեղադրիր այն ստորև։",
-      "scopes": "Հաշիվ՝ կարդալ · Պահոցներ՝ կարդալ/գրել · Միավորման հարցումներ՝ կարդալ · Վեբհուկեր՝ կարդալ/գրել",
+      "scopes": "Հաշիվ՝ կարդալ · Պահոցներ՝ կարդալ/գրել · Pull request-ներ՝ կարդալ · Վեբհուկեր՝ կարդալ/գրել",
       "tokenPlaceholder": "Աշխատանքային տարածքի հասանելիության տոկեն"
     },
     "scopeList": {
@@ -1620,7 +1620,7 @@
       "title": "Վերջին ստուգումներ",
       "couldNotLoad": "Չհաջողվեց բեռնել ստուգումները։",
       "noReviews": "Ստուգումներ դեռ չկան",
-      "noReviewsDescription": "Ստուգումներն այստեղ կհայտնվեն, երբ Կոդի ստուգիչը ստուգի միավորման հարցում։",
+      "noReviewsDescription": "Ստուգումներն այստեղ կհայտնվեն, երբ Կոդի ստուգիչը ստուգի pull request։",
       "startManualReview": "Սկսել ձեռքով ստուգում",
       "configureProvider": "Կարգավորել մատակարարը"
     },
@@ -1635,7 +1635,7 @@
       "githubError": "Չհաջողվեց բացել GitHub-ի կարգավորումը։ Կրկին փորձիր։",
       "gitlabAccount": "GitLab հաշիվ",
       "gitlabError": "Չհաջողվեց բացել GitLab-ի կարգավորումը։ Կրկին փորձիր։",
-      "description": "Միացրու Kilo-ի {{label}}-ը՝ միավորման հարցումներն ավտոմատ ստուգելու համար։",
+      "description": "Միացրու Kilo-ի {{label}}-ը՝ pull request-ներն ավտոմատ ստուգելու համար։",
       "bitbucketError": "Չհաջողվեց բացել Bitbucket-ի կարգավորումը։ Կրկին փորձիր։"
     },
     "overview": {
@@ -1789,7 +1789,7 @@
         "dismiss": "Մերժել",
         "manualReview": "Ձեռքով վերանայում",
         "monitor": "Հետևել",
-        "openPr": "Բացել փուլ ռիքուեսթը"
+        "openPr": "Բացել pull request-ը"
       }
     },
     "dashboard": {
@@ -2247,7 +2247,7 @@
       "dollar_other": "դոլար",
       "costSpoken": "արժեքը՝ {{cost}}",
       "costSpokenWithTime": "արժեքը՝ {{cost}}, {{time}}",
-      "pullRequest": "միավորման հարցում {{number}}",
+      "pullRequest": "pull request {{number}}",
       "spokenJoiner": "և"
     },
     "githubInstall": {
@@ -2940,10 +2940,10 @@
       "unavailable": "Այս նստաշրջանը չի կարող ստանալ թույլտվության հարցումներ։"
     },
     "prBadge": {
-      "open": "բաց միավորման հարցում",
-      "closed": "փակված միավորման հարցում",
-      "merged": "միավորված միավորման հարցում",
-      "draft": "միավորման սևագիր հարցում",
+      "open": "բաց pull request",
+      "closed": "փակված pull request",
+      "merged": "միավորված pull request",
+      "draft": "սևագիր pull request",
       "updating": "Թարմացվում է, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

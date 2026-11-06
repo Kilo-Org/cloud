@@ -14,7 +14,9 @@ const JWT_SECRET = NEXTAUTH_SECRET;
 export async function POST(request: NextRequest) {
   const body: unknown = await request.json().catch(() => undefined);
   const token =
-    typeof body === 'object' && body !== null && 'token' in body ? body.token : undefined;
+    typeof body === 'object' && body !== null && 'token' in body && typeof body.token === 'string'
+      ? body.token
+      : undefined;
 
   if (!token) {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 });

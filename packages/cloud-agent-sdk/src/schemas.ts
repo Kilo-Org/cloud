@@ -217,6 +217,7 @@ export const remoteModelCatalogWireV1Schema = z
     default: z.record(remoteModelIdentitySchema, remoteModelIdentitySchema),
     connected: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
     failed: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
+    failures: z.array(z.never()).max(0).optional(),
     protocolVersion: z.literal(1),
     currentModel: modelSelectionSchema.optional(),
     defaultModel: modelRefSchema.optional(),

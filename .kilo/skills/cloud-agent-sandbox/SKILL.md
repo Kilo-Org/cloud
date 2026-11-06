@@ -22,28 +22,38 @@ What survives depends on how the sandbox came back:
   an environment snapshot, gets the whole disk back: the pnpm wrapper,
   `.wrangler/kilo-startup/`, installed packages, and Docker images. Processes
   and cgroups are not restored, so dockerd, dnsmasq, the DNS iptables rule, and
-  the `kilo-docker` cgroup are gone. The first pnpm command inside the
-  repository, normally the environment's start command, sees that dockerd is
-  not running and runs `bash .kilo/cloud-agent-setup.sh --resume` first. That
-  restarts Docker and DNS in a few seconds without apt, installs, or image
-  builds. Its output goes to stderr, and concurrent pnpm calls wait on one lock.
-  If Docker cannot start, pnpm warns and runs anyway. `--resume` is safe to run
-  by hand, or as the environment's start command. On a machine that was never
-  set up, it runs full setup instead.
+  the `kilo-docker` cgroup are gone. Nothing restarts them automatically:
+  Docker is only needed by the dev stack, database tests, and local Cloud Agent
+  sessions, so start it when you need those.
 
-Check before starting services:
+Check before starting services from the repository root:
 
 ```bash
-test -f .wrangler/kilo-startup/env \
-  && grep -q kilo-cloud-agent-pnpm-wrapper "$(command -v pnpm)" \
-  && docker info >/dev/null 2>&1 && echo ready
+if ! test -f .wrangler/kilo-startup/env \
+  || ! grep -q kilo-cloud-agent-pnpm-wrapper "$(command -v pnpm)"; then
+  echo 'setup needed'
+elif ! docker info >/dev/null 2>&1; then
+  echo 'resume needed'
+else
+  echo ready
+fi
 ```
 
-If this does not print `ready`, run setup from the repository root:
+For `resume needed`, restart Docker, dnsmasq, and the DNS redirect from the
+installed filesystem. This takes a few seconds and skips apt, installs, and
+image builds:
+
+```bash
+bash .kilo/cloud-agent-setup.sh --resume
+```
+
+For `setup needed`, run full setup:
 
 ```bash
 bash .kilo/cloud-agent-setup.sh
 ```
+
+`--resume` on a machine that was never set up runs full setup instead.
 
 A restarted machine takes about 6 minutes, mostly building the Cloud Agent
 sandbox images; `node_modules` survives the restart. A rerun on a running
@@ -77,8 +87,7 @@ its containers survive in `kilo-docker`.
   images through `mirror.gcr.io`. The daemon log is
   `.wrangler/kilo-startup/dockerd.log`.
 - Installs a global `pnpm` wrapper. Inside this repository it loads
-  `.wrangler/kilo-startup/env` and restarts Docker if it is not running.
-  Outside the repository it runs the real pnpm, saved at
+  `.wrangler/kilo-startup/env`. Outside the repository it runs the real pnpm, saved at
   `/usr/local/lib/kilo-cloud-agent/real-pnpm`, unchanged.
 - Installs dependencies, creates `.env.local`, runs `pnpm test:db`, and seeds a
   fake-login user with credits.
@@ -98,7 +107,8 @@ the sandbox image build, then stops the Docker daemon it started and exits. It
 skips the Docker cgroup, database migration and fake-user seed. Without
 `KILO_ENVIRONMENT_BUILD=1`, a missing `kilo-workloads` cgroup still fails setup.
 A snapshot captures files, not running daemons. In a session started from it,
-the first pnpm command in the repository restarts Docker as described above.
+run `bash .kilo/cloud-agent-setup.sh --resume` before starting services, as
+described above.
 
 Environment-build setup commands may use the rest of the 30-minute build
 deadline; the inactivity timeout remains 5 minutes.

@@ -172,7 +172,7 @@ if (( ${#tools[@]} )); then
 fi
 
 mkdir -p "$startup_bin"
-rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection" "$state_dir/memory-mb" "$state_dir/memory-mb.lock"
+rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection" "$state_dir/memory-mb" "$state_dir/memory-mb.lock" "$state_dir/resume.lock"
 real_docker=$(readlink -f "$(command -v docker)")
 # Containers land in kilo-docker/containers through dockerd's --cgroup-parent.
 cat > "$state_dir/compose.memory.yml" <<YAML
@@ -284,18 +284,6 @@ printf '%s\n' "$real_pnpm" | "${root[@]}" tee "$global_state_dir/real-pnpm" >/de
 real_pnpm=$(< /usr/local/lib/kilo-cloud-agent/real-pnpm)
 if [[ ($PWD == "$repo" || $PWD == "$repo"/*) && -f $env_file ]]; then
   source "$env_file"
-  # Docker is gone after a workspace tail snapshot resume or an environment
-  # snapshot start, and the first command there is usually a pnpm start command.
-  docker_pid=$(cat /var/run/docker.pid 2>/dev/null || true)
-  # A supplied daemon (DOCKER_HOST, or a socket without our pid file) is not ours to restart.
-  if [[ -z ${DOCKER_HOST:-} && -n ${KILO_DOCKER_CGROUP:-} && -f ${KILO_DOCKER_CGROUP%/*}/memory.max ]] \
-    && [[ -f /var/run/docker.pid || ! -S /var/run/docker.sock ]] \
-    && ! [[ $docker_pid =~ ^[0-9]+$ && $(cat "/proc/$docker_pid/comm" 2>/dev/null) == dockerd ]]; then
-    printf 'Docker is not running; restarting the sandbox daemons.\n' >&2
-    if ! flock -o "${env_file%/*}/resume.lock" bash "$repo/.kilo/cloud-agent-setup.sh" --resume >&2; then
-      printf 'Warning: Docker could not be restarted; rerun bash %q/.kilo/cloud-agent-setup.sh.\n' "$repo" >&2
-    fi
-  fi
 fi
 exec "$real_pnpm" "$@"
 SH
@@ -469,7 +457,7 @@ if (( build_mode )); then
 else
   printf '\nSetup complete. Docker memory peak so far: %s MiB.\n' \
     "$(( $(< "$KILO_DOCKER_CGROUP/memory.peak") / 1048576 ))"
-  printf 'Run from %s (pnpm there loads %s and restarts Docker if it is not running):\n' "$repo" "$env_file"
+  printf 'Run from %s (pnpm there loads %s):\n' "$repo" "$env_file"
   printf '  pnpm dev:start --no-attach app                 # web app\n'
   printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with local fake inference\n'
   printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'

@@ -501,7 +501,7 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
-  /** Comma-separated org UUIDs whose new downloaded sandboxes run the Kilo v2 harness. */
+  /** Comma-separated org UUIDs whose new downloaded cloud-agent-web sandboxes run Kilo v2. */
   RUNTIME_KILO2_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;

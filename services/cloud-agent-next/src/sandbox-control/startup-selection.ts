@@ -18,6 +18,7 @@ export type StartupSelection =
 
 export type StartupRouteIdentity = {
   orgId?: string;
+  createdOnPlatform?: string;
 };
 
 export type StartupCohortContext = {
@@ -110,7 +111,8 @@ function startupTarget(
 
 /**
  * The harness a sandbox's first allocation selects. Only a downloaded start in
- * the `RUNTIME_KILO2_ORG_IDS` scope runs v2; an unset list keeps v1 everywhere.
+ * the `RUNTIME_KILO2_ORG_IDS` scope whose routes are all cloud-agent-web runs v2.
+ * An unset list keeps v1 everywhere.
  */
 export function newSandboxHarness(
   env: StartupEnv,
@@ -119,7 +121,11 @@ export function newSandboxHarness(
 ): RuntimeHarness {
   if (startupTarget(env, provider, cohort).mode !== 'downloaded') return 'kilo';
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
-  return orgIds !== undefined && inOrgScope(provider, cohort, orgIds) ? 'kilo2' : 'kilo';
+  return orgIds !== undefined &&
+    inOrgScope(provider, cohort, orgIds) &&
+    cohort?.preparingRoutes?.every(route => route.createdOnPlatform === 'cloud-agent-web')
+    ? 'kilo2'
+    : 'kilo';
 }
 
 /** Resolve trusted deployment configuration once per create attempt. */

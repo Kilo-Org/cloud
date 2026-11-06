@@ -415,6 +415,8 @@ describe('startup selection and preflight', () => {
 });
 
 describe('runtime harness selection', () => {
+  const webRoute = { ...orgRoute, createdOnPlatform: 'cloud-agent-web' };
+  const webCohort = { ...isolatedCohort, preparingRoutes: [webRoute] };
   const kilo2Env = {
     ...scopedEnv,
     RUNTIME_INTERACTIVE_ORG_IDS: undefined,
@@ -463,47 +465,60 @@ describe('runtime harness selection', () => {
       permanentReason: 'invalid_configuration',
     });
   });
-  it('selects v2 only for a new sandbox whose routes all belong to one listed organization', () => {
-    expect(newSandboxHarness(kilo2Env, 'cloudflare-containers', isolatedCohort)).toBe('kilo2');
-    expect(newSandboxHarness(kilo2Env, 'vercel', { preparingRoutes: [orgRoute] })).toBe('kilo2');
+  it('selects v2 only for web routes that all belong to one listed organization', () => {
+    expect(newSandboxHarness(kilo2Env, 'cloudflare-containers', webCohort)).toBe('kilo2');
+    expect(newSandboxHarness(kilo2Env, 'vercel', { preparingRoutes: [webRoute] })).toBe('kilo2');
     for (const preparingRoutes of [
-      [{ orgId: otherOrgId }],
+      [{ ...webRoute, orgId: otherOrgId }],
       [{}],
-      [orgRoute, { orgId: otherOrgId }],
+      [webRoute, { ...webRoute, orgId: otherOrgId }],
       [],
     ])
       expect(
-        newSandboxHarness(kilo2Env, 'cloudflare-containers', { ...isolatedCohort, preparingRoutes })
+        newSandboxHarness(kilo2Env, 'cloudflare-containers', { ...webCohort, preparingRoutes })
       ).toBe('kilo');
     expect(
       newSandboxHarness(kilo2Env, 'cloudflare-containers', {
-        ...isolatedCohort,
+        ...webCohort,
         sandboxKind: 'shared',
       })
     ).toBe('kilo');
   });
+  it.each(['code-review', 'desktop', 'agent-manager', 'slack', 'unknown', '', undefined])(
+    'keeps v1 for a listed organization when the origin is %s',
+    createdOnPlatform => {
+      const route = { ...webRoute, createdOnPlatform };
+      for (const provider of ['cloudflare-containers', 'vercel'] as const) {
+        for (const preparingRoutes of [[route], [webRoute, route], [route, webRoute]]) {
+          expect(newSandboxHarness(kilo2Env, provider, { ...webCohort, preparingRoutes })).toBe(
+            'kilo'
+          );
+        }
+      }
+    }
+  );
   it('keeps v1 when the list is unset or empty, or startup is not downloaded', () => {
     for (const ids of [undefined, ''])
       expect(
         newSandboxHarness(
           { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: ids },
           'cloudflare-containers',
-          isolatedCohort
+          webCohort
         )
       ).toBe('kilo');
-    expect(newSandboxHarness(kilo2Env, 'cloudflare', isolatedCohort)).toBe('kilo');
+    expect(newSandboxHarness(kilo2Env, 'cloudflare', webCohort)).toBe('kilo');
     expect(
       newSandboxHarness(
         { ...kilo2Env, RUNTIME_INTERACTIVE_ORG_IDS: otherOrgId },
         'cloudflare-containers',
-        isolatedCohort
+        webCohort
       )
     ).toBe('kilo');
     expect(() =>
       newSandboxHarness(
         { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' },
         'cloudflare-containers',
-        isolatedCohort
+        webCohort
       )
     ).toThrow('configuration');
   });

@@ -494,19 +494,41 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   );
 });
 
-test('the harness SDK action restores dist and builds only on a miss', () => {
+test('the harness SDK action shares one dist entry across runner operating systems', () => {
   const steps = harnessBuildAction.runs.steps;
   const key = steps.find(step => step.name === 'Hash harness SDK build inputs');
   const cache = steps.find(step => step.name === 'Restore harness SDK build');
+  const restored = steps.find(step => step.name === 'Check the restored build');
   const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
   const build = steps.find(step => step.name === 'Build harness SDK');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
   assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
   assert.equal(cache.with.path, 'packages/harness-sdk/dist');
-  assert.equal(cache.with.key, '${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}');
+  // The dist is a TypeScript emit and actions/cache derives the same version on
+  // Linux and macOS, so an OS prefix would only split one build into a family
+  // per runner and leave the macOS jobs unable to hit an ubuntu save.
+  assert.equal(cache.with.key, 'harness-sdk-build-${{ steps.key.outputs.key }}');
   assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
+  // A hit alone is not a build: a restore missing the package entry rebuilds.
+  assert.ok(
+    steps.indexOf(cache) < steps.indexOf(restored) &&
+      steps.indexOf(restored) < steps.indexOf(build),
+    'the check runs between the restore and the build'
+  );
+  assert.equal(restored.id, 'restored');
+  assert.equal(restored.shell, 'bash');
+  assert.equal(restored.if, undefined, 'the check runs on a miss too');
+  for (const entry of [
+    'packages/harness-sdk/dist/index.js',
+    'packages/harness-sdk/dist/index.d.ts',
+  ]) {
+    assert.ok(restored.run.includes(entry), `the check requires ${entry}`);
+  }
+  assert.match(restored.run, /^usable='false'$/m);
+  assert.match(restored.run, /echo "usable=\$usable" >> "\$GITHUB_OUTPUT"/m);
+  const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.run, harnessBuild);
-  assert.equal(build.if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(build.if, rebuild);
   // The typia transform takes minutes to compile, so the build's plugin cache
   // comes from the same action and only when a build will run.
   assert.equal(plugins.length, 1);
@@ -516,7 +538,7 @@ test('the harness SDK action restores dist and builds only on a miss', () => {
     plugins[0].with.key,
     "${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}"
   );
-  assert.equal(plugins[0].if, "steps.cache.outputs.cache-hit != 'true'");
+  assert.equal(plugins[0].if, rebuild);
 });
 
 // One job compiles the tRPC declarations per commit. The typecheck and lint

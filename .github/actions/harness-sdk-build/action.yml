@@ -4,8 +4,11 @@ description: >-
   hashes every repository file of the tsconfig.build.json program (from
   `tsgo --listFilesOnly`), the build configuration, and the lockfile entries of
   the package's importer closure, which pin every file the build reads under
-  node_modules. A hit therefore restores exactly what the build would write. Run
-  it after `pnpm install`.
+  node_modules. A hit therefore restores exactly what the build would write. The
+  dist is a TypeScript emit, so one entry serves every runner operating system:
+  actions/cache derives its version from the paths, the compression method and
+  the platform only on Windows, and the Linux and macOS images both compress
+  with zstd. Run it after `pnpm install`.
 
 runs:
   using: composite
@@ -20,12 +23,34 @@ runs:
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: packages/harness-sdk/dist
-        key: ${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}
+        key: harness-sdk-build-${{ steps.key.outputs.key }}
+
+    # A hit proves the key, not the tree: a restore that failed halfway, or an
+    # entry written by a future build step that emits something else, would
+    # otherwise be served as a build. Only a hit that carries the package entry
+    # skips the build.
+    - name: Check the restored build
+      id: restored
+      shell: bash
+      run: |
+        set -euo pipefail
+        usable='false'
+        if [ '${{ steps.cache.outputs.cache-hit }}' = 'true' ]; then
+          usable='true'
+          for file in packages/harness-sdk/dist/index.js packages/harness-sdk/dist/index.d.ts; do
+            if [ ! -f "$file" ]; then
+              echo "::warning::the restored harness SDK build has no $file"
+              usable='false'
+            fi
+          done
+        fi
+        echo "usable=$usable" >> "$GITHUB_OUTPUT"
 
     # ttsc compiles the typia transform on its first build, which takes minutes
-    # on a cold Go cache. Only a miss builds, so only a miss needs the plugin.
+    # on a cold Go cache. Only a build needs the plugin, so only a build needs
+    # the plugin cache.
     - name: Cache compiler plugins
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.restored.outputs.usable != 'true'
       uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: node_modules/.cache/ttsc/plugins
@@ -34,6 +59,6 @@ runs:
           ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
     - name: Build harness SDK
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: steps.restored.outputs.usable != 'true'
       shell: bash
       run: pnpm --filter @kilocode/harness-sdk run build

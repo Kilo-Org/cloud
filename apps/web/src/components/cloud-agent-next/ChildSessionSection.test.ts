@@ -10,6 +10,7 @@ import type {
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import type { ChildSessionDrawer as ChildSessionDrawerComponent } from './ChildSessionDrawer';
 import type { StoredMessage, ToolPart } from './types';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 jest.mock('./CloudAgentProvider', () => ({
   useManager: jest.fn(),
@@ -37,7 +38,7 @@ jest.mock('@/components/ui/sheet', () => {
 });
 
 import { useOptionalManager } from './CloudAgentProvider';
-import { ChildSessionSection } from './ChildSessionSection';
+import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 
 function installDom() {
   const requireFromHere = createRequire(__filename);
@@ -315,6 +316,129 @@ describe('ChildSessionSection live subscription', () => {
       );
     });
     expect(container.textContent).toContain('1 tool call');
+  });
+
+  it.each([
+    [
+      'read',
+      { filePath: '/cloud-agent/sessions/ses_test/src/nested/read.ts' },
+      'Read src/nested/read.ts',
+    ],
+    ['edit', { filePath: '/cloud-agent/sessions/ses_test/src/edit.ts' }, 'Edit src/edit.ts'],
+    ['write', { filePath: '/cloud-agent/sessions/ses_test/src/write.ts' }, 'Write src/write.ts'],
+    ['read', { filePath: '/cloud-agent/sessions/ses_test' }, 'Read .'],
+    ['list', { path: '/cloud-agent/sessions/ses_test/src' }, 'List src'],
+    [
+      'bash',
+      { command: 'pnpm test', cwd: '/cloud-agent/sessions/ses_test/src' },
+      'Shell pnpm · src',
+    ],
+    ['custom', { root: '/cloud-agent/sessions/ses_test/src/root.ts' }, 'Custom src/root.ts'],
+    ['glob', { path: '/cloud-agent/sessions/ses_test', pattern: '*.ts' }, 'Glob . · *.ts'],
+    [
+      'grep',
+      { path: '/cloud-agent/sessions/ses_test/src', pattern: 'needle' },
+      'Grep src · needle',
+    ],
+    [
+      'mcp',
+      {
+        server_name: 'files',
+        tool_name: 'read',
+        arguments: { filepath: '/cloud-agent/sessions/ses_test/src/mcp.ts' },
+      },
+      'Mcp src/mcp.ts',
+    ],
+  ] satisfies [string, Record<string, unknown>, string][])(
+    'normalizes file and directory context in child %s activity',
+    (tool, input, expected) => {
+      const child = childMessageWithTools(1);
+      const part = readToolPart('tool-1');
+      part.tool = tool;
+      part.state = { status: 'running', input, time: { start: 1 } };
+      child.parts = [part];
+
+      act(() =>
+        root?.render(
+          createElement(ChildSessionSection, {
+            taskToolPart: parentPart,
+            sessionId: childSessionId,
+            childMessages: [child],
+          })
+        )
+      );
+
+      expect(container.textContent).toContain(expected);
+      expect(container.innerHTML).not.toContain('ses_test');
+      expect(container.textContent).not.toContain('/cloud-agent/');
+    }
+  );
+
+  it('shows native v2 child commands and opens the linked child session', () => {
+    const session = {
+      id: `ses_${'c'.repeat(26)}`,
+      location: { directory: '/workspace' },
+      time: { created: 1, updated: 2 },
+    };
+    const parent = readKilo2Messages(session, [
+      {
+        id: 'msg_parent',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_delegate',
+            name: 'subagent',
+            state: {
+              status: 'running',
+              input: { agent: 'explore', description: 'Inspect commands' },
+              metadata: { sessionID: childSessionId },
+            },
+          },
+        ],
+      },
+    ])[0];
+    const task = parent.parts[0];
+    if (task.type !== 'tool') throw new Error('Expected a projected subagent tool');
+    const childMessages = readKilo2Messages({ ...session, id: childSessionId }, [
+      {
+        id: 'msg_child',
+        type: 'assistant',
+        time: { created: 2 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_shell',
+            name: 'shell',
+            state: { status: 'running', input: { command: 'pwd' } },
+          },
+        ],
+      },
+    ]);
+    const onOpenChildSession = jest.fn();
+    act(() => {
+      root?.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: task,
+          sessionId: getTaskToolSessionId(task),
+          childMessages,
+          onOpenChildSession,
+        })
+      );
+    });
+    expect(container.textContent).toContain('Shell pwd');
+    expect(container.textContent).toContain('Explore');
+    const trigger = container.querySelector('button');
+    if (!trigger) throw new Error('Native v2 child session trigger missing');
+    click(trigger);
+    expect(onOpenChildSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: childSessionId,
+        description: 'Inspect commands',
+        agent: 'explore',
+      })
+    );
   });
 });
 

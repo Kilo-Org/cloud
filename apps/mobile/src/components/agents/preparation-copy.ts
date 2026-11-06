@@ -80,6 +80,8 @@ const ERROR_KEYS = {
   preparation_timeout: 'agentChat.preparation.errorPreparationTimeout',
   workspace_setup_failed: 'agentChat.preparation.errorWorkspaceSetupFailed',
   credential_upgrade_required: 'agentChat.preparation.errorCredentialUpgradeRequired',
+  // No copy of its own yet: a new key needs all 87 catalogs. It reads like a workspace failure.
+  repository_access_failed: 'agentChat.preparation.errorWorkspaceSetupFailed',
   agent_unavailable: 'agentChat.preparation.errorAgentUnavailable',
   billing_blocked: 'agentChat.preparation.errorBillingBlocked',
   billing_unavailable: 'agentChat.preparation.errorBillingUnavailable',

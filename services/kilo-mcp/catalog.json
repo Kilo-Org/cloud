@@ -4019,6 +4019,42 @@
     ],
     "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
   },
+  "byok.reorder": {
+    "path": "byok.reorder",
+    "kind": "mutation",
+    "summary": "Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "keyIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "keyIds"
+      ]
+    },
+    "tags": [
+      "byok",
+      "reorder",
+      "organizationid",
+      "keyids"
+    ],
+    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder organizationid keyids organizationId keyIds"
+  },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",
     "kind": "mutation",
@@ -4911,6 +4947,149 @@
     ],
     "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid worktreeId organizationId"
   },
+  "cliSessionsV2.enableWatchPr": {
+    "path": "cliSessionsV2.enableWatchPr",
+    "kind": "mutation",
+    "summary": "Start watching a session's open same-repository pull request for a limited time (up to 24 hours) using a chosen GitHub connection, creating an observation-only PR watch.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "integrationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "number",
+              "const": 1
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "profileId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "categories": {
+              "type": "object",
+              "properties": {
+                "reviews": {
+                  "type": "boolean"
+                },
+                "failedChecks": {
+                  "type": "boolean"
+                },
+                "baseUpdates": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "reviews",
+                "failedChecks",
+                "baseUpdates"
+              ]
+            },
+            "branchStrategy": {
+              "type": "string",
+              "enum": [
+                "merge",
+                "rebase"
+              ]
+            },
+            "historyRewriteConsent": {
+              "type": "boolean"
+            },
+            "maxAttemptsPerProblem": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
+            },
+            "maxTotalAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "observationOnlyConsent": {
+              "type": "boolean",
+              "const": true
+            },
+            "futureEventsOnlyConsent": {
+              "type": "boolean",
+              "const": true
+            },
+            "noHardSpendCapConsent": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "version",
+            "model",
+            "profileId",
+            "categories",
+            "branchStrategy",
+            "historyRewriteConsent",
+            "maxAttemptsPerProblem",
+            "maxTotalAttempts",
+            "observationOnlyConsent",
+            "futureEventsOnlyConsent",
+            "noHardSpendCapConsent"
+          ],
+          "additionalProperties": false
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber",
+        "integrationId",
+        "policy",
+        "expiresAt"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "enablewatchpr",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber",
+      "integrationid",
+      "policy",
+      "expiresat"
+    ],
+    "searchBlob": "cliSessionsV2.enableWatchPr Start watching a session's open same-repository pull request for a limited time (up to 24 hours) using a chosen GitHub connection, creating an observation-only PR watch. clisessionsv2 enablewatchpr sessionid expectedrepourl expectedprnumber integrationid policy expiresat sessionId expectedRepoUrl expectedPrNumber integrationId policy expiresAt"
+  },
   "cliSessionsV2.get": {
     "path": "cliSessionsV2.get",
     "kind": "query",
@@ -4959,6 +5138,42 @@
       "cloud_agent_session_id"
     ],
     "searchBlob": "cliSessionsV2.getByCloudAgentSessionId Look up a user's CLI session record by the underlying cloud agent session ID. clisessionsv2 getbycloudagentsessionid cloud_agent_session_id cloud_agent_session_id"
+  },
+  "cliSessionsV2.getPrWatchOptions": {
+    "path": "cliSessionsV2.getPrWatchOptions",
+    "kind": "query",
+    "summary": "Check whether PR watch can be enabled for a cloud agent session's linked pull request, returning eligible GitHub connection options, unavailable reason, and defaults before turning monitoring on.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getprwatchoptions",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber"
+    ],
+    "searchBlob": "cliSessionsV2.getPrWatchOptions Check whether PR watch can be enabled for a cloud agent session's linked pull request, returning eligible GitHub connection options, unavailable reason, and defaults before turning monitoring on. clisessionsv2 getprwatchoptions sessionid expectedrepourl expectedprnumber sessionId expectedRepoUrl expectedPrNumber"
   },
   "cliSessionsV2.getSessionDiff": {
     "path": "cliSessionsV2.getSessionDiff",
@@ -5044,6 +5259,42 @@
       "cursor"
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
+  },
+  "cliSessionsV2.getWatchPr": {
+    "path": "cliSessionsV2.getWatchPr",
+    "kind": "query",
+    "summary": "Get the current PR watch for a session's linked pull request, including its status, projection, and recent watch activity; returns null when no watch exists.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedRepoUrl": {
+          "type": "string"
+        },
+        "expectedPrNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "sessionId",
+        "expectedRepoUrl",
+        "expectedPrNumber"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getwatchpr",
+      "sessionid",
+      "expectedrepourl",
+      "expectedprnumber"
+    ],
+    "searchBlob": "cliSessionsV2.getWatchPr Get the current PR watch for a session's linked pull request, including its status, projection, and recent watch activity; returns null when no watch exists. clisessionsv2 getwatchpr sessionid expectedrepourl expectedprnumber sessionId expectedRepoUrl expectedPrNumber"
   },
   "cliSessionsV2.getWithRuntimeState": {
     "path": "cliSessionsV2.getWithRuntimeState",
@@ -5184,6 +5435,38 @@
     ],
     "searchBlob": "cliSessionsV2.list List the current user's CLI/agent sessions with pagination, filtering by organization, worktree, git URL, platform, shared/public status, version, or recent updates. clisessionsv2 list cursor limit orderby includechildren sharedonly createdonplatform organizationid worktreeid giturl updatedsince version fetchreviewdecision cursor limit orderBy includeChildren sharedOnly createdOnPlatform organizationId worktreeId gitUrl updatedSince version fetchReviewDecision"
   },
+  "cliSessionsV2.pauseWatchPr": {
+    "path": "cliSessionsV2.pauseWatchPr",
+    "kind": "mutation",
+    "summary": "Pause an active PR watch so it temporarily stops tracking changes, keeping it resumable until expiry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "pausewatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.pauseWatchPr Pause an active PR watch so it temporarily stops tracking changes, keeping it resumable until expiry. clisessionsv2 pausewatchpr watchid generation watchId generation"
+  },
   "cliSessionsV2.recentRepositories": {
     "path": "cliSessionsV2.recentRepositories",
     "kind": "query",
@@ -5221,6 +5504,38 @@
       "updatedsince"
     ],
     "searchBlob": "cliSessionsV2.recentRepositories Return the user's most recently active git repositories based on session activity since a given timestamp. clisessionsv2 recentrepositories organizationid updatedsince organizationId updatedSince"
+  },
+  "cliSessionsV2.recheckWatchPr": {
+    "path": "cliSessionsV2.recheckWatchPr",
+    "kind": "mutation",
+    "summary": "Manually re-check a watched pull request's identity and lifecycle state now, updating the watch without waiting for the next event.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "recheckwatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.recheckWatchPr Manually re-check a watched pull request's identity and lifecycle state now, updating the watch without waiting for the next event. clisessionsv2 recheckwatchpr watchid generation watchId generation"
   },
   "cliSessionsV2.refreshAssociatedPullRequest": {
     "path": "cliSessionsV2.refreshAssociatedPullRequest",
@@ -5321,6 +5636,38 @@
       "name"
     ],
     "searchBlob": "cliSessionsV2.renameWorktree Rename a cloud agent worktree owned by the user or their organization. Return the new worktree name. clisessionsv2 renameworktree worktreeid organizationid name worktreeId organizationId name"
+  },
+  "cliSessionsV2.resumeWatchPr": {
+    "path": "cliSessionsV2.resumeWatchPr",
+    "kind": "mutation",
+    "summary": "Resume a paused PR watch after re-verifying that the watched pull request and its source worktree are unchanged.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "resumewatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.resumeWatchPr Resume a paused PR watch after re-verifying that the watched pull request and its source worktree are unchanged. clisessionsv2 resumewatchpr watchid generation watchId generation"
   },
   "cliSessionsV2.search": {
     "path": "cliSessionsV2.search",
@@ -5477,6 +5824,38 @@
     ],
     "searchBlob": "cliSessionsV2.share Share a CLI session by generating a public share link. Return the share token. clisessionsv2 share session_id duration include_new_messages session_id duration include_new_messages"
   },
+  "cliSessionsV2.stopWatchPr": {
+    "path": "cliSessionsV2.stopWatchPr",
+    "kind": "mutation",
+    "summary": "Stop and finish a PR watch permanently, clearing pending items and attention flags for the watched pull request.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "watchId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "generation": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "watchId",
+        "generation"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "stopwatchpr",
+      "watchid",
+      "generation"
+    ],
+    "searchBlob": "cliSessionsV2.stopWatchPr Stop and finish a PR watch permanently, clearing pending items and attention flags for the watched pull request. clisessionsv2 stopwatchpr watchid generation watchId generation"
+  },
   "cliSessionsV2.unshare": {
     "path": "cliSessionsV2.unshare",
     "kind": "mutation",
@@ -5542,6 +5921,44 @@
       "organizationid"
     ],
     "searchBlob": "cliSessionsV2.worktreeDetails Fetch summary details for a set of cloud agent worktrees, including the session that started each one, active PR info, and per-worktree session activity/status. clisessionsv2 worktreedetails worktreeids organizationid worktreeIds organizationId"
+  },
+  "cliSessionsV2.worktreeParent": {
+    "path": "cliSessionsV2.worktreeParent",
+    "kind": "query",
+    "summary": "Get the parent workspace session that a worktree session belongs to, returning its session ID, title or worktree name, and organization, or null if there is no parent. Use it to navigate from a worktree session back to the workspace it was spawned from.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "worktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "worktreeId",
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "worktreeparent",
+      "worktreeid",
+      "organizationid"
+    ],
+    "searchBlob": "cliSessionsV2.worktreeParent Get the parent workspace session that a worktree session belongs to, returning its session ID, title or worktree name, and organization, or null if there is no parent. Use it to navigate from a worktree session back to the workspace it was spawned from. clisessionsv2 worktreeparent worktreeid organizationid worktreeId organizationId"
   },
   "cloudAgentNext.answerPermission": {
     "path": "cloudAgentNext.answerPermission",
@@ -6106,6 +6523,48 @@
     ],
     "searchBlob": "cloudAgentNext.getSession Retrieve the current status and details of a cloud agent session. cloudagentnext getsession cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getSessionMessagesPage": {
+    "path": "cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+  },
   "cloudAgentNext.getWorktreeChanges": {
     "path": "cloudAgentNext.getWorktreeChanges",
     "kind": "query",
@@ -6386,41 +6845,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "cloudflare"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "kilo"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "enum": [
-                            "single",
-                            "shared"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -6488,8 +6912,6 @@
                 {
                   "type": "string",
                   "enum": [
-                    "cloudflare-single",
-                    "cloudflare-shared",
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
@@ -6583,18 +7005,37 @@
             "cloneFromKiloSessionId": {},
             "cloneUpToMessageId": {},
             "callbackTarget": {
-              "type": "object",
-              "properties": {
-                "url": {
-                  "type": "string",
-                  "const": "session:parent"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "workspace:new-chat"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                 }
-              },
-              "required": [
-                "url"
               ],
-              "additionalProperties": false,
-              "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+              "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
             },
             "githubRepo": {
               "type": "string",
@@ -6653,6 +7094,47 @@
               "type": "string",
               "maxLength": 50,
               "pattern": "^[a-zA-Z]+$"
+            },
+            "requestedEnvironment": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositories": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repoFullName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": [
+                      "repoFullName"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "requireEnvironmentChoice": {
+              "type": "boolean",
+              "const": true
             },
             "profileId": {
               "type": "string",
@@ -7078,41 +7560,6 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "cloudflare"
-                            },
-                            "account": {
-                              "type": "string",
-                              "const": "kilo"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "account"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "instanceType": {
-                          "type": "string",
-                          "enum": [
-                            "single",
-                            "shared"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "instanceType"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
                               "const": "vercel"
                             },
                             "account": {
@@ -7180,8 +7627,6 @@
                 {
                   "type": "string",
                   "enum": [
-                    "cloudflare-single",
-                    "cloudflare-shared",
                     "cloudflare-containers-standard-3",
                     "cloudflare-containers-standard-4",
                     "vercel-small",
@@ -7214,18 +7659,37 @@
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
             "callbackTarget": {
-              "type": "object",
-              "properties": {
-                "url": {
-                  "type": "string",
-                  "const": "session:parent"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "const": "workspace:new-chat"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                 }
-              },
-              "required": [
-                "url"
               ],
-              "additionalProperties": false,
-              "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+              "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
             },
             "githubRepo": {
               "type": "string",
@@ -7284,6 +7748,47 @@
               "type": "string",
               "maxLength": 50,
               "pattern": "^[a-zA-Z]+$"
+            },
+            "requestedEnvironment": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositories": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repoFullName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": [
+                      "repoFullName"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "requireEnvironmentChoice": {
+              "type": "boolean",
+              "const": true
             },
             "profileId": {
               "type": "string",
@@ -7700,6 +8205,8 @@
       "mode",
       "model",
       "variant",
+      "requestedenvironment",
+      "requireenvironmentchoice",
       "profileid",
       "envvars",
       "setupcommands",
@@ -7711,7 +8218,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -8193,8 +8700,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -8261,8 +8766,6 @@
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -8452,7 +8955,7 @@
   "cloudEnvironments.create": {
     "path": "cloudEnvironments.create",
     "kind": "mutation",
-    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -8537,6 +9040,81 @@
             }
           ]
         },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "github"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "gitlab"
+                  },
+                  "projectPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "projectPath"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "bitbucket"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "workspaceUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "repositoryUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName",
+                  "workspaceUuid",
+                  "repositoryUuid"
+                ]
+              }
+            ]
+          }
+        },
         "plainVars": {
           "type": "object",
           "propertyNames": {
@@ -8570,13 +9148,20 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -8587,11 +9172,31 @@
               "type": "null"
             }
           ]
+        },
+        "egressMode": {
+          "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+          "type": "string",
+          "enum": [
+            "unrestricted",
+            "allowlist"
+          ]
+        },
+        "egressAllowlist": {
+          "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        },
+        "egressAudit": {
+          "not": {}
         }
       },
       "required": [
-        "name",
-        "repository"
+        "name"
       ]
     },
     "tags": [
@@ -8600,12 +9205,17 @@
       "organizationid",
       "name",
       "repository",
+      "repositories",
       "plainvars",
       "secrets",
       "commands",
-      "sandboxallocation"
+      "startcommands",
+      "sandboxallocation",
+      "egressmode",
+      "egressallowlist",
+      "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId name repository repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -8804,6 +9414,81 @@
           "minLength": 1,
           "maxLength": 100
         },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "github"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "gitlab"
+                  },
+                  "projectPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "projectPath"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "bitbucket"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "workspaceUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "repositoryUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName",
+                  "workspaceUuid",
+                  "repositoryUuid"
+                ]
+              }
+            ]
+          }
+        },
         "plainVars": {
           "type": "object",
           "propertyNames": {
@@ -8869,13 +9554,20 @@
             "maxLength": 16000
           }
         },
+        "startCommands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
         "sandboxAllocation": {
           "anyOf": [
             {
               "type": "string",
               "enum": [
-                "cloudflare-single",
-                "cloudflare-shared",
                 "cloudflare-containers-standard-3",
                 "cloudflare-containers-standard-4",
                 "vercel-small",
@@ -8886,6 +9578,27 @@
               "type": "null"
             }
           ]
+        },
+        "egressMode": {
+          "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+          "type": "string",
+          "enum": [
+            "unrestricted",
+            "allowlist"
+          ]
+        },
+        "egressAllowlist": {
+          "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
+        },
+        "egressAudit": {
+          "not": {}
         }
       },
       "required": [
@@ -8898,12 +9611,17 @@
       "organizationid",
       "environmentid",
       "name",
+      "repositories",
       "plainvars",
       "secrets",
       "commands",
-      "sandboxallocation"
+      "startcommands",
+      "sandboxallocation",
+      "egressmode",
+      "egressallowlist",
+      "egressaudit"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands startcommands sandboxallocation egressmode egressallowlist egressaudit organizationId environmentId name repositories plainVars secrets commands startCommands sandboxAllocation egressMode egressAllowlist egressAudit"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -17060,6 +17778,56 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getSession Get details of an organization cloud agent session by session ID. organizations cloudagentnext getsession organizationid cloudagentsessionid organizationId cloudAgentSessionId"
   },
+  "organizations.cloudAgentNext.getSessionMessagesPage": {
+    "path": "organizations.cloudAgentNext.getSessionMessagesPage",
+    "kind": "query",
+    "summary": "Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessionmessagespage",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+  },
   "organizations.cloudAgentNext.getWorktreeChanges": {
     "path": "organizations.cloudAgentNext.getWorktreeChanges",
     "kind": "query",
@@ -17546,41 +18314,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "cloudflare"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "kilo"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "enum": [
-                                "single",
-                                "shared"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -17648,8 +18381,6 @@
                     {
                       "type": "string",
                       "enum": [
-                        "cloudflare-single",
-                        "cloudflare-shared",
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",
@@ -17743,18 +18474,37 @@
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
                 "callbackTarget": {
-                  "type": "object",
-                  "properties": {
-                    "url": {
-                      "type": "string",
-                      "const": "session:parent"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "workspace:new-chat"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                     }
-                  },
-                  "required": [
-                    "url"
                   ],
-                  "additionalProperties": false,
-                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                  "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
                 },
                 "githubRepo": {
                   "type": "string",
@@ -17813,6 +18563,47 @@
                   "type": "string",
                   "maxLength": 50,
                   "pattern": "^[a-zA-Z]+$"
+                },
+                "requestedEnvironment": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "requireEnvironmentChoice": {
+                  "type": "boolean",
+                  "const": true
                 },
                 "profileId": {
                   "type": "string",
@@ -18244,41 +19035,6 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "cloudflare"
-                                },
-                                "account": {
-                                  "type": "string",
-                                  "const": "kilo"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "account"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "instanceType": {
-                              "type": "string",
-                              "enum": [
-                                "single",
-                                "shared"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "provider",
-                            "instanceType"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "provider": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
                                   "const": "vercel"
                                 },
                                 "account": {
@@ -18346,8 +19102,6 @@
                     {
                       "type": "string",
                       "enum": [
-                        "cloudflare-single",
-                        "cloudflare-shared",
                         "cloudflare-containers-standard-3",
                         "cloudflare-containers-standard-4",
                         "vercel-small",
@@ -18380,18 +19134,37 @@
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "callbackTarget": {
-                  "type": "object",
-                  "properties": {
-                    "url": {
-                      "type": "string",
-                      "const": "session:parent"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "const": "workspace:new-chat"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "pattern": "^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages."
                     }
-                  },
-                  "required": [
-                    "url"
                   ],
-                  "additionalProperties": false,
-                  "description": "Notify the spawning parent session when this child finishes. Omit for no callback."
+                  "description": "Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback."
                 },
                 "githubRepo": {
                   "type": "string",
@@ -18450,6 +19223,47 @@
                   "type": "string",
                   "maxLength": 50,
                   "pattern": "^[a-zA-Z]+$"
+                },
+                "requestedEnvironment": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "requireEnvironmentChoice": {
+                  "type": "boolean",
+                  "const": true
                 },
                 "profileId": {
                   "type": "string",
@@ -18871,6 +19685,8 @@
       "mode",
       "model",
       "variant",
+      "requestedenvironment",
+      "requireenvironmentchoice",
       "profileid",
       "envvars",
       "setupcommands",
@@ -18882,7 +19698,7 @@
       "attachments",
       "devcontainer"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist egressaudit sandboxallocation prompt initialmessageid initialpayload autoinitiate operationkey kilosessionid clonefromkilosessionid cloneuptomessageid callbacktarget githubrepo githubintegrationid gitlabproject bitbucketrepo publicrepourl mode model variant requestedenvironment requireenvironmentchoice profileid envvars setupcommands mcpservers runtimeskills runtimeagents upstreambranch autocommit attachments devcontainer organizationId egressMode egressAllowlist egressAudit sandboxAllocation prompt initialMessageId initialPayload autoInitiate operationKey kiloSessionId cloneFromKiloSessionId cloneUpToMessageId callbackTarget githubRepo githubIntegrationId gitlabProject bitbucketRepo publicRepoUrl mode model variant requestedEnvironment requireEnvironmentChoice profileId envVars setupCommands mcpServers runtimeSkills runtimeAgents upstreamBranch autoCommit attachments devcontainer"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",
@@ -19597,7 +20413,7 @@
                                 "const": "selected"
                               },
                               "model_allow_list": {
-                                "maxItems": 500,
+                                "maxItems": 2000,
                                 "type": "array",
                                 "items": {
                                   "type": "string",
@@ -20042,7 +20858,7 @@
                               "const": "selected"
                             },
                             "model_allow_list": {
-                              "maxItems": 500,
+                              "maxItems": 2000,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -20294,7 +21110,7 @@
                               "const": "selected"
                             },
                             "model_allow_list": {
-                              "maxItems": 500,
+                              "maxItems": 2000,
                               "type": "array",
                               "items": {
                                 "type": "string",
@@ -20500,7 +21316,7 @@
   "organizations.guardrails.get": {
     "path": "organizations.guardrails.get",
     "kind": "query",
-    "summary": "Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only.",
+    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -20521,7 +21337,7 @@
       "get",
       "organizationid"
     ],
-    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
+    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
   "organizations.invoices": {
     "path": "organizations.invoices",
@@ -24343,6 +25159,134 @@
     ],
     "searchBlob": "organizations.modes.update Update an organization custom mode's name, slug, configuration, or model route. Use to edit an organization mode. organizations modes update organizationid modeid name slug config route_model organizationId modeId name slug config route_model"
   },
+  "organizations.requestLogs.getDetails": {
+    "path": "organizations.requestLogs.getDetails",
+    "kind": "query",
+    "summary": "Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "usageId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId",
+        "usageId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "getdetails",
+      "organizationid",
+      "usageid"
+    ],
+    "searchBlob": "organizations.requestLogs.getDetails Get full details for one organization request log entry, including model, provider, status code, finish reason, streaming, session, editor, mode, and region. organizations requestlogs getdetails organizationid usageid organizationId usageId"
+  },
+  "organizations.requestLogs.isAvailable": {
+    "path": "organizations.requestLogs.isAvailable",
+    "kind": "query",
+    "summary": "Check whether request logs (per-request usage and cost history) are enabled for an organization, returning a simple available flag.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "isavailable",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.requestLogs.isAvailable Check whether request logs (per-request usage and cost history) are enabled for an organization, returning a simple available flag. organizations requestlogs isavailable organizationid organizationId"
+  },
+  "organizations.requestLogs.list": {
+    "path": "organizations.requestLogs.list",
+    "kind": "query",
+    "summary": "List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "modelPrefix": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "list",
+      "organizationid",
+      "starttime",
+      "userid",
+      "modelprefix"
+    ],
+    "searchBlob": "organizations.requestLogs.list List an organization's recent API or AI requests with user, model, provider, cost, token counts, errors, latency, and project, newest first. organizations requestlogs list organizationid starttime userid modelprefix organizationId startTime userId modelPrefix"
+  },
+  "organizations.requestLogs.listEnkryptUsage": {
+    "path": "organizations.requestLogs.listEnkryptUsage",
+    "kind": "query",
+    "summary": "Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "requestlogs",
+      "listenkryptusage",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.requestLogs.listEnkryptUsage Shows recent Enkrypt guardrail request logs for an organization, including per-call decisions (allowed, blocked, error), guardrail type, charged amount, added latency, and the user and session involved, plus summary totals and averages. organizations requestlogs listenkryptusage organizationid organizationId"
+  },
   "organizations.reviewAgent.createManualReviewJob": {
     "path": "organizations.reviewAgent.createManualReviewJob",
     "kind": "mutation",
@@ -24387,6 +25331,11 @@
         "instructions": {
           "type": "string",
           "maxLength": 4000
+        },
+        "operationKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         },
         "council": {
           "type": "object",
@@ -24512,9 +25461,10 @@
       "modelslug",
       "thinkingeffort",
       "instructions",
+      "operationkey",
       "council"
     ],
-    "searchBlob": "organizations.reviewAgent.createManualReviewJob Start a manual code review on a pull request or merge request for an organization. Use to request an on-demand review. organizations reviewagent createmanualreviewjob organizationid platform url modelslug thinkingeffort instructions council organizationId platform url modelSlug thinkingEffort instructions council"
+    "searchBlob": "organizations.reviewAgent.createManualReviewJob Start a manual code review on a pull request or merge request for an organization. Use to request an on-demand review. organizations reviewagent createmanualreviewjob organizationid platform url modelslug thinkingeffort instructions operationkey council organizationId platform url modelSlug thinkingEffort instructions operationKey council"
   },
   "organizations.reviewAgent.getBitbucketReadiness": {
     "path": "organizations.reviewAgent.getBitbucketReadiness",
@@ -26162,14 +27112,15 @@
         },
         "limit": {
           "default": 50,
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
         "offset": {
           "default": 0,
-          "type": "number",
-          "minimum": 0
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -26251,22 +27202,22 @@
           ]
         },
         "slaCriticalDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaHighDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaMediumDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaLowDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
@@ -26286,7 +27237,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "modelSlug": {
@@ -26450,7 +27403,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       },
@@ -26957,6 +27912,32 @@
       "specific_model"
     ],
     "searchBlob": "organizations.settings.configureOrganizationDefaultBehavior Configure the organization's default model behavior: a global default, a specific model, or Organization Auto with a fallback. Use to set how the organization picks models by default. organizations settings configureorganizationdefaultbehavior organizationid behavior fallback_model specific_model organizationId behavior fallback_model specific_model"
+  },
+  "organizations.settings.getGatewaySettings": {
+    "path": "organizations.settings.getGatewaySettings",
+    "kind": "query",
+    "summary": "Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "getgatewaysettings",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.settings.getGatewaySettings Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured. organizations settings getgatewaysettings organizationid organizationId"
   },
   "organizations.settings.listAvailableModels": {
     "path": "organizations.settings.listAvailableModels",
@@ -28450,6 +29431,11 @@
           "type": "string",
           "maxLength": 4000
         },
+        "operationKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "council": {
           "type": "object",
           "properties": {
@@ -28571,9 +29557,10 @@
       "modelslug",
       "thinkingeffort",
       "instructions",
+      "operationkey",
       "council"
     ],
-    "searchBlob": "personalReviewAgent.createManualReviewJob Manually start a code review on a repository, pull request, or commit instead of waiting for an automatic trigger. Use it to run the AI review agent on demand. personalreviewagent createmanualreviewjob platform url modelslug thinkingeffort instructions council platform url modelSlug thinkingEffort instructions council"
+    "searchBlob": "personalReviewAgent.createManualReviewJob Manually start a code review on a repository, pull request, or commit instead of waiting for an automatic trigger. Use it to run the AI review agent on demand. personalreviewagent createmanualreviewjob platform url modelslug thinkingeffort instructions operationkey council platform url modelSlug thinkingEffort instructions operationKey council"
   },
   "personalReviewAgent.getGitHubStatus": {
     "path": "personalReviewAgent.getGitHubStatus",
@@ -31840,14 +32827,15 @@
         },
         "limit": {
           "default": 50,
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
         "offset": {
           "default": 0,
-          "type": "number",
-          "minimum": 0
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -31911,22 +32899,22 @@
           ]
         },
         "slaCriticalDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaHighDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaMediumDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
         "slaLowDays": {
-          "type": "number",
+          "type": "integer",
           "minimum": 1,
           "maximum": 365
         },
@@ -31946,7 +32934,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "modelSlug": {
@@ -32102,7 +33092,9 @@
         "selectedRepositoryIds": {
           "type": "array",
           "items": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         }
       },
@@ -32665,6 +33657,18 @@
       "rules"
     ],
     "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
+  },
+  "stepUp.getStatus": {
+    "path": "stepUp.getStatus",
+    "kind": "query",
+    "summary": "Check whether the current admin's step-up authentication is set up and still valid for this browser session, including enrolled passkey count, whether the session is bound, whether verification is fresh, and whether enrollment is available.",
+    "inputSchema": {},
+    "tags": [
+      "stepup",
+      "getstatus"
+    ],
+    "searchBlob": "stepUp.getStatus Check whether the current admin's step-up authentication is set up and still valid for this browser session, including enrolled passkey count, whether the session is bound, whether verification is fresh, and whether enrollment is available. stepup getstatus",
+    "admin": true
   },
   "todos.items.candidatesForSession": {
     "path": "todos.items.candidatesForSession",
@@ -36462,6 +37466,10 @@
               "type": "null"
             }
           ]
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -36475,9 +37483,10 @@
       "moveworktree",
       "organizationid",
       "worktreeid",
-      "folderid"
+      "folderid",
+      "cloudagentsessionid"
     ],
-    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid organizationId worktreeId folderId"
+    "searchBlob": "workspaceFolders.moveWorktree Move a worktree into a workspace folder, or remove it from its folder. workspacefolders moveworktree organizationid worktreeid folderid cloudagentsessionid organizationId worktreeId folderId cloudAgentSessionId"
   },
   "workspaceFolders.reorder": {
     "path": "workspaceFolders.reorder",

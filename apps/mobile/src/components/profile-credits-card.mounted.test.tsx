@@ -1086,3 +1086,102 @@ describe('CreditsCard credits header', () => {
     unmount();
   });
 });
+
+describe('CreditsCard balance row', () => {
+  /** The card's outer box: the only View the card gives `gap-3` and a layout reader. */
+  function cardBox(renderer: ReactTestRenderer) {
+    return renderer.root.find(
+      node => Object.is(node.type, 'View') && node.props.className === 'gap-3'
+    );
+  }
+
+  /** The balance shell's classes: the card's only `min-h-16 gap-2` box. */
+  function balanceClasses(renderer: ReactTestRenderer): string[] {
+    const balance = renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') && String(node.props.className).includes('min-h-16 gap-2')
+    );
+    return String(balance.props.className).split(' ');
+  }
+
+  /** The amount-and-note column of the one-row layout. */
+  function wideTextColumn(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') && String(node.props.className) === 'min-w-0 flex-1 gap-1'
+    );
+  }
+
+  /** The amount row of the stacked layout: the amount and the hide/show toggle. */
+  function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
+    return renderer.root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
+    );
+  }
+
+  /** Whether `node` or one of its descendants renders the given string. */
+  function renders(node: ReactTestInstance, text: string): boolean {
+    return (
+      node.findAll(
+        candidate =>
+          candidate.children.some(child => typeof child === 'string' && child.includes(text)) ||
+          // A mock child rendered as a bare component name, such as the
+          // purchase action, is its own text.
+          (typeof candidate.type === 'string' && candidate.type === text)
+      ).length > 0
+    );
+  }
+
+  async function mountAtCardWidth(width: number) {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const mounted = await mountCard();
+    const box = cardBox(mounted.renderer);
+    await act(() => {
+      (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+        nativeEvent: { layout: { width } },
+      });
+    });
+    return mounted;
+  }
+
+  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
+    const { renderer, unmount } = await mountAtCardWidth(383);
+
+    // The note shares the amount's column, which gives it the same tight gap
+    // under the amount as the wide layout always had; the visibility toggle is
+    // that column's sibling, and the purchase action keeps its own column.
+    const column = wideTextColumn(renderer);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+    expect(renders(cardBox(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
+    unmount();
+  });
+
+  it.each<[string, number]>([
+    // The standard matrix's compact cell (360 dp screen) and a 390 dp screen:
+    // in the one-row layout the note's column there wrapped the sentence to
+    // three lines, so both stack instead.
+    ['the compact cell', 332],
+    ['a 390 dp screen', 362],
+  ])('gives the note its own row under the amount on %s', async (_name, width) => {
+    const { renderer, unmount } = await mountAtCardWidth(width);
+
+    const classes = balanceClasses(renderer);
+    expect(classes).toContain('items-stretch');
+    expect(classes).not.toContain('flex-row');
+    // Row 1 is the amount and the toggle; the note follows it at the card's
+    // full width and the purchase action takes the row below the note, so the
+    // amount keeps the tight gap under it that the wide cells show.
+    const row = amountRow(renderer);
+    expect(renders(row, 'No expiring credits.')).toBe(false);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    const card = cardBox(renderer);
+    expect(renders(card, 'No expiring credits.')).toBe(true);
+    expect(renders(card, 'ADD_CREDITS_BUTTON')).toBe(true);
+    unmount();
+  });
+});

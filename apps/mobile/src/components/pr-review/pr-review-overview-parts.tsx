@@ -4,6 +4,7 @@ import {
   GitMerge,
   GitPullRequest,
   type LucideIcon,
+  UserRound,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -104,21 +105,42 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
 }
 
 /**
- * A GitHub account's avatar at the size every PR-review row uses. Falls back
- * to the muted circle when GitHub reports no avatar, so the row never jumps.
+ * A GitHub account's avatar at the size every PR-review row uses. Falls back to
+ * the account's initial on a filled disc when GitHub reports no avatar, so a
+ * row without a picture still reads as a person instead of an empty circle.
+ * The fallback is decoration: the login beside it is the text a reader gets, so
+ * the disc stays out of both accessibility trees instead of adding a lone
+ * initial to a row that is announced as one element.
  */
-export function PrAvatar({ avatarUrl }: Readonly<{ avatarUrl: string | null }>) {
-  if (!avatarUrl) {
-    return <View className="size-6 rounded-full bg-muted" />;
+export function PrAvatar({
+  avatarUrl,
+  login,
+}: Readonly<{ avatarUrl: string | null; login: string | null }>) {
+  const colors = useThemeColors();
+  if (avatarUrl) {
+    return (
+      <Image
+        source={{ uri: avatarUrl }}
+        className="size-6 rounded-full"
+        transition={0}
+        cachePolicy="memory"
+        accessibilityIgnoresInvertColors
+      />
+    );
   }
+  const initial = login?.trim().charAt(0).toLocaleUpperCase(i18n.language);
   return (
-    <Image
-      source={{ uri: avatarUrl }}
-      className="size-6 rounded-full"
-      transition={0}
-      cachePolicy="memory"
-      accessibilityIgnoresInvertColors
-    />
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="size-6 items-center justify-center rounded-full bg-secondary-fill"
+    >
+      {initial ? (
+        <Text className="text-[11px] font-semibold text-secondary-foreground">{initial}</Text>
+      ) : (
+        <UserRound size={12} color={colors.secondaryForeground} />
+      )}
+    </View>
   );
 }
 
@@ -129,7 +151,7 @@ export function PrAuthorRow({
   if (!author) {
     return (
       <View className="flex-row items-center gap-2">
-        <PrAvatar avatarUrl={null} />
+        <PrAvatar avatarUrl={null} login={null} />
         <Text variant="muted" className="text-sm">
           {t('prReview.overview.unknownAuthor')}
         </Text>
@@ -138,7 +160,7 @@ export function PrAuthorRow({
   }
   return (
     <View className="flex-row items-center gap-2">
-      <PrAvatar avatarUrl={author.avatarUrl} />
+      <PrAvatar avatarUrl={author.avatarUrl} login={author.login} />
       <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
         {author.login}
       </Text>

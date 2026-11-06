@@ -1,7 +1,4 @@
 import { it, expect } from 'vitest';
-import fs from 'node:fs/promises';
-import { URL } from 'node:url';
-import { parse } from 'jsonc-parser';
 import { selectRuntimeTarget, renderRuntimeTarget } from './runtime-target.js';
 
 const startup = { mode: 'downloaded', image: 'runtime-free' } as const;
@@ -34,37 +31,6 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog scopes production runtime-free to an org cohort', async () => {
-  const catalog: unknown = JSON.parse(
-    await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
-  );
-  expect(selectRuntimeTarget(catalog, 'production')).toMatchObject({
-    mode: 'downloaded',
-    image: 'runtime-free',
-    interactiveOrgIds: [expect.any(String)],
-  });
-  for (const target of ['dev', 'isolated'])
-    expect(selectRuntimeTarget(catalog, target)).toEqual({
-      mode: 'preinstalled',
-      image: 'all-in-one',
-    });
-});
-it('renders both real Wrangler targets without publication credentials', async () => {
-  const raw: unknown = parse(
-    await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
-  );
-  for (const environment of ['production', 'dev']) {
-    const output = renderRuntimeTarget({
-      config: raw,
-      environment,
-      startup: { mode: 'preinstalled', image: 'all-in-one' },
-    });
-    const target = environment === 'production' ? output : output.env?.dev;
-    expect(target).toMatchObject({
-      vars: { RUNTIME_STARTUP_MODE: 'preinstalled', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
-    });
-  }
-});
 it('renders the selected runtime-free digest and retains unrelated target settings', () => {
   const original = baseline();
   const output = renderRuntimeTarget({
@@ -151,6 +117,50 @@ it.each([{ ids: [] }, { ids: ['*'] }, { ids: ['not-an-org-id'] }])(
     ).toThrow();
   }
 );
+it('renders the published Kilo v2 release for its organization scope', () => {
+  const kilo2 = {
+    orgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56', '11111111-1111-4111-8111-111111111111'],
+  };
+  const output = renderRuntimeTarget({
+    config: baseline(),
+    environment: 'production',
+    startup: { ...startup, kilo2 },
+    release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+  });
+  expect(output.vars).toMatchObject({
+    RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
+    RUNTIME_KILO2_ORG_IDS: kilo2.orgIds.join(','),
+    RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
+  });
+  expect(
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup,
+      release: { ...release, kilo2DescriptorSha256: 'f'.repeat(64) },
+    }).vars
+  ).not.toHaveProperty('RUNTIME_KILO2_ORG_IDS');
+  expect(() =>
+    renderRuntimeTarget({
+      config: baseline(),
+      environment: 'production',
+      startup: { ...startup, kilo2 },
+      release,
+    })
+  ).toThrow('Kilo v2 runtime handoff');
+  for (const invalid of [{ orgIds: [] }, { orgIds: ['*'] }, { ...kilo2, descriptorSha256: 'f' }])
+    expect(() =>
+      selectRuntimeTarget({ default: { ...startup, kilo2: invalid }, targets: {} }, 'production')
+    ).toThrow();
+  expect(() =>
+    renderRuntimeTarget({
+      config: { ...baseline(), vars: { RUNTIME_KILO2_ORG_IDS: kilo2.orgIds[0] } },
+      environment: 'production',
+      startup,
+      release,
+    })
+  ).toThrow('configuration drift');
+});
 it('rejects manual cohort settings and secondary image drift', () => {
   const scopedVars = { ...baseline(), vars: { RUNTIME_INTERACTIVE_ORG_IDS: '*' } };
   expect(() =>

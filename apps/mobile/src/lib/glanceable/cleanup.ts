@@ -9,6 +9,7 @@ import { clearHomeWidgetData } from './home-widget-data';
 import { getGlanceableSnapshotForSignedInScope, getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
 import { forEachSink, getGlanceableDelivery, guardSink } from './sink-registry';
+import { recordWaitingAsk } from './waiting-ask';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
 // publisher captures it at construction and refuses to emit once it advances,
@@ -112,6 +113,11 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  // The ask names a session and an organization of the scope that is ending.
+  // End it with that scope, in memory and in the mirror: the surfaces read the
+  // record at draw time, so a record left behind would keep naming the previous
+  // scope's session to whoever picks up the device next.
+  recordWaitingAsk(null);
   clearHomeWidgetData();
   // The scope cleanup also deletes the followed session card tokens.
   getGlanceableDelivery().cleanupTokens('scope');

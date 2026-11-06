@@ -19,6 +19,8 @@ import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plan
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
+import type { Harness as HarnessClient } from './harness.js';
+import { createKiloHarness } from './kilo-harness.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -773,7 +775,7 @@ function createHarness(
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
-  let currentClient: WrapperKiloClient | undefined;
+  let currentClient: HarnessClient | undefined;
   const runtimeKeys = new Set<string>();
   let runtimeRestarting = false;
 
@@ -783,7 +785,7 @@ function createHarness(
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
       runtimeKeys.add(input.key);
       await options.beforeEnsure?.();
-      if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
+      if (ensureHung) return new Promise<HarnessClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
       const client = {
@@ -839,8 +841,22 @@ function createHarness(
           if (cleanupFailure) throw new Error('stop failed');
         },
       } as unknown as WrapperKiloClient;
-      currentClient = client;
-      return client;
+      currentClient = createKiloHarness({
+        client,
+        server: { url: 'http://127.0.0.1:1' },
+        directory: input.directory,
+        restore: (async (...args: unknown[]) => {
+          restoreArgs.push(args[3] as Record<string, unknown> | undefined);
+          return restore();
+        }) as never,
+        seedRegistration: async () => undefined,
+        sessionExists: async () => {
+          if (sessionExistsHung) return new Promise<boolean>(() => undefined);
+          return sessionExists;
+        },
+        log: message => logs.push(message),
+      });
+      return currentClient;
     },
     installCredentials: async (key, env, cloudAgentMcp) => {
       installCalls.push({ key, env, cloudAgentMcp });
@@ -902,16 +918,7 @@ function createHarness(
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
-    restore: (async (...args: unknown[]) => {
-      restoreArgs.push(args[3] as Record<string, unknown> | undefined);
-      return restore();
-    }) as never,
-    seedRegistration: async () => undefined,
     recoverWorktree: options.recoverWorktree,
-    sessionExists: async () => {
-      if (sessionExistsHung) return new Promise<boolean>(() => undefined);
-      return sessionExists;
-    },
     sleep: async () => undefined,
   });
 
@@ -1074,8 +1081,8 @@ function createRegistryRuntimes(): {
         get env() {
           return env;
         },
-        client: {} as WrapperKiloClient,
-        ensure: async () => ({}) as WrapperKiloClient,
+        client: { open: async () => true } as unknown as HarnessClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async (next: Record<string, string>) => {
           env = next;
         },
@@ -1912,9 +1919,8 @@ describe('createPreparationManager', () => {
         runtimes: {
           ensure: async () =>
             ({
-              serverUrl: 'http://127.0.0.1:1',
-              ensureSession: async () => undefined,
-            }) as unknown as WrapperKiloClient,
+              open: async () => true,
+            }) as unknown as HarnessClient,
           installCredentials: async () => undefined,
           isUnavailable: () => false,
           getLiveClient: () => undefined,
@@ -1928,8 +1934,6 @@ describe('createPreparationManager', () => {
         writeStamp: async () => undefined,
         mkdir: async () => undefined,
         configureGitAuthor: async () => undefined,
-        seedRegistration: async () => undefined,
-        sessionExists: async () => true,
       });
 
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
@@ -2664,7 +2668,7 @@ describe('createPreparationManager', () => {
       timers: FAST_TIMERS,
       emit: frame => harness.frames.push(frame),
       runtimes: {
-        ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
+        ensure: async () => ({ open: async () => true }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         getLiveClient: () => undefined,
@@ -2684,14 +2688,6 @@ describe('createPreparationManager', () => {
         onOutput?.('stdout', 'installing dependencies\n');
         return result(1);
       },
-      restore: (async () => ({
-        ok: false,
-        code: 404,
-        error: 'missing',
-        step: 'download',
-      })) as never,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
       sleep: async () => undefined,
     });
     const spec = routeSpec({ setupCommands: ['npm install'] });
@@ -2984,10 +2980,14 @@ describe('adopting an environment snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
   });
 
-  it('runs the setup commands after an adopt and fails the route when one fails', async () => {
+  it('runs only the start commands after an adopt and fails the route when one fails', async () => {
     const harness = adoptHarness();
-    harness.setSetupResult(result(1, 'install failed'));
-    const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
+    harness.setSetupResult(result(1, 'serve failed'));
+    const spec = routeSpec({
+      git: { url: REPO },
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
+    });
 
     await harness.manager.prepare(spec);
 
@@ -3250,6 +3250,86 @@ describe('workspace Git credentials', () => {
       expect(harness.gitCalls).toEqual([]);
       expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
         'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('workspace Git credentials of a V2 environment', () => {
+  const GITLAB_PROJECT = 'https://gitlab.com/group/sub/project.git';
+  const record = (host: string, username: string, password: string) =>
+    `protocol=https\nhost=${host}\nusername=${username}\npassword=${password}\n`;
+
+  it('records one alias for each host at preparation, for the helper to answer by host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab')}`
+      );
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('alias-');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites every host record on a credential renewal', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github-2', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab-2', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github-2')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab-2')}`
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the V1 record when the credentials carry no extra host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        record('github.com', 'x-access-token', 'alias-github')
       );
     } finally {
       await fs.rm(root, { recursive: true, force: true });
@@ -4271,12 +4351,12 @@ describe('release cleanup with no live runtime client', () => {
       runtimes: {
         ensure: async () =>
           ({
-            serverUrl: 'http://127.0.0.1:1',
-            ensureSession: async () => undefined,
-            abortSessionForCleanup: async (opts: { sessionId: string }) => {
+            open: async () => true,
+            release: async (opts: { sessionId: string }) => {
               abortCalls.push(opts.sessionId);
+              return { ok: true, sessions: 1, failures: 0, elapsedMs: 0 };
             },
-          }) as unknown as WrapperKiloClient,
+          }) as unknown as HarnessClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
         // The runtime is restarting: the real adapter reports no live client.
@@ -4291,8 +4371,6 @@ describe('release cleanup with no live runtime client', () => {
       writeStamp: async () => undefined,
       mkdir: async () => undefined,
       configureGitAuthor: async () => undefined,
-      seedRegistration: async () => undefined,
-      sessionExists: async () => true,
     });
     const directory = '/tmp/release-no-client';
     await manager.prepare(routeSpec({ sessionId: 'ses_a', directory }));

@@ -53,6 +53,7 @@ const OVERVIEW_SURFACES = [
   'merge-request',
   'overview-no-checks',
   'overview-multi-group',
+  'overview-auto-merge',
   'merge-request-missing',
   'merge-request-error',
 ] as const;
@@ -72,7 +73,8 @@ const files = [
     status: 'modified',
     additions: 1,
     deletions: 1,
-    patch: '@@ -1 +1 @@\n-export const greeting = "Hi";\n+export const greeting = "Hello";',
+    patch:
+      '@@ -1,3 +1,3 @@\n import { formatGreeting } from "./format";\n-export const greeting = "Hi";\n+export const greeting = "Hello";\n export default greeting;',
     patchMissing: false,
   },
   {

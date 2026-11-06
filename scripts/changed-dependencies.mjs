@@ -81,6 +81,18 @@ function dependencyGraph(lockfile, workspace, patches, directory) {
   return new Map(JSON.parse(serialized));
 }
 
+// Everything in the lockfile that can decide what one workspace installs: its
+// importer entry, every snapshot and package metadata entry its graph resolves,
+// and the patched content inside that graph. A caller that cannot get a closure
+// must widen its input: an unreadable entry here is not a reason to guess.
+export function importerClosure(snapshot, directory) {
+  const { lockfile } = snapshot;
+  if (lockfile.lockfileVersion !== '9.0' || !lockfile.importers || !lockfile.snapshots) {
+    throw new Error('Unsupported pnpm lockfile');
+  }
+  return dependencyGraph(lockfile, snapshot.workspace, snapshot.patches, directory);
+}
+
 function nativeOnlyPatch(content) {
   const lines = content.split('\n');
   const headers = lines.filter(line => line.startsWith('diff --git '));
@@ -136,9 +148,7 @@ export function changedDependencyWorkspaces(before, after) {
     return ['*'];
   }
 
-  const graph = (snapshot, directory) =>
-    dependencyGraph(snapshot.lockfile, snapshot.workspace, snapshot.patches, directory);
-  if (!isDeepStrictEqual(graph(before, '.'), graph(after, '.'))) return ['*'];
+  if (!isDeepStrictEqual(importerClosure(before, '.'), importerClosure(after, '.'))) return ['*'];
 
   const directories = new Set([
     ...Object.keys(before.lockfile.importers),
@@ -147,11 +157,14 @@ export function changedDependencyWorkspaces(before, after) {
   directories.delete('.');
   return [...directories].filter(directory => {
     if (!before.lockfile.importers[directory] || !after.lockfile.importers[directory]) return true;
-    return !isDeepStrictEqual(graph(before, directory), graph(after, directory));
+    return !isDeepStrictEqual(
+      importerClosure(before, directory),
+      importerClosure(after, directory)
+    );
   });
 }
 
-function readSnapshot(read) {
+export function readDependencySnapshot(read) {
   const workspace = load(read('pnpm-workspace.yaml'));
   const patches = {};
   for (const path of Object.values(workspace.patchedDependencies ?? {})) {
@@ -167,14 +180,14 @@ if (import.meta.main) {
   try {
     const base = process.argv[2];
     if (!base) throw new Error('A Git base revision is required');
-    const before = readSnapshot(path =>
+    const before = readDependencySnapshot(path =>
       execFileSync('git', ['show', `${base}:${path}`], {
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
       })
     );
     const head = process.argv[3];
-    const after = readSnapshot(path =>
+    const after = readDependencySnapshot(path =>
       head
         ? execFileSync('git', ['show', `${head}:${path}`], {
             encoding: 'utf8',

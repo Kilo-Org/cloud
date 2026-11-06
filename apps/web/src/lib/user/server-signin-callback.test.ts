@@ -37,6 +37,7 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
 }));
 
 import jwt from 'jsonwebtoken';
+import { encode } from 'next-auth/jwt';
 import { authOptions } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -65,6 +66,17 @@ function setValidTurnstileCookie() {
     value: jwt.sign({ guid: randomUUID(), ip: '203.0.113.7' }, NEXTAUTH_SECRET, {
       algorithm: 'HS256',
       expiresIn: '5m',
+    }),
+  });
+}
+
+/** Signs in the request as `userId` with a real NextAuth session cookie. */
+async function setSessionCookie(userId: string) {
+  cookieStore.set('next-auth.session-token', {
+    name: 'next-auth.session-token',
+    value: await encode({
+      secret: NEXTAUTH_SECRET,
+      token: { kiloUserId: userId, sub: randomUUID() },
     }),
   });
 }
@@ -239,6 +251,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     const result = await signIn({
       user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
@@ -259,6 +272,87 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
+  it('requires the web session to name the same user as the pending link', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+    await setSessionCookie('other-user');
+
+    const result = await signIn({
+      user: { id: 'x', email: 'mismatch-link@example.com', name: 'Mismatch', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-mismatch-sub', email: 'mismatch-link@example.com' },
+    } as never);
+
+    // The refusal is the linking failure the person reads on the page the link
+    // started from, and no user is settled and no provider is attached.
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('requires a web session to complete a pending link', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'anonymous-link@example.com', name: 'Anonymous', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-anonymous-sub', email: 'anonymous-link@example.com' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('sends a refused organization connect back to its BYOK card', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+    } as never);
+    await setSessionCookie('other-user');
+
+    const result = await signIn({
+      user: { id: 'x', email: 'org-mismatch@example.com', name: 'Org Mismatch', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+      },
+      profile: { sub: 'openai-org-mismatch-sub', email: 'org-mismatch@example.com' },
+    } as never);
+
+    // The organization's BYOK card reads `openai_error`, so a refused
+    // organization connect returns there, like the shared-services re-check.
+    expect(result).toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+  });
+
   it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',
@@ -269,6 +363,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     const profile: Record<string, unknown> = {
       sub: 'openai-org-sub',
@@ -307,6 +402,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       success: true,
       user: { id: 'existing-user', blocked_reason: null },
     } as never);
+    await setSessionCookie('existing-user');
 
     return signIn({
       user: { id: 'x', email: 'shared-services@example.com', name: 'Shared', image: '' },

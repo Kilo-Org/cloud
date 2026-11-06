@@ -50,7 +50,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `pnpm run lint` - oxlint
 - `pnpm run format` - oxfmt write (src only)
 - `pnpm run format:check` - oxfmt check (src only)
-- `pnpm run typecheck` - TypeScript (tsgo) + wrapper typecheck
+- `pnpm run typecheck:wrapper` - TypeScript (tsgo) + wrapper typecheck
 - `pnpm run test:checkers` - Duplication checker fixtures
 - `pnpm run check:duplication` - Production duplicate-code ratchet
 
@@ -85,10 +85,9 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 - `src/sandbox-control/` - Provider adapters, credentials, startup, runtime artifacts and wrapper transport
 - `src/sandbox-containers/` - `SandboxContainers` provider and container outbound handling
+- `src/legacy-runtime-tombstones.ts` - Export-only no-op tombstones for retired SDK sandbox DO names
 - `src/agent-sandbox/` - Provider protocol and provider REST clients
-- `Dockerfile`, `Dockerfile.containers*` - Sandbox images
-- `Dockerfile.dev` - Dev sandbox image (local Kilocode CLI)
-- `cloud-agent-build.sh` - Builds the local Kilocode CLI binary for `Dockerfile.dev`
+- `Dockerfile.containers`, `Dockerfile.containers.runtime-free` - Native sandbox images
 
 ### Wrapper
 

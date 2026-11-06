@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { EnvironmentResponse, EnvironmentSummary } from '@kilocode/cloud-agent-profile';
+import type * as EnvironmentHooks from '@/hooks/useCloudAgentEnvironments';
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 
 Object.assign(globalThis, { React });
@@ -61,6 +62,7 @@ jest.mock('sonner', () => ({
 }));
 
 jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
+  ...jest.requireActual<typeof EnvironmentHooks>('@/hooks/useCloudAgentEnvironments'),
   useCloudAgentEnvironment: () => ({
     data: mockEnvironment,
     isLoading: false,
@@ -78,6 +80,30 @@ jest.mock('@/hooks/useCloudAgentEnvironments', () => ({
   }),
   useEnvironmentBuildStatus: () => ({ data: undefined }),
 }));
+
+jest.mock('@/hooks/useEnvironmentRepositoryChoices', () => ({
+  useEnvironmentRepositoryChoices: () => [],
+}));
+
+jest.mock('@/components/ui/popover', () => {
+  const react = jest.requireActual<typeof React>('react');
+  const content = ({ children }: { children?: ReactNode }) =>
+    react.createElement(react.Fragment, null, children);
+  return { Popover: content, PopoverTrigger: content, PopoverContent: content };
+});
+
+jest.mock('@/components/ui/command', () => {
+  const react = jest.requireActual<typeof React>('react');
+  const content = ({ children }: { children?: ReactNode }) =>
+    react.createElement('div', null, children);
+  return {
+    Command: content,
+    CommandEmpty: content,
+    CommandList: content,
+    CommandItem: content,
+    CommandInput: () => react.createElement('input'),
+  };
+});
 
 jest.mock('@/hooks/useEnvironmentProfiles', () => ({
   useEnvironmentProfiles: () => ({
@@ -151,13 +177,15 @@ const { RepositoryEnvironmentChip } = require('./RepositoryEnvironmentChip') as 
     repository: { platform: 'github'; fullName: string };
     repositoryLabel: string;
     environment: EnvironmentSummary;
+    environments: EnvironmentSummary[];
+    onChooseEnvironment: (environmentId: string) => void;
   }>;
 };
 const { EnvironmentsSection } = require('./settings/EnvironmentsSection') as {
   EnvironmentsSection: React.ComponentType<{ canManage: boolean }>;
 };
 
-const environment: EnvironmentSummary = {
+const environment = {
   id: 'env-1',
   name: 'Kilo Environment',
   platform: 'github',
@@ -172,7 +200,7 @@ const environment: EnvironmentSummary = {
   commandCount: 1,
   configurationRevision: 1,
   sandboxAllocation: null,
-};
+} satisfies EnvironmentSummary;
 
 const environmentDetail: EnvironmentResponse = {
   id: environment.id,
@@ -193,8 +221,11 @@ const environmentDetail: EnvironmentResponse = {
     },
   ],
   commands: ['pnpm install'],
+  startCommands: [],
   configurationRevision: environment.configurationRevision,
   sandboxAllocation: environment.sandboxAllocation,
+  egressMode: null,
+  egressAllowlist: null,
   secretKeys: ['API_KEY'],
 };
 
@@ -337,6 +368,8 @@ function chipElement(): React.ReactElement {
     repository: { platform: 'github', fullName: environment.repoFullName },
     repositoryLabel: environment.repoFullName,
     environment,
+    environments: [environment],
+    onChooseEnvironment: () => {},
   });
 }
 
@@ -345,8 +378,8 @@ describe('environment access for members and managers', () => {
     mockCanManage = false;
     const mounted = mount(chipElement());
     try {
-      const trigger = mounted.container.querySelector('[aria-label="View environment"]');
-      expect(trigger).not.toBeNull();
+      const trigger = findButton(mounted.container, 'View environment');
+      expect(trigger).toBeDefined();
       expect(dialogContent(mounted.container)).toBeNull();
 
       click(trigger);
@@ -368,7 +401,13 @@ describe('environment access for members and managers', () => {
       expect(scripts).not.toBeNull();
       expect(scripts?.hasAttribute('readOnly')).toBe(true);
       expect(content?.textContent).not.toContain('Choose file');
-      expect(content?.textContent).toContain('Runs before the agent starts.');
+      expect(content?.textContent).toContain('Runs when a snapshot is built');
+
+      click(content?.querySelector('[aria-label="Back to environment"]'));
+      clickButton(content!, 'Start script');
+      content = dialogContent(mounted.container);
+      expect(content?.querySelector('textarea')?.hasAttribute('readOnly')).toBe(true);
+      expect(content?.textContent).toContain('Runs each time a workspace starts');
 
       click(content?.querySelector('[aria-label="Back to environment"]'));
       clickButton(content!, 'Environment variables');
@@ -391,8 +430,8 @@ describe('environment access for members and managers', () => {
     mockCanManage = true;
     const mounted = mount(chipElement());
     try {
-      const trigger = mounted.container.querySelector('[aria-label="Edit environment"]');
-      expect(trigger).not.toBeNull();
+      const trigger = findButton(mounted.container, 'Edit environment');
+      expect(trigger).toBeDefined();
 
       click(trigger);
       const content = dialogContent(mounted.container);
@@ -440,6 +479,38 @@ describe('environment access for members and managers', () => {
       mounted.cleanup();
     }
   });
+});
+
+test.each([false, true])('V2 membership is editable only for managers: canManage=%s', canManage => {
+  mockCanManage = canManage;
+  mockEnvironment = {
+    ...environmentDetail,
+    platform: undefined,
+    repoFullName: undefined,
+    gitlabCloneUrl: undefined,
+    bitbucketWorkspaceUuid: undefined,
+    bitbucketRepositoryUuid: undefined,
+    repositories: [
+      { platform: 'github', repoFullName: 'Kilo-Org/cloud' },
+      { platform: 'github', repoFullName: 'Kilo-Org/cli' },
+    ],
+  };
+  const mounted = mount(chipElement());
+  try {
+    click(findButton(mounted.container, canManage ? 'Edit environment' : 'View environment'));
+    const remove = mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]');
+    expect(remove).not.toBeNull();
+    expect(remove?.closest('fieldset')?.hasAttribute('disabled')).toBe(!canManage);
+    if (canManage) {
+      click(remove);
+      expect(mounted.container.querySelector('[aria-label="Remove Kilo-Org/cli"]')).toBeNull();
+      expect(findButton(mounted.container, 'Save environment')?.disabled).toBe(false);
+    } else {
+      expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
+    }
+  } finally {
+    mounted.cleanup();
+  }
 });
 
 afterEach(() => {

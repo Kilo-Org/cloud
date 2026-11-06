@@ -37,7 +37,7 @@ import type {
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
 import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
 import { BILLING_HEARTBEAT_CALLBACK as VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/metered-billing-lifecycle.js';
-import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
+import { encodeCloudflareProviderRef } from '../../src/sandbox-control/provider-ref.js';
 import type { ContainersLaunchInput } from '../../src/sandbox-containers/SandboxContainers.js';
 import {
   VERCEL_BILLING_SCHEDULE_KEY,
@@ -208,7 +208,7 @@ async function startAllocation(
     });
   }
   await stub.ensureAllocation({
-    provider: options.provider ?? 'cloudflare',
+    provider: options.provider ?? 'cloudflare-containers',
     ...(options.provider === 'vercel'
       ? { byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' } }
       : {}),
@@ -651,6 +651,56 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual(
       Array.from({ length: TIMERS.providerStopLadderMs.length + 1 }, () => provider.refs[0])
     );
+  });
+
+  it('fails a persisted retired Cloudflare pin after eviction without retrying or waiting for the route deadline', async () => {
+    const sandboxId = 'sbx__retired_pin_after_eviction';
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const stub = await startAllocation(provider, {
+      sandboxId,
+      provider: 'cloudflare',
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+
+    await evictAllDurableObjects();
+
+    const sessionId = 'workspace_retired_pin';
+    await insertPreparingRoute(stub, {
+      sessionId,
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    const directPrepare = {
+      spec: {
+        sessionId,
+        kiloSessionId: `kilo-${sessionId}`,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-a1`,
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId: `kilo-${sessionId}`,
+        kiloToken: RUNTIME_AUTHORIZED_KILO_TOKEN,
+      },
+    };
+    expect(await stub.prepare(directPrepare)).toMatchObject({ state: 'preparing' });
+
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    const stopped = await readState(stub);
+    expect(stopped.kind).toBe('stopped');
+    expect(stopped.allocationId).toBeNull();
+    expect(await readAlarm(stub)).toBeNull();
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').provider).toBe('cloudflare');
+    expect(await stub.getProviderRuntime()).toEqual({
+      provider: 'cloudflare',
+      allocationName: sandboxId,
+    });
+    expect((await stub.getStatusSnapshot()).provider).toBe('Cloudflare');
   });
 
   it('fails a container limit denial from the sandbox start without retrying the create', async () => {
@@ -1197,7 +1247,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
 
     const starting = await readState(stub);
-    expect(starting.provider).toBe('cloudflare');
+    expect(starting.provider).toBe('cloudflare-containers');
     expect(await readAlarm(stub)).toBe(starting.firstConnectDeadlineAt);
 
     const { credential, allocationId } = launchIdentity(provider);
@@ -1221,7 +1271,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
 
     expect(provider.createInputs[0]?.billing).toEqual(billing);
-    expect(provider.createInputs[0]?.containment).toEqual({ kilocode: true });
+    expect(provider.createInputs[0]?.containment).toEqual({
+      kilocode: true,
+      github: true,
+      worktreeScoped: true,
+    });
   });
 
   it('stops the sandbox when the wrapper never connects within the first-connect window', async () => {
@@ -1725,7 +1779,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await awaitLaunch(provider);
     const { allocationId } = await connectAndHello(provider, stub);
     const before = await readState(stub);
-    expect(before.provider).toBe('cloudflare');
+    expect(before.provider).toBe('cloudflare-containers');
 
     await evictAllDurableObjects();
     // No fake re-install: the reloaded instance must rebuild from the pin.
@@ -1734,12 +1788,15 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const after = await readState(stub);
     expect(after.providerRef).toBe(before.providerRef);
     expect(after.allocationId).toBe(allocationId);
-    expect(after.provider).toBe('cloudflare');
+    expect(after.provider).toBe('cloudflare-containers');
     const runtime = await runInDurableObject(stub, instance => instance.getProviderRuntime());
-    expect(runtime).toEqual({ provider: 'cloudflare', allocationName: CUSTOM_ALLOCATION_NAME });
+    expect(runtime).toEqual({
+      provider: 'cloudflare-containers',
+      allocationName: CUSTOM_ALLOCATION_NAME,
+    });
     const pin = await readProviderPin(stub);
     expect(pin === null ? null : JSON.parse(pin)).toMatchObject({
-      provider: 'cloudflare',
+      provider: 'cloudflare-containers',
       allocationName: CUSTOM_ALLOCATION_NAME,
     });
   });

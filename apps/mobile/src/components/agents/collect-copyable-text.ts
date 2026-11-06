@@ -7,6 +7,8 @@ import {
 
 import { i18n } from '@/i18n';
 
+import { humanTextParts } from './part-types';
+
 type CopyableMessage = {
   parts: readonly Part[];
 };
@@ -62,10 +64,11 @@ function collectToolPartText(part: ToolPart): string {
  * The message's own prose. The Copy message action reads only these parts:
  * the thinking block the transcript shows above a reply and the tool calls it
  * shows between its paragraphs are transcript chrome, not message text, so
- * they never reach the clipboard ahead of or around the reply.
+ * they never reach the clipboard ahead of or around the reply. Synthetic
+ * server context is chrome too and is dropped when a human text part exists.
  */
 export function messageTextParts(parts: readonly Part[]): Part[] {
-  return parts.filter((part): part is TextPart => isTextPart(part));
+  return humanTextParts(parts);
 }
 
 /**

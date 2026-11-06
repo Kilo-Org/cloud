@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "ネイティブリモートデモ",
+    "sessionsEmpty": "ネイティブセッションはまだありません",
+    "hosts": "オンラインのホスト",
+    "hostsEmpty": "オンラインのホストはありません",
+    "directory": "作業ディレクトリ",
+    "createSession": "ネイティブセッションを作成",
+    "queueIfOffline": "ホストがオフラインの場合はプロンプトを順番待ちにする",
+    "prompt": "プロンプトまたは/command",
+    "localClear": "ローカル表示をクリア",
+    "abort": "ターンを中止",
+    "failed": "ネイティブリモート操作に失敗しました",
+    "creationUnknown": "作成結果が不明です。再試行する前にセッションを更新してください。",
+    "commandFailed": "ランナーのコマンドに失敗しました",
+    "invalidReply": "ランナーからの応答が無効です",
+    "unsafeCommand": "/compact、/new、/skill、/models、/agents、または/clear（ローカルのみ）を使用してください。",
+    "status": "接続：{{connection}} · ランナー：{{runner}}",
+    "presenceStatus": "ホスト：{{connection}}",
+    "commandStatus": "コマンドの配信：{{status}}",
+    "delivered": "配信済み",
+    "expired": "期限切れ"
+  },
   "common": {
     "cancel": "キャンセル",
     "done": "完了",
@@ -189,6 +211,7 @@
     "resendCode": "コードを再送信",
     "termsPrefix": "続行すると、",
     "terms": "利用規約",
+    "termsInSentence": "利用規約",
     "termsConnector": "および",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
@@ -1543,6 +1566,7 @@
       "actionFailed": "この操作を完了できませんでした。もう一度お試しください。",
       "actionBlocked": "この操作を完了できませんでした。再試行するには、まず問題を解決する必要があります。",
       "syncNoRepositories": "同期対象にリポジトリがありません。セキュリティエージェントが監視するリポジトリを選択してから、もう一度同期してください。",
+      "syncNoRepositoriesNoManage": "同期対象にリポジトリがありません。同期するには、組織のオーナー、管理者、または請求管理者がリポジトリを接続する必要があります。",
       "syncIntegrationInactive": "セキュリティエージェントの GitHub 接続が有効になっていません。Kilo GitHub App を再接続してから、もう一度同期してください。",
       "syncMissingPermission": "Kilo GitHub App は vulnerability alerts を読み取れません。GitHub でその権限を付与してから、もう一度同期してください。",
       "configConflict": "セキュリティエージェントの設定が別の場所で変更されました。最新の設定を確認して、もう一度保存してください。"
@@ -2011,6 +2035,7 @@
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
+      "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
     "thresholdTitle": "しきい値の超過",
-    "thresholdSubtitle": "累計支出が上限を超えています",
+    "thresholdSubtitle": "このスコープの選択した期間の累計支出が上限を超えています",
     "anomalyTitle": "毎時の急増",
-    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "anomalySubtitle": "このスコープの1時間あたりのレートが、自身のp95ベースラインを大きく上回っています",
     "limitLabel": "上限 (USD)",
     "windowLabel": "期間",
     "window24h": "24時間",
@@ -3809,14 +3834,14 @@
     "saved": "支出アラートの設定を保存しました",
     "loadError": "支出アラートを読み込めませんでした。",
     "saveError": "支出アラートを保存できませんでした。",
-    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
-    "noSpend": "まだ支出が記録されていません",
+    "sendAlerts": "アラートを送信",
+    "noSpend": "まだ支出なし",
     "spend24h": "過去24時間の支出",
     "multiplierError": "1以上の倍率を入力してください",
     "permissionDenied": "支出アラートを管理する権限がありません。",
     "pushOffByCategory": "通知でオフ",
     "multiplierMaxError": "{{max}}以下の倍率を入力してください",
-    "thresholdMaxError": "{{max}}以下の金額を入力してください。"
+    "thresholdMaxError": "{{max}}以下の金額を入力してください"
   },
   "profiles": {
     "title": "プロフィール",

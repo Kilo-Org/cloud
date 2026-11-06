@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo nativnog daljinskog upravljanja",
+    "sessionsEmpty": "Još nema nativnih sesija",
+    "hosts": "Hostovi na mreži",
+    "hostsEmpty": "Nema hostova na mreži",
+    "directory": "Radni direktorij",
+    "createSession": "Kreiraj nativnu sesiju",
+    "queueIfOffline": "Stavi upit u red čekanja ako host nije na mreži",
+    "prompt": "Upit ili /command",
+    "localClear": "Očisti lokalni prikaz",
+    "abort": "Prekini potez",
+    "failed": "Nativna daljinska radnja nije uspjela",
+    "creationUnknown": "Ishod kreiranja nije poznat. Osvježi sesije prije ponovnog pokušaja.",
+    "commandFailed": "Naredba izvršnog procesa nije uspjela",
+    "invalidReply": "Nevažeći odgovor izvršnog procesa",
+    "unsafeCommand": "Koristi /compact, /new, /skill, /models, /agents ili /clear (samo lokalno).",
+    "status": "Veza: {{connection}} · Izvršni proces: {{runner}}",
+    "presenceStatus": "Hostovi: {{connection}}",
+    "commandStatus": "Isporuka naredbe: {{status}}",
+    "delivered": "Isporučeno",
+    "expired": "Isteklo"
+  },
   "common": {
     "cancel": "Otkaži",
     "done": "Gotovo",
@@ -189,6 +211,7 @@
     "resendCode": "Pošalji kod ponovo",
     "termsPrefix": "Nastavkom prihvataš naše ",
     "terms": "Uslove",
+    "termsInSentence": "Uslove",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više opcija za prijavu",
@@ -2120,6 +2143,7 @@
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem se mora riješiti prije ponovnog pokušaja.",
       "syncNoRepositories": "Nijedan repozitorij nije u obuhvatu sinhronizacije. Odaberite repozitorije koje Sigurnosni agent nadzire, pa ponovo sinhronizujte.",
+      "syncNoRepositoriesNoManage": "Nijedan repozitorij nije u obuhvatu sinhronizacije. Vlasnik organizacije, administrator ili menadžer za naplatu mora povezati repozitorije prije nego što se sinhronizacija može pokrenuti.",
       "syncIntegrationInactive": "Veza s GitHubom za Sigurnosnog agenta nije aktivna. Ponovo povežite Kilo GitHub App, pa ponovo sinhronizirajte.",
       "syncMissingPermission": "Kilo GitHub App ne može čitati vulnerability alerts. Dodijeli to dopuštenje u GitHubu, zatim ponovo sinhronizuj.",
       "configConflict": "Postavke Sigurnosnog agenta promijenjene su na drugom mjestu. Pregledaj najnovije postavke i ponovo sačuvaj."
@@ -2596,6 +2620,7 @@
       "assistantStopped": "Generisanje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predug za model.",
       "assistantProviderError": "Pružalac usluge je vratio grešku.",
+      "assistantProviderRefused": "Pružalac usluge je odbio ovaj zahtjev i nije ga moguće ponoviti.",
       "assistantOutputLimit": "Odgovor je dostigao ograničenje izlaza modela.",
       "assistantStructuredOutput": "Odgovor nije odgovarao potrebnom formatu.",
       "assistantFailed": "Generisanje odgovora nije uspjelo."
@@ -3853,9 +3878,9 @@
   "spendAlerts": {
     "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog obuhvata pređe limit ili skoči iznad uobičajene satne stope.",
     "thresholdTitle": "Prekoračenje praga",
-    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "thresholdSubtitle": "Tekuća potrošnja ovog obuhvata tokom odabranog prozora prelazi tvoj limit",
     "anomalyTitle": "Satni skok",
-    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog obuhvata",
+    "anomalySubtitle": "Satna stopa ovog obuhvata je daleko iznad njegove vlastite p95 osnovne linije",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Prozor",
     "window24h": "24 sata",
@@ -3865,14 +3890,14 @@
     "saved": "Postavke upozorenja o potrošnji su sačuvane",
     "loadError": "Upozorenja o potrošnji nisu učitana.",
     "saveError": "Upozorenja o potrošnji nisu sačuvana.",
-    "empty": "Upozorenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog obuhvata.",
-    "noSpend": "Još nema zabilježene potrošnje",
+    "sendAlerts": "Pošalji upozorenja",
+    "noSpend": "Još nema potrošnje",
     "spend24h": "Potrošnja u posljednja 24 sata",
     "multiplierError": "Unesi množilac 1 ili veći",
     "permissionDenied": "Nemaš dozvolu za upravljanje upozorenjima o potrošnji.",
     "pushOffByCategory": "Isključeno u Obavijestima",
     "multiplierMaxError": "Unesi množilac {{max}} ili manji",
-    "thresholdMaxError": "Unesi iznos {{max}} ili manji."
+    "thresholdMaxError": "Unesi iznos {{max}} ili manji"
   },
   "profiles": {
     "title": "Profili",

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demonstração de controlo remoto nativo",
+    "sessionsEmpty": "Ainda não há sessões nativas",
+    "hosts": "Hosts online",
+    "hostsEmpty": "Nenhum host online",
+    "directory": "Diretório de trabalho",
+    "createSession": "Criar sessão nativa",
+    "queueIfOffline": "Colocar o prompt na fila se o host estiver offline",
+    "prompt": "Prompt ou /command",
+    "localClear": "Limpar vista local",
+    "abort": "Interromper turno",
+    "failed": "Falha na ação remota nativa",
+    "creationUnknown": "Resultado da criação desconhecido. Atualize as sessões antes de tentar novamente.",
+    "commandFailed": "Falha no comando do executor",
+    "invalidReply": "Resposta inválida do executor",
+    "unsafeCommand": "Use /compact, /new, /skill, /models, /agents ou /clear (apenas localmente).",
+    "status": "Ligação: {{connection}} · Executor: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Entrega do comando: {{status}}",
+    "delivered": "Entregue",
+    "expired": "Expirado"
+  },
   "common": {
     "cancel": "Cancelar",
     "done": "Concluir",
@@ -189,6 +211,7 @@
     "resendCode": "Reenviar código",
     "termsPrefix": "Ao continuar, aceitas os nossos ",
     "terms": "Termos",
+    "termsInSentence": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mais opções de início de sessão",
@@ -2126,6 +2149,7 @@
       "actionFailed": "Não foi possível concluir esta ação. Tenta novamente.",
       "actionBlocked": "Não foi possível concluir esta ação. O problema tem de ser resolvido antes de tentares novamente.",
       "syncNoRepositories": "Nenhum repositório está no escopo de sincronização. Escolha os repositórios que o Agente de segurança monitora e sincronize novamente.",
+      "syncNoRepositoriesNoManage": "Nenhum repositório está no escopo de sincronização. Um proprietário da organização, um administrador ou um gestor de faturação tem de ligar repositórios antes de a sincronização poder ser executada.",
       "syncIntegrationInactive": "A conexão com o GitHub do Agente de segurança não está ativa. Reconecte o GitHub App do Kilo e sincronize novamente.",
       "syncMissingPermission": "A aplicação do Kilo no GitHub não consegue ler os alertas de vulnerabilidade. Concede essa permissão no GitHub e sincroniza novamente.",
       "configConflict": "As definições do agente de segurança foram alteradas noutro local. Revê as definições mais recentes e guarda novamente."
@@ -2602,6 +2626,7 @@
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O fornecedor devolveu um erro.",
+      "assistantProviderRefused": "O fornecedor rejeitou este pedido e não é possível repeti-lo.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "A resposta falhou."
@@ -3859,9 +3884,9 @@
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
     "thresholdTitle": "Ultrapassagem do limite",
-    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "thresholdSubtitle": "Os gastos acumulados deste âmbito na janela escolhida ultrapassam o seu limite",
     "anomalyTitle": "Pico horário",
-    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste âmbito",
+    "anomalySubtitle": "O ritmo horário deste âmbito está muito acima da sua própria linha de base p95",
     "limitLabel": "Limite (USD)",
     "windowLabel": "Janela",
     "window24h": "24 horas",
@@ -3871,14 +3896,14 @@
     "saved": "Definições dos alertas de gastos guardadas",
     "loadError": "Não foi possível carregar os alertas de gastos.",
     "saveError": "Não foi possível guardar os alertas de gastos.",
-    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contactos de faturação deste âmbito.",
-    "noSpend": "Ainda não há gastos registados",
+    "sendAlerts": "Enviar alertas",
+    "noSpend": "Ainda sem gastos",
     "spend24h": "Gastos nas últimas 24 horas",
     "multiplierError": "Introduza um multiplicador de 1 ou mais",
     "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
     "pushOffByCategory": "Desativado em Notificações",
     "multiplierMaxError": "Introduza um multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduza um valor de {{max}} ou menos."
+    "thresholdMaxError": "Introduza um valor de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfis",

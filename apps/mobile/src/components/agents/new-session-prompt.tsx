@@ -2,10 +2,14 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  createAnimatedComponent,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { useKeyboardMotionProgress } from '@/components/keyboard-motion-provider';
 import {
   AccessibilityInfo,
-  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
@@ -17,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
@@ -96,6 +101,7 @@ const PROMPT_TOP_FADE_STYLE = {
   top: PROMPT_INPUT_VERTICAL_INSET,
 } as const;
 const PROMPT_TOP_FADE_FILL = { flex: 1 } as const;
+const AnimatedPromptInput = createAnimatedComponent(RNTextInput);
 
 type NewSessionPromptComponentProps = NewSessionPromptProps & {
   /**
@@ -143,7 +149,10 @@ export function NewSessionPrompt({
   voiceInputSettlerRef,
   initialPrompt,
   frameHeight,
+  keyboardClosedFrameHeight,
   cardTop = 0,
+  lineCount = NEW_SESSION_PROMPT_DEFAULT_LINES,
+  keyboardClosedLineCount = lineCount,
   onStartSession,
   isCloneEntry = false,
   autoFocusOnMount = true,
@@ -191,27 +200,30 @@ export function NewSessionPrompt({
     attachment => attachment.metadataStripFailed === true
   );
   const showsCounter = counterRemaining !== null;
-  // The chrome the card renders around the input, measured by the card's
-  // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
-  // the frame leaves for the input.
-  const [cardChromeHeight, setCardChromeHeight] = useState(0);
-  // The input is one size whatever the draft holds: the 3-line floor, lowered
-  // only where the frame cannot hold it (the keyboard up on a short window). A
-  // draft taller than the field scrolls inside it. Sizing the field to its text
-  // made every row below it move once the stored draft loaded, seconds after
-  // the screen opened, so the composer is content-independent instead.
-  const promptHeight = resolveNewSessionPromptMinHeight({
-    frameHeight: frameHeight ?? 0,
+  const [topChromeHeight, setTopChromeHeight] = useState(0);
+  const [bottomChromeHeight, setBottomChromeHeight] = useState(0);
+  const cardChromeHeight =
+    topChromeHeight > 0 && bottomChromeHeight > 0 ? topChromeHeight + bottomChromeHeight + 2 : 0;
+  const fit = {
     cardTop,
     cardChromeHeight,
-    // The shared helper keeps the preferred 3-line floor in one place.
-    preferredMinHeight: resolveNewSessionPromptHeight(
-      promptLineHeight,
-      NEW_SESSION_PROMPT_DEFAULT_LINES
-    ),
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, lineCount),
     lineHeight: promptLineHeight,
-    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+    preferredLines: lineCount,
+  };
+  const promptHeight = resolveNewSessionPromptMinHeight({ ...fit, frameHeight: frameHeight ?? 0 });
+  const closedPromptHeight = resolveNewSessionPromptMinHeight({
+    ...fit,
+    preferredMinHeight: resolveNewSessionPromptHeight(promptLineHeight, keyboardClosedLineCount),
+    preferredLines: keyboardClosedLineCount,
+    frameHeight: keyboardClosedFrameHeight ?? frameHeight ?? 0,
   });
+  const keyboardProgress = useKeyboardMotionProgress();
+  const promptHeightStyle = useAnimatedStyle(() => ({
+    height:
+      closedPromptHeight +
+      (promptHeight - closedPromptHeight) * Math.max(0, Math.min(1, keyboardProgress.value)),
+  }));
 
   // The draft's own laid-out height, reported by the input on every content
   // change. The field keeps its size, so this only decides whether a vertical
@@ -249,6 +261,10 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     textAlignVertical: 'top',
   } satisfies TextStyle;
+  // The one-line floor is shorter than the touch target. The slop makes the
+  // field's whole height reachable without taking room from the sections under
+  // the card, which the short window has none of.
+  const promptHitSlopDp = Math.max(0, (TOUCH_TARGET_DP - promptHeight) / 2);
 
   // Publish the counter only when the value the card renders changes: the
   // count stays hidden until the draft nears the limit, and republishing the
@@ -357,16 +373,6 @@ export function NewSessionPrompt({
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
   });
 
-  function handleCardLayout(event: LayoutChangeEvent) {
-    const { height } = event.nativeEvent.layout;
-    // Everything the card renders other than the input itself, which is a
-    // constant here, so one layout pass settles it. The card's `y` is not read
-    // here: it is relative to the padding-free host wrapper, so the host passes
-    // the frame-relative offset as `cardTop` instead.
-    const nextChromeHeight = height - promptHeight;
-    setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
-  }
-
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
@@ -428,62 +434,66 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View
-      onLayout={handleCardLayout}
-      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]"
-    >
-      {isModelsError && modelOptions.length === 0 ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('organization.boundary.loadErrorMessage')}
-          onRetry={() => {
-            onRefetchModels();
-          }}
-          className="border-b border-border py-4"
+    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+      <View
+        className="pb-2"
+        onLayout={event => {
+          setTopChromeHeight(event.nativeEvent.layout.height);
+        }}
+      >
+        {isModelsError && modelOptions.length === 0 ? (
+          <QueryError
+            placement="top"
+            variant="server"
+            title={t('agentChat.newSession.couldNotLoadModels')}
+            message={t('organization.boundary.loadErrorMessage')}
+            onRetry={() => {
+              onRefetchModels();
+            }}
+            className="border-b border-border py-4"
+          />
+        ) : (
+          <ChatToolbar
+            modeControl={{ mode, onModeChange, customOptions }}
+            model={model}
+            variant={variant}
+            modelOptions={modelOptions}
+            onModelSelect={onModelSelect}
+            disabled={isCreating}
+            isLoadingModels={isLoadingModels}
+            modelLocked={modelLocked}
+            modelLockLabel={modelLockLabel}
+            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+          />
+        )}
+        {sharePrefill.failed ? (
+          <SharePrefillFailure
+            onRetry={() => {
+              sharePrefill.retry();
+            }}
+            onDismiss={() => {
+              sharePrefill.dismiss();
+            }}
+          />
+        ) : null}
+        <AttachmentPreviewStrip
+          attachments={attachments}
+          onRemove={onRemoveAttachment}
+          onRetry={onRetryAttachment}
+          onMove={onMoveAttachment}
+          onReorder={onReorderAttachments}
         />
-      ) : (
-        <ChatToolbar
-          modeControl={{ mode, onModeChange, customOptions }}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
-      {sharePrefill.failed ? (
-        <SharePrefillFailure
-          onRetry={() => {
-            sharePrefill.retry();
-          }}
-          onDismiss={() => {
-            sharePrefill.dismiss();
-          }}
-        />
-      ) : null}
-      <AttachmentPreviewStrip
-        attachments={attachments}
-        onRemove={onRemoveAttachment}
-        onRetry={onRetryAttachment}
-        onMove={onMoveAttachment}
-        onReorder={onReorderAttachments}
-      />
-      {showsAttachmentStatus ? (
-        <AccessibleStatus
-          tone="error"
-          message={t('agentChat.composer.photoMetadataNotRemoved')}
-          className="mb-2 px-4 text-xs"
-        />
-      ) : null}
-      <View className="px-2 pt-2">
+        {showsAttachmentStatus ? (
+          <AccessibleStatus
+            tone="error"
+            message={t('agentChat.composer.photoMetadataNotRemoved')}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+      </View>
+      <View className="px-2">
         <View>
-          <RNTextInput
+          <AnimatedPromptInput
             ref={promptInputRef}
             placeholder={t('agentChat.newSession.promptPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
@@ -498,13 +508,18 @@ export function NewSessionPrompt({
             className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
             style={[
               promptInputStyle,
-              { height: promptHeight },
+              promptHeightStyle,
               Platform.OS === 'android'
                 ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
                 : undefined,
             ]}
             onChangeText={handlePromptChange}
             onSelectionChange={handlePromptSelectionChange}
+            hitSlop={
+              promptHitSlopDp > 0
+                ? { top: promptHitSlopDp, right: 0, bottom: promptHitSlopDp, left: 0 }
+                : undefined
+            }
             onContentSizeChange={event => {
               const next = Math.round(event.nativeEvent.contentSize.height * 100) / 100;
               setContentHeight(current => (current === next ? current : next));
@@ -549,45 +564,51 @@ export function NewSessionPrompt({
             </Animated.View>
           ) : null}
         </View>
-        {showsCounter ? (
-          <View className="flex-row justify-end px-1 pb-1">
-            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-            <Text
-              className="text-xs font-normal text-muted-foreground"
-              accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                count: counterRemaining,
-              })}
-            >
-              {counterRemaining}
-            </Text>
-          </View>
-        ) : null}
-        <NewSessionPromptControls
-          control={control}
-          voiceInput={voiceInput}
-          onAddAttachment={onAddAttachment}
-          pasteClipboard={pasteClipboard}
+        <View
+          onLayout={event => {
+            setBottomChromeHeight(event.nativeEvent.layout.height);
+          }}
         >
-          {returnSendsMessage ? (
-            <View className="ml-1">
-              <Pressable
-                onPress={handleInsertNewline}
-                disabled={control.draftMutationLocked}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('agentChat.composer.insertNewline')}
-                accessibilityState={{ disabled: control.draftMutationLocked }}
-                style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
-                className={cn(
-                  'items-center justify-center rounded-full active:opacity-70',
-                  control.draftMutationLocked && 'opacity-50'
-                )}
+          {showsCounter ? (
+            <View className="flex-row justify-end px-1 pb-1">
+              {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+              <Text
+                className="text-xs font-normal text-muted-foreground"
+                accessibilityLabel={t('agentChat.composer.charactersRemaining', {
+                  count: counterRemaining,
+                })}
               >
-                <CornerDownLeft size={18} color={colors.mutedForeground} />
-              </Pressable>
+                {counterRemaining}
+              </Text>
             </View>
           ) : null}
-        </NewSessionPromptControls>
+          <NewSessionPromptControls
+            control={control}
+            voiceInput={voiceInput}
+            onAddAttachment={onAddAttachment}
+            pasteClipboard={pasteClipboard}
+          >
+            {returnSendsMessage ? (
+              <View className="ml-1">
+                <Pressable
+                  onPress={handleInsertNewline}
+                  disabled={control.draftMutationLocked}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('agentChat.composer.insertNewline')}
+                  accessibilityState={{ disabled: control.draftMutationLocked }}
+                  style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
+                  className={cn(
+                    'items-center justify-center rounded-full active:opacity-70',
+                    control.draftMutationLocked && 'opacity-50'
+                  )}
+                >
+                  <CornerDownLeft size={18} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+            ) : null}
+          </NewSessionPromptControls>
+        </View>
       </View>
     </View>
   );

@@ -135,6 +135,17 @@ describe('PrOverviewMeta', () => {
     expect(pending.props.color).toBe(lightColors.mutedForeground);
   });
 
+  it('marks a reviewer without an avatar with the account initial', () => {
+    const renderer = render(
+      overview({ reviewers: [{ login: 'ada', avatarUrl: null, state: 'APPROVED' }] })
+    );
+    // GitHub reported no avatar, so the row must not paint an empty circle.
+    expect(renderer.root.findAll(node => String(node.type) === 'Image')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text' && node.props.children === 'A')
+    ).toHaveLength(1);
+  });
+
   it('drops a pending reviewer once the pull request is no longer open', () => {
     const reviewers = [
       { login: 'ada', avatarUrl: null, state: 'APPROVED' as const },

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo af native-fjernstyring",
+    "sessionsEmpty": "Ingen native-sessioner endnu",
+    "hosts": "Værter online",
+    "hostsEmpty": "Ingen værter online",
+    "directory": "Arbejdsmappe",
+    "createSession": "Opret native-session",
+    "queueIfOffline": "Sæt prompt i kø, hvis værten er offline",
+    "prompt": "Prompt eller /command",
+    "localClear": "Ryd lokal visning",
+    "abort": "Afbryd tur",
+    "failed": "Handling via native-fjernstyring mislykkedes",
+    "creationUnknown": "Resultatet af oprettelsen er ukendt. Opdater sessionerne, før du prøver igen.",
+    "commandFailed": "Runner-kommando mislykkedes",
+    "invalidReply": "Ugyldigt svar fra runner",
+    "unsafeCommand": "Brug /compact, /new, /skill, /models, /agents eller /clear (kun lokalt).",
+    "status": "Forbindelse: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Værter: {{connection}}",
+    "commandStatus": "Kommandolevering: {{status}}",
+    "delivered": "Leveret",
+    "expired": "Udløbet"
+  },
   "common": {
     "cancel": "Annuller",
     "done": "Færdig",
@@ -189,6 +211,7 @@
     "resendCode": "Send kode igen",
     "termsPrefix": "Ved at fortsætte accepterer du vores ",
     "terms": "Vilkår",
+    "termsInSentence": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere muligheder for login",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Handlingen kunne ikke gennemføres. Prøv igen.",
       "actionBlocked": "Handlingen kunne ikke gennemføres. Problemet skal løses, før du kan prøve igen.",
       "syncNoRepositories": "Der er ingen kodelagre i synkroniseringsomfanget. Vælg de kodelagre, som Sikkerhedsagenten overvåger, og synkroniser derefter igen.",
+      "syncNoRepositoriesNoManage": "Der er ingen kodelagre i synkroniseringsomfanget. En organisationsejer, administrator eller faktureringsansvarlig skal forbinde kodelagre, før der kan synkroniseres.",
       "syncIntegrationInactive": "GitHub-forbindelsen for Sikkerhedsagenten er ikke aktiv. Genopret forbindelsen til Kilos GitHub-app, og synkroniser derefter igen.",
       "syncMissingPermission": "Kilos GitHub-app kan ikke læse sårbarhedsadvarsler. Giv den tilladelse i GitHub, og synkroniser derefter igen.",
       "configConflict": "Sikkerhedsagentens indstillinger er ændret et andet sted. Gennemgå de nyeste indstillinger, og gem igen."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Genereringen af svaret blev stoppet.",
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
       "assistantProviderError": "Udbyderen returnerede en fejl.",
+      "assistantProviderRefused": "Udbyderen afviste denne anmodning, og den kan ikke forsøges igen.",
       "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
       "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "Send en advarsel via e-mail eller push til faktureringskontakterne, når dette områdes forbrug overskrider en grænse eller stiger over den sædvanlige timesats.",
     "thresholdTitle": "Grænseoverskridelse",
-    "thresholdSubtitle": "Løbende forbrug overskrider din grænse",
+    "thresholdSubtitle": "Dette områdes løbende forbrug i det valgte vindue overskrider din grænse",
     "anomalyTitle": "Spike pr. time",
-    "anomalySubtitle": "En time er langt over dette områdes sædvanlige sats",
+    "anomalySubtitle": "Dette områdes sats pr. time er langt over dets egen p95-baseline",
     "limitLabel": "Grænse (USD)",
     "windowLabel": "Vindue",
     "window24h": "24 timer",
@@ -3809,14 +3834,14 @@
     "saved": "Indstillinger for forbrugsadvarsler er gemt",
     "loadError": "Forbrugsadvarsler kunne ikke indlæses.",
     "saveError": "Forbrugsadvarsler kunne ikke gemmes.",
-    "empty": "Forbrugsadvarsler er slået fra. Slå dem til for at advare dette områdes faktureringskontakter.",
-    "noSpend": "Der er endnu ikke registreret noget forbrug",
+    "sendAlerts": "Send advarsler",
+    "noSpend": "Endnu intet forbrug",
     "spend24h": "Forbrug de seneste 24 timer",
     "multiplierError": "Angiv en multiplikator på 1 eller mere",
     "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
     "pushOffByCategory": "Fra i Notifikationer",
     "multiplierMaxError": "Angiv en multiplikator på {{max}} eller mindre",
-    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre."
+    "thresholdMaxError": "Angiv et beløb på {{max}} eller mindre"
   },
   "profiles": {
     "title": "Profiler",

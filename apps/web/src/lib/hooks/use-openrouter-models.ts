@@ -110,9 +110,11 @@ export function useOpenRouterProviders() {
 export function useModelSelectorList(
   organizationId: string | undefined,
   enabled = true,
-  audience: OrganizationModelAudience = 'member'
+  audience: OrganizationModelAudience = 'member',
+  cacheOptions?: { staleTime: number; gcTime: number }
 ) {
   const query = useQuery({
+    ...cacheOptions,
     queryKey: ['openrouter-models', organizationId, audience],
     enabled,
     queryFn: async (): Promise<OpenRouterModelsResponse> => {

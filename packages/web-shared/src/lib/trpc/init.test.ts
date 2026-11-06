@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import * as z from 'zod';
+import { TRPCError } from '@trpc/server';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   adminProcedure,
@@ -18,6 +19,11 @@ import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({
   ping: adminProcedure.query(() => 'ok'),
+  chainedDenial: adminProcedure
+    .use(async () => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Specialized guard denied' });
+    })
+    .query(() => 'unreachable'),
   // Stands in for the `is_admin` bypasses on regular procedures, which can only
   // name their procedure if `baseProcedure` publishes it onto the context.
   bypass: baseProcedure.mutation(async ({ ctx }) => {
@@ -78,13 +84,59 @@ describe('adminProcedure admin_access telemetry', () => {
 
     await caller.ping();
 
-    expect(events).toHaveLength(1);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
     expect(events[0]).toMatchObject({
       surface: 'trpc',
       kind: 'admin_guard',
       authVia: 'token',
       adminTier: 'platform_admin',
+      credential: 'delegated_workload',
+      wouldBlock: true,
       tokenSource: 'cloud-agent',
+    });
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'delegated_workload',
+      outcome: 'succeeded',
+      actionClass: 'platform_read',
+    });
+  });
+
+  test('emits denied, not succeeded, when a chained guard refuses the request', async () => {
+    const caller = createCaller(
+      ctxFor({
+        user: defineTestUser({ is_admin: true, is_super_admin: false }),
+        authViaToken: true,
+      })
+    );
+
+    await expect(caller.chainedDenial()).rejects.toThrow();
+
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    expect(events[1]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      wouldBlock: true,
+    });
+  });
+
+  test('emits a denied privileged_access event for a non-admin bearer caller', async () => {
+    const caller = createCaller(
+      ctxFor({ user: defineTestUser({ is_admin: false }), authViaToken: true })
+    );
+
+    await expect(caller.ping()).rejects.toThrow();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'privileged_access',
+      credential: 'human_bearer',
+      outcome: 'denied',
+      actionClass: 'platform_read',
+      adminTier: null,
+      email: null,
+      wouldBlock: true,
     });
   });
 
@@ -203,6 +255,9 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         .input(z.object({ sessionId: z.string() }).strict())
         .mutation(({ input }) => input),
     }),
+    models: createTRPCRouter({
+      list: baseProcedure.query(() => 'models'),
+    }),
     organizations: createTRPCRouter({
       cloudAgentNext: createTRPCRouter({
         getSession: baseProcedure
@@ -229,9 +284,15 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         .input(z.object({ cloudAgentSessionId: z.string() }).strict())
         .mutation(({ input }) => input),
     }),
+    models: createTRPCRouter({
+      list: baseProcedure.mutation(() => 'models'),
+    }),
   });
 
   const outsideAllowlistRouter = createTRPCRouter({
+    models: createTRPCRouter({
+      preferred: baseProcedure.query(() => 'preferred'),
+    }),
     user: createTRPCRouter({
       getMe: baseProcedure.query(() => 'me'),
     }),
@@ -264,6 +325,32 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
     await expect(
       caller.cloudAgentNext.interruptSession({ sessionId: childSessionId })
     ).resolves.toEqual({ sessionId: childSessionId });
+    await expect(caller.models.list()).resolves.toBe('models');
+  });
+
+  test('allows only strict empty models.list discovery for both scopes', async () => {
+    const personal = scopedCaller(context(authority));
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const organization = scopedCaller(context({ ...authority, organizationId }));
+
+    await expect(personal.models.list()).resolves.toBe('models');
+    await expect(organization.models.list()).resolves.toBe('models');
+    await expect((personal.models.list as (input: unknown) => Promise<unknown>)({})).resolves.toBe(
+      'models'
+    );
+    for (const caller of [personal, organization]) {
+      for (const input of [{ organizationId }, { extra: true }, null]) {
+        await expect(
+          (caller.models.list as (input: unknown) => Promise<unknown>)(input)
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
+    }
+  });
+
+  test('denies other models procedures even when the name is adjacent', async () => {
+    await expect(outsideCaller(context(authority)).models.preferred()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   test('denies a procedure whose registered kind does not match the authority kind', async () => {
@@ -272,6 +359,9 @@ describe('cloudAgentAuthorityMiddleware exact procedure allowlist', () => {
         cloudAgentSessionId: childSessionId,
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(wrongKindCaller(context(authority)).models.list()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   test('denies procedures outside the authority allowlist', async () => {

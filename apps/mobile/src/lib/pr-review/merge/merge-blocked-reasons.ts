@@ -321,6 +321,21 @@ export function prMergeDescription(method: AllowedMergeMethod): string {
   return i18n.t(PR_MERGE_DESCRIPTION_KEYS[method]);
 }
 
+function isAllowedMergeMethod(value: string): value is AllowedMergeMethod {
+  return value === 'merge' || value === 'squash' || value === 'rebase';
+}
+
+/**
+ * The method name for a value that arrives on the wire (`lowercase` GitHub codes,
+ * and whatever a provider sends). Prose that names the method interpolates this,
+ * never the code itself; a value this build does not know is passed on exactly as
+ * received.
+ */
+export function prMergeMethodName(method: string): string {
+  const code = method.toLowerCase();
+  return isAllowedMergeMethod(code) ? prMergeShortLabel(code) : method;
+}
+
 /** The default method the picker selects on first open. */
 export function defaultMergeMethodFor(repo: PrOverviewRepoSettings): AllowedMergeMethod {
   const allowed = getAllowedMergeMethods(repo);

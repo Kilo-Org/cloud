@@ -23,6 +23,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  apiRequestLogBlobSchema,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import type { RewriteResponseParams } from './rewriteModelResponse.shared';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
@@ -2044,6 +2048,149 @@ async function rewriteUsageFixture(
   return { payload: envelope.message ?? envelope.response ?? envelope, objects };
 }
 
+describe('Vercel provider metadata rewriting', () => {
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
+  const metadata = {
+    gateway: {
+      cost: '0.25',
+      routing: {
+        finalProvider: 'amazon-bedrock',
+        modelAttempts: [
+          {
+            success: true,
+            providerAttempts: [
+              { provider: 'openai', success: false, error: { code: 'rate_limit' } },
+              { provider: 'amazon-bedrock', success: true, credentialType: 'byok' },
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  beforeEach(() => {
+    jest.spyOn(fakeR2, 'send');
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-ai-provider-metadata',
+      R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+      R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+    });
+    fakeR2.objects.clear();
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  function expectNoArchiveIO() {
+    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(fakeR2.send).not.toHaveBeenCalled();
+    expect(fakeR2.objects.size).toBe(0);
+  }
+
+  describe.each(usageShapes)('$kind', shape => {
+    describe.each([false, true])('stream=%s', stream => {
+      test.each(['provider_metadata', 'providerMetadata'])(
+        'strips %s without scheduling archive IO',
+        async metadataKey => {
+          const payload = {
+            id: 'gen_metadata_test',
+            model: 'upstream-model',
+            usage: { ...shape.tokens },
+            [metadataKey]: metadata,
+            ...(shape.kind === 'chat_completions'
+              ? {
+                  choices: [
+                    {
+                      index: 0,
+                      ...(stream
+                        ? { delta: { content: 'answer' } }
+                        : { message: { role: 'assistant', content: 'answer' } }),
+                    },
+                  ],
+                }
+              : {}),
+          };
+          const body =
+            !stream || shape.kind === 'chat_completions'
+              ? payload
+              : shape.kind === 'messages'
+                ? { type: 'message_start', message: payload }
+                : { type: 'response.completed', response: payload };
+          const result = await rewriteModelResponse({
+            response: stream
+              ? sseResponse(`data: ${JSON.stringify(body)}\n\n`)
+              : jsonResponse(body),
+            model: 'requested-model',
+            providerId: 'vercel',
+            kind: shape.kind,
+            isFree: false,
+            userByok: false,
+            customLlmPricing: null,
+            logging: makeLogging(),
+            responseTransforms: null,
+          });
+          const output = stream
+            ? await readOutputStream(result)
+            : JSON.stringify(await result.json());
+
+          expect(output).not.toContain('provider_metadata');
+          expect(output).not.toContain('providerMetadata');
+          expectNoArchiveIO();
+        }
+      );
+    });
+  });
+
+  test.each([false, true])(
+    'strips nested Chat Completions metadata without usage or archive IO, stream=%s',
+    async stream => {
+      const choice = { content: 'answer', provider_metadata: metadata };
+      const body = {
+        id: 'gen_metadata_test',
+        choices: [{ index: 0, ...(stream ? { delta: choice } : { message: choice }) }],
+      };
+      const result = await rewriteModelResponse({
+        response: stream ? sseResponse(`data: ${JSON.stringify(body)}\n\n`) : jsonResponse(body),
+        model: 'requested-model',
+        providerId: 'vercel',
+        kind: 'chat_completions',
+        isFree: false,
+        userByok: false,
+        customLlmPricing: null,
+        logging: makeLogging(),
+        responseTransforms: null,
+      });
+      const output = stream ? await readOutputStream(result) : JSON.stringify(await result.json());
+
+      expect(output).not.toContain('provider_metadata');
+      expectNoArchiveIO();
+    }
+  );
+
+  test('does not perform archive IO for observed metadata before an upstream disconnect', async () => {
+    const result = await rewriteModelResponse({
+      response: failingResponse(
+        'text/event-stream',
+        'ResponseAborted',
+        `data: ${JSON.stringify({ id: 'gen_metadata_test', choices: [], provider_metadata: metadata })}\n\n`
+      ),
+      model: 'requested-model',
+      providerId: 'vercel',
+      kind: 'chat_completions',
+      isFree: false,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging(),
+      responseTransforms: null,
+    });
+
+    expect(await readOutputStream(result)).toContain('upstream_disconnect');
+    expectNoArchiveIO();
+  });
+});
+
 describe.each(usageShapes)('$kind billed usage normalization', shape => {
   describe.each([false, true])('stream=%s', stream => {
     describe.each(['openrouter', 'vercel'] as const)('%s', provider => {
@@ -2937,9 +3084,13 @@ describe('api_request_log storage', () => {
     await db.delete(api_request_log).where(eq(api_request_log.vercel_request_id, vercelRequestId));
   });
 
-  test('stores the redacted request and raw response in R2', async () => {
+  test('stores the redacted request and raw response with one R2 upload', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
     await logUpstreamError();
 
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(fakeR2.objects.size).toBe(1);
     expect(fakeR2.credentials).toEqual({
       accessKeyId: 'mock-test-api-request-log-access-key',
       secretAccessKey: 'mock-test-api-request-log-secret-key',
@@ -2952,17 +3103,137 @@ describe('api_request_log storage', () => {
       response: null,
       error: null,
     });
-    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/request\.json$/);
-    expect(row.response_r2_key).toBe(row.request_r2_key?.replace('request.json', 'response.txt'));
+    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/record\.v1\.json$/);
+    expect(row.response_r2_key).toBe(row.request_r2_key);
     expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
-      model: 'kilo-internal/my-model',
-      messages: [{ role: 'user', content: 'hello' }],
-      providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
+      version: 1,
+      request: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+        providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
+      },
+      response: JSON.stringify({ error: 'upstream error' }),
     });
-    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
-      JSON.stringify({ error: 'upstream error' })
-    );
   });
+
+  test('awaits Enkrypt calls only in after() and stores them with the request and response in one PUT', async () => {
+    const send = jest.spyOn(fakeR2, 'send');
+    const pending = Promise.withResolvers<EnkryptRequestLog[]>();
+    const getterStarted = Promise.withResolvers<void>();
+    const enkrypt = jest.fn(() => {
+      getterStarted.resolve();
+      return pending.promise;
+    });
+    const calls: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        request: {
+          text: 'hello',
+          detectors: { injection_attack: { enabled: true, need_explanation: false } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "injection_attack": 0 }, "vendor_detail": "raw input" }',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        request: {
+          text: 'hello back',
+          detectors: { pii: { enabled: true, entities: ['secrets'] } },
+          user_metadata: { organization_id: 'org-1' },
+        },
+        response: '{ "summary": { "pii": 0 }, "vendor_detail": "raw output" }',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'kilo-internal/my-model',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    } satisfies GatewayRequest;
+    const upstream = { model: 'upstream-model', choices: [] };
+    mockedOptIn.mockResolvedValueOnce('all');
+
+    const response = await rewriteModelResponse({
+      response: jsonResponse(upstream),
+      model: request.body.model,
+      providerId: 'custom',
+      kind: request.kind,
+      isFree: true,
+      userByok: false,
+      customLlmPricing: null,
+      logging: makeLogging({ vercel_request_id: vercelRequestId, request, enkrypt }),
+      responseTransforms: null,
+    });
+    await response.text();
+
+    expect(enkrypt).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    const persisted = runScheduledLogInsert();
+    await getterStarted.promise;
+    try {
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+    } finally {
+      pending.resolve(calls);
+      await persisted;
+    }
+
+    const row = await selectLoggedRow();
+    expect(enkrypt).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    expect(row.response_r2_key).toBe(row.request_r2_key);
+    expect(fakeR2.objects.size).toBe(1);
+    expect(
+      apiRequestLogBlobSchema.parse(
+        JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')
+      )
+    ).toEqual({
+      version: 1,
+      request: request.body,
+      response: JSON.stringify(upstream),
+      enkrypt: calls,
+    });
+  });
+
+  test.each([null, 'errors_only'] as const)(
+    'disables Enkrypt response capture in after() for a successful response with logging mode %s',
+    async mode => {
+      const send = jest.spyOn(fakeR2, 'send');
+      const enkrypt = jest.fn(
+        async (_captureResponse?: boolean): Promise<EnkryptRequestLog[]> => []
+      );
+      mockedOptIn.mockResolvedValueOnce(mode);
+      const response = await rewriteModelResponse({
+        response: jsonResponse({ model: 'upstream-model', choices: [] }),
+        model: 'kilo-internal/my-model',
+        providerId: 'custom',
+        kind: 'chat_completions',
+        isFree: true,
+        userByok: false,
+        customLlmPricing: null,
+        logging: makeLogging({ vercel_request_id: vercelRequestId, enkrypt }),
+        responseTransforms: null,
+      });
+      await response.text();
+
+      expect(enkrypt).not.toHaveBeenCalled();
+      await runScheduledLogInsert();
+
+      expect(enkrypt).toHaveBeenCalledTimes(1);
+      expect(enkrypt).toHaveBeenCalledWith(false);
+      expect(send).not.toHaveBeenCalled();
+      expect(await selectLoggedRows()).toEqual([]);
+      expect(fakeR2.objects.size).toBe(0);
+    }
+  );
 
   test('keeps the log row and records the failure when the R2 upload fails', async () => {
     jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
@@ -2975,28 +3246,9 @@ describe('api_request_log storage', () => {
       request_r2_key: null,
       response_r2_key: null,
       error: {
-        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+        r2_upload_error: 'Error: R2 unavailable',
       },
     });
-  });
-
-  test('records the key of a body that was uploaded when the other upload fails', async () => {
-    const send = fakeR2.send.bind(fakeR2);
-    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
-      if (command instanceof PutObjectCommand && command.input.Key?.endsWith('/response.txt')) {
-        throw new Error('R2 unavailable');
-      }
-      return send(command);
-    });
-
-    await logUpstreamError();
-
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      response_r2_key: null,
-      error: { r2_upload_error: 'response: Error: R2 unavailable' },
-    });
-    expect(fakeR2.objects.has(`${bucket}/${row.request_r2_key}`)).toBe(true);
   });
 
   test('logs upstream error statuses for errors-only opt-ins', async () => {
@@ -3004,7 +3256,7 @@ describe('api_request_log storage', () => {
 
     const row = await selectLoggedRow();
     expect(row).toMatchObject({ status_code: 400, error: null });
-    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
+    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`) ?? '').response).toBe(
       JSON.stringify({ error: 'upstream error' })
     );
   });
@@ -3032,6 +3284,14 @@ describe('api_request_log storage', () => {
       status_code: 200,
       error: { response_body_read_error: expect.stringContaining('upstream disconnected') },
     });
+    expect(row.request_r2_key).not.toBeNull();
+    expect(row.response_r2_key).toBe(row.request_r2_key);
+    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toMatchObject({
+      version: 1,
+      request: expect.any(Object),
+      response: null,
+    });
+    expect(fakeR2.objects.size).toBe(1);
   });
 
   test('logs successful responses for opt-ins that log all requests', async () => {
@@ -3065,7 +3325,7 @@ describe('api_request_log storage', () => {
       status_code: 503,
       error: {
         guardrail_rejection: 'unavailable',
-        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+        r2_upload_error: 'Error: R2 unavailable',
       },
     });
   });

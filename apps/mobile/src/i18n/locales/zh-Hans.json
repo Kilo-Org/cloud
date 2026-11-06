@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "原生远程演示",
+    "sessionsEmpty": "暂无原生会话",
+    "hosts": "在线主机",
+    "hostsEmpty": "暂无在线主机",
+    "directory": "工作目录",
+    "createSession": "新建原生会话",
+    "queueIfOffline": "主机离线时将提示词加入队列",
+    "prompt": "提示词或 /command",
+    "localClear": "清空本地视图",
+    "abort": "中止当前轮次",
+    "failed": "原生远程操作失败",
+    "creationUnknown": "创建结果未知。请刷新会话列表后再重试。",
+    "commandFailed": "执行器命令失败",
+    "invalidReply": "执行器响应无效",
+    "unsafeCommand": "请使用 /compact、/new、/skill、/models、/agents 或 /clear（仅清空本地视图）。",
+    "status": "连接：{{connection}} · 执行器：{{runner}}",
+    "presenceStatus": "主机：{{connection}}",
+    "commandStatus": "命令送达状态：{{status}}",
+    "delivered": "已送达",
+    "expired": "已过期"
+  },
   "common": {
     "cancel": "取消",
     "done": "完成",
@@ -189,6 +211,7 @@
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
     "terms": "条款",
+    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
@@ -1543,6 +1566,7 @@
       "actionFailed": "无法完成此操作。请重试。",
       "actionBlocked": "无法完成此操作。必须先修复此问题，才能重试。",
       "syncNoRepositories": "同步范围内没有仓库。请选择安全智能体要监控的仓库，然后再次同步。",
+      "syncNoRepositoriesNoManage": "同步范围内没有仓库。组织所有者、管理员或账单管理员必须先连接仓库，然后才能同步。",
       "syncIntegrationInactive": "安全智能体的 GitHub 连接未激活。请重新连接 Kilo GitHub App，然后再次同步。",
       "syncMissingPermission": "Kilo GitHub App 无法读取 vulnerability alerts。请在 GitHub 中授予该权限，然后重新同步。",
       "configConflict": "安全智能体的设置已在其他地方更改。请查看最新设置并重新保存。"
@@ -2011,6 +2035,7 @@
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
       "assistantProviderError": "提供商返回了错误。",
+      "assistantProviderRefused": "提供商拒绝了该请求，且无法重试。",
       "assistantOutputLimit": "回复已达到模型的输出上限。",
       "assistantStructuredOutput": "回复与所需格式不匹配。",
       "assistantFailed": "生成回复失败。"
@@ -3809,14 +3834,14 @@
     "saved": "支出提醒设置已保存",
     "loadError": "无法加载支出提醒。",
     "saveError": "无法保存支出提醒。",
-    "empty": "支出提醒已关闭。开启后会通知此范围的账单联系人。",
-    "noSpend": "尚无支出记录",
+    "sendAlerts": "发送支出提醒",
+    "noSpend": "暂无支出",
     "spend24h": "过去 24 小时的支出",
     "multiplierError": "请输入 1 或更大的倍数",
     "permissionDenied": "你没有管理支出提醒的权限。",
     "pushOffByCategory": "已在通知中关闭",
     "multiplierMaxError": "请输入 {{max}} 或更小的倍数",
-    "thresholdMaxError": "请输入不大于 {{max}} 的金额。"
+    "thresholdMaxError": "请输入不大于 {{max}} 的金额"
   },
   "profiles": {
     "title": "配置文件",

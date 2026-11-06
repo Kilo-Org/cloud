@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Idemo yokulawula i-CLI v2 ukude",
+    "sessionsEmpty": "Awekho amaseshini e-CLI v2 okwamanje",
+    "hosts": "Abasingathi abaxhunyiwe",
+    "hostsEmpty": "Abekho abasingathi abaxhunyiwe",
+    "directory": "Uhla lwemibhalo lokusebenza",
+    "createSession": "Dala iseshini ye-CLI v2",
+    "queueIfOffline": "Faka isicelo emgqeni uma umsingathi engaxhunyiwe",
+    "prompt": "Isicelo noma /command",
+    "localClear": "Sula okubukwayo kule divayisi",
+    "abort": "Misa umzuliswano",
+    "failed": "Isenzo sokulawula i-CLI v2 ukude sehlulekile",
+    "creationUnknown": "Umphumela wokudala awaziwa. Vuselela amaseshini ngaphambi kokuzama futhi.",
+    "commandFailed": "Umyalo wenqubo ye-CLI wehlulekile",
+    "invalidReply": "Impendulo yenqubo ye-CLI ayivumelekile",
+    "unsafeCommand": "Sebenzisa /compact, /new, /skill, /models, /agents noma /clear (kule divayisi kuphela).",
+    "status": "Ukuxhumana: {{connection}} · Inqubo ye-CLI: {{runner}}",
+    "presenceStatus": "Abasingathi: {{connection}}",
+    "commandStatus": "Ukulethwa komyalo: {{status}}",
+    "delivered": "Kulethiwe",
+    "expired": "Kuphelelwe yisikhathi"
+  },
   "common": {
     "cancel": "Khansela",
     "done": "Kwenziwe",
@@ -189,6 +211,7 @@
     "resendCode": "Thumela ikhodi futhi",
     "termsPrefix": "Ngokuqhubeka, wamukela lokhu okulandelayo kwethu: ",
     "terms": "Imigomo",
+    "termsInSentence": "Imigomo",
     "termsConnector": " kanye ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ezinye izinketho zokungena",
@@ -2088,6 +2111,7 @@
       "actionFailed": "Asikwazanga ukuqedela lesi senzo. Sicela uzame futhi.",
       "actionBlocked": "Asikwazanga ukuqedela lesi senzo. Kumele kulungiswe le nkinga kuqala.",
       "syncNoRepositories": "Awekho amakhosombe akumkhawulo wokuvumelanisa. Khetha amakhosombe i-ejenti yezokuphepha ewabhekayo, bese uvumelanisa futhi.",
+      "syncNoRepositoriesNoManage": "Awekho amakhosombe akumkhawulo wokuvumelanisa. Umnikazi wenhlangano, umlawuli, noma umphathi wezinkokhelo kufanele axhumanise amakhosombe ngaphambi kokuba kuvumelaniswe.",
       "syncIntegrationInactive": "Ukuxhumana kwe-GitHub kwe-Ejenti yezokuphepha akusebenzi. Xhuma kabusha i-Kilo GitHub App, bese uvumelanisa futhi.",
       "syncMissingPermission": "I-Kilo GitHub App ayikwazi ukufunda vulnerability alerts. Nika leyo mvume ku-GitHub, bese u-sync futhi.",
       "configConflict": "Izilungiselelo ze-ejenti yezokuphepha zishintshiwe kwenye indawo. Buyekeza izilungiselelo zakamuva bese ulondoloza futhi."
@@ -2556,6 +2580,7 @@
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
       "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
+      "assistantProviderRefused": "Umhlinzeki wenqabe lesi sicelo futhi asikwazi ukuphinda sizanywe.",
       "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
       "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."
@@ -3803,9 +3828,9 @@
   "spendAlerts": {
     "subtitle": "Thumela isexwayiso nge-imeyili noma nge-push kwabathintwayo bokukhokha lapho ukusetshenziswa kwemali kwalesi sikhathi kweqa umkhawulo noma kukhuphuka ngaphezu kwezinga elivamile lehora.",
     "thresholdTitle": "Ukweqa umkhawulo",
-    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kweqa umkhawulo wakho",
+    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kulesi sikhathi ngesikhathi osikhethile kuweqa umkhawulo wakho",
     "anomalyTitle": "Ukukhuphuka ngehora",
-    "anomalySubtitle": "Ihora elilodwa liphakeme kakhulu kunezinga elivamile lalesi sikhathi",
+    "anomalySubtitle": "Isilinganiso sehora lalesi sikhathi siphezulu kakhulu kunesisekelo saso se p95",
     "limitLabel": "Umkhawulo (USD)",
     "windowLabel": "Isikhathi",
     "window24h": "Amahora angu-24",
@@ -3815,14 +3840,14 @@
     "saved": "Izilungiselelo zexwayiso lokusetshenziswa kwemali zilondoloziwe",
     "loadError": "Ayikwazanga ukulayisha izexwayiso zokusetshenziswa kwemali.",
     "saveError": "Ayikwazanga ukulondoloza izexwayiso zokusetshenziswa kwemali.",
-    "empty": "Izexwayiso zokusetshenziswa kwemali zivaliwe. Zivule ukuze uxwayise abathintwayo bokukhokha balesi sikhathi.",
-    "noSpend": "Akukho kusetshenziswa kwemali okurekhodiwe okwamanje",
+    "sendAlerts": "Thumela izexwayiso",
+    "noSpend": "Akukho kusetshenziswa kwemali",
     "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
     "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
     "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
     "pushOffByCategory": "Kucishiwe kuzaziso",
     "multiplierMaxError": "Faka isiphindaphindi esingu-{{max}} noma ngaphansi",
-    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}."
+    "thresholdMaxError": "Faka inani elingaphansi kuka-{{max}}"
   },
   "profiles": {
     "title": "Amaphrofayili",

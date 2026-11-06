@@ -11,6 +11,7 @@ import {
 import { verifyRuntimeSourceCheckout } from './runtime-source.js';
 import { remoteArtifactStore } from './runtime-publish-store.js';
 import { loadRuntimeHandoff, runtimeHandoffKey } from './runtime-handoff.js';
+import { probePublication } from './runtime-publication-runs.js';
 import {
   runtimeBaseInputId,
   verifyRuntimeBase,
@@ -50,12 +51,50 @@ export async function prepareRuntimeDeployment(input: {
     startup,
     release: {
       descriptorSha256: handoff.descriptorSha256,
+      ...(handoff.kilo2DescriptorSha256 === undefined
+        ? {}
+        : { kilo2DescriptorSha256: handoff.kilo2DescriptorSha256 }),
       baseImage: handoff.base.image,
       bucket: input.bucket,
     },
   });
   await input.verifyBase(handoff.base);
   return config;
+}
+
+const HANDOFF_WAIT_MS = 45 * 60_000;
+const HANDOFF_POLL_MS = 5_000;
+const PUBLICATION_PROBE_MS = 30_000;
+
+/**
+ * Wait for the exact-SHA handoff. When the publication can no longer produce it, fail with the
+ * probe's reason instead of holding the deployment for the full wait.
+ */
+export async function waitForRuntimeHandoff(
+  store: ArtifactObjectStore,
+  sourceSha: string,
+  probe?: (waitedMs: number) => Promise<string | null>
+): Promise<void> {
+  const key = runtimeHandoffKey(sourceSha);
+  const started = Date.now();
+  let probedAt = Number.NEGATIVE_INFINITY;
+  while ((await store.getBytes(key)) === null) {
+    const waitedMs = Date.now() - started;
+    if (waitedMs > HANDOFF_WAIT_MS)
+      throw new Error(
+        `Exact-SHA runtime publication did not complete within ${HANDOFF_WAIT_MS / 60_000} minutes`
+      );
+    if (probe && Date.now() - probedAt >= PUBLICATION_PROBE_MS) {
+      probedAt = Date.now();
+      const failure = await probe(waitedMs);
+      if (failure) {
+        // The publication may have written the handoff just before its run completed.
+        if ((await store.getBytes(key)) !== null) return;
+        throw new Error(failure);
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, HANDOFF_POLL_MS));
+  }
 }
 
 async function writeDeploymentConfig(packageRoot: string, environment: string, config: unknown) {
@@ -116,12 +155,22 @@ export async function main(
     accessKeyId: z.string().parse(process.env.RUNTIME_R2_ACCESS_KEY_ID),
     secretAccessKey: z.string().parse(process.env.RUNTIME_R2_SECRET_ACCESS_KEY),
   });
-  const started = Date.now();
-  while ((await store.getBytes(runtimeHandoffKey(sourceSha))) === null) {
-    if (Date.now() - started > 45 * 60_000)
-      throw new Error('Exact-SHA runtime publication did not complete');
-    await new Promise(resolve => setTimeout(resolve, 5000));
-  }
+  const token = process.env.GITHUB_TOKEN;
+  const repository = process.env.GITHUB_REPOSITORY;
+  await waitForRuntimeHandoff(
+    store,
+    sourceSha,
+    token && repository
+      ? async waitedMs => {
+          try {
+            return await probePublication(sourceSha, repository, token, waitedMs);
+          } catch (error) {
+            console.warn('Runtime publication status is unavailable; still waiting', error);
+            return null;
+          }
+        }
+      : undefined
+  );
   await withRuntimeRegistry(packageRoot, async () => {
     const config = await prepareRuntimeDeployment({
       config: raw,

@@ -10,10 +10,12 @@ import { describeEnvironmentProfileImpact } from './environment-profile-impact';
 export function EnvironmentProfileSetupNotice({
   organizationId,
   repository,
+  environment,
   selectedProfileId,
 }: {
   organizationId?: string;
   repository: EnvironmentRepository;
+  environment?: { repositories?: unknown } | null;
   selectedProfileId?: string | null;
 }) {
   const { profiles, isLoading, isError } = useEnvironmentProfiles({
@@ -23,6 +25,7 @@ export function EnvironmentProfileSetupNotice({
       fullName: repository.platform === 'gitlab' ? repository.projectPath : repository.fullName,
     },
     selectedProfileId,
+    environment,
   });
   if (isLoading || isError) return null;
 

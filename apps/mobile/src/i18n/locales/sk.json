@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Ukážka natívneho vzdialeného ovládania",
+    "sessionsEmpty": "Zatiaľ žiadne natívne relácie",
+    "hosts": "Hostitelia online",
+    "hostsEmpty": "Žiadni hostitelia online",
+    "directory": "Pracovný adresár",
+    "createSession": "Vytvoriť natívnu reláciu",
+    "queueIfOffline": "Zaradiť zadanie do poradia, ak je hostiteľ offline",
+    "prompt": "Zadanie alebo /command",
+    "localClear": "Vymazať lokálne zobrazenie",
+    "abort": "Prerušiť ťah",
+    "failed": "Natívna vzdialená akcia zlyhala",
+    "creationUnknown": "Výsledok vytvorenia nie je známy. Pred ďalším pokusom obnovte zoznam relácií.",
+    "commandFailed": "Príkaz pre proces CLI zlyhal",
+    "invalidReply": "Neplatná odpoveď procesu CLI",
+    "unsafeCommand": "Použite /compact, /new, /skill, /models, /agents alebo /clear (iba lokálne).",
+    "status": "Pripojenie: {{connection}} · Proces CLI: {{runner}}",
+    "presenceStatus": "Hostitelia: {{connection}}",
+    "commandStatus": "Doručenie príkazu: {{status}}",
+    "delivered": "Doručené",
+    "expired": "Platnosť vypršala"
+  },
   "common": {
     "cancel": "Zrušiť",
     "done": "Hotovo",
@@ -189,6 +211,7 @@
     "resendCode": "Odoslať kód znova",
     "termsPrefix": "Pokračovaním súhlasíte s našimi ",
     "terms": "Podmienkami",
+    "termsInSentence": "Podmienkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ďalšie možnosti prihlásenia",
@@ -2158,6 +2181,7 @@
       "actionFailed": "Túto akciu sa nepodarilo dokončiť. Skúste to znova.",
       "actionBlocked": "Túto akciu sa nepodarilo dokončiť. Problém je potrebné najprv vyriešiť.",
       "syncNoRepositories": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vyberte repozitáre, ktoré Bezpečnostný agent monitoruje, a potom znova synchronizujte.",
+      "syncNoRepositoriesNoManage": "V rozsahu synchronizácie nie sú žiadne repozitáre. Vlastník organizácie, správca alebo správca fakturácie musí pripojiť repozitáre, aby bolo možné synchronizovať.",
       "syncIntegrationInactive": "Pripojenie GitHub pre Bezpečnostného agenta nie je aktívne. Znovu pripojte Kilo GitHub App a potom znova synchronizujte.",
       "syncMissingPermission": "Aplikácia Kilo na GitHube nemôže čítať upozornenia na zraniteľnosti. Udeľte toto povolenie na GitHube a potom znova synchronizujte.",
       "configConflict": "Nastavenia bezpečnostného agenta sa zmenili inde. Skontrolujte najnovšie nastavenia a znova uložte."
@@ -2642,6 +2666,7 @@
       "assistantStopped": "Generovanie odpovede sa zastavilo.",
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
       "assistantProviderError": "Poskytovateľ vrátil chybu.",
+      "assistantProviderRefused": "Poskytovateľ túto požiadavku odmietol a nemožno ju zopakovať.",
       "assistantOutputLimit": "Odpoveď dosiahla limit výstupu modelu.",
       "assistantStructuredOutput": "Odpoveď nezodpovedala požadovanému formátu.",
       "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
@@ -3909,9 +3934,9 @@
   "spendAlerts": {
     "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
     "thresholdTitle": "Prekročenie prahu",
-    "thresholdSubtitle": "Priebežné výdavky prekračujú tvoj limit",
+    "thresholdSubtitle": "Priebežné výdavky tohto rozsahu za zvolené okno prekračujú tvoj limit",
     "anomalyTitle": "Hodinová špička",
-    "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
+    "anomalySubtitle": "Hodinová sadzba tohto rozsahu je výrazne nad jeho vlastným p95 základom",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Okno",
     "window24h": "24 hodín",
@@ -3921,14 +3946,14 @@
     "saved": "Nastavenia upozornení na výdavky boli uložené",
     "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
     "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
-    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
-    "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
+    "sendAlerts": "Posielať upozornenia",
+    "noSpend": "Zatiaľ žiadne výdavky",
     "spend24h": "Výdavky za posledných 24 hodín",
     "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
     "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
     "pushOffByCategory": "Vypnuté v Upozorneniach",
     "multiplierMaxError": "Zadaj násobiteľ {{max}} alebo menší",
-    "thresholdMaxError": "Zadaj sumu {{max}} alebo menšiu."
+    "thresholdMaxError": "Zadaj sumu {{max}} alebo menšiu"
   },
   "profiles": {
     "title": "Profily",

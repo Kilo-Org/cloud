@@ -63,7 +63,7 @@ function metadata(input: {
       : { parentCloudAgentSessionId: input.parentCloudAgentSessionId }),
     workspace: {
       sandboxId: 'ses-0123456789abcdef',
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
       ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
     },
     lifecycle: { version: 1, timestamp: 1 },
@@ -107,7 +107,7 @@ async function registerParent(
       ...(worktreeId === undefined ? {} : { worktreeId }),
       ...(parentCloudAgentSessionId === undefined ? {} : { parentCloudAgentSessionId }),
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
     ...(seal === undefined ? {} : { runtimeAuthorizationSeal: seal }),
   });
   expect(result).toEqual({ success: true });

@@ -5,6 +5,7 @@ import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
@@ -15,6 +16,7 @@ import {
   enkryptCreditsToMicrodollars,
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
   recordEnkryptUsage,
+  recordEnkryptUsageLocally,
   type EnkryptUsageRecord,
 } from './usage';
 
@@ -71,20 +73,27 @@ describe('enkryptCreditsToMicrodollars', () => {
 describe('recordEnkryptUsage', () => {
   it('writes a ledger row and debits the organization and member usage', async () => {
     const { user, organization } = await organizationWithMember();
-    await recordEnkryptUsage(usageRecord(organization.id, user.id));
+    const microdollarUsageId = randomUUID();
+    await recordEnkryptUsage(usageRecord(organization.id, user.id, { microdollarUsageId }));
 
     const rows = await db
       .select({
         kilo_user_id: enkrypt_usage.kilo_user_id,
         session_id: enkrypt_usage.session_id,
+        microdollar_usage_id: enkrypt_usage.microdollar_usage_id,
         api_kind: api_kind.api_kind,
         decision: enkrypt_usage_decision.decision,
         enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
         charged_microdollars: enkrypt_usage.charged_microdollars,
         added_latency_ms: enkrypt_usage.added_latency_ms,
+        guardrail: enkrypt_usage_guardrail.guardrail,
       })
       .from(enkrypt_usage)
       .innerJoin(api_kind, eq(api_kind.api_kind_id, enkrypt_usage.api_kind_id))
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
       .innerJoin(
         enkrypt_usage_decision,
         eq(enkrypt_usage_decision.decision_id, enkrypt_usage.decision_id)
@@ -94,11 +103,13 @@ describe('recordEnkryptUsage', () => {
       expect.objectContaining({
         kilo_user_id: user.id,
         session_id: 'ses_guardrail',
+        microdollar_usage_id: microdollarUsageId,
         api_kind: 'messages',
         decision: 'blocked',
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
         added_latency_ms: 212,
+        guardrail: 'input',
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -112,14 +123,36 @@ describe('recordEnkryptUsage', () => {
     expect(memberUsage?.microdollarUsage).toBe(7 * MICRODOLLARS_PER_ENKRYPT_CREDIT);
   });
 
+  it('records an output guardrail call as such and debits it like an input call', async () => {
+    const { user, organization } = await organizationWithMember();
+    await recordEnkryptUsage(usageRecord(organization.id, user.id, { guardrail: 'output' }));
+
+    const rows = await db
+      .select({ guardrail: enkrypt_usage_guardrail.guardrail })
+      .from(enkrypt_usage)
+      .innerJoin(
+        enkrypt_usage_guardrail,
+        eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
+      )
+      .where(eq(enkrypt_usage.organization_id, organization.id));
+    expect(rows).toEqual([{ guardrail: 'output' }]);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+    });
+  });
+
   it('creates and reuses lookup values for concurrent usage records without losing a debit', async () => {
     const { user, organization } = await organizationWithMember();
+    const microdollarUsageId = randomUUID();
     const apiKind = `test-api-${randomUUID()}` as EnkryptUsageRecord['apiKind'];
     const decision = `test-decision-${randomUUID()}` as EnkryptUsageRecord['decision'];
 
     await Promise.all(
       Array.from({ length: 5 }, () =>
-        recordEnkryptUsage(usageRecord(organization.id, user.id, { apiKind, decision }))
+        recordEnkryptUsage(
+          usageRecord(organization.id, user.id, { apiKind, decision, microdollarUsageId })
+        )
       )
     );
 
@@ -131,7 +164,11 @@ describe('recordEnkryptUsage', () => {
     expect(apiKinds).toHaveLength(1);
     expect(decisions).toHaveLength(1);
     const rows = await db
-      .select({ api_kind_id: enkrypt_usage.api_kind_id, decision_id: enkrypt_usage.decision_id })
+      .select({
+        api_kind_id: enkrypt_usage.api_kind_id,
+        decision_id: enkrypt_usage.decision_id,
+        microdollar_usage_id: enkrypt_usage.microdollar_usage_id,
+      })
       .from(enkrypt_usage)
       .where(eq(enkrypt_usage.organization_id, organization.id));
     expect(rows).toHaveLength(5);
@@ -139,6 +176,7 @@ describe('recordEnkryptUsage', () => {
       Array.from({ length: 5 }, () => ({
         api_kind_id: apiKinds[0].api_kind_id,
         decision_id: decisions[0].decision_id,
+        microdollar_usage_id: microdollarUsageId,
       }))
     );
     expect(await organizationBalance(organization.id)).toEqual({
@@ -212,6 +250,7 @@ describe('recordEnkryptUsage', () => {
         enkrypt_credits_cost: enkrypt_usage.enkrypt_credits_cost,
         charged_microdollars: enkrypt_usage.charged_microdollars,
         added_latency_ms: enkrypt_usage.added_latency_ms,
+        microdollar_usage_id: enkrypt_usage.microdollar_usage_id,
       })
       .from(enkrypt_usage)
       .innerJoin(
@@ -225,6 +264,7 @@ describe('recordEnkryptUsage', () => {
         enkrypt_credits_cost: null,
         charged_microdollars: 0,
         added_latency_ms: null,
+        microdollar_usage_id: null,
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -276,5 +316,30 @@ describe('recordEnkryptUsage', () => {
         .from(organization_user_usage)
         .where(eq(organization_user_usage.organization_id, organization.id))
     ).toEqual([]);
+  });
+
+  it('records and debits a redelivered usage id only once', async () => {
+    const { user, organization } = await organizationWithMember();
+    const usageWrite = {
+      ...usageRecord(organization.id, user.id),
+      guardrail: 'input' as const,
+      id: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      microdollarUsageId: randomUUID(),
+    };
+
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('recorded');
+    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('duplicate');
+
+    expect(
+      await db
+        .select()
+        .from(enkrypt_usage)
+        .where(eq(enkrypt_usage.organization_id, organization.id))
+    ).toEqual([expect.objectContaining({ microdollar_usage_id: usageWrite.microdollarUsageId })]);
+    expect(await organizationBalance(organization.id)).toEqual({
+      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+    });
   });
 });

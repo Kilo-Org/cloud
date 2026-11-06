@@ -123,6 +123,27 @@ describe('muted-foreground token contrast (WCAG AA text)', () => {
   });
 });
 
+describe('auto-merge banner copy contrast (WCAG AA text)', () => {
+  // The banner's description paints `text-ink2` on `bg-accent-soft-tint`, the
+  // accent at 16% over the page. The muted foreground reads as a quiet second
+  // line here but measures under 4.5:1 on this surface, so the pair is guarded
+  // on the composite the text actually renders on.
+  const themes = [
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const;
+
+  it('every theme: ink2 on the accent tint clears 4.5:1', () => {
+    for (const [themeName, colors] of themes) {
+      const tint = compositeHex(colors.accentSoftTint, colors.background);
+      expect(
+        contrastRatio(colors.ink2, tint),
+        `ink2 vs accent tint (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+    }
+  });
+});
+
 describe('status token contrast on light surfaces (WCAG AA text)', () => {
   // Status tokens are read as text on the app background (screens) and on
   // `secondary` (status chips/cards). `global.css` keeps `--good` /

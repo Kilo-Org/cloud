@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "הדגמת שליטה מרחוק בפרוטוקול נייטיב",
+    "sessionsEmpty": "עדיין אין סשנים בפרוטוקול נייטיב",
+    "hosts": "מארחים מחוברים",
+    "hostsEmpty": "אין מארחים מחוברים",
+    "directory": "תיקיית עבודה",
+    "createSession": "יצירת סשן בפרוטוקול נייטיב",
+    "queueIfOffline": "הוספת הפרומפט לתור אם המארח לא מחובר",
+    "prompt": "פרומפט או /command",
+    "localClear": "ניקוי התצוגה המקומית",
+    "abort": "עצירת הסבב",
+    "failed": "פעולת השליטה מרחוק בפרוטוקול נייטיב נכשלה",
+    "creationUnknown": "תוצאת היצירה אינה ידועה. יש לרענן את רשימת הסשנים לפני ניסיון נוסף.",
+    "commandFailed": "הפקודה לתהליך ההרצה נכשלה",
+    "invalidReply": "תגובה לא תקינה מתהליך ההרצה",
+    "unsafeCommand": "יש להשתמש בפקודות /compact, /new, /skill, /models, /agents או /clear (מקומית בלבד).",
+    "status": "חיבור: {{connection}} · תהליך הרצה: {{runner}}",
+    "presenceStatus": "מארחים: {{connection}}",
+    "commandStatus": "מסירת הפקודה: {{status}}",
+    "delivered": "נמסרה",
+    "expired": "פג התוקף"
+  },
   "common": {
     "cancel": "ביטול",
     "done": "סיום",
@@ -189,6 +211,7 @@
     "resendCode": "שליחת הקוד שוב",
     "termsPrefix": "המשך השימוש מהווה הסכמה למסמכים הבאים: ",
     "terms": "תנאי השימוש",
+    "termsInSentence": "תנאי השימוש",
     "termsConnector": " וכן ",
     "termsSuffix": ".",
     "moreSignInOptions": "אפשרויות כניסה נוספות",
@@ -1560,6 +1583,7 @@
       "actionFailed": "לא ניתן להשלים את הפעולה הזו. נסה שוב.",
       "actionBlocked": "לא ניתן להשלים את הפעולה הזו. יש לתקן את הבעיה לפני שניתן יהיה לנסות שוב.",
       "syncNoRepositories": "אין מאגרים בהיקף הסנכרון. יש לבחור את המאגרים שסוכן האבטחה עוקב אחריהם, ואז לסנכרן שוב.",
+      "syncNoRepositoriesNoManage": "אין מאגרים בהיקף הסנכרון. על בעל ארגון, מנהל או מנהל חיובים לחבר מאגרים לפני שניתן לסנכרן.",
       "syncIntegrationInactive": "החיבור של GitHub עבור סוכן האבטחה אינו פעיל. יש לחבר מחדש את אפליקציית Kilo GitHub, ואז לסנכרן שוב.",
       "syncMissingPermission": "אפליקציית Kilo GitHub אינה יכולה לקרוא vulnerability alerts. יש להעניק הרשאה זו ב-GitHub, ואז לסנכרן שוב.",
       "configConflict": "ההגדרות של סוכן האבטחה שונו במקום אחר. בדוק את ההגדרות העדכניות ושמור שוב."
@@ -2036,6 +2060,7 @@
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
+      "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -3853,9 +3878,9 @@
   "spendAlerts": {
     "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
     "thresholdTitle": "חציית סף",
-    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "thresholdSubtitle": "ההוצאה המצטברת של תחום זה בחלון הנבחר חוצה את המגבלה שלך",
     "anomalyTitle": "זינוק שעתי",
-    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "anomalySubtitle": "הקצב השעתי של תחום זה גבוה בהרבה מקו הבסיס p95 שלו",
     "limitLabel": "מגבלה (USD)",
     "windowLabel": "חלון",
     "window24h": "24 שעות",
@@ -3865,14 +3890,14 @@
     "saved": "הגדרות התראות ההוצאות נשמרו",
     "loadError": "לא ניתן לטעון את התראות ההוצאות.",
     "saveError": "לא ניתן לשמור את התראות ההוצאות.",
-    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
-    "noSpend": "עדיין לא נרשמה הוצאה",
+    "sendAlerts": "שלח התראות",
+    "noSpend": "אין עדיין הוצאות",
     "spend24h": "הוצאה ב־24 השעות האחרונות",
     "multiplierError": "הזן מכפיל של 1 או יותר",
     "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
     "pushOffByCategory": "כבוי בהתראות",
     "multiplierMaxError": "הזן מכפיל של {{max}} או פחות",
-    "thresholdMaxError": "הזן סכום של {{max}} או פחות."
+    "thresholdMaxError": "הזן סכום של {{max}} או פחות"
   },
   "profiles": {
     "title": "פרופילים",

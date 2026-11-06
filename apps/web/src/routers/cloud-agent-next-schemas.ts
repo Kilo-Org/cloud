@@ -2,8 +2,13 @@ import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script'
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
-import { ParentSessionCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
+import { ParentCallbackTargetSchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  cloudSessionMetadataSchema,
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageWireSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
@@ -354,6 +359,28 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
+ * The environment the user selected, and the branch of each additional
+ * repository of a multi-repository environment. The worker checks both against
+ * the owner and the launch repository, and validates each branch.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: z.string().min(1).max(255).optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict();
+
+/**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
  * the non-clone variant keeps the required `prompt` and the current optional
  * initial fields, while the clone-only variant requires the source session,
@@ -361,7 +388,7 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+  callbackTarget: ParentCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()
@@ -406,6 +433,15 @@ const PrepareSessionSharedFields = {
     .max(50)
     .regex(/^[a-zA-Z]+$/)
     .optional(),
+
+  /** The repository environment the user selected, with branches for its additional repositories. */
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  /**
+   * Set by a client that shows an environment picker. When several environments
+   * contain the repository and none is selected, the start then fails and names
+   * them; without it, the session runs with no environment.
+   */
+  requireEnvironmentChoice: z.literal(true).optional(),
 
   /**
    * Optional environment profile id. When omitted, the effective default
@@ -665,6 +701,8 @@ export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
   cloudAgentSessionId: z.string().regex(SESSION_ID_RE, 'Invalid session ID format'),
   limit: z.number().int().min(1).max(100).default(50),
 }).strict();
+export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
+export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
 
 export const baseGetSandboxStatusNextSchema = z
   .object({
@@ -818,11 +856,18 @@ export const baseGetSessionNextOutputSchema = z.object({
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
+  environmentId: z.string().uuid().optional(),
+  title: cloudSessionMetadataSchema.shape.title,
+  associatedPr: cloudSessionMetadataSchema.shape.associatedPr,
+  totalCostMicrodollars: cloudSessionMetadataSchema.shape.totalCostMicrodollars,
+  createdOnPlatform: cloudSessionMetadataSchema.shape.createdOnPlatform,
+  profileId: cloudSessionMetadataSchema.shape.profileId,
 
   // Worktree ownership (present only for worktree sessions)
   worktreeId: z.string().nullable().optional(),
   parentSessionId: z.string().nullable().optional(),
   cloudAgentSessionScopeId: z.string().nullable().optional(),
+  parentCloudAgentSessionId: z.string().optional(),
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),

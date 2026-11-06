@@ -120,6 +120,41 @@ describe('toNativePublicEvent', () => {
     expect(info.path).toEqual({ cwd: '/workspace/app', root: '/workspace/app' });
   });
 
+  it.each(['event', 'type'])(
+    'preserves standalone Read/Grep/Glob paths in a %s envelope without assistant root metadata',
+    key => {
+      const directory = publicCloudAgentDirectory(kiloSessionId);
+      for (const root of [
+        '/workspace/app',
+        '/workspace/user-1/worktrees/worktree_abc',
+        '/workspace/org-1/user-1/sessions/ses_abc',
+      ]) {
+        for (const [tool, input, expected] of [
+          [
+            'read',
+            { filePath: `${root}/src/nested/a.ts` },
+            { filePath: `${directory}/src/nested/a.ts` },
+          ],
+          [
+            'grep',
+            { path: `${root}/src`, pattern: 'needle' },
+            { path: `${directory}/src`, pattern: 'needle' },
+          ],
+          ['glob', { path: root, pattern: '**/*.ts' }, { path: directory, pattern: '**/*.ts' }],
+        ]) {
+          const part = { type: 'tool', tool, state: { status: 'running', input } };
+          expect(
+            toNativePublicEvent(
+              streamEvent(11, { [key]: 'message.part.updated', properties: { part } }),
+              kiloSessionId
+            )
+          ).toMatchObject({ properties: { part: { state: { input: expected } } } });
+          expect(part.state.input).toEqual(input);
+        }
+      }
+    }
+  );
+
   it.each(['session.created', 'session.updated'])(
     'projects captured %s nested directory without dropping SDK fields',
     type => {
@@ -175,12 +210,28 @@ describe('toNativePublicEvent', () => {
         permission: 'edit',
         patterns: ['native-permission.txt'],
         metadata: {
-          filepath: publicCloudAgentDirectory(kiloSessionId),
-          diff: `Index: ${publicCloudAgentDirectory(kiloSessionId)}\n--- ${publicCloudAgentDirectory(kiloSessionId)}\n+++ ${publicCloudAgentDirectory(kiloSessionId)}\n@@ -0,0 +1 @@\n+Keep /workspace/app/native-permission.txt`,
-          filediff: { file: publicCloudAgentDirectory(kiloSessionId), additions: 1, deletions: 0 },
+          filepath: `${publicCloudAgentDirectory(kiloSessionId)}/native-permission.txt`,
+          diff: `Index: ${publicCloudAgentDirectory(kiloSessionId)}/native-permission.txt\n--- ${publicCloudAgentDirectory(kiloSessionId)}/native-permission.txt\n+++ ${publicCloudAgentDirectory(kiloSessionId)}/native-permission.txt\n@@ -0,0 +1 @@\n+Keep /workspace/app/native-permission.txt`,
+          filediff: {
+            file: `${publicCloudAgentDirectory(kiloSessionId)}/native-permission.txt`,
+            additions: 1,
+            deletions: 0,
+          },
         },
       },
     });
+  });
+
+  it.each([
+    'session.created',
+    'session.updated',
+    'session.status',
+    'conversation.source',
+    'conversation.message.updated',
+  ])('delivers upserted %s rows even when their stable id precedes the fence', type => {
+    const event = streamEvent(2, { event: type, properties: { sessionID: kiloSessionId } });
+    expect(isDeliverableNativeEvent(event)).toBe(true);
+    expect(isMaterializedNativeEvent(event)).toBe(true);
   });
 
   it('classifies stored kilocode autocommit updates as materialized and deliverable', () => {
@@ -195,7 +246,7 @@ describe('toNativePublicEvent', () => {
       properties: { messageId: 'msg_commit', success: true },
     });
     expect(isMaterializedNativeEvent(streamEvent(3, { type: 'autocommit_completed' }))).toBe(true);
-    expect(isMaterializedNativeEvent(streamEvent(4, { event: 'session.updated' }))).toBe(false);
+    expect(isMaterializedNativeEvent(streamEvent(4, { event: 'session.error' }))).toBe(false);
     expect(isDeliverableNativeEvent(streamEvent(0, event.data))).toBe(false);
     expect(
       isDeliverableNativeEvent(streamEvent(2, { messageId: 'msg_commit' }, 'autocommit_completed'))

@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Sýnidæmi um native-fjarstýringu",
+    "sessionsEmpty": "Engar native-lotur enn",
+    "hosts": "Tengdar vélar",
+    "hostsEmpty": "Engar tengdar vélar",
+    "directory": "Vinnumappa",
+    "createSession": "Stofna native-lotu",
+    "queueIfOffline": "Setja fyrirmæli í biðröð ef vélin er ótengd",
+    "prompt": "Fyrirmæli eða /command",
+    "localClear": "Hreinsa staðbundna sýn",
+    "abort": "Stöðva umferð",
+    "failed": "Aðgerð með native-fjarstýringu mistókst",
+    "creationUnknown": "Óvíst hvort lota var stofnuð. Endurnýjaðu lotulistann áður en þú reynir aftur.",
+    "commandFailed": "Skipun til keyrsluferlis mistókst",
+    "invalidReply": "Ógilt svar frá keyrsluferli",
+    "unsafeCommand": "Notaðu /compact, /new, /skill, /models, /agents eða /clear (aðeins staðbundið).",
+    "status": "Tenging: {{connection}} · Keyrsluferli: {{runner}}",
+    "presenceStatus": "Vélar: {{connection}}",
+    "commandStatus": "Afhending skipunar: {{status}}",
+    "delivered": "Afhent",
+    "expired": "Útrunnið"
+  },
   "common": {
     "cancel": "Hætta við",
     "done": "Lokið",
@@ -189,6 +211,7 @@
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú ",
     "terms": "Skilmála",
+    "termsInSentence": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Ekki tókst að ljúka þessari aðgerð. Reyndu aftur.",
       "actionBlocked": "Ekki tókst að ljúka þessari aðgerð. Leysa verður vandamálið áður en þú getur reynt aftur.",
       "syncNoRepositories": "Engar geymslur eru í samstillingarsviðinu. Veldu geymslurnar sem Öryggiserindrekinn fylgist með og samstilltu síðan aftur.",
+      "syncNoRepositoriesNoManage": "Engar geymslur eru í samstillingarsviðinu. Eigandi fyrirtækisins, stjórnandi eða innheimtustjóri verður að tengja geymslur áður en hægt er að samstilla.",
       "syncIntegrationInactive": "Tengingin við GitHub fyrir Öryggiserindreka er ekki virk. Tengdu Kilo GitHub App aftur og samstilltu svo aftur.",
       "syncMissingPermission": "Kilo GitHub App getur ekki lesið vulnerability alerts. Veittu þá heimild í GitHub og samstilltu svo aftur.",
       "configConflict": "Stillingar öryggiserindrekans voru breyttar annars staðar. Farðu yfir nýjustu stillingarnar og vistaðu aftur."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Hætt var að mynda svarið.",
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
       "assistantProviderError": "Veitandinn skilaði villu.",
+      "assistantProviderRefused": "Veitandinn hafnaði þessari beiðni og ekki er hægt að reyna aftur.",
       "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
       "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
     "thresholdTitle": "Yfirferð þröskulds",
-    "thresholdSubtitle": "Safnað útgjöld fara yfir mörkin þín",
+    "thresholdSubtitle": "Safnað útgjöld þessa svæðis yfir valda gluggann fara yfir mörkin þín",
     "anomalyTitle": "Uppsveifla á klukkustund",
-    "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
+    "anomalySubtitle": "Klukkustundarhraði þessa svæðis er langt yfir eigin p95 grunnlínu",
     "limitLabel": "Mörk (USD)",
     "windowLabel": "Gluggi",
     "window24h": "24 klukkustundir",
@@ -3809,14 +3834,14 @@
     "saved": "Stillingar útgjaldaviðvarana vistaðar",
     "loadError": "Ekki tókst að hlaða útgjaldaviðvörunum.",
     "saveError": "Ekki tókst að vista útgjaldaviðvaranir.",
-    "empty": "Útgjaldaviðvaranir eru af. Kveiktu á þeim til að vara innheimtutengiliði þessa svæðis við.",
-    "noSpend": "Engin útgjöld skráð ennþá",
+    "sendAlerts": "Senda viðvaranir",
+    "noSpend": "Engin útgjöld",
     "spend24h": "Útgjöld síðustu 24 klukkustundir",
     "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
     "pushOffByCategory": "Af í Tilkynningum",
     "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
-    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri."
+    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri"
   },
   "profiles": {
     "title": "Snið",

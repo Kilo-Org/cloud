@@ -448,6 +448,83 @@ describe('organization Pass consumption', () => {
     expect(bonusCredits).toHaveLength(0);
   });
 
+  it('decides the expired window outcome from spend inside the window only', async () => {
+    const expired = {
+      start: new Date('2025-05-01T00:00:00.000Z'),
+      end: new Date('2025-06-01T00:00:00.000Z'),
+    };
+    const { owner, organization } = await activePass(expired);
+    const [snapshot] = await db
+      .select()
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(
+        eq(kilo_pass_org_issuance_snapshots.allocation_container_organization_id, organization.id)
+      );
+    const [inWindowSource, closingSource] = await db
+      .insert(credit_transactions)
+      .values([
+        {
+          kilo_user_id: owner.id,
+          organization_id: organization.id,
+          amount_microdollars: -1_000_000,
+          is_free: false,
+          credit_category: `kpo:repair-source:${crypto.randomUUID()}`,
+          check_category_uniqueness: true,
+        },
+        {
+          kilo_user_id: owner.id,
+          organization_id: organization.id,
+          amount_microdollars: -snapshot.unlock_spend_microdollars,
+          is_free: false,
+          credit_category: `kpo:repair-source:${crypto.randomUUID()}`,
+          check_category_uniqueness: true,
+        },
+      ])
+      .returning({ id: credit_transactions.id });
+    await db.insert(kilo_pass_org_qualifying_spend_events).values([
+      {
+        issuance_snapshot_id: snapshot.id,
+        allocation_container_organization_id: organization.id,
+        credit_transaction_id: inWindowSource.id,
+        spent_microdollars: 1_000_000,
+        occurred_at: '2025-05-15T12:00:00.000Z',
+      },
+      {
+        issuance_snapshot_id: snapshot.id,
+        allocation_container_organization_id: organization.id,
+        credit_transaction_id: closingSource.id,
+        spent_microdollars: snapshot.unlock_spend_microdollars,
+        occurred_at: expired.end.toISOString(),
+      },
+    ]);
+
+    const first = await db.transaction(tx =>
+      repairExpiredOrganizationPassBonuses(tx, '2027-07-01T00:00:00.000Z')
+    );
+    const replay = await db.transaction(tx =>
+      repairExpiredOrganizationPassBonuses(tx, '2027-07-01T00:00:00.000Z')
+    );
+
+    expect(first.recordedMisses).toBe(0);
+    expect(replay.examined).toBe(0);
+    const [repaired] = await db
+      .select()
+      .from(kilo_pass_org_issuance_snapshots)
+      .where(eq(kilo_pass_org_issuance_snapshots.id, snapshot.id));
+    expect(repaired.qualifying_spend_microdollars).toBe(1_000_000);
+    expect(repaired.repair_completed_at).not.toBeNull();
+    const repairs = await db
+      .select()
+      .from(kilo_pass_org_audit_records)
+      .where(
+        and(
+          eq(kilo_pass_org_audit_records.agreement_id, snapshot.agreement_id),
+          eq(kilo_pass_org_audit_records.action, 'bonus_missed_after_expiry')
+        )
+      );
+    expect(repairs).toHaveLength(0);
+  });
+
   it('records late historical usage and an audit outcome without unlocking an expired bonus', async () => {
     const expired = {
       start: new Date('2025-05-01T00:00:00.000Z'),

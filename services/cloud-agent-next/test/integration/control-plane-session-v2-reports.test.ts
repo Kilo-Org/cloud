@@ -20,11 +20,6 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 const NATIVE_KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
 
-let sequence = 0;
-function unique(prefix: string): string {
-  sequence += 1;
-  return `${prefix}_${sequence}`;
-}
 function newSessionId(): string {
   return `workspace_${crypto.randomUUID()}`;
 }
@@ -47,7 +42,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     callback: { target: { url: 'https://callback.test/hook' } },
     lifecycle: { version: 1, timestamp: 1 },
@@ -129,13 +124,13 @@ async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = unique('sbx__reports');
+  const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
   const stub = sessions.getByName(sessionId);
   const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
   sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
     metadata: sessionMetadata,
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   const peer = new FakeSandboxPeer();
   peer.prepareView = peer.view('ready');
@@ -498,7 +493,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
   });
 
   it('persists parent delivery identity and deduplicates its admitted parent turn', async () => {
-    const { sessionId, stub } = await setup('session:parent');
+    const { sessionId, stub } = await setup('workspace:new-chat');
     const captured = await installCapturedQueues(stub);
     await stub.send(promptPayload('child-task'));
     await waitFor(async () => expect(await messageStatus(stub, 'child-task')).toBe('running'));

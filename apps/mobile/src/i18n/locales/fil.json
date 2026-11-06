@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo ng native remote",
+    "sessionsEmpty": "Wala pang native na sesyon",
+    "hosts": "Mga online na host",
+    "hostsEmpty": "Walang online na host",
+    "directory": "Direktoryo ng trabaho",
+    "createSession": "Gumawa ng native na sesyon",
+    "queueIfOffline": "Ipila ang prompt kung offline ang host",
+    "prompt": "Prompt o /command",
+    "localClear": "Linisin ang lokal na view",
+    "abort": "Ihinto ang turn",
+    "failed": "Nabigo ang aksyon sa native remote",
+    "creationUnknown": "Hindi tiyak kung nalikha ang sesyon. I-refresh ang mga sesyon bago subukang muli.",
+    "commandFailed": "Nabigo ang command sa runner",
+    "invalidReply": "Hindi wastong tugon mula sa runner",
+    "unsafeCommand": "Gamitin ang /compact, /new, /skill, /models, /agents o /clear (lokal lang).",
+    "status": "Koneksyon: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Mga host: {{connection}}",
+    "commandStatus": "Paghahatid ng command: {{status}}",
+    "delivered": "Naihatid",
+    "expired": "Nag-expire"
+  },
   "common": {
     "cancel": "Kanselahin",
     "done": "Tapos",
@@ -189,6 +211,7 @@
     "resendCode": "Ipadala muli ang code",
     "termsPrefix": "Sa pagpapatuloy, sumasang-ayon ka sa aming ",
     "terms": "Mga tuntunin",
+    "termsInSentence": "Mga tuntunin",
     "termsConnector": " at ",
     "termsSuffix": ".",
     "moreSignInOptions": "Higit pang mga opsyon sa pag-sign in",
@@ -2088,6 +2111,7 @@
       "actionFailed": "Hindi magawang matapos ang aksyon na ito. Pakisubukang muli.",
       "actionBlocked": "Hindi magawang matapos ang aksyon na ito. Kailangang ayusin muna ang problema bago mo ito muling subukan.",
       "syncNoRepositories": "Walang mga repositoryo sa saklaw ng pag-sync. Piliin ang mga repositoryong sinusubaybayan ng Ahente sa seguridad, pagkatapos i-sync muli.",
+      "syncNoRepositoriesNoManage": "Walang mga repositoryo sa saklaw ng pag-sync. Kailangan ng may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta ang mga repositoryo bago ito maisync.",
       "syncIntegrationInactive": "Hindi aktibo ang koneksyon sa GitHub para sa Ahente sa seguridad. I-reconnect ang Kilo GitHub App, pagkatapos i-sync muli.",
       "syncMissingPermission": "Hindi mabasa ng Kilo GitHub App ang vulnerability alerts. Ibigay ang pahintulot na iyon sa GitHub, pagkatapos ay mag-sync muli.",
       "configConflict": "Nagbago ang mga setting ng Ahente sa seguridad sa ibang lugar. Suriin ang pinakabagong mga setting at i-save muli."
@@ -2556,6 +2580,7 @@
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
       "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
+      "assistantProviderRefused": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingang ito at hindi na ito maaaring muling subukan.",
       "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
       "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."
@@ -3803,9 +3828,9 @@
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
     "thresholdTitle": "Paglampas sa hangganan",
-    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ng saklaw na ito sa loob ng napiling panahon ay lumampas sa iyong limitasyon",
     "anomalyTitle": "Pagtaas bawat oras",
-    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "anomalySubtitle": "Ang rate ng saklaw na ito bawat oras ay malayo sa itaas ng sarili nitong p95 baseline",
     "limitLabel": "Limitasyon (USD)",
     "windowLabel": "Panahon",
     "window24h": "24 na oras",
@@ -3815,14 +3840,14 @@
     "saved": "Nai-save ang mga setting ng babala sa gastos",
     "loadError": "Hindi ma-load ang mga babala sa gastos.",
     "saveError": "Hindi mai-save ang mga babala sa gastos.",
-    "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
-    "noSpend": "Wala pang naitalang gastos",
+    "sendAlerts": "Magpadala ng babala",
+    "noSpend": "Wala pang gastos",
     "spend24h": "Gastos sa nakalipas na 24 na oras",
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
     "pushOffByCategory": "Naka-off sa Mga abiso",
     "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
-    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa"
   },
   "profiles": {
     "title": "Mga profile",

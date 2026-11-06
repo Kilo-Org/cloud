@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo e kontrollit në distancë me protokollin native",
+    "sessionsEmpty": "Ende nuk ka sesione native",
+    "hosts": "Hoste në linjë",
+    "hostsEmpty": "Nuk ka hoste në linjë",
+    "directory": "Dosja e punës",
+    "createSession": "Krijo sesion native",
+    "queueIfOffline": "Vendose udhëzimin në radhë nëse hosti është jashtë linje",
+    "prompt": "Udhëzim ose /command",
+    "localClear": "Pastro pamjen lokale",
+    "abort": "Ndërprit radhën",
+    "failed": "Veprimi në distancë me protokollin native dështoi",
+    "creationUnknown": "Rezultati i krijimit nuk dihet. Rifresko sesionet para se të provosh përsëri.",
+    "commandFailed": "Komanda e ekzekutuesit dështoi",
+    "invalidReply": "Përgjigje e pavlefshme nga ekzekutuesi",
+    "unsafeCommand": "Përdor /compact, /new, /skill, /models, /agents ose /clear (vetëm lokalisht).",
+    "status": "Lidhja: {{connection}} · Ekzekutuesi: {{runner}}",
+    "presenceStatus": "Hostet: {{connection}}",
+    "commandStatus": "Dorëzimi i komandës: {{status}}",
+    "delivered": "Dorëzuar",
+    "expired": "Skaduar"
+  },
   "common": {
     "cancel": "Anulo",
     "done": "U krye",
@@ -189,6 +211,7 @@
     "resendCode": "Ridërgo kodin",
     "termsPrefix": "Duke vazhduar, pajtohesh me ",
     "terms": "Kushtet",
+    "termsInSentence": "Kushtet",
     "termsConnector": " dhe ",
     "termsSuffix": ".",
     "moreSignInOptions": "Më shumë opsione hyrjeje",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Ky veprim nuk u përfundua dot. Provo përsëri.",
       "actionBlocked": "Ky veprim nuk u përfundua dot. Problemi duhet zgjidhur përpara se të provosh përsëri.",
       "syncNoRepositories": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Zgjidhni depot që monitoron Agjenti i sigurisë, më pas sinkronizoni përsëri.",
+      "syncNoRepositoriesNoManage": "Asnjë depo nuk është në fushëveprimin e sinkronizimit. Një pronar, administrator ose menaxher faturimi i organizatës duhet të lidhë depot përpara se të mund të sinkronizohet.",
       "syncIntegrationInactive": "Lidhja e GitHub për Agjentin e sigurisë nuk është aktive. Rilidhni Kilo GitHub App, më pas sinkronizoni përsëri.",
       "syncMissingPermission": "Aplikacioni Kilo për GitHub nuk mund të lexojë alarmet e dobësive. Jepi atë leje në GitHub, pastaj sinkronizo përsëri.",
       "configConflict": "Cilësimet e Agjentit të sigurisë u ndryshuan diku tjetër. Rishiko cilësimet më të fundit dhe ruaj përsëri."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Gjenerimi i përgjigjes u ndal.",
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
+      "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
     "thresholdTitle": "Tejkalimi i pragut",
-    "thresholdSubtitle": "Shpenzimet rrjedhëse tejkalojnë kufirin tënd",
+    "thresholdSubtitle": "Shpenzimet rrjedhëse të këtij fushëveprimi gjatë dritares së zgjedhur tejkalojnë kufirin tënd",
     "anomalyTitle": "Rritje për orë",
-    "anomalySubtitle": "Një orë është shumë mbi ritmin e zakonshëm të këtij fushëveprimi",
+    "anomalySubtitle": "Ritmi për orë i këtij fushëveprimi është shumë mbi vijën e vet bazë p95",
     "limitLabel": "Kufi (USD)",
     "windowLabel": "Dritare",
     "window24h": "24 orë",
@@ -3809,14 +3834,14 @@
     "saved": "Cilësimet e njoftimeve për shpenzimet u ruajtën",
     "loadError": "Njoftimet për shpenzimet nuk u ngarkuan dot.",
     "saveError": "Njoftimet për shpenzimet nuk u ruajtën dot.",
-    "empty": "Njoftimet për shpenzimet janë të fikura. Ndizni ato për të paralajmëruar kontaktet e faturimit të këtij fushëveprimi.",
-    "noSpend": "Nuk është regjistruar ende asnjë shpenzim",
+    "sendAlerts": "Dërgo njoftime",
+    "noSpend": "Ende asnjë shpenzim",
     "spend24h": "Shpenzimet në 24 orët e fundit",
     "multiplierError": "Vendos një shumëzues 1 ose më shumë",
     "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
     "pushOffByCategory": "Fikur në Njoftimet",
     "multiplierMaxError": "Vendos një shumëzues {{max}} ose më të vogël",
-    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak."
+    "thresholdMaxError": "Shkruaj një shumë prej {{max}} ose më pak"
   },
   "profiles": {
     "title": "Profilet",

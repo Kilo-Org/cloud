@@ -42,6 +42,34 @@ server save finishes, so reopening the form does not restore an older cached
 choice. Older in-flight preference reads are cancelled before that update.
 The existing server, local, and default-model fallback order is unchanged.
 
+## New-session keyboard and Back
+
+Back keeps a dirty editor mounted while the keyboard closes, then opens the
+discard confirmation. Keep editing restores input focus only after the sheet
+closes. Discard and Save as to-do leave the keyboard closed.
+
+The prompt interpolates whole-line heights from the app-root keyboard motion
+provider. Screens do not register keyboard listeners. Native progress is bounded
+before interpolation because keyboard height changes can exceed its normal range.
+The iOS swipe guard requires a native build with the `react-native-screens` patch.
+
+For local computer, folder, model, and effort picker verification, run
+`pnpm dev:seed app:connected-computer kilo-<name>@example.com`.
+The fixture requires an existing fake account, a localhost database,
+`NEXTAUTH_SECRET`, and a running local `cloudflare-session-ingest` service.
+The optional `sessionIngestPort` argument selects an explicit local port.
+The fixture serves read-only picker commands and rejects execution commands.
+
+## Organization credit-activity links
+
+Credit activity treats a scalar `org` or the first value of a repeated `org`
+parameter as its explicit scope. An empty first value means no explicit scope;
+later values are not fallbacks. The route guard and screen share this rule.
+Explicit links remain on their named organization after an account switch, while
+plain account-scoped routes leave. Membership validation still gates the data
+query: a foreign or malformed explicit organization never falls back to the
+selected organization's transactions.
+
 ## Organization hub connectivity
 
 Usage tiles retain labels and show cached totals or em dash placeholders.
@@ -120,6 +148,12 @@ Standalone transcript continuation and recovery buttons use the shared
 Compact, default, and large button sizes remain unchanged for other controls.
 Verify Android targets using the clickable accessibility node bounds, not
 hitSlop alone; keep the translated label fully visible.
+
+## Loading buttons
+
+The shared `Button` uses the native iOS spinner without an additional ring.
+Android keeps its circular track while the native indicator animates.
+Both platforms preserve the button dimensions, accessible busy name, and disabled state during loading.
 
 ## Mounted query tests
 

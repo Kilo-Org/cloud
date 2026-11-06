@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Nuotolinio valdymo per v2 CLI demonstracija",
+    "sessionsEmpty": "Dar nėra v2 CLI sesijų",
+    "hosts": "Prisijungę vykdymo procesai",
+    "hostsEmpty": "Nėra prisijungusių vykdymo procesų",
+    "directory": "Darbinis katalogas",
+    "createSession": "Sukurti v2 CLI sesiją",
+    "queueIfOffline": "Įtraukti užklausą į eilę, jei vykdymo procesas atsijungęs",
+    "prompt": "Užklausa arba /command",
+    "localClear": "Išvalyti vietinį rodinį",
+    "abort": "Nutraukti ėjimą",
+    "failed": "Nepavyko atlikti nuotolinio v2 CLI veiksmo",
+    "creationUnknown": "Sukūrimo rezultatas nežinomas. Prieš bandydami dar kartą, atnaujinkite sesijų sąrašą.",
+    "commandFailed": "Vykdymo proceso komanda nepavyko",
+    "invalidReply": "Netinkamas vykdymo proceso atsakymas",
+    "unsafeCommand": "Naudokite /compact, /new, /skill, /models, /agents arba /clear (tik vietiniam rodiniui).",
+    "status": "Ryšys: {{connection}} · Vykdymo procesas: {{runner}}",
+    "presenceStatus": "Vykdymo procesai: {{connection}}",
+    "commandStatus": "Komandos pristatymas: {{status}}",
+    "delivered": "Pristatyta",
+    "expired": "Galiojimas baigėsi"
+  },
   "common": {
     "cancel": "Atšaukti",
     "done": "Baigti",
@@ -189,6 +211,7 @@
     "resendCode": "Siųsti kodą iš naujo",
     "termsPrefix": "Tęsdamas sutinki su mūsų ",
     "terms": "Sąlygomis",
+    "termsInSentence": "Sąlygomis",
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
@@ -2158,6 +2181,7 @@
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "syncNoRepositoriesNoManage": "Sinchronizavimo apimtyje nėra saugyklų. Kad būtų galima sinchronizuoti, organizacijos savininkas, administratorius arba atsiskaitymų administratorius turi prijungti saugyklas.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
       "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
       "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
@@ -2642,6 +2666,7 @@
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
+      "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
@@ -3909,9 +3934,9 @@
   "spendAlerts": {
     "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
     "thresholdTitle": "Slenksčio viršijimas",
-    "thresholdSubtitle": "Einamosios išlaidos viršija tavo limitą",
+    "thresholdSubtitle": "Šios srities einamosios išlaidos per pasirinktą langą viršija tavo limitą",
     "anomalyTitle": "Valandinis šuolis",
-    "anomalySubtitle": "Viena valanda gerokai viršija įprastą šios srities tempą",
+    "anomalySubtitle": "Šios srities valandinis tempas gerokai viršija jos pačios p95 bazinį lygį",
     "limitLabel": "Limitas (USD)",
     "windowLabel": "Langas",
     "window24h": "24 valandos",
@@ -3921,14 +3946,14 @@
     "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
     "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
     "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
-    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
-    "noSpend": "Išlaidų dar neužregistruota",
+    "sendAlerts": "Siųsti įspėjimus",
+    "noSpend": "Kol kas jokių išlaidų",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
     "pushOffByCategory": "Išjungta pranešimuose",
     "multiplierMaxError": "Įvesk daugiklį, lygų {{max}} arba mažesnį",
-    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę."
+    "thresholdMaxError": "Įveskite sumą, lygią {{max}} arba mažesnę"
   },
   "profiles": {
     "title": "Profiliai",

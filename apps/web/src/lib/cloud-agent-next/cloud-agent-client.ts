@@ -1,3 +1,4 @@
+import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -23,9 +24,14 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   parseCustomerBillingFailure,
+  type CloudSessionMetadata,
   type PreparationAttempt,
   type SessionConfig,
 } from '@kilocode/cloud-agent-sdk';
+import {
+  cloudSessionMessagesPageInputSchema,
+  cloudSessionMessagesPageWireSchema,
+} from '@kilocode/cloud-agent-sdk/schemas';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -134,6 +140,13 @@ type PrepareSessionSharedFields = {
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
   kilocodeOrganizationId?: string;
+  /** The repository environment the user selected, with branches for its additional repositories. */
+  requestedEnvironment?: {
+    id: string;
+    repositories?: { repoFullName: string; branch?: string }[];
+  };
+  /** Set by a client that shows an environment picker; see the worker's `requireEnvironmentChoice`. */
+  requireEnvironmentChoice?: true;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
   envVars?: Record<string, string>;
@@ -335,6 +348,8 @@ export type ListChildSessionsOutput = {
   nextCursor?: string;
 };
 
+export type GetSessionMessagesPageInput = z.input<typeof cloudSessionMessagesPageInputSchema>;
+
 /** Interactions a cloud-agent session currently waits on. */
 export type GetPendingInteractionsOutput = {
   questions: unknown[];
@@ -376,6 +391,7 @@ export type GetSessionOutput = {
   worktreeId?: string | null;
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
+  parentCloudAgentSessionId?: string;
 
   githubRepo?: string;
   gitUrl?: string;
@@ -384,6 +400,7 @@ export type GetSessionOutput = {
   prompt?: string;
   mode?: AgentMode;
   model?: string;
+  variant?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
   branchName?: string;
@@ -396,6 +413,7 @@ export type GetSessionOutput = {
   // Lifecycle timestamps (critical for idempotency)
   preparedAt?: number;
   initiatedAt?: number;
+  routeReady?: boolean;
 
   // Callback configuration is intentionally NOT exposed: the stored target
   // may carry service-to-service auth headers (e.g. X-Internal-Secret used
@@ -411,7 +429,10 @@ export type GetSessionOutput = {
   // present after at least one event has been persisted. Null when no events
   // exist, and absent when the DO cannot be reached (fails open).
   latestEventId?: number | null;
-};
+} & Pick<
+  CloudSessionMetadata,
+  'title' | 'associatedPr' | 'totalCostMicrodollars' | 'createdOnPlatform' | 'profileId'
+>;
 
 /**
  * Input for updateSession procedure.
@@ -626,6 +647,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
+  };
+  getSessionMessagesPage: {
+    query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -911,6 +935,15 @@ export class CloudAgentNextClient {
       });
       throw error;
     }
+  }
+
+  async getSessionMessagesPage(
+    input: GetSessionMessagesPageInput
+  ): Promise<CloudSessionMessagesWirePage> {
+    const request = cloudSessionMessagesPageInputSchema.parse(input);
+    return cloudSessionMessagesPageWireSchema.parse(
+      await this.client.getSessionMessagesPage.query(request)
+    );
   }
 
   /** The session's preparation attempts, as its stream replays them. */

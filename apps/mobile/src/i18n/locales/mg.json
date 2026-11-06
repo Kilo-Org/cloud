@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo fanaraha-maso lavitra native",
+    "sessionsEmpty": "Tsy mbola misy fotoam-piasana native",
+    "hosts": "Milina mifandray",
+    "hostsEmpty": "Tsy misy milina mifandray",
+    "directory": "Lahatahiry iasana",
+    "createSession": "Mamorona fotoam-piasana native",
+    "queueIfOffline": "Alaharo ny toromarika raha tsy mifandray ny milina",
+    "prompt": "Toromarika na /command",
+    "localClear": "Diovy ny fijery eo an-toerana",
+    "abort": "Atsaharo ny fihodinana",
+    "failed": "Tsy nahomby ny hetsika lavitra native",
+    "creationUnknown": "Tsy fantatra raha voaforona ilay fotoam-piasana. Havaozy ny fotoam-piasana alohan'ny hanandramana indray.",
+    "commandFailed": "Tsy nahomby ny baikon'ny prosesy CLI",
+    "invalidReply": "Tsy manankery ny valin'ny prosesy CLI",
+    "unsafeCommand": "Ampiasao ny /compact, /new, /skill, /models, /agents na /clear (eo an-toerana ihany).",
+    "status": "Fifandraisana: {{connection}} · Prosesy CLI: {{runner}}",
+    "presenceStatus": "Milina: {{connection}}",
+    "commandStatus": "Fanaterana baiko: {{status}}",
+    "delivered": "Voatolotra",
+    "expired": "Lany fe-potoana"
+  },
   "common": {
     "cancel": "Foano",
     "done": "Vita",
@@ -189,6 +211,7 @@
     "resendCode": "Alefaso indray ny kaody",
     "termsPrefix": "Rehefa manohy ianao dia manaiky ny ",
     "terms": "Fepetra",
+    "termsInSentence": "Fepetra",
     "termsConnector": " sy ",
     "termsSuffix": ".",
     "moreSignInOptions": "Safidy fidirana fanampiny",
@@ -2088,6 +2111,7 @@
       "actionFailed": "Tsy azo vitaina ity hetsika ity. Andramo indray azafady.",
       "actionBlocked": "Tsy azo vitaina ity hetsika ity. Mila vahana aloha ny olana.",
       "syncNoRepositories": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Safidio ny depo arovan'ny Mpanampy amin'ny fiarovana, dia mifanaraha indray.",
+      "syncNoRepositoriesNoManage": "Tsy misy depo ao amin'ny sehatry ny fampifanarahana. Tsy maintsy mampifandray depo ny tompon'ny fikambanana, ny mpitantana, na ny mpitantana ny faktiora vao afaka mifanaraka.",
       "syncIntegrationInactive": "Tsy mavitrika ny fifandraisana amin'ny GitHub an'ny Mpanampy amin'ny fiarovana. Ampifandraiso indray ny Kilo GitHub App, dia avereno indray ny fampifanarahana.",
       "syncMissingPermission": "Tsy afaka mamaky ny vulnerability alerts ny Kilo GitHub App. Omeo ao amin'ny GitHub io alalana io, dia avereno indray ny sync.",
       "configConflict": "Niova tany an-kafa ny fandrindran'ny mpanampy amin'ny fiarovana. Jereo ny fandrindrana farany ary tehirizo indray."
@@ -2556,6 +2580,7 @@
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
+      "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."
@@ -3803,9 +3828,9 @@
   "spendAlerts": {
     "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
     "thresholdTitle": "Fihoaram-bidy",
-    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
+    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy amin'ity faritra ity mandritra ny fe-potoana voafidy",
     "anomalyTitle": "Fitsambikinana isan'ora",
-    "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
+    "anomalySubtitle": "Ny taha isan'oran'ity faritra ity dia ambony lavitra noho ny fototra p95 azy manokana",
     "limitLabel": "Fetra (USD)",
     "windowLabel": "Fe-potoana",
     "window24h": "Adiny 24",
@@ -3815,14 +3840,14 @@
     "saved": "Voatahiry ny fikirakirana ny fampitandremana momba ny fandaniana",
     "loadError": "Tsy afaka nampiditra ny fampitandremana momba ny fandaniana.",
     "saveError": "Tsy afaka nitahiry ny fampitandremana momba ny fandaniana.",
-    "empty": "Mihidy ny fampitandremana momba ny fandaniana. Velomy izy ireo hampandre ny mpifandray amin'ny faktiora amin'ity faritra ity.",
-    "noSpend": "Mbola tsy misy fandaniana voarakitra",
+    "sendAlerts": "Alefaso ny fampitandremana",
+    "noSpend": "Tsy misy fandaniana",
     "spend24h": "Fandaniana tao anatin'ny 24 ora farany",
     "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana",
     "multiplierMaxError": "Ampidiro mpamaro tsy mihoatra ny {{max}}",
-    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}."
+    "thresholdMaxError": "Mampidira vola tsy mihoatra ny {{max}}"
   },
   "profiles": {
     "title": "mombamomba",

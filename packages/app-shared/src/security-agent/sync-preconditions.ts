@@ -21,13 +21,20 @@ export type SecuritySyncPrecondition = keyof typeof SECURITY_SYNC_PRECONDITION_C
 export type SecuritySyncPreconditionCode =
   (typeof SECURITY_SYNC_PRECONDITION_CODES)[SecuritySyncPrecondition];
 
-// A Map, not an object literal: an inherited `Object.prototype` name such as
-// `constructor` must read as "no precondition", not as a function.
-const PRECONDITION_BY_CODE = new Map<string, SecuritySyncPrecondition>([
-  [SECURITY_SYNC_PRECONDITION_CODES.noRepositories, 'noRepositories'],
-  [SECURITY_SYNC_PRECONDITION_CODES.integrationInactive, 'integrationInactive'],
-  [SECURITY_SYNC_PRECONDITION_CODES.missingPermission, 'missingPermission'],
-]);
+// Derived by inverting SECURITY_SYNC_PRECONDITION_CODES: a code added to that
+// object is mapped here too, so it cannot resolve to null. A Map, not an
+// object literal: an inherited `Object.prototype` name such as `constructor`
+// must read as "no precondition", not as a function.
+const PRECONDITION_BY_CODE = new Map<string, SecuritySyncPrecondition>(
+  Object.entries(SECURITY_SYNC_PRECONDITION_CODES).map(
+    ([precondition, code]): [string, SecuritySyncPrecondition] => [
+      code,
+      // Object.entries widens the const object's keys to `string`; its keys
+      // are exactly the precondition names.
+      precondition as SecuritySyncPrecondition,
+    ]
+  )
+);
 
 /** The sync precondition an upstream code names, or null for any other code. */
 export function securitySyncPreconditionForCode(

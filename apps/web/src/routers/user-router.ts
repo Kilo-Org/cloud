@@ -56,7 +56,7 @@ import {
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
+import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
@@ -592,6 +592,16 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
   };
 }
 
+// Passkey enrollment and management change which authenticators can sign in
+// as this account, so they are bound to a browser session. A bearer token must
+// not be able to add or remove a sign-in factor.
+const passkeyManagementProcedure = baseProcedure.use(({ ctx, next }) => {
+  if (ctx.credential !== 'session') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Browser session required' });
+  }
+  return next();
+});
+
 export const userRouter = createTRPCRouter({
   getPaidCreditPolicy: baseProcedure.query(() =>
     getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
@@ -651,7 +661,7 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
-  renamePasskey: baseProcedure
+  renamePasskey: passkeyManagementProcedure
     .input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(64) }))
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
@@ -666,7 +676,7 @@ export const userRouter = createTRPCRouter({
       return successResult();
     }),
 
-  deletePasskey: baseProcedure
+  deletePasskey: passkeyManagementProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
@@ -684,6 +694,17 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // Account linking requires the web session that started it, and a
+      // provider's callback carries that session only when it is a same-site
+      // GET. Refuse every provider the metadata does not offer for linking here
+      // instead of letting the round trip end in a failure on
+      // /connected-accounts.
+      if (!isAccountLinkingProvider(input.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This sign-in method cannot be added to an account.',
+        });
+      }
       // An organization-scoped link records the organization on the linking
       // session so the callback can store the BYOK connection for it. Only the
       // OpenAI (ChatGPT) provider has an organization-scoped connection, so any

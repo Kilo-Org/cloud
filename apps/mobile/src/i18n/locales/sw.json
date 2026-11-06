@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Onyesho la udhibiti wa mbali wa CLI native",
+    "sessionsEmpty": "Bado hakuna vikao vya CLI native",
+    "hosts": "Vizio vilivyo mtandaoni",
+    "hostsEmpty": "Hakuna vizio vilivyo mtandaoni",
+    "directory": "Saraka ya kazi",
+    "createSession": "Unda kikao cha CLI native",
+    "queueIfOffline": "Weka agizo kwenye foleni ikiwa kizio hakiko mtandaoni",
+    "prompt": "Agizo au /command",
+    "localClear": "Futa mwonekano wa ndani tu",
+    "abort": "Katisha zamu",
+    "failed": "Kitendo cha udhibiti wa mbali wa CLI native kimeshindwa",
+    "creationUnknown": "Matokeo ya uundaji hayajulikani. Onyesha upya vikao kabla ya kujaribu tena.",
+    "commandFailed": "Amri ya kiendeshi imeshindwa",
+    "invalidReply": "Jibu la kiendeshi si halali",
+    "unsafeCommand": "Tumia /compact, /new, /skill, /models, /agents au /clear (ndani tu).",
+    "status": "Muunganisho: {{connection}} · Kiendeshi: {{runner}}",
+    "presenceStatus": "Vizio: {{connection}}",
+    "commandStatus": "Uwasilishaji wa amri: {{status}}",
+    "delivered": "Imewasilishwa",
+    "expired": "Muda wake umeisha"
+  },
   "common": {
     "cancel": "Ghairi",
     "done": "Nimemaliza",
@@ -189,6 +211,7 @@
     "resendCode": "Tuma msimbo tena",
     "termsPrefix": "Kwa kuendelea unakubali ",
     "terms": "Masharti",
+    "termsInSentence": "Masharti",
     "termsConnector": " na ",
     "termsSuffix": ".",
     "moreSignInOptions": "Machaguo zaidi ya kuingia",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Imeshindikana kukamilisha kitendo hiki. Tafadhali jaribu tena.",
       "actionBlocked": "Imeshindikana kukamilisha kitendo hiki. Tatizo lazima litatuliwe kwanza.",
       "syncNoRepositories": "Hakuna hazina zilizo katika wigo wa usawazishaji. Chagua hazina ambazo Wakala wa usalama hufuatilia, kisha usawazishe tena.",
+      "syncNoRepositoriesNoManage": "Hakuna hazina zilizo katika wigo wa usawazishaji. Mmiliki, msimamizi, au msimamizi wa bili wa shirika lazima aunganishe hazina kabla ya kusawazisha.",
       "syncIntegrationInactive": "Muunganisho wa GitHub wa Wakala wa usalama haupo hai. Unganisha tena GitHub App ya Kilo, kisha usawazishe tena.",
       "syncMissingPermission": "Kilo GitHub App haiwezi kusoma arifa za udhaifu. Toa ruhusa hiyo katika GitHub, kisha sinkronisha tena.",
       "configConflict": "Mipangilio ya Wakala wa usalama ilibadilishwa mahali pengine. Pitia mipangilio ya hivi punde na uhifadhi tena."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Jibu lilisimamishwa.",
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
       "assistantProviderError": "Mtoa huduma alirudisha kosa.",
+      "assistantProviderRefused": "Mtoa huduma alikataa ombi hili na haliwezi kujaribiwa tena.",
       "assistantOutputLimit": "Jibu lilifikisha kikomo cha matokeo ya modeli.",
       "assistantStructuredOutput": "Jibu halikulingana na muundo unaohitajika.",
       "assistantFailed": "Imeshindikana kutoa jibu."
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
     "thresholdTitle": "Kuvuka kizingiti",
-    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "thresholdSubtitle": "Matumizi yanayoendelea ya wigo huu kwenye kipindi ulichochagua yanapita kikomo chako",
     "anomalyTitle": "Kuongezeka kwa saa",
-    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "anomalySubtitle": "Kiwango cha matumizi kwa saa cha wigo huu kiko juu sana kuliko msingi wake wa p95",
     "limitLabel": "Kikomo (USD)",
     "windowLabel": "Kipindi",
     "window24h": "Saa 24",
@@ -3809,14 +3834,14 @@
     "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
     "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
     "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
-    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
-    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "sendAlerts": "Tuma tahadhari",
+    "noSpend": "Hakuna matumizi bado",
     "spend24h": "Matumizi katika saa 24 zilizopita",
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa",
     "multiplierMaxError": "Weka kizidishi cha {{max}} au chini",
-    "thresholdMaxError": "Weka kiasi cha {{max}} au chini."
+    "thresholdMaxError": "Weka kiasi cha {{max}} au chini"
   },
   "profiles": {
     "title": "Wasifu",

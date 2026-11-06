@@ -38,6 +38,7 @@ import {
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import { SeatsRequirementDialog } from '@/app/admin/components/OrganizationAdmin/SeatsRequirementDialog';
 import { PlanDialog } from '@/app/admin/components/OrganizationAdmin/PlanDialog';
+import { AdminViewOrganizationButton } from '@/app/admin/support-access/AdminViewOrganizationButton';
 import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/TrialEndDateDialog';
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
@@ -486,10 +487,10 @@ function Inner(props: InnerProps) {
               <label className="text-muted-foreground text-sm font-medium">Quick Actions</label>
               <div className="mt-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/organizations/${id}`} target="_blank">
+                  <AdminViewOrganizationButton organizationId={id} organizationName={name}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View Organization Page
-                  </Link>
+                  </AdminViewOrganizationButton>
                 </Button>
               </div>
             </div>

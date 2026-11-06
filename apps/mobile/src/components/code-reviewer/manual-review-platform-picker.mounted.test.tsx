@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 
+import { type ManualReviewPlatform } from './manual-review-platform';
 import { ManualReviewPlatformPicker } from './manual-review-platform-picker';
 
 // The explorer finding (manual-review platform group, 2026-10-31) was a
@@ -20,7 +21,6 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
@@ -32,17 +32,15 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 type PickerProps = {
-  isLoading?: boolean;
-  platform: 'github' | 'gitlab';
-  connected: readonly ('github' | 'gitlab')[];
+  platform: ManualReviewPlatform;
+  connected: readonly ManualReviewPlatform[];
 };
 
-function renderPicker({ isLoading = false, platform, connected }: PickerProps) {
+function renderPicker({ platform, connected }: PickerProps) {
   act(() => {
     const element = createElement(ManualReviewPlatformPicker, {
-      isLoading,
       platform,
-      isConnected: (option: 'github' | 'gitlab') => connected.includes(option),
+      isConnected: (option: ManualReviewPlatform) => connected.includes(option),
       onSelect: () => undefined,
     });
     if (renderer) {

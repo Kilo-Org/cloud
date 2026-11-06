@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Demo remota nativa",
+    "sessionsEmpty": "Aínda non hai sesións nativas",
+    "hosts": "Hosts en liña",
+    "hostsEmpty": "Non hai hosts en liña",
+    "directory": "Directorio de traballo",
+    "createSession": "Crear sesión nativa",
+    "queueIfOffline": "Poñer o prompt en cola se o host está desconectado",
+    "prompt": "Prompt ou /command",
+    "localClear": "Limpar a vista local",
+    "abort": "Abortar a quenda",
+    "failed": "Fallou a acción remota nativa",
+    "creationUnknown": "Descoñécese o resultado da creación. Actualiza as sesións antes de tentalo de novo.",
+    "commandFailed": "Fallou o comando do runner",
+    "invalidReply": "Resposta do runner non válida",
+    "unsafeCommand": "Usa /compact, /new, /skill, /models, /agents ou /clear (só local).",
+    "status": "Conexión: {{connection}} · Runner: {{runner}}",
+    "presenceStatus": "Hosts: {{connection}}",
+    "commandStatus": "Entrega do comando: {{status}}",
+    "delivered": "Entregado",
+    "expired": "Caducado"
+  },
   "common": {
     "cancel": "Cancelar",
     "done": "Feito",
@@ -189,6 +211,7 @@
     "resendCode": "Reenviar código",
     "termsPrefix": "Ao continuar aceptas os nosos ",
     "terms": "Termos",
+    "termsInSentence": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Máis opcións de inicio de sesión",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Non se puido completar esta acción. Téntao de novo.",
       "actionBlocked": "Non se puido completar esta acción. Tes que resolver o problema antes de tentalo de novo.",
       "syncNoRepositories": "Non hai repositorios no ámbito de sincronización. Escolle os repositorios que supervisa o axente de seguridade e volve sincronizar.",
+      "syncNoRepositoriesNoManage": "Non hai repositorios no ámbito de sincronización. Un propietario da organización, un administrador ou un xestor de facturación debe conectar repositorios antes de poder sincronizar.",
       "syncIntegrationInactive": "A conexión de GitHub para o axente de seguridade non está activa. Volve conectar a aplicación de Kilo en GitHub e sincroniza de novo.",
       "syncMissingPermission": "A aplicación de Kilo en GitHub non pode ler as alertas de vulnerabilidade. Concede ese permiso en GitHub e sincroniza de novo.",
       "configConflict": "Os axustes do axente de seguridade cambiáronse noutro lugar. Revisa os axustes máis recentes e garda de novo."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Detívose a resposta.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O provedor devolveu un erro.",
+      "assistantProviderRefused": "O provedor rexeitou esta solicitude e non se pode reintentar.",
       "assistantOutputLimit": "A resposta alcanzou o límite de saída do modelo.",
       "assistantStructuredOutput": "A resposta non coincidía co formato requirido.",
       "assistantFailed": "Non se puido xerar a resposta."
@@ -3797,9 +3822,9 @@
   "spendAlerts": {
     "subtitle": "Envía unha alerta por correo ou notificación push aos contactos de facturación cando o gasto deste ámbito supere un límite ou se dispare por riba do seu ritmo horario habitual.",
     "thresholdTitle": "Superación do limiar",
-    "thresholdSubtitle": "O gasto acumulado supera o teu límite",
+    "thresholdSubtitle": "O gasto acumulado deste ámbito na ventá elixida supera o teu límite",
     "anomalyTitle": "Pico por hora",
-    "anomalySubtitle": "Unha hora está moi por riba do ritmo habitual deste ámbito",
+    "anomalySubtitle": "O ritmo por hora deste ámbito está moi por riba da súa propia liña base p95",
     "limitLabel": "Límite (USD)",
     "windowLabel": "Ventá",
     "window24h": "24 horas",
@@ -3809,14 +3834,14 @@
     "saved": "Gardáronse os axustes das alertas de gasto",
     "loadError": "Non se puideron cargar as alertas de gasto.",
     "saveError": "Non se puideron gardar as alertas de gasto.",
-    "empty": "As alertas de gasto están desactivadas. Actívaas para avisar os contactos de facturación deste ámbito.",
-    "noSpend": "Aínda non se rexistrou ningún gasto",
+    "sendAlerts": "Enviar alertas",
+    "noSpend": "Aínda ningún gasto",
     "spend24h": "Gasto nas últimas 24 horas",
     "multiplierError": "Introduce un multiplicador de 1 ou máis",
     "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
     "pushOffByCategory": "Desactivado en Notificacións",
     "multiplierMaxError": "Introduce un multiplicador de {{max}} ou menos",
-    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos."
+    "thresholdMaxError": "Introduce unha cantidade de {{max}} ou menos"
   },
   "profiles": {
     "title": "Perfís",

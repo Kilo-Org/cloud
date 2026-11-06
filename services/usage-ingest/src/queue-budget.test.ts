@@ -4,7 +4,7 @@ import { unstable_readConfig } from 'wrangler';
 
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href);
 
-it('bounds production EU processing to 400 direct Frankfurt writer calls', () => {
+it('bounds production EU processing to 450 direct Frankfurt writer calls', () => {
   const production = unstable_readConfig({ config });
   expect(production.services).toEqual([]);
   expect(production.queues.producers).toEqual([
@@ -13,14 +13,14 @@ it('bounds production EU processing to 400 direct Frankfurt writer calls', () =>
   ]);
   expect(production.vars.USAGE_WRITER_URL).toBe('https://app.kilo.ai/api/internal/usage/record');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
+  expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([
     {
       queue: 'usage-ingest-processing-eu',
       max_batch_size: 6,
       max_batch_timeout: 0,
-      max_concurrency: 200,
+      max_concurrency: 225,
       max_retries: 20,
       retry_delay: 60,
       dead_letter_queue: 'usage-ingest-processing-dlq-eu',
@@ -28,7 +28,8 @@ it('bounds production EU processing to 400 direct Frankfurt writer calls', () =>
   ]);
   const cap = production.queues.consumers[0].max_concurrency;
   if (typeof cap !== 'number') throw new Error('Missing production queue cap');
-  expect(cap * Number(production.vars.USAGE_INGEST_PARALLELISM)).toBe(400);
+  expect(cap).toBe(225);
+  expect(cap * Number(production.vars.USAGE_INGEST_PARALLELISM)).toBe(450);
 });
 
 it('keeps staging on one EU queue with at most 400 concurrent writer calls', () => {
@@ -42,7 +43,7 @@ it('keeps staging on one EU queue with at most 400 concurrent writer calls', () 
     { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
   ]);
   expect(staging.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(staging.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
+  expect(staging.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(staging.queues.consumers).toHaveLength(1);
   expect(staging.queues.consumers[0].queue).toBe('usage-ingest-processing-staging-eu');
   let writerBudget = 0;

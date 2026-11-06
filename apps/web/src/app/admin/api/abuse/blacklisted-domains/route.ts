@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { sql, count, or } from 'drizzle-orm';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import {
+  BLACKLIST_STATS_ROW_LIMIT,
+  computeBlacklistStats,
+  countUsersByEmailHost,
+} from '@/lib/abuse/blacklist-domain-stats';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
@@ -12,31 +15,13 @@ export async function GET() {
   }
 
   try {
-    const BLACKLIST_DOMAINS = await getBlacklistedDomains();
+    const blacklistedDomains = await getBlacklistedDomains();
+    // The report is assembled from one grouped aggregate on the read replica.
+    const emailHostCounts = await countUsersByEmailHost(readDb);
 
-    const domainCounts = await Promise.all(
-      BLACKLIST_DOMAINS.map(async domain => {
-        const conditions = or(
-          sql`lower(${kilocode_users.google_user_email}) LIKE ${`%@${domain.toLowerCase()}`}`,
-          sql`lower(${kilocode_users.google_user_email}) LIKE ${`%.${domain.toLowerCase()}`}`
-        );
-
-        const result = await db.select({ count: count() }).from(kilocode_users).where(conditions);
-
-        return {
-          domain,
-          blockedCount: result[0]?.count || 0,
-        };
-      })
+    return NextResponse.json(
+      computeBlacklistStats(blacklistedDomains, emailHostCounts, BLACKLIST_STATS_ROW_LIMIT)
     );
-
-    domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
-
-    return NextResponse.json({
-      domains: domainCounts,
-      totalDomains: BLACKLIST_DOMAINS.length,
-      totalBlockedUsers: domainCounts.reduce((sum, d) => sum + Number(d.blockedCount), 0),
-    });
   } catch (error) {
     console.error('Error fetching blacklisted domains:', error);
     return NextResponse.json({ error: 'Failed to fetch blacklisted domains' }, { status: 500 });

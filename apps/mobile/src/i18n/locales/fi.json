@@ -1,4 +1,26 @@
 {
+  "nativeRemote": {
+    "title": "Natiivi etädemo",
+    "sessionsEmpty": "Ei vielä natiiveja istuntoja",
+    "hosts": "Verkossa olevat isännät",
+    "hostsEmpty": "Ei verkossa olevia isäntiä",
+    "directory": "Työhakemisto",
+    "createSession": "Luo natiivi istunto",
+    "queueIfOffline": "Lisää kehote jonoon, jos isäntä ei ole verkossa",
+    "prompt": "Kehote tai /command",
+    "localClear": "Tyhjennä paikallinen näkymä",
+    "abort": "Keskeytä vuoro",
+    "failed": "Natiivi etätoiminto epäonnistui",
+    "creationUnknown": "Luonnin lopputulos on tuntematon. Päivitä istunnot ennen kuin yrität uudelleen.",
+    "commandFailed": "Suorittajan komento epäonnistui",
+    "invalidReply": "Virheellinen vastaus suorittajalta",
+    "unsafeCommand": "Käytä komentoa /compact, /new, /skill, /models, /agents tai /clear (vain paikallisesti).",
+    "status": "Yhteys: {{connection}} · Suorittaja: {{runner}}",
+    "presenceStatus": "Isännät: {{connection}}",
+    "commandStatus": "Komennon toimitus: {{status}}",
+    "delivered": "Toimitettu",
+    "expired": "Vanhentunut"
+  },
   "common": {
     "cancel": "Peruuta",
     "done": "Valmis",
@@ -189,6 +211,7 @@
     "resendCode": "Lähetä koodi uudelleen",
     "termsPrefix": "Jatkamalla hyväksyt ",
     "terms": "Käyttöehdot",
+    "termsInSentence": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Lisää kirjautumisvaihtoehtoja",
@@ -2082,6 +2105,7 @@
       "actionFailed": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
       "actionBlocked": "Toimintoa ei voitu suorittaa loppuun. Ongelma on korjattava ensin.",
       "syncNoRepositories": "Synkronointilaajuudessa ei ole yhtään repositoriota. Valitse repositoriot, joita Tietoturva-agentti valvoo, ja synkronoi sitten uudelleen.",
+      "syncNoRepositoriesNoManage": "Synkronointilaajuudessa ei ole yhtään repositoriota. Organisaation omistajan, ylläpitäjän tai laskutusvastaavan on yhdistettävä repositoriot, ennen kuin synkronointi voi tapahtua.",
       "syncIntegrationInactive": "Tietoturva-agentin GitHub-yhteys ei ole aktiivinen. Yhdistä Kilo GitHub App uudelleen ja synkronoi sitten uudelleen.",
       "syncMissingPermission": "Kilo GitHub App ei voi lukea haavoittuvuushälytyksiä. Myönnä kyseinen käyttöoikeus GitHubissa ja synkronoi sitten uudelleen.",
       "configConflict": "Tietoturva-agentin asetuksia muutettiin muualla. Tarkista uusimmat asetukset ja tallenna uudelleen."
@@ -2550,6 +2574,7 @@
       "assistantStopped": "Vastauksen tuottaminen keskeytettiin.",
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
+      "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."
@@ -3809,14 +3834,14 @@
     "saved": "Kulutusvaroitusten asetukset tallennettu",
     "loadError": "Kulutusvaroituksia ei voitu ladata.",
     "saveError": "Kulutusvaroituksia ei voitu tallentaa.",
-    "empty": "Kulutusvaroitukset ovat pois päältä. Ota ne käyttöön, jotta voit varoittaa tämän alueen laskutusyhteyshenkilöitä.",
-    "noSpend": "Kulutusta ei ole vielä kirjattu",
+    "sendAlerts": "Lähetä varoituksia",
+    "noSpend": "Ei vielä kulutusta",
     "spend24h": "Kulutus viimeisten 24 tunnin aikana",
     "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
     "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
     "pushOffByCategory": "Pois päältä Ilmoituksissa",
     "multiplierMaxError": "Anna kerroin, joka on {{max}} tai pienempi",
-    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi."
+    "thresholdMaxError": "Anna summa, joka on {{max}} tai pienempi"
   },
   "profiles": {
     "title": "Profiilit",

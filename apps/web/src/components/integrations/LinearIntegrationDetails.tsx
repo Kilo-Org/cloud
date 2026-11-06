@@ -15,6 +15,7 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
 
 type LinearIntegrationDetailsProps = {
   organizationId?: string;
@@ -32,7 +33,11 @@ const linearConnectionErrorMessages: Record<string, string> = {
 };
 
 function getLinearConnectionErrorMessage(error: string): string {
-  return linearConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+  return resolveConnectionErrorMessage(
+    linearConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
 }
 
 export function LinearIntegrationDetails({

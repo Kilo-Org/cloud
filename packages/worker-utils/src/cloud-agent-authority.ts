@@ -2,11 +2,42 @@ import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
-export const PARENT_SESSION_CALLBACK_URL = 'session:parent';
-export const ParentSessionCallbackTargetSchema = z
-  .object({ url: z.literal(PARENT_SESSION_CALLBACK_URL) })
+export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
+export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
+const WORKSPACE_SESSION_CALLBACK_URL_PATTERN =
+  /^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const ParentWorkspaceCallbackTargetSchema = z
+  .object({ url: z.literal(PARENT_WORKSPACE_CALLBACK_URL) })
   .strict()
-  .describe('Notify the spawning parent session when this child finishes. Omit for no callback.');
+  .describe(
+    'Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback.'
+  );
+export const ParentWorkspaceSessionCallbackTargetSchema = z
+  .object({
+    url: z.string().regex(WORKSPACE_SESSION_CALLBACK_URL_PATTERN),
+  })
+  .strict()
+  .describe(
+    'Notify one existing chat in the spawning parent workspace. Use the workspace session id from the cloud-agent-context in your messages.'
+  );
+export const ParentCallbackTargetSchema = z
+  .union([ParentWorkspaceCallbackTargetSchema, ParentWorkspaceSessionCallbackTargetSchema])
+  .describe(
+    'Open a new chat in the spawning parent workspace, or notify one existing chat in that workspace. Omit for no callback.'
+  );
+
+export type ParentWorkspaceSessionCallbackTarget = z.infer<
+  typeof ParentWorkspaceSessionCallbackTargetSchema
+>;
+
+export function parseWorkspaceSessionCallbackTarget(url: string): string | null {
+  if (!WORKSPACE_SESSION_CALLBACK_URL_PATTERN.test(url)) return null;
+  return url.slice(WORKSPACE_SESSION_CALLBACK_PREFIX.length);
+}
+
+export function isWorkspaceCallbackTargetUrl(url: string): boolean {
+  return url === PARENT_WORKSPACE_CALLBACK_URL || parseWorkspaceSessionCallbackTarget(url) !== null;
+}
 
 export const CloudAgentSpawnProcedureSchema = z.enum([
   'cloudAgentNext.prepareSession',
@@ -76,13 +107,17 @@ const scopedPrepareSessionSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
-    callbackTarget: ParentSessionCallbackTargetSchema.optional(),
+    callbackTarget: ParentCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();
 
 const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
+// Discovery is scope-neutral; auth context pins any signed organization, and the
+// shared input stays empty so it cannot carry one.
+const MODELS_LIST_PROCEDURE = 'models.list';
+const modelsListInputSchema = z.object({}).strict();
 const scopedChildOperations = {
   prepareSession: { kind: 'mutation', schema: scopedPrepareSessionSchema },
   listChildSessions: {
@@ -135,7 +170,24 @@ const scopedChildOperations = {
   },
 } as const;
 
-function childOperation(procedure: string) {
+const scopedFolderOperations = {
+  'workspaceFolders.list': { kind: 'query', schema: z.object({}).strict() },
+  'workspaceFolders.moveWorktree': {
+    kind: 'mutation',
+    schema: z
+      .object({
+        cloudAgentSessionId: childSessionIdSchema,
+        worktreeId: cloudAgentWorktreeIdSchema,
+        folderId: z.uuid().nullable(),
+      })
+      .strict(),
+  },
+} as const;
+
+function scopedOperation(procedure: string) {
+  if (Object.hasOwn(scopedFolderOperations, procedure)) {
+    return scopedFolderOperations[procedure as keyof typeof scopedFolderOperations];
+  }
   const match = /^(?:organizations\.)?cloudAgentNext\.([A-Za-z]+)$/.exec(procedure);
   const name = match?.[1];
   if (!name || !Object.hasOwn(scopedChildOperations, name)) {
@@ -144,14 +196,23 @@ function childOperation(procedure: string) {
   return scopedChildOperations[name as keyof typeof scopedChildOperations];
 }
 
+function isModelsListProcedure(procedure: string): boolean {
+  return procedure === MODELS_LIST_PROCEDURE;
+}
+
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix =
     authority.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
-  return Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`);
+  return [
+    ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
+    MODELS_LIST_PROCEDURE,
+    ...Object.keys(scopedFolderOperations),
+  ];
 }
 
 export function cloudAgentAuthorityProcedureKind(procedure: string): 'query' | 'mutation' {
-  return childOperation(procedure).kind;
+  if (isModelsListProcedure(procedure)) return 'query';
+  return scopedOperation(procedure).kind;
 }
 
 export function cloudAgentAuthorityInputSchema(
@@ -161,13 +222,18 @@ export function cloudAgentAuthorityInputSchema(
   if (!cloudAgentAuthorityProcedures(authority).includes(procedure)) {
     throw new Error('Cloud Agent launch exceeds its authority');
   }
+  if (isModelsListProcedure(procedure)) {
+    return z.toJSONSchema(modelsListInputSchema, { io: 'input' });
+  }
   return z.toJSONSchema(
-    childOperation(procedure).schema.extend({
-      organizationId:
-        authority.organizationId === null
+    scopedOperation(procedure).schema.extend({
+      organizationId: procedure.startsWith('workspaceFolders.')
+        ? z.literal(authority.organizationId)
+        : authority.organizationId === null
           ? z.never().optional()
           : z.literal(authority.organizationId),
-    })
+    }),
+    { io: 'input' }
   );
 }
 
@@ -187,13 +253,21 @@ export function validateCloudAgentAuthorityRequest(
   if (scope.expiresAt <= nowSeconds || !cloudAgentAuthorityProcedures(scope).includes(procedure)) {
     throw new Error('Cloud Agent authority does not permit this procedure');
   }
-  const operation = childOperation(procedure);
+  if (isModelsListProcedure(procedure)) {
+    return modelsListInputSchema.optional().parse(input);
+  }
+  const operation = scopedOperation(procedure);
+  const folderProcedure = procedure.startsWith('workspaceFolders.');
   const request = operation.schema
-    .extend({ organizationId: z.string().min(1).optional() })
+    .extend({
+      organizationId: folderProcedure
+        ? z.literal(scope.organizationId)
+        : z.string().min(1).optional(),
+    })
     .parse(input);
   const organizationProcedure = procedure.startsWith('organizations.');
   if (
-    organizationProcedure !== (scope.organizationId !== null) ||
+    (!folderProcedure && organizationProcedure !== (scope.organizationId !== null)) ||
     (request.organizationId ?? null) !== scope.organizationId
   ) {
     throw new Error('Cloud Agent launch exceeds its authority');

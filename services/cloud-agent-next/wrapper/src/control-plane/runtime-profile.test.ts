@@ -120,6 +120,32 @@ describe('runtime profile materialization', () => {
     }
   });
 
+  it('applies built-in agent overrides without forcing a mode', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        builtinAgents: {
+          explore: { model: 'anthropic/claude-haiku-4.5' },
+          compaction: { model: 'anthropic/claude-haiku-4.5', variant: 'low' },
+          plan: { disable: true },
+        },
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+      });
+      const config = JSON.parse(await fs.readFile(profileConfigPath(home), 'utf8')) as {
+        agent: Record<string, Record<string, unknown>>;
+      };
+      expect(config.agent.explore).toEqual({ model: 'kilo/anthropic/claude-haiku-4.5' });
+      expect(config.agent.compaction).toEqual({
+        model: 'kilo/anthropic/claude-haiku-4.5',
+        variant: 'low',
+      });
+      expect(config.agent.plan).toEqual({ disable: true });
+      expect(config.agent.reviewer).toEqual({ mode: 'primary' });
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('replaces stale skill companion files and clears absent profile artifacts on a restored home', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-'));
     try {

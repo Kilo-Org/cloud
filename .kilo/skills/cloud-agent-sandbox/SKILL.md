@@ -14,21 +14,46 @@ management. This skill covers what is different in the sandbox.
 
 ## Is setup done?
 
-Sandbox restarts wipe Docker, the pnpm wrapper, the memory cgroup, and
-`.wrangler/kilo-startup/`. The repository and `node_modules` survive. Check
-before starting services:
+What survives depends on how the sandbox came back:
+
+- A plain restart wipes Docker, the pnpm wrapper, and `.wrangler/kilo-startup/`.
+  The repository and `node_modules` survive. Run full setup.
+- A workspace resumed from a workspace tail snapshot, or a session started from
+  an environment snapshot, gets the whole disk back: the pnpm wrapper,
+  `.wrangler/kilo-startup/`, installed packages, and Docker images. Processes
+  and cgroups are not restored, so dockerd, dnsmasq, the DNS iptables rule, and
+  the `kilo-docker` cgroup are gone. Nothing restarts them automatically:
+  Docker is only needed by the dev stack, database tests, and local Cloud Agent
+  sessions, so start it when you need those.
+
+Check before starting services from the repository root:
 
 ```bash
-test -f .wrangler/kilo-startup/env \
-  && grep -q kilo-cloud-agent-pnpm-wrapper "$(command -v pnpm)" \
-  && docker info >/dev/null 2>&1 && echo ready
+if ! test -f .wrangler/kilo-startup/env \
+  || ! grep -q kilo-cloud-agent-pnpm-wrapper "$(command -v pnpm)"; then
+  echo 'setup needed'
+elif ! docker info >/dev/null 2>&1; then
+  echo 'resume needed'
+else
+  echo ready
+fi
 ```
 
-If this does not print `ready`, run setup from the repository root:
+For `resume needed`, restart Docker, dnsmasq, and the DNS redirect from the
+installed filesystem. This takes a few seconds and skips apt, installs, and
+image builds:
+
+```bash
+bash .kilo/cloud-agent-setup.sh --resume
+```
+
+For `setup needed`, run full setup:
 
 ```bash
 bash .kilo/cloud-agent-setup.sh
 ```
+
+`--resume` on a machine that was never set up runs full setup instead.
 
 A restarted machine takes about 6 minutes, mostly building the Cloud Agent
 sandbox images; `node_modules` survives the restart. A rerun on a running
@@ -36,17 +61,33 @@ machine takes under 2 minutes, because images come from the build cache. A
 machine without dependencies adds about 3 minutes for `pnpm install`. Setup stops at the first failure and prints
 the line number.
 
+## Memory containment
+
+The session wrapper (`services/cloud-agent-next/wrapper/src/control/workload-cgroup.ts`)
+owns memory limits; setup does not create a cap of its own. Under the delegated
+`/sys/fs/cgroup/kilo-workloads`, capped at the container limit minus 1 GiB:
+
+| cgroup | Owner | Contents and limit |
+|---|---|---|
+| `kilo-control-<id>/server` | wrapper | The Kilo server, protected with `memory.min` and OOM immunity |
+| `kilo-control-<id>/tools` | wrapper | Every agent tool process: pnpm, node, tmux, dev servers. Moved there within a second. Capped 1.5 GiB below the parent |
+| `kilo-setup` | wrapper | Environment setup and start commands and the daemons they start |
+| `kilo-docker` | setup | `daemon/` holds dockerd, containerd, and dnsmasq. `containers/` holds every container, and `containers/builds` (2 GiB) holds image builds. Capped 1.5 GiB below the parent |
+
+Every agent process is capped within a second of starting, however it was
+started. When the Kilo runtime stops, the wrapper kills its whole
+`kilo-control-<id>` scope, including dev servers the agent started. Docker and
+its containers survive in `kilo-docker`.
+
 ## What setup does
 
-- Creates a memory cgroup for all dev workloads, capped at the sandbox memory
-  minus 2 GiB. Override the cap in MiB with `KILO_STARTUP_MEMORY_MB`; the
-  minimum is 3072.
+- Creates the `kilo-docker` cgroup tree above.
 - Installs Docker, Compose v2, tmux, Chromium, agent-browser, and dnsmasq.
-  Starts dockerd with its containers inside the cgroup and pulls images through
-  `mirror.gcr.io`.
-- Installs a global `pnpm` wrapper. Inside this repository it moves the command
-  into the capped cgroup and loads `.wrangler/kilo-startup/env`. Outside the
-  repository it runs the real pnpm, saved at
+  Starts dockerd with its containers in `kilo-docker/containers` and pulls
+  images through `mirror.gcr.io`. The daemon log is
+  `.wrangler/kilo-startup/dockerd.log`.
+- Installs a global `pnpm` wrapper. Inside this repository it loads
+  `.wrangler/kilo-startup/env`. Outside the repository it runs the real pnpm, saved at
   `/usr/local/lib/kilo-cloud-agent/real-pnpm`, unchanged.
 - Installs dependencies, creates `.env.local`, runs `pnpm test:db`, and seeds a
   fake-login user with credits.
@@ -63,10 +104,11 @@ The builder sets `KILO_ENVIRONMENT_BUILD=1` for every setup command; the script
 uses it to switch to build mode. That builder has no session wrapper, so it has
 no `kilo-workloads` cgroup. Build mode installs packages, pulls images and warms
 the sandbox image build, then stops the Docker daemon it started and exits. It
-skips the memory cap, database migration and fake-user seed. Without
+skips the Docker cgroup, database migration and fake-user seed. Without
 `KILO_ENVIRONMENT_BUILD=1`, a missing `kilo-workloads` cgroup still fails setup.
-A snapshot captures files, not running daemons, and the session's own setup run
-repeats the full path from that filesystem.
+A snapshot captures files, not running daemons. In a session started from it,
+run `bash .kilo/cloud-agent-setup.sh --resume` before starting services, as
+described above.
 
 Environment-build setup commands may use the rest of the 30-minute build
 deadline; the inactivity timeout remains 5 minutes.
@@ -76,7 +118,7 @@ it before running pnpm. Do not edit the file: setup rewrites it.
 
 ## Start services
 
-Run every command from the repository root, so that pnpm is capped.
+Run every command from the repository root, so that pnpm loads the env file.
 
 ```bash
 pnpm dev:start --no-attach app               # web app
@@ -120,7 +162,7 @@ pnpm dev:stop
 Setup seeds a verified user with credits. Its email is `KILO_TEST_USER_EMAIL` in
 the env file. Shells outside the pnpm wrapper must load the env file first. It
 also puts setup's `docker` wrapper on `PATH`, which keeps builds serialized and
-inside the cap:
+inside the Docker build slice:
 
 ```bash
 source .wrangler/kilo-startup/env
@@ -171,17 +213,20 @@ WORKER_URL=http://localhost:8794 FAKE_LLM_URL=http://localhost:8811 \
 
 ## Memory
 
-The cap is a hard limit with no swap. When the workload nears it, the kernel
-reclaims memory instead of killing processes: everything slows, and
-`docker`, `tmux`, and `pnpm dev:stop` can hang. Check pressure with:
+The caps are hard limits with no swap. When a cgroup nears its cap, the kernel
+reclaims memory first: everything slows, and `docker`, `tmux`, and
+`pnpm dev:stop` can hang. Only after that does it OOM-kill the largest process in
+that cgroup. Check pressure on the tools, Docker, and parent cgroups:
 
 ```bash
-cg=/sys/fs/cgroup/kilo-workloads/kilo-dev-$(basename "$PWD")
-echo "$(( $(cat $cg/memory.current) / 1048576 )) MiB of $(( $(cat $cg/memory.max) / 1048576 )) MiB"
-grep -E '^(high|max|oom_kill) ' $cg/memory.events
+for cg in /sys/fs/cgroup/kilo-workloads{/kilo-control-*/tools,/kilo-docker,}; do
+  printf '%s: %s MiB of %s MiB; ' "${cg#/sys/fs/cgroup/}" \
+    "$(( $(cat $cg/memory.current) / 1048576 ))" "$(( $(cat $cg/memory.max) / 1048576 ))"
+  grep -E '^(max|oom_kill) ' $cg/memory.events | tr '\n' ' '; echo
+done
 ```
 
-If the `high` or `max` count keeps rising, you are near the cap. Stop work you do
+If the `max` count keeps rising, you are near the cap. Stop work you do
 not need, remove idle sandbox containers, or start fewer services. Dev tooling is
 heavy: wrangler and workerd use about 3 GB, and the pnpm parents and log filters
 about 2 GB.
@@ -191,7 +236,7 @@ about 2 GB.
   2.8 GB, and 4.4 GB after `/cloud` fell to 2.0 GB. Opening many routes back to
   back fills the cap before that happens. Pause between heavy routes.
 - Turbopack's default `experimental.turbopackMemoryEviction` is `auto`, which
-  decides from OS memory-pressure feedback. The dev cgroup cap (about 9 GiB) sits
+  decides from OS memory-pressure feedback. The tools cgroup cap (about 9.5 GiB) sits
   well below the sandbox `MemTotal` (about 12.5 GiB), so that feedback reports
   free memory the cgroup does not have and `auto` can leave the web dev server
   holding several GB. Setup therefore exports
@@ -202,17 +247,20 @@ about 2 GB.
 - High Redis, redis-http, or Postgres CPU means memory pressure, not load. Under
   pressure, Redis used 6 s of user CPU and 1590 s of system CPU in 90 minutes:
   the kernel kept evicting and re-reading its code pages. Compare with
-  `cat $cg/containers/*/cpu.stat`. Idle Redis without pressure uses under 1%.
-- At the cap the kernel reclaims rather than OOM-killing (`oom_kill` stays 0), so
+  `cat /sys/fs/cgroup/kilo-workloads/kilo-docker/containers/*/cpu.stat`. Idle
+  Redis without pressure uses under 1%.
+- The next figures were measured under setup's former single dev cap, which put
+  dev servers and containers in one cgroup. Near a cap the kernel mostly
+  reclaims rather than OOM-killing, so
   commands that shell out — `pnpm dev:restart`, `pnpm dev:stop`, `tmux`, `docker`,
   wrangler — block and appear to hang. The same restart that hangs for minutes at
   ~8.8 GiB runs in seconds at ~5 GiB. Recover by killing the large consumer
   before retrying the restart or stop, e.g. `pkill -9 -f '^[n]ext-server'` (kill
   by PID if the pattern is in your own command line), then `pnpm dev:stop`.
 
-Run heavy commands such as builds, tests, and typechecks from inside the
-repository, so that the wrapper caps them. pnpm outside the repository and
-direct `node` or `npx` processes are not capped.
+Every agent command is capped wherever it runs, including direct `node` or
+`npx` and pnpm outside the repository. Builds, tests, and typechecks share the
+tools cap with running dev servers.
 
 ## Docker networking and DNS
 

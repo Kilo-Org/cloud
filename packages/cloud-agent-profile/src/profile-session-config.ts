@@ -3,7 +3,7 @@ import { agent_environment_profiles } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import type { AgentConfig } from '@kilocode/db/schema-types';
-import { getEffectiveDefaultProfileId, getDefaultProfile } from './profile-service';
+import { getEffectiveDefaultProfileId, getDefaultProfileId } from './profile-service';
 import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
 import { getCommandsForSession } from './profile-commands-service';
@@ -382,7 +382,7 @@ export async function mergeProfileConfiguration(
     ? null
     : owner.type === 'organization' && userId
       ? await getEffectiveDefaultProfileId(db, userId, owner.id)
-      : ((await getDefaultProfile(db, owner))?.id ?? null);
+      : await getDefaultProfileId(db, owner);
 
   const { base, top } = resolveProfileLayers({
     repoBindingProfileId,

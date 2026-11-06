@@ -36,7 +36,6 @@ cloud-agent-next refactor.
 ## Credential containment
 
 Containment is mandatory for all sandbox providers, including local development.
-The obsolete `CREDENTIAL_CONTAINMENT_ENABLED` setting has no effect.
 Sandboxes receive scoped aliases and runtime proxy handles, never platform-managed upstream tokens.
 Provider adapters authenticate sandbox requests; shared services authorize and forward them.
 Missing containment support fails preparation instead of selecting direct credentials.
@@ -94,7 +93,11 @@ pnpm --filter cloud-agent-next exec tsx test/e2e/fixture-provider.ts \
 ```
 
 The request contains `runId`, `lane`, `fakeLlmScope`, `descriptorPath`,
-`projectDir`, and the per-run XDG `state` directories. A run id is 1-55
+`projectDir`, and the per-run XDG `state` directories. It may also carry the
+optional `scenarioId`. A Cloud `session.open` prepare seeds the workspace with
+`__fake__:idle` so the IDE opens stored state; `prompt.stream` creates an empty
+workspace so the IDE prompt is the session's first turn. `prepare-lanes` and
+requests without a scenario id keep the seeded default. A run id is 1-55
 characters of letters, digits, underscore, or dash: `scopeForRun` prefixes
 `kilo-e2e-` and the fake LLM caps a scope token at 64 characters. `prepare` writes the
 descriptor atomically with mode 0600, refuses a scope other than

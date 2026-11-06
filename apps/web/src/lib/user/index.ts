@@ -10,6 +10,7 @@ import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
 import {
   createSoftDeletedBlockedReason,
   isSoftDeletedBlockedReason,
@@ -1127,6 +1128,8 @@ export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
 ): Promise<void> {
+  // GitHub identity writers take this lock before the user row. Keep the same order.
+  await lockGitHubIdentityWrites(tx, userId);
   const [user] = await tx
     .select()
     .from(kilocode_users)
@@ -2334,6 +2337,8 @@ export function inferRowlessAuthProviders(
       return ['discord'];
     case hosted_domain_specials.openai:
       return ['openai'];
+    case hosted_domain_specials.claude:
+      return ['claude'];
     case hosted_domain_specials.email:
       return ['email'];
     default:

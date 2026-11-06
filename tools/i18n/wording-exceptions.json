@@ -406,6 +406,7 @@
     "remediation failed",
     "remediation requested",
     "review",
+    "search repositories",
     "stopped",
     "superseded",
     "tokens"
@@ -610,12 +611,15 @@
     "block",
     "cancelled",
     "dismissed",
+    "edit",
     "manual review",
     "no changes needed",
+    "open",
     "open pull request",
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "review",
     "superseded"
   ],
   "ms": ["deleted", "dismissed", "open", "open pull request", "review"],

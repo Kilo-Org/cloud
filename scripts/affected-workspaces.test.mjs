@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { isModuleSpecifier, isNeutral, selectAffected } from './affected-workspaces.mjs';
+import {
+  isModuleSpecifier,
+  isNeutral,
+  selectAffected,
+  selectGroups,
+} from './affected-workspaces.mjs';
 
 const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { dependencies } });
 const items = [
@@ -126,6 +131,104 @@ test('a check script change runs only that check everywhere', () => {
   assert.deepEqual(both.packages, ['leaf']);
 });
 
+const groups = selection => selectGroups({ dirs: [], packages: [], ...selection });
+
+test('a selection that affects the extension leaves both trpc rows out', () => {
+  // extension CI typechecks and lints the extension for the same selection, so
+  // ci.yml must not pay for a second copy.
+  assert.deepEqual(groups({ dirs: ['apps/extension'], packages: ['kilo-extension'] }), {
+    typecheck_groups: [],
+    lint_groups: [],
+  });
+  // The same holds when another workspace is affected, including one that
+  // reaches the extension through a workspace read: changed-workspaces.sh reads
+  // this detector's `dirs`, so extension CI selects the extension there too.
+  const reachedFromMobile = {
+    dirs: ['apps/extension', 'apps/mobile', 'apps/web', 'packages/trpc'],
+    packages: ['@kilocode/trpc', 'kilo-app', 'kilo-extension', 'web'],
+  };
+  assert.deepEqual(groups(reachedFromMobile), {
+    typecheck_groups: ['web'],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(
+    groups({
+      dirs: ['apps/extension', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'kilo-extension'],
+    }),
+    { typecheck_groups: [], lint_groups: ['rest'] }
+  );
+});
+
+test('a full check keeps every group, including both trpc rows', () => {
+  assert.deepEqual(
+    groups({
+      full_checks: ['lint', 'typecheck'],
+      dirs: ['apps/extension', 'apps/mobile', 'apps/web'],
+      packages: ['kilo-app', 'kilo-extension', 'web'],
+    }),
+    { typecheck_groups: ['web', 'trpc', 'packages'], lint_groups: ['trpc', 'rest'] }
+  );
+});
+
+test('a check-script change keeps that check full and leaves the other quiet', () => {
+  assert.deepEqual(groups({ full_checks: ['typecheck'] }), {
+    typecheck_groups: ['web', 'trpc', 'packages'],
+    lint_groups: [],
+  });
+  assert.deepEqual(groups({ full_checks: ['lint'] }), {
+    typecheck_groups: [],
+    lint_groups: ['trpc', 'rest'],
+  });
+});
+
+test('a partial selection keeps only the groups its workspaces need', () => {
+  assert.deepEqual(groups({ packages: ['web'], dirs: ['apps/web'] }), {
+    typecheck_groups: ['web'],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['@kilocode/storybook'], dirs: ['apps/storybook'] }), {
+    typecheck_groups: ['web'],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['@kilocode/db'], dirs: ['packages/db'] }), {
+    typecheck_groups: ['packages'],
+    lint_groups: ['rest'],
+  });
+  // @kilocode/trpc is built by the trpc-declarations producer, and kilo-app
+  // typechecks and lints in kilo-app CI: neither selects a typecheck row, and
+  // only the trpc package's own sources reach the rest lint group.
+  assert.deepEqual(groups({ packages: ['@kilocode/trpc'], dirs: ['packages/trpc'] }), {
+    typecheck_groups: [],
+    lint_groups: ['rest'],
+  });
+  assert.deepEqual(groups({ packages: ['kilo-app'], dirs: ['apps/mobile'] }), {
+    typecheck_groups: [],
+    lint_groups: [],
+  });
+});
+
+test('the groups mode prints the groups for a selection on standard input', () => {
+  const script = fileURLToPath(new URL('./affected-workspaces.mjs', import.meta.url));
+  const output = execFileSync(process.execPath, [script, '--groups'], {
+    input: JSON.stringify({ dirs: ['apps/extension'], packages: ['kilo-extension'] }),
+    encoding: 'utf8',
+  });
+  assert.deepEqual(JSON.parse(output), { typecheck_groups: [], lint_groups: [] });
+  const full = execFileSync(process.execPath, [script, '--groups'], {
+    input: JSON.stringify({
+      dirs: ['apps/extension'],
+      packages: ['kilo-extension'],
+      full_checks: ['lint', 'typecheck'],
+    }),
+    encoding: 'utf8',
+  });
+  assert.deepEqual(JSON.parse(full), {
+    typecheck_groups: ['web', 'trpc', 'packages'],
+    lint_groups: ['trpc', 'rest'],
+  });
+});
+
 test('dependency manifest changes select the workspaces whose dependencies changed', () => {
   for (const manifest of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     assert.deepEqual(select([manifest], ['services/leaf']), {
@@ -175,25 +278,35 @@ test('documents and neutral root locations are the shared neutral set', () => {
   }
 });
 
+test('a file inside a workspace selects it, including a test file', () => {
+  // The test matrix runs a workspace when any of its files changed, so a test
+  // file inside a workspace must select that workspace and must not be neutral.
+  for (const [file, dir] of [
+    ['packages/db/src/schema.test.ts', 'packages/db'],
+    ['apps/web/src/__tests__/usage-partitions.test.ts', 'apps/web'],
+    ['services/agent/wrapper/src/main.spec.ts', 'services/agent/wrapper'],
+  ]) {
+    assert.equal(isNeutral(file), false, file);
+    const result = select([file]);
+    assert.equal(result.full, false, file);
+    assert.ok(result.dirs.includes(dir), file);
+  }
+});
+
 test('the neutral filter keeps every path a check reads', () => {
-  const script = fileURLToPath(new URL('./affected-workspaces.mjs', import.meta.url));
+  // The paths the test matrix still sees after the detector drops the neutral
+  // ones.
   const input = [
     'README.md',
     'packages/db/README.md',
     'packages/db/src/schema.ts',
     'apps/web/.env.test',
     'services/leaf/src/index.ts',
-    '',
-  ].join('\n');
-  const output = execFileSync(process.execPath, [script, '--filter-neutral'], {
-    input,
-    encoding: 'utf8',
-  });
-  assert.deepEqual(output.split('\n').filter(Boolean), [
-    'packages/db/src/schema.ts',
-    'apps/web/.env.test',
-    'services/leaf/src/index.ts',
-  ]);
+  ];
+  assert.deepEqual(
+    input.filter(file => !isNeutral(file)),
+    ['packages/db/src/schema.ts', 'apps/web/.env.test', 'services/leaf/src/index.ts']
+  );
 });
 
 // leaf-reader depends on leaf, so a full edge into leaf reaches it too.

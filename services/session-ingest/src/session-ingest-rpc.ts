@@ -114,6 +114,7 @@ import {
   beginWorktreeDeletion,
   recordWorktreeCleanup,
   completeWorktreeDeletion,
+  deleteWorktreeContent,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
   retireWorktreeIfSoleMember,
@@ -263,6 +264,14 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     );
   }
 
+  async deleteCloudAgentWorktreeContent(params: CloudAgentWorktreeDeletionParams) {
+    return deleteWorktreeContent(
+      this.env,
+      cloudAgentWorktreeDeletionSchema.parse(params),
+      this.ctx
+    );
+  }
+
   async canDestroyCloudAgentWorktreeSandbox(params: CanDestroyCloudAgentWorktreeSandboxParams) {
     return canDestroyWorktreeSandbox(
       this.env,
@@ -303,6 +312,31 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
     const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
+
+    // Require available ingest storage before any clone or row write, so the
+    // caller learns the destination cannot accept data instead of receiving a
+    // ready result it cannot use. A probe error keeps create available.
+    let destinationRetired = false;
+    try {
+      destinationRetired = await withDORetry(
+        () =>
+          getSessionIngestDO(this.env, {
+            kiloUserId: parsed.kiloUserId,
+            sessionId: parsed.sessionId,
+          }),
+        stub => stub.isDeleted(),
+        'SessionIngestDO.isDeleted'
+      );
+    } catch (error) {
+      console.error('Failed to probe destination availability before Cloud Agent session create', {
+        kiloUserId: parsed.kiloUserId,
+        sessionId: parsed.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (destinationRetired) {
+      return { status: 'rejected', code: 'session_retired' };
+    }
 
     let copiedItemCount = 0;
     if (parsed.cloneFromKiloSessionId !== undefined) {

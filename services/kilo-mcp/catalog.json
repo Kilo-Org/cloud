@@ -4896,6 +4896,11 @@
         "session_id": {
           "type": "string",
           "minLength": 1
+        },
+        "operationKey": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -4905,9 +4910,10 @@
     "tags": [
       "clisessionsv2",
       "delete",
-      "session_id"
+      "session_id",
+      "operationkey"
     ],
-    "searchBlob": "cliSessionsV2.delete Delete a CLI cloud agent session, including its child sessions and cloud-agent cleanup. Return success and the session ID. clisessionsv2 delete session_id session_id"
+    "searchBlob": "cliSessionsV2.delete Delete a CLI cloud agent session, including its child sessions and cloud-agent cleanup. Return success and the session ID. clisessionsv2 delete session_id operationkey session_id operationKey"
   },
   "cliSessionsV2.deleteWorktree": {
     "path": "cliSessionsV2.deleteWorktree",
@@ -4932,6 +4938,10 @@
               "type": "null"
             }
           ]
+        },
+        "onlyIfSoleSessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -4943,9 +4953,10 @@
       "clisessionsv2",
       "deleteworktree",
       "worktreeid",
-      "organizationid"
+      "organizationid",
+      "onlyifsolesessionid"
     ],
-    "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid worktreeId organizationId"
+    "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid onlyifsolesessionid worktreeId organizationId onlyIfSoleSessionId"
   },
   "cliSessionsV2.enableWatchPr": {
     "path": "cliSessionsV2.enableWatchPr",
@@ -6412,11 +6423,6 @@
         "cloudAgentSessionId": {
           "type": "string",
           "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -6426,10 +6432,9 @@
     "tags": [
       "cloudagentnext",
       "getpreviewoptions",
-      "cloudagentsessionid",
-      "organizationid"
+      "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -6981,6 +6986,21 @@
                       "default": "",
                       "type": "string",
                       "maxLength": 100000
+                    },
+                    "mode": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "pattern": "^[a-zA-Z]+$"
                     }
                   },
                   "required": [
@@ -8442,6 +8462,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -8502,6 +8537,65 @@
       "attachments"
     ],
     "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "cloudAgentNextFailures.exportSessionDiagnostics": {
+    "path": "cloudAgentNextFailures.exportSessionDiagnostics",
+    "kind": "query",
+    "summary": "Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "format": {
+          "default": "json",
+          "type": "string",
+          "enum": [
+            "json",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "exportsessiondiagnostics",
+      "cloudagentsessionid",
+      "format"
+    ],
+    "searchBlob": "cloudAgentNextFailures.exportSessionDiagnostics Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket. cloudagentnextfailures exportsessiondiagnostics cloudagentsessionid format cloudAgentSessionId format"
+  },
+  "cloudAgentNextFailures.getSessionFailureHistory": {
+    "path": "cloudAgentNextFailures.getSessionFailureHistory",
+    "kind": "query",
+    "summary": "Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "getsessionfailurehistory",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNextFailures.getSessionFailureHistory Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window. cloudagentnextfailures getsessionfailurehistory cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -8598,6 +8692,28 @@
     ],
     "searchBlob": "cloudAgentNextFeedback.create Submit user feedback about a Cloud Agent session, including the rating text, model, repository, and recent messages. Use this to report a problem or share an opinion about a cloud agent run. cloudagentnextfeedback create cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages"
   },
+  "cloudAgentNextFeedback.list": {
+    "path": "cloudAgentNextFeedback.list",
+    "kind": "query",
+    "summary": "List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    },
+    "tags": [
+      "cloudagentnextfeedback",
+      "list",
+      "limit"
+    ],
+    "searchBlob": "cloudAgentNextFeedback.list List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported. cloudagentnextfeedback list limit limit"
+  },
   "cloudAgentSettings.canManage": {
     "path": "cloudAgentSettings.canManage",
     "kind": "query",
@@ -8681,6 +8797,67 @@
       "platform"
     ],
     "searchBlob": "cloudAgentSettings.removeRepositorySettings Delete the saved Cloud Agent settings for a specific repository. cloudagentsettings removerepositorysettings organizationid repofullname platform organizationId repoFullName platform"
+  },
+  "cloudAgentSettings.setBuiltinAgents": {
+    "path": "cloudAgentSettings.setBuiltinAgents",
+    "kind": "mutation",
+    "summary": "Save which built-in agents are enabled or disabled for the current user's Cloud Agent settings, and return the updated configuration. Use to turn built-in agents on or off or update their per-agent settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "code",
+              "plan",
+              "debug",
+              "orchestrator",
+              "ask",
+              "explore",
+              "compaction"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "variant": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "disable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "agents"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setbuiltinagents",
+      "agents"
+    ],
+    "searchBlob": "cloudAgentSettings.setBuiltinAgents Save which built-in agents are enabled or disabled for the current user's Cloud Agent settings, and return the updated configuration. Use to turn built-in agents on or off or update their per-agent settings. cloudagentsettings setbuiltinagents agents agents"
   },
   "cloudAgentSettings.setContextAllocation": {
     "path": "cloudAgentSettings.setContextAllocation",
@@ -11024,12 +11201,48 @@
     "path": "githubApps.disconnectUserAuthorization",
     "kind": "mutation",
     "summary": "Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authorizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialVersion": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "authorizationId",
+        "credentialVersion"
+      ],
+      "additionalProperties": false
+    },
     "tags": [
       "githubapps",
-      "disconnectuserauthorization"
+      "disconnectuserauthorization",
+      "authorizationid",
+      "credentialversion"
     ],
-    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization"
+    "searchBlob": "githubApps.disconnectUserAuthorization Disconnect your personal GitHub account from Kilo. Use to unlink the GitHub identity tied to your user. githubapps disconnectuserauthorization authorizationid credentialversion authorizationId credentialVersion"
   },
   "githubApps.getAppType": {
     "path": "githubApps.getAppType",
@@ -18450,6 +18663,21 @@
                           "default": "",
                           "type": "string",
                           "maxLength": 100000
+                        },
+                        "mode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50,
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "variant": {
+                          "type": "string",
+                          "maxLength": 50,
+                          "pattern": "^[a-zA-Z]+$"
                         }
                       },
                       "required": [
@@ -19984,6 +20212,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -21316,7 +21559,7 @@
   "organizations.guardrails.get": {
     "path": "organizations.guardrails.get",
     "kind": "query",
-    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
+    "summary": "Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -21337,7 +21580,7 @@
       "get",
       "organizationid"
     ],
-    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, whether tool results are scanned, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
+    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI guardrail settings: whether input checks are enabled, the input detectors, and whether response checks are enabled with their detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
   "organizations.invoices": {
     "path": "organizations.invoices",
@@ -35916,6 +36159,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -36372,6 +36616,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -37430,6 +37675,58 @@
       "organizationid"
     ],
     "searchBlob": "workspaceFolders.list List the signed-in user's workspace folders, optionally scoped to an organization, including each folder's name, color, and assigned worktrees. workspacefolders list organizationid organizationId"
+  },
+  "workspaceFolders.moveSession": {
+    "path": "workspaceFolders.moveSession",
+    "kind": "mutation",
+    "summary": "Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "folderId"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "movesession",
+      "organizationid",
+      "sessionid",
+      "folderid"
+    ],
+    "searchBlob": "workspaceFolders.moveSession Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one. workspacefolders movesession organizationid sessionid folderid organizationId sessionId folderId"
   },
   "workspaceFolders.moveWorktree": {
     "path": "workspaceFolders.moveWorktree",

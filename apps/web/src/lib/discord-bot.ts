@@ -328,7 +328,7 @@ export async function processDiscordBotMessage(
     };
   }
 
-  // Get the configured model for this integration (validated at setup/update time)
+  // The integration's model, resolved against the organization's current policy
   const selectedModel = await getModel(owner);
   if (!selectedModel) {
     console.error('[DiscordBot] No model configured for owner:', owner);

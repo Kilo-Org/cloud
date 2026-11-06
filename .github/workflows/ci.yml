@@ -258,6 +258,8 @@ jobs:
               - 'pnpm-lock.yaml'
       # Pull requests check only the workspaces a change can affect. Main
       # pushes and the merge queue pass no base, which selects every workspace.
+      # The document names the base it was computed for, so the matrix step
+      # below reuses it instead of selecting the repository again.
       - name: Detect affected workspaces
         id: affected
         env:
@@ -266,17 +268,13 @@ jobs:
         run: |
           affected=$(node scripts/affected-workspaces.mjs "$BASE_SHA")
           jq . <<< "$affected"
-          typecheck_groups=$(jq -c '
-            (.full_checks | index("typecheck") != null) as $all | .packages as $p | [
-              (select($all or ($p | index("web")) or ($p | index("@kilocode/storybook"))) | "web"),
-              (select($all or ($p | index("kilo-extension"))) | "trpc"),
-              (select($all or ($p - ["web", "@kilocode/trpc", "@kilocode/storybook", "kilo-app", "kilo-extension"] | length > 0)) | "packages")
-            ]' <<< "$affected")
-          lint_groups=$(jq -c '
-            (.full_checks | index("lint") != null) as $all | .dirs as $d | [
-              (select($all or ($d | index("apps/extension"))) | "trpc"),
-              (select($all or ($d - ["apps/mobile", "apps/extension"] | length > 0)) | "rest")
-            ]' <<< "$affected")
+          # The matrix groups this selection pays for. scripts/affected-workspaces.mjs
+          # owns the decision, so the trpc rows follow the extension's own
+          # workflow: extension-ci.yml typechecks and lints the extension for
+          # this same selection, so those rows run only on a full check. That
+          # keeps the extension's gate on the merge queue, whose workflow has no
+          # extension trigger.
+          groups=$(node scripts/affected-workspaces.mjs --groups <<< "$affected")
           # Every part when cloud-agent-next is affected. When only its tests
           # read changed data, the unit part covers a reading test under src/,
           # scripts/ or test/unit/; any other reading test runs every part.
@@ -288,13 +286,15 @@ jobs:
             ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
-            echo "typecheck_groups=$typecheck_groups"
-            echo "lint_groups=$lint_groups"
+            echo "typecheck_groups=$(jq -c .typecheck_groups <<< "$groups")"
+            echo "lint_groups=$(jq -c .lint_groups <<< "$groups")"
             echo "cloud_agent_next_parts=$cloud_agent_next_parts"
           } >> "$GITHUB_OUTPUT"
 
       # Also test the workspaces whose tests read changed data
-      # (test_only_dirs); their typecheck and lint stay skipped.
+      # (test_only_dirs); their typecheck and lint stay skipped. The matrix
+      # decides from the document the step above published, so one run selects
+      # the repository once.
       - name: Detect changed workspaces with tests
         id: workspaces
         env:
@@ -358,14 +358,18 @@ jobs:
       # a broken admission still blocks the merge. sbom.yml is only reached by
       # a PR that changes the workflow or its test, and that path set does not
       # trip the kilocode_backend filter that gates test-scripts, so its wiring
-      # check runs here too.
+      # check runs here. This list is the only place that suite runs: the
+      # `test:mobile-sbom` script that test-scripts reaches must not name it,
+      # or one run executes the file in two jobs.
       - name: Test workflow wiring
         run: >-
           node --test
           scripts/stacked-ci.test.mjs
           scripts/changed-dependencies.test.mjs
           scripts/build-key-inputs.test.mjs
+          scripts/ttsc-plugin-key.test.mjs
           scripts/affected-workspaces.test.mjs
+          scripts/changed-workspaces.test.mjs
           scripts/changes-filter-retry.test.mjs
           scripts/typecheck-ci.test.mjs
           scripts/deployment-workflows.test.mjs
@@ -374,6 +378,13 @@ jobs:
           scripts/meta-janitor-approve.test.mjs
           scripts/mobile-sbom-workflow.test.mjs
 
+      # The same gap for the release workflow: a PR that changes it or its test
+      # does not trip the backend filter either, so its wiring checks run here
+      # and a workflow change cannot drop a release gate unnoticed. This step is
+      # the only place the suite runs, for the same reason as the list above.
+      - name: Test release workflow wiring
+        run: node --test scripts/kilo-app-release-workflow.test.mjs
+
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
   # compiled the same declaration program in two 4 vCPU jobs that started
@@ -381,10 +392,10 @@ jobs:
   # every consumer downloads the built tree instead of building it again.
   trpc-declarations:
     needs: changes
-    # Only the trpc rows consume the declarations: the typecheck group that
-    # covers the extension, and the lint group that lints it. The web and
-    # packages groups never read packages/trpc/dist, so a run that selects only
-    # them must not wait for this job.
+    # Only the trpc rows consume the declarations, and both run only for a full
+    # check: the typecheck group that typechecks the extension, and the lint
+    # group that lints it. The web and packages groups never read packages/trpc/dist,
+    # so a run that selects only them must not wait for this job.
     if: contains(fromJSON(needs.changes.outputs.typecheck_groups), 'trpc') || contains(fromJSON(needs.changes.outputs.lint_groups), 'trpc')
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -903,8 +914,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only this app's dependency closure and the root project are installed:
+      # every step below runs `--filter ai-gateway`. Widen the filter when a
+      # step here imports a workspace outside the closure, as
+      # build-ai-gateway-secure-proxy does.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'ai-gateway...' --filter kilocode-monorepo
 
       - name: Cache Next.js build
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -1261,6 +1276,11 @@ jobs:
           path: node_modules/.cache/ttsc/plugins
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
+      # test-scripts runs the whole test/integration set through
+      # `test:integration` when the kilocode_backend filter matches, so this
+      # file would run in two jobs of one run. Keep the step for the selection
+      # that misses that filter, a dependency or test-only change that still
+      # selects this row, where it is the only place the file runs.
       - name: Test native heartbeat attachment compatibility
-        if: matrix.workspace.name == 'cloudflare-session-ingest'
+        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.kilocode_backend != 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts

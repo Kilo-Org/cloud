@@ -38,3 +38,10 @@ apps/web/src/lib/organizations/guardrails/mcp-identity\.test\.ts
 apps/web/src/lib/organizations/guardrails/guardrails-policy\.test\.ts
 apps/web/src/routers/organizations/organization-mcp-guardrails-router\.test\.ts
 apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test\.ts
+
+# Dev seed target fixtures. db.test.ts builds database connection strings for a
+# loopback host and a non-loopback host. The commit that added the fixture used a
+# placeholder user and password, and a later commit replaced it with a
+# credential-free value; the earlier commit stays in branch history. Exclude the
+# fixture path so the synthetic URI does not fail the scan.
+dev/seed/lib/db\.test\.ts

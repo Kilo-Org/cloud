@@ -27,9 +27,8 @@ import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
-
-const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
   readonly enabled: boolean;

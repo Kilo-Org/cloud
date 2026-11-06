@@ -267,12 +267,17 @@ const operations: WorkerOperation[] = [
   },
   {
     name: 'GitHub authorization disconnect',
+    body: { authorizationId: null, credentialVersion: null },
     audience: GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
     legacyAudience: false,
     url: `${mockConfig.gitTokenServiceUrl}/internal/github-user-authorizations/disconnect`,
     response: () => jsonResponse({ disconnected: true }),
     expectedResult: undefined,
-    invoke: () => disconnectStoredGitHubUserAuthorization(userId),
+    invoke: () =>
+      disconnectStoredGitHubUserAuthorization(userId, {
+        authorizationId: null,
+        credentialVersion: null,
+      }),
   },
   {
     name: 'user-data export dispatch',

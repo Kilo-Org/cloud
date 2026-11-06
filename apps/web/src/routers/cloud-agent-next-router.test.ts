@@ -335,7 +335,6 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   }>;
   getPreviewOptions: (input: {
     cloudAgentSessionId: `workspace_${string}`;
-    organizationId?: string;
   }) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
   checkEligibility: () => Promise<{
     balance: number;
@@ -846,6 +845,44 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { model: 'kilo/free-model', isFree: true },
+    { model: 'kilo/selected-paid-model', isFree: false },
+  ])(
+    'uses the selected command model for eligibility and dispatch: $model',
+    async ({ model, isFree }) => {
+      mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+        isFree,
+        hasUserByokAvailable: false,
+      });
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+      const payload = {
+        type: 'command' as const,
+        command: 'review',
+        arguments: '',
+        mode: 'code',
+        model,
+        variant: 'high',
+      };
+
+      await caller.sendMessage({
+        cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
+        payload,
+      });
+
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+        expect.objectContaining({ modelId: model })
+      );
+      expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+        isFree,
+        hasUserByokAvailable: false,
+      });
+      expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ payload }));
+    }
+  );
 
   it('routes free follow-up command turns through the balance-skip client using the session model', async () => {
     mockGetSession.mockResolvedValueOnce({ model: 'kilo/free-model' });
@@ -2255,10 +2292,7 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
       enabled: false,
     });
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
-      cloudAgentSessionId,
-      organizationId: undefined,
-    });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId });
   });
 
   it('returns disabled when the Worker call fails', async () => {
@@ -2271,15 +2305,6 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
     });
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
-  });
-
-  it('passes the route organization to the Worker gate', async () => {
-    const organizationId = '11111111-1111-4111-8111-111111111111';
-    mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });
-    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
-
-    await caller.getPreviewOptions({ cloudAgentSessionId, organizationId });
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId, organizationId });
   });
 
   it('puts the Worker host template on the browser-facing Worker scheme', async () => {

@@ -40,6 +40,7 @@ import {
   deleteDirectorySubOrganization,
   DirectorySyncConflictError,
   removeDirectoryMembership,
+  revokeAllDirectoryMemberships,
   upsertDirectoryOrganization,
   upsertDirectorySubOrganization,
   upsertDirectoryUser,
@@ -1138,6 +1139,136 @@ describe('directory membership', () => {
       .from(kilocode_users)
       .where(eq(kilocode_users.external_id, absentExternalId));
     expect(users).toEqual([]);
+  });
+});
+
+describe('revokeAllDirectoryMemberships', () => {
+  test('a user in two sibling groups loses both and the parent', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+
+    const siblingGroupId = `directory_group_sibling_${suffix}`;
+    const sibling = await upsertDirectorySubOrganization(siblingGroupId, {
+      directoryId,
+      directoryIdpId: `idp_group_sibling_${suffix}`,
+      name: `on-call-${suffix}`,
+    });
+    trackOrganization(sibling.id);
+
+    await addDirectoryMembership({ directoryGroupId, externalId });
+    await addDirectoryMembership({ directoryGroupId: siblingGroupId, externalId });
+
+    const result = await revokeAllDirectoryMemberships(externalId);
+
+    expect(result.kiloUserId).toBe(userId);
+    expect(result.revokedOrganizationIds.toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+
+    // Every removal goes through the ordinary removal primitive, so each one
+    // leaves the tombstone that stops an SSO sign-in restoring it.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    expect(tombstones.map(row => row.organizationId).toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    // Memberships only: the account is never deleted or anonymized.
+    const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    expect(user.external_id).toBe(externalId);
+    expect(user.google_user_email).toBe(email);
+  });
+
+  test('a user holding only the parent membership of a directory organization loses it', async () => {
+    const parentId = await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The group went first — a disbanded group, or a `dsync.group.deleted` that
+    // arrived before the user's deletion. The user now holds no live group
+    // membership at all, only the enterprise one, so the parents of the groups
+    // being left are an empty set and the directory organization itself is the
+    // only candidate. Missing it would leave a deleted directory user inside
+    // the enterprise organization.
+    await deleteDirectorySubOrganization(directoryGroupId);
+
+    const result = await revokeAllDirectoryMemberships(externalId);
+
+    expect(result).toEqual({ kiloUserId: userId, revokedOrganizationIds: [parentId] });
+
+    // The soft-deleted group keeps its membership row, which is not this
+    // function's to clean up; what matters is that no live organization does.
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+      .where(
+        and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
+      );
+    expect(remaining).toEqual([]);
+  });
+
+  test('an unknown directory user converges with an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const absentExternalId = `directory_user_absent_${suffix}`;
+
+    // Nothing to revoke is the state the event asserts, so this must not
+    // conflict and must not provision the departing user.
+    const result = await revokeAllDirectoryMemberships(absentExternalId);
+
+    expect(result).toEqual({ kiloUserId: null, revokedOrganizationIds: [] });
+
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, absentExternalId));
+    expect(users).toEqual([]);
+  });
+
+  test('a replay reports an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    const first = await revokeAllDirectoryMemberships(externalId);
+    const replay = await revokeAllDirectoryMemberships(externalId);
+
+    expect(first.revokedOrganizationIds.length).toBe(2);
+    expect(replay).toEqual({ kiloUserId: userId, revokedOrganizationIds: [] });
+  });
+
+  test('a membership in a sub-organization with no directory group binding is left alone', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The customer created this one, so it is not the directory's to revoke.
+    const manual = await createChildOrganization(`manual-${suffix}`, parentId);
+    trackOrganization(manual.id);
+    await addUserToOrganization(manual.id, userId, 'member');
+
+    const result = await revokeAllDirectoryMemberships(externalId);
+
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, childId].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId)).toEqual([manual.id]);
   });
 });
 

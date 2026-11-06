@@ -73,9 +73,7 @@ export const openAiServedModelsMetadataSource: MetadataSource<Set<string>> = {
 };
 
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
-  const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb, {
-    maxAgeMs: CACHE_TTL_MS,
-  });
+  const stored = await readStoredMetadata(openAiServedModelsMetadataSource, readDb);
   if (stored) return stored;
 
   try {

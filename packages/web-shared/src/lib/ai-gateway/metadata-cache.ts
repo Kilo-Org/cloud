@@ -38,30 +38,24 @@ export function assertMinimumCount(url: string, count: number, minimum: number) 
   }
 }
 
-function isOlderThan(updatedAt: string, maxAgeMs: number) {
-  const ageMs = Date.now() - new Date(updatedAt).getTime();
-  return Number.isNaN(ageMs) || ageMs > maxAgeMs;
-}
-
+/**
+ * A stored row is used however old it is. The table exists so that metadata survives an upstream
+ * outage, so an out-of-date row must not trigger a live fetch: only a missing or unparseable row
+ * does. A row that stops being refreshed because the cron job or its deployment is broken is
+ * reported by the stale alert in the refresh job, and that failure should be fixed rather than
+ * worked around here.
+ */
 export async function readStoredMetadata<T>(
   source: MetadataSource<T>,
-  fromDb: MetadataDb,
-  options: { maxAgeMs?: number } = {}
+  fromDb: MetadataDb
 ): Promise<T | null> {
   try {
     const [row] = await fromDb
-      .select({
-        data: ai_gateway_metadata_cache.data,
-        updated_at: ai_gateway_metadata_cache.updated_at,
-      })
+      .select({ data: ai_gateway_metadata_cache.data })
       .from(ai_gateway_metadata_cache)
       .where(eq(ai_gateway_metadata_cache.url, source.url))
       .limit(1);
-    if (!row) return null;
-    if (options.maxAgeMs !== undefined && isOlderThan(row.updated_at, options.maxAgeMs)) {
-      return null;
-    }
-    return source.parse(row.data);
+    return row ? source.parse(row.data) : null;
   } catch (error) {
     warnExceptInTest(`[metadata-cache] stored ${source.url} is unusable`, error);
     return null;

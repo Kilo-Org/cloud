@@ -9,19 +9,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  skipToken,
-  useQuery,
-  useQueryClient,
-  useMutation,
-  useMutationState,
-} from '@tanstack/react-query';
+import { skipToken, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
-import { formatSessionError } from '@kilocode/cloud-agent-sdk';
 import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
@@ -46,13 +41,17 @@ import {
   deleteSessionFromStoreAtom,
 } from './store/db-session-atoms';
 import {
+  getDeletionErrorMessage,
   getWorktreeDeletionRedirect,
   invalidateSessionQueries,
-  removeDeletedSession,
+  removeDeletedSessions,
+  type SessionDeletionEvent,
 } from './session-deletion';
+import { useSessionDeletion } from './hooks/useSessionDeletion';
 import { useManager } from './CloudAgentProvider';
 import type { StoredSession } from './types';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
+import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -140,6 +139,11 @@ const UNTITLED_WORKTREE_DETAILS: SidebarWorktreeDetails = {
   prSession: null,
   sessions: [],
 };
+
+const SESSIONS_SIDEBAR_MIN_WIDTH = 320;
+const SESSIONS_SIDEBAR_MAX_WIDTH = 480;
+const SESSIONS_SIDEBAR_KEYBOARD_STEP = 16;
+const SESSIONS_SIDEBAR_STORAGE_KEY = 'cloud-agent:sessions-sidebar-width';
 
 type SidebarLayoutContextValue = WorktreeChatTabs & {
   toggleMobileSidebar: () => void;
@@ -309,11 +313,41 @@ function CloudSidebarLayoutContent({
   const [composerFocusRequest, setComposerFocusRequest] = useState<ComposerFocusRequest | null>(
     null
   );
-  const [sessionPendingDeletion, setSessionPendingDeletion] = useState<string>();
   const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
+  const {
+    width: sessionsSidebarWidth,
+    startDrag: startSessionsSidebarDrag,
+    resizeTo: resizeSessionsSidebar,
+  } = useResizableSidebar(
+    SESSIONS_SIDEBAR_MIN_WIDTH,
+    SESSIONS_SIDEBAR_MIN_WIDTH,
+    SESSIONS_SIDEBAR_MAX_WIDTH,
+    SESSIONS_SIDEBAR_STORAGE_KEY
+  );
+  const handleSessionsSidebarKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    let nextWidth: number;
+    switch (event.key) {
+      case 'ArrowLeft':
+        nextWidth = sessionsSidebarWidth - SESSIONS_SIDEBAR_KEYBOARD_STEP;
+        break;
+      case 'ArrowRight':
+        nextWidth = sessionsSidebarWidth + SESSIONS_SIDEBAR_KEYBOARD_STEP;
+        break;
+      case 'Home':
+        nextWidth = SESSIONS_SIDEBAR_MIN_WIDTH;
+        break;
+      case 'End':
+        nextWidth = SESSIONS_SIDEBAR_MAX_WIDTH;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    resizeSessionsSidebar(nextWidth);
+  };
   const {
     localSessions,
     createLocalSession,
@@ -571,32 +605,6 @@ function CloudSidebarLayoutContent({
   const setDbSessions = useSetAtom(dbSessionsAtom);
   const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
-  const { mutate: deleteCliSessionV2 } = useMutation(
-    trpc.cliSessionsV2.delete.mutationOptions({
-      onSuccess: async (_data, { session_id: sessionId }) => {
-        await removeDeletedSession({
-          sessionId,
-          queryClient,
-          trpc,
-          setDbSessions,
-          deleteSessionFromStore,
-        });
-        toast('Session deleted successfully');
-        await queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
-        await invalidateSessionQueries({ queryClient, trpc });
-      },
-      onError: error => {
-        console.error('Error calling session deletion API:', error);
-        toast.error('Failed to delete session. Please try again.');
-        void invalidateSessionQueries({ queryClient, trpc });
-      },
-    })
-  );
-  const deletingSessionIds = useMutationState({
-    filters: { mutationKey: trpc.cliSessionsV2.delete.mutationKey(), status: 'pending' },
-    select: mutation =>
-      (mutation.state.variables as Parameters<typeof deleteCliSessionV2>[0]).session_id,
-  });
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
   );
@@ -850,46 +858,93 @@ function CloudSidebarLayoutContent({
     ]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    if (!sessionPendingDeletion || deletingSessionIds.includes(sessionPendingDeletion)) return;
+  const deletableSessionsById = useMemo(
+    () =>
+      new Map(
+        [...sessions, ...cachedSessions, ...worktreeChats].map(session => [
+          session.sessionId,
+          session,
+        ])
+      ),
+    [cachedSessions, sessions, worktreeChats]
+  );
 
-    setSessionPendingDeletion(undefined);
-    deleteCliSessionV2({ session_id: sessionPendingDeletion });
-    if (sessionPendingDeletion === currentSessionId) {
+  const navigateAfterWorkspaceDeletion = useCallback(
+    (worktreeId: string, deletedSessionIds: readonly string[]) => {
+      forgetWorktreeTabs(worktreeId, deletedSessionIds);
+      const redirect = getWorktreeDeletionRedirect(
+        new URL(window.location.href),
+        worktreeId,
+        deletedSessionIds,
+        organizationId
+      );
+      if (redirect) router.push(redirect);
+      return redirect !== null;
+    },
+    [forgetWorktreeTabs, organizationId, router]
+  );
+
+  const handleDeletedSessions = useCallback(
+    (event: SessionDeletionEvent) => {
+      const deleted = new Set(event.deletedSessionIds);
+      if (
+        event.scope === 'workspace' &&
+        event.worktreeId &&
+        navigateAfterWorkspaceDeletion(event.worktreeId, event.deletedSessionIds)
+      ) {
+        return;
+      }
+      if (!currentSessionId || !deleted.has(currentSessionId)) return;
+
       const survivingWorktreeChat = openWorktreeChats.find(
-        session =>
-          session.sessionId !== sessionPendingDeletion &&
-          !deletingSessionIds.includes(session.sessionId)
+        session => !deleted.has(session.sessionId)
       );
       if (survivingWorktreeChat) {
         openSessionInternal(survivingWorktreeChat.sessionId);
-      } else if (
-        selectedWorktreeId &&
-        worktreeChats.some(
-          session =>
-            session.sessionId !== sessionPendingDeletion &&
-            !deletingSessionIds.includes(session.sessionId)
-        )
-      ) {
-        openWorktree(selectedWorktreeId);
-      } else {
-        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
-        router.replace(basePath);
+        return;
       }
-    }
-  }, [
-    sessionPendingDeletion,
-    deletingSessionIds,
-    deleteCliSessionV2,
-    currentSessionId,
-    openSessionInternal,
-    openWorktree,
-    openWorktreeChats,
+      if (selectedWorktreeId && worktreeChats.some(session => !deleted.has(session.sessionId))) {
+        openWorktree(selectedWorktreeId);
+        return;
+      }
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+      router.replace(basePath);
+    },
+    [
+      currentSessionId,
+      navigateAfterWorkspaceDeletion,
+      openSessionInternal,
+      openWorktree,
+      openWorktreeChats,
+      organizationId,
+      router,
+      selectedWorktreeId,
+      worktreeChats,
+    ]
+  );
+
+  const {
+    deleteSession,
+    deletingSessionIds: deletingSessionIdSet,
+    deletingWorktreeIds: deletingSessionWorktreeIds,
+    isDeleting: isSessionDeleting,
+  } = useSessionDeletion({
     organizationId,
-    router,
-    selectedWorktreeId,
-    worktreeChats,
-  ]);
+    onDeleted: handleDeletedSessions,
+  });
+  const deletingSessionIds = useMemo(() => [...deletingSessionIdSet], [deletingSessionIdSet]);
+
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      const session = deletableSessionsById.get(sessionId);
+      void deleteSession({
+        sessionId,
+        title: session?.prompt,
+        worktreeId: session?.worktreeId ?? null,
+      });
+    },
+    [deletableSessionsById, deleteSession]
+  );
 
   const handleRenameSession = useCallback(
     async (sessionId: string, title: string) => {
@@ -922,43 +977,42 @@ function CloudSidebarLayoutContent({
 
   const handleConfirmWorktreeDelete = useCallback(() => {
     const worktreeId = worktreePendingDeletion;
-    if (!worktreeId || deletingWorktreeIds.has(worktreeId)) return;
+    if (
+      !worktreeId ||
+      deletingWorktreeIds.has(worktreeId) ||
+      deletingSessionWorktreeIds.has(worktreeId)
+    ) {
+      return;
+    }
 
     setWorktreePendingDeletion(undefined);
     setDeletingWorktreeIds(previous => new Set(previous).add(worktreeId));
 
     void (async () => {
       try {
-        const { deletedSessionIds } = await deleteWorktree({
+        const { deletedSessionIds, cleanup } = await deleteWorktree({
           worktreeId: cloudAgentWorktreeIdSchema.parse(worktreeId),
           organizationId: organizationId ?? null,
         });
-        await Promise.all(
-          deletedSessionIds.map(sessionId =>
-            removeDeletedSession({
-              sessionId,
-              queryClient,
-              trpc,
-              setDbSessions,
-              deleteSessionFromStore,
-            })
-          )
-        );
-        forgetWorktreeTabs(worktreeId, deletedSessionIds);
-        const redirect = getWorktreeDeletionRedirect(
-          new URL(window.location.href),
-          worktreeId,
-          deletedSessionIds,
-          organizationId
-        );
-        if (redirect) router.push(redirect);
-        void invalidateSessionQueries({ queryClient, trpc });
-        void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
-        toast.success('Worktree deleted');
+        await removeDeletedSessions({
+          sessionIds: deletedSessionIds,
+          queryClient,
+          trpc,
+          setDbSessions,
+          deleteSessionFromStore,
+        });
+        navigateAfterWorkspaceDeletion(worktreeId, deletedSessionIds);
+        await invalidateSessionQueries({ queryClient, trpc });
+        if (cleanup === 'pending') {
+          toast.warning('Workspace removed; runtime cleanup is incomplete.');
+        } else {
+          toast.success('Worktree deleted');
+        }
       } catch (error) {
-        toast.error('Failed to delete worktree', { description: formatSessionError(error) });
-        void invalidateSessionQueries({ queryClient, trpc });
-        void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
+        toast.error('Could not delete the workspace', {
+          description: getDeletionErrorMessage(error),
+        });
+        await invalidateSessionQueries({ queryClient, trpc });
       } finally {
         setDeletingWorktreeIds(previous => {
           const next = new Set(previous);
@@ -970,17 +1024,20 @@ function CloudSidebarLayoutContent({
   }, [
     deleteSessionFromStore,
     deleteWorktree,
+    deletingSessionWorktreeIds,
     deletingWorktreeIds,
-    forgetWorktreeTabs,
+    navigateAfterWorkspaceDeletion,
     organizationId,
     queryClient,
-    router,
     setDbSessions,
     trpc,
     worktreePendingDeletion,
   ]);
 
-  const deletingWorktreeIdList = useMemo(() => [...deletingWorktreeIds], [deletingWorktreeIds]);
+  const deletingWorktreeIdList = useMemo(
+    () => [...new Set([...deletingWorktreeIds, ...deletingSessionWorktreeIds])],
+    [deletingSessionWorktreeIds, deletingWorktreeIds]
+  );
   const toggleMobileSidebar = useCallback(() => setMobileSheetOpen(prev => !prev), []);
   const sidebarContext = useMemo(
     () => ({
@@ -1045,7 +1102,7 @@ function CloudSidebarLayoutContent({
               onOpenSession={selectSession}
               onOpenWorktree={openWorktreeFromSidebar}
               organizationId={organizationId}
-              onDeleteSession={setSessionPendingDeletion}
+              onDeleteSession={handleDeleteSession}
               onRenameSession={handleRenameSession}
               worktreeDetails={sidebarWorktreeDetails}
               loadingWorktreeIds={sidebarLoadingWorktreeIds}
@@ -1058,6 +1115,7 @@ function CloudSidebarLayoutContent({
               activeSessions={activeSessions}
               foregroundSession={foregroundSession}
               deletingSessionIds={deletingSessionIds}
+              isDeletionInProgress={isSessionDeleting}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               platformFilter={platformFilter}
@@ -1071,7 +1129,10 @@ function CloudSidebarLayoutContent({
         </Sheet>
 
         {/* Desktop Sidebar */}
-        <div className="hidden w-80 shrink-0 border-r lg:block">
+        <div
+          className="relative hidden max-w-[max(20rem,calc(100%_-_28rem))] w-(--sessions-sidebar-width) shrink-0 border-r lg:block"
+          style={{ '--sessions-sidebar-width': `${sessionsSidebarWidth}px` } as CSSProperties}
+        >
           <ChatSidebar
             key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
             workspaceFolders={sidebarWorkspaceFolders}
@@ -1081,7 +1142,7 @@ function CloudSidebarLayoutContent({
             onOpenSession={selectSession}
             onOpenWorktree={openWorktreeFromSidebar}
             organizationId={organizationId}
-            onDeleteSession={setSessionPendingDeletion}
+            onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
             worktreeDetails={sidebarWorktreeDetails}
             loadingWorktreeIds={sidebarLoadingWorktreeIds}
@@ -1093,6 +1154,7 @@ function CloudSidebarLayoutContent({
             activeSessions={activeSessions}
             foregroundSession={foregroundSession}
             deletingSessionIds={deletingSessionIds}
+            isDeletionInProgress={isSessionDeleting}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             platformFilter={platformFilter}
@@ -1101,34 +1163,24 @@ function CloudSidebarLayoutContent({
             onProjectChange={setProjectFilter}
             recentProjects={recentProjects}
           />
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sessions sidebar"
+            aria-valuemin={SESSIONS_SIDEBAR_MIN_WIDTH}
+            aria-valuemax={SESSIONS_SIDEBAR_MAX_WIDTH}
+            aria-valuenow={sessionsSidebarWidth}
+            aria-valuetext={`Preferred width ${sessionsSidebarWidth} pixels`}
+            tabIndex={0}
+            className="before:bg-border hover:before:bg-ring focus-visible:before:bg-ring absolute inset-y-0 -right-1.5 z-10 w-3 cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:content-[''] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            onMouseDown={startSessionsSidebarDrag}
+            onKeyDown={handleSessionsSidebarKeyDown}
+          />
         </div>
 
         {/* Main Content */}
         <div className="h-full min-w-0 flex-1 overflow-hidden">{children}</div>
       </div>
-      <AlertDialog
-        open={sessionPendingDeletion !== undefined}
-        onOpenChange={open => {
-          if (!open) {
-            setSessionPendingDeletion(undefined);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes the session and its history.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleConfirmDelete}>
-              Delete session
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog
         open={worktreePendingDeletion !== undefined}
         onOpenChange={open => {
@@ -1140,8 +1192,7 @@ function CloudSidebarLayoutContent({
             <AlertDialogTitle>Delete worktree?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,
-              and cleans up its sandbox resources. Other worktrees are not affected. Deletion
-              continues in the background.
+              and cleans up its sandbox resources. Other worktrees are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

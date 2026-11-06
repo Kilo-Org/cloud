@@ -11,6 +11,24 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const execute = new AsyncFunction('github', 'context', 'core', script);
 const sha = 'a'.repeat(40);
 const bot = { login: 'kilo-code-bot[bot]', type: 'Bot' };
+// ci-wiring runs the wiring suites in one `node --test` invocation; pin the
+// exact command so this suite cannot silently leave the job.
+const wiringSuites = [
+  'scripts/stacked-ci.test.mjs',
+  'scripts/changed-dependencies.test.mjs',
+  'scripts/build-key-inputs.test.mjs',
+  'scripts/ttsc-plugin-key.test.mjs',
+  'scripts/affected-workspaces.test.mjs',
+  'scripts/changed-workspaces.test.mjs',
+  'scripts/changes-filter-retry.test.mjs',
+  'scripts/typecheck-ci.test.mjs',
+  'scripts/deployment-workflows.test.mjs',
+  'scripts/main-workflow-failure.test.mjs',
+  'scripts/production-deploy-failure.test.mjs',
+  'scripts/meta-janitor-approve.test.mjs',
+  'scripts/mobile-sbom-workflow.test.mjs',
+];
+const wiringCommand = `node --test ${wiringSuites.join(' ')}`;
 const signalBody = `Meta Janitor: Safety review passed; requesting approval.\n\n<!-- meta-janitor-approve:v1 head=${sha} -->`;
 
 function fixture() {
@@ -172,11 +190,7 @@ test('workflow is created-comment-only, least-privilege, and never checks out PR
     assert.ok(workflow.jobs.approve.if.includes(condition));
   }
   const ci = load(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'));
-  assert.ok(
-    ci.jobs['ci-wiring'].steps.some(
-      step => step.run === 'node --test scripts/meta-janitor-approve.test.mjs'
-    )
-  );
+  assert.ok(ci.jobs['ci-wiring'].steps.some(step => step.run === wiringCommand));
 });
 
 test('approves the assessed commit without requiring stale-approval dismissal', async () => {

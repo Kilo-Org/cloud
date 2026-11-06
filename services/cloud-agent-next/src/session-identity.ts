@@ -61,39 +61,3 @@ export function requiredProviderCapability(
   }
   return undefined;
 }
-
-export type CodeReviewContainersEnv = {
-  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
-};
-
-/** Provider enrollment for Code Reviewer sessions. */
-export function isCodeReviewContainersOwner(
-  env: CodeReviewContainersEnv,
-  owner: { userId: string; orgId?: string }
-): boolean {
-  return (
-    ownerIdInList(env.CODE_REVIEW_CONTAINERS_ORG_IDS, owner.userId) ||
-    ownerIdInList(env.CODE_REVIEW_CONTAINERS_ORG_IDS, owner.orgId)
-  );
-}
-
-/** UI gate only: hides the preview button and links; entry still checks session access. */
-export function isPreviewOwner(
-  env: { PREVIEW_ENABLED_IDS?: string },
-  owner: { userId: string; orgId?: string }
-): boolean {
-  return (
-    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.userId) ||
-    ownerIdInList(env.PREVIEW_ENABLED_IDS, owner.orgId)
-  );
-}
-
-function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {
-  if (!raw) return false;
-  const items = raw
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  if (items.includes('*')) return true;
-  return id !== undefined && items.includes(id);
-}

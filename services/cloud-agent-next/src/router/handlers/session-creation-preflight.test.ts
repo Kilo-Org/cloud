@@ -1,13 +1,16 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
+import { BuiltinAgentSettingsSchema } from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
 import jwt from 'jsonwebtoken';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../../logger.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import type { TRPCContext } from '../../types.js';
 
 const {
   db,
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
@@ -19,6 +22,7 @@ const {
 } = vi.hoisted(() => ({
   db: { mockedDb: true },
   mergeProfileConfigurationMock: vi.fn(),
+  getBuiltinAgentSettingsMock: vi.fn(),
   loadEnvironmentForSessionMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
@@ -34,6 +38,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -121,6 +126,7 @@ describe('session creation preflight', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
@@ -1264,6 +1270,101 @@ describe('session creation preflight', () => {
   });
 });
 
+describe('user built-in agent overrides', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    assertRepositoryAccessMock.mockResolvedValue(undefined);
+    assertEnvironmentRepositoriesAccessMock.mockResolvedValue(undefined);
+    parentSpawnContextMock.mockResolvedValue({
+      token: 'trusted-parent-model-token',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    parentMetadataMock.mockResolvedValue(parentMetadata());
+    balanceMock.mockResolvedValue({ success: true });
+  });
+
+  it('injects the user overrides into a web session profile resolution', async () => {
+    getBuiltinAgentSettingsMock.mockResolvedValue({
+      explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+      plan: { disable: true },
+    });
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(getBuiltinAgentSettingsMock).toHaveBeenCalledWith(db, context.userId);
+    expect(resolved.profile?.resolved?.builtinAgents).toEqual({
+      explore: { model: 'kilo/anthropic/claude-haiku-4.5' },
+      plan: { disable: true },
+    });
+  });
+
+  it('injects the user overrides even when the origin skips default profile resolution', async () => {
+    getBuiltinAgentSettingsMock.mockResolvedValue({
+      compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+    });
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'code-review' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(resolved.profile?.resolved?.builtinAgents).toEqual({
+      compaction: { model: 'kilo/anthropic/claude-haiku-4.5' },
+    });
+  });
+
+  it.each(['cloud-agent-web', 'code-review'])(
+    'uses defaults when the preference read fails for %s',
+    async createdOnPlatform => {
+      getBuiltinAgentSettingsMock.mockRejectedValueOnce(new Error('database unavailable'));
+      const childLogger = logger.withFields({});
+      const warn = vi.spyOn(childLogger, 'warn').mockImplementation(() => {});
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(childLogger);
+
+      const resolved = await preflightSessionCreation(
+        request({ options: { createdOnPlatform } }),
+        context,
+        'prepareSession'
+      );
+
+      expect(resolved.profile?.resolved?.builtinAgents).toBeUndefined();
+      expect(assertKiloModelAvailableMock).toHaveBeenCalled();
+      expect(withFields).toHaveBeenCalledWith({ userId: context.userId, errorClass: 'Error' });
+      expect(warn).toHaveBeenCalledWith(
+        'Unable to load built-in agent preferences; using defaults'
+      );
+    }
+  );
+
+  it('uses defaults when stored preferences fail schema validation', async () => {
+    getBuiltinAgentSettingsMock.mockImplementationOnce(async () =>
+      BuiltinAgentSettingsSchema.parse({ futureAgent: { model: 'future/model' } })
+    );
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(resolved.profile?.resolved?.builtinAgents).toBeUndefined();
+  });
+});
+
 describe('scoped child network policy', () => {
   const authority = {
     version: 1 as const,
@@ -1299,6 +1400,7 @@ describe('scoped child network policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);

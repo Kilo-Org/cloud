@@ -112,13 +112,11 @@ describe('Pashto count-one copy', () => {
       'ساړه بیا راوړنه، سناپشاټ پلی شو، بېرته راوړل شوي فایلونه: 1 له 4'
     );
     expect(
-      i18n.t('agentChat.preparation.detailRestoreIncompleteReport', {
+      i18n.t('agentChat.preparation.detailRestoreIncompleteFiles', {
         skipped: '1',
         total: '4',
         reasons: 'the patch did not apply',
       })
-    ).toBe(
-      'د ناستې بېرته راوړل بشپړ نه شو، بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)'
-    );
+    ).toBe('بېرته نه راوړل شوي فایلونه: 1 له 4 (the patch did not apply)');
   });
 });

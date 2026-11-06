@@ -129,7 +129,8 @@ describe('worktree deletion PostgreSQL membership boundary', () => {
       )
     ).rejects.toMatchObject({
       cause: {
-        code: '23503',
+        // PostgreSQL 18 separates RESTRICT from the earlier foreign-key error.
+        code: expect.stringMatching(/^(23001|23503)$/),
         constraint: 'cli_sessions_v2_parent_session_id_kilo_user_id_fk',
       },
     });

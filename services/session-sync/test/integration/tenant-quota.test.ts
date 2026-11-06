@@ -292,7 +292,7 @@ it.each([false, true])(
     await accepted.json();
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
   }
@@ -317,7 +317,7 @@ it.each([false, true])(
     const tenantStub = getTenantStub(testEnv, principal.tenant);
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
     if (restart) {

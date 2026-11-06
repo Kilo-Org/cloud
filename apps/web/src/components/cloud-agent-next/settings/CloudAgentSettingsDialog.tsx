@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { BuiltinAgentsSection } from './BuiltinAgentsSection';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
@@ -80,10 +81,10 @@ function CloudAgentSettings({
           <DialogTitle>Cloud Agent settings</DialogTitle>
           <Badge variant="secondary">{organizationId ? 'Organization' : 'Personal'}</Badge>
         </div>
-        {settings && !settings.canManage ? (
+        {organizationId && settings && !settings.canManage ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
-            View only. Organization owners and admins can change these settings.
+            Organization settings are view only. Your personal agent preferences remain editable.
           </DialogDescription>
         ) : (
           <DialogDescription className="sr-only">
@@ -108,7 +109,7 @@ function CloudAgentSettings({
       >
         <TabsList
           aria-label="Settings sections"
-          className="h-auto shrink-0 justify-start gap-1 rounded-none border-b bg-transparent p-3 md:w-44 md:flex-col md:justify-start md:border-r md:border-b-0"
+          className="h-auto min-w-0 shrink-0 justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-3 md:w-44 md:flex-col md:justify-start md:overflow-visible md:border-r md:border-b-0"
         >
           <TabsTrigger
             value="general"
@@ -149,12 +150,26 @@ function CloudAgentSettings({
           <div className="flex flex-col gap-8">
             {settings ? (
               <>
-                <DefaultSandboxSection organizationId={organizationId} settings={settings} />
-                <RepositoryOverridesSection
-                  organizationId={organizationId}
-                  settings={settings}
-                  onManageProfiles={() => setSection('profiles')}
-                />
+                <div className="flex flex-col gap-6">
+                  {organizationId && (
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-sm font-medium">Organization defaults</h3>
+                      <p className="text-muted-foreground text-xs">
+                        Applies to new sessions across this organization. Only owners and admins can
+                        change these settings.
+                      </p>
+                    </div>
+                  )}
+                  <DefaultSandboxSection organizationId={organizationId} settings={settings} />
+                  <RepositoryOverridesSection
+                    organizationId={organizationId}
+                    settings={settings}
+                    onManageProfiles={() => setSection('profiles')}
+                  />
+                </div>
+                <div className="border-t pt-6">
+                  <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
+                </div>
               </>
             ) : settingsQuery.isError ? (
               <LoadError onRetry={() => void settingsQuery.refetch()} />

@@ -6,15 +6,6 @@ import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
 
-test('allows the Responses API for OpenCode Go', async () => {
-  const upstream = await openCodeGo.resolveUpstream({
-    credential: 'test-api-key',
-    model: { id: 'qwen3.7-plus' },
-    stream: false,
-  });
-  expect(upstream.supportedChatApis).toContain('responses');
-});
-
 describe('OpenCode Go session headers', () => {
   const requests: GatewayRequest[] = [
     { kind: 'chat_completions', body: { model: 'qwen3.7-plus', messages: [] } },

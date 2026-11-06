@@ -36,8 +36,7 @@ vi.mock('../byoc/vercel-credential-resolver.js', async importActual => {
 const db = {} as WorkerDb;
 const owner = { userId: 'oauth/user', orgId: 'org-id' };
 
-// Selection is enabled and Vercel is configured. Cloudflare containers are not
-// enrolled, and credential containment is on by default.
+// Selection is enabled and Vercel BYOC credentials are configured.
 const selectionEnv = Object.assign({} as Env, {
   SANDBOX_SELECTION_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
@@ -50,7 +49,6 @@ const selectionEnv = Object.assign({} as Env, {
   VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
 });
 const env = selectionEnv as Env;
-const enrolledEnv = { ...selectionEnv, CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' } as Env;
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
 const disabledEnv = {} as Env;
 
@@ -125,7 +123,7 @@ describe('resolveSavedSandboxAllocation', () => {
     });
 
     await expect(
-      resolve({ env: enrolledEnv, environmentAllocation: 'cloudflare-containers-standard-4' })
+      resolve({ env: env, environmentAllocation: 'cloudflare-containers-standard-4' })
     ).resolves.toBe('cloudflare-containers-standard-4');
   });
 
@@ -145,7 +143,7 @@ describe('resolveSavedSandboxAllocation', () => {
       contextAllocation: 'cloudflare-single',
     });
 
-    await expect(resolve({ env: enrolledEnv })).resolves.toBe('cloudflare-containers-standard-4');
+    await expect(resolve({ env: env })).resolves.toBe('cloudflare-containers-standard-4');
   });
 
   it('falls back to the context default when the repository override is unavailable', async () => {
@@ -168,13 +166,13 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(resolve()).resolves.toBe('cloudflare-containers-standard-3');
   });
 
-  it('skips a saved containers size that the picker does not offer', async () => {
+  it('keeps a saved larger containers size', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'cloudflare-containers-standard-4',
       contextAllocation: 'vercel-small',
     });
 
-    await expect(resolve()).resolves.toBeUndefined();
+    await expect(resolve()).resolves.toBe('cloudflare-containers-standard-4');
   });
 
   it.each(['github', 'gitlab', 'bitbucket'] as const)(
@@ -210,7 +208,7 @@ describe('resolveSavedSandboxAllocation', () => {
         contextAllocation: 'cloudflare-containers-standard-4',
       });
 
-      await expect(resolve({ env: enrolledEnv, capability })).resolves.toBe(
+      await expect(resolve({ env: env, capability })).resolves.toBe(
         'cloudflare-containers-standard-4'
       );
     }
@@ -277,7 +275,7 @@ describe('resolveSavedSandboxAllocation', () => {
   });
 
   it('keeps an enrolled saved Cloudflare allocation without reading BYOC credentials', async () => {
-    const byocEnv = { ...enrolledEnv, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
     fetchByocVercelEnrollmentMock.mockRejectedValue(
       new Error('Vercel credentials must not be consulted for Cloudflare')
     );
@@ -354,7 +352,7 @@ describe('resolveSavedSandboxAllocation', () => {
           contextAllocation: 'cloudflare-containers-standard-4',
         });
 
-        await expect(resolve({ env: enrolledEnv, environment: v2 })).resolves.toBe(
+        await expect(resolve({ env: env, environment: v2 })).resolves.toBe(
           'cloudflare-containers-standard-4'
         );
       }
@@ -375,7 +373,7 @@ describe('resolveSavedSandboxAllocation', () => {
         contextAllocation: 'cloudflare-shared',
       });
 
-      await expect(resolve({ env: enrolledEnv, environment: v2 })).resolves.toBeUndefined();
+      await expect(resolve({ env: env, environment: v2 })).resolves.toBeUndefined();
     });
 
     it('does not skip the environment allocation, so the start fails with the reason', async () => {
@@ -384,7 +382,7 @@ describe('resolveSavedSandboxAllocation', () => {
       });
 
       const allocation = await resolve({
-        env: { ...enrolledEnv, BYOC_VERCEL_IDS: owner.orgId } as Env,
+        env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env,
         environment: v2,
         environmentAllocation: 'vercel-small',
       });
@@ -416,7 +414,7 @@ describe('resolveSavedSandboxAllocation', () => {
         contextAllocation: 'cloudflare-single',
       });
 
-      await expect(resolve({ env: enrolledEnv, environment: v1 })).resolves.toBeUndefined();
+      await expect(resolve({ env: env, environment: v1 })).resolves.toBeUndefined();
     });
   });
 });
@@ -430,7 +428,7 @@ describe('withSavedSandboxAllocation', () => {
       options: { kilocodeOrganizationId: 'org-id' },
       ...overrides,
     }) as SessionCreateRequest;
-  const args = { db, env: enrolledEnv, userId: 'oauth/user' };
+  const args = { db, env: env, userId: 'oauth/user' };
 
   it('records the saved allocation on the request', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({

@@ -12,13 +12,11 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const providersQueryFn = vi.hoisted(() => vi.fn());
 const organizationsQueryFn = vi.hoisted(() => vi.fn());
-const passPresentationQueryFn = vi.hoisted(() => vi.fn());
 const signOutFn = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
 const keys = vi.hoisted(() => ({
   providers: ['user', 'getAuthProviders'],
   organizations: ['organizations', 'list'],
-  passPresentation: ['kiloPass', 'getPurchasePresentation'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
 const idleState = vi.hoisted(() => ({
@@ -48,7 +46,6 @@ export {
   keys,
   organizationState,
   organizationsQueryFn,
-  passPresentationQueryFn,
   providersQueryFn,
   routerPush,
   setOrganizationIdFn,
@@ -99,16 +96,6 @@ vi.mock('@/lib/trpc', () => ({
     organizations: {
       list: {
         queryOptions: () => ({ queryKey: keys.organizations, queryFn: organizationsQueryFn }),
-      },
-    },
-    kiloPass: {
-      // The card reads it for its inert state; the helper's suites drive it
-      // with the answer they seed, same as the other queries here.
-      getPurchasePresentation: {
-        queryOptions: () => ({
-          queryKey: keys.passPresentation,
-          queryFn: passPresentationQueryFn,
-        }),
       },
     },
   }),

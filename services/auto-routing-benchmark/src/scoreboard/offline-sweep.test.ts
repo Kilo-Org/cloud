@@ -12,89 +12,95 @@ import { selectSweepCases } from './sweep';
 
 const execute = promisify(execFile);
 
-it('retains the unknown-cost stop when a resumed sweep has no unattempted cases', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'sweep-resume-'));
-  try {
-    const pair = { model: 'fixture/model', variant: null };
-    const cases = selectSweepCases().filter(row => row.taskType !== 'agentic_execution');
-    const sweep: OfflineSweep = {
-      startedAt: '2026-01-01T00:00:00.000Z',
-      suite: 'efficient',
-      truncated: false,
-      costUsd: 0,
-      graderCostUsd: 0,
-      pairs: [
-        {
-          ...pair,
-          results: cases.map((row, index) => ({
-            caseId: row.id,
-            rep: 0,
-            routeKey: `${row.taskType}/${row.subtaskType}`,
-            split:
-              createHash('sha256').update(row.id).digest().readUInt8(0) % 2 === 0
-                ? 'train'
-                : 'heldOut',
-            score: 0,
-            costUsd: index === 0 ? null : 0,
-            graderCostUsd: 0,
-            latencyMs: 1,
-            ttftMs: null,
-            error: index === 0 ? 'usage_missing' : null,
-          })),
-        },
-      ],
-      summaries: [],
-    };
-    await writeFile(join(directory, 'resume.json'), JSON.stringify(sweep));
-    await writeFile(join(directory, 'pairs.json'), JSON.stringify([pair]));
-    await writeFile(
-      join(directory, 'catalog.json'),
-      JSON.stringify({ data: [{ id: pair.model }] })
-    );
-    await writeFile(
-      join(directory, 'network.mjs'),
-      "import {writeFile} from 'node:fs/promises'; globalThis.fetch=async()=>{await writeFile(process.env.SWEEP_EGRESS_MARKER,'attempted');throw new Error('Unexpected network request');};"
-    );
-    await execute(
-      process.execPath,
-      [
-        '--import',
-        join(directory, 'network.mjs'),
-        '--import',
-        'tsx',
-        'scripts/offline-sweep.ts',
-        '--pairs',
-        join(directory, 'pairs.json'),
-        '--catalog',
+it.each([1, 2])(
+  'retains the unknown-cost stop when resuming with %i repetitions',
+  async repetitions => {
+    const directory = await mkdtemp(join(tmpdir(), 'sweep-resume-'));
+    try {
+      const pair = { model: 'fixture/model', variant: null };
+      const cases = selectSweepCases().filter(row => row.taskType !== 'agentic_execution');
+      const sweep: OfflineSweep = {
+        startedAt: '2026-01-01T00:00:00.000Z',
+        suite: 'efficient',
+        truncated: false,
+        costUsd: 0,
+        graderCostUsd: 0,
+        pairs: [
+          {
+            ...pair,
+            results: cases.map((row, index) => ({
+              caseId: row.id,
+              rep: 0,
+              routeKey: `${row.taskType}/${row.subtaskType}`,
+              split:
+                createHash('sha256').update(row.id).digest().readUInt8(0) % 2 === 0
+                  ? 'train'
+                  : 'heldOut',
+              score: 0,
+              costUsd: index === 0 ? null : 0,
+              graderCostUsd: 0,
+              latencyMs: 1,
+              ttftMs: null,
+              error: index === 0 ? 'usage_missing' : null,
+            })),
+          },
+        ],
+        summaries: [],
+      };
+      await writeFile(join(directory, 'resume.json'), JSON.stringify(sweep));
+      await writeFile(join(directory, 'pairs.json'), JSON.stringify([pair]));
+      await writeFile(
         join(directory, 'catalog.json'),
-        '--skip-agentic',
-        '--max-usd',
-        '1',
-        '--resume',
-        join(directory, 'resume.json'),
-        '--out',
-        join(directory, 'out.json'),
-      ],
-      {
-        cwd: fileURLToPath(new URL('../../', import.meta.url)),
-        env: {
-          ...process.env,
-          OPENROUTER_API_KEY: 'fixture-key',
-          SWEEP_EGRESS_MARKER: join(directory, 'egress'),
-        },
-        timeout: 10_000,
-      }
-    );
-    const resumed = OfflineSweepSchema.parse(
-      JSON.parse(await readFile(join(directory, 'out.json'), 'utf8'))
-    );
-    expect(resumed.truncated).toBe(true);
-    expect(resumed.pairs[0].results).toEqual(sweep.pairs[0].results);
-    expect(await readdir(directory)).not.toContain('egress');
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-}, 15_000);
+        JSON.stringify({ data: [{ id: pair.model }] })
+      );
+      await writeFile(
+        join(directory, 'network.mjs'),
+        "import {writeFile} from 'node:fs/promises'; globalThis.fetch=async()=>{await writeFile(process.env.SWEEP_EGRESS_MARKER,'attempted');throw new Error('Unexpected network request');};"
+      );
+      await execute(
+        process.execPath,
+        [
+          '--import',
+          join(directory, 'network.mjs'),
+          '--import',
+          'tsx',
+          'scripts/offline-sweep.ts',
+          '--pairs',
+          join(directory, 'pairs.json'),
+          '--catalog',
+          join(directory, 'catalog.json'),
+          '--skip-agentic',
+          '--reps',
+          String(repetitions),
+          '--max-usd',
+          '1',
+          '--resume',
+          join(directory, 'resume.json'),
+          '--out',
+          join(directory, 'out.json'),
+        ],
+        {
+          cwd: fileURLToPath(new URL('../../', import.meta.url)),
+          env: {
+            ...process.env,
+            OPENROUTER_API_KEY: 'fixture-key',
+            SWEEP_EGRESS_MARKER: join(directory, 'egress'),
+          },
+          timeout: 10_000,
+        }
+      );
+      const resumed = OfflineSweepSchema.parse(
+        JSON.parse(await readFile(join(directory, 'out.json'), 'utf8'))
+      );
+      expect(resumed.truncated).toBe(true);
+      expect(resumed.pairs[0].results).toEqual(sweep.pairs[0].results);
+      expect(await readdir(directory)).not.toContain('egress');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+  15_000
+);
 
 it('preserves distinct variants from a pairs file and resumes their results independently', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'offline-sweep-variants-'));

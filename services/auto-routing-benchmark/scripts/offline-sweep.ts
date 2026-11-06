@@ -302,7 +302,11 @@ async function main() {
           }
         }
       }
-      if (modelCostUsd === null && error !== 'Sweep budget exhausted before request') {
+      if (error === 'Sweep budget exhausted before request') {
+        sweep.truncated = true;
+        return;
+      }
+      if (modelCostUsd === null) {
         unknownCost = true;
         sweep.truncated = true;
       }

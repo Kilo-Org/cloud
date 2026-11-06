@@ -497,18 +497,24 @@ Legacy sweeps without TTFT remain readable and do not substitute total latency.
 Missing picks are excluded; `quality.heldOut.routes` reports coverage.
 `--max-usd` compares known model and grader spend only. In-flight requests can
 overshoot it; this stop is not a financed bound on total charges.
-An unknown model cost stops new sweep dispatch and grading across workers.
-Already dispatched work finishes and retains its receipts. Resume preserves this
-stop when any stored row has unknown cost.
+An unknown model cost stops new model and paid-judge requests across workers.
+Mechanical checks continue. Already dispatched work finishes and retains its receipts.
+Resume preserves this stop when any stored row has unknown cost. A request blocked
+before dispatch creates no result row and remains unattempted for a later resume.
 Direct and container requests send one attempt. HTTP and transport failures do not
 trigger automatic redispatch because the earlier attempt can have an unknown charge.
 The row retains an unknown cost; this does not create a funded reservation.
+An HTTP status alone does not supply a complete billing receipt, including BYOK
+provider charges and auxiliary service fees. Do not infer a zero total charge.
+Legacy null-cost rows remain blocked without independent billing evidence;
+an old error string is not proof that no earlier request reached a provider.
 Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` requires the same suite and pairs, skips completed
 pair/case/repetitions, and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
-`errors`; empty answers score zero. Missing usage still permits grading but makes
-`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+`errors`; empty answers score zero. Missing usage still permits mechanical grading.
+New paid judging stays blocked; judged rows without a grade record `grader_failed`.
+An unknown `costUsd` excludes that row from the cost mean. Graded training candidates
 with unknown cost still compete at the route's maximum known request-cost estimate
 (or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
 Recompute old summaries without
@@ -764,8 +770,9 @@ explicitly listed in `excludedRoutes`, never simulated by direct completions.
 A shared worker pool pulls requests in round-robin order, alternating each model's
 variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
 order spreads partial-run coverage across models; completions may arrive out of order.
-Direct requests, streaming TTFT, retries, long-context materialization, and grading
-reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+Direct requests, streaming TTFT, long-context materialization, and grading reuse
+the offline sweep path. Direct model requests are not automatically retried.
+Set `OPENROUTER_API_KEY`; no container is required.
 
 The report contains model-wide and per-variant accuracy, Wilson lower bounds,
 benchmark and estimated production request cost, p50 TTFT and total latency, raw

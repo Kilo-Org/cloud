@@ -154,19 +154,30 @@ export function CenteredState({
     [bottomReservation, layout, ready]
   );
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  // The hidden-until-measured gate keeps a data state from flashing at the wrong
+  // spot on its first frame. It must only ever gate that first frame: once the
+  // state has been painted, a measurement that lands, detaches and lands again
+  // — a restored route, the tab bar's own layout pass, a rotation — must not
+  // hide it again. Re-arming this window on every `ready` transition did
+  // exactly that, and a run of them kept an empty history body invisible for
+  // seconds after a relaunch. The timer starts once at mount, and the reveal is
+  // latched for the life of the mount.
   useEffect(() => {
-    if (ready) {
-      setFallbackElapsed(false);
-      return undefined;
-    }
     const timer = setTimeout(() => {
       setFallbackElapsed(true);
     }, STATE_SURFACE_FALLBACK_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [ready]);
-  const visible = ready || fallbackElapsed;
+  }, []);
+  // Latched during render rather than in an effect: a detach clears the measured
+  // placement in a layout effect, so an effect-only latch would still paint one
+  // hidden frame.
+  const [revealed, setRevealed] = useState(false);
+  const visible = ready || fallbackElapsed || revealed;
+  if (visible && !revealed) {
+    setRevealed(true);
+  }
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');

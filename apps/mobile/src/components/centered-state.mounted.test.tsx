@@ -274,28 +274,45 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('rejects old viewport results after the surface changes', async () => {
+  it('ignores old viewport results after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The measured placement drops back to the centering fallback, but the
+    // state stays painted: a surface change never blanks what is on screen.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // A viewport measured against the old frame is not reused for the new one.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.settle(380, 340);
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     mounted.unmount();
   });
 
-  it('clears readiness on detach and ignores the detached request', async () => {
+  it('ignores a detached measurement request and keeps the painted state', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
@@ -312,13 +329,15 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(null);
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // A detach only clears the measured placement. It must never hide a state
+    // that is already on screen: that is what blanked a restored history body.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
@@ -327,23 +346,37 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('waits for a new valid measurement after the surface detaches', async () => {
+  it('keeps the painted state visible while the surface re-measures', async () => {
     const mounted = await mount();
     mounted.settle();
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The placement falls back to the centering style, the state stays painted.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     native.surface.frame = frame;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     mounted.settle(0, 0);
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.unmount();
   });
 });
@@ -389,6 +422,41 @@ describe('CenteredState measurement fallback', () => {
         await Promise.resolve();
       });
       expect(mounted.content().accessibilityElementsHidden).toBe(true);
+      mounted.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a revealed state visible when the measurement run never settles', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // A restored route measures late, and the surface can detach and
+      // re-attach several times while the tab bar and the nav transition land.
+      // Every 'ready' transition used to re-arm the hidden window, so a run of
+      // them left a settled state (an empty history body) invisible for
+      // seconds. The reveal must be latched for the mount instead.
+      const mounted = await mount();
+      await act(async () => {
+        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS);
+        await Promise.resolve();
+      });
+      expect(mounted.content().accessibilityElementsHidden).toBe(false);
+
+      for (let round = 0; round < 4; round += 1) {
+        native.surface.frame = null;
+        mounted.rerender();
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(mounted.content().accessibilityElementsHidden).toBe(false);
+        native.surface.frame = { top: 0, bottom: 500 };
+        mounted.rerender();
+        await act(async () => {
+          await Promise.resolve();
+        });
+        expect(mounted.content().accessibilityElementsHidden).toBe(false);
+      }
       mounted.unmount();
     } finally {
       vi.useRealTimers();

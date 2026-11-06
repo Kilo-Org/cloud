@@ -1710,7 +1710,7 @@
       "outcome": "Nsonaazụ",
       "slaStatus": "Ọnọdụ SLA",
       "sortBy": "Ihe a ga-eji hazie",
-      "statusOpen": "Meghe",
+      "statusOpen": "Emeghe",
       "fixed": "Edoziri",
       "statusIgnored": "E leghaara anya",
       "severityHigh": "Elu",
@@ -1767,7 +1767,7 @@
       "retryAnalysis": "Nwaa nyocha ọzọ",
       "analyzeRepository": "Nyochaa ebe nchekwa",
       "rerunAnalysis": "Mee nyocha ọzọ",
-      "capacityFull": "Ọnụọgụ nyocha na-aga eruola oke. Chere ka otu nyocha na-aga n'ihu gwụchaa.",
+      "capacityFull": "Ọnụọgụ nyocha eruola oke. Chere ka otu nyocha na-aga n'ihu gwụchaa.",
       "couldNotCheckCapacity": "Enweghị ike ịlele ma enwere ohere maka nyocha ọzọ.",
       "watchInCloudAgent": "Lelee n'onye nnọchi anya igwe ojii",
       "triageConfidence": "Ntụkwasị obi na nyocha mbụ",
@@ -1789,7 +1789,7 @@
         "dismiss": "Wepụ",
         "manualReview": "Nyocha aka",
         "monitor": "Lekọta",
-        "openPr": "Meghee arịrịọ ndọtị"
+        "openPr": "Mepee arịrịọ ndọtị"
       }
     },
     "dashboard": {
@@ -1820,7 +1820,7 @@
       "repoSummaryHigh": "{{displayCount}} dị elu",
       "repoSummaryHigh_one": "{{displayCount}} dị elu",
       "repoSummaryHigh_other": "{{displayCount}} dị elu",
-      "couldNotLoad": "Enweghị ike ibudata data ibe nchịkọta.",
+      "couldNotLoad": "Enweghị ike ibudata data ibe nchịkọta",
       "filterByRepository": "Jiri ebe nchekwa nzacha",
       "lastSynced": "Mmekọrịta data ikpeazụ: {{time}}",
       "manageRepositories": "Jikwaa ebe nchekwa",
@@ -1831,7 +1831,7 @@
       "syncing": "Na-emekọrịta data…",
       "syncNow": "Mekọrịta data ugbu a",
       "syncQueued": "E tinyela mmekọrịta data n'ahịrị nchere",
-      "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data.",
+      "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data",
       "daysOverdue_one": "Gafere oge site n'ụbọchị {{displayCount}}",
       "daysOverdue_other": "Gafere oge site n'ụbọchị {{displayCount}}",
       "findingsCount_one": "{{displayCount}} ihe achọpụtara",
@@ -1902,7 +1902,7 @@
       "source": "Isi mmalite",
       "sourceId": "ID isi mmalite",
       "viewAdvisory": "Lee ọkwa nchebe na GitHub",
-      "statusOpen": "Meghe",
+      "statusOpen": "Emeghe",
       "sourceDependabot": "GitHub Dependabot",
       "reasonAfterReview": "mgbe nyochachara"
     },
@@ -1949,9 +1949,9 @@
       "title": "Ihe nlereanya na nyocha",
       "couldNotLoad": "Enweghị ike ibudata ntọala nyocha.",
       "depth": "Omimi nyocha",
-      "triageModel": "Ụdị AI maka nyocha mbụ",
-      "analysisModel": "Ụdị AI maka nyocha",
-      "remediationModel": "Ụdị AI maka ndozi"
+      "triageModel": "Ihe nlereanya maka nyocha mbụ",
+      "analysisModel": "Ihe nlereanya maka nyocha",
+      "remediationModel": "Ihe nlereanya maka ndozi"
     },
     "sla": {
       "title": "Amụma SLA",
@@ -2120,7 +2120,7 @@
       "extractionFailedDescription": "Enweghị ike ịtụgharị akụkọ teknụzụ ahụ ka ọ bụrụ nsonaazụ a haziri ahazi.",
       "exploitableDescription": "Koodu ngwa nwere ike iru ọrụ emetụtara.",
       "notExploitable": "Enweghị ike iru ya",
-      "notExploitableDescription": "Ahụghị ụzọ ọ bụla enwere ike iru na ebe nchekwa a.",
+      "notExploitableDescription": "Ahụghị ụzọ ọ bụla enwere ike iru na ebe nchekwa koodu a.",
       "unknown": "Chọrọ nyocha",
       "unknownDescription": "Nyocha enweghị ike ikwenye ma koodu nwere ike iru ọrụ nwere oghere nchebe.",
       "safeToDismiss": "Ọ dị mma ileghara ya anya",
@@ -2129,7 +2129,7 @@
       "manualReviewDescription": "Nyocha mbụ gosiri na mmadụ ga-enyocha ihe achọpụtara a.",
       "analysisRequired": "Nyocha achọrọ",
       "analysisRequiredTitle": "Nyocha koodu achọrọ",
-      "analysisRequiredDescription": "Nyocha mbụ na-atụ aro ka a nyochaa ebe nchekwa tupu e kpebie ihe a ga-eme.",
+      "analysisRequiredDescription": "Nyocha mbụ na-atụ aro ka a nyochaa ebe nchekwa koodu tupu e kpebie ihe a ga-eme.",
       "completedDescription": "Nyocha ahụ gwụchara, mana e dekọghị nsonaazụ a kapịrị ọnụ.",
       "notAnalyzed": "Enyochabeghị",
       "notAnalyzedDescription": "E mebeghị nyocha koodu maka ihe achọpụtara a."

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -58,9 +57,12 @@ export async function getExaMonthlyUsage(
 
 /**
  * Records the source row, monthly counter, and charged owner mutation atomically.
+ * A repeated `id`/`occurredAt` pair is a no-op, so retries cannot double-charge.
  * Low-balance notification scheduling happens only after commit.
  */
 export async function recordExaUsage(params: {
+  id: string;
+  occurredAt: string;
   userId: string;
   organizationId: string | undefined;
   path: string;
@@ -69,8 +71,10 @@ export async function recordExaUsage(params: {
   freeAllowanceMicrodollars: number;
   featureId?: string;
   type?: string;
-}): Promise<void> {
+}): Promise<'recorded' | 'duplicate'> {
   const {
+    id,
+    occurredAt,
     userId,
     organizationId,
     path,
@@ -81,21 +85,29 @@ export async function recordExaUsage(params: {
     type,
   } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
-  const sourceId = randomUUID();
-  const occurredAt = new Date().toISOString();
 
-  const organizationUsage = await db.transaction(async tx => {
-    await tx.insert(exa_usage_log).values({
-      id: sourceId,
-      kilo_user_id: userId,
-      organization_id: organizationId ?? null,
-      path,
-      cost_microdollars: costMicrodollars,
-      charged_to_balance: chargedToBalance,
-      feature_id: featureId ?? null,
-      type: type ?? null,
-      created_at: occurredAt,
-    });
+  const outcome = await db.transaction(async tx => {
+    const [inserted] = await tx
+      .insert(exa_usage_log)
+      .values({
+        id,
+        kilo_user_id: userId,
+        organization_id: organizationId ?? null,
+        path,
+        cost_microdollars: costMicrodollars,
+        charged_to_balance: chargedToBalance,
+        feature_id: featureId ?? null,
+        type: type ?? null,
+        created_at: occurredAt,
+      })
+      .onConflictDoNothing({
+        target: [exa_usage_log.id, exa_usage_log.created_at],
+      })
+      .returning({ id: exa_usage_log.id });
+
+    if (!inserted) {
+      return { status: 'duplicate' as const, organizationUsage: null };
+    }
 
     await upsertMonthlyCounter(tx, {
       userId,
@@ -106,22 +118,26 @@ export async function recordExaUsage(params: {
       freeAllowanceMicrodollars,
     });
 
-    if (!chargedToBalance || costMicrodollars <= 0) return null;
+    if (!chargedToBalance || costMicrodollars <= 0) {
+      return { status: 'recorded' as const, organizationUsage: null };
+    }
 
-    const result = await deductFromBalance(tx, {
+    const organizationUsage = await deductFromBalance(tx, {
       userId,
       organizationId,
       occurredAt,
       costMicrodollars,
-      sourceId,
+      sourceId: id,
     });
 
-    return result;
+    return { status: 'recorded' as const, organizationUsage };
   });
 
-  if (organizationId && organizationUsage) {
-    scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+  if (organizationId && outcome.organizationUsage) {
+    scheduleOrganizationLowBalanceAlert(organizationId, outcome.organizationUsage);
   }
+
+  return outcome.status;
 }
 
 /**

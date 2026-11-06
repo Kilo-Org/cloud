@@ -58,8 +58,8 @@ describe('projectAllocationStatusSnapshot', () => {
     }
   );
 
-  it.each([null, 'cloudflare', 'vercel'] as const)(
-    'omits Containers runtime metadata without a Containers allocation: %s',
+  it.each([null, 'cloudflare'] as const)(
+    'omits Containers runtime metadata without a versioned allocation: %s',
     provider => {
       const snapshot = projectAllocationStatusSnapshot({
         allocation:
@@ -73,6 +73,82 @@ describe('projectAllocationStatusSnapshot', () => {
       expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
     }
   );
+
+  it('reports observed versions for a Vercel allocation with an unknown sandbox type', () => {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+        provider: 'vercel',
+        configuration: null,
+      },
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: IDLE_MS,
+      runtimeIdentity: {
+        allocationId: 'allocation-1',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+      },
+    });
+    expect(snapshot).toMatchObject({
+      status: 'active',
+      provider: 'Vercel',
+      runtime: {
+        sandboxType: 'unknown',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+        startedAt: null,
+        stoppedAt: null,
+      },
+    });
+    expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+  });
+
+  it.each(['containers-standard-3', 'containers-standard-4'] as const)(
+    'reports observed versions for a %s allocation',
+    sandboxType => {
+      const instance = sandboxType === 'containers-standard-4' ? 'standard-4' : 'standard-3';
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation: {
+          ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+          provider: 'cloudflare-containers',
+          configuration: { provider: 'cloudflare-containers', instance },
+        },
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+        runtimeIdentity: {
+          allocationId: 'allocation-1',
+          kiloCliVersion: '7.4.20-canary.1',
+          wrapperVersion: null,
+        },
+      });
+      expect(snapshot.runtime).toEqual({
+        sandboxType,
+        kiloCliVersion: '7.4.20-canary.1',
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      });
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    }
+  );
+
+  it('ignores identity observed for another allocation', () => {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...allocation({ kind: 'connected', allocationId: 'allocation-1' }),
+        provider: 'cloudflare-containers',
+        configuration: { provider: 'cloudflare-containers' },
+      },
+      observedAt: OBSERVED_AT,
+      inactivityTimeoutMs: IDLE_MS,
+      runtimeIdentity: {
+        allocationId: 'allocation-0',
+        kiloCliVersion: '7.4.20',
+        wrapperVersion: '2.4.0',
+      },
+    });
+    expect(snapshot.runtime).toMatchObject({ kiloCliVersion: null, wrapperVersion: null });
+  });
 
   it('reports unknown with insufficient evidence and no provider', () => {
     const snapshot = project(null, 'cloudflare');

@@ -276,174 +276,173 @@ async function performAutoTopUpForEntity(
     return failureResult('concurrent_attempt_in_progress');
   }
 
-  // Re-check under the lock: another request may have funded the account.
-  const {
-    currentBalance_USD,
-    stripe_customer_id,
-    accountCreatedAt,
-    accountUsedMicrodollars,
-    autoTopUpEnabled,
-  } = await getEntityBalanceAndStripeCustomer(entity);
-  const threshold =
-    entity.type === 'user'
-      ? AUTO_TOP_UP_THRESHOLD_DOLLARS
-      : orgThresholdDollars(config.threshold_cents);
-  if (!autoTopUpEnabled || currentBalance_USD >= threshold) {
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult(autoTopUpEnabled ? 'balance_already_sufficient' : 'auto_top_up_disabled');
-  }
-
-  if (!stripe_customer_id) {
-    await disableAutoTopUpForEntity(entity, 'no_stripe_customer');
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult('no_stripe_customer');
-  }
-
-  const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
-  const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
-  // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
-  const bouncerUserId =
-    entity.type === 'user'
-      ? entity.user.id
-      : (config.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID);
-  const bouncerOrgId = entity.type === 'organization' ? entity.organization.id : undefined;
-
+  // Every exit below releases the lock, except a paid invoice: that one stays held until the
+  // `invoice.paid` webhook posts the credits.
+  let holdAttemptLock = false;
   try {
-    // Create a proper invoice (with PDF) and pay it off-session.
-    // Credit application is handled by the `invoice.paid` webhook.
-    const invoiceMetadata: Record<string, string> =
-      entity.type === 'user'
-        ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
-        : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
-    invoiceMetadata.paid_credit_policy = getPaidCreditTerms('stripe', new Date());
-
-    const flow = entity.type === 'user' ? 'personal_auto_top_up' : 'organization_auto_top_up';
-    const invoice = await client.invoices.create({
-      customer: stripe_customer_id,
-      auto_advance: false,
-      metadata: {
-        ...invoiceMetadata,
-        serviceFeePrincipalMinor: String(amountCents),
-        serviceFeeFlow: flow,
-      },
-      description: 'Kilo automatic top up',
-    });
-
-    const feeDeps = createAutoTopUpFeeDeps();
-    const preparedFee = await prepareAutoTopUpInvoiceFee({
-      flow,
-      invoiceId: invoice.id,
-      principalMinor: amountCents,
-      kiloUserId: entity.type === 'user' ? entity.user.id : undefined,
-      organizationId: entity.type === 'organization' ? entity.organization.id : undefined,
-      stripeCustomerId: stripe_customer_id,
-      invoiceCreated: invoice.created ? new Date(invoice.created * 1000) : undefined,
-      taxPrincipal: { kind: 'inline' },
-      deps: feeDeps,
-    });
-
-    try {
-      await client.invoices.update(invoice.id, {
-        metadata: mergeServiceFeeCommercialMetadata(
-          {
-            ...invoiceMetadata,
-            serviceFeePrincipalMinor: String(amountCents),
-          },
-          preparedFee.commercialMetadata
-        ),
-      });
-    } catch (metadataError) {
-      captureException(metadataError, {
-        tags: { source: 'auto_top_up_service_fee_metadata' },
-        extra: { invoice_id: invoice.id, flow },
-      });
-    }
-
-    // Attach the line item directly to this invoice.
-    // (Creating a pending invoice item and then creating an invoice can produce a $0 invoice,
-    // depending on Stripe's pending_invoice_items_behavior defaults.)
-    await client.invoiceItems.create({
-      customer: stripe_customer_id,
-      invoice: invoice.id,
-      amount: amountCents,
-      currency: 'usd',
-      description: 'Kilo automatic top up',
-    });
-    await attachPreparedAutoTopUpInvoiceFee({
-      prepared: preparedFee,
-      deps: feeDeps,
-    });
-
-    // Pay the invoice. The PaymentIntent is created during payment, not finalization.
-    await reportChargeAttempted({
-      flow: 'auto_topup',
-      userId: bouncerUserId,
-      orgId: bouncerOrgId,
-      amountCents,
+    // Re-check under the lock: another request may have funded the account.
+    const {
+      currentBalance_USD,
+      stripe_customer_id,
       accountCreatedAt,
       accountUsedMicrodollars,
-    });
-    const paidInvoice = await client.invoices.pay(invoice.id, {
-      payment_method: config.stripe_payment_method_id,
-      off_session: true,
-    });
-
-    if (paidInvoice.status === 'paid') {
-      // NOTE: We intentionally do NOT synchronously credit the balance here.
-      // The `invoice.paid` webhook is the single source of truth for crediting.
-      // We also intentionally keep the attempt_started_at lock held until the webhook processes
-      // the charge, to avoid multiple invoices/charges being created before the credit lands.
-      logExceptInTest(`Auto-top-up invoice paid for ${entityLabel}, webhook will apply credits`, {
-        traceId,
-        entity_type: entity.type,
-        entity_id: ownerId,
-        invoice_id: invoice.id,
-        amount_cents: amountCents,
-      });
-      return successResult({ stripe_id: invoice.id });
+      autoTopUpEnabled,
+    } = await getEntityBalanceAndStripeCustomer(entity);
+    const threshold =
+      entity.type === 'user'
+        ? AUTO_TOP_UP_THRESHOLD_DOLLARS
+        : orgThresholdDollars(config.threshold_cents);
+    if (!autoTopUpEnabled || currentBalance_USD >= threshold) {
+      return failureResult(
+        autoTopUpEnabled ? 'balance_already_sufficient' : 'auto_top_up_disabled'
+      );
     }
 
-    // Payment did not complete successfully (e.g. requires authentication).
-    const errorStatus = `unexpected_status_${paidInvoice.status}`;
-    await disableAutoTopUpForEntity(entity, errorStatus);
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult(errorStatus);
-  } catch (error) {
-    // StripeCardError = card was declined (insufficient funds, expired, etc.)
-    // These are expected user-facing events, not engineering problems.
-    const isCardDecline = error instanceof Stripe.errors.StripeCardError;
-    const code = isCardDecline
-      ? error.decline_code || error.code || 'unknown_error'
-      : 'unknown_error';
-
-    if (isCardDecline) {
-      logExceptInTest(`Auto-top-up card declined for ${entityLabel}`, {
-        traceId,
-        code,
-        reason: error.message,
-      });
-    } else {
-      captureException(error, {
-        tags: { source: 'auto_top_up' },
-        extra: { entity_type: entity.type, entity_id: ownerId },
-      });
+    if (!stripe_customer_id) {
+      await disableAutoTopUpForEntity(entity, 'no_stripe_customer');
+      return failureResult('no_stripe_customer');
     }
 
-    await disableAutoTopUpForEntity(entity, code);
-    await db
-      .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
-      .where(eq(auto_top_up_configs.id, config.id));
-    return failureResult(code);
+    const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
+    const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
+    // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
+    const bouncerUserId =
+      entity.type === 'user'
+        ? entity.user.id
+        : (config.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID);
+    const bouncerOrgId = entity.type === 'organization' ? entity.organization.id : undefined;
+
+    try {
+      // Create a proper invoice (with PDF) and pay it off-session.
+      // Credit application is handled by the `invoice.paid` webhook.
+      const invoiceMetadata: Record<string, string> =
+        entity.type === 'user'
+          ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
+          : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
+      invoiceMetadata.paid_credit_policy = getPaidCreditTerms('stripe', new Date());
+
+      const flow = entity.type === 'user' ? 'personal_auto_top_up' : 'organization_auto_top_up';
+      const invoice = await client.invoices.create({
+        customer: stripe_customer_id,
+        auto_advance: false,
+        metadata: {
+          ...invoiceMetadata,
+          serviceFeePrincipalMinor: String(amountCents),
+          serviceFeeFlow: flow,
+        },
+        description: 'Kilo automatic top up',
+      });
+
+      const feeDeps = createAutoTopUpFeeDeps();
+      const preparedFee = await prepareAutoTopUpInvoiceFee({
+        flow,
+        invoiceId: invoice.id,
+        principalMinor: amountCents,
+        kiloUserId: entity.type === 'user' ? entity.user.id : undefined,
+        organizationId: entity.type === 'organization' ? entity.organization.id : undefined,
+        stripeCustomerId: stripe_customer_id,
+        invoiceCreated: invoice.created ? new Date(invoice.created * 1000) : undefined,
+        taxPrincipal: { kind: 'inline' },
+        deps: feeDeps,
+      });
+
+      try {
+        await client.invoices.update(invoice.id, {
+          metadata: mergeServiceFeeCommercialMetadata(
+            {
+              ...invoiceMetadata,
+              serviceFeePrincipalMinor: String(amountCents),
+            },
+            preparedFee.commercialMetadata
+          ),
+        });
+      } catch (metadataError) {
+        captureException(metadataError, {
+          tags: { source: 'auto_top_up_service_fee_metadata' },
+          extra: { invoice_id: invoice.id, flow },
+        });
+      }
+
+      // Attach the line item directly to this invoice.
+      // (Creating a pending invoice item and then creating an invoice can produce a $0 invoice,
+      // depending on Stripe's pending_invoice_items_behavior defaults.)
+      await client.invoiceItems.create({
+        customer: stripe_customer_id,
+        invoice: invoice.id,
+        amount: amountCents,
+        currency: 'usd',
+        description: 'Kilo automatic top up',
+      });
+      await attachPreparedAutoTopUpInvoiceFee({
+        prepared: preparedFee,
+        deps: feeDeps,
+      });
+
+      // Pay the invoice. The PaymentIntent is created during payment, not finalization.
+      await reportChargeAttempted({
+        flow: 'auto_topup',
+        userId: bouncerUserId,
+        orgId: bouncerOrgId,
+        amountCents,
+        accountCreatedAt,
+        accountUsedMicrodollars,
+      });
+      const paidInvoice = await client.invoices.pay(invoice.id, {
+        payment_method: config.stripe_payment_method_id,
+        off_session: true,
+      });
+
+      if (paidInvoice.status === 'paid') {
+        // NOTE: We intentionally do NOT synchronously credit the balance here.
+        // The `invoice.paid` webhook is the single source of truth for crediting.
+        // We also intentionally keep the attempt_started_at lock held until the webhook processes
+        // the charge, to avoid multiple invoices/charges being created before the credit lands.
+        logExceptInTest(`Auto-top-up invoice paid for ${entityLabel}, webhook will apply credits`, {
+          traceId,
+          entity_type: entity.type,
+          entity_id: ownerId,
+          invoice_id: invoice.id,
+          amount_cents: amountCents,
+        });
+        holdAttemptLock = true;
+        return successResult({ stripe_id: invoice.id });
+      }
+
+      // Payment did not complete successfully (e.g. requires authentication).
+      const errorStatus = `unexpected_status_${paidInvoice.status}`;
+      await disableAutoTopUpForEntity(entity, errorStatus);
+      return failureResult(errorStatus);
+    } catch (error) {
+      // StripeCardError = card was declined (insufficient funds, expired, etc.)
+      // These are expected user-facing events, not engineering problems.
+      const isCardDecline = error instanceof Stripe.errors.StripeCardError;
+      const code = isCardDecline
+        ? error.decline_code || error.code || 'unknown_error'
+        : 'unknown_error';
+
+      if (isCardDecline) {
+        logExceptInTest(`Auto-top-up card declined for ${entityLabel}`, {
+          traceId,
+          code,
+          reason: error.message,
+        });
+      } else {
+        captureException(error, {
+          tags: { source: 'auto_top_up' },
+          extra: { entity_type: entity.type, entity_id: ownerId },
+        });
+      }
+
+      await disableAutoTopUpForEntity(entity, code);
+      return failureResult(code);
+    }
+  } finally {
+    if (!holdAttemptLock) {
+      await db
+        .update(auto_top_up_configs)
+        .set({ attempt_started_at: null })
+        .where(eq(auto_top_up_configs.id, config.id));
+    }
   }
 }
 

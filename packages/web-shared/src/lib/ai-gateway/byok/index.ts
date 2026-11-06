@@ -4,7 +4,7 @@ import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
-import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import {
   decryptByokEnvelope,
   getByokKmsClientConfig,
@@ -197,7 +197,7 @@ const encryptedByokKeyColumns = {
 
 function reportByokDecryptFailure(keyId: string, error: unknown): void {
   // A key that stays undecryptable reports once per window instead of once per lookup.
-  if (claimFailureReport(keyId, Date.now())) {
+  if (claimReportWindow(keyId, Date.now())) {
     captureException(error, { tags: { source: 'byok_decrypt' } });
   }
 }

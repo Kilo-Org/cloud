@@ -13,6 +13,7 @@ import {
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
+import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
 import { z } from 'zod';
@@ -121,17 +122,22 @@ export async function POST(request: NextRequest) {
 
   // Record cost asynchronously after sending the response
   const cloned = response.clone();
+  const usageId = crypto.randomUUID();
+  const occurredAt = new Date().toISOString();
   after(async () => {
     if (response.status >= 400) {
       return;
     }
 
+    let costMicrodollars: number | undefined;
     try {
       const body: unknown = await cloned.json();
-      const costMicrodollars = extractCostMicrodollars(body);
+      costMicrodollars = extractCostMicrodollars(body);
       if (costMicrodollars === undefined) return;
 
       await recordExaUsage({
+        id: usageId,
+        occurredAt,
         userId: user.id,
         organizationId,
         path: exaPath,
@@ -151,6 +157,27 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           responseStatus: response.status,
         },
+      });
+      const described = describeDatabaseError(error);
+      const code =
+        described.code !== null && /^[0-9A-Z]{5}$/.test(described.code) ? described.code : null;
+      console.error('[exa] usage record failed; charge may be unrecorded', {
+        exa_path: exaPath,
+        payer_kind: organizationId ? 'organization' : 'personal',
+        charged_to_balance: isPaidRequest,
+        ...(costMicrodollars === undefined ? {} : { cost_microdollars: costMicrodollars }),
+        stage: costMicrodollars === undefined ? 'cost_parse' : 'record_write',
+        error:
+          code === null
+            ? {
+                type:
+                  error instanceof z.ZodError
+                    ? 'validation'
+                    : error instanceof SyntaxError
+                      ? 'syntax'
+                      : 'unknown',
+              }
+            : { type: 'database', code },
       });
     }
   });

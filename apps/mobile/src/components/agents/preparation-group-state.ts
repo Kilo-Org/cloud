@@ -8,10 +8,37 @@ import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode
  */
 const RESTORE_INCOMPLETE_STEP_KEY = 'restore_incomplete';
 
+/**
+ * The phase that owns the individual setup commands. Its own name is a progress
+ * phrase ("Running setup commands"), so it never titles a failed group: the
+ * failed command under it does, and without one the group keeps the generic
+ * failure title.
+ */
+const SETUP_COMMANDS_STEP_KEY = 'setup_commands';
+
 export function findRestoreIncompleteStep(
   attempt: PreparationAttempt
 ): PreparationStepSnapshot | undefined {
   return attempt.steps.find(step => step.key === RESTORE_INCOMPLETE_STEP_KEY);
+}
+
+/**
+ * The phase that failed, which names a failed group's header. A failed setup
+ * command outranks the phase it ran under, because that phase starts first and
+ * is settled as failed with the same error; the incomplete-restore step is a
+ * report rather than a stage.
+ */
+export function failedStageStep(attempt: PreparationAttempt): PreparationStepSnapshot | undefined {
+  if (attempt.status !== 'failed') {
+    return undefined;
+  }
+  const failed = attempt.steps.filter(
+    step => step.status === 'failed' && step.key !== RESTORE_INCOMPLETE_STEP_KEY
+  );
+  return (
+    failed.find(step => step.kind === 'setup_command') ??
+    failed.find(step => step.key !== SETUP_COMMANDS_STEP_KEY)
+  );
 }
 
 /**

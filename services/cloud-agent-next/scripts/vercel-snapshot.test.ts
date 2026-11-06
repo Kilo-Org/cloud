@@ -243,7 +243,7 @@ describe('Vercel snapshot operator pure logic', () => {
     await main(['help']);
 
     const output = write.mock.calls.map(([chunk]) => String(chunk)).join('');
-    expect(output).toContain('Deploy code with VERCEL_SANDBOX_ORG_IDS empty');
+    expect(output).toContain('Deploy code with BYOC_VERCEL_IDS empty');
     expect(output).toContain(
       'Disabling enrollment prevents new Vercel selection but does not stop already-pinned sessions'
     );

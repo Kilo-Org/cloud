@@ -94,6 +94,7 @@ type ChatSidebarProps = {
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   deletingWorktreeIds?: readonly string[];
+  isDeletionInProgress?: boolean;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -124,6 +125,7 @@ const SessionRow = memo(function SessionRow({
   isLive,
   onDeleteSession,
   isDeleting,
+  isDeletionInProgress,
   onStartRename,
   isEditing,
   editTitle,
@@ -137,6 +139,7 @@ const SessionRow = memo(function SessionRow({
   isLive: boolean;
   onDeleteSession?: (sessionId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
   onStartRename?: (session: StoredSession) => void;
   isEditing: boolean;
   editTitle: string;
@@ -268,6 +271,7 @@ const SessionRow = memo(function SessionRow({
                       {onDeleteSession && (
                         <DropdownMenuItem
                           variant="destructive"
+                          disabled={isDeletionInProgress}
                           onClick={e => {
                             e.stopPropagation();
                             onDeleteSession(session.sessionId);
@@ -298,6 +302,7 @@ function WorktreeGroupRow({
   onRenameWorktree,
   onDeleteWorktree,
   isDeleting,
+  isDeletionInProgress,
   isLoadingDetails,
   activeSessionStatuses,
   foregroundSession,
@@ -311,6 +316,7 @@ function WorktreeGroupRow({
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
   isLoadingDetails: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -592,6 +598,7 @@ function WorktreeGroupRow({
                       {onDeleteWorktree && (
                         <DropdownMenuItem
                           variant="destructive"
+                          disabled={isDeletionInProgress}
                           onSelect={() => onDeleteWorktree(group.worktreeId)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -666,6 +673,7 @@ export function ChatSidebar({
   onRenameWorktree,
   onDeleteWorktree,
   deletingWorktreeIds = [],
+  isDeletionInProgress = false,
   isInSheet = false,
   activeSessions = [],
   foregroundSession,
@@ -976,6 +984,7 @@ export function ChatSidebar({
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
       isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
+      isDeletionInProgress={isDeletionInProgress}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
       folderControls={
@@ -1004,6 +1013,7 @@ export function ChatSidebar({
         onDeleteSession={onDeleteSession}
         onStartRename={onRenameSession ? handleStartRename : undefined}
         isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
+        isDeletionInProgress={isDeletionInProgress}
         isEditing={editingSessionId === session.sessionId}
         editTitle={editingSessionId === session.sessionId ? editTitle : ''}
         onEditTitleChange={setEditTitle}
@@ -1022,6 +1032,7 @@ export function ChatSidebar({
       handleSaveRename,
       handleSessionClick,
       handleStartRename,
+      isDeletionInProgress,
       onDeleteSession,
       onRenameSession,
     ]

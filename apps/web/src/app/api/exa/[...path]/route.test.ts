@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -85,7 +85,7 @@ describe('POST /api/exa/[...path]', () => {
     // Default: user is within free tier, no existing row
     mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
     mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
-    mockedRecordExaUsage.mockResolvedValue();
+    mockedRecordExaUsage.mockResolvedValue('recorded');
   });
 
   afterAll(() => {
@@ -333,6 +333,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        id: expect.any(String),
+        occurredAt: expect.any(String),
         userId: 'user-123',
         organizationId: undefined,
         path: '/search',
@@ -342,6 +344,33 @@ describe('POST /api/exa/[...path]', () => {
         featureId: undefined,
         type: undefined,
       });
+    });
+
+    it('passes the same usage id and occurredAt to recordExaUsage', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+      const usageId = '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f';
+      const occurredAt = new Date('2026-11-06T12:00:00.000Z');
+      jest.useFakeTimers({ now: occurredAt, doNotFake: ['nextTick'] });
+      const randomUUIDSpy = jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(usageId);
+
+      try {
+        const { POST } = await import('./route');
+        await POST(makeRequest('/search') as never);
+        await flushAfterCallbacks();
+
+        expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: usageId,
+            occurredAt: occurredAt.toISOString(),
+          })
+        );
+      } finally {
+        randomUUIDSpy.mockRestore();
+        jest.useRealTimers();
+      }
     });
 
     it('records cost with chargedToBalance when over free tier', async () => {
@@ -357,6 +386,8 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        id: expect.any(String),
+        occurredAt: expect.any(String),
         userId: 'user-123',
         organizationId: undefined,
         path: '/search',
@@ -524,6 +555,159 @@ describe('POST /api/exa/[...path]', () => {
       expect(response.status).toBe(200);
       await expect(flushAfterCallbacks()).resolves.toBeUndefined();
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('usage failure logging', () => {
+    let consoleError: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleError.mockRestore();
+    });
+
+    it('logs one bounded line and still reports to Sentry when the usage write fails', async () => {
+      setUserAuth();
+      const writeError = Object.assign(new Error('duplicate key'), {
+        code: '23505',
+        constraint: 'exa_usage_log_pkey',
+        table: 'exa_usage_log',
+      });
+      mockedRecordExaUsage.mockRejectedValue(writeError);
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[exa] usage record failed; charge may be unrecorded',
+        {
+          exa_path: '/search',
+          payer_kind: 'personal',
+          charged_to_balance: false,
+          cost_microdollars: 7000,
+          stage: 'record_write',
+          error: {
+            type: 'database',
+            code: '23505',
+          },
+        }
+      );
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledWith(writeError, expect.any(Object));
+    });
+
+    it('logs organization payer and balance charge for a failed write', async () => {
+      const orgId = 'org-456';
+      setUserAuth('user-123', orgId);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.005 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/contents') as never);
+      await flushAfterCallbacks();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[exa] usage record failed; charge may be unrecorded',
+        expect.objectContaining({
+          exa_path: '/contents',
+          payer_kind: 'organization',
+          charged_to_balance: true,
+          cost_microdollars: 5000,
+          stage: 'record_write',
+        })
+      );
+    });
+
+    it.each([
+      ['an unparseable', '0.007', 'validation'],
+      ['a negative', -0.007, 'unknown'],
+    ])('logs stage cost_parse when the cost is %s total', async (_label, total, type) => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [], costDollars: { total } }));
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[exa] usage record failed; charge may be unrecorded',
+        {
+          exa_path: '/search',
+          payer_kind: 'personal',
+          charged_to_balance: false,
+          stage: 'cost_parse',
+          error: { type },
+        }
+      );
+      expect(consoleError.mock.calls[0][1]).not.toHaveProperty('cost_microdollars');
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits no failure line when the usage write succeeds', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('does not include request body or query text in the failure line', async () => {
+      setUserAuth();
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(
+        makeRequest('/search', { query: 'secret-query-text', type: 'secret-type' }) as never
+      );
+      await flushAfterCallbacks();
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      const logged = JSON.stringify(consoleError.mock.calls[0]);
+      expect(logged).not.toContain('secret-query-text');
+      expect(logged).not.toContain('secret-type');
+    });
+
+    it('reports to Sentry before logging, so a throwing log sink cannot skip it', async () => {
+      consoleError.mockImplementation(() => {
+        throw new Error('log sink failed');
+      });
+      setUserAuth();
+      mockedRecordExaUsage.mockRejectedValue(new Error('write failed'));
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).rejects.toThrow('log sink failed');
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
     });
   });
 });

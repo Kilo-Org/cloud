@@ -28,6 +28,7 @@ import {
   userIDSchema,
   type Tenant,
 } from '../protocol';
+import { diagnostic, phase } from '../metrics';
 
 const WATCH_LEASE_MS = 5 * 60_000;
 const WATCH_LIMIT = 128;
@@ -151,64 +152,66 @@ export class SessionPresenceDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
-      const active = new Set<string>();
-      for (const ws of ctx.getWebSockets()) {
-        let value: unknown;
-        try {
-          value = ws.deserializeAttachment();
-        } catch {
-          value = undefined;
-        }
-        const saved = attachmentSchema.safeParse(value);
-        if (saved.success && !saved.data.closed) {
-          active.add(saved.data.connectionID);
-          this.attachments.set(ws, saved.data);
-        } else {
+    void ctx.blockConcurrencyWhile(() =>
+      phase(env, 'presenceInitialize', 'initialize', async () => {
+        await migrate(this.db, migrations);
+        const active = new Set<string>();
+        for (const ws of ctx.getWebSockets()) {
+          let value: unknown;
           try {
-            ws.close(
-              saved.success ? 1000 : 1008,
-              saved.success ? 'Connection already closed' : 'Invalid connection metadata'
-            );
+            value = ws.deserializeAttachment();
           } catch {
-            // A transport that already disconnected has no open socket to reclaim.
+            value = undefined;
+          }
+          const saved = attachmentSchema.safeParse(value);
+          if (saved.success && !saved.data.closed) {
+            active.add(saved.data.connectionID);
+            this.attachments.set(ws, saved.data);
+          } else {
+            try {
+              ws.close(
+                saved.success ? 1000 : 1008,
+                saved.success ? 'Connection already closed' : 'Invalid connection metadata'
+              );
+            } catch {
+              // A transport that already disconnected has no open socket to reclaim.
+            }
           }
         }
-      }
-      for (const row of this.db.select().from(presenceAdvertisements).all()) {
-        let value: unknown;
-        try {
-          value = JSON.parse(row.advertisement);
-        } catch {
-          value = undefined;
+        for (const row of this.db.select().from(presenceAdvertisements).all()) {
+          let value: unknown;
+          try {
+            value = JSON.parse(row.advertisement);
+          } catch {
+            value = undefined;
+          }
+          const advertisement = advertisementSchema.safeParse(value);
+          if (active.has(row.connection_id) && advertisement.success) {
+            this.advertisements.set(row.connection_id, {
+              value: advertisement.data,
+              encoded: row.advertisement,
+            });
+          } else {
+            this.db
+              .delete(presenceAdvertisements)
+              .where(eq(presenceAdvertisements.connection_id, row.connection_id))
+              .run();
+          }
         }
-        const advertisement = advertisementSchema.safeParse(value);
-        if (active.has(row.connection_id) && advertisement.success) {
-          this.advertisements.set(row.connection_id, {
-            value: advertisement.data,
-            encoded: row.advertisement,
-          });
-        } else {
-          this.db
-            .delete(presenceAdvertisements)
-            .where(eq(presenceAdvertisements.connection_id, row.connection_id))
-            .run();
+        const saved = await ctx.storage.get<unknown>('watches');
+        if (saved !== undefined) this.watches = z.array(watchSchema).max(WATCH_LIMIT).parse(saved);
+        this.alarmAt = await ctx.storage.getAlarm();
+        this.expireCommands(Date.now());
+        for (const route of this.db.select().from(presenceCommandRoutes).all()) {
+          if (
+            !active.has(route.runner_connection_id) ||
+            route.controller_connection_id === null ||
+            !active.has(route.controller_connection_id)
+          )
+            this.finishUnknown(route);
         }
-      }
-      const saved = await ctx.storage.get<unknown>('watches');
-      if (saved !== undefined) this.watches = z.array(watchSchema).max(WATCH_LIMIT).parse(saved);
-      this.alarmAt = await ctx.storage.getAlarm();
-      this.expireCommands(Date.now());
-      for (const route of this.db.select().from(presenceCommandRoutes).all()) {
-        if (
-          !active.has(route.runner_connection_id) ||
-          route.controller_connection_id === null ||
-          !active.has(route.controller_connection_id)
-        )
-          this.finishUnknown(route);
-      }
-    });
+      })
+    );
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -826,9 +829,24 @@ export class SessionPresenceDO extends DurableObject<Env> {
         !(sameTenant(watch.tenant, tenant) && watch.sessionID === sessionID)
     );
     if (watching) next.push({ tenant, sessionID, expiresAt: now + WATCH_LEASE_MS });
-    if (next.length > WATCH_LIMIT || byteLength(next) > 100_000)
+    if (next.length > WATCH_LIMIT || byteLength(next) > 100_000) {
+      diagnostic(this.env, {
+        operation: 'relayWatch',
+        stage: 'watch_budget',
+        tenant: tenant.type,
+        outcome: 'error',
+        cause: 'watch_budget',
+        queueDepth: next.length,
+      });
       throw new Error('Presence watch budget exceeded');
-    const persisted = this.ctx.storage.put('watches', next);
+    }
+    const persisted = phase(
+      this.env,
+      'relayWatch',
+      'watch_storage',
+      () => this.ctx.storage.put('watches', next),
+      tenant.type
+    );
     this.watches = next;
     for (const [ws, state] of this.connections()) {
       if (
@@ -841,7 +859,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
       }
     }
     await persisted;
-    await this.schedule();
+    await phase(this.env, 'relayWatch', 'schedule', () => this.schedule(), tenant.type);
   }
 
   async list(): Promise<Instance[]> {

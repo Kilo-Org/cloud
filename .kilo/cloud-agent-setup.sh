@@ -16,6 +16,13 @@ env_file="$state_dir/env"
 global_state_dir=/usr/local/lib/kilo-cloud-agent
 pnpm_wrapper_marker='# kilo-cloud-agent-pnpm-wrapper'
 
+resume=0
+case ${1:-} in
+  '') ;;
+  --resume) resume=1 ;;
+  *) printf 'Usage: %s [--resume]\n' "$0" >&2; exit 2 ;;
+esac
+
 clean_path=
 IFS=: read -ra path_entries <<< "$PATH"
 for entry in "${path_entries[@]}"; do
@@ -28,8 +35,10 @@ export NEXT_TELEMETRY_DISABLED=1
 export KILO_ENV_SYNC_CONCURRENCY=1
 export SKIP_STRIPE_API="${SKIP_STRIPE_API:-true}"
 export KILO_PORT_OFFSET="${KILO_PORT_OFFSET:-auto}"
-KILO_STARTUP_RESERVE_MB=2048
 bridge_gateway=172.17.0.1
+# Part of the workload parent Docker can never take, matching the headroom the
+# session wrapper keeps between its tools cgroup and the parent cap.
+kilo_headroom_bytes=$(( 1536 * 1048576 ))
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This setup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -45,8 +54,14 @@ if (( EUID != 0 )); then
   root=(sudo -n)
 fi
 
+# The session wrapper owns memory containment: it caps the delegated
+# kilo-workloads parent, protects the Kilo server, moves every agent tool
+# process into its capped tools cgroup, and runs setup and start commands in
+# kilo-setup. Docker needs a sibling of its own because container cgroups cannot
+# nest under a cgroup that holds processes. A workspace tail snapshot restores
+# files but not cgroups or daemons; --resume recreates both.
 workload_parent=${KILO_WORKLOAD_CGROUP_ROOT:-/sys/fs/cgroup/kilo-workloads}
-KILO_STARTUP_CGROUP="$workload_parent/kilo-dev-$(basename "$repo")"
+KILO_DOCKER_CGROUP="$workload_parent/kilo-docker"
 build_mode=0
 if [[ ${KILO_ENVIRONMENT_BUILD:-} == 1 ]]; then
   # The environment builder runs without the session wrapper, so it has no
@@ -54,54 +69,50 @@ if [[ ${KILO_ENVIRONMENT_BUILD:-} == 1 ]]; then
   # packages and warm Docker's image store for the snapshot; session setup
   # starts the daemons from the captured filesystem.
   build_mode=1
-  KILO_STARTUP_CGROUP=
+  if (( resume )); then
+    printf -- '--resume is not supported in environment builds.\n' >&2
+    exit 1
+  fi
 elif [[ ! -f $workload_parent/memory.max ]]; then
   printf 'Memory-safe setup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
   exit 1
 fi
-export KILO_WORKLOAD_CGROUP_ROOT=$workload_parent KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
-if (( ! build_mode )); then
-KILO_STARTUP_MEMORY_MB=$(node -e '
-  const fs = require("node:fs");
-  const MiB = 1048576;
-  const parent = process.env.KILO_WORKLOAD_CGROUP_ROOT || "/sys/fs/cgroup/kilo-workloads";
-  function fail(message) {
-    console.error(message + " No workloads were started.");
-    process.exit(1);
-  }
-  function protectedMemory(directory) {
-    const stat = Object.fromEntries(fs.readFileSync(directory + "/memory.stat", "utf8").trim().split("\n").map(line => line.split(" ")));
-    const current = Number(fs.readFileSync(directory + "/memory.current", "utf8"));
-    return current - Number(stat.inactive_file || 0) + Number(stat.file_dirty || 0) + Number(stat.file_writeback || 0);
-  }
-  const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
-  const meminfoBytes = key => Number(meminfo.match(new RegExp("^" + key + ":\\s+(\\d+)", "m"))[1]) * 1024;
-  const parentMax = Number(fs.readFileSync(parent + "/memory.max", "utf8"));
-  const total = Math.min(meminfoBytes("MemTotal"), Number.isFinite(parentMax) ? parentMax : Infinity);
-  const reserve = Number(process.env.KILO_STARTUP_RESERVE_MB) * MiB;
-  const requested = process.env.KILO_STARTUP_MEMORY_MB;
-  if (requested !== undefined && !/^[0-9]+$/.test(requested)) fail("KILO_STARTUP_MEMORY_MB must be an integer number of MiB.");
-  const limit = requested === undefined ? Math.floor((total - reserve) / MiB) * MiB : Number(requested) * MiB;
-  if (limit < 3072 * MiB) fail("The dev workload needs at least 3072 MiB, but its cap is " + Math.floor(limit / MiB) + " MiB (" + Math.floor(total / MiB) + " MiB total, " + Math.floor(reserve / MiB) + " MiB reserve).");
-  const existing = fs.existsSync(process.env.KILO_STARTUP_CGROUP + "/memory.current") ? protectedMemory(process.env.KILO_STARTUP_CGROUP) : 0;
-  const others = Math.max(0, protectedMemory(parent) - existing);
-  if (limit + others > total) fail("Insufficient memory headroom: other sandbox workloads hold " + Math.ceil(others / MiB) + " MiB, so a " + Math.floor(limit / MiB) + " MiB dev workload cap exceeds the " + Math.floor(total / MiB) + " MiB total. Stop other workloads or use a larger sandbox.");
-  const additional = Math.max(0, limit - existing);
-  if (additional > meminfoBytes("MemAvailable")) fail("Insufficient host memory: " + Math.ceil(additional / MiB) + " MiB additional capacity required, " + Math.floor(meminfoBytes("MemAvailable") / MiB) + " MiB available.");
-  console.log(Math.floor(limit / MiB));
-')
-export KILO_STARTUP_MEMORY_MB
-"${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP"
-printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.max" >/dev/null
-printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 * 95 / 100 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.high" >/dev/null
-printf '0\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.swap.max" >/dev/null
-printf '1\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.oom.group" >/dev/null
-printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/cgroup.subtree_control" >/dev/null
-"${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP/processes" "$KILO_STARTUP_CGROUP/containers"
-printf '%s\n' "$$" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
-printf 'Dev workload capped at %s MiB, with %s MiB reserved for other sandbox workloads.\n' "$KILO_STARTUP_MEMORY_MB" "$KILO_STARTUP_RESERVE_MB"
+if (( resume )) && { [[ ! -f $env_file ]] || ! command -v dockerd >/dev/null \
+  || ! grep -qF "$pnpm_wrapper_marker" "$(command -v pnpm)" 2>/dev/null; }; then
+  printf 'This workspace was not fully set up; running full setup.\n' >&2
+  resume=0
 fi
 
+docker_daemon_cgroup=
+if (( ! build_mode )); then
+  parent_max=$(< "$workload_parent/memory.max")
+  docker_max=max
+  if [[ $parent_max =~ ^[0-9]+$ ]]; then
+    docker_max=$(( parent_max - kilo_headroom_bytes ))
+  fi
+  "${root[@]}" mkdir -p "$KILO_DOCKER_CGROUP"
+  printf '%s\n' "$docker_max" | "${root[@]}" tee "$KILO_DOCKER_CGROUP/memory.max" >/dev/null
+  printf '0\n' | "${root[@]}" tee "$KILO_DOCKER_CGROUP/memory.swap.max" >/dev/null
+  printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_DOCKER_CGROUP/cgroup.subtree_control" >/dev/null
+  # dockerd, containerd and dnsmasq live in daemon/, so a Kilo runtime restart,
+  # which kills its tools cgroup, does not take Docker or DNS down.
+  docker_daemon_cgroup="$KILO_DOCKER_CGROUP/daemon"
+  "${root[@]}" mkdir -p "$docker_daemon_cgroup" "$KILO_DOCKER_CGROUP/containers/builds"
+  printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_DOCKER_CGROUP/containers/cgroup.subtree_control" >/dev/null
+  # Image build steps run in their own 2 GiB slice.
+  printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$KILO_DOCKER_CGROUP/containers/builds/memory.max" >/dev/null
+  printf '0\n' | "${root[@]}" tee "$KILO_DOCKER_CGROUP/containers/builds/memory.swap.max" >/dev/null
+fi
+export KILO_DOCKER_CGROUP
+
+# Run a command as root inside the Docker daemon cgroup (or unplaced in build mode).
+as_docker_daemon() {
+  "${root[@]}" bash -c '[[ -z $1 ]] || printf "%s\n" "$$" > "$1/cgroup.procs"; shift; exec "$@"' _ "$docker_daemon_cgroup" "$@"
+}
+
+# --resume restarts what a workspace tail snapshot does not restore (Docker,
+# dnsmasq, the DNS redirect) from the installed filesystem, skipping installs and builds.
+if (( ! resume )); then
 "${root[@]}" timeout --foreground 5m apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 docker_packages=(docker.io)
 for package in docker-cli docker-buildx; do
@@ -160,36 +171,22 @@ if (( ${#tools[@]} )); then
   "${root[@]}" npm install --global --no-audit --no-fund "${tools[@]}"
 fi
 
-if (( ! build_mode )) && tmux list-sessions >/dev/null 2>&1; then
-  tmux_pid=$(tmux display-message -p '#{pid}')
-  if ! node -e 'const fs = require("node:fs"); process.exit(fs.readFileSync("/proc/" + process.argv[1] + "/cgroup", "utf8").includes(process.env.KILO_STARTUP_CGROUP.replace("/sys/fs/cgroup", "") + "/processes") ? 0 : 1)' "$tmux_pid"; then
-    printf 'The existing tmux server is outside the dev workload memory budget. Stop its sessions before running this script.\n' >&2
-    exit 1
-  fi
-fi
-
 mkdir -p "$startup_bin"
-rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection"
+rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection" "$state_dir/memory-mb" "$state_dir/memory-mb.lock" "$state_dir/resume.lock"
 real_docker=$(readlink -f "$(command -v docker)")
-compose_cgroup_parent=
-if (( ! build_mode )); then
-  compose_cgroup_parent="    cgroup_parent: ${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
-fi
+# Containers land in kilo-docker/containers through dockerd's --cgroup-parent.
 cat > "$state_dir/compose.memory.yml" <<YAML
 services:
   postgres:
     mem_limit: 768m
     memswap_limit: 768m
     shm_size: 128m
-$compose_cgroup_parent
   redis:
     mem_limit: 128m
     memswap_limit: 128m
-$compose_cgroup_parent
   redis-http:
     mem_limit: 256m
     memswap_limit: 256m
-$compose_cgroup_parent
     environment:
       ERL_FLAGS: "+S 2:2 +A 2"
 YAML
@@ -217,7 +214,8 @@ function run(input) {
     if (source !== -1) args.splice(source + 2, 0, '-f', path.join(__dirname, 'compose.memory.yml'));
   }
   // dockerd's own BuildKit keeps images in the daemon store, so unchanged images rebuild from cache in seconds.
-  if (build && process.env.KILO_STARTUP_CGROUP) args.splice(1, 0, `--cgroup-parent=${process.env.KILO_STARTUP_CGROUP.replace('/sys/fs/cgroup', '')}/containers/builds`);
+  const builds = process.env.KILO_DOCKER_CGROUP && path.join(process.env.KILO_DOCKER_CGROUP, 'containers/builds');
+  if (build && builds && fs.existsSync(builds)) args.splice(1, 0, `--cgroup-parent=${builds.replace('/sys/fs/cgroup', '')}`);
   const command = build ? 'flock' : process.env.KILO_STARTUP_REAL_DOCKER;
   const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), process.env.KILO_STARTUP_REAL_DOCKER, ...args] : args;
   const child = spawn(command, commandArgs, { stdio: [input === undefined ? 'inherit' : 'pipe', 'inherit', 'inherit'] });
@@ -252,7 +250,7 @@ env_default() {
 {
   printf 'case ":$PATH:" in *:%q:*) ;; *) export PATH=%q:"$PATH" ;; esac\n' "$startup_bin" "$startup_bin"
   printf 'export SHELL=%q\n' "$startup_bin/kilo-shell"
-  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_STARTUP_CGROUP; do
+  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_DOCKER_CGROUP; do
     env_default "$name" "${!name}"
   done
   env_default KILO_STARTUP_REAL_DOCKER "$real_docker"
@@ -276,38 +274,32 @@ env_default() {
   fi
 } > "$env_file"
 
-cgroup_writer=(tee)
-if (( ${#root[@]} )); then
-  cgroup_writer=("${root[@]}" tee)
-fi
+"${root[@]}" rm -f "$global_state_dir/dev-cgroup"
 "${root[@]}" mkdir -p "$global_state_dir"
 printf '%s\n' "$real_pnpm" | "${root[@]}" tee "$global_state_dir/real-pnpm" >/dev/null
 {
   printf '#!/usr/bin/env bash\n%s\n' "$pnpm_wrapper_marker"
   printf 'repo=%q\nenv_file=%q\n' "$repo" "$env_file"
-  printf 'cgroup_writer=(%s)\n' "$(printf '%q ' "${cgroup_writer[@]}")"
   cat <<'SH'
 real_pnpm=$(< /usr/local/lib/kilo-cloud-agent/real-pnpm)
 if [[ ($PWD == "$repo" || $PWD == "$repo"/*) && -f $env_file ]]; then
   source "$env_file"
-  cgroup=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}
-  if [[ $(< /proc/self/cgroup) != "0::$cgroup/"* ]]; then
-    if [[ ! -d $KILO_STARTUP_CGROUP/processes ]]; then
-      printf 'The sandbox dev memory cgroup is missing. Rerun bash %q/.kilo/cloud-agent-setup.sh.\n' "$repo" >&2
-      exit 1
-    fi
-    printf '%s\n' "$$" | "${cgroup_writer[@]}" "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
-  fi
 fi
 exec "$real_pnpm" "$@"
 SH
 } > "$state_dir/pnpm-wrapper"
 "${root[@]}" install -m 0755 "$state_dir/pnpm-wrapper" "${global_pnpm:-/usr/local/bin/pnpm}"
 hash -r
+fi
 source "$env_file"
 
 started_docker=0
 if ! docker info >/dev/null 2>&1; then
+  if [[ -z ${DOCKER_HOST:-} && -f /var/run/docker.pid ]] \
+    && ! pgrep -x dockerd >/dev/null && ! mountpoint -q /var/run/docker.sock; then
+    # A restored disk keeps the socket and pid file of a daemon that no longer exists.
+    "${root[@]}" rm -f /var/run/docker.sock /var/run/docker.pid
+  fi
   if [[ -n ${DOCKER_HOST:-} ]] || [[ -S /var/run/docker.sock ]]; then
     printf 'The supplied Docker daemon is inaccessible; fix Docker access and rerun.\n' >&2
     exit 1
@@ -318,13 +310,16 @@ if ! docker info >/dev/null 2>&1; then
     printf 'Only overlay2 or fuse-overlayfs are allowed; vfs layer copies are unsafe for this sandbox.\n' >&2
     exit 1
   fi
-  docker_cgroup_parent=
+  dockerd_args=(--group="$(id -gn)" --storage-driver="$storage_driver" --ip-forward=false
+    --bip="$bridge_gateway/16" --registry-mirror=https://mirror.gcr.io)
   if (( ! build_mode )); then
-    docker_cgroup_parent=" --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+    dockerd_args+=(--cgroup-parent="${KILO_DOCKER_CGROUP#/sys/fs/cgroup}/containers")
   fi
   # Own the socket by the invoking user's group so a non-root sandbox can use the daemon it starts.
-  "${root[@]}" tmux new-session -d -s kilo-startup-docker \
-    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --registry-mirror=https://mirror.gcr.io$docker_cgroup_parent"
+  dockerd_log="$state_dir/dockerd.log"
+  mkdir -p "$state_dir"
+  as_docker_daemon setsid env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd "${dockerd_args[@]}" \
+    > "$dockerd_log" 2>&1 < /dev/null &
   started_docker=1
   for (( attempt=0; attempt<30; attempt++ )); do
     docker info >/dev/null 2>&1 && break
@@ -332,7 +327,7 @@ if ! docker info >/dev/null 2>&1; then
   done
   if ! docker info >/dev/null 2>&1; then
     printf 'Docker could not start. This sandbox must support nested containers or supply a Docker socket.\n' >&2
-    "${root[@]}" tmux capture-pane -p -t kilo-startup-docker || true
+    tail -20 "$dockerd_log" >&2 || true
     exit 1
   fi
 fi
@@ -340,7 +335,15 @@ if pgrep -a -x dockerd | grep -qF -- "--bip=$bridge_gateway/16"; then
   # Without IP forwarding, bridge containers reach only the host. Workerd pins sandbox
   # containers to public resolvers, so redirect all their DNS to a forwarder on the gateway.
   if ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then
-    "${root[@]}" dnsmasq --conf-file=/dev/null --no-hosts --bind-interfaces --listen-address="$bridge_gateway"
+    # dnsmasq reads resolv.conf only once its mtime advances, and the sandbox's file is
+    # dated 1970, so it would answer REFUSED. Pass the upstream servers explicitly.
+    dns_servers=()
+    while read -r key value _; do
+      [[ $key == nameserver && -n $value ]] && dns_servers+=(--server="$value")
+    done < /etc/resolv.conf
+    (( ${#dns_servers[@]} )) || dns_servers=(--server=1.1.1.1 --server=8.8.8.8)
+    as_docker_daemon dnsmasq --conf-file=/dev/null --no-hosts --no-resolv "${dns_servers[@]}" \
+      --bind-interfaces --listen-address="$bridge_gateway"
   fi
   for proto in udp tcp; do
     dns_redirect=(PREROUTING -i docker0 -p "$proto" --dport 53 -j DNAT --to-destination "$bridge_gateway:53")
@@ -354,20 +357,17 @@ fi
 if (( ! build_mode )) && tmux list-sessions >/dev/null 2>&1; then
   while IFS= read -r line; do
     tmux set-environment -g "${line%%=*}" "${line#*=}"
-  done < <(bash -c 'source "$1"; for name in PATH SHELL KILO_PORT_OFFSET KILO_STARTUP_CGROUP KILO_STARTUP_REAL_DOCKER WRANGLER_DOCKER_BIN WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST NODE_EXTRA_CA_CERTS; do [[ -n ${!name:-} ]] && printf "%s=%s\n" "$name" "${!name}"; done' _ "$env_file")
+  done < <(bash -c 'source "$1"; for name in PATH SHELL KILO_PORT_OFFSET KILO_DOCKER_CGROUP KILO_STARTUP_REAL_DOCKER WRANGLER_DOCKER_BIN WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST NODE_EXTRA_CA_CERTS; do [[ -n ${!name:-} ]] && printf "%s=%s\n" "$name" "${!name}"; done' _ "$env_file")
 fi
 
 legacy_builder="kilo-lowmem-$(basename "$repo")"
 if docker buildx inspect "$legacy_builder" >/dev/null 2>&1; then
   docker buildx rm --force "$legacy_builder" >/dev/null
 fi
-# Image build steps run in their own 2 GiB slice of the dev workload budget.
-if (( ! build_mode )); then
-  builds_cgroup="$KILO_STARTUP_CGROUP/containers/builds"
-  printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/containers/cgroup.subtree_control" >/dev/null
-  "${root[@]}" mkdir -p "$builds_cgroup"
-  printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$builds_cgroup/memory.max" >/dev/null
-  printf '0\n' | "${root[@]}" tee "$builds_cgroup/memory.swap.max" >/dev/null
+
+if (( resume )); then
+  printf 'Resumed: Docker and DNS forwarding running in %s.\n' "$KILO_DOCKER_CGROUP"
+  exit 0
 fi
 
 timeout 15m pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4
@@ -456,9 +456,9 @@ if (( build_mode )); then
   printf '\nEnvironment build complete. Docker packages and sandbox images are captured in the snapshot.\n'
   printf 'Session setup starts Docker and the dev database from that filesystem.\n'
 else
-  printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
-    "$(( $(< "$KILO_STARTUP_CGROUP/memory.peak") / 1048576 ))" "$KILO_STARTUP_MEMORY_MB"
-  printf 'Run from %s (pnpm there joins the capped cgroup and loads %s):\n' "$repo" "$env_file"
+  printf '\nSetup complete. Docker memory peak so far: %s MiB.\n' \
+    "$(( $(< "$KILO_DOCKER_CGROUP/memory.peak") / 1048576 ))"
+  printf 'Run from %s (pnpm there loads %s):\n' "$repo" "$env_file"
   printf '  pnpm dev:start --no-attach app                 # web app\n'
   printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with local fake inference\n'
   printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'

@@ -164,6 +164,7 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
+  provideUserToken: (input: unknown) => Promise<unknown>;
   listIntegrations: (input?: { organizationId?: string }) => Promise<unknown[]>;
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
@@ -218,6 +219,45 @@ let createCaller: (ctx: { user: User }) => {
     integrationId: string;
   }) => Promise<{ success: boolean }>;
 };
+
+describe('personal GitHub token submission', () => {
+  it('returns a fixed error without reflecting secret input or accepting organization ownership', async () => {
+    const caller = createCaller({ user: { id: 'personal-user', is_admin: false } as User });
+    for (const input of [
+      {
+        token: 'ghs_SENTINELSECRET',
+        expected: { authorizationId: null, credentialVersion: null },
+      },
+      {
+        token: 'ghp_SENTINELSECRET',
+        expected: { authorizationId: null, credentialVersion: null },
+        organizationId: 'organization',
+      },
+    ]) {
+      await expect(caller.provideUserToken(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'invalid_github_token_request',
+      });
+    }
+  });
+
+  it('reports GitHub throttling as too many requests', async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 429 }));
+    try {
+      const caller = createCaller({ user: { id: 'personal-user', is_admin: false } as User });
+      await expect(
+        caller.provideUserToken({
+          token: 'ghp_SENTINELSECRET',
+          expected: { authorizationId: null, credentialVersion: null },
+        })
+      ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS', message: 'rate_limited' });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
 
 beforeAll(async () => {
   const mod = await import('./github-apps-router');

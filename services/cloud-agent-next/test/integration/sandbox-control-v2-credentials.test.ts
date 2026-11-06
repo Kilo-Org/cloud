@@ -334,10 +334,7 @@ async function setup(
   }));
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    // This suite asserts contained grants; keep containment on by default so the
-    // local `.dev.vars` value cannot change what each test means.
     installFakeCredentialEnv(instance.env, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'true',
       WORKER_URL: VERCEL_TARGET,
       KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
       KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
@@ -1565,7 +1562,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
   it('denies a containment-off selection with a legacy user token', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
@@ -1593,7 +1590,6 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
       WORKER_URL: 'https://api.kilo.ai',
     });
     await runInDurableObject(stub, instance => {
@@ -1621,7 +1617,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
   it('stays contained when the selection carries containment on', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'true' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
     });
@@ -1651,7 +1647,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
   it('denies the containment default with a legacy user token instead of issuing direct credentials', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
-    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    const stub = await setup(provider, broker);
     const source = credentialsSource(SESSION, {
       kiloToken: NATIVE_KILO_TOKEN,
       repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
@@ -1758,9 +1754,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
   it('fails a persisted legacy containment-off grant with the upgrade stage', async () => {
     const provider = createFakeProvider();
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     const spec = { ...routeSpec(SESSION), directory: '/workspace/legacy' };
     const legacy = legacyGrant({
       sessionId: SESSION,
@@ -3194,9 +3188,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       brokerCalls += 1;
       return { success: false, reason: sentinelReason, secret: brokerSecretMarker };
     };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     await installGrantBroker(stub, broker.service);
     // A synthetic user secret genuinely carried through the credential source.
     const source = credentialsSource(SESSION, { userId: USER_SECRET });
@@ -3420,9 +3412,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
       authCalls.push(params);
       return { success: false, reason: 'unexpected' };
     };
-    const stub = await setup(provider, createFakeCredentialBroker(), {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
-    });
+    const stub = await setup(provider, createFakeCredentialBroker(), {});
     await installGrantBroker(stub, broker.service);
     const explicitToken = 'ghp_explicit_native_token_value';
     const source = credentialsSource(SESSION, {
@@ -4040,7 +4030,6 @@ describe('SandboxControlV2 environment repository credentials', () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker, {
-      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
       WORKER_URL: 'https://api.kilo.ai',
     });
     const view = await stub.prepare({

@@ -88,6 +88,17 @@ const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
 };
 
+/**
+ * The placement a state carries while its geometry is pending or rejected: the
+ * content stays where it is, centered, until a measurement places it.
+ */
+const UNPLACED_FALLBACK_STYLE = {
+  flexGrow: 1,
+  justifyContent: 'center',
+  paddingTop: 16,
+  paddingBottom: 16,
+};
+
 async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>> = {}) {
   let rerender: (() => void) | undefined = undefined;
   function Harness() {
@@ -274,7 +285,7 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('rejects old viewport results after the surface changes', async () => {
+  it('keeps a revealed state on screen and ignores stale geometry after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
@@ -283,24 +294,28 @@ describe('CenteredState measurements', () => {
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The surface moved, so the old placement no longer applies. It stays on
+    // screen all the same: a re-measure is not a reason to take back content
+    // the user already sees.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
-    mounted.settle(380, 340);
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    mounted.settle(680, 340);
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
     mounted.unmount();
   });
 
-  it('clears readiness on detach and ignores the detached request', async () => {
+  it('keeps a revealed state on screen with its placement when its scroller detaches', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     const props = mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
       typeof ScrollView
@@ -312,18 +327,23 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(null);
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The host view re-attaches on a screen's return, and the band it had is
+    // the band it still has: the placement must survive the gap rather than
+    // re-center and jump back.
+    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     mounted.unmount();
   });
 
@@ -333,17 +353,22 @@ describe('CenteredState measurements', () => {
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     native.surface.frame = frame;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     mounted.settle(0, 0);
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     mounted.settle();
-    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.unmount();
   });
 });

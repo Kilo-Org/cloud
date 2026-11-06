@@ -2744,10 +2744,10 @@
     },
     "connect": {
       "checkFailedTitle": "Tidak dapat memeriksa koneksi GitHub.",
-      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
+      "checkFailedMessage": "Tidak dapat menghubungi GitHub. Periksa koneksimu dan coba lagi.",
       "checkFailedTitleGitLab": "Tidak dapat memeriksa koneksi GitLab.",
       "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
-      "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
+      "providerCheckFailedMessage": "Tidak dapat menghubungi penyedia. Periksa koneksimu dan coba lagi.",
       "reconnectTitle": "Hubungkan ulang GitHub",
       "reconnectTitleGitLab": "Hubungkan ulang GitLab",
       "reconnectTitleBitbucket": "Hubungkan ulang Bitbucket",

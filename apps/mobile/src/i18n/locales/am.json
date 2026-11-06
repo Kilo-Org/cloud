@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "የGitHub ግንኙነቱን መፈተሽ አልተቻለም።",
-      "checkFailedMessage": "ይህ እስኪጫን ድረስ የመግቢያ ሁኔታውን ማወቅ አይቻልም።",
+      "checkFailedMessage": "GitHub ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
       "checkFailedTitleGitLab": "የGitLab ግንኙነቱን መፈተሽ አልተቻለም።",
       "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
-      "providerCheckFailedMessage": "ይህ እስኪጫን ድረስ የግንኙነት ሁኔታ አይገኝም።",
+      "providerCheckFailedMessage": "አቅራቢው ላይ መድረስ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
       "reconnectTitle": "GitHubን እንደገና ማገናኘት",
       "reconnectTitleGitLab": "GitLabን እንደገና ማገናኘት",
       "reconnectTitleBitbucket": "Bitbucketን እንደገና ማገናኘት",

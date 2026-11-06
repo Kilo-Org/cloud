@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub जडान जाँच्न सकिएन।",
-      "checkFailedMessage": "यो लोड नभएसम्म साइन इनको अवस्था थाहा हुँदैन।",
+      "checkFailedMessage": "GitHub मा पुग्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
       "checkFailedTitleGitLab": "GitLab जडान जाँच्न सकिएन।",
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
-      "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
+      "providerCheckFailedMessage": "प्रदायकमा पुग्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
       "reconnectTitle": "GitHub मा पुनः जडान",
       "reconnectTitleGitLab": "GitLab मा पुनः जडान",
       "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",

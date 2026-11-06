@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHubi ühendust ei õnnestunud kontrollida.",
-      "checkFailedMessage": "Sisselogimisolekut saab näha alles pärast laadimise lõppu.",
+      "checkFailedMessage": "GitHubiga ei õnnestunud ühendust luua. Kontrolli ühendust ja proovi uuesti.",
       "checkFailedTitleGitLab": "GitLabi ühendust ei õnnestunud kontrollida.",
       "checkFailedTitleBitbucket": "Bitbucketi ühendust ei õnnestunud kontrollida.",
-      "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
+      "providerCheckFailedMessage": "Teenusepakkujaga ei õnnestunud ühendust luua. Kontrolli ühendust ja proovi uuesti.",
       "reconnectTitle": "Ühenda GitHub uuesti",
       "reconnectTitleGitLab": "Ühenda GitLab uuesti",
       "reconnectTitleBitbucket": "Ühenda Bitbucket uuesti",

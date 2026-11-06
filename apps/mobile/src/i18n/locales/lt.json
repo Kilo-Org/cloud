@@ -727,10 +727,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
-      "checkFailedMessage": "Kol duomenys neįkelti, prisijungimo būsena nepasiekiama.",
+      "checkFailedMessage": "Nepavyko pasiekti GitHub. Patikrink ryšį ir bandyk dar kartą.",
       "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
       "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
-      "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
+      "providerCheckFailedMessage": "Nepavyko pasiekti tiekėjo. Patikrink ryšį ir bandyk dar kartą.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
       "reconnectTitleBitbucket": "Prisijungti prie Bitbucket iš naujo",

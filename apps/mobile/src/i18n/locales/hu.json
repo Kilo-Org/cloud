@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot",
-      "checkFailedMessage": "A bejelentkezési állapot csak a betöltés után érhető el.",
+      "checkFailedMessage": "Nem sikerült elérni a GitHubot. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot",
       "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot",
-      "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
+      "providerCheckFailedMessage": "Nem sikerült elérni a szolgáltatót. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectTitleGitLab": "Újracsatlakozás a GitLabhoz",
       "reconnectTitleBitbucket": "Újracsatlakozás a Bitbuckethoz",

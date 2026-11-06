@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "Enweghị ike ịlele njikọ GitHub",
-      "checkFailedMessage": "Enweghị ike ịmata ọnọdụ nbanye ruo mgbe ebudatara nke a.",
+      "checkFailedMessage": "Enweghị ike ijikọ na GitHub. Lelee njikọ gị ma nwaa ọzọ.",
       "checkFailedTitleGitLab": "Enweghị ike ịlele njikọ GitLab",
       "checkFailedTitleBitbucket": "Enweghị ike ịlele njikọ Bitbucket",
-      "providerCheckFailedMessage": "Ọnọdụ njikọ agaghị adị ruo mgbe nke a budatara.",
+      "providerCheckFailedMessage": "Enweghị ike ijikọ na onye na-enye ọrụ. Lelee njikọ gị ma nwaa ọzọ.",
       "reconnectTitle": "Jikọtaghachi GitHub",
       "reconnectTitleGitLab": "Jikọtaghachi GitLab",
       "reconnectTitleBitbucket": "Jikọtaghachi Bitbucket",

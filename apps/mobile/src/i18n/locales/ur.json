@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub کنکشن چیک نہیں ہو سکا۔",
-      "checkFailedMessage": "جب تک یہ لوڈ نہیں ہوتا، سائن ان کی حالت دستیاب نہیں ہوگی۔",
+      "checkFailedMessage": "GitHub تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
-      "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
+      "providerCheckFailedMessage": "پرووائیڈر تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
       "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
       "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",

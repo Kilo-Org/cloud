@@ -10,7 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
 export const usage = '<fake-email>';
 
@@ -46,12 +46,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     throw new Error('Provide one owned fake email matching kilo-<name>@example.com.');
   }
-  const databaseUrl = new URL(process.env.POSTGRES_URL ?? '');
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(databaseUrl.hostname) ||
-    process.env.NODE_ENV === 'production' ||
-    process.env.SKIP_STRIPE_API !== 'true'
-  ) {
+  assertLocalSeedDatabase('app:mobile-reviewer-trial-gate');
+  if (process.env.NODE_ENV === 'production' || process.env.SKIP_STRIPE_API !== 'true') {
     throw new Error('This fixture requires a local development database and SKIP_STRIPE_API=true.');
   }
   const db = getSeedDb();

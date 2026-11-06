@@ -2892,10 +2892,10 @@
     },
     "connect": {
       "checkFailedTitle": "تعذّر التحقق من ربط حساب GitHub.",
-      "checkFailedMessage": "لا يمكن معرفة حالة تسجيل الدخول حتى يكتمل التحميل.",
+      "checkFailedMessage": "تعذّر الوصول إلى GitHub. تحقق من اتصالك وحاول مرة أخرى.",
       "checkFailedTitleGitLab": "تعذّر التحقق من ربط حساب GitLab.",
       "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
-      "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
+      "providerCheckFailedMessage": "تعذّر الوصول إلى المزوّد. تحقق من اتصالك وحاول مرة أخرى.",
       "reconnectTitle": "إعادة ربط GitHub",
       "reconnectTitleGitLab": "إعادة ربط GitLab",
       "reconnectTitleBitbucket": "إعادة ربط Bitbucket",

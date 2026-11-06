@@ -613,6 +613,7 @@
     "dismissed",
     "manual review",
     "no changes needed",
+    "open",
     "open pull request",
     "pr opened",
     "remediation blocked",

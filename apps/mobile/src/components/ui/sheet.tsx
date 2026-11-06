@@ -4,11 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  holdSheetTouch,
-  SHEET_TOUCH_SETTLE_MS,
-  useSheetTouchHold,
-} from '@/lib/sheet-touch-guard';
+import { holdSheetTouch, SHEET_TOUCH_SETTLE_MS, useSheetTouchHold } from '@/lib/sheet-touch-guard';
 
 /**
  * The app's sheet surface. This file is the only place that imports

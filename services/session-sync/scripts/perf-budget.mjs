@@ -106,7 +106,11 @@ export function forecast(input) {
     reserveUSD: plan.delayedBillingReserveUSD,
     committedCeilingUSD,
     hardLimitUSD: plan.hardLimitUSD,
-    targets: { cloudflareUSD: plan.hardLimitUSD - 15, vmUSD: 5, delayedReserveUSD: 10 },
+    targets: {
+      cloudflareUSD: plan.hardLimitUSD - 15,
+      vmUSD: 5,
+      delayedReserveUSD: plan.delayedBillingReserveUSD,
+    },
     passed:
       committedCeilingUSD <= plan.hardLimitUSD &&
       pessimisticCFUSD <= plan.hardLimitUSD - 15 &&

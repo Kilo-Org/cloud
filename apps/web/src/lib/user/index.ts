@@ -513,14 +513,14 @@ async function recordSignupImpactTracking(args: {
 }
 
 /**
- * Sign-in methods that only exist after their flow proved the address: a
+ * Sign-in method types accepted for the account-sign-in requirement: a
  * consumed magic link or code, a native token that checked `email_verified`, a
  * Google profile the acceptance path asserts, an Anaconda profile its parser
- * refuses without the claim, or an enterprise SSO assertion. OpenAI tokens carry
- * an optional `email_verified` claim that this table deliberately does not rely
- * on.
+ * refuses without the claim, Apple sign-in, or an enterprise SSO assertion.
+ * OpenAI tokens carry an optional `email_verified` claim that this table does
+ * not rely on.
  */
-const SETUP_PROVES_EMAIL: Partial<Record<AuthProviderId, true>> = {
+const QUALIFYING_SIGN_IN_METHODS: Partial<Record<AuthProviderId, true>> = {
   google: true,
   apple: true,
   anaconda: true,
@@ -589,25 +589,25 @@ export async function createOrUpdateUser(
     // email_verified claim). Proof authorizes the link; without proof the
     // sign-in keeps the DIFFERENT-OAUTH refusal below.
     //
-    // Linking into an existing account also requires that the account was
-    // itself established by a sign-in that proves its email. An account with no
+    // Linking into an existing account also requires that the account currently
+    // carries at least one method from the table above. An account with no
     // provider row predates provider rows or follows an admin reset, and the
-    // email auto-link is its only way in, so it counts as established. Sign-in
-    // through the account's own provider resolves by provider identity above
-    // and never reaches this requirement.
+    // email auto-link is its only way in, so it counts. Sign-in through the
+    // account's own provider resolves by provider identity above and never
+    // reaches this requirement.
     //
     // WorkOS SSO settlement keeps its existing behavior: an SSO-required hosted
     // domain is the only path into the account, and its authority-gated callback
     // proves the organization controls it, so it always resolves (relaying a
     // stale profile ID when one is stored).
-    const accountHasProvenSignIn =
+    const accountHasQualifyingSignIn =
       existingProviders.length === 0 ||
-      existingProviders.some(p => SETUP_PROVES_EMAIL[p.provider] === true);
+      existingProviders.some(p => QUALIFYING_SIGN_IN_METHODS[p.provider] === true);
     const workosSettles = args.provider === 'workos' && autoLinkToExistingUser;
     const shouldLink =
       workosSettles ||
       (!hasThisProvider &&
-        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasProvenSignIn)));
+        (onlyHasFakeLogin || (autoLinkToExistingUser && accountHasQualifyingSignIn)));
 
     if (shouldLink) {
       let linkedUser = userByEmail;
@@ -706,7 +706,7 @@ export async function createOrUpdateUser(
         !workosSettles &&
         autoLinkToExistingUser &&
         !onlyHasFakeLogin &&
-        !accountHasProvenSignIn;
+        !accountHasQualifyingSignIn;
       if (skippedBySignInHistory) {
         posthogClient.capture({
           distinctId: userByEmail.google_user_email,

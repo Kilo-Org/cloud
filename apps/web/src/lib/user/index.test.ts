@@ -2135,7 +2135,7 @@ describe('User', () => {
       expect(providerRows.some(row => row.provider === 'github')).toBe(true);
     });
 
-    it('keeps the different-provider refusal when the existing account has no proven sign-in method', async () => {
+    it('keeps the different-provider refusal when the existing account has no qualifying sign-in method', async () => {
       const existing = await insertTestUser({
         google_user_email: 'existing-other-method@example.com',
         google_user_name: 'Existing Other Method',
@@ -2225,16 +2225,16 @@ describe('User', () => {
       );
     });
 
-    it('allows auto-link when the existing account has a proven provider', async () => {
+    it('allows auto-link when the existing account has a qualifying sign-in method', async () => {
       const existing = await insertTestUser({
-        google_user_email: 'existing-proven@example.com',
-        google_user_name: 'Existing Proven',
+        google_user_email: 'existing-qualifying@example.com',
+        google_user_name: 'Existing Qualifying',
       });
       await db.insert(user_auth_provider).values({
         kilo_user_id: existing.id,
         provider: 'apple',
         provider_account_id: 'apple-n',
-        email: 'existing-proven@example.com',
+        email: 'existing-qualifying@example.com',
         avatar_url: '',
         display_name: null,
         hosted_domain: hosted_domain_specials.apple,
@@ -2242,7 +2242,7 @@ describe('User', () => {
 
       const result = await createOrUpdateUser(
         {
-          google_user_email: 'existing-proven@example.com',
+          google_user_email: 'existing-qualifying@example.com',
           google_user_name: 'Google Later Two',
           google_user_image_url: 'https://example.com/avatar.png',
           hosted_domain: 'example.com',

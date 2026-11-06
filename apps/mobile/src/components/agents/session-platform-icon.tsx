@@ -69,7 +69,10 @@ export function selectRowPlatformPresentation({
   statusGlyph,
   gitUrl,
 }: RowPlatformPresentationInput): RowPlatformPresentation {
-  const eyebrowNamesRepo = repoNameFromGitUrl(gitUrl) != null;
+  // Truthiness, not a null check: a git URL whose project segment is empty
+  // yields `''`, and the label helpers fall back to the platform label there.
+  // The glyph must fall back with them, or the row states its type twice.
+  const eyebrowNamesRepo = Boolean(repoNameFromGitUrl(gitUrl));
   const iconKind =
     variant === 'list' && !statusGlyph && eyebrowNamesRepo
       ? sessionPlatformIconKind(platform)

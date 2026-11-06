@@ -126,6 +126,21 @@ describe('selectRowPlatformPresentation', () => {
     }
   });
 
+  it('treats a git URL with an empty project segment as the label fallback', () => {
+    // `repoNameFromGitUrl` answers `''` here, and the label helpers read it as
+    // absent, so the glyph has to fall back with them or the row states its
+    // type twice.
+    expect(
+      selectRowPlatformPresentation({
+        platform: 'cloud-agent-web',
+        variant: 'list',
+        needsInput: false,
+        statusGlyph: false,
+        gitUrl: 'git@github.com:/',
+      })
+    ).toEqual({ iconKind: null, spokenPlatform: undefined });
+  });
+
   it('sets spokenPlatform when an icon shows with a repo-name eyebrow (stored git_url shape)', () => {
     // Stored rows pass session.git_url into the same gitUrl param.
     expect(

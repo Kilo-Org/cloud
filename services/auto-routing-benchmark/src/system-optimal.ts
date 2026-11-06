@@ -36,11 +36,6 @@ export const ACCURACY_NOISE_BAND_GRID = [0, 0.02, 0.05, 0.08, 0.1] as const;
 // optimizer declines to change anything and the current value stands.
 const MIN_HELDOUT_GRADED_CASES = 20;
 const MIN_EVALUATED_ROUTES = 2;
-// Quality may fall at most this far below the best grid point.
-const ACCURACY_FLOOR_MARGIN = 0.05;
-// Objective values within this share of the best count as the same plateau.
-const PLATEAU_TOLERANCE = 0.02;
-const MIN_REQUEST_COST_USD = 1e-9;
 
 export type ThresholdOptimization = {
   minAccuracy: number;
@@ -62,28 +57,17 @@ type GridPoint = {
   accuracyNoiseBand: number;
   accuracy: number;
   costUsd: number;
-  objective: number;
   cases: number;
   routes: number;
 };
 
-function closestTo(values: readonly number[], target: number): number | undefined {
-  return values.reduce<number | undefined>(
-    (best, value) =>
-      best === undefined || Math.abs(value - target) < Math.abs(best - target) ? value : best,
-    undefined
-  );
-}
-
 /**
- * Grid the min-accuracy threshold and noise band over measured candidates,
- * scoring each candidate table on held-out cases: mean estimated request cost
- * per held-out case against the accuracy that table actually achieves. The
- * chosen point is the middle of the stable plateau, not its edge.
- *
- * Returns null when the stored case results cannot support a decision.
+ * These cases select the policy, so they are validation data, not final evidence.
+ * Efficient preserves reference accuracy; Frontier preserves reference cost.
  */
 export function optimizeThresholdPolicy(params: {
+  router: AutoRouter;
+  referencePolicy: { minAccuracy: number; accuracyNoiseBand: number };
   pairs: OfflineSweep['pairs'];
   profile: ProductionTokenProfile | null;
   pricing: ReadonlyMap<string, CandidatePricing | null>;
@@ -92,6 +76,31 @@ export function optimizeThresholdPolicy(params: {
     ...pair,
     results: pair.results.map(result => ({ ...result, split: caseSplitForId(result.caseId) })),
   }));
+  const expectedRoutes = new Set(splitPairs[0]?.results.map(result => result.routeKey) ?? []);
+  const supportByRoute = new Map<string, string>();
+  for (const pair of splitPairs) {
+    const casesByRoute = new Map<string, string[]>();
+    for (const result of pair.results) {
+      if (!isGradedSweepResult(result) || result.costUsd === null) return null;
+      let cases = casesByRoute.get(result.routeKey);
+      if (!cases) {
+        cases = [];
+        casesByRoute.set(result.routeKey, cases);
+      }
+      cases.push(JSON.stringify([result.split, result.caseId, result.rep]));
+    }
+    if (casesByRoute.size !== expectedRoutes.size) return null;
+    for (const route of expectedRoutes) {
+      if (!casesByRoute.has(route)) return null;
+    }
+    for (const [route, cases] of casesByRoute) {
+      if (new Set(cases).size !== cases.length) return null;
+      const support = JSON.stringify(cases.toSorted());
+      const previous = supportByRoute.get(route);
+      if (previous !== undefined && previous !== support) return null;
+      supportByRoute.set(route, support);
+    }
+  }
   const summaries = summarizeSweep(splitPairs);
 
   // Every model on a route is graded on the same held-out cases, so the sample
@@ -143,42 +152,58 @@ export function optimizeThresholdPolicy(params: {
   }
 
   const points: GridPoint[] = [];
-  for (const minAccuracy of MIN_ACCURACY_GRID) {
-    for (const accuracyNoiseBand of ACCURACY_NOISE_BAND_GRID) {
+  const thresholds = new Set([...MIN_ACCURACY_GRID, params.referencePolicy.minAccuracy]);
+  const noiseBands = new Set([
+    ...ACCURACY_NOISE_BAND_GRID,
+    params.referencePolicy.accuracyNoiseBand,
+  ]);
+  for (const minAccuracy of thresholds) {
+    for (const accuracyNoiseBand of noiseBands) {
       let scoreSum = 0;
       let costSum = 0;
       let cases = 0;
       let routes = 0;
       for (const candidates of byRoute.values()) {
         const trainCandidates = [...candidates.values()].flatMap(entry =>
-          entry.train && entry.train.cases > 0 && entry.train.accuracy !== null
+          entry.train &&
+          entry.train.cases > 0 &&
+          entry.train.accuracy !== null &&
+          entry.train.avgCostUsd !== null
             ? [
                 {
                   model: entry.train.model,
                   variant: entry.train.variant,
                   accuracy: entry.train.accuracy,
                   cases: entry.train.cases,
-                  avgCostUsd: entry.train.avgCostUsd ?? 0,
+                  avgCostUsd: entry.train.avgCostUsd,
                   p50LatencyMs: entry.train.p50LatencyMs,
+                  p50TtftMs: entry.train.p50TtftMs,
                   pricing: params.pricing.get(entry.train.model) ?? null,
                 },
               ]
             : []
         );
-        if (trainCandidates.length === 0) continue;
+        if (trainCandidates.length === 0) return null;
         const pick = rankCandidates(trainCandidates, minAccuracy, {
           profile: params.profile,
           accuracyNoiseBand,
         })[0];
-        if (!pick) continue;
+        if (!pick) return null;
         const heldOut = candidates.get(
           benchmarkPairKey({ model: pick.model, variant: pick.variant ?? null })
         )?.heldOut;
-        if (!heldOut || heldOut.cases === 0 || heldOut.accuracy === null) continue;
+        if (
+          !heldOut ||
+          heldOut.cases === 0 ||
+          heldOut.accuracy === null ||
+          heldOut.avgCostUsd === null
+        ) {
+          return null;
+        }
         scoreSum += heldOut.accuracy * heldOut.cases;
         costSum +=
           estimateRequestCostUsd(
-            { avgCostUsd: pick.avgCostUsd, pricing: pick.pricing ?? null },
+            { avgCostUsd: heldOut.avgCostUsd, pricing: pick.pricing ?? null },
             params.profile
           ) * heldOut.cases;
         cases += heldOut.cases;
@@ -192,7 +217,6 @@ export function optimizeThresholdPolicy(params: {
         accuracyNoiseBand,
         accuracy,
         costUsd,
-        objective: accuracy / Math.max(costUsd, MIN_REQUEST_COST_USD),
         cases,
         routes,
       });
@@ -200,27 +224,32 @@ export function optimizeThresholdPolicy(params: {
   }
   if (points.length === 0) return null;
 
-  const maxAccuracy = Math.max(...points.map(point => point.accuracy));
-  const floor = maxAccuracy - ACCURACY_FLOOR_MARGIN;
-  const eligible = points.filter(point => point.accuracy >= floor);
-  const bestObjective = Math.max(...eligible.map(point => point.objective));
-  const plateau = eligible.filter(
-    point => point.objective >= bestObjective * (1 - PLATEAU_TOLERANCE)
+  const reference = points.find(
+    point =>
+      point.minAccuracy === params.referencePolicy.minAccuracy &&
+      point.accuracyNoiseBand === params.referencePolicy.accuracyNoiseBand
   );
-
-  const accuracyValues = [...new Set(plateau.map(point => point.minAccuracy))].sort(
-    (a, b) => a - b
+  if (!reference) return null;
+  if (points.some(point => point.cases !== reference.cases || point.routes !== reference.routes)) {
+    return null;
+  }
+  const eligible = points.filter(point =>
+    params.router === 'efficient'
+      ? point.accuracy >= reference.accuracy
+      : point.costUsd <= reference.costUsd
   );
-  const chosenMinAccuracy = closestTo(
-    accuracyValues,
-    (accuracyValues[0] + accuracyValues[accuracyValues.length - 1]) / 2
-  );
-  const bandPoints = plateau.filter(point => point.minAccuracy === chosenMinAccuracy);
-  const bandValues = [...new Set(bandPoints.map(point => point.accuracyNoiseBand))].sort(
-    (a, b) => a - b
-  );
-  const chosenBand = closestTo(bandValues, (bandValues[0] + bandValues[bandValues.length - 1]) / 2);
-  const chosen = bandPoints.find(point => point.accuracyNoiseBand === chosenBand) ?? bandPoints[0];
+  const chosen = eligible.toSorted(
+    (a, b) =>
+      (params.router === 'efficient'
+        ? a.costUsd - b.costUsd || b.accuracy - a.accuracy
+        : b.accuracy - a.accuracy || a.costUsd - b.costUsd) ||
+      Math.abs(a.minAccuracy - reference.minAccuracy) +
+        Math.abs(a.accuracyNoiseBand - reference.accuracyNoiseBand) -
+        Math.abs(b.minAccuracy - reference.minAccuracy) -
+        Math.abs(b.accuracyNoiseBand - reference.accuracyNoiseBand) ||
+      a.minAccuracy - b.minAccuracy ||
+      a.accuracyNoiseBand - b.accuracyNoiseBand
+  )[0];
   if (!chosen) return null;
 
   return {
@@ -230,7 +259,7 @@ export function optimizeThresholdPolicy(params: {
     estimatedRequestCostUsd: chosen.costUsd,
     heldOutCases: chosen.cases,
     routes: chosen.routes,
-    evidence: `held-out grid minAccuracy ${chosen.minAccuracy.toFixed(2)}, noise band ${chosen.accuracyNoiseBand.toFixed(2)}: accuracy ${(chosen.accuracy * 100).toFixed(1)}% at $${chosen.costUsd.toFixed(5)}/request over ${chosen.cases} cases on ${chosen.routes} routes`,
+    evidence: `validation grid (${params.router}): accuracy ${chosen.accuracy.toFixed(4)} at $${chosen.costUsd.toFixed(5)}/request; reference accuracy ${reference.accuracy.toFixed(4)} at $${reference.costUsd.toFixed(5)}/request over ${chosen.cases} cases on ${chosen.routes} routes`,
   };
 }
 
@@ -370,7 +399,16 @@ async function optimizeRegistryThresholds(
       runId: row.run_id,
     }));
   if (readyEntries.length === 0) return null;
+  const policy = resolveEffectivePolicy(config);
   return optimizeThresholdPolicy({
+    router,
+    referencePolicy: {
+      minAccuracy: Math.min(
+        1,
+        policy.minAccuracy + (router === 'frontier' ? policy.frontierMinAccuracyDelta : 0)
+      ),
+      accuracyNoiseBand: policy.accuracyNoiseBand,
+    },
     pairs: await getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
     profile,
     pricing: catalogCandidatePrices(catalog),

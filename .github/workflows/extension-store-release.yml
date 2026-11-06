@@ -53,7 +53,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (typecheck, lint, format, unit tests)
+      - name: Verify (typecheck, lint, unit tests)
         run: pnpm --filter kilo-extension verify
 
       - name: Zip (Chrome MV3)

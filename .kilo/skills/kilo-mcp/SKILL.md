@@ -117,6 +117,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `cliSessions`
 - `cliSessionsV2`
 - `cloudAgentNext`
+- `cloudAgentNextFailures`
 - `cloudAgentNextFeedback`
 - `cloudAgentSettings`
 - `cloudEnvironments`

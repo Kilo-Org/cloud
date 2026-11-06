@@ -42,6 +42,63 @@ describe('isEligibleFirstWorktreeSession', () => {
     ).toBe(true);
   });
 
+  it('admits an Agent Manager create with no initial turn', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        ctx
+      )
+    ).toBe(true);
+  });
+
+  it('requires a prompt for a browser create', () => {
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          options: {
+            clientProvenance: 'browser',
+            createdOnPlatform: 'cloud-agent-web',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        ctx
+      )
+    ).toBe(false);
+  });
+
+  it('requires a prompt for an authenticated child create', () => {
+    const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
+    expect(
+      isEligibleFirstWorktreeSession(
+        input({
+          parentCloudAgentSessionId: parentSessionId,
+          options: {
+            clientProvenance: 'agent-manager',
+            createdOnPlatform: 'agent-manager',
+            operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        }),
+        {
+          ...ctx,
+          cloudAgentAuthority: {
+            version: 1 as const,
+            ownerId: 'usr_test',
+            parentSessionId,
+            organizationId: null,
+            authorizationId: '12345678-1234-4234-8234-123456789abc',
+            expiresAt: 1_800_000_000,
+          },
+        }
+      )
+    ).toBe(false);
+  });
+
   it('admits a server-marked clone-only continuation create', () => {
     expect(
       isEligibleFirstWorktreeSession(

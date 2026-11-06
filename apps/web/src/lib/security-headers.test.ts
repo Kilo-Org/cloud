@@ -85,14 +85,13 @@ describe('security headers', () => {
       'wss://ingest.example.com',
       'https://gastown.example.com',
       'wss://gastown.example.com',
-      'https://session-sync.kiloapps.io',
-      'wss://session-sync.kiloapps.io',
     ]);
   });
 
   it('derives ws:// Gastown origins for non-HTTPS development URLs', () => {
     expect(
       getConfiguredConnectSrcOrigins({
+        NODE_ENV: 'development',
         NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
         NEXT_PUBLIC_SESSION_SYNC_URL: 'http://localhost:8791',
       })
@@ -103,6 +102,19 @@ describe('security headers', () => {
       'ws://localhost:8791',
     ]);
   });
+
+  it.each(['production', 'test', undefined])(
+    'excludes preview relay permissions from CSP outside development: %s',
+    nodeEnv => {
+      const origins = getConfiguredConnectSrcOrigins({
+        NODE_ENV: nodeEnv,
+        NEXT_PUBLIC_SESSION_SYNC_URL: 'https://preview-relay.example.com/path',
+      });
+      const policy = buildContentSecurityPolicy({ connectSrcUrls: origins });
+
+      expect(getPolicyDirective(policy, 'connect-src')).not.toContain('preview-relay.example.com');
+    }
+  );
 
   it('supports enforcement, report-only, and off modes', () => {
     expect(getContentSecurityPolicyMode({})).toBe('report-only');

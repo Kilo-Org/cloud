@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileScreen } from '@/components/profile-screen';
@@ -54,7 +54,6 @@ vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
-vi.mock('@/lib/analytics/posthog', () => ({ useFeatureFlag: () => false }));
 vi.mock('@/lib/config', () => ({ SESSION_SYNC_URL: undefined }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -170,9 +169,11 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
 
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
+    vi.stubGlobal('__DEV__', false);
     signOutFn.mockReset();
     alertFn.mockReset();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   /**
    * Calls one of a mounted element's own props inside `act`. The test renderer

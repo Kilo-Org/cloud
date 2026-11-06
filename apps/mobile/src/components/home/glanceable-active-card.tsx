@@ -12,9 +12,14 @@ import {
   namedSessionTitle,
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
+import {
+  STATUS_FILTER_ORDER,
+  statusFilterLabelKey,
+} from '@/components/agents/live-session-status-filter';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { EmptyState } from '@/components/empty-state';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,34 +29,19 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-/**
- * The four ranked state counts, in the order every glanceable surface draws
- * them: what the user must act on, then what is making progress, then what will
- * wake later, then what is only connected. Zero rows still draw, so every
- * state remains visible even when no session currently occupies it.
- */
-const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
-  { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
-  { kind: 'running', labelKey: 'common.working' },
-  { kind: 'scheduled', labelKey: 'common.scheduled' },
-  { kind: 'idle', labelKey: 'common.idle' },
-];
-
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
-const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
+const COUNT_ROW_CLASS = `${ROW_TARGET_CLASS} flex-row items-center gap-2`;
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
-function labelKeyFor(kind: GlanceableStatusKind): string {
-  return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
-}
-
 type GlanceableActiveCardProps = {
   sessions: readonly ActiveSession[];
   onPressSession: (session: ActiveSession) => void;
+  /** Opens the live index narrowed to one state. Rows stay inert without it. */
+  onPressStatus?: (kind: GlanceableStatusKind) => void;
   embedded?: boolean;
 };
 
@@ -67,6 +57,7 @@ type GlanceableActiveCardProps = {
 export function GlanceableActiveCard({
   sessions,
   onPressSession,
+  onPressStatus,
   embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
@@ -77,7 +68,7 @@ export function GlanceableActiveCard({
   // cold start; subscribing re-renders the block once it lands.
   useUserSessionTitlesRevision();
   const counts = countGlanceableSessions(sessions);
-  const primaryKind = COUNT_LINES.find(line => counts[line.kind] > 0)?.kind ?? null;
+  const primaryKind = STATUS_FILTER_ORDER.find(line => counts[line.kind] > 0)?.kind ?? null;
   const scheduledAt = soonestScheduledAt(sessions);
   const scheduledWake = scheduledAt === null ? null : formatScheduledWake(scheduledAt);
   // The widgets name the same session (`pickNewestSession`), and any live
@@ -91,7 +82,7 @@ export function GlanceableActiveCard({
       ? null
       : (namedSessionTitle(newestSession.title, newestSession.id) ??
         t('agents.sessionRow.untitled'));
-  const stateLabel = newestKind === null ? null : t(labelKeyFor(newestKind));
+  const stateLabel = newestKind === null ? null : t(statusFilterLabelKey(newestKind));
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
@@ -110,10 +101,26 @@ export function GlanceableActiveCard({
       {empty ? null : (
         <>
           <View className={COUNTS_CLASS}>
-            {COUNT_LINES.map(line => {
+            {STATUS_FILTER_ORDER.map(line => {
               const isPrimary = line.kind === primaryKind;
+              // The row keeps its drawn height so the frame's sizing probe
+              // still matches; the touch target grows through hitSlop. Rows
+              // render through CardControl so the reserved layer stays inert.
               return (
-                <View key={line.kind} className={COUNT_ROW_CLASS}>
+                <CardControl
+                  key={line.kind}
+                  onPress={
+                    onPressStatus === undefined
+                      ? undefined
+                      : () => {
+                          onPressStatus(line.kind);
+                        }
+                  }
+                  accessibilityRole={onPressStatus === undefined ? undefined : 'button'}
+                  testID={`home-status-${line.kind}`}
+                  hitSlop={onPressStatus === undefined ? undefined : 3}
+                  className={COUNT_ROW_CLASS}
+                >
                   <SessionStatusIcon kind={line.kind} />
                   <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
                   <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
@@ -131,7 +138,7 @@ export function GlanceableActiveCard({
                       </Text>
                     ) : null}
                   </View>
-                </View>
+                </CardControl>
               );
             })}
           </View>
@@ -194,7 +201,7 @@ export function GlanceableActiveCardSkeleton({
       importantForAccessibility="no-hide-descendants"
     >
       <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => (
+        {STATUS_FILTER_ORDER.map(line => (
           <View key={line.kind} className={COUNT_ROW_CLASS}>
             <Skeleton className="size-3 rounded-full" />
             <Skeleton className="h-3 w-6 rounded" />

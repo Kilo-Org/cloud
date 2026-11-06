@@ -68,6 +68,36 @@ describe('baseSendMessageNextSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('preserves the selected agent, model, and variant on commands', () => {
+    const payload = {
+      ...commandPayload('changes'),
+      mode: 'reviewer',
+      model: 'kilo/selected-model',
+      variant: 'high',
+    };
+    const result = baseSendMessageNextSchema.parse({
+      cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
+      payload,
+    });
+    expect(result.payload).toEqual(payload);
+  });
+
+  it.each([
+    { mode: 'custom' },
+    { mode: 'not a slug' },
+    { model: '' },
+    { variant: 'high-123' },
+    { variant: 'x'.repeat(51) },
+  ])('rejects invalid command selection %p', selection => {
+    const result = baseSendMessageNextSchema.safeParse({
+      cloudAgentSessionId: 'cloud-session-1',
+      messageId: MESSAGE_ID,
+      payload: { ...commandPayload(), ...selection },
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('accepts a text-only prompt', () => {
     const result = baseSendMessageNextSchema.safeParse({
       cloudAgentSessionId: 'cloud-session-1',

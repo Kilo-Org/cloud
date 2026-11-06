@@ -62,14 +62,15 @@ export const CreateHostedWorkspaceInput = z
     operationKey: z.uuid(),
     clientProvenance: z.literal('agent-manager'),
     repository: RepositoryInputSchema,
-    profile: RequiredProfileInput,
+    profile: RequiredProfileInput.optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
         attachments: AttachmentsSchema.optional(),
         id: MessageIdSchema.optional(),
       })
-      .strict(),
+      .strict()
+      .optional(),
     agent: z
       .object({
         mode: ModeSlugSchema,
@@ -96,7 +97,7 @@ export const CreateHostedWorkspaceOutput = z
     workspaceId: cloudAgentWorktreeIdSchema,
     cloudAgentSessionId: workspaceSessionIdSchema,
     kiloSessionId: z.string(),
-    messageId: MessageIdSchema,
+    messageId: MessageIdSchema.optional(),
     replayed: z.boolean().optional(),
   })
   .strict();
@@ -136,12 +137,16 @@ export function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWo
 
 export function hostedWorkspaceCreateRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
   return {
-    initialTurn: {
-      type: 'prompt',
-      prompt: input.message.prompt,
-      ...(input.message.attachments ? { attachments: input.message.attachments } : {}),
-      ...(input.message.id ? { id: input.message.id } : {}),
-    },
+    ...(input.message
+      ? {
+          initialTurn: {
+            type: 'prompt',
+            prompt: input.message.prompt,
+            ...(input.message.attachments ? { attachments: input.message.attachments } : {}),
+            ...(input.message.id ? { id: input.message.id } : {}),
+          },
+        }
+      : {}),
     agent: input.agent,
     repository: repositoryInputToSessionRepository(input.repository),
     profile: profileInputToSessionProfile(input.profile),
@@ -196,12 +201,12 @@ const createHostedWorkspaceHandler = protectedProcedure
       {
         billingOrigin: AGENT_MANAGER_ORIGIN,
         operationKey: input.operationKey,
-        includeInitialMessage: true,
+        includeInitialMessage: input.message !== undefined,
         resolveSavedAllocationBeforeAdmission: true,
         startedAt: Date.now(),
       }
     );
-    if (!registration.messageId) {
+    if (input.message !== undefined && !registration.messageId) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'hosted_workspace_creation_failed',
@@ -218,7 +223,7 @@ const createHostedWorkspaceHandler = protectedProcedure
       workspaceId,
       cloudAgentSessionId: workspaceSessionIdSchema.parse(registration.cloudAgentSessionId),
       kiloSessionId: registration.kiloSessionId,
-      messageId: registration.messageId,
+      ...(registration.messageId ? { messageId: registration.messageId } : {}),
       ...(registration.replayed === true ? { replayed: true } : {}),
     };
   });

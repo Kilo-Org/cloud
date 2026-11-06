@@ -355,7 +355,6 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             selection={selection}
             fallbackPath={path}
             fallbackLineLabel={lineRangeLabel}
-            fallbackSide={side}
             preferFallback={isEdit}
           />
           <View className="gap-1">
@@ -369,7 +368,17 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
                 defaultValue={bodyRef.current}
                 onChangeText={handleBodyChange}
               />
-            ) : null}
+            ) : (
+              // Reserve the field's own box while the durable draft loads, so
+              // the footer below does not jump when the field mounts.
+              <View
+                className={
+                  keyboardVisible
+                    ? 'min-h-12 rounded-md border border-transparent'
+                    : 'min-h-14 rounded-md border border-transparent'
+                }
+              />
+            )}
             {showInsertSuggestion ? (
               <Button
                 variant="ghost"

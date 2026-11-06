@@ -49,6 +49,9 @@ export type SendMessagePayload =
       type: 'command';
       command: string;
       arguments: string;
+      mode?: string;
+      model?: string;
+      variant?: string;
     };
 
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs

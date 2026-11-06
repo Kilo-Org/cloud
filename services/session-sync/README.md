@@ -1037,12 +1037,19 @@ Specific authorization, deletion, and command failures appear alongside the inte
 warning. An individual oversized frame reports its size limit separately from a
 combined backlog overflow.
 
-The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
-PostHog flag `native-remote-web` is enabled. Its same-origin
-`POST /api/native-remote/token` authenticates the web session and issues a five-minute
-Kilo credential with credential exchange disabled; session-sync enforces all creator ACLs independently of the
-flag. `NEXT_PUBLIC_SESSION_SYNC_URL` optionally selects an isolated local Worker
-(`http://localhost:8817`); otherwise the production destination is used.
+The intentionally minimal web demo is `/native-remote` in development mode.
+Its server page returns the not-found page outside development; a feature flag
+cannot enable it in a deployed environment. The same-origin
+`POST /api/native-remote/token` also requires development mode before authenticating
+the web session and issuing a five-minute Kilo credential with credential exchange
+disabled. Session-sync enforces all creator ACLs independently of the preview.
+The preview defaults to the isolated local Worker at `http://localhost:8817`;
+`NEXT_PUBLIC_SESSION_SYNC_URL` selects another development relay. Its connection
+permissions are included in the web CSP only in development. The CLI and SDK
+production endpoints are unchanged.
+The mobile preview also requires a development bundle (`__DEV__`) and an explicit
+`EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
+nor its route, regardless of remote feature flags.
 Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
 and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only
 when the Worker environment is `development`. Browser and React Native WebSockets

@@ -71,13 +71,13 @@ else
 fi
 
 # Reuse the document the caller computed for this base (AFFECTED). A document is
-# usable only when it holds the directory list and names the same base: one
+# usable only when its directory list is an array and it names the same base: one
 # computed for another revision describes other changes, so it is ignored and the
 # detector runs below. A local run supplies nothing here, and an unreadable
 # document fails the same check.
 selection=""
 if [ -n "${AFFECTED:-}" ] \
-    && [ "$(jq -r --arg base "$base" 'if has("dirs") and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null)" = "1" ]; then
+    && [ "$(jq -r --arg base "$base" 'if (.dirs | type) == "array" and ((.base // "") == $base) then 1 else 0 end' <<< "$AFFECTED" 2>/dev/null)" = "1" ]; then
   selection="$AFFECTED"
   echo "selection: reusing the affected-workspace document for ${base:-no base revision}" >&2
 fi

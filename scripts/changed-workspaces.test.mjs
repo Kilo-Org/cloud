@@ -297,6 +297,25 @@ test('an unreadable supplied selection keeps the detector and fallback paths', t
   }
 });
 
+test('a document without a directory array keeps the fallback path', t => {
+  const fixture = createFixture({ withDetector: false });
+  t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));
+  const base = fixture.head();
+
+  // `has("dirs")` alone would pass this document, and a reuse attempt would
+  // fail the step instead of selecting.
+  const result = runMatrix(fixture, base, [], {
+    AFFECTED: JSON.stringify({ base, full: false, dirs: null }),
+  });
+  assert.doesNotMatch(result.stderr, /reusing the affected-workspace document/);
+  assert.match(result.stderr, /selecting every workspace with tests/);
+  assert.deepEqual(rows(JSON.parse(result.stdout)), [
+    'leaf packages/leaf',
+    'reader packages/reader',
+    'tool packages/tool',
+  ]);
+});
+
 test('an empty selection for the same base selects no rows', t => {
   const fixture = createFixture({ withDetector: false });
   t.after(() => rmSync(fixture.dir, { recursive: true, force: true }));

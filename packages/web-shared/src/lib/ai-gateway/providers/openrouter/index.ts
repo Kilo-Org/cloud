@@ -371,26 +371,61 @@ function openRouterModelsHeaders() {
   };
 }
 
-export const openRouterModelsMetadataSource: MetadataSource<OpenRouterModelsResponse> = {
-  url: `${OPENROUTER.apiUrl}/models`,
-  headers: openRouterModelsHeaders,
-  parse: raw => {
-    const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
-    assertMinimumCount(openRouterModelsMetadataSource.url, parsed.data.length, 100);
-    return parsed;
-  },
-};
+function openRouterModelsSource(
+  url: string,
+  minimumCount: number
+): MetadataSource<OpenRouterModelsResponse> {
+  return {
+    url,
+    headers: openRouterModelsHeaders,
+    parse: raw => {
+      const parsed = OpenRouterModelsResponseSchema.parse(removeUpstreamEnkrypt(raw));
+      assertMinimumCount(url, parsed.data.length, minimumCount);
+      return parsed;
+    },
+  };
+}
 
-const openRouterModelsReader = createCachedMetadataReader(openRouterModelsMetadataSource, {
-  fromDb: readDb,
-  ttlMs: OPENROUTER_MODELS_CACHE_TTL_MS,
-  fetchFallback: () =>
-    fetchOpenRouterModels(
-      openRouterModelsMetadataSource.url,
-      { method: 'GET', headers: openRouterModelsHeaders() },
-      { subject: 'models', endpoint: 'openrouter/models' }
-    ),
+function createOpenRouterModelsReader(
+  source: MetadataSource<OpenRouterModelsResponse>,
+  { subject, endpoint }: { subject: 'models' | 'transcription models'; endpoint: string }
+) {
+  return createCachedMetadataReader(source, {
+    fromDb: readDb,
+    ttlMs: OPENROUTER_MODELS_CACHE_TTL_MS,
+    fetchFallback: () =>
+      fetchOpenRouterModels(
+        source.url,
+        { method: 'GET', headers: openRouterModelsHeaders(), cache: 'no-store' },
+        { subject, endpoint }
+      ),
+  });
+}
+
+export const openRouterModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models`,
+  100
+);
+
+export const openRouterTranscriptionModelsMetadataSource = openRouterModelsSource(
+  `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+  1
+);
+
+const openRouterModelsReader = createOpenRouterModelsReader(openRouterModelsMetadataSource, {
+  subject: 'models',
+  endpoint: 'openrouter/models',
 });
+
+const openRouterTranscriptionModelsReader = createOpenRouterModelsReader(
+  openRouterTranscriptionModelsMetadataSource,
+  { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
+);
+
+export function resetOpenRouterModelsCaches() {
+  openRouterModelsReader.reset();
+  openRouterTranscriptionModelsReader.reset();
+}
 
 /**
  * Fetch raw, unfiltered models from OpenRouter API
@@ -398,10 +433,6 @@ const openRouterModelsReader = createCachedMetadataReader(openRouterModelsMetada
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
   return openRouterModelsReader.get();
-}
-
-export function resetRawOpenRouterModelsCache() {
-  openRouterModelsReader.reset();
 }
 
 /**
@@ -431,17 +462,14 @@ export async function getEnhancedOpenRouterModels({
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
   const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();
+  if (!localFakeModelsUrl) {
+    return openRouterTranscriptionModelsReader.get();
+  }
   return fetchOpenRouterModels(
-    localFakeModelsUrl ?? `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+    localFakeModelsUrl,
     {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${localFakeModelsUrl ? LOCAL_FAKE_LLM_API_KEY : OPENROUTER.apiKey}`,
-        ...ATTRIBUTION_HEADERS,
-      },
-      // Never serve a cached catalogue: a cached answer would mask an
-      // unreachable gateway and the mobile picker would list stale models
-      // instead of showing its load-failed retry state.
+      headers: { Authorization: `Bearer ${LOCAL_FAKE_LLM_API_KEY}`, ...ATTRIBUTION_HEADERS },
       cache: 'no-store',
     },
     { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }

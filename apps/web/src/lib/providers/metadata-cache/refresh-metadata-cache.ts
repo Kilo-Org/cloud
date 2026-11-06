@@ -10,7 +10,10 @@ import {
   readStoredMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
-import { openRouterModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import {
+  openRouterModelsMetadataSource,
+  openRouterTranscriptionModelsMetadataSource,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { OPENAI_CHATGPT_API_KEY_ENV } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
 import {
@@ -35,6 +38,7 @@ const REFRESH_BUDGET_MS = 180_000;
 function catalogSources(): MetadataSource<unknown>[] {
   const sources: MetadataSource<unknown>[] = [
     openRouterModelsMetadataSource,
+    openRouterTranscriptionModelsMetadataSource,
     openRouterGatewayModelsSource,
     vercelGatewayModelsSource,
     openRouterProvidersSource,

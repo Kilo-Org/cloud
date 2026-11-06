@@ -5,7 +5,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
-  resetRawOpenRouterModelsCache,
+  resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import {
@@ -52,7 +52,7 @@ jest.mock(
 const originalFetch = global.fetch;
 
 beforeEach(() => {
-  resetRawOpenRouterModelsCache();
+  resetOpenRouterModelsCaches();
 });
 
 function buildModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
@@ -658,15 +658,10 @@ describe('OpenRouter transcription model fetcher', () => {
     );
   });
 
-  it('never caches the transcription catalogue so an unreachable gateway surfaces as a failure', async () => {
-    // The Data Cache would keep serving a stale catalogue while the gateway
-    // is down, and the mobile picker would list dead models instead of its
-    // load-failed retry state.
+  it('reuses the fetched transcription catalogue from memory', async () => {
+    await getOpenRouterTranscriptionModels();
     await getOpenRouterTranscriptionModels();
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ cache: 'no-store' })
-    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

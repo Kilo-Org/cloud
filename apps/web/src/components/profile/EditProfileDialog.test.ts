@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- @swc/jest does not hoist `jest.mock` above imports, so the mocked module and the component that imports it are required after the mock registers. */
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
 import * as React from 'react';
 import { act } from 'react';
@@ -14,8 +14,9 @@ jest.mock('next/link', () => ({
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({ user: { updateProfile: { mutationOptions: () => ({}) } } }),
 }));
+const mockMutate = jest.fn();
 jest.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ mutate: () => undefined, isPending: false, error: null }),
+  useMutation: () => ({ mutate: mockMutate, isPending: false, error: null }),
 }));
 jest.mock('@/components/ui/dialog', () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => children,
@@ -37,10 +38,11 @@ type EditProfileDialogProps = {
   githubLinkedViaOAuth: boolean;
 };
 
-const { EditProfileDialog, SAVE_LABEL } = require('./EditProfileDialog') as {
+const { EditProfileDialog } = require('./EditProfileDialog') as {
   EditProfileDialog: (props: EditProfileDialogProps) => React.ReactNode;
-  SAVE_LABEL: string;
 };
+
+const SAVE_LABEL = 'Save';
 
 type LinkedomParseHtml = (html: string) => {
   window: typeof globalThis & {
@@ -118,6 +120,10 @@ describe('EditProfileDialog validation', () => {
   let root: Root | undefined;
   let cleanup: (() => void) | undefined;
 
+  beforeEach(() => {
+    mockMutate.mockClear();
+  });
+
   afterEach(() => {
     if (root) act(() => root?.unmount());
     root = undefined;
@@ -125,15 +131,27 @@ describe('EditProfileDialog validation', () => {
     cleanup = undefined;
   });
 
-  function mountDialog(dom: { container: HTMLElement }, githubLinkedViaOAuth = false) {
+  function mountDialog(
+    dom: { container: HTMLElement },
+    options: {
+      githubLinkedViaOAuth?: boolean;
+      linkedinUrl?: string;
+      githubUrl?: string;
+    } = {}
+  ) {
+    const {
+      githubLinkedViaOAuth = false,
+      linkedinUrl = 'not-a-url',
+      githubUrl = 'not-a-url',
+    } = options;
     act(() => {
       root = createRoot(dom.container);
       root.render(
         React.createElement(EditProfileDialog, {
           open: true,
           onOpenChange: () => undefined,
-          linkedinUrl: 'not-a-url',
-          githubUrl: 'not-a-url',
+          linkedinUrl,
+          githubUrl,
           githubLinkedViaOAuth,
         })
       );
@@ -170,23 +188,91 @@ describe('EditProfileDialog validation', () => {
       expect(input?.getAttribute('aria-invalid')).toBe('true');
       expect(input?.getAttribute('aria-describedby')).toBe(errorId);
       const error = dom.container.querySelector(`#${errorId}`);
-      expect(error?.querySelector('[role="alert"]')?.textContent).toContain('http://');
+      expect(error?.getAttribute('role')).toBe('alert');
+      expect(error?.textContent).toContain('http://');
     }
   });
 
-  it('re-announces an unchanged validation error on a repeated Save', () => {
+  it('keeps the error region mounted and alerting across repeated Save', () => {
     const dom = installDom();
     cleanup = dom.cleanup;
     mountDialog(dom);
 
     pressSave(dom);
-    const firstAlert = dom.container.querySelector('#linkedin-url-error [role="alert"]');
-    expect(firstAlert).not.toBeNull();
+    const alertRegion = dom.container.querySelector('#linkedin-url-error');
+    expect(alertRegion?.getAttribute('role')).toBe('alert');
+    expect(alertRegion?.textContent).toContain('http://');
 
     pressSave(dom);
-    const secondAlert = dom.container.querySelector('#linkedin-url-error [role="alert"]');
-    expect(secondAlert).not.toBeNull();
-    expect(secondAlert).not.toBe(firstAlert);
+    const repeatedRegion = dom.container.querySelector('#linkedin-url-error');
+    expect(repeatedRegion).toBe(alertRegion);
+    expect(repeatedRegion?.getAttribute('role')).toBe('alert');
+    expect(repeatedRegion?.textContent).toContain('http://');
+  });
+
+  it('resolves every label to an existing element', () => {
+    for (const githubLinkedViaOAuth of [false, true]) {
+      const dom = installDom();
+      cleanup = dom.cleanup;
+      mountDialog(dom, { githubLinkedViaOAuth });
+
+      const labels = Array.from(dom.container.querySelectorAll('label[for]'));
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        const target = label.getAttribute('for');
+        expect(target).not.toBeNull();
+        expect(dom.container.querySelector(`#${target}`)).not.toBeNull();
+      }
+      if (githubLinkedViaOAuth) {
+        expect(dom.container.querySelector('label[for="github-url"]')).toBeNull();
+      }
+
+      act(() => root?.unmount());
+      root = undefined;
+      cleanup?.();
+      cleanup = undefined;
+    }
+  });
+
+  it('sends one exact payload with both URLs when GitHub is not OAuth-linked', () => {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    mountDialog(dom, {
+      linkedinUrl: 'https://linkedin.com/in/example',
+      githubUrl: 'https://github.com/example',
+    });
+
+    pressSave(dom);
+
+    expect(mockMutate.mock.calls).toStrictEqual([
+      [
+        {
+          linkedin_url: 'https://linkedin.com/in/example',
+          github_url: 'https://github.com/example',
+        },
+      ],
+    ]);
+  });
+
+  it('leaves github_url untouched for an OAuth-linked GitHub account', () => {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    mountDialog(dom, {
+      githubLinkedViaOAuth: true,
+      linkedinUrl: 'https://linkedin.com/in/example',
+      githubUrl: 'https://github.com/example',
+    });
+
+    pressSave(dom);
+
+    expect(mockMutate.mock.calls).toStrictEqual([
+      [
+        {
+          linkedin_url: 'https://linkedin.com/in/example',
+          github_url: undefined,
+        },
+      ],
+    ]);
   });
 
   it('drops the error association when the form resets', () => {
@@ -217,14 +303,14 @@ describe('EditProfileDialog validation', () => {
       expect(currentInput?.hasAttribute('aria-describedby')).toBe(false);
       const error = dom.container.querySelector(`#${field}-error`);
       expect(error?.textContent).toBe('');
-      expect(error?.querySelector('[role="alert"]')).toBeNull();
+      expect(error?.getAttribute('role')).toBeNull();
     }
   });
 
   it('does not render or describe a GitHub URL field when GitHub is OAuth-linked', () => {
     const dom = installDom();
     cleanup = dom.cleanup;
-    mountDialog(dom, true);
+    mountDialog(dom, { githubLinkedViaOAuth: true });
 
     expect(dom.container.querySelector('#github-url')).toBeNull();
     expect(dom.container.querySelector('#github-url-error')).toBeNull();

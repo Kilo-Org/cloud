@@ -25,7 +25,6 @@ type EditProfileDialogProps = {
 };
 
 const URL_ERROR_MESSAGE = 'URL must start with http:// or https://';
-export const SAVE_LABEL = 'Save';
 
 function isValidHttpUrlOrEmpty(value: string): boolean {
   if (value.trim() === '') return true;
@@ -51,7 +50,6 @@ export function EditProfileDialog({
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
   const [githubValue, setGithubValue] = useState(githubUrl ?? '');
   const [githubError, setGithubError] = useState<string | null>(null);
-  const [validationAttempt, setValidationAttempt] = useState(0);
 
   // Reset form state when dialog opens
   useEffect(() => {
@@ -97,20 +95,13 @@ export function EditProfileDialog({
     }
 
     if (hasError) {
-      setValidationAttempt(attempt => attempt + 1);
       return;
     }
 
-    if (githubLinkedViaOAuth) {
-      updateProfileMutation.mutate({
-        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
-      });
-    } else {
-      updateProfileMutation.mutate({
-        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
-        github_url: trimmedGithub === '' ? null : trimmedGithub,
-      });
-    }
+    updateProfileMutation.mutate({
+      linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
+      github_url: githubLinkedViaOAuth ? undefined : trimmedGithub === '' ? null : trimmedGithub,
+    });
   }
 
   return (
@@ -133,16 +124,15 @@ export function EditProfileDialog({
               aria-invalid={linkedinError !== null}
               aria-describedby={linkedinError ? 'linkedin-url-error' : undefined}
             />
-            <p id="linkedin-url-error" className="text-destructive text-sm">
-              {linkedinError && (
-                <span key={validationAttempt} role="alert">
-                  {linkedinError}
-                </span>
-              )}
+            <p
+              id="linkedin-url-error"
+              role={linkedinError ? 'alert' : undefined}
+              className="text-destructive text-sm"
+            >
+              {linkedinError}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="github-url">GitHub Profile URL</Label>
             {githubLinkedViaOAuth ? (
               <p className="text-muted-foreground text-sm">
                 Linked via GitHub.{' '}
@@ -152,6 +142,7 @@ export function EditProfileDialog({
               </p>
             ) : (
               <>
+                <Label htmlFor="github-url">GitHub Profile URL</Label>
                 <Input
                   id="github-url"
                   placeholder="https://github.com/yourusername"
@@ -163,12 +154,12 @@ export function EditProfileDialog({
                   aria-invalid={githubError !== null}
                   aria-describedby={githubError ? 'github-url-error' : undefined}
                 />
-                <p id="github-url-error" className="text-destructive text-sm">
-                  {githubError && (
-                    <span key={validationAttempt} role="alert">
-                      {githubError}
-                    </span>
-                  )}
+                <p
+                  id="github-url-error"
+                  role={githubError ? 'alert' : undefined}
+                  className="text-destructive text-sm"
+                >
+                  {githubError}
                 </p>
               </>
             )}
@@ -188,7 +179,7 @@ export function EditProfileDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={updateProfileMutation.isPending}>
-            {updateProfileMutation.isPending ? 'Saving...' : SAVE_LABEL}
+            {updateProfileMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

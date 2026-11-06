@@ -8,10 +8,9 @@ const SUMMARY_COMMENT_ENDPOINTS = ['repos/*/issues/*/comments', 'repos/*/issues/
 
 const SUMMARY_WRITE_FLAGS = ['--method', '-X', '--input', '-f', '-F', '--field', '--raw-field'];
 
-/** A graphql request names its operation in the command text or in a provided body. */
 const GRAPHQL_ENDPOINT = 'graphql';
 
-const GRAPHQL_WRITE_MARKERS = ['mutation', '--input', '=@'];
+const COMMENT_SUBCOMMANDS = ['gh issue comment', 'gh pr comment'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -20,10 +19,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Comment writes on the reviewed pull request belong to the trusted publisher.
  * The map denies every `gh` form that creates or edits a conversation comment,
- * in any flag order. The CLI matcher anchors whole-command globs and lets the
- * last matching pattern win, so a rule appended here overrides an earlier
- * allow. Paginated reads, inline review writes on pull review endpoints, and
- * inline read-only graphql queries stay allowed.
+ * in any flag order and regardless of a command prefix. The CLI matcher
+ * anchors whole-command globs and lets the last matching pattern win, so a rule
+ * appended here overrides an earlier allow. Paginated reads and inline review
+ * writes on pull review endpoints stay allowed.
  */
 export function buildGitHubReviewBashDenies(): Record<string, string> {
   const denies: Record<string, string> = {};
@@ -32,18 +31,25 @@ export function buildGitHubReviewBashDenies(): Record<string, string> {
       denies[`gh api ${flag}*${endpoint}*`] = 'deny';
       denies[`gh api * ${flag}*${endpoint}*`] = 'deny';
       denies[`gh api ${endpoint}* ${flag}*`] = 'deny';
+      // Matched anywhere in the command text (a leading wildcard allows a
+      // wrapper prefix or a surrounding command), so a write form cannot move
+      // out of reach.
+      denies[`*gh api *${flag}*${endpoint}*`] = 'deny';
+      denies[`*gh api *${endpoint}*${flag}*`] = 'deny';
     }
-  }
-  for (const marker of GRAPHQL_WRITE_MARKERS) {
-    denies[`gh api *${GRAPHQL_ENDPOINT}*${marker}*`] = 'deny';
-    denies[`gh api *${marker}*${GRAPHQL_ENDPOINT}*`] = 'deny';
   }
   // A pull request is an issue, so both comment subcommands reach the same
   // conversation comment.
-  denies['gh issue comment'] = 'deny';
-  denies['gh issue comment *'] = 'deny';
-  denies['gh pr comment'] = 'deny';
-  denies['gh pr comment *'] = 'deny';
+  for (const subcommand of COMMENT_SUBCOMMANDS) {
+    denies[subcommand] = 'deny';
+    denies[`${subcommand} *`] = 'deny';
+    denies[`*${subcommand}*`] = 'deny';
+  }
+  // A graphql request carries its operation in the command text or in a
+  // provided body, and every `gh api` call that reaches graphql is denied.
+  denies[`gh api ${GRAPHQL_ENDPOINT}`] = 'deny';
+  denies[`gh api ${GRAPHQL_ENDPOINT} *`] = 'deny';
+  denies[`*gh api *${GRAPHQL_ENDPOINT}*`] = 'deny';
   return denies;
 }
 

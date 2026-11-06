@@ -416,6 +416,11 @@ describe('createSessionForCloudAgent', () => {
 
   beforeEach(() => {
     vi.mocked(canCreateCliSessionForUser).mockReset().mockResolvedValue(true);
+    // The availability probe runs before every create; default it to an
+    // available destination so each test opts into the refusal.
+    vi.mocked(getSessionIngestDO).mockReset().mockReturnValue({
+      isDeleted: vi.fn(async () => false),
+    } as never);
   });
 
   it('creates a root with both Cloud Agent identity columns', async () => {
@@ -778,6 +783,69 @@ describe('createSessionForCloudAgent', () => {
     await expect(
       rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/other/repo' })
     ).rejects.toThrow('Cloud Agent root session identity conflict');
+  });
+
+  it('refuses an unavailable destination before writing anything', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true),
+    } as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'rejected',
+      code: 'session_retired',
+    });
+    expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('refuses an unavailable clone destination before reading the source', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+    const isDeleted = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        ...params,
+        cloneFromKiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
+      })
+    ).resolves.toEqual({ status: 'rejected', code: 'session_retired' });
+    expect(isDeleted).toHaveBeenCalledOnce();
+    expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('keeps create available when the ingest probe fails', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+    vi.mocked(getSessionIngestDO).mockImplementation(() => {
+      throw new Error('probe unavailable');
+    });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    error.mockRestore();
   });
 });
 
@@ -1388,7 +1456,13 @@ describe('createSessionForCloudAgent clone path', () => {
     });
 
     return {
-      stub: { inspectCloneStage, stageCloneBatch, finalizeCloneStage, resetCloneStage },
+      stub: {
+        isDeleted: vi.fn(async () => false),
+        inspectCloneStage,
+        stageCloneBatch,
+        finalizeCloneStage,
+        resetCloneStage,
+      },
       state,
     };
   }

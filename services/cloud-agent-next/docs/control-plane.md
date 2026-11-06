@@ -53,9 +53,15 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 
 ## 3. Topology and identities
 
-- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. One sandbox
-  serves one workspace: it hosts the sibling chats and worktrees of that workspace and of no other.
-  Legacy shared keys (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them.
+- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
+- Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
+  per sandbox**, or **one workspace per sandbox, containing any number of sessions**. Sessions in
+  the same workspace share its sandbox and runtime. Independent workspaces and standalone sessions
+  never share a sandbox. The `workspace_*` session ID prefix does not imply workspace membership.
+- All new functionality targets this exclusive ownership model. It does not need to support
+  sandboxes shared across independent workspaces or standalone sessions. Legacy shared keys
+  (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them. Retained legacy shared-sandbox
+  decoding and cleanup are compatibility-only, not a supported topology to extend.
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.

@@ -45,7 +45,7 @@ type GuardrailRejection = {
 };
 
 const REVERT_GUIDANCE =
-  ' To change it, use Revert to here under your message (or /undo in the TUI) and retry.';
+  ' To change it, use Revert to here under your message (or /undo in the TUI).';
 
 /**
  * A block is final, so clients are told not to retry, and an unavailable guardrail is retried

@@ -8,7 +8,7 @@ import {
 
 const block = { action: 'block', message: 'Blocked: prompt injection.' } as const;
 const blockWithRevertGuidance =
-  'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI) and retry.';
+  'Blocked: prompt injection. To change it, use Revert to here under your message (or /undo in the TUI).';
 
 describe('enkryptGuardrailRejectionResponse', () => {
   it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {

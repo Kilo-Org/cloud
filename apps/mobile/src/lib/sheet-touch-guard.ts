@@ -1,7 +1,8 @@
 import { useLayoutEffect } from 'react';
 
 /**
- * How long a sheet is given to create its own window and take the touch itself.
+ * How long a sheet is given to hand touch over to its own window — when it
+ * opens, and again when it dismisses and reports the finished dismissal.
  *
  * Measured on the Android emulator: a tap ~320 ms after the open request still
  * reached the tab bar behind the sheet, one at ~500 ms reached the sheet. The
@@ -12,8 +13,8 @@ import { useLayoutEffect } from 'react';
 export const SHEET_TOUCH_HOLD_MS = 800;
 
 /**
- * Whether a native sheet has been asked for but its own window does not take
- * touch yet.
+ * Whether a native sheet is in one of the two windows in which its own window
+ * does not take touch: while it opens, and while it dismisses.
  *
  * A sheet's dialog window is created after its component commits, and until it
  * exists the app window still owns touch: a tap made while the sheet opens
@@ -22,11 +23,18 @@ export const SHEET_TOUCH_HOLD_MS = 800;
  * is what makes the window safe: a layer that has to be mounted first is in the
  * touch path after the touch it should have claimed.
  *
- * The hold is bounded because the sheet's own content is part of the app's
+ * The dismissal has the same window at its other end. The native sheet stops
+ * taking touch when it starts to go away and reports the finished dismissal
+ * only after its animation: a second tap, ~50-60 ms behind the one that pressed
+ * the sheet's Apply, reached the row that sat underneath the button and opened
+ * an unrelated session. The gate therefore stays shut from the close request
+ * until the sheet reports the dismissal, not only from the open request.
+ *
+ * Each hold is bounded because the sheet's own content is part of the app's
  * React tree: a gate that never let go would swallow the sheet's own buttons
  * too (measured on the emulator: a press on the sheet's Cancel reached the gate
- * with the sheet's own coordinates). It only has to cover the handover, after
- * which the sheet's separate window takes every touch itself.
+ * with the sheet's own coordinates), and a dismissal the platform never reports
+ * must not keep the screen behind it dead.
  */
 let holds = 0;
 
@@ -53,7 +61,20 @@ export function isSheetTouchHeld(): boolean {
   return holds > 0;
 }
 
-/** Holds the gate for as long as the caller's sheet is presented. */
-export function useSheetTouchHold(presented: boolean): void {
-  useLayoutEffect(() => (presented ? holdSheetTouch() : undefined), [presented]);
+/**
+ * Holds the gate while the caller's sheet is in one of its two in-flight
+ * windows: `opening` from the present request until its own window takes touch,
+ * `dismissing` from the close request until the native sheet reports the
+ * dismissal finished.
+ *
+ * Each window arms its own hold, so a close that lands while the open hold is
+ * still running keeps the gate shut, and a dismissal long after the open hold
+ * ended arms a fresh one.
+ */
+export function useSheetTouchHold(
+  windows: Readonly<{ opening: boolean; dismissing: boolean }>
+): void {
+  const { opening, dismissing } = windows;
+  useLayoutEffect(() => (opening ? holdSheetTouch() : undefined), [opening]);
+  useLayoutEffect(() => (dismissing ? holdSheetTouch() : undefined), [dismissing]);
 }

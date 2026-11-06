@@ -90,10 +90,16 @@ export function Sheet({
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
-  // The app-wide touch gate stays shut for as long as this sheet is presented:
-  // until the sheet's own window takes touch, a tap made while it opens would
-  // land on the screen and the tab bar behind it.
-  useSheetTouchHold(visible);
+  // The app-wide touch gate stays shut in the two windows where this sheet's
+  // own window does not take touch: while it opens, and while it dismisses.
+  // During the dismissal the native sheet has already let go of touch but has
+  // not reported the finished animation, so the tap a double press aimed at the
+  // sheet's Apply would otherwise reach the screen behind it.
+  const [selfDismissalStarted, setSelfDismissalStarted] = useState(false);
+  // A dismissal the caller asked for: `visible` is false while the sheet is
+  // still mounted waiting for the native report.
+  const dismissing = (!visible && mounted) || selfDismissalStarted;
+  useSheetTouchHold({ opening: visible, dismissing });
   // A dismissal handed to the native sheet that has not reported back yet.
   const [dismissalPending, setDismissalPending] = useState(false);
 
@@ -121,6 +127,18 @@ export function Sheet({
     }
   }, [visible]);
 
+  // A dismissal the sheet starts itself — a downward drag, the backdrop or
+  // Android Back — is granted here and reported later, so the settle window is
+  // armed while the caller still has `visible` true. A refused request keeps
+  // the sheet up and must not arm the gate.
+  const selfDismissRef = useRef<() => boolean>(() => true);
+  selfDismissRef.current = (): boolean => {
+    if (onRequestDismiss?.() === false) {
+      return false;
+    }
+    setSelfDismissalStarted(true);
+    return true;
+  };
   // Before the sheet's own window takes focus, Android Back reaches the app
   // instead of the sheet's native handler, so a press in that window of the
   // opening animation is answered here. Once the window has focus the sheet
@@ -164,7 +182,7 @@ export function Sheet({
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
       dismissGestures={dismissGestures}
-      onRequestDismiss={onRequestDismiss}
+      onRequestDismiss={() => selfDismissRef.current()}
       locale={i18n.language}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
@@ -177,6 +195,8 @@ export function Sheet({
         onClose();
       }}
       onDismiss={() => {
+        // Whatever started the dismissal, the finished report ends the gate.
+        setSelfDismissalStarted(false);
         setDismissalPending(false);
         if (visible && dismissalPending) {
           // Superseded: the caller reopened while this dismissal was in flight.

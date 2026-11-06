@@ -363,7 +363,7 @@ function GitHubIntegrationDetailsContent({
   // setting is visible and can be cleared instead of silently persisting.
   const effortOptions = useMemo(
     () =>
-      selectedEffort !== null && !availableVariants.includes(selectedEffort)
+      selectedEffort && !availableVariants.includes(selectedEffort)
         ? [...availableVariants, selectedEffort]
         : availableVariants,
     [availableVariants, selectedEffort]

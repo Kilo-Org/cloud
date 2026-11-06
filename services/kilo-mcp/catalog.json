@@ -11472,6 +11472,18 @@
         },
         "modelSlug": {
           "type": "string"
+        },
+        "thinkingEffort": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 50,
+              "pattern": "^[a-zA-Z]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -11483,9 +11495,10 @@
       "updatemodel",
       "organizationid",
       "integrationid",
-      "modelslug"
+      "modelslug",
+      "thinkingeffort"
     ],
-    "searchBlob": "githubApps.updateModel Set the AI model used for a GitHub App integration or installation. Use to change which model handles GitHub-triggered tasks. githubapps updatemodel organizationid integrationid modelslug organizationId integrationId modelSlug"
+    "searchBlob": "githubApps.updateModel Set the AI model used for a GitHub App integration or installation. Use to change which model handles GitHub-triggered tasks. githubapps updatemodel organizationid integrationid modelslug thinkingeffort organizationId integrationId modelSlug thinkingEffort"
   },
   "githubPrReview.addIssueComment": {
     "path": "githubPrReview.addIssueComment",

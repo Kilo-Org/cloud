@@ -550,7 +550,7 @@ function InstallationModelSettings({
   // default model) so an effort-only change is savable and attributable.
   const effectiveModelSlug = modelSlug ?? DEFAULT_BOT_MODEL;
   const [selectedModel, setSelectedModel] = useState(effectiveModelSlug);
-  const [selectedEffort, setSelectedEffort] = useState<string | null>(thinkingEffort);
+  const [selectedEffort, setSelectedEffort] = useState<string | null>(thinkingEffort ?? null);
   const availableVariants = useMemo(
     () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
     [modelOptions, selectedModel]
@@ -560,7 +560,7 @@ function InstallationModelSettings({
   // setting is visible and can be cleared instead of silently persisting.
   const effortOptions = useMemo(
     () =>
-      selectedEffort !== null && !availableVariants.includes(selectedEffort)
+      selectedEffort && !availableVariants.includes(selectedEffort)
         ? [...availableVariants, selectedEffort]
         : availableVariants,
     [availableVariants, selectedEffort]
@@ -570,7 +570,7 @@ function InstallationModelSettings({
     setSelectedModel(modelSlug ?? DEFAULT_BOT_MODEL);
   }, [modelSlug]);
   useEffect(() => {
-    setSelectedEffort(thinkingEffort);
+    setSelectedEffort(thinkingEffort ?? null);
   }, [thinkingEffort]);
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);

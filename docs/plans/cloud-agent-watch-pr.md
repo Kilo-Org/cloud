@@ -6,8 +6,8 @@ runtime safety prerequisites. Not ready for the MVP release gate.
 
 ## Implementation status (2026-10-27)
 
-The first deliverable is deliberately observation-only. Watch enablement is behind
-the `cloud-agent-watch-pr` release toggle; passive PR hover-card counts are not.
+The first deliverable is deliberately observation-only. Watch enablement is available
+to every eligible owner; passive PR hover-card counts were never gated.
 It does not issue execution credentials, queue repair prompts, create repair chats,
 edit files, or push commits.
 

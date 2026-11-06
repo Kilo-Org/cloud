@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "A kò lè ṣàyẹ̀wò àsopọ̀ GitHub.",
-      "checkFailedMessage": "A kò lè fi ipò ìwọlé hàn títí èyí yóò fi ṣàkójọ tán.",
+      "checkFailedMessage": "A kò lè sopọ̀ mọ́ GitHub. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
       "checkFailedTitleGitLab": "A kò lè ṣàyẹ̀wò àsopọ̀ GitLab.",
       "checkFailedTitleBitbucket": "A kò lè ṣàyẹ̀wò àsopọ̀ Bitbucket.",
-      "providerCheckFailedMessage": "Ipò ìsopọ̀ kò wà títí èyí yóò fi gbé wọlé.",
+      "providerCheckFailedMessage": "A kò lè sopọ̀ mọ́ olùpèsè náà. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
       "reconnectTitle": "Àtúnsopọ̀ GitHub",
       "reconnectTitleGitLab": "Àtúnsopọ̀ GitLab",
       "reconnectTitleBitbucket": "Àtúnsopọ̀ Bitbucket",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
       "assistantProviderError": "Olùpèsè náà da àṣìṣe padà.",
       "assistantProviderRefused": "Olùpèsè náà kọ ìbéèrè náà, a kò sì lè tún gbìyànjú rẹ̀.",
+      "assistantCreditsRefusal": "Kirẹ́dítì kò tó láti lo Cloud Agent.",
       "assistantOutputLimit": "Ìdáhùn náà dé ààlà ìjade ti àwòṣe náà.",
       "assistantStructuredOutput": "Ìdáhùn náà kò bá àgbékalẹ̀ tí a fẹ́ mu.",
       "assistantFailed": "Ìdáhùn náà kùnà."
@@ -3491,9 +3492,9 @@
       "searching": "Wíwá lórí wẹ́ẹ̀bù",
       "thinking": "Ń rònú jinlẹ̀"
     },
-    "planOf": "nínú",
+    "planProgress": "{{done}} nínú {{total}}",
     "filesChanged": "àwọn fáìlì tí a yí padà",
-    "finishedIn": "Ó parí ní",
+    "finishedIn": "Ó parí ní {{duration}}",
     "noActivityFor": "Kò sí ìṣe fún",
     "prOpened": "Ìbéèrè ìfà ti ṣí",
     "permissionWants": "Ó fẹ́ ṣiṣẹ́",

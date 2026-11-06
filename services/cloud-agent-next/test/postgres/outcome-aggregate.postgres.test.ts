@@ -25,6 +25,7 @@ import {
   type OutcomeRole,
   type OutcomeWindow,
   type ProductOrigin,
+  type RuntimeHarnessBucket,
 } from '../../src/telemetry/outcome-aggregate.js';
 import { isControlSession } from '../../src/session-identity.js';
 
@@ -177,10 +178,12 @@ async function insertRun(values: {
   failureCode?: string;
   failureResponsibility?: string;
   failureReason?: string;
+  container?: Record<string, unknown>;
 }): Promise<void> {
   await writer.db.insert(cloud_agent_session_runs).values({
     cloud_agent_session_id: values.cloudAgentSessionId,
     message_id: values.messageId,
+    container: (values.container ?? null) as never,
     status: values.status,
     queued_at: values.terminalAt,
     terminal_at: values.terminalAt,
@@ -202,10 +205,15 @@ function headline(
   result: OutcomeAggregate,
   generation: OutcomeGeneration,
   role: OutcomeRole,
-  productOrigin: ProductOrigin
+  productOrigin: ProductOrigin,
+  runtimeHarness: RuntimeHarnessBucket = 'unknown'
 ): AgentExecutionHeadline {
   const found = assembleExecutionHeadlines(result.runCounts).find(
-    row => row.generation === generation && row.role === role && row.productOrigin === productOrigin
+    row =>
+      row.generation === generation &&
+      row.role === role &&
+      row.productOrigin === productOrigin &&
+      row.runtimeHarness === runtimeHarness
   );
   if (!found) throw new Error('missing headline');
   return found;
@@ -439,12 +447,61 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
         generation: 'control',
         role: 'initial',
         productOrigin: 'unknown',
+        runtimeHarness: 'unknown',
         responsibility: 'unknown',
         stage: 'unknown',
         code: 'unclassified',
         reason: 'unclassified',
         count: 1,
       },
+    ]);
+  });
+
+  it('splits runs by the reported runtime harness and buckets the rest as unknown', async () => {
+    const window = nextWindow();
+    const container = (runtimeHarness?: 'kilo' | 'kilo2') => ({
+      provider: 'cloudflare-containers' as const,
+      sandboxId: `sandbox_${randomUUID()}`,
+      ...(runtimeHarness === undefined ? {} : { runtimeHarness }),
+    });
+    const v1Session = uniqueSessionId('workspace');
+    const v1Initial = await createSession(v1Session, window.start);
+    await saveReport(
+      v1Session,
+      { ...completedRun(v1Initial, window.start), container: container('kilo') },
+      window.end
+    );
+    const v2Session = uniqueSessionId('workspace');
+    const v2Initial = await createSession(v2Session, window.start);
+    await saveReport(
+      v2Session,
+      { ...platformFailedRun(v2Initial, window.start), container: container('kilo2') },
+      window.end
+    );
+    const unreportedSession = uniqueSessionId('workspace');
+    const unreportedInitial = await createSession(unreportedSession, window.start);
+    await saveReport(
+      unreportedSession,
+      { ...completedRun(unreportedInitial, window.start), container: container() },
+      window.end
+    );
+    const foreignSession = uniqueSessionId('workspace');
+    const foreignInitial = await insertSession(foreignSession, window.start);
+    await insertRun({
+      cloudAgentSessionId: foreignSession,
+      messageId: foreignInitial,
+      status: 'completed',
+      terminalAt: window.start,
+      container: { ...container(), runtimeHarness: 'kilo3' },
+    });
+
+    const result = await aggregate(window);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo').completed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo2').platformFailed).toBe(1);
+    expect(headline(result, 'control', 'initial', 'unknown', 'kilo2').completed).toBe(0);
+    expect(headline(result, 'control', 'initial', 'unknown', 'unknown').completed).toBe(2);
+    expect(assembleFailureRows(result.runCounts)).toEqual([
+      expect.objectContaining({ runtimeHarness: 'kilo2', responsibility: 'platform', count: 1 }),
     ]);
   });
 
@@ -587,7 +644,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     const result = await aggregate(window);
 
     const headlines = assembleExecutionHeadlines(result.runCounts);
-    expect(headlines).toHaveLength(12);
+    expect(headlines).toHaveLength(36);
     expect(headlines.every(row => row.completed === 0 && row.interrupted === 0)).toBe(true);
   });
 

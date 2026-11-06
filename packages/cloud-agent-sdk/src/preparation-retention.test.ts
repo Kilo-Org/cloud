@@ -48,6 +48,82 @@ const stepSnapshot = (index: number) => ({
 });
 
 describe('preparation diagnostics', () => {
+  it.each(['attempt_started', 'attempt_snapshot'])(
+    'retains the newest orphan step snapshot until %s without requiring redelivery',
+    action => {
+      const state = createServiceState({ rootSessionId: 'session' });
+      const snapshot = { ...stepSnapshot(0), revision: 5, outputTail: 'latest output' };
+      for (const step of [snapshot, { ...snapshot, revision: 4, outputTail: 'stale output' }]) {
+        processPreparation(state, {
+          ...base,
+          action: 'step_snapshot',
+          revision: step.revision,
+          stepId: step.id,
+          stepSnapshot: step,
+        });
+      }
+      expect(state.getPreparationAttempts()).toEqual([]);
+      expect(state.getCloudStatus()).toBeNull();
+      processPreparation(state, {
+        ...base,
+        action,
+        revision: 3,
+        attempt: {
+          id: base.attemptId,
+          triggerMessageId: base.triggerMessageId,
+          status: 'completed',
+          startedAt: 1,
+          completedAt: 2,
+          revision: 3,
+        },
+      });
+      expect(state.getPreparationAttempts()).toMatchObject([
+        { id: base.attemptId, revision: 5, steps: [snapshot] },
+      ]);
+      expect(state.getCloudStatus()?.type).toBe(
+        action === 'attempt_snapshot' ? 'ready' : 'preparing'
+      );
+    }
+  );
+
+  it.each(['clearPreparationAttempts', 'reset'] as const)(
+    '%s discards orphan step snapshots',
+    clear => {
+      const state = createServiceState({ rootSessionId: 'session' });
+      processPreparation(state, {
+        ...base,
+        action: 'step_snapshot',
+        stepId: 'step-0',
+        stepSnapshot: stepSnapshot(0),
+      });
+      state[clear]();
+      processPreparation(state, { ...base, action: 'attempt_started' });
+      expect(state.getPreparationAttempts()[0]?.steps).toEqual([]);
+    }
+  );
+
+  it('bounds orphan step snapshots by the preparation history budget', () => {
+    const state = createServiceState({ rootSessionId: 'session' });
+    const count = PREPARATION_MAX_ATTEMPTS * PREPARATION_MAX_STEPS;
+    for (let index = 0; index <= count; index++) {
+      processPreparation(state, {
+        ...base,
+        attemptId: `attempt-${index}`,
+        action: 'step_snapshot',
+        stepId: 'step-0',
+        stepSnapshot: stepSnapshot(0),
+      });
+    }
+    processPreparation(state, { ...base, attemptId: 'attempt-0', action: 'attempt_started' });
+    expect(state.getPreparationAttempts()[0]?.steps).toEqual([]);
+    processPreparation(state, {
+      ...base,
+      attemptId: `attempt-${count}`,
+      action: 'attempt_started',
+    });
+    expect(state.getPreparationAttempts()[1]?.steps).toEqual([stepSnapshot(0)]);
+  });
+
   it('retains recent setup messages and clears them on completion', () => {
     const state = createServiceState({ rootSessionId: 'session' });
     const messages = Array.from(

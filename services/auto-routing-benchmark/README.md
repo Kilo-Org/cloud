@@ -352,13 +352,23 @@ Expand a route to inspect every ranked model/effort pair.
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
 - Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`. The delta is fixed at 0, so the frontier router uses its own system-computed `minAccuracy`.
-- Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
-- Daily re-evaluation: `minAccuracy`/`accuracyNoiseBand` come from a held-out grid over the
-  registry's measurements, `productionTokenProfile`/`switchHorizonTurns` from production auto
-  usage (mean uncached/cached input tokens per request, median requests per session), and the
-  rest are fixed constants. Admin overrides win over the computed values.
+- Both routers share candidate ranking, with separate validation objectives over their own measured pools.
+- Efficient minimizes estimated request cost without reducing the current policy's validation accuracy.
+- Frontier maximizes validation accuracy without increasing the current policy's estimated request cost.
+- Daily re-evaluation includes the current effective thresholds in its validation grid.
+  Incomplete, unmatched, or duplicate case coverage leaves the current settings unchanged.
+  Equivalent outcomes keep the current thresholds.
+- These request-level validation objectives are proxies, not verified full-task success or total task cost.
+  The grid selects settings; it does not provide independent evidence of improvement.
+  Freeze the policy before evaluating untouched full tasks and their complete costs.
+- `productionTokenProfile` and `switchHorizonTurns` still use production usage estimates.
+  Admin overrides retain precedence over computed settings.
 - Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.15 (tuned on a fully streamed offline sweep); without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
-- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- Published `estimatedRequestCostUsd` adds the configured input profile to the observed per-pair benchmark cost.
+  Fresh selection uses known request tokens at the prompt price, without assuming cache hits.
+  Unpriced candidates retain their published estimates.
+  The observed benchmark cost remains a limited base estimate, not a prediction of full-task output or remaining turns.
+  Tables without stored noise-band metadata retain their published ordering until republished.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - A candidate whose `estimatedRequestCostUsd` is exactly 0 outranks every paid candidate inside the accuracy band and takes no cost term (ADR 0005): $0 candidates are ordered by `effectiveLatency^1.5 / wilson^15` alone, so a free-but-slow or thinly measured one still loses to a free candidate with latency and coverage. Paid ordering is unchanged. Client models in a custom router are the usual source of $0.
 - The other candidates follow by accuracy, then cost.
@@ -366,17 +376,16 @@ Expand a route to inspect every ranked model/effort pair.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
-Production CLI benchmarks currently record total latency only, so published D1
-tables use the total-latency fallback. Offline sweep and candidate-screen
-summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
-never fabricated.
+Published tables retain measured total latency, time to first token, and the policy noise band through D1 storage.
+If every final candidate lacks total latency, request-time repricing compares cost and Wilson-adjusted accuracy without a latency factor.
+Unknown measurements remain unknown; a candidate missing latency remains conservative when another candidate has measured latency.
 
-The optional `effortByComplexity` table mapping selects a variant after the model
-has been picked, using the production classifier's `low`, `medium`, or `high`
-reasoning-complexity bucket. It never changes models or restores a candidate
-excluded by the decision filters. Same-model effort changes retain the prompt
-cache and do not trigger cost-switch logic; sticky-immediate turns retain the
-incumbent variant until a classification is available.
+The optional `effortByComplexity` mapping filters each model to its measured variant before fresh model selection.
+The filter preserves published relative ordering and cannot restore an ineligible pair.
+Known request pricing then re-ranks those final pairs within the stored quality band.
+Cheapest mode skips the complexity mapping.
+Sticky decisions keep their existing exact-pair identity and cache-switch economics.
+Sticky-immediate turns retain the incumbent variant until classification is available.
 
 Platform and custom-table builds read `case_results` for each ready pair's exact
 provenance run and join the committed `src/datasets/case-complexity.json` labels.
@@ -384,6 +393,11 @@ Missing labels are ignored. Each route/model/bucket ranks its measured variants
 with the same value policy, falling back to the route-level variant when fewer
 than six distinct graded cases are available. Mappings are persisted with the
 table and included in its version identity.
+
+Apply the additive routing-evidence migration before deploying readers that select its columns.
+Deploy the benchmark writer and republish from ready measurements to populate the new evidence.
+Do not backfill old policy bands or latency from current configuration or unrelated profiles.
+
 
 Regenerate the labels with the production classifier and gateway normalization:
 

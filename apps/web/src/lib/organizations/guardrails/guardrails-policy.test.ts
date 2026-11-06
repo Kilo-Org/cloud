@@ -73,7 +73,7 @@ describe('resolveGuardrailsSettings', () => {
         })
       )
     ).toEqual({
-      inputScan: { enabled: true, scanToolResults: false },
+      inputScan: { enabled: true, scanToolResults: true },
       outputScan: { enabled: true, buffersResponses: false },
       mcpEnforcement: 'shadow',
       skill: { enabled: true, scanBeforeUse: false },

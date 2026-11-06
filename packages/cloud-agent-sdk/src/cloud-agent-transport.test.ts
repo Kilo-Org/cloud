@@ -1126,6 +1126,76 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 
+  it('converts a Kilo model ref and forwards mode and variant for a command', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+        variant: 'high',
+      },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB008',
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'gpt-4',
+        variant: 'high',
+      },
+    });
+
+    transport.destroy();
+  });
+
+  it('rejects a non-Kilo model ref on a command before calling the Cloud Agent API', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await expect(
+      transport.send!({
+        messageId: 'msg_123456789abc123456789AB009',
+        payload: {
+          type: 'command',
+          command: 'compact',
+          arguments: '',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(api.send).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('keeps a command without overrides backward compatible on the wire', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.send!({
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
+    });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB00A',
+      payload: { type: 'command', command: 'help', arguments: '' },
+    });
+
+    transport.destroy();
+  });
+
   it('rejects a non-Kilo model ref before calling the Cloud Agent API', async () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);

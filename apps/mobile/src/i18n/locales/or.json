@@ -697,10 +697,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
-      "checkFailedMessage": "ଏହା ଲୋଡ୍ ହେବା ପରେ ହିଁ ସାଇନ୍ ଇନ୍ ସ୍ଥିତି ଜାଣିହେବ।",
+      "checkFailedMessage": "GitHub ସହ ସଂଯୋଗ ସ୍ଥାପନ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "checkFailedTitleGitLab": "GitLab ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
-      "providerCheckFailedMessage": "ଏହା ଲୋଡ୍ ହେବା ପର୍ଯ୍ୟନ୍ତ ସଂଯୋଗ ଅବସ୍ଥା ଉପଲବ୍ଧ ନୁହେଁ।",
+      "providerCheckFailedMessage": "ପ୍ରଦାନକାରୀ ସହ ସଂଯୋଗ ସ୍ଥାପନ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
       "reconnectTitleGitLab": "GitLab ସହ ପୁଣି ସଂଯୋଗ",
       "reconnectTitleBitbucket": "Bitbucket ସହ ପୁଣି ସଂଯୋଗ",
@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "ବାର୍ତ୍ତାଳାପ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ଲମ୍ବା ହୋଇଗଲାଣି।",
       "assistantProviderError": "ସେବା ପ୍ରଦାନକାରୀ ଏକ ତ୍ରୁଟି ଫେରାଇଲେ।",
       "assistantProviderRefused": "ସେବା ପ୍ରଦାନକାରୀ ଏହି ଅନୁରୋଧକୁ ଅସ୍ୱୀକାର କଲେ ଏବଂ ଏହା ପୁନଃଚେଷ୍ଟା କରାଯାଇପାରିବ ନାହିଁ।",
+      "assistantCreditsRefusal": "Cloud Agent ଚଲାଇବାକୁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ।",
       "assistantOutputLimit": "ଉତ୍ତର ମଡେଲ୍ର ଆଉଟପୁଟ୍ ସୀମାରେ ପହଞ୍ଚିଲା।",
       "assistantStructuredOutput": "ଉତ୍ତର ଆବଶ୍ୟକ ଫର୍ମାଟ୍ ସହିତ ମେଳ ହେଲା ନାହିଁ।",
       "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।"
@@ -3491,9 +3492,9 @@
       "searching": "ୱେବ ସନ୍ଧାନ",
       "thinking": "ଚିନ୍ତା କରୁଛି"
     },
-    "planOf": "ମଧ୍ୟରୁ",
+    "planProgress": "{{total}} ମଧ୍ୟରୁ {{done}}",
     "filesChanged": "ଫାଇଲ ବଦଳିଛି",
-    "finishedIn": "ସମାପ୍ତ",
+    "finishedIn": "{{duration}}ରେ ସମାପ୍ତ",
     "noActivityFor": "କୌଣସି କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
     "prOpened": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଗଲା",
     "permissionWants": "ଚଲାଇବାକୁ ଚାହେଁ",

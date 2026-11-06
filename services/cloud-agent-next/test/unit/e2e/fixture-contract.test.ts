@@ -117,6 +117,27 @@ describe('provider request contract', () => {
     );
   });
 
+  it('accepts an optional scenario id and rejects an unknown one', () => {
+    const request = {
+      schemaVersion: SCHEMA_VERSION,
+      operation: 'prepare',
+      runId: 'run-1',
+      lane: 'local',
+      scenarioId: 'prompt.stream',
+      fakeLlmScope: 'kilo-e2e-run-1',
+      descriptorPath: '/tmp/descriptor.json',
+      projectDir: '/tmp/project',
+      state: { data: '/d', config: '/c', state: '/s', cache: '/k' },
+    };
+    expect(ProviderPrepareRequest.parse(request).scenarioId).toBe('prompt.stream');
+    expect(
+      ProviderPrepareRequest.safeParse({ ...request, scenarioId: 'unknown.scenario' }).success
+    ).toBe(false);
+    const { scenarioId, ...withoutScenario } = request;
+    expect(scenarioId).toBe('prompt.stream');
+    expect(ProviderPrepareRequest.parse(withoutScenario).scenarioId).toBeUndefined();
+  });
+
   it('rejects a request with an unsupported version', () => {
     expect(() =>
       parseProviderRequest({

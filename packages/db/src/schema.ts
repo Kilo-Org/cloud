@@ -4775,12 +4775,17 @@ export const user_github_app_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     github_app_type: text().$type<'standard' | 'lite'>().notNull().default('standard'),
+    // The standard slot owns the personal identity for either credential source.
+    credential_source: text()
+      .$type<'github_app' | 'provided_token'>()
+      .notNull()
+      .default('github_app'),
     github_user_id: text().notNull(),
     github_login: text().notNull(),
     access_token_encrypted: text().notNull(),
-    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    refresh_token_encrypted: text().notNull(),
-    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     credential_version: integer().notNull().default(1),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revocation_reason: text(),
@@ -4800,6 +4805,17 @@ export const user_github_app_tokens = pgTable(
     check(
       'user_github_app_tokens_app_type_check',
       sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'user_github_app_tokens_source_check',
+      sql`(${table.credential_source} = 'github_app'
+        AND ${table.access_token_expires_at} IS NOT NULL
+        AND ${table.refresh_token_encrypted} IS NOT NULL
+        AND ${table.refresh_token_expires_at} IS NOT NULL)
+        OR (${table.credential_source} = 'provided_token'
+        AND ${table.github_app_type} = 'standard'
+        AND ${table.refresh_token_encrypted} IS NULL
+        AND ${table.refresh_token_expires_at} IS NULL)`
     ),
   ]
 );
@@ -7138,6 +7154,7 @@ export type CloudAgentRunContainer = {
   snapshotId?: string;
   runtimeBuildId?: string;
   startSource?: 'image' | 'snapshot';
+  runtimeHarness?: 'kilo' | 'kilo2';
 };
 
 export const cloud_agent_session_runs = pgTable(
@@ -8801,6 +8818,41 @@ export type CloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferSelect;
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
+
+// ============ CLOUD AGENT BUILT-IN AGENT SETTINGS ============
+// User-scoped model and visibility overrides for the CLI's built-in agents
+// (for example `explore`, `compaction`, `plan`, and `debug`). These apply to
+// every Cloud Agent session the user starts, independent of a profile.
+
+export const cloud_agent_builtin_agent_settings = pgTable(
+  'cloud_agent_builtin_agent_settings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Map of built-in agent slug → override. Only model, variant, and disable
+    // are meaningful here; see BuiltinAgentSettingsSchema in
+    // `@kilocode/cloud-agent-profile`.
+    agents: jsonb()
+      .$type<Record<string, { model?: string | null; variant?: string; disable?: boolean }>>()
+      .notNull()
+      .default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_cloud_agent_builtin_agent_settings_user').on(table.user_id)]
+);
+
+export type CloudAgentBuiltinAgentSetting = typeof cloud_agent_builtin_agent_settings.$inferSelect;
+export type NewCloudAgentBuiltinAgentSetting =
+  typeof cloud_agent_builtin_agent_settings.$inferInsert;
 
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the

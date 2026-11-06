@@ -1323,6 +1323,39 @@ describe('workspace DO history and mutation cursors', () => {
     });
   });
 
+  it('retains skipped and failed auto-commit results for each repository across replay', async () => {
+    const { stub } = await fixture();
+    for (const repository of ['org/first', 'org/second']) {
+      await publish(stub, 'autocommit_completed', {
+        messageId: 'msg_multi_repo',
+        repository,
+        skipped: true,
+      });
+      await publish(stub, 'autocommit_completed', {
+        messageId: 'msg_failed_multi_repo',
+        repository,
+        success: false,
+        error: 'Commit failed',
+      });
+    }
+    await runInDurableObject(stub, (_instance, state) => {
+      const rows = drizzle(state.storage).select().from(events).all();
+      const commits = rows
+        .map(row => readNativeEventPayload(row.payload))
+        .filter(event => event?.type === 'autocommit_completed')
+        .map(event => event?.properties);
+      expect(commits).toHaveLength(4);
+      expect(commits).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ messageId: 'msg_multi_repo', repository: 'org/first' }),
+          expect.objectContaining({ messageId: 'msg_multi_repo', repository: 'org/second' }),
+          expect.objectContaining({ messageId: 'msg_failed_multi_repo', repository: 'org/first' }),
+          expect.objectContaining({ messageId: 'msg_failed_multi_repo', repository: 'org/second' }),
+        ])
+      );
+    });
+  });
+
   it('restores full current retry status and bounded commit bootstrap without transcript replay', async () => {
     const { stub, kiloSessionId } = await fixture();
     await publish(stub, 'session.status', {

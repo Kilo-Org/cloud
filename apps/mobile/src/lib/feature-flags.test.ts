@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  compareAppVersions,
-  currentAppVersion,
-  getFeatureFlagDefinition,
-  isAppVersionAtLeast,
-} from './feature-flags';
+import { compareAppVersions, currentAppVersion, isAppVersionAtLeast } from './feature-flags';
 
 // expo-application is a native module whose source pulls in react-native
 // (Flow-typed), which the pure vitest pipeline cannot parse. Mock it with a
@@ -61,15 +56,5 @@ describe('currentAppVersion', () => {
     expect(currentAppVersion()).toBe('1.0.8');
     hoisted.nativeApplicationVersion = undefined;
     expect(currentAppVersion()).toBeNull();
-  });
-});
-
-describe('native remote flag', () => {
-  it('defaults off and requires the first supported app version', () => {
-    expect(getFeatureFlagDefinition('native-remote-mobile')).toEqual({
-      key: 'native-remote-mobile',
-      minAppVersion: '1.0.15',
-      defaultValue: false,
-    });
   });
 });

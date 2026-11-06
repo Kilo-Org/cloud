@@ -280,6 +280,14 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   if (failure.detailKey !== null && copy === i18n.t(failure.detailKey)) {
     return true;
   }
+  // A credits refusal states its cause on the row, and the row's Add credits
+  // action is the recovery; the footer's credits line names the same cause and
+  // would restate it. The two lines are worded for their own surface — the row
+  // keeps the cause, the footer adds the instruction — so they are compared by
+  // class, not by string.
+  if (failure.canAddCredits && copy === i18n.t('agentChat.session.notEnoughCredits')) {
+    return true;
+  }
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts) while the SDK's status indicator for it is the
   // delivery-failed line ("Message delivery failed" -> "Message not sent",

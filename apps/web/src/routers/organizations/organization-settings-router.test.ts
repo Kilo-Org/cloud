@@ -3,9 +3,11 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   addUserToOrganization,
+  mutateOrganizationSettings,
   updateOrganizationSettings,
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
@@ -18,14 +20,24 @@ import {
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
+  organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
+jest.setTimeout(30_000);
+
 jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
+}));
+
+// The experimental-settings procedure only admits a fixed allowlist of organization
+// ids. Point that allowlist at a throwaway organization so the procedure is testable.
+jest.mock('@kilocode/web-shared/lib/organizations/constants', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/organizations/constants'),
+  KILO_ORGANIZATION_ID: '3f1d8f7e-6a2b-4f0d-9a3c-0b6e5d4c2a10',
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => {
@@ -1441,7 +1453,8 @@ describe('organizations settings trpc router', () => {
       const auditLogs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.id);
       expect(auditLogs.map(log => log.message)).toContain(
         'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
       );
@@ -1472,6 +1485,173 @@ describe('organizations settings trpc router', () => {
           data_region: 'us',
         })
       ).rejects.toThrow();
+    });
+  });
+
+  describe('settings saves next to other settings writes', () => {
+    // Resolve once `expected` other backends wait for the organization row.
+    async function waitForOrganizationRowLockWaiters(expected: number): Promise<void> {
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        // A row lock wait is recorded against the waiting transaction.
+        const { rows } = await db.execute<{ n: number }>(sql`
+          SELECT count(DISTINCT activity.pid)::int AS n
+            FROM pg_locks locked
+            JOIN pg_stat_activity activity ON activity.pid = locked.pid
+           WHERE NOT locked.granted
+             AND locked.pid <> pg_backend_pid()
+             AND activity.datname = current_database()
+             AND activity.wait_event_type = 'Lock'
+             AND activity.query LIKE '%organizations%'
+        `);
+        if (Number(rows[0]?.n ?? 0) >= expected) return;
+        if (Date.now() > deadline) {
+          throw new Error(`timed out waiting for ${expected} organization row lock waiters`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    // Holds the organization row with a locked settings write of
+    // `provider_allow_list` while `save` runs.
+    async function withConcurrentSettingsWrite<T>(
+      organizationId: string,
+      save: () => Promise<T>
+    ): Promise<T> {
+      const held = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const holder = db.transaction(async tx => {
+        await mutateOrganizationSettings(
+          organizationId,
+          organization => ({ ...organization.settings, provider_allow_list: ['anthropic'] }),
+          tx
+        );
+        held.resolve();
+        await release.promise;
+      });
+
+      try {
+        await held.promise;
+        const pending = save();
+        await waitForOrganizationRowLockWaiters(1);
+        release.resolve();
+        const [result] = await Promise.all([pending, holder]);
+        return result;
+      } finally {
+        release.resolve();
+      }
+    }
+
+    async function resetSettings(organizationId: string, settings: object) {
+      await updateOrganizationSettings(organizationId, settings);
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+    }
+
+    it('saves the data collection policy', async () => {
+      await resetSettings(testOrganization.id, { data_collection: 'allow' });
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(testOrganization.id, () =>
+        caller.organizations.settings.updateDataCollection({
+          organizationId: testOrganization.id,
+          dataCollection: 'deny',
+        })
+      );
+
+      expect(result.settings.data_collection).toBe('deny');
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.data_collection).toBe('deny');
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('saves the minimum balance alert', async () => {
+      await resetSettings(testOrganization.id, {});
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(testOrganization.id, () =>
+        caller.organizations.settings.updateMinimumBalanceAlert({
+          organizationId: testOrganization.id,
+          enabled: true,
+          minimum_balance: 100,
+          minimum_balance_alert_email: ['alert@example.com'],
+        })
+      );
+
+      expect(result.settings.minimum_balance).toBe(100);
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(testOrganization.id);
+      expect(stored?.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('saves the projects UI flag', async () => {
+      const privilegedOrganizationId = KILO_ORGANIZATION_ID;
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, privilegedOrganizationId));
+      await db.delete(organizations).where(eq(organizations.id, privilegedOrganizationId));
+      await db.insert(organizations).values({
+        id: privilegedOrganizationId,
+        name: 'Privileged Settings Organization',
+        created_by_kilo_user_id: owner.id,
+        plan: 'enterprise',
+        require_seats: false,
+        settings: {},
+      });
+      await addUserToOrganization(privilegedOrganizationId, owner.id, 'owner');
+
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await withConcurrentSettingsWrite(privilegedOrganizationId, () =>
+        caller.organizations.settings.updateProjectsUIEnabled({
+          organizationId: privilegedOrganizationId,
+          projects_ui_enabled: true,
+        })
+      );
+
+      expect(result.settings.projects_ui_enabled).toBe(true);
+      expect(result.settings.provider_allow_list).toEqual(['anthropic']);
+
+      const stored = await getOrganizationById(privilegedOrganizationId);
+      expect(stored?.settings.projects_ui_enabled).toBe(true);
+      expect(stored?.settings.provider_allow_list).toEqual(['anthropic']);
+    });
+
+    it('records a data collection policy change in the audit log', async () => {
+      await resetSettings(testOrganization.id, {});
+      const caller = await createCallerForUser(billingManager.id);
+
+      const save = (dataCollection: 'allow' | 'deny' | null) =>
+        caller.organizations.settings.updateDataCollection({
+          organizationId: testOrganization.id,
+          dataCollection,
+        });
+
+      await save('deny');
+      await save('deny');
+      await save(null);
+      await save(null);
+
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id))
+        .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+
+      expect(auditLogs.map(log => log.message)).toEqual([
+        'Data collection: denied',
+        'Data collection: follow extension setting',
+      ]);
+      for (const log of auditLogs) {
+        expect(log.action).toBe('organization.settings.change');
+        expect(log.actor_id).toBe(billingManager.id);
+        expect(log.actor_email).toBe('billing-settings@example.com');
+      }
     });
   });
 });

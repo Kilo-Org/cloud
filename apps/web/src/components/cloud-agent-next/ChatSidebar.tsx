@@ -65,6 +65,7 @@ import { WorkspaceFolderSection } from './WorkspaceFolderSection';
 import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
 import { SidebarListSkeleton } from './SidebarListSkeleton';
 import {
+  controlPlaneSessionIdSchema,
   getWorkspaceFolderColor,
   getWorkspaceFolderDropAction,
   getWorkspaceFolderId,
@@ -73,15 +74,8 @@ import {
   type WorkspaceFolderDragItem,
   type WorkspaceFolderDropTarget,
 } from './workspace-folders';
-
-type ActiveSession = {
-  id: string;
-  status: string;
-  title: string;
-  connectionId: string;
-  gitUrl?: string;
-  gitBranch?: string;
-};
+import { filterLiveSidebarSessions } from './live-sidebar-sessions';
+import type { ActiveSession } from './hooks/useActiveSessions';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -101,6 +95,7 @@ type ChatSidebarProps = {
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   deletingWorktreeIds?: readonly string[];
+  isDeletionInProgress?: boolean;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -131,6 +126,7 @@ const SessionRow = memo(function SessionRow({
   isLive,
   onDeleteSession,
   isDeleting,
+  isDeletionInProgress,
   onStartRename,
   isEditing,
   editTitle,
@@ -138,12 +134,17 @@ const SessionRow = memo(function SessionRow({
   onSaveRename,
   onCancelRename,
   onClick,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  isDragging,
 }: {
   session: StoredSession;
   isActive: boolean;
   isLive: boolean;
   onDeleteSession?: (sessionId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
   onStartRename?: (session: StoredSession) => void;
   isEditing: boolean;
   editTitle: string;
@@ -151,6 +152,10 @@ const SessionRow = memo(function SessionRow({
   onSaveRename?: () => void;
   onCancelRename: () => void;
   onClick: (sessionId: string) => void;
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLDivElement>, session: StoredSession) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -188,11 +193,15 @@ const SessionRow = memo(function SessionRow({
   return (
     <div
       onClick={isEditing || isDeleting ? undefined : () => onClick(session.sessionId)}
+      draggable={draggable}
+      onDragStart={onDragStart ? event => onDragStart(event, session) : undefined}
+      onDragEnd={onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
         'hover:bg-accent cursor-pointer rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
+        isDragging && 'opacity-50',
         isActive && 'bg-accent font-medium'
       )}
     >
@@ -275,6 +284,7 @@ const SessionRow = memo(function SessionRow({
                       {onDeleteSession && (
                         <DropdownMenuItem
                           variant="destructive"
+                          disabled={isDeletionInProgress}
                           onClick={e => {
                             e.stopPropagation();
                             onDeleteSession(session.sessionId);
@@ -305,6 +315,7 @@ function WorktreeGroupRow({
   onRenameWorktree,
   onDeleteWorktree,
   isDeleting,
+  isDeletionInProgress,
   isLoadingDetails,
   activeSessionStatuses,
   foregroundSession,
@@ -318,6 +329,7 @@ function WorktreeGroupRow({
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
   isDeleting: boolean;
+  isDeletionInProgress: boolean;
   isLoadingDetails: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -599,6 +611,7 @@ function WorktreeGroupRow({
                       {onDeleteWorktree && (
                         <DropdownMenuItem
                           variant="destructive"
+                          disabled={isDeletionInProgress}
                           onSelect={() => onDeleteWorktree(group.worktreeId)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -673,6 +686,7 @@ export function ChatSidebar({
   onRenameWorktree,
   onDeleteWorktree,
   deletingWorktreeIds = [],
+  isDeletionInProgress = false,
   isInSheet = false,
   activeSessions = [],
   foregroundSession,
@@ -798,21 +812,32 @@ export function ChatSidebar({
     [activeSessions]
   );
 
-  // Heartbeats reorder activeSessions per connection, so the Remote section
-  // needs its own stable order: attention first, then working, id last.
+  // Live sessions the stored list does not carry. The live rows bypass the
+  // server-side filter the stored list gets, so they have to honor the same
+  // selections here or the sidebar shows rows the filters exclude.
   const liveOnlySessions = useMemo(() => {
+    // The merge order is per-connection and changes on every heartbeat, so the
+    // rendered order is decided here: attention first, then working, id last.
     const remotePriority = (status: string) =>
       status === 'question' || status === 'permission'
         ? 2
         : status === 'busy' || status === 'retry'
           ? 1
           : 0;
-    return activeSessions
-      .filter(activeS => !sessions.some(s => s.sessionId === activeS.id))
-      .sort(
-        (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
-      );
-  }, [activeSessions, sessions]);
+    return filterLiveSidebarSessions(
+      activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
+      {
+        platformFilter: platformFilter ?? [],
+        projectFilter: projectFilter ?? [],
+        searchQuery,
+        // The stored list is queried with `organizationId ?? null`, where
+        // `null` means personal. Match it, or the personal view keeps org rows.
+        organizationId: organizationId ?? null,
+      }
+    ).sort(
+      (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
+    );
+  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery, organizationId]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
@@ -851,28 +876,39 @@ export function ChatSidebar({
     [dateGroups]
   );
 
-  const clearDrag = () => {
+  const clearDrag = useCallback(() => {
     setDragItem(null);
     setDropTarget(null);
-  };
+  }, []);
 
-  const startDrag = (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
-    if (!canEditFolders) {
-      event.preventDefault();
-      return;
-    }
-    event.stopPropagation();
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
-    const bounds = event.currentTarget.getBoundingClientRect();
-    event.dataTransfer.setDragImage(
-      event.currentTarget,
-      event.clientX - bounds.left,
-      event.clientY - bounds.top
-    );
-    setDragItem(item);
-    setDropTarget(null);
-  };
+  const startDrag = useCallback(
+    (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
+      if (!canEditFolders) {
+        event.preventDefault();
+        return;
+      }
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
+      const bounds = event.currentTarget.getBoundingClientRect();
+      event.dataTransfer.setDragImage(
+        event.currentTarget,
+        event.clientX - bounds.left,
+        event.clientY - bounds.top
+      );
+      setDragItem(item);
+      setDropTarget(null);
+    },
+    [canEditFolders]
+  );
+
+  const startSessionDrag = useCallback(
+    (event: DragEvent<HTMLDivElement>, session: StoredSession) => {
+      const parsed = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+      if (parsed.success) startDrag(event, { type: 'session', id: parsed.data });
+    },
+    [startDrag]
+  );
 
   const folderTarget = (
     event: DragEvent<HTMLElement>,
@@ -941,6 +977,8 @@ export function ChatSidebar({
     event.stopPropagation();
     if (action.type === 'move-worktree') {
       void moveWorktree(action.worktreeId, action.folderId);
+    } else if (action.type === 'move-session') {
+      void workspaceFolders.moveSession(action.sessionId, action.folderId);
     } else {
       void workspaceFolders.reorderFolders(action.folderIds);
     }
@@ -972,6 +1010,7 @@ export function ChatSidebar({
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
       isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
+      isDeletionInProgress={isDeletionInProgress}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
       folderControls={
@@ -990,36 +1029,63 @@ export function ChatSidebar({
     />
   );
 
+  const onStartRenameSession = useCallback(
+    (session: StoredSession) => handleStartRename(session),
+    [handleStartRename]
+  );
+
   const renderSession = useCallback(
-    (session: StoredSession) => (
-      <SessionRow
-        key={session.sessionId}
-        session={session}
-        isActive={session.sessionId === currentSessionId}
-        isLive={activeSessionIds.has(session.sessionId)}
-        onDeleteSession={onDeleteSession}
-        onStartRename={onRenameSession ? handleStartRename : undefined}
-        isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
-        isEditing={editingSessionId === session.sessionId}
-        editTitle={editingSessionId === session.sessionId ? editTitle : ''}
-        onEditTitleChange={setEditTitle}
-        onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
-        onCancelRename={handleCancelRename}
-        onClick={handleSessionClick}
-      />
-    ),
+    (session: StoredSession) => {
+      const parsedSessionId = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+      const sessionId = parsedSessionId.success ? parsedSessionId.data : null;
+      const isDeleting = deletingSessionIds?.includes(session.sessionId) ?? false;
+      return (
+        <SessionRow
+          key={session.sessionId}
+          session={session}
+          isActive={session.sessionId === currentSessionId}
+          isLive={activeSessionIds.has(session.sessionId)}
+          onDeleteSession={onDeleteSession}
+          onStartRename={onRenameSession ? onStartRenameSession : undefined}
+          isDeleting={isDeleting}
+          isDeletionInProgress={isDeletionInProgress}
+          isEditing={editingSessionId === session.sessionId}
+          editTitle={editingSessionId === session.sessionId ? editTitle : ''}
+          onEditTitleChange={setEditTitle}
+          onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
+          onCancelRename={handleCancelRename}
+          onClick={handleSessionClick}
+          draggable={
+            sessionId !== null &&
+            canEditFolders &&
+            editingSessionId !== session.sessionId &&
+            !isDeleting
+          }
+          onDragStart={sessionId ? startSessionDrag : undefined}
+          onDragEnd={sessionId ? clearDrag : undefined}
+          isDragging={
+            sessionId !== null && dragItem?.type === 'session' && dragItem.id === sessionId
+          }
+        />
+      );
+    },
     [
       activeSessionIds,
+      canEditFolders,
+      clearDrag,
       currentSessionId,
       deletingSessionIds,
+      dragItem,
       editingSessionId,
       editTitle,
       handleCancelRename,
       handleSaveRename,
       handleSessionClick,
-      handleStartRename,
+      isDeletionInProgress,
       onDeleteSession,
       onRenameSession,
+      onStartRenameSession,
+      startSessionDrag,
     ]
   );
 

@@ -70,6 +70,33 @@ const turns = asMessages({
   turns: [...transcriptTurns],
 });
 
+/** The error payload of the failed turn the fixture draws. */
+type AssistantFailure = NonNullable<Extract<StoredMessage['info'], { role: 'assistant' }>['error']>;
+
+/**
+ * The gateway's answer to a paid request from an account that cannot pay it:
+ * status 402 with its named credit block in the body
+ * (`usageLimitExceededResponse` in packages/web-shared). This is the failure
+ * the row states as the credits copy beside Add credits.
+ */
+const CREDITS_REFUSAL: AssistantFailure = {
+  name: 'APIError',
+  data: {
+    message: 'Add credits to continue, or switch to a free model',
+    statusCode: 402,
+    isRetryable: false,
+    responseBody: JSON.stringify({
+      error: {
+        title: 'Paid Model - Credits Required',
+        message: 'Add credits to continue, or switch to a free model',
+        balance: 0,
+        buyCreditsUrl: 'https://app.kilo.ai/profile',
+      },
+      error_type: 'usage_limit_exceeded',
+    }),
+  },
+};
+
 /**
  * The turn the provider refused: a contentless assistant row carrying the
  * gateway's verdict for the failure. A retryable one (the default) is what the
@@ -78,6 +105,17 @@ const turns = asMessages({
  * like, and its row offers no resend. The fixture never sends anything.
  */
 function failedAnswer(isRetryable: boolean): StoredMessage {
+  return failedAnswerWith({
+    name: 'APIError',
+    data: {
+      message: 'Upstream provider returned HTTP 500',
+      statusCode: 500,
+      isRetryable,
+    },
+  });
+}
+
+function failedAnswerWith(error: AssistantFailure): StoredMessage {
   return {
     info: {
       id: 'failed-answer',
@@ -92,14 +130,7 @@ function failedAnswer(isRetryable: boolean): StoredMessage {
       path: { cwd: '/workspace', root: '/workspace' },
       cost: 0,
       tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-      error: {
-        name: 'APIError',
-        data: {
-          message: 'Upstream provider returned HTTP 500',
-          statusCode: 500,
-          isRetryable,
-        },
-      },
+      error,
     },
     parts: [],
   };
@@ -107,6 +138,7 @@ function failedAnswer(isRetryable: boolean): StoredMessage {
 
 const retryableMessages = [...turns, failedAnswer(true)];
 const terminalMessages = [...turns, failedAnswer(false)];
+const creditsMessages = [...turns, failedAnswerWith(CREDITS_REFUSAL)];
 
 /**
  * The question whose answer failed, drawn the way the chat screen draws it: the
@@ -152,12 +184,19 @@ const ignoreRetry = (): void => undefined;
 /** The fixture copies into a composer it does not draw, so the action stays inert. */
 const ignoreCopy = (): void => undefined;
 
-/** The failure the fixture draws: the retryable answer, the terminal one, or the asked question's. */
-type FixtureFailure = 'retryable' | 'terminal' | 'execution' | 'undelivered';
+/** The fixture has no purchase screen behind it, so the action stays inert. */
+const ignoreAddCredits = (): void => undefined;
+
+/**
+ * The failure the fixture draws: the retryable answer, the terminal one, the
+ * one the account's balance caused, or the asked question's.
+ */
+type FixtureFailure = 'retryable' | 'terminal' | 'credits' | 'execution' | 'undelivered';
 
 const MESSAGES_BY_FAILURE = {
   retryable: retryableMessages,
   terminal: terminalMessages,
+  credits: creditsMessages,
   execution: executionFailureMessages,
   undelivered: turns,
 } satisfies Record<FixtureFailure, readonly StoredMessage[]>;
@@ -195,6 +234,7 @@ export function TranscriptStyleFixture({
             key={message.info.id}
             message={message}
             onRetryMessage={retryAvailable ? ignoreRetry : undefined}
+            onAddCredits={ignoreAddCredits}
             retryAvailable={retryAvailable}
             {...(failedRow !== undefined && message.info.id === failedRow.id
               ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }

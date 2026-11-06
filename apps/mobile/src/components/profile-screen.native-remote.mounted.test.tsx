@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findConfigureRows,
   mountProfile,
-  nativeRemoteFlag,
   organizationsQueryFn,
   providersQueryFn,
   routerPush,
@@ -17,14 +16,14 @@ beforeEach(() => {
 });
 
 describe('Profile native remote demo entry', () => {
-  it('is absent while the client-only flag is off', async () => {
+  it('is absent in a release bundle', async () => {
     const { renderer, unmount } = await mountProfile();
     expect(findConfigureRows(renderer.root, i18n.t('nativeRemote.title'))).toHaveLength(0);
     unmount();
   });
 
-  it('opens the gated demo route when the flag is on', async () => {
-    nativeRemoteFlag.enabled = true;
+  it('opens the preview route in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
     const { renderer, unmount } = await mountProfile();
     const [row] = findConfigureRows(renderer.root, i18n.t('nativeRemote.title'));
     const onPress = row?.props.onPress as (() => void) | undefined;

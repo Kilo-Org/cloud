@@ -23,15 +23,15 @@ What survives depends on how the sandbox came back:
   the pnpm wrapper, `/usr/local/lib/kilo-cloud-agent/`,
   `.wrangler/kilo-startup/`, installed packages, and Docker images. Kernel and
   process state is not restored: the dev memory cgroup, dockerd, dnsmasq, and
-  the DNS iptables rule are gone. pnpm inside the repository recreates the
-  cgroup with the saved cap (`.wrangler/kilo-startup/memory-mb`) and keeps
-  working. If the delegated `kilo-workloads` cgroup is missing too, pnpm warns
-  and runs uncapped. Bring Docker and DNS back in a few seconds, without apt,
-  installs, or image builds:
-
-  ```bash
-  bash .kilo/cloud-agent-setup.sh --resume
-  ```
+  the DNS iptables rule are gone. The first pnpm command inside the repository
+  (normally the environment's start command) notices the missing cgroup and
+  runs `bash .kilo/cloud-agent-setup.sh --resume` before continuing. That
+  recreates the cgroup with the saved cap (`.wrangler/kilo-startup/memory-mb`)
+  and restarts Docker and DNS in a few seconds, without apt, installs, or image
+  builds. Its output goes to stderr. Concurrent pnpm calls wait on one lock. If
+  Docker fails to start, pnpm warns and still runs in the cgroup. If the
+  delegated `kilo-workloads` cgroup is missing, pnpm warns and runs uncapped.
+  Running `--resume` by hand is safe and repeatable.
 
 Check before starting services:
 
@@ -89,10 +89,10 @@ snapshot runs without joining a cgroup until session setup runs.
 
 A workspace tail snapshot is different: it is taken after a session's own
 (non-build) setup run, so its env file names a dev cgroup that no longer exists
-after resume. The pnpm wrapper recreates it through
-`/usr/local/lib/kilo-cloud-agent/dev-cgroup`, the same helper setup uses, so the
-limits match. Run `bash .kilo/cloud-agent-setup.sh --resume` to restart Docker
-and dnsmasq; full setup also works but repeats apt and image builds.
+after resume. The pnpm wrapper runs `--resume`, which recreates it through
+`/usr/local/lib/kilo-cloud-agent/dev-cgroup`, the same helper setup uses, so
+the limits match, and restarts Docker and dnsmasq. Full setup also works but
+repeats apt and image builds.
 
 Environment-build setup commands may use the rest of the 30-minute build
 deadline; the inactivity timeout remains 5 minutes.

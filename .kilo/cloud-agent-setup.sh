@@ -347,12 +347,19 @@ if [[ ($PWD == "$repo" || $PWD == "$repo"/*) && -f $env_file ]]; then
       # A workspace tail snapshot restores files but not the cgroup tree.
       parent=${KILO_WORKLOAD_CGROUP_ROOT:-/sys/fs/cgroup/kilo-workloads}
       memory_mb=$(cat "$memory_file" 2>/dev/null || true)
-      if [[ ! -f $parent/memory.max || -z $memory_mb || ! -x $dev_cgroup_helper ]] \
-        || ! "${root[@]}" "$dev_cgroup_helper" "$KILO_STARTUP_CGROUP" "$memory_mb" 2>/dev/null; then
+      if [[ ! -f $parent/memory.max || -z $memory_mb || ! -x $dev_cgroup_helper ]]; then
         printf 'Warning: the sandbox dev memory cgroup is unavailable; running pnpm without the memory cap.\n' >&2
         exec "$real_pnpm" "$@"
       fi
-      printf 'Recreated the sandbox dev memory cgroup (%s MiB). If Docker is not running, start it with bash %q/.kilo/cloud-agent-setup.sh --resume.\n' "$memory_mb" "$repo" >&2
+      # Restart the cgroup, Docker and DNS once; stdout stays pnpm's.
+      printf 'Restoring the sandbox after a workspace resume (cgroup, Docker, DNS).\n' >&2
+      if ! flock -o "$memory_file.lock" bash "$repo/.kilo/cloud-agent-setup.sh" --resume >&2; then
+        if ! "${root[@]}" "$dev_cgroup_helper" "$KILO_STARTUP_CGROUP" "$memory_mb" 2>/dev/null; then
+          printf 'Warning: the sandbox dev memory cgroup is unavailable; running pnpm without the memory cap.\n' >&2
+          exec "$real_pnpm" "$@"
+        fi
+        printf 'Warning: Docker could not be restarted; rerun bash %q/.kilo/cloud-agent-setup.sh.\n' "$repo" >&2
+      fi
     fi
     printf '%s\n' "$$" | "${cgroup_writer[@]}" "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
   fi

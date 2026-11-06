@@ -19,14 +19,15 @@ type SessionRowProps = {
   agentLabel: string;
   /**
    * The row tint to paint when the eyebrow names something other than an
-   * agent or origin name: the word's colour must not drift with its
-   * translation, so the state pins instead of hashing. `unknown` is a
-   * placeholder for a value the row cannot name, so it takes the muted
-   * placeholder ink; `idle`/`live` keep the ramp entry the English word
-   * already hashed to (sky blue). Omit it for a real agent, repo or platform
-   * name, which keeps its own deterministic hash.
+   * agent or repository name: the word's colour must not drift with its
+   * translation, so the key pins instead of hashing. `unknown` is a
+   * placeholder for a value the row cannot name, and `platform` names the kind
+   * of agent the row ran on; both are metadata rather than a name, so they take
+   * the muted pair and the title leads. `idle`/`live` keep the ramp entry the
+   * English word already hashed to (sky blue). Omit it for a repository name,
+   * which keeps its own deterministic hash.
    */
-  agentState?: 'unknown' | 'idle' | 'live' | null;
+  agentState?: 'unknown' | 'platform' | 'idle' | 'live' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;

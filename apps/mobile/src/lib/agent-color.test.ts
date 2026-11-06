@@ -9,6 +9,13 @@ describe('stateTint', () => {
     expect(stateTint('unknown').hueTextClass).not.toMatch(/^text-agent-/);
   });
 
+  it('renders the agent type as muted metadata, so the title leads the row', () => {
+    // A row whose eyebrow can only name the kind of agent it ran on is not
+    // naming itself: an accent there competes with the title beside it.
+    expect(stateTint('platform')).toBe(PLACEHOLDER_TINT);
+    expect(stateTint('platform').hueClass).toBe('bg-muted-soft');
+  });
+
   it('keeps each live state at the tint its English word first rendered', () => {
     // The continuity contract: the pre-pin row tint was the hash of the
     // rendered English word, so each state pin must equal that hash or an

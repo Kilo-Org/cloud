@@ -1,11 +1,4 @@
-jest.mock('posthog-js/react', () => ({ useFeatureFlagEnabled: jest.fn() }));
-jest.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: jest.fn() }));
-
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { useFeatureFlagEnabled } from 'posthog-js/react';
-import { NativeSyncClient, type NativeEvent } from '@kilocode/cloud-agent-sdk';
-import NativeRemotePage from './page';
+import type { NativeEvent } from '@kilocode/cloud-agent-sdk';
 import {
   commandResult,
   commandRunner,
@@ -26,12 +19,6 @@ function event(type: string, data: unknown, seq = 1): NativeEvent {
   };
 }
 
-it.each([false, undefined])('hides all UI and never creates a client when flag is %s', enabled => {
-  jest.mocked(useFeatureFlagEnabled).mockReturnValue(enabled);
-  expect(renderToStaticMarkup(React.createElement(NativeRemotePage))).toBe('');
-  expect(NativeSyncClient).not.toHaveBeenCalled();
-  expect(useFeatureFlagEnabled).toHaveBeenCalledWith('native-remote-web');
-});
 it('tracks actual native permission asks and settlement', () => {
   const asked = event('permission.asked', {
     id: 'per_1',

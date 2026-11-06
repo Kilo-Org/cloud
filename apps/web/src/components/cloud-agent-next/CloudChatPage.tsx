@@ -43,7 +43,7 @@ import {
   ensureSelectedCustomOption,
   filterSessionCustomModeOptions,
   modeControlValue,
-  normalizeAlias,
+  resolveSendSelection,
   type CustomModeOption,
 } from './session-config';
 import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
@@ -658,26 +658,14 @@ export default function CloudChatPage({
       // produces no output, so the resume keeps the position instead of being
       // abandoned at the bottom.
       const resumeStateAtSend = captureSendPosition();
-      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
-        a => a.slug === sessionConfig?.mode
-      );
-      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
-      // An agent's variant only applies when it also pins a model — variants
-      // are model-specific (validated at write time in AgentConfigSchema). When
-      // an agent pins a model, its variant (if any) wins; otherwise the
-      // user-selected session variant applies.
-      const agentVariantOverrideForSend = agentModelOverrideForSend
-        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
-        : undefined;
+      const selection = resolveSendSelection(sessionConfig);
       const acceptedPromise = manager.send({
         payload: {
           type: 'prompt',
           prompt,
-          mode: normalizeAlias(sessionConfig?.mode) || 'code',
-          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-          variant: agentModelOverrideForSend
-            ? agentVariantOverrideForSend
-            : (sessionConfig?.variant ?? undefined),
+          mode: selection.mode,
+          model: selection.model,
+          variant: selection.variant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -715,8 +703,16 @@ export default function CloudChatPage({
       // or the effect re-pauses follow and cancels the scroll for this
       // command's output. A refused command leaves the resume in place.
       const resumeStateAtSend = captureSendPosition();
+      const selection = resolveSendSelection(sessionConfig);
       const acceptedPromise = manager.send({
-        payload: { type: 'command', command, arguments: args },
+        payload: {
+          type: 'command',
+          command,
+          arguments: args,
+          mode: selection.mode,
+          ...(selection.model ? { model: selection.model } : {}),
+          ...(selection.variant ? { variant: selection.variant } : {}),
+        },
         attachments: supportsAttachments ? attachments : undefined,
       });
       // Pins the tail when the list already follows; a no-op under a resume.
@@ -731,7 +727,14 @@ export default function CloudChatPage({
       followAcceptedSend(resumeStateAtSend);
       return true;
     },
-    [manager, scheduleScrollToBottom, supportsAttachments, captureSendPosition, followAcceptedSend]
+    [
+      manager,
+      scheduleScrollToBottom,
+      sessionConfig,
+      supportsAttachments,
+      captureSendPosition,
+      followAcceptedSend,
+    ]
   );
 
   const handleStopExecution = useCallback(() => {

@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionPageSheet } from './session-page-sheet';
 
-// Mutated between tests so one suite can prove both platform branches.
+// Mutated between tests so one suite can prove both platform branches and the
+// Android top-inset padding.
 const reactNativeMock = vi.hoisted(() => ({
   Platform: { OS: 'ios' as string },
 }));
@@ -140,9 +141,8 @@ describe('SessionPageSheet mounted', () => {
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // The sheet presents below the status bar on its own, so the surface
-    // reserves no top inset on either platform.
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
@@ -183,16 +183,19 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('reserves no top inset on Android, where the sheet window starts below the status bar', async () => {
+  it('pads the Android surface by the top inset', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await mountSheet();
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
-    // The app-level inset belongs to the activity window; the sheet presents in
-    // a window of its own that already begins below the status bar, so padding
-    // by it would leave a dead band of exactly that height above the header.
-    expect(surface?.props.style).toBeUndefined();
+    // The padding keeps the content below the system status bar.
+    expect(surface?.props.style).toEqual({ paddingTop: 24 });
+    // The surface clears the status bar, so the sheet must not reserve that inset
+    // too: Android reads a dialog window's insets only after the sheet measured
+    // itself, and the sheet then shrank by the status bar and moved its whole
+    // content — header included — after it had already appeared.
+    expect(sheet(renderer.root).props.contentOwnsTopInset).toBe(true);
 
     renderer.unmount();
   });

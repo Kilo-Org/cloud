@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -32,6 +33,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
+import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -42,6 +44,7 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
@@ -109,6 +112,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
   const { t } = useTranslation();
+  // The same preference the Profile credits card obeys. Until the disk read
+  // settles the choice is unknown, so the amount stays masked: the hub must
+  // never paint an amount the person may have hidden one screen away.
+  const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
+  const hideOrgBalance = hideBalance || !hideBalanceLoaded;
 
   if (isResolving || organizationId == null || org == null) {
     return (
@@ -192,8 +200,21 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
-              value={formatMoney(fromMicrodollars(org.balance), i18n.language)}
+              value={
+                hideOrgBalance
+                  ? HIDDEN_BALANCE
+                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
+              }
               valueFace="numeric"
+              // Always pass the label: a node React Native stops handing a
+              // label keeps its previous native value on Android, so a
+              // masked row that reveals its amount would still announce
+              // "Balance hidden" (the credits card's own note).
+              valueAccessibilityLabel={
+                hideOrgBalance
+                  ? t('profile.balanceHidden')
+                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
+              }
             />
           )}
           {showMoney && org.balance === 0 && (
@@ -315,6 +336,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           title={t('organization.hub.renameTitle')}
           placeholder={t('organization.hub.renamePlaceholder')}
           initialValue={org.organizationName}
+          // The server validates a rename with `OrganizationNameSchema`
+          // (packages/web-shared), so the field must accept the name it would
+          // accept. RenameModal's own default is lower than a stored name can
+          // be, and React Native applies `maxLength` to the seeded value: the
+          // dialog would open on a cut name, and saving would store the cut.
+          maxLength={ORGANIZATION_NAME_MAX_LENGTH}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

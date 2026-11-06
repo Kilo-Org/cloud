@@ -9,6 +9,7 @@
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 
+import { ORGANIZATION_NAME_MAX_LENGTH } from '@kilocode/app-shared/organizations';
 import { createElement } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +30,7 @@ const SPACING_UNIT_DP = 4;
 
 const boundary = vi.hoisted(() => ({
   role: 'owner' as string,
+  name: 'Acme',
   parentOrganizationId: null as string | null | undefined,
   requireSeats: false,
   seatCount: { used: 1, total: 1 },
@@ -60,7 +62,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     role: boundary.role,
     org: {
       organizationId: 'org-1',
-      organizationName: 'Acme',
+      organizationName: boundary.name,
       parentOrganizationId: boundary.parentOrganizationId,
       balance: 5_000_000,
       requireSeats: boundary.requireSeats,
@@ -77,6 +79,21 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
   useOrganizationMutations: () => ({ rename: { mutateAsync: vi.fn() } }),
+}));
+
+// The hub obeys the Profile tab's hide-balance preference; this suite pins both
+// renderings from a hoisted state each case sets.
+const hideBalancePref = vi.hoisted(() => ({
+  hideBalance: false,
+  hasLoaded: true,
+}));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', () => ({
+  useHideBalancePreference: () => ({
+    hideBalance: hideBalancePref.hideBalance,
+    hasLoaded: hideBalancePref.hasLoaded,
+    setHideBalance: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -239,9 +256,12 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.name = 'Acme';
   boundary.parentOrganizationId = null;
   boundary.requireSeats = false;
   boundary.seatCount = { used: 1, total: 1 };
+  hideBalancePref.hideBalance = false;
+  hideBalancePref.hasLoaded = true;
   kiloPassRowState.current = null;
   routerPush.mockClear();
   kiloPassQuery.enabled = [];
@@ -275,6 +295,55 @@ describe('Organization hub card', () => {
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
+});
+
+describe('Organization hub balance masking', () => {
+  // The mocked org carries balance 5_000_000 → the mocked formatMoney paints $5.
+  const balanceRow = (renderer: TestRenderer.ReactTestRenderer) =>
+    renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+
+  it('paints the amount while the hide-balance preference is off', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('$5');
+    // The spoken label always carries the amount: a node React Native stops
+    // handing a label keeps its previous native value on Android, so the
+    // masked-until-settled flip to visible must not leave "Balance hidden".
+    expect(row?.props.valueAccessibilityLabel).toBe('$5');
+    unmount();
+  });
+
+  it('masks the amount and speaks the hidden label while the preference is on', async () => {
+    hideBalancePref.hideBalance = true;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
+    // No painted node may carry the amount while it is hidden.
+    expect(
+      renderer.root.findAll(
+        node => typeof node.props.children === 'string' && node.props.children === '$5'
+      )
+    ).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the amount masked until the preference read settles', async () => {
+    hideBalancePref.hideBalance = false;
+    hideBalancePref.hasLoaded = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const row = balanceRow(renderer);
+    expect(row?.props.value).toBe('*****');
+    expect(row?.props.valueAccessibilityLabel).toBe(i18n.t('profile.balanceHidden'));
     unmount();
   });
 });
@@ -342,6 +411,31 @@ describe('OrganizationHubScreen rename control', () => {
     });
 
     expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(1);
+    unmount();
+  });
+
+  it('opens the rename sheet on the whole stored name, up to the server limit', async () => {
+    // `RenameModal`'s own default is shorter than a stored organization name can
+    // be, and React Native applies `maxLength` to the seeded value: the dialog
+    // then opens on a cut name, and saving keeps only what the field shows.
+    const longName = 'Northwind Logistics — European Operations and Customer Support Berlin';
+    expect(longName.length).toBeGreaterThan(50);
+    boundary.name = longName;
+
+    const { renderer, unmount } = await renderHub();
+    const control = findRenameControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('rename control not found');
+    }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    const modal = renderer.root.findAll(node => String(node.type) === 'RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      initialValue: longName,
+      maxLength: ORGANIZATION_NAME_MAX_LENGTH,
+    });
     unmount();
   });
 

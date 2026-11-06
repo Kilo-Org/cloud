@@ -819,6 +819,44 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
+  it('accepts optional command mode, model, and variant overrides', () => {
+    const result = SendMessageV2Input.safeParse({
+      cloudAgentSessionId: validSessionId,
+      messageId: validMessageId,
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data).toMatchObject({
+      payload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        variant: 'thinking',
+      },
+    });
+  });
+
+  it('rejects custom mode on a command payload without appendSystemPrompt', () => {
+    expect(
+      SendMessageV2Input.safeParse({
+        cloudAgentSessionId: validSessionId,
+        payload: { type: 'command', command: 'compact', arguments: '', mode: 'custom' },
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects attachment descriptors on nested command payloads', () => {
     for (const descriptor of [{ attachments: validAttachments }]) {
       expect(

@@ -1849,6 +1849,7 @@ export type AuthProviderId =
   | 'linkedin'
   | 'discord'
   | 'openai'
+  | 'claude'
   | 'fake-login'
   | 'workos';
 

@@ -100,6 +100,43 @@ function build(
 
 describe('buildScoreboard', () => {
   it.each([
+    { override: undefined, expectedAccuracy: 0.99 },
+    { override: 0.05, expectedAccuracy: 0.91 },
+  ])(
+    'uses the stored quality band unless override $override is supplied',
+    ({ override, expectedAccuracy }) => {
+      const inputTable: ScoreboardRoutingTable = {
+        ...table,
+        minAccuracy: 0.95,
+        accuracyNoiseBand: 0,
+        routes: {
+          'implementation/code_generation': [
+            {
+              model: 'accurate',
+              accuracy: 0.99,
+              avgCostUsd: 0.01,
+              p50LatencyMs: 1000,
+              meetsThreshold: true,
+            },
+            {
+              model: 'economical',
+              accuracy: 0.91,
+              avgCostUsd: 0.000001,
+              p50LatencyMs: 1000,
+              meetsThreshold: false,
+            },
+          ],
+        },
+      };
+      const result = build(inputTable, null, null, {
+        rerankProfile: { uncachedInputTokens: 0, cachedInputTokens: 0 },
+        accuracyNoiseBand: override,
+      });
+      expect(result.quality.benchmarkAccuracyWeighted).toBeCloseTo(expectedAccuracy);
+    }
+  );
+
+  it.each([
     { accuracyNoiseBand: undefined, expectedAccuracy: 0 },
     { accuracyNoiseBand: 0.05, expectedAccuracy: 0 },
     { accuracyNoiseBand: 0.01, expectedAccuracy: 1 },
@@ -270,6 +307,7 @@ describe('buildScoreboard', () => {
       published_at: now.toISOString(),
       generated_at: now.toISOString(),
       min_accuracy: 0.5,
+      accuracy_noise_band: 0,
       switch_cost_factor: 2,
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: JSON.stringify(profile),
@@ -288,7 +326,8 @@ describe('buildScoreboard', () => {
       variant: '',
       pricing: JSON.stringify(pricing),
       estimated_request_cost_usd: 0.22,
-      p50LatencyMs: 100,
+      p50_latency_ms: 100,
+      p50_ttft_ms: 10,
     });
     const parsed = ScoreboardRoutingTableSchema.parse(rowsToRoutingTable(tableRow, [candidateRow]));
     expect(parsed.productionTokenProfile).toEqual(profile);

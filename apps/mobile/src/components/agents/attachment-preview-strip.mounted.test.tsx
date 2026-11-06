@@ -898,9 +898,8 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     expect(sheets[0]?.props.index).toBe(0);
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // The sheet presents below the status bar on its own, so the surface
-    // reserves no top inset on either platform.
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
@@ -931,7 +930,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
-  it('renders an opaque full-window sheet that reserves no top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
@@ -944,10 +943,9 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    // flex-1 fills the sheet's own window, which already starts below the
-    // status bar, so the surface adds no inset on top of it.
+    // flex-1 fills the window; the padding clears the system status bar.
     expect(surface[0]?.props.className).toContain('flex-1');
-    expect(surface[0]?.props.style).toBeUndefined();
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
 
     // The insets.bottom spacer clears the Android navigation bar.
     const spacers = renderer.root.findAll(

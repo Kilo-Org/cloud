@@ -31,7 +31,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
@@ -407,7 +407,7 @@ export default function SessionDetailScreen() {
                   // POP_TO reuses the `(tabs)` route under this screen and
                   // truncates every `agent-chat` route above it, so a composer
                   // still on the stack under a missing session is gone with it.
-                  router.dismissTo(AGENTS_SESSIONS_HREF);
+                  router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
                 }}
               >
                 <Text>{t('agentChat.session.backToSessions')}</Text>

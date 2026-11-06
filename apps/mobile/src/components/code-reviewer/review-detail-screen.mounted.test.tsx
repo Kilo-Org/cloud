@@ -1100,12 +1100,12 @@ describe('ReviewDetailScreen transcript sheet', () => {
       expect(connection.connect).toHaveBeenCalledTimes(1);
       expect(composerRenders.list).toHaveLength(0);
 
-      // The sheet presents in its own window below the status bar on both
-      // platforms, so the surface reserves no top inset.
+      // Android expands the sheet over the status bar, so the surface pads the
+      // top inset; iOS presents below it and pads nothing.
       const surface = renderer.root.findAll(
         node => node.props.testID === 'session-page-sheet-surface'
       )[0];
-      expect(surface?.props.style).toBeUndefined();
+      expect(surface?.props.style).toEqual({ paddingTop: platform === 'ios' ? 0 : 24 });
 
       act(() => {
         (sheet?.props.onClose as (() => void) | undefined)?.();

@@ -67,13 +67,12 @@ export function useFormSheetScreenOptions() {
  *   itself — measured on the PR review formSheets, whose header sits at the
  *   window top with its own status-bar padding. iOS presents the native sheet
  *   below the status bar, so there the header reserves nothing.
- * - 'ios-page-sheet': a sheet that presents in the platform's own sheet window
- *   — `SessionPageSheet` — so the header reserves no top clearance on either
- *   platform. That window (the native iOS page sheet, the Android Material
- *   dialog behind `Sheet`) already begins below the status bar, and
- *   `useSafeAreaInsets` still reports the activity window's inset inside it.
- *   Reading that inset in the header, or padding the sheet surface by it,
- *   leaves a dead band above the title one status bar tall.
+ * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
+ *   on both platforms, so the header reserves no top clearance — the native
+ *   iOS pageSheet presents below the status bar, and the Android full-window
+ *   Modal pads its own top inset (session-page-sheet). `useSafeAreaInsets`
+ *   still reports the window's inset inside either Modal, so reading it in the
+ *   header would leave a dead band above the title.
  * - 'never': the surface can never reach the window top (half-detent-only
  *   sheets), so the header reserves no top clearance on either platform —
  *   the inset would only be a dead band above the title.

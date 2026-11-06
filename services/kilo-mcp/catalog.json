@@ -6986,6 +6986,21 @@
                       "default": "",
                       "type": "string",
                       "maxLength": 100000
+                    },
+                    "mode": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 50,
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "variant": {
+                      "type": "string",
+                      "maxLength": 50,
+                      "pattern": "^[a-zA-Z]+$"
                     }
                   },
                   "required": [
@@ -8447,6 +8462,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -8507,6 +8537,65 @@
       "attachments"
     ],
     "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
+  },
+  "cloudAgentNextFailures.exportSessionDiagnostics": {
+    "path": "cloudAgentNextFailures.exportSessionDiagnostics",
+    "kind": "query",
+    "summary": "Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "format": {
+          "default": "json",
+          "type": "string",
+          "enum": [
+            "json",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "exportsessiondiagnostics",
+      "cloudagentsessionid",
+      "format"
+    ],
+    "searchBlob": "cloudAgentNextFailures.exportSessionDiagnostics Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket. cloudagentnextfailures exportsessiondiagnostics cloudagentsessionid format cloudAgentSessionId format"
+  },
+  "cloudAgentNextFailures.getSessionFailureHistory": {
+    "path": "cloudAgentNextFailures.getSessionFailureHistory",
+    "kind": "query",
+    "summary": "Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "getsessionfailurehistory",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNextFailures.getSessionFailureHistory Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window. cloudagentnextfailures getsessionfailurehistory cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -8602,6 +8691,28 @@
       "recent_messages"
     ],
     "searchBlob": "cloudAgentNextFeedback.create Submit user feedback about a Cloud Agent session, including the rating text, model, repository, and recent messages. Use this to report a problem or share an opinion about a cloud agent run. cloudagentnextfeedback create cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages"
+  },
+  "cloudAgentNextFeedback.list": {
+    "path": "cloudAgentNextFeedback.list",
+    "kind": "query",
+    "summary": "List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        }
+      }
+    },
+    "tags": [
+      "cloudagentnextfeedback",
+      "list",
+      "limit"
+    ],
+    "searchBlob": "cloudAgentNextFeedback.list List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported. cloudagentnextfeedback list limit limit"
   },
   "cloudAgentSettings.canManage": {
     "path": "cloudAgentSettings.canManage",
@@ -18552,6 +18663,21 @@
                           "default": "",
                           "type": "string",
                           "maxLength": 100000
+                        },
+                        "mode": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50,
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "variant": {
+                          "type": "string",
+                          "maxLength": 50,
+                          "pattern": "^[a-zA-Z]+$"
                         }
                       },
                       "required": [
@@ -20086,6 +20212,21 @@
                   "default": "",
                   "type": "string",
                   "maxLength": 100000
+                },
+                "mode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50,
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z]+$"
                 }
               },
               "required": [
@@ -36018,6 +36159,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -36474,6 +36616,7 @@
             "linkedin",
             "discord",
             "openai",
+            "claude",
             "fake-login",
             "workos",
             "passkey"
@@ -37532,6 +37675,58 @@
       "organizationid"
     ],
     "searchBlob": "workspaceFolders.list List the signed-in user's workspace folders, optionally scoped to an organization, including each folder's name, color, and assigned worktrees. workspacefolders list organizationid organizationId"
+  },
+  "workspaceFolders.moveSession": {
+    "path": "workspaceFolders.moveSession",
+    "kind": "mutation",
+    "summary": "Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "folderId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "folderId"
+      ]
+    },
+    "tags": [
+      "workspacefolders",
+      "movesession",
+      "organizationid",
+      "sessionid",
+      "folderid"
+    ],
+    "searchBlob": "workspaceFolders.moveSession Move a chat session into a workspace folder, or pass a null folder ID to move it out and leave it ungrouped. Use this to organize sessions into project folders or unfile one. workspacefolders movesession organizationid sessionid folderid organizationId sessionId folderId"
   },
   "workspaceFolders.moveWorktree": {
     "path": "workspaceFolders.moveWorktree",

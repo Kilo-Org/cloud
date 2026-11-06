@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type AdaptiveHomeCardFrameProps = {
@@ -103,7 +104,7 @@ export function AdaptiveHomeCardFrame({
       >
         <View className="gap-2 px-4 py-3">
           {[0, 1, 2, 3].map(row => (
-            <View key={row} className="min-h-6 justify-center">
+            <View key={row} className={`${ROW_TARGET_CLASS} justify-center`}>
               <Text className="text-sm">{'\u200B'}</Text>
             </View>
           ))}

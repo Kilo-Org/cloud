@@ -678,13 +678,18 @@ export function isEligibleFirstWorktreeSession(
       input.clone !== undefined
     );
   }
+  // Only the IDE Agent Manager may create a workspace with no first turn; the
+  // first prompt arrives later through the same root session.
   return (
     (isTrustedWorktreeCreateOrigin(
       input.options?.clientProvenance,
       input.options?.createdOnPlatform
     ) ||
       isAuthenticatedChildWorktreeCreate(input, ctx)) &&
-    input.initialTurn !== undefined &&
+    (input.initialTurn !== undefined ||
+      (input.parentCloudAgentSessionId === undefined &&
+        input.options?.clientProvenance === 'agent-manager' &&
+        input.options?.createdOnPlatform === 'agent-manager')) &&
     input.clone === undefined
   );
 }
@@ -1257,7 +1262,7 @@ async function allocateNewSession(
  * instead of allocating fresh ones. When the create carried an initial turn it
  * keeps the stored `initialMessageId` (the retry's own message id is never
  * used) with the turn content from `input.initialTurn`, which the intent
- * fingerprint already proved unchanged. A clone-only create recorded no
+ * fingerprint already proved unchanged. A prompt-less create recorded no
  * `initialMessageId` and rebuilds no initial turn.
  */
 function rebuildRecordedSessionAllocation(
@@ -1750,9 +1755,10 @@ async function allocateSessionForCreate(
 
 /**
  * Registers an already allocated session in its Durable Object without
- * admitting an initial turn. Used by the clone-only create, which has no
- * synthetic initial turn. Mirrors `registerNewSession` but threads the ledger
- * hooks so the create effect settles exactly once.
+ * admitting an initial turn. Used by the clone-only create and the prompt-less
+ * hosted workspace create, neither of which has a synthetic initial turn.
+ * Mirrors `registerNewSession` but threads the ledger hooks so the create
+ * effect settles exactly once.
  */
 async function registerAllocatedSession(
   input: SessionRegistrationInput,

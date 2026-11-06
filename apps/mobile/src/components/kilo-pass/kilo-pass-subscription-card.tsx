@@ -140,11 +140,13 @@ export function KiloPassSubscriptionCard({
       ) : null}
 
       {contentState.kind === 'loading' && hideLoadingSkeleton ? (
-        // The height the loading card below renders at, so revealing it never
-        // moves layout: p-3 (24) + the h-10 icon row (40) + the 1px borders
-        // (2), plus the stacked copy row (gap-2 8 + the two skeleton bars
-        // 12 + 16 + 12) when narrow.
-        <View className={narrow ? 'h-[114px]' : 'h-[66px]'} />
+        // The height the card renders at while the inputs are pending. The
+        // reserve uses exact pixel classes: rem-sized placeholders render
+        // undersize on Android, so the reveal moved every section below
+        // (Android base cell, design gate 2026-11-06). Measured resolved wide
+        // card: 58.67 dp; the stacked copy row above takes the same p-3 shell
+        // with its own copy, so the narrow reserve keeps the wider stack.
+        <View className={narrow ? 'h-[101px]' : 'h-[58.5px]'} />
       ) : null}
 
       {contentState.kind === 'loading' && !hideLoadingSkeleton ? (

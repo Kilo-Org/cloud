@@ -296,11 +296,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         // were invisible in this shell (b911 e2 spot check: "blank beige
         // block", e2-nav-profile.png).
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <View className="min-h-12 flex-1 justify-center gap-1">
-            <Skeleton className="h-7 w-28 rounded-md bg-muted-soft" />
+          {/* The column and the reserve are exact pixel heights: rem-sized
+              placeholders render at a fraction of their nominal dp on Android,
+              so `min-h-12` settled 6 dp under the row it stood in for and the
+              row's arrival moved every section below (Android base cell,
+              design gate 2026-11-06). The row's height is its control box —
+              the toggle's 48 dp, which `ICON_TARGET_BOX_CLASS` writes
+              exactly — so the placeholder carries the same 48. */}
+          <View className="min-h-[48px] flex-1 justify-center gap-1">
+            <Skeleton className="h-[28px] w-28 rounded bg-muted-soft" />
             <Skeleton className="h-[14px] w-40 rounded bg-muted-soft" />
           </View>
-          <View className="h-12 w-12 shrink-0" />
+          <View className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0')} />
         </View>
       )}
       {balanceFailed && (

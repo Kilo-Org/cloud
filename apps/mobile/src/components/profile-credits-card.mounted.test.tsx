@@ -757,7 +757,8 @@ describe('CreditsCard balance state', () => {
     const { renderer, texts, unmount } = await mountCard();
     expect(texts().filter(text => text === 'SKELETON')).toHaveLength(2);
     const spacer = renderer.root.find(
-      node => String(node.props.className) === 'h-12 w-12 shrink-0'
+      node =>
+        String(node.props.className) === 'h-[48px] w-[48px] items-center justify-center shrink-0'
     );
     expect(spacer).toBeTruthy();
     unmount();

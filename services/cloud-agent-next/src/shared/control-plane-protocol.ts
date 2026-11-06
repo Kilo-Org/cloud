@@ -552,6 +552,8 @@ export const controlPlaneCredentialSourceSchema = z
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
       .optional(),
     createdOnPlatform: z.string().max(100).optional(),
+    /** Worker-owned origin; client platform claims do not select runtime harnesses. */
+    billingOrigin: z.string().max(100).optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this

@@ -1,5 +1,6 @@
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { applyPricingTiers } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
@@ -47,8 +48,8 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    isFree: model.pricing === undefined,
-    mayTrainOnYourPrompts: true,
+    isFree: isFreeModel(publicId),
+    mayTrainOnYourPrompts: model.may_train_on_prompts !== false,
     opencode: opencode && withLegacyVariants(opencode),
   };
 }

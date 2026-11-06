@@ -111,6 +111,7 @@ const mockSession = {
   dismissSuggestion: jest.fn(),
   retryRemoteModels: jest.fn(),
   retryRemoteCommands: jest.fn(),
+  observeProjected: jest.fn(),
   createRemoteSession: jest.fn(() => Promise.resolve(kiloId('ses_12345678901234567890123456'))),
   exitRemoteSession: jest.fn(() => Promise.resolve()),
   canSend: true,
@@ -124,6 +125,7 @@ const mockSession = {
     getStatus: jest.fn<AgentStatus, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getPreparationAttempts: jest.fn<readonly PreparationAttempt[], []>(() => []),
     getCommits: jest.fn(() => []),
     clearCommits: jest.fn(),
     clearPreparationAttempts: jest.fn(),
@@ -438,6 +440,7 @@ describe('createSessionManager', () => {
     mockSession.exitRemoteSession.mockClear();
     mockSession.exitRemoteSession.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
+    mockSession.observeProjected.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
     mockSession.state.subscribe.mockImplementation(callback => {
@@ -447,6 +450,7 @@ describe('createSessionManager', () => {
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
     mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.state.getSetupLog.mockReturnValue([]);
+    mockSession.state.getPreparationAttempts.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
     mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
     mockSession.storage = latestStorage;
@@ -738,7 +742,7 @@ describe('createSessionManager', () => {
         callback();
         return () => {};
       });
-      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      mockSession.state.getPreparationAttempts.mockImplementation(livePreparation);
       try {
         const config = createMockConfig({
           writeCachedSnapshotPage: page => cached.set(page.info.id, page),
@@ -768,7 +772,7 @@ describe('createSessionManager', () => {
         expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
         mgr.destroy();
       } finally {
-        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+        mockSession.state.getPreparationAttempts.mockReturnValue([]);
       }
     });
 
@@ -789,7 +793,7 @@ describe('createSessionManager', () => {
         callback();
         return () => {};
       });
-      Object.assign(mockSession.state, { getPreparationAttempts: livePreparation });
+      mockSession.state.getPreparationAttempts.mockImplementation(livePreparation);
       try {
         const config = createMockConfig({
           fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
@@ -810,7 +814,7 @@ describe('createSessionManager', () => {
         expect(config.store.get(mgr.atoms.preparationAttempts)).toEqual([replayed]);
         mgr.destroy();
       } finally {
-        delete (mockSession.state as { getPreparationAttempts?: unknown }).getPreparationAttempts;
+        mockSession.state.getPreparationAttempts.mockReturnValue([]);
       }
     });
 
@@ -5599,6 +5603,11 @@ describe('createSessionManager', () => {
       expect(childMessages('child-old')).toEqual([
         { info: firstMessage.info, parts: [firstPart] },
         { info: secondMessage.info, parts: [secondPart] },
+      ]);
+      // Both child pages seed the live part positions.
+      expect(mockSession.observeProjected.mock.calls).toEqual([
+        [[{ info: firstMessage.info, parts: [firstPart] }]],
+        [[{ info: secondMessage.info, parts: [secondPart] }]],
       ]);
       const state = atomValue<
         (childSessionId: string) => {

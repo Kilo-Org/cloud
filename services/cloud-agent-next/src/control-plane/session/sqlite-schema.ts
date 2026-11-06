@@ -11,12 +11,36 @@ export const events = sqliteTable(
     payload: text('payload').notNull(),
     timestamp: integer('timestamp').notNull(),
     entity_id: text('entity_id').unique(),
+    mutation_cursor: integer('mutation_cursor').notNull().default(0),
   },
   table => [
     index('idx_events_execution').on(table.execution_id),
     index('idx_events_type').on(table.stream_event_type),
     index('idx_events_timestamp').on(table.timestamp),
     index('idx_events_id_execution').on(table.id, table.execution_id),
+    index('idx_events_mutation_cursor').on(table.mutation_cursor),
+  ]
+);
+
+export const eventMutationCursor = sqliteTable('event_mutation_cursor', {
+  id: integer('id').primaryKey(),
+  cursor: integer('cursor').notNull().default(0),
+});
+
+export const historyImport = sqliteTable(
+  'history_import',
+  {
+    entity_id: text('entity_id').primaryKey(),
+    kilo_session_id: text('kilo_session_id').notNull().default(''),
+    payload: text('payload').notNull(),
+    timestamp: integer('timestamp').notNull(),
+  },
+  table => [
+    index('idx_history_import_scope_timestamp_entity').on(
+      table.kilo_session_id,
+      table.timestamp,
+      table.entity_id
+    ),
   ]
 );
 

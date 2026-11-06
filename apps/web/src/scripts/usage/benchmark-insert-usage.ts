@@ -206,6 +206,7 @@ function generateRandomRecord(
       70
     ),
     reasoning_setting: null,
+    inference_region: null,
     market_cost: core.cost,
     non_inference_cost: null,
     is_free: Math.random() < 0.1,

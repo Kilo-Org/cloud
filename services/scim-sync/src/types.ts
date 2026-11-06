@@ -1,5 +1,5 @@
 /**
- * Durable Object RPC result shapes.
+ * Durable Object RPC and status shapes.
  *
  * These are internal contracts between the Worker and its Durable Object, not
  * data crossing an IO boundary, so they are plain types rather than Zod

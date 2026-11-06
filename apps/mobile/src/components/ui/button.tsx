@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text, TextClassContext } from '@/components/ui/text';
@@ -92,14 +92,9 @@ const buttonGapVariants = cva('', {
 // accessibility tree, because the button carries its own busy name.
 export const BUTTON_BUSY_LABEL_CLASS = 'min-w-0 shrink flex-row items-center justify-center';
 export const BUTTON_BUSY_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
-/** The busy mark draws at the label's own line height, so it replaces its ink. */
 const BUTTON_BUSY_MARK_SIZE = 20;
-/**
- * The platform's small indicator strokes a ring centred on a 7.5 dp radius; a
- * 17 dp box with a 2 dp border paints the same ring behind it as a track, in
- * the indicator's own ink rather than a washed-out version of it.
- */
-const BUSY_TRACK_SIZE = 17;
+// Android's native arc can shrink to a dot; iOS uses a spoke spinner.
+const ANDROID_BUSY_TRACK_SIZE = 17;
 
 /**
  * The visible text of the button's children, for a label a loading button can
@@ -134,40 +129,48 @@ function flattenChildrenText(children: React.ReactNode): string | undefined {
   return text === '' ? undefined : text;
 }
 
-// Spinner color per variant, matching that variant's text color (see
-// buttonTextVariants below).
-function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
-  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
-    return colors.foreground;
-  }
-  if (variant === 'link') {
-    return colors.primary;
-  }
-  if (variant === 'accent-soft') {
-    return colors.accentSoftTintForeground;
-  }
-  if (variant === 'destructive') {
-    return colors.destructiveSolidForeground;
-  }
-  if (variant === 'outline-destructive') {
-    return colors.destructive;
-  }
-  // default
-  return colors.primaryForeground;
-}
+type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
+
+/**
+ * Each variant's ink in one place: the class its label paints and the theme
+ * token its busy mark follows. The mark has to read in the label's own colour —
+ * a busy button shows the mark where the label was, and a still capture of the
+ * platform indicator is otherwise a speck on the fill — so the two columns
+ * cannot be kept apart. Recording both here makes a variant added to
+ * `buttonVariants` without an ink pair, or an ink pair naming a token the
+ * palette does not define, a type error instead of a mark in the default
+ * variant's colour.
+ */
+const BUTTON_INK = {
+  default: { label: 'text-primary-foreground', mark: 'primaryForeground' },
+  destructive: {
+    label: 'text-destructive-solid-foreground',
+    mark: 'destructiveSolidForeground',
+  },
+  outline: { label: 'text-foreground', mark: 'foreground' },
+  'outline-destructive': { label: 'text-destructive', mark: 'destructive' },
+  secondary: { label: 'text-secondary-foreground', mark: 'secondaryForeground' },
+  ghost: { label: 'text-foreground', mark: 'foreground' },
+  link: { label: 'text-primary group-active:underline', mark: 'primary' },
+  'accent-soft': {
+    label: 'text-accent-soft-tint-foreground',
+    mark: 'accentSoftTintForeground',
+  },
+} as const satisfies Record<ButtonVariant, { label: string; mark: keyof ThemeColors }>;
+
+/**
+ * The label column of `BUTTON_INK`, keyed by the variant union. The table above
+ * is what makes it complete and what ties each label to its mark; `fromEntries`
+ * only rebuilds the same keys and widens them to `string`, so the record type
+ * restores the union cva reads its `variant` prop from.
+ */
+const buttonLabelClasses = Object.fromEntries(
+  Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
+) as Record<ButtonVariant, string>;
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      destructive: 'text-destructive-solid-foreground',
-      outline: 'text-foreground',
-      'outline-destructive': 'text-destructive',
-      secondary: 'text-secondary-foreground',
-      ghost: 'text-foreground',
-      link: 'text-primary group-active:underline',
-      'accent-soft': 'text-accent-soft-tint-foreground',
-    },
+    variant: buttonLabelClasses,
     size: {
       default: '',
       sm: '',
@@ -185,7 +188,7 @@ const buttonTextVariants = cva('text-foreground text-center text-sm font-semibol
 type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
   React.RefAttributes<typeof Pressable> &
   VariantProps<typeof buttonVariants> & {
-    /** Disables the button and shows an ActivityIndicator alongside its content. */
+    /** Disables the button and replaces its label with a centered ActivityIndicator. */
     loading?: boolean;
     children?: React.ReactNode;
   };
@@ -237,25 +240,26 @@ function Button({
   // The children sit one level deeper in that layout, so their spacing moves
   // inside the wrapper; it takes the same size gap the row would have applied.
   const busyLabelGap = buttonGapVariants({ size });
-  // A busy mark has to read in a still capture as well as on screen. The
-  // platform indicator's indeterminate arc sweeps from near-zero on Android, so
-  // a still can land on a speck of ink where the label used to be. A track at
-  // the arc's own radius and stroke, painted in the label's own ink, keeps the
-  // mark a ring in every frame without diluting the ink the label used.
-  const busyInk = spinnerColor(variant, colors);
+  const busyInk = colors[BUTTON_INK[variant ?? 'default'].mark];
   const busyMark = (
     <View
       className="items-center justify-center"
       // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
       style={{ width: BUTTON_BUSY_MARK_SIZE, height: BUTTON_BUSY_MARK_SIZE }}
     >
-      <View className="absolute inset-0 items-center justify-center">
-        <View
-          className="rounded-full border-2"
-          // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
-          style={{ width: BUSY_TRACK_SIZE, height: BUSY_TRACK_SIZE, borderColor: busyInk }}
-        />
-      </View>
+      {Platform.OS === 'android' ? (
+        <View className="absolute inset-0 items-center justify-center">
+          <View
+            className="rounded-full border-2"
+            // eslint-disable-next-line react-native/no-inline-styles -- a numeric size cannot be a compiled class
+            style={{
+              width: ANDROID_BUSY_TRACK_SIZE,
+              height: ANDROID_BUSY_TRACK_SIZE,
+              borderColor: busyInk,
+            }}
+          />
+        </View>
+      ) : null}
       <ActivityIndicator accessible={false} size="small" color={busyInk} />
     </View>
   );

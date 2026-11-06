@@ -2,8 +2,17 @@ import 'server-only';
 
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { api_kind, enkrypt_usage, enkrypt_usage_decision } from '@kilocode/db/schema';
-import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
+import {
+  api_kind,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  enkrypt_usage_guardrail,
+} from '@kilocode/db/schema';
+import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
+} from '@kilocode/db/schema-types';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -13,6 +22,7 @@ import {
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
 import type {
   EnkryptUsageWrite,
+  EnkryptUsageWriteInput,
   EnkryptUsageWriteResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 
@@ -27,6 +37,7 @@ export type EnkryptGuardrailCall = {
   organizationId: string;
   kiloUserId: string;
   sessionId: string | null;
+  microdollarUsageId?: string;
   apiKind: EnkryptGuardrailApiKind;
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
@@ -36,6 +47,8 @@ export type EnkryptGuardrailCall = {
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
   /** The request's wait for the verdict, on one call per request only; see the ledger column. */
   addedLatencyMs: number | null;
+  /** Defaults to the input guardrail. */
+  guardrail?: EnkryptGuardrailDirection;
 };
 
 export function enkryptCreditsToMicrodollars(creditsCost: number | null): number {
@@ -50,13 +63,33 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
  * defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const usageWrite: EnkryptUsageWrite = {
-    ...usageRecord,
+  const { guardrail = 'input', ...call } = usageRecord;
+  const usageWrite: EnkryptUsageWriteInput = {
+    ...call,
+    // Input calls omit the field, so a web app deployed before it still accepts them.
+    ...(guardrail === 'output' ? { guardrail } : {}),
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
   if (isUSRegion() && (await recordEnkryptUsageInPrimaryRegion(usageWrite))) return;
-  await recordEnkryptUsageLocally(usageWrite);
+  await recordEnkryptUsageLocally({ ...usageWrite, guardrail });
+}
+
+/**
+ * The id of a lookup value, inserting it when it is new. A concurrent insert of the same value
+ * makes the insert return nothing, so the value is read again.
+ */
+async function lookupId(
+  select: () => Promise<{ id: number }[]>,
+  insert: () => Promise<{ id: number }[]>
+): Promise<number> {
+  const [row] = await select();
+  if (row) return row.id;
+  const [inserted] = await insert();
+  if (inserted) return inserted.id;
+  const [concurrent] = await select();
+  if (!concurrent) throw new Error('Enkrypt usage lookup resolution failed');
+  return concurrent.id;
 }
 
 /**
@@ -73,41 +106,45 @@ export async function recordEnkryptUsageLocally(
   const chargedMicrodollars = enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
   const outcome = await db.transaction(async tx => {
-    let [apiKind] = await tx
-      .select({ id: api_kind.api_kind_id })
-      .from(api_kind)
-      .where(eq(api_kind.api_kind, usageWrite.apiKind));
-    if (!apiKind) {
-      [apiKind] = await tx
-        .insert(api_kind)
-        .values({ api_kind: usageWrite.apiKind })
-        .onConflictDoNothing({ target: api_kind.api_kind })
-        .returning({ id: api_kind.api_kind_id });
-      if (!apiKind) {
-        [apiKind] = await tx
+    const apiKindId = await lookupId(
+      () =>
+        tx
           .select({ id: api_kind.api_kind_id })
           .from(api_kind)
-          .where(eq(api_kind.api_kind, usageWrite.apiKind));
-      }
-    }
-    let [decision] = await tx
-      .select({ id: enkrypt_usage_decision.decision_id })
-      .from(enkrypt_usage_decision)
-      .where(eq(enkrypt_usage_decision.decision, usageWrite.decision));
-    if (!decision) {
-      [decision] = await tx
-        .insert(enkrypt_usage_decision)
-        .values({ decision: usageWrite.decision })
-        .onConflictDoNothing({ target: enkrypt_usage_decision.decision })
-        .returning({ id: enkrypt_usage_decision.decision_id });
-      if (!decision) {
-        [decision] = await tx
+          .where(eq(api_kind.api_kind, usageWrite.apiKind)),
+      () =>
+        tx
+          .insert(api_kind)
+          .values({ api_kind: usageWrite.apiKind })
+          .onConflictDoNothing({ target: api_kind.api_kind })
+          .returning({ id: api_kind.api_kind_id })
+    );
+    const decisionId = await lookupId(
+      () =>
+        tx
           .select({ id: enkrypt_usage_decision.decision_id })
           .from(enkrypt_usage_decision)
-          .where(eq(enkrypt_usage_decision.decision, usageWrite.decision));
-      }
-    }
-    if (!apiKind || !decision) throw new Error('Enkrypt usage lookup resolution failed');
+          .where(eq(enkrypt_usage_decision.decision, usageWrite.decision)),
+      () =>
+        tx
+          .insert(enkrypt_usage_decision)
+          .values({ decision: usageWrite.decision })
+          .onConflictDoNothing({ target: enkrypt_usage_decision.decision })
+          .returning({ id: enkrypt_usage_decision.decision_id })
+    );
+    const guardrailId = await lookupId(
+      () =>
+        tx
+          .select({ id: enkrypt_usage_guardrail.guardrail_id })
+          .from(enkrypt_usage_guardrail)
+          .where(eq(enkrypt_usage_guardrail.guardrail, usageWrite.guardrail)),
+      () =>
+        tx
+          .insert(enkrypt_usage_guardrail)
+          .values({ guardrail: usageWrite.guardrail })
+          .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail })
+          .returning({ id: enkrypt_usage_guardrail.guardrail_id })
+    );
 
     const [inserted] = await tx
       .insert(enkrypt_usage)
@@ -116,11 +153,13 @@ export async function recordEnkryptUsageLocally(
         organization_id: usageWrite.organizationId,
         kilo_user_id: usageWrite.kiloUserId,
         session_id: usageWrite.sessionId,
-        api_kind_id: apiKind.id,
-        decision_id: decision.id,
+        microdollar_usage_id: usageWrite.microdollarUsageId ?? null,
+        api_kind_id: apiKindId,
+        decision_id: decisionId,
         enkrypt_credits_cost: usageWrite.creditsCost,
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
+        guardrail_id: guardrailId,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

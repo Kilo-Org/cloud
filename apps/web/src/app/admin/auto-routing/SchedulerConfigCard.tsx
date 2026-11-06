@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BENCHMARK_SCHEDULER_SETTING_KEYS,
@@ -34,12 +36,12 @@ const SETTING_LABELS: Record<BenchmarkSchedulerSettingKey, string> = {
 type SchedulerOverrideForm = Record<BenchmarkSchedulerSettingKey, string>;
 
 async function fetchSchedulerConfig() {
-  const response = await fetch(SCHEDULER_CONFIG_URL);
+  const response = await adminFetch(SCHEDULER_CONFIG_URL);
   return parseAdminResponse(response, BenchmarkSchedulerConfigResponseSchema);
 }
 
 async function saveSchedulerConfig(overrides: BenchmarkSchedulerOverrides) {
-  const response = await fetch(SCHEDULER_CONFIG_URL, {
+  const response = await adminFetch(SCHEDULER_CONFIG_URL, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(overrides),

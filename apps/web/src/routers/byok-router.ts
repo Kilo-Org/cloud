@@ -59,6 +59,7 @@ import {
   getByokKmsContext,
   getModelGatewayUserByokProviders,
   servesCatalogModels,
+  type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -134,23 +135,23 @@ function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys
   }));
 }
 
-function ownedPersonalKeys(userId: string) {
-  return and(
-    eq(byok_api_keys.kilo_user_id, userId),
-    ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+function ownedKeys(owner: ByokOwner) {
+  return eq(
+    owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id,
+    owner.id
   );
 }
 
-async function writePersonalKeyPriorities(
+async function writeKeyPriorities(
   tx: DrizzleTransaction,
-  userId: string,
+  owner: ByokOwner,
   keyIds: readonly string[]
 ) {
   for (const [priority, id] of keyIds.entries()) {
     await tx
       .update(byok_api_keys)
       .set({ settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ priority })}::jsonb` })
-      .where(and(eq(byok_api_keys.id, id), ownedPersonalKeys(userId)));
+      .where(and(eq(byok_api_keys.id, id), ownedKeys(owner)));
   }
 }
 
@@ -186,11 +187,14 @@ async function toBYOKApiKeyResponse(
   };
 }
 
-function rejectUnavailableExperimentalProvider(
+async function rejectUnavailableExperimentalProvider(
   providerId: string,
   organizationId: string | null | undefined
 ) {
-  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+  if (
+    isExperimentalByokProviderId(providerId) &&
+    !(await isExperimentalByokEnabled(organizationId))
+  ) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
@@ -334,31 +338,49 @@ export const byokRouter = createTRPCRouter({
     }),
 
   /**
-   * Sets the priority of every personal key: each request uses the first key in this order that can
+   * Sets the priority of every scoped key: each request uses the first key in this order that can
    * serve it. The ChatGPT connection is not a listed key and keeps its own step.
    */
   reorder: baseProcedure
     .input(ReorderBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
+      const { organizationId } = input;
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES)
+        : null;
+      const owner = byokOwner(ctx.user.id, organizationId);
       const keys = await db.transaction(async tx => {
         const owned = await tx
           .select({ id: byok_api_keys.id })
           .from(byok_api_keys)
-          .where(ownedPersonalKeys(ctx.user.id))
+          .where(and(ownedKeys(owner), ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)))
           .for('update');
         const ownedIds = new Set(owned.map(key => key.id));
         if (owned.length !== input.keyIds.length || input.keyIds.some(id => !ownedIds.has(id))) {
           throw new TRPCError({ code: 'CONFLICT', message: KEYS_CHANGED_MESSAGE });
         }
-        await writePersonalKeyPriorities(tx, ctx.user.id, input.keyIds);
+        await writeKeyPriorities(tx, owner, input.keyIds);
+        if (organizationId) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: 'Updated BYOK key priorities',
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return tx
           .select(BYOK_KEY_COLUMNS)
           .from(byok_api_keys)
-          .where(eq(byok_api_keys.kilo_user_id, ctx.user.id))
+          .where(ownedKeys(owner))
           .orderBy(...BYOK_KEY_ORDER);
       });
-      return Promise.all(inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, null)));
+      return Promise.all(
+        inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
     }),
 
   /**
@@ -392,7 +414,7 @@ export const byokRouter = createTRPCRouter({
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
-      rejectUnavailableExperimentalProvider(provider_id, organizationId);
+      await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
@@ -486,7 +508,10 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
+      await rejectUnavailableExperimentalProvider(
+        existingKey.provider_id,
+        existingKey.organization_id
+      );
       validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);

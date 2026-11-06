@@ -72,7 +72,7 @@
     "expo-application": "~58.1.1",
     "expo-asset": "~58.0.15",
     "expo-audio": "~58.0.9",
-    "expo-background-task": "~58.0.10",
+    "expo-background-task": "~58.0.11",
     "expo-battery": "~58.0.3",
     "expo-blur": "~58.0.3",
     "expo-build-properties": "~58.0.10",
@@ -107,7 +107,7 @@
     "expo-status-bar": "~58.0.3",
     "expo-store-review": "~58.0.2",
     "expo-system-ui": "~58.0.5",
-    "expo-task-manager": "~58.0.11",
+    "expo-task-manager": "~58.0.12",
     "expo-tracking-transparency": "~58.0.2",
     "expo-video": "~58.0.10",
     "expo-web-browser": "~58.0.6",
@@ -176,7 +176,6 @@
         "buildFromSource": [
           "expo-localization",
           "expo-ui",
-          "expo-background-task",
           "expo-notifications",
           "expo-task-manager",
           "unimodules-app-loader"

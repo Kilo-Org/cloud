@@ -5,6 +5,7 @@ import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
+import { storedSessionIdSchema } from './kilo-session-id';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
@@ -367,13 +368,12 @@ export const kiloSdkSessionSnapshotOutcomeSchema = z.discriminatedUnion('kind', 
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
-export type KiloSdkSessionSnapshotRead = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
-export type KiloSdkSessionSnapshotOutcome = KiloSdkSessionSnapshotRead;
+export type KiloSdkSessionSnapshotOutcome = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
 
 export type CloudAgentRootSessionSnapshot = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  snapshot: KiloSdkSessionSnapshotRead;
+  snapshot: KiloSdkSessionSnapshotOutcome;
 };
 export type GetCloudAgentRootSessionSnapshotParams =
   ResolveCloudAgentRootSessionForKiloSessionParams;
@@ -740,7 +740,10 @@ export type SessionDiffRead = z.infer<typeof sessionDiffReadSchema>;
 
 const kiloSdkUserMessageBaseShape = {
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  // The stored message's own session id, as the store addressed the session when
+  // it was written. A session created before the canonical shape was issued
+  // keeps its own id, so the stored transcript must still parse under it.
+  sessionID: storedSessionIdSchema,
   role: z.literal('user'),
   time: z.object({ created: z.number() }),
   /**
@@ -794,7 +797,8 @@ export type KiloSdkUserMessage = z.infer<typeof kiloSdkUserMessageSchema>;
 
 export const kiloSdkAssistantMessageSchema = z.object({
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the user message above. */
+  sessionID: storedSessionIdSchema,
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
@@ -821,7 +825,8 @@ export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
   id: partIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the stored messages. */
+  sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
@@ -1199,7 +1204,7 @@ export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
 /** Base64 and base64url alphabets, plus the optional trailing padding. */
 const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
-export const kiloSdkMessagesLegacyCursorSchema = z
+export const kiloSdkMessagesCursorSchema = z
   .object({
     id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
       message: 'message cursor ids must fit the cursor id byte limit',
@@ -1207,10 +1212,7 @@ export const kiloSdkMessagesLegacyCursorSchema = z
     time: z.number().nonnegative(),
   })
   .strict();
-export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCursorSchema>;
-
-export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
-export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
+export type KiloSdkMessagesCursor = z.infer<typeof kiloSdkMessagesCursorSchema>;
 
 export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
   return encodeBase64Url(JSON.stringify(kiloSdkMessagesCursorSchema.parse(cursor)));
@@ -1291,15 +1293,18 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`. `before` is capped at
- * `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized value never reaches
- * the decoder.
+ * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
+ * value never reaches the decoder.
+ *
+ * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
+ * store still addresses sessions created before the canonical id shape was
+ * issued, and their transcript must stay readable. The access check below owns
+ * authorization, not the id shape.
  */
 export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
-    kiloSessionId: sessionIdSchema,
+    kiloSessionId: storedSessionIdSchema,
     limit: z
       .number()
       .int()

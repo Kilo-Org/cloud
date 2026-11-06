@@ -52,14 +52,35 @@ const AuthProviderIds = AllAuthProviders.map(p => p.id);
 export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
-// Subset used for account linking (excludes SSO, email, passkeys, and dev-only
-// providers).
+// Subset offered for OAuth sign-in: every provider except SSO, email, passkeys
+// and the dev-only one.
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
   p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 
 export const LinkableAuthProviders = [...AllAuthProviders.filter(isLinkableAuthProvider)] as const;
 export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as const;
 export const ProdNonSSOAuthProviders = [...LinkableAuthProviders.map(p => p.id), 'email'] as const;
+
+// Providers whose callback does not carry the web session that started an
+// account link: the link requires that session, and Apple's callback is a
+// cross-site form POST. They stay sign-in methods only. This is the single
+// declaration of the exclusion; the offered list and the link start both read
+// what it produces.
+const LinkSessionUnavailableProviderIds = ['apple'] as const satisfies readonly AuthProviderId[];
+
+// The providers a person may start an account link for. Every link start reads
+// this list, not only the `/connected-accounts` offer: the organization BYOK
+// card and the shared-services ChatGPT connect start a link through the same
+// predicate.
+export const AccountLinkingProviders = [
+  ...LinkableAuthProviders.filter(p => !LinkSessionUnavailableProviderIds.some(id => id === p.id)),
+] as const;
+
+const AccountLinkingProviderIds = new Set<string>(AccountLinkingProviders.map(p => p.id));
+
+/** Whether a person may start an account link for `provider`. */
+export const isAccountLinkingProvider = (provider: AuthProviderId): boolean =>
+  AccountLinkingProviderIds.has(provider);
 
 // All auth methods (excludes fake-login, used for sign-in hints)
 // This is the same as all providers except fake-login

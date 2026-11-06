@@ -12,8 +12,10 @@ import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gatewa
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
-import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
-import { createVercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
+import {
+  uploadApiRequestLogBlobs,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { after, type NextResponse } from 'next/server';
 import type {
   RequestLogCapture,
@@ -29,6 +31,7 @@ export type RequestLoggingParams = {
   session_id: string | null;
   vercel_request_id: string | null;
   request: GatewayRequest;
+  enkrypt?: (captureResponse?: boolean) => Promise<EnkryptRequestLog[]>;
 };
 
 export type LogUnrewrittenResponseParams = {
@@ -56,10 +59,10 @@ type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
 
-export function redactApiRequestLogRequest(request: GatewayRequest): unknown {
+export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
   const gateway = request.body.providerOptions?.gateway;
   if (!gateway?.byok) {
-    return request.body;
+    return { ...request.body };
   }
 
   const redactedByok = Object.fromEntries(
@@ -91,6 +94,7 @@ async function createRequestLogCapture(
     organizationId: organization_id,
   });
   if (loggingMode === null) {
+    if (logging.enkrypt) after(async () => void (await logging.enkrypt?.(false)));
     return null;
   }
   const status = response.status;
@@ -132,11 +136,13 @@ async function createRequestLogCapture(
       const detectedError =
         extraError === null ? responseError : { ...(responseError ?? {}), ...extraError };
       if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
+        await logging.enkrypt?.(false);
         return;
       }
       const { columns: blobColumns, uploadError } = await uploadApiRequestLogBlobs({
-        request: JSON.stringify(redactApiRequestLogRequest(request)),
+        request: redactApiRequestLogRequest(request),
         response: responseText,
+        enkrypt: await logging.enkrypt?.(),
       });
       const r2UploadError = uploadError?.substring(0, 4000);
       if (r2UploadError !== undefined) {
@@ -224,8 +230,6 @@ export async function rewriteModelResponse({
     user_byok: userByok,
     custom_llm_pricing: customLlmPricing,
     custom_pricing_config: await getCustomPricingConfig(),
-    captureProviderMetadata:
-      providerId === 'vercel' ? createVercelProviderMetadataCapture() : undefined,
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

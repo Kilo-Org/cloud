@@ -14,8 +14,11 @@ import {
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
@@ -29,7 +32,7 @@ import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 import { assertRequestedRepositories } from './requested-environment-repositories.js';
-import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { getSandboxSessionStub, type SessionStub } from '../../sandbox-session/session-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -216,6 +219,10 @@ function applyProfileResolution(
       resolved: {
         envVars: resolved.envVars,
         setupCommands: resolved.setupCommands,
+        ...(resolved.startCommands ? { startCommands: resolved.startCommands } : {}),
+        ...(resolved.environmentSetupCommandCount === undefined
+          ? {}
+          : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
         encryptedSecrets: resolved.encryptedSecrets,
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,
@@ -230,10 +237,13 @@ function applyProfileResolution(
 function assertResolvedConfigurationWithinSessionLimits(
   resolved: SessionProfileBundle | undefined
 ): void {
+  // An older wrapper receives the start commands appended to setup, so the
+  // combined list must fit one setup list.
+  const setupAndStart = [...(resolved?.setupCommands ?? []), ...(resolved?.startCommands ?? [])];
   const parsed = SessionProfileBundleSchema.safeParse({
     envVars: resolved?.envVars,
     encryptedSecrets: resolved?.encryptedSecrets,
-    setupCommands: resolved?.setupCommands,
+    setupCommands: setupAndStart,
   });
   if (!parsed.success) {
     throw new TRPCError({
@@ -270,13 +280,82 @@ export async function resolveEffectiveSessionConfiguration(
     environmentSandboxAllocation: _clientAllocation,
     ...withoutEnvironment
   } = resolvedRequest;
-  if (!environment) return withoutEnvironment;
-  return {
+  let effectiveRequest: SessionCreateRequest = {
     ...withoutEnvironment,
-    environment: environment.reference,
-    ...(environment.sandboxAllocation
+    ...(environment ? { environment: environment.reference } : {}),
+    ...(environment?.sandboxAllocation
       ? { environmentSandboxAllocation: environment.sandboxAllocation }
       : {}),
+  };
+  // A saved allowlist enters the same runtime slot as explicit input, but only
+  // when the request named no policy. Full and legacy null policies are already
+  // the unrestricted default, so they need no write.
+  if (
+    environment?.egressMode === 'allowlist' &&
+    input.runtime?.egressMode === undefined &&
+    input.runtime?.egressAllowlist === undefined
+  ) {
+    effectiveRequest = {
+      ...effectiveRequest,
+      runtime: {
+        ...effectiveRequest.runtime,
+        egressMode: 'allowlist',
+        egressAllowlist: environment.egressAllowlist ?? [],
+      },
+    };
+  }
+  return effectiveRequest;
+}
+
+type InheritedEgressPolicy = {
+  egressMode: EgressMode;
+  egressAllowlist?: string[];
+  egressAudit?: boolean;
+};
+
+function parentPolicyUnavailableError(): TRPCError {
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Cloud Agent parent policy unavailable',
+  });
+}
+
+/**
+ * Reads the policy the authorized parent recorded when it was created. The
+ * environment's current settings do not apply to an existing parent.
+ */
+async function readParentEgressPolicy(
+  getStub: () => SessionStub,
+  authority: CloudAgentAuthority
+): Promise<InheritedEgressPolicy | undefined> {
+  let raw: unknown;
+  try {
+    raw = await withDORetry(getStub, parent => parent.getMetadata(), 'getMetadata');
+  } catch {
+    throw parentPolicyUnavailableError();
+  }
+
+  // The RPC returns the current grouped schema, but revalidate so a malformed
+  // or legacy payload cannot be read as an unrestricted parent.
+  const parsed = CurrentSessionMetadataSchema.safeParse(raw);
+  if (!parsed.success) throw parentPolicyUnavailableError();
+  const metadata = parsed.data;
+  if (
+    metadata.identity.sessionId !== authority.parentSessionId ||
+    metadata.identity.userId !== authority.ownerId ||
+    (metadata.identity.orgId ?? null) !== authority.organizationId
+  ) {
+    throw parentPolicyUnavailableError();
+  }
+
+  const workspace = metadata.workspace;
+  if (workspace?.egressMode !== 'allowlist' && workspace?.egressAudit !== true) return undefined;
+  return {
+    egressMode: workspace.egressMode ?? 'unrestricted',
+    ...(workspace.egressMode === 'allowlist'
+      ? { egressAllowlist: workspace.egressAllowlist ?? [] }
+      : {}),
+    ...(workspace.egressAudit === true ? { egressAudit: true } : {}),
   };
 }
 
@@ -341,6 +420,7 @@ export async function preflightSessionCreation(
   validateEndpoint?: EndpointValidator,
   policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
+  let inheritedEgress: InheritedEgressPolicy | undefined;
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     if (
@@ -350,11 +430,12 @@ export async function preflightSessionCreation(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
     }
+    const parentStub = () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId);
     let token: string;
     let parentCreatedOnPlatform: string | undefined;
     try {
       const parent = await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
+        parentStub,
         stub => stub.getCloudAgentSpawnContext(authority),
         'getCloudAgentSpawnContext'
       );
@@ -376,6 +457,7 @@ export async function preflightSessionCreation(
       ...request.options,
       createdOnPlatform: parentCreatedOnPlatform,
     };
+    inheritedEgress = await readParentEgressPolicy(parentStub, authority);
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
@@ -438,6 +520,22 @@ export async function preflightSessionCreation(
     repository: resolvedRequest.repository,
     environment: resolvedRequest.environment,
   });
+  if (
+    inheritedEgress &&
+    request.runtime?.egressMode === undefined &&
+    request.runtime?.egressAllowlist === undefined
+  ) {
+    const { egressAllowlist, ...inheritedPolicy } = inheritedEgress;
+    const runtime = { ...resolvedRequest.runtime, ...inheritedPolicy };
+    // An environment-derived allowlist must not survive an unrestricted
+    // inherited mode; the policy schema rejects that combination.
+    if (runtime.egressMode === 'allowlist') {
+      runtime.egressAllowlist = egressAllowlist ?? [];
+    } else {
+      delete runtime.egressAllowlist;
+    }
+    resolvedRequest = { ...resolvedRequest, runtime };
+  }
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
     resolvedRequest.profile?.resolved ?? {},

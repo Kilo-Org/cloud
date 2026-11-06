@@ -327,6 +327,20 @@ describe('useSidebarSessions live update helpers', () => {
     }
   );
 
+  it('keeps a generated title when an out-of-order placeholder event arrives', () => {
+    const cached: DbSessionV2 = {
+      ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
+      title: 'Fix login form validation',
+    };
+    const event = eventRowToDbSession(
+      makeEventRow({ title: 'New session - 2026-01-01T00:00:02.000Z' })
+    );
+
+    const [updated] = upsertSidebarDbSession([cached], event);
+
+    expect(updated.title).toBe('Fix login form validation');
+  });
+
   it.each(['completed', 'queued', 'accepted'] as const)(
     'clears a previous failure when an authoritative %s outcome arrives',
     latestRunStatus => {

@@ -70,7 +70,16 @@ function trpcContext(claims: Claims): TRPCContext {
     env: testEnv,
     executionCtx: { waitUntil: vi.fn() } as unknown as ExecutionContext,
     userId,
-    isAdmin: claims.isAdmin ?? false,
+    workerAdmin: {
+      legacyClaim: claims.isAdmin ?? false,
+      decide: async () => ({
+        allowed: false,
+        source: 'none',
+        status: 403,
+        reason: 'legacy_claim_rejected',
+      }),
+    } as never,
+    procedurePath: '',
     apiTokenPepper: null,
     gastownAccess: claims.gastownAccess,
     orgMemberships: [{ orgId, role: 'owner' }],

@@ -1,3 +1,4 @@
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import {
   baseProcedure,
   createTRPCRouter,
@@ -23,7 +24,7 @@ import { codeIndexingAdminRouter } from './code-indexing-admin-router';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
-import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import { chunkCountToSizeKbSql, isEnabledForUser } from '@/lib/code-indexing/util';
 import {
   CODE_INDEXING_GONE_MESSAGE,
   isCodeIndexingEnabled,
@@ -169,6 +170,13 @@ export async function getCodeIndexOrganizationId(
     return input.organizationId;
   }
 
+  if (!isEnabledForUser(ctx.user)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Code indexing is not enabled for this account',
+    });
+  }
+
   return getUserUUID(ctx.user);
 }
 
@@ -181,6 +189,12 @@ async function resolveOrganizationIdWithOverride(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Only admins can use overrideUser parameter',
+      });
+    }
+    if (isSupportAccessEnabled()) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'overrideUser is disabled while support access is enforced',
       });
     }
 

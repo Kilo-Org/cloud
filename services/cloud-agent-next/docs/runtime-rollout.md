@@ -8,30 +8,73 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
-| preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
-| downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
+| preinstalled | all-in-one | `Dockerfile.containers` and pinned build variables |
+| downloaded | all-in-one | `Dockerfile.containers`, exact-SHA runtime descriptor |
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+Downloaded startup supports native Cloudflare Containers and BYOC Vercel. Preinstalled is the native default.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
-path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
+path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
+(`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
+next to `RUNTIME_DISTRIBUTION`. The operator build installs the whole set; the Durable Object build
+installs `bun` and the Kilo CLI. Both install from those pins, check the downloaded bytes before
+unpacking or installing, and re-check the tools they installed by exact version and digest before the
+snapshot is created or accepted.
+Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
+### BYOC snapshot upgrade timing
+
+The pinned-toolchain installation change keeps the tool versions and base ABI unchanged; it has no
+premerge production prerequisite. Deploy the Worker code first; each enrolled BYOC owner can then
+choose **Upgrade runtime** in Vercel Compute settings
+to build the new snapshot in that owner's Vercel team/project. The authenticated procedures are
+`organizations.vercelCompute.upgradeRuntime` (organization admin, with `organizationId`) and
+`vercelCompute.upgradeRuntime` (the signed-in personal owner). They use the owner's existing encrypted
+Vercel credential and invoke the deployed `VercelSnapshotBuild`; no new global token or snapshot
+environment variable is needed.
+
+A stored runtime digest differing from the deployed identity sets `upgradeAvailable` in the settings
+status. It does not invalidate a ready connection or reject new sessions: provider selection checks
+setup readiness, and the BYOC runtime resolver uses the stored snapshot ID. During an upgrade, the
+old ready snapshot remains selected until the validated replacement is projected as ready. A failed
+upgrade retains the old ready snapshot. New allocations use the replacement after activation;
+already-running allocations are not restarted. This does not waive the fixed-Node-path requirement
+above when deliberately enabling downloaded startup on an older base.
+
+The lifecycle is implemented by the
+[settings router](../../../apps/web/src/routers/organizations/organization-vercel-compute-router.ts),
+[runtime resolver](../src/byoc/vercel-credential-resolver.ts) and
+[upgrade status projection](../../../apps/web/src/lib/cloud-agent-next/vercel-compute-status.ts).
+Check these consumers when deciding whether a future base change requires a coordinated cutover.
+
+The standalone operator harness is a separate provider qualification path:
+`pnpm --filter cloud-agent-next snapshot:vercel build --output <accepted-config.json>`, then
+`pnpm --filter cloud-agent-next snapshot:vercel acceptance --snapshot-id <snapshot-id> --build-id <build-id>`.
+It requires `VERCEL_TOKEN`, `VERCEL_TEAM_ID` and `VERCEL_PROJECT_ID` (environment or service `.dev.vars`;
+team/project may instead be explicit arguments). These commands call the real Vercel API and create
+billable builder/child sandboxes and a retained snapshot. Accepted config JSON is output, not an
+activation of a BYOC connection; it does not update the owner's stored snapshot or digest.
+Do not use the harness as a substitute for an owner's in-app upgrade. Before any authorized live
+qualification, verify the token's actual account, team/project and billing scope; a local command or
+test label alone does not establish isolation. A local provider stand-in proves execution of the
+builder and child scripts, not acceptance by Vercel or activation for a real owner.
+
 A downloaded target can optionally scope its startup to an `interactiveOrgIds` list, rendered as
 `RUNTIME_INTERACTIVE_ORG_IDS`. No current target sets this restriction, so new native and BYOC Vercel
-allocations use downloaded startup for every organization and personal account, including code reviews
-and shared native sandboxes. SDK pins always stay preinstalled.
+allocations use downloaded startup for every organization and personal account, including code reviews.
+SDK pins always stay preinstalled.
 
 When a list is configured, a new allocation selects downloaded startup only when all its preparing
 routes belong to one listed organization, whatever their origin (web, webhook, Slack and other
 automation). Native allocations must also be isolated; Vercel allocations use the same organization
-rule. Other organizations, personal sessions, shared native sandboxes, and missing or mixed route
+rule. Other organizations, personal sessions, legacy native sandboxes that are not isolated, and missing or mixed route
 identities then retain preinstalled startup on `app`. These identity values are rollout metadata,
 not an authorization boundary.
 
@@ -39,6 +82,31 @@ The renderer retains `app` alongside `runtime-free`; the allocation's selected s
 are used together, including snapshot fallback. Existing allocations keep their running image and mode.
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. A complete rollback must change the downloaded default; see Rollback below.
+
+### Kilo v2 harness
+
+A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
+A sandbox's first allocation selects v2 when its downloaded start passes the `interactiveOrgIds` rule
+above for the `kilo2.orgIds` list. The Sandbox DO stores that harness, and every later allocation of the
+sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
+before this record existed stays on v1. The harness is stored after startup preflight and capacity
+checks, before provider creation. A failed preflight does not fix the harness for later attempts.
+Changing the v2 organization list affects only sandboxes without a stored harness.
+
+Existing v2 sandboxes cannot move back to v1. Removing the v2 release, selecting preinstalled mode,
+or excluding their organizations from downloaded startup prevents their next allocation with
+`invalid_configuration`. Recovery of existing v2 sessions after these changes is unsupported.
+New sandboxes select v1 and can start under the rollback configuration. To keep existing v2
+sessions recoverable, retain downloaded startup, their organization scope, and the v2 release.
+
+Each publication packages the pinned v1 and v2 CLIs (`PINNED_CLIS` in
+`scripts/runtime-cli-artifact.ts`) with the same control payload. It verifies both on the base and
+records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS` and
+`RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that handoff, and fails when a `kilo2` target
+has no v2 release. The release names its harness through its CLI executable (`package/bin/kilo2`).
+A start whose release harness differs from the sandbox's stored harness fails as
+`invalid_configuration`. Session snapshots are keyed by the selected descriptor, and environment
+snapshots do not depend on the runtime release, so neither needs a harness namespace.
 
 Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
 remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of startup selection. Production
@@ -59,6 +127,10 @@ deployment waits for that handoff. Use a dedicated test organization for real-pr
 the current catalog does not limit downloaded startup to that organization. Record the Worker name,
 exact source SHA, bucket and instance type for each qualification deployment. Broad enrollment does
 not itself establish that the provider checks below passed.
+
+Before deploying a release that removes SDK sandbox bindings, drain every session
+still running on a retired sandbox class. The new Worker cannot stop, inspect or
+reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
    Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that

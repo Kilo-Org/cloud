@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ChevronRight, Loader2, Terminal, KeyRound } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Play, Terminal, KeyRound } from 'lucide-react';
 import {
   ENVIRONMENT_LIMITS,
   validateEnvironmentCommands,
@@ -31,9 +31,12 @@ import {
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import {
   hasEnvironmentFormChanges,
+  buildEgressPolicy,
   toEnvironmentCommands,
   toEnvironmentScript,
+  toNetworkAccessDraft,
 } from './environment-form';
+import { EnvironmentNetworkField } from './EnvironmentNetworkField';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
   buildEnvironmentVariableChanges,
@@ -106,7 +109,7 @@ type EnvironmentFormProps = Omit<
   EnvironmentDialogProps,
   'open' | 'onOpenChange' | 'environmentId'
 > & { existing: EnvironmentResponse | undefined };
-type EditorPage = 'overview' | 'scripts' | 'variables';
+type EditorPage = 'overview' | 'scripts' | 'start' | 'variables';
 
 function EnvironmentForm({
   organizationId,
@@ -138,6 +141,12 @@ function EnvironmentForm({
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
   const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
+  // Retain the baseline shown when editing starts, even if queries refresh in the background.
+  const [initialNetworkAccess] = useState(() =>
+    toNetworkAccessDraft(existing?.egressMode ?? null, existing?.egressAllowlist ?? null)
+  );
+  const [networkAccess, setNetworkAccess] = useState(initialNetworkAccess);
+  const [networkAccessError, setNetworkAccessError] = useState<string | null>(null);
   const sandboxRepository = repositories[0]
     ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
     : undefined;
@@ -151,6 +160,10 @@ function EnvironmentForm({
   const [script, setScript] = useState(initialScript);
   // Leave existing scripts untouched when saving only variables or the sandbox size.
   const commands = existing && script === initialScript ? undefined : toEnvironmentCommands(script);
+  const [initialStartScript] = useState(() => toEnvironmentScript(existing?.startCommands ?? []));
+  const [startScript, setStartScript] = useState(initialStartScript);
+  const startCommands =
+    existing && startScript === initialStartScript ? undefined : toEnvironmentCommands(startScript);
   // Retain the baseline shown when editing starts, even if queries refresh in the background.
   const [savedVariables] = useState(() => ({
     plainVars: existing?.plainVars ?? [],
@@ -165,10 +178,12 @@ function EnvironmentForm({
       {
         name: existing?.name ?? defaultName,
         script: initialScript,
+        startScript: initialStartScript,
         variablesText: initialVariablesText,
         sandboxAllocation: initialSandboxAllocation,
+        networkAccess: initialNetworkAccess,
       },
-      { name: savedName, script, variablesText, sandboxAllocation }
+      { name: savedName, script, startScript, variablesText, sandboxAllocation, networkAccess }
     ) || repositoriesChanged;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
@@ -184,6 +199,7 @@ function EnvironmentForm({
   }
   const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
   const hasScript = script.trim().length > 0;
+  const hasStartScript = startScript.trim().length > 0;
   const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
   const changePage = (next: EditorPage) => {
     setError(null);
@@ -196,10 +212,18 @@ function EnvironmentForm({
       setPage('variables');
       return;
     }
+    const egress = buildEgressPolicy(networkAccess, initialNetworkAccess);
+    if (egress.error) {
+      setNetworkAccessError(egress.error);
+      setPage('overview');
+      return;
+    }
+    setNetworkAccessError(null);
     setError(null);
     try {
       validateEnvironmentName(savedName);
       validateEnvironmentCommands(commands);
+      validateEnvironmentCommands(startCommands, 'Start');
       if (existing) {
         await updateEnvironment.mutateAsync({
           organizationId,
@@ -209,7 +233,9 @@ function EnvironmentForm({
           plainVars: variables.plainVars,
           secrets: variables.secrets,
           commands,
+          startCommands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(existing.id);
       } else {
@@ -229,7 +255,9 @@ function EnvironmentForm({
           plainVars: variables.plainVars,
           secrets,
           commands,
+          startCommands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(created.id);
       }
@@ -268,15 +296,17 @@ function EnvironmentForm({
           <DialogTitle>
             {page === 'scripts'
               ? 'Setup script'
-              : page === 'variables'
-                ? 'Environment variables'
-                : existing
-                  ? 'Environment'
-                  : 'Set up environment'}
+              : page === 'start'
+                ? 'Start script'
+                : page === 'variables'
+                  ? 'Environment variables'
+                  : existing
+                    ? 'Environment'
+                    : 'Set up environment'}
           </DialogTitle>
         </div>
         <DialogDescription className="sr-only">
-          Configure repositories, setup scripts, and environment variables.
+          Configure repositories, setup and start scripts, and environment variables.
         </DialogDescription>
         {!canManage && (
           <p className="text-muted-foreground text-xs">
@@ -318,6 +348,16 @@ function EnvironmentForm({
                   isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
                 />
               )}
+              <EnvironmentNetworkField
+                value={networkAccess}
+                sandboxAllocation={sandboxAllocation}
+                error={networkAccessError}
+                disabled={!canManage || isSaving}
+                onChange={next => {
+                  setNetworkAccessError(null);
+                  setNetworkAccess(next);
+                }}
+              />
               <div className="space-y-3">
                 <EditorRow
                   icon={<Terminal className="size-4" />}
@@ -328,6 +368,16 @@ function EnvironmentForm({
                       : 'Install dependencies and prepare your repository'
                   }
                   onClick={() => changePage('scripts')}
+                />
+                <EditorRow
+                  icon={<Play className="size-4" />}
+                  label="Start script"
+                  detail={
+                    hasStartScript
+                      ? 'Configure your start script'
+                      : 'Start services when a workspace starts'
+                  }
+                  onClick={() => changePage('start')}
                 />
                 <EditorRow
                   icon={<KeyRound className="size-4" />}
@@ -346,6 +396,14 @@ function EnvironmentForm({
           )}
           {page === 'scripts' && (
             <EnvironmentScriptsEditor script={script} onChange={setScript} readOnly={!canManage} />
+          )}
+          {page === 'start' && (
+            <EnvironmentScriptsEditor
+              kind="start"
+              script={startScript}
+              onChange={setStartScript}
+              readOnly={!canManage}
+            />
           )}
           {page === 'variables' && (
             <EnvironmentVariablesEditor

@@ -42,6 +42,9 @@ catalog:
   jose: 6.2.12
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
+  # apps/web builds its CSS with this and the workspace override below forces one
+  # copy across the tree, so both read the pin from here.
+  postcss: 8.5.30
   stripe: 23.0.0
   tsx: 4.23.15
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
@@ -103,9 +106,9 @@ minimumReleaseAgeExclude:
   # enough on its own.
   - react-native-reanimated@4.7.1
   # @types/bun is DefinitelyTyped only: types, no runtime code, no install scripts.
-  # The wrapper and gastown dev types must equal the Bun the sandbox runs, which
-  # sandbox-image-versions.test.ts asserts. Bun 1.4.4 is the first release that
-  # rejects the compromised eMudhra chains, so the pair moves before the window.
+  # The wrapper and gastown dev types must equal the Bun the sandbox runs. Bun
+  # 1.4.4 is the first release that rejects the compromised eMudhra chains, so
+  # the pair moves before the window.
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
@@ -162,12 +165,12 @@ overrides:
   compression: 1.8.2
   source-map-js: 1.2.2
   tinypool: 2.1.2
-  postcss: 8.5.30
-  # @modelcontextprotocol/sdk declares zod as a peer and packages/harness-sdk
-  # relies on the auto-installed peer. Without this line, a dependency that
-  # brings a newer zod into the dev graph (knip) would silently change the zod
-  # the shipped MCP client is built against. Follow the catalog pin so the two
-  # cannot drift apart.
+  postcss: 'catalog:'
+  # @modelcontextprotocol/sdk declares zod as both a dependency and a required
+  # peer, so this override pins that resolution to the catalog version. Without
+  # this line, a dependency that brings a newer zod into the dev graph (knip)
+  # would silently change the zod the shipped MCP client is built against.
+  # Follow the catalog pin so the two cannot drift apart.
   '@modelcontextprotocol/sdk>zod': 'catalog:'
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
@@ -323,7 +326,7 @@ patchedDependencies:
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@58.0.11: patches/expo-task-manager@58.0.11.patch
+  expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
   expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
@@ -346,10 +349,6 @@ patchedDependencies:
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
   react-native@0.88.0: patches/react-native@0.88.0.patch
-  # Android: read the live entry of the unique work chain, not the first one.
-  # A finished first entry made a cold start re-enqueue with REPLACE, which
-  # cancelled the glanceable refresh run in progress.
-  expo-background-task@58.0.10: patches/expo-background-task@58.0.10.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.
   react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch

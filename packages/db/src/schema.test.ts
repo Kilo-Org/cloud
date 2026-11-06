@@ -590,6 +590,17 @@ async function expectPlatformCredentialConstraintViolation(
 }
 
 describe('database schema', () => {
+  it('indexes Enkrypt usage lookups by inference usage across monthly partitions', async () => {
+    await schemaTestDb.db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`
+        EXPLAIN SELECT * FROM ${schema.enkrypt_usage}
+        WHERE ${schema.enkrypt_usage.microdollar_usage_id} = ${crypto.randomUUID()}::uuid
+      `);
+      expect(JSON.stringify(plan.rows)).toContain('Index Cond: (microdollar_usage_id =');
+    });
+  });
+
   it('indexes Enkrypt usage lookups by user across monthly partitions', async () => {
     await schemaTestDb.db.transaction(async tx => {
       await tx.execute(sql`SET LOCAL enable_seqscan = off`);
@@ -638,6 +649,7 @@ describe('database schema', () => {
           id: crypto.randomUUID(),
           organization_id: crypto.randomUUID(),
           kilo_user_id: 'oauth/enkrypt-partition-test',
+          microdollar_usage_id: crypto.randomUUID(),
           api_kind_id: apiKind.api_kind_id,
           decision_id: decision.decision_id,
           charged_microdollars: 100,
@@ -1128,6 +1140,103 @@ describe('database schema', () => {
             sql`${schema.cloud_agent_environments.owned_by_user_id} = ${userId} AND ${schema.cloud_agent_environments.repositories} @> ${JSON.stringify([members[1]])}::jsonb`
           );
         expect(matches.map(row => row.name).sort()).toEqual(['v2', 'v2-again']);
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('enforces a consistent nullable network policy', async () => {
+      const userId = `schema-env-egress-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env egress test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const base = {
+        owned_by_user_id: userId,
+        platform: 'github' as const,
+      };
+
+      try {
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'absent',
+          repo_full_name: 'acme/absent',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'full',
+          repo_full_name: 'acme/full',
+          egress_mode: 'unrestricted',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'none',
+          repo_full_name: 'acme/none',
+          egress_mode: 'allowlist',
+          egress_allowlist: [],
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          ...base,
+          name: 'limited',
+          repo_full_name: 'acme/limited',
+          egress_mode: 'allowlist',
+          egress_allowlist: ['api.example.com'],
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'allowlist-without-list',
+            repo_full_name: 'acme/allowlist-without-list',
+            egress_mode: 'allowlist',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'unrestricted-with-list',
+            repo_full_name: 'acme/unrestricted-with-list',
+            egress_mode: 'unrestricted',
+            egress_allowlist: ['api.example.com'],
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            ...base,
+            name: 'mode-absent-with-list',
+            repo_full_name: 'acme/mode-absent-with-list',
+            egress_allowlist: ['api.example.com'],
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
+
+        // Raw SQL because 'gitea' is not a valid value of the typed mode union;
+        // the database check is the guard for non-TypeScript writers.
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO cloud_agent_environments
+              (owned_by_user_id, name, platform, repo_full_name, egress_mode, egress_allowlist)
+            VALUES
+              (${userId}, 'unknown-mode', 'github', 'acme/unknown-mode', 'unknown', ARRAY['api.example.com'])
+          `)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_egress_policy_check' },
+        });
       } finally {
         await schemaTestDb.db
           .delete(schema.cloud_agent_environments)

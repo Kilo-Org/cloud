@@ -12,6 +12,7 @@ import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-author
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   assertCloudAgentParentAuthority,
   CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
@@ -21,6 +22,7 @@ import {
   CloudAgentAuthoritySchema,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
+import { sessionCallbackContext } from './callback-context.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -43,8 +45,7 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
-  hasRetiredDevcontainerRuntime,
-  DEVCONTAINER_RETIRED_MESSAGE,
+  retiredRuntimeMessage,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -64,7 +65,6 @@ import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
-  persistSandboxControlSessionEvent,
   type PendingInteractions,
 } from '../../sandbox-session/sandbox-control-event.js';
 import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
@@ -74,8 +74,7 @@ import type {
   SafeMessageResultResponse,
   MessageResultRPCResponse,
 } from '../../session/message-result.js';
-import type { LatestAssistantMessage } from '../../session/types.js';
-import { createEventQueries, type EventQueries } from '../../session/queries/index.js';
+import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
 import { sessionIdFromDoName } from '../../session-identity.js';
 import {
@@ -196,7 +195,27 @@ import type {
   GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { cloudAgentChildSessions, controlPlaneMessages, events } from './sqlite-schema.js';
+import {
+  cloudAgentChildSessions,
+  controlPlaneMessages,
+  events,
+  historyImport,
+} from './sqlite-schema.js';
+import {
+  decodeSessionHistoryCursor,
+  readSessionMessagesPage,
+  sessionHistoryPageInputSchema,
+  type SessionMessagesPage,
+} from './history.js';
+import {
+  HISTORY_HYDRATION_WAIT_MS,
+  hydrateSessionHistory,
+  markHistoryHydrated,
+  readHistoryHydration,
+} from './history-hydration.js';
+import { persistSessionEvent, readNativeEventPayload } from './native-events.js';
+import { createPartTextBuffer, type PartTextBuffer } from './part-text-buffer.js';
+import { readOwnedHistoryLineage, readStoredHistoryLineage } from './history-lineage.js';
 import { parseWipeLocator, runTransactionalWipe, type WipeLocator } from './transactional-wipe.js';
 import {
   buildControlPlaneSessionRegistration,
@@ -229,6 +248,12 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
+const EVENT_RECEIPT_PREFIX = 'native_event_receipt/';
+/**
+ * A delivery is retried only until `expiresAt`, but an attempt can wait in this DO's queue past it.
+ * Receipts outlive the deadline so a late attempt still applies once and its retry cannot repeat it.
+ */
+const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
 
 /**
  * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
@@ -394,6 +419,9 @@ export type ControlPlaneSessionSnapshot =
       }>;
       /** Durability watermark: latest stored event id, or null when none. */
       latestEventId: number | null;
+      updateCursor: number;
+      totalCostMicrodollars: number;
+      title?: string;
     };
 
 /**
@@ -592,7 +620,9 @@ function unavailableStatusSnapshot(): SandboxStatusSnapshot {
 export class SandboxSessionV2 extends DurableObject<Env> {
   readonly sessionId: SessionId;
   private readonly db: DrizzleSqliteDODatabase;
-  private readonly eventQueries: EventQueries;
+  private readonly eventQueries: SessionEventQueries;
+  /** Streamed part text not yet in its row. Flush it before reading stored history. */
+  private readonly partText: PartTextBuffer;
   private readonly initialized: Promise<void>;
   private readonly operations: { tail: Promise<unknown> } = { tail: Promise.resolve() };
   private registration: ControlPlaneSessionRegistration | null = null;
@@ -606,6 +636,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
+  private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
@@ -641,7 +672,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sessionId = sessionIdFromDoName(ctx.id.name ?? ctx.id.toString()) as SessionId;
     this.db = drizzle(ctx.storage, { logger: false });
-    this.eventQueries = createEventQueries(this.db, ctx.storage.sql);
+    this.eventQueries = createSessionEventQueries(this.db, ctx.storage);
+    this.partText = createPartTextBuffer({
+      queries: this.eventQueries,
+      onFlushError: error =>
+        logger
+          .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+          .error('Streamed part text flush failed'),
+    });
     this.reportOutbox = createReportOutbox({
       storage: ctx.storage,
       getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
@@ -650,18 +688,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       getMetadata: () => this.metadata,
       getCallbackQueue: () => this.env.CALLBACK_QUEUE,
-      getRecentAssistantMessagesForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
-        this.eventQueries.getRecentAssistantMessagesForUserMessage(
+      getRecentAssistantAnswersForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getRecentAssistantAnswersForUserMessage(
           sessionId,
           kiloSessionId,
           parentMessageId
-        ),
-      getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
-        this.eventQueries.getAssistantMessageForUserMessage(
+        );
+      },
+      getAssistantAnswerForUserMessage: (sessionId, kiloSessionId, parentMessageId) => {
+        this.partText.flush();
+        return this.eventQueries.getAssistantAnswerForUserMessage(
           sessionId,
           kiloSessionId,
           parentMessageId
-        ),
+        );
+      },
     });
     this.worktreeChanges = createControlPlaneWorktreeChanges({
       storage: ctx.storage,
@@ -804,6 +846,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     const registration = controlPlaneSessionRegistrationSchema.parse(input);
     await this.enqueue(async () => {
+      if (this.registration === null) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
     });
@@ -854,7 +897,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -865,6 +908,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (sealed.type === 'failure') return sealed.failure;
 
     await this.enqueue(async () => {
+      if (validated.data.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
@@ -916,7 +960,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         sandboxSelection,
         this.env.AGENT_ENV_VARS_PRIVATE_KEY,
         {
-          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
         }
       );
@@ -926,6 +970,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
     await this.enqueue(async () => {
+      if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
       await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(metadata));
@@ -1081,6 +1126,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async authorizeCloudAgentWorkspaceSibling(input: {
+    siblingSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentWorkspaceSibling({
+      parentSessionId: this.metadata?.identity.sessionId ?? '',
+      siblingSessionId: input.siblingSessionId,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
   async issueCloudAgentMcpGrant(
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
@@ -1116,11 +1177,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
-    const containment = this.registration?.sandboxSelection?.containment;
-    const contained =
-      containment === undefined
-        ? this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
-        : containment.kilocode || containment.github;
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
@@ -1128,7 +1184,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       authorization: authorization.success ? authorization.data : null,
       fence,
       token,
-      mode: contained ? 'contained' : 'direct',
+      mode: 'contained',
     });
   }
 
@@ -1485,9 +1541,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A delete queued ahead of this task made the session not-found; do not
       // persist a queued row against wiped storage.
       if (this.registration === null) return { type: 'session-not-found' };
-      const admitted = await this.admitMessage(parsed);
+      const admitted = await this.admitMessage(await this.withSessionCallbackContext(parsed));
       return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
     });
+  }
+
+  /**
+   * Gives an interactive chat the server-signed values it needs to route a
+   * child callback back to itself. The token is derived from the session's
+   * immutable identity, so a retry and a replay produce the same context.
+   */
+  private async withSessionCallbackContext(
+    intent: ControlPlanePromptPayload
+  ): Promise<ControlPlanePromptPayload> {
+    if (intent.turn.type !== 'prompt') return intent;
+    const context = sessionCallbackContext(this.metadata);
+    return context === undefined ? intent : { ...intent, context };
   }
 
   /**
@@ -1674,6 +1743,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
       return { oversized: false, fence: null, events: [], stopped: true };
+    this.partText.flush();
     const kiloSessionId = this.registration.spec.kiloSessionId;
     const fence =
       input.continuation === undefined
@@ -1844,7 +1914,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
-      for (const event of parsed.events) {
+      const delivery = parsed.delivery;
+      const receiptKey =
+        delivery === undefined
+          ? undefined
+          : `${EVENT_RECEIPT_PREFIX}${String(delivery.expiresAt).padStart(16, '0')}/${delivery.id}`;
+      const retainedFrom = Date.now() - EVENT_RECEIPT_RETENTION_MS;
+      for (const [key] of this.ctx.storage.kv.list({
+        prefix: EVENT_RECEIPT_PREFIX,
+        end: `${EVENT_RECEIPT_PREFIX}${String(retainedFrom).padStart(16, '0')}/`,
+        limit: 100,
+      }))
+        this.ctx.storage.kv.delete(key);
+      if (delivery !== undefined && delivery.expiresAt <= retainedFrom) {
+        logger
+          .withFields({ sessionId: this.sessionId, eventCount: parsed.events.length })
+          .warn('Dropped native event delivery past receipt retention');
+        return;
+      }
+      const nextEvent =
+        receiptKey === undefined
+          ? 0
+          : z
+              .number()
+              .int()
+              .nonnegative()
+              .parse(this.ctx.storage.kv.get(receiptKey) ?? 0);
+      for (const [index, event] of parsed.events.entries()) {
+        if (index < nextEvent) continue;
         if (event.type === 'commands.available') {
           await handleCommandsAvailable(event.properties, {
             setAvailableCommands: async commands => {
@@ -1873,12 +1970,30 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
         await this.recordRootStatus(event);
-        persistSandboxControlSessionEvent({
-          sessionId: this.sessionId,
-          payload: event,
-          eventQueries: this.eventQueries,
-          broadcast: stored => this.broadcast(stored),
-        });
+        // A retried batch can be partially applied; commit its receipt with the row mutation.
+        const stored = this.partText.transaction(() =>
+          this.ctx.storage.transactionSync(() => {
+            const persisted = persistSessionEvent({
+              sessionId: this.sessionId,
+              event,
+              queries: this.eventQueries,
+              partText: this.partText,
+            });
+            if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
+            return persisted;
+          })
+        );
+        if (stored !== null) this.broadcast(stored);
+        if (event.type === 'session.created' && this.registration !== null) {
+          const info = z
+            .object({ id: z.string(), parentID: z.string() })
+            .safeParse(event.properties.info);
+          if (
+            info.success &&
+            readStoredHistoryLineage(this.db, this.registration.spec.kiloSessionId, info.data.id)
+          )
+            markHistoryHydrated(this.ctx.storage, info.data.id);
+        }
         this.worktreeChanges.onEvent(event.type, event.properties);
       }
     });
@@ -2001,6 +2116,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
+    this.partText.flush();
+    const native = this.eventQueries.findByEntityId(
+      `session/${this.registration.spec.kiloSessionId}`
+    );
+    const info = z
+      .object({ title: z.string().optional() })
+      .safeParse(
+        native === null ? undefined : readNativeEventPayload(native.payload)?.properties.info
+      );
     return {
       type: 'found',
       sessionId: this.sessionId,
@@ -2014,7 +2138,139 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         reason: message.reason,
       })),
       latestEventId: this.eventQueries.getLatestEventId(),
+      updateCursor: this.eventQueries.getUpdateCursor(),
+      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+        this.sessionId,
+        this.registration.spec.kiloSessionId
+      ),
+      ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
+  }
+
+  async getSessionMessagesPage(
+    input: {
+      cursor?: string;
+      limit?: number;
+      kiloSessionId?: string;
+      expectedRootKiloSessionId?: string;
+    } = {}
+  ): Promise<SessionMessagesPage | null> {
+    await this.initialized;
+    const parsed = sessionHistoryPageInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      registration === null ||
+      (input.expectedRootKiloSessionId !== undefined &&
+        input.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    if (parsed.cursor !== undefined) {
+      const cursor = decodeSessionHistoryCursor(parsed.cursor);
+      if (
+        cursor.sessionId !== this.sessionId ||
+        cursor.rootKiloSessionId !== rootKiloSessionId ||
+        cursor.kiloSessionId !== kiloSessionId
+      ) {
+        throw new Error('Session history cursor belongs to another session');
+      }
+    }
+    const isRoot = kiloSessionId === rootKiloSessionId;
+    const storedLineage = isRoot
+      ? undefined
+      : readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
+    const lineage =
+      isRoot || storedLineage !== undefined
+        ? storedLineage
+        : await withTimeout(
+            readOwnedHistoryLineage({
+              env: this.env,
+              userId: registration.credentials.userId,
+              sessionId: this.sessionId,
+              rootKiloSessionId,
+              kiloSessionId,
+            }),
+            5000,
+            'Session history lineage lookup timed out'
+          );
+    if ((!isRoot && lineage == null) || this.registration !== registration) return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    return readSessionMessagesPage({
+      db: this.db,
+      storage: this.ctx.storage,
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      rootKiloSessionId,
+      ...parsed,
+      kiloSessionId,
+      metadata: isRoot ? this.metadata : null,
+      parentID: lineage?.parentID,
+      omittedItemCount:
+        readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
+          ?.omittedItemCount ?? 0,
+    });
+  }
+
+  private async ensureClientHistory(
+    kiloSessionId = this.registration?.spec.kiloSessionId
+  ): Promise<void> {
+    const registration = this.registration;
+    const metadata = this.metadata;
+    if (
+      registration === null ||
+      kiloSessionId === undefined ||
+      metadata === null ||
+      readHistoryHydration(
+        this.ctx.storage,
+        kiloSessionId === registration.spec.kiloSessionId ? undefined : kiloSessionId
+      )?.phase === 'complete'
+    )
+      return;
+    // Session-ingest holds only v1 history; native v2 history lives only in this DO.
+    if (
+      this.eventQueries.findByEntityId(`conversation-source/${registration.spec.kiloSessionId}`) !==
+      null
+    )
+      return;
+    let hydration = this.historyHydrations.get(kiloSessionId);
+    if (hydration === undefined) {
+      hydration = (async () => {
+        const internalSecret = await resolveSecret(this.env.INTERNAL_API_SECRET_PROD);
+        if (this.registration !== registration) return;
+        await hydrateSessionHistory({
+          db: this.db,
+          storage: this.ctx.storage,
+          ingest: this.env.SESSION_INGEST,
+          queries: this.eventQueries,
+          partText: this.partText,
+          sessionId: this.sessionId,
+          kiloSessionId,
+          rootKiloSessionId: registration.spec.kiloSessionId,
+          userId: metadata.identity.userId,
+          internalSecret: internalSecret ?? '',
+          isCurrent: () => this.registration === registration,
+          broadcast: event => this.broadcast(event),
+        });
+      })().finally(() => {
+        if (this.historyHydrations.get(kiloSessionId) === hydration)
+          this.historyHydrations.delete(kiloSessionId);
+      });
+      this.historyHydrations.set(kiloSessionId, hydration);
+    }
+    try {
+      // A slow hydration keeps running; the next read joins it rather than restarting it.
+      await withTimeout(
+        hydration,
+        HISTORY_HYDRATION_WAIT_MS,
+        'Session history hydration is still in progress'
+      );
+    } catch (error) {
+      if (this.registration !== null) throw error;
+    }
   }
 
   /**
@@ -2079,18 +2335,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       cloudAgentSessionId: this.sessionId,
     };
     return { type: 'found', result };
-  }
-
-  /**
-   * Latest assistant message for the session's Kilo session (legacy
-   * `getLatestAssistantMessage`). Reads the shared event log; the Kilo session
-   * id is the route spec's identity.
-   */
-  async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
-    await this.initialized;
-    const kiloSessionId = this.registration?.spec.kiloSessionId;
-    if (kiloSessionId === undefined) return null;
-    return this.eventQueries.getLatestAssistantMessage(this.sessionId, kiloSessionId);
   }
 
   /**
@@ -2403,6 +2647,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   private async resetSessionStorage(): Promise<void> {
     const locator = await this.acceptedHandleLocatorForWipe();
+    // A later flush must not write buffered text back into wiped storage.
+    this.partText.clear();
     if (locator === null) {
       await this.resetSessionStorageByDeleteAll();
       return;
@@ -2436,6 +2682,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.db.delete(controlPlaneMessages).run();
         this.db.delete(events).run();
         this.db.delete(cloudAgentChildSessions).run();
+        this.db.delete(historyImport).run();
       },
     });
     this.clearSessionInMemoryState();
@@ -2477,6 +2724,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
+    this.historyHydrations.clear();
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
   }
@@ -2556,6 +2804,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return new Response('Sandbox unavailable', { status: 503 });
       }
     }
+    try {
+      // Replay ends with bootstrap.complete, so history must land before the replay starts.
+      await this.ensureClientHistory();
+    } catch (error) {
+      // The live stream does not need old history; hydration resumes on the next read.
+      logger
+        .withFields({ sessionId: this.sessionId, error: errorMessage(error) })
+        .warn('Session history hydration failed before stream connect');
+    }
+    if (this.registration === null) return new Response('Session not found', { status: 404 });
+    // Replay sends the stored part row; later deltas must extend all text sent before it.
+    this.partText.flush();
     return this.streamHandler().handleStreamRequest(request);
   }
 
@@ -2593,6 +2853,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       readPendingInteractions: () => this.readPendingInteractions(),
       getAvailableCommands: async () => this.availableCommands,
       getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
+      getUpdateCursor: () => this.eventQueries.getUpdateCursor(),
+      getAncillaryBootstrap: async () => this.eventQueries.readAncillaryBootstrap(),
     });
   }
 
@@ -2723,7 +2985,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
-    if (await this.failRetiredQueuedMessages()) return;
+    if (await this.failRetiredPendingMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -2815,19 +3077,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.persistQueuedContainer(container);
   }
 
-  private async failRetiredQueuedMessages(): Promise<boolean> {
-    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+  private async failRetiredPendingMessages(): Promise<boolean> {
+    if (this.metadata === null) return false;
+    const reason = retiredRuntimeMessage(this.metadata);
+    if (reason === null) return false;
     await this.settleMessages(
-      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      openMessages(this.messages).map(message => message.messageId),
       'failed',
-      DEVCONTAINER_RETIRED_MESSAGE
+      reason
     );
     this.finishWorktreePreparation();
     return true;
   }
 
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
-    if (await this.failRetiredQueuedMessages()) return null;
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;
@@ -2861,6 +3125,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     pass: TransportPass,
     ownerHint?: ControlPlaneRouteUpdate
   ): Promise<void> {
+    if (await this.failRetiredPendingMessages()) return;
     if (!this.messages.some(message => message.state === 'queued')) return;
     let view = await this.readSandboxView(pass);
     if (view === null) return;
@@ -2916,6 +3181,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async readSandboxView(pass: TransportPass): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredPendingMessages()) return null;
     const peer = this.sandboxPeer();
     if (peer === null) {
       await this.scheduleTransportRecovery(pass);
@@ -3242,6 +3508,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         content: renderTurnContent(message.intent),
         delivery: 'queued',
       },
+      `cloud-message/queued/${message.messageId}`,
       message.createdAt
     );
   }
@@ -3250,6 +3517,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.emitSynthetic(
       'cloud.message.sent',
       { messageId: message.messageId, delivery: 'sent' },
+      `cloud-message/sent/${message.messageId}`,
       message.acceptedAt ?? message.createdAt
     );
   }
@@ -3307,26 +3575,43 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   }): void {
-    this.emitSynthetic('cloud.status', { cloudStatus: status });
+    this.emitSynthetic('cloud.status', { cloudStatus: status }, 'cloud-status');
   }
 
+  /** One row per entity keeps synthetic state replayable by cursor without unbounded growth. */
   private emitSynthetic(
     streamEventType: StoredEvent['stream_event_type'],
     data: unknown,
+    entityId: string,
     timestamp: number = Date.now()
   ): void {
+    const payload = JSON.stringify(data);
+    const id = this.eventQueries.upsert({
+      executionId: '',
+      sessionId: this.sessionId,
+      streamEventType,
+      payload,
+      timestamp,
+      entityId,
+    });
     this.broadcast({
-      id: 0,
+      id,
       execution_id: '',
       session_id: this.sessionId,
       stream_event_type: streamEventType,
-      payload: JSON.stringify(data),
+      payload,
       timestamp,
     });
   }
 
   private broadcast(event: StoredEvent): void {
-    this.streamHandler().broadcastEvent(event);
+    const stored =
+      event.id > 0 && event.mutation_cursor === undefined
+        ? this.eventQueries.findById(event.id)
+        : null;
+    this.streamHandler().broadcastEvent(
+      stored === null ? event : { ...event, mutation_cursor: stored.mutation_cursor }
+    );
   }
 
   private deriveCloudStatus(): {
@@ -3371,10 +3656,33 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   private deriveSessionStatus(): SessionStatus | undefined {
     const root = this.rootStatus;
-    if (root === undefined || !root.settled) return undefined;
-    if (root.type !== 'busy' && root.type !== 'retry') return undefined;
-    if (this.messages.some(message => message.state === 'accepted')) return undefined;
-    return { type: 'idle' };
+    const accepted = this.messages.some(message => message.state === 'accepted');
+    if (root?.settled && (root.type === 'busy' || root.type === 'retry'))
+      return { type: accepted ? 'busy' : 'idle' };
+    const kiloSessionId = this.registration?.spec.kiloSessionId;
+    const stored =
+      kiloSessionId === undefined ? null : this.eventQueries.getLatestNativeStatus(kiloSessionId);
+    const parsed = z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('busy') }),
+        z.object({ type: z.literal('idle') }),
+        z.object({
+          type: z.literal('retry'),
+          attempt: z.number(),
+          message: z.string(),
+          next: z.number(),
+        }),
+        z.object({
+          type: z.literal('offline'),
+          requestID: z.string(),
+          message: z.string(),
+        }),
+      ])
+      .safeParse(
+        stored === null ? undefined : readNativeEventPayload(stored.payload)?.properties.status
+      );
+    if (accepted && (!parsed.success || parsed.data.type === 'idle')) return { type: 'busy' };
+    return parsed.success ? parsed.data : undefined;
   }
 
   private deriveQueuedMessages(): QueuedMessageSnapshot[] {

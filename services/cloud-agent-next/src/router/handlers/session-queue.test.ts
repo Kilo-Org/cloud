@@ -7,7 +7,6 @@ import { createSessionSendHandlers } from './session-send.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import type { Env } from '../../types.js';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('../../session-access.js', () => ({ requireCurrentSessionAccess: vi.fn() }));
 
 const api = router({ ...createSessionSendHandlers(), ...createSessionManagementHandlers() });

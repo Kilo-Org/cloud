@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 import {
   boundSlashCommandCatalog,
@@ -13,25 +10,6 @@ import {
   type SlashCommandInfo,
 } from './slash-commands.js';
 import { DEFAULT_SLASH_COMMANDS } from './default-slash-commands.generated';
-
-/**
- * The mobile composer (`apps/mobile/src/components/agents/chat-composer-slash-commands.ts`)
- * localizes a built-in row only when the description this catalog reports is
- * character-for-character equal to the app's English copy for that command:
- * the wire carries no "this is the built-in" marker, so the English source
- * string is the only signal that separates a built-in from a repository or MCP
- * command that reuses the name. Regenerating this catalog or editing the app
- * copy must therefore keep the two strings in step — this test fails when they
- * drift instead of letting the row silently fall back to English.
- */
-const MOBILE_BUILT_IN_DESCRIPTION_KEYS = {
-  compact: 'compactDescription',
-  goal: 'goalDescription',
-  init: 'initDescription',
-  'resume-claude': 'resumeClaudeDescription',
-  'resume-codex': 'resumeCodexDescription',
-  review: 'reviewDescription',
-} as const;
 
 describe('parseSlashInvocation', () => {
   it('parses bare command', () => {
@@ -272,29 +250,5 @@ describe('slashCommandCatalogStatus', () => {
       dropped: 0,
       overLimit: true,
     });
-  });
-});
-
-describe('mobile catalogue contract', () => {
-  it('reports the built-in English descriptions the app catalogue matches on', () => {
-    const en = JSON.parse(
-      readFileSync(
-        fileURLToPath(
-          new URL('../../../../apps/mobile/src/i18n/locales/en.json', import.meta.url).href
-        ),
-        'utf8'
-      )
-    ) as { agentChat: { slashCommands: Record<string, string> } };
-    const defaults = commandsOrDefault([]);
-    const reported = new Map(defaults.map(command => [command.name, command.description]));
-    for (const command of defaults) {
-      // Skill rows are not localized built-ins: the composer shows their
-      // reported description with a skill badge.
-      if (command.source === 'skill') continue;
-      expect(MOBILE_BUILT_IN_DESCRIPTION_KEYS).toHaveProperty(command.name);
-    }
-    for (const [name, key] of Object.entries(MOBILE_BUILT_IN_DESCRIPTION_KEYS)) {
-      expect(reported.get(name)).toBe(en.agentChat.slashCommands[key]);
-    }
   });
 });

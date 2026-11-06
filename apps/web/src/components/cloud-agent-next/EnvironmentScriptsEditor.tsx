@@ -8,15 +8,33 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+const SCRIPT_COPY = {
+  setup: {
+    label: 'Setup script',
+    placeholder: '#!/bin/bash\npnpm install',
+    help: 'Installs tools and dependencies. Runs when a snapshot is built, and when a workspace starts without a snapshot. Rebuild the snapshot after changing it.',
+  },
+  start: {
+    label: 'Start script',
+    placeholder: '#!/bin/bash\ndocker compose up -d',
+    help: 'Runs each time a workspace starts, including from a snapshot. Chats that join a running workspace do not run it again. Start services here.',
+  },
+} as const;
+
+export type EnvironmentScriptKind = keyof typeof SCRIPT_COPY;
+
 export function EnvironmentScriptsEditor({
+  kind = 'setup',
   script,
   onChange,
   readOnly = false,
 }: {
+  kind?: EnvironmentScriptKind;
   script: string;
   onChange: (script: string) => void;
   readOnly?: boolean;
 }) {
+  const copy = SCRIPT_COPY[kind];
   const id = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -28,7 +46,7 @@ export function EnvironmentScriptsEditor({
         disabled={readOnly}
         accept=".sh,.bash,.txt,text/plain,application/x-sh"
         className="hidden"
-        aria-label="Choose setup script file"
+        aria-label={`Choose ${copy.label.toLowerCase()} file`}
         onChange={async event => {
           const file = event.target.files?.[0];
           event.target.value = '';
@@ -56,7 +74,7 @@ export function EnvironmentScriptsEditor({
       />
       <div className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
-          <Label htmlFor={id}>Setup script</Label>
+          <Label htmlFor={id}>{copy.label}</Label>
           {!readOnly && (
             <Button
               type="button"
@@ -75,7 +93,7 @@ export function EnvironmentScriptsEditor({
           readOnly={readOnly}
           onChange={event => onChange(event.target.value)}
           rows={10}
-          placeholder={'#!/bin/bash\npnpm install'}
+          placeholder={copy.placeholder}
           className="min-h-60 resize-y font-mono text-sm leading-6"
           spellCheck={false}
           autoCapitalize="none"
@@ -96,8 +114,8 @@ export function EnvironmentScriptsEditor({
       </div>
       <p id={`${id}-help`} className="text-muted-foreground text-xs">
         {readOnly
-          ? 'Runs before the agent starts.'
-          : 'Runs before the agent starts. For longer setup, call a script in your repository.'}
+          ? copy.help
+          : `${copy.help} For longer scripts, call a script in your repository.`}
       </p>
       {fileError && (
         <p role="alert" className="text-destructive text-sm">

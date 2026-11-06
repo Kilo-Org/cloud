@@ -2,10 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  ...jest.requireActual('@kilocode/web-shared/lib/organizations/effective-model-access.server'),
-  isOrganizationModelUpdateAllowed: jest.fn(async () => true),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    ...jest.requireActual(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ),
+    isOrganizationModelUpdateAllowed: jest.fn(async () => true),
+  })
+);
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
 import {

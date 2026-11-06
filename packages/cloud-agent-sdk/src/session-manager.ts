@@ -1,6 +1,8 @@
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import {
   errorShapeSchema,
+  cloudSessionMetadataSchema,
+  cloudSessionMessagesPageSchema,
   parseCustomerBillingFailure,
   type CustomerBillingFailure,
 } from './schemas';
@@ -19,7 +21,7 @@ import type {
   RemoteModelState,
 } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
-import type { NormalizedEvent } from './normalizer';
+import type { ChatEventVersion, NormalizedEvent } from './normalizer';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import {
@@ -29,6 +31,7 @@ import {
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
+import { upsertByRequestId } from './pending-requests';
 import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
@@ -38,6 +41,7 @@ import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
   CloudAgentSessionId,
+  CloudSessionMetadata,
   KiloSessionId,
   ResolvedSession,
   SessionSnapshot,
@@ -268,7 +272,7 @@ type AssociatedPrData = {
   headSha: string | null;
   lastSyncedAt: string;
   /** PR host (`github`, `gitlab`, …). Populated from `cli_sessions_v2.platform`. */
-  platform?: string;
+  platform?: string | undefined;
   reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
   reviewDecisionPending: boolean;
 };
@@ -282,6 +286,7 @@ type FetchedSessionData = {
   gitBranch: string | null;
   worktreeId?: string | null;
   mode: string | null;
+  environmentId?: string | null;
   model: string | null;
   variant: string | null;
   repository: string | null;
@@ -345,6 +350,11 @@ type SessionManagerConfig = {
     kiloSessionId: KiloSessionId,
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
+  fetchCloudSession?: (sessionId: CloudAgentSessionId) => Promise<CloudSessionMetadata>;
+  fetchCloudSnapshotPage?: (
+    sessionId: CloudAgentSessionId,
+    options: { cursor?: string; limit?: number; kiloSessionId?: string }
+  ) => Promise<unknown>;
   /**
    * Optional caller-persisted transcript page, used to paint a cached session
    * on open before the live transport's snapshot refresh settles. `switchSession`
@@ -921,17 +931,6 @@ function pendingDeliveryStatesEqual(
   return true;
 }
 
-function upsertPendingRequest<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 /** True when two request lists name the same requests in the same order. */
 function sameRequestIds(
   a: readonly { requestId: string }[],
@@ -952,11 +951,31 @@ function removePendingRequest<T extends { requestId: string }>(
 }
 
 /**
+ * Composer readiness from the session's cloud status. No reported status yet,
+ * a settled agent, or a failed cloud status all count as ready; an active
+ * cloud-agent session stays ready while the infrastructure prepares or
+ * finalizes, because the CLI queues those sends.
+ */
+function isCloudReady(
+  cloudStatus: CloudStatus | null,
+  sessionType: ActiveSessionType | null
+): boolean {
+  return (
+    cloudStatus === null ||
+    cloudStatus.type === 'ready' ||
+    cloudStatus.type === 'error' ||
+    (sessionType === 'cloud-agent' &&
+      (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'))
+  );
+}
+
+/**
  * Mutable state of one session open: the generations it checks, the storage it
  * paints into, and the cache-read flags its metadata failure path and its
  * deferred cache read share.
  */
 type SessionOpen = {
+  initialResolvedSession: ResolvedSession | null;
   kiloSessionId: KiloSessionId;
   expectedGeneration: number;
   preserveTranscript: boolean;
@@ -1488,6 +1507,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let metadataRecoveryCleanups: Array<() => void> = [];
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
+  let activeCloudSessionId: CloudAgentSessionId | null = null;
   const childSessionHydrationRequests = new Map<string, Promise<void>>();
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
@@ -1620,6 +1640,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesTerminal = false;
     currentCapabilities = undefined;
     clearPendingInterrupt();
+    activeCloudSessionId = null;
   }
 
   /**
@@ -1718,26 +1739,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   function replayMessagesIntoStorage(
     storage: SessionStorage,
-    messages: SessionSnapshot['messages']
+    messages: SessionSnapshot['messages'],
+    updateCursor?: number
   ): void {
     const chatProcessor = createChatProcessor(storage, {
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
     });
-    replayStoredMessages(messages, event => chatProcessor.process(event));
+    const version: ChatEventVersion | undefined =
+      activeCloudSessionId && updateCursor !== undefined
+        ? { sourceId: activeCloudSessionId, cursor: updateCursor }
+        : undefined;
+    replayStoredMessages(messages, event => chatProcessor.process(event), version);
   }
 
   /**
    * Replay a child page/snapshot's messages into the active storage through
    * the chat processor. Child pages must never go through `applyPage`: that
    * path drops any page whose `info.id` is not the root session id, and a
-   * child page never carries the root id.
+   * child page never carries the root id. The live session also reads the
+   * page, so a child message that is still streaming continues after its
+   * stored parts.
    */
   function replayChildMessages(
     storage: JotaiSessionStorage,
-    messages: SessionSnapshot['messages']
+    messages: SessionSnapshot['messages'],
+    updateCursor?: number
   ): void {
-    replayMessagesIntoStorage(storage, messages);
+    currentSession?.observeProjected(messages);
+    replayMessagesIntoStorage(storage, messages, updateCursor);
   }
 
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
@@ -1759,8 +1789,25 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const request = (async () => {
       try {
-        if (config.fetchSnapshotPage) {
-          const page = await config.fetchSnapshotPage(childSessionId, {});
+        if (activeCloudSessionId || config.fetchSnapshotPage) {
+          let page: SessionSnapshotPageOutcome | null;
+          if (activeCloudSessionId) {
+            if (!config.fetchCloudSnapshotPage) {
+              throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+            }
+            page = cloudSessionMessagesPageSchema.parse(
+              await config.fetchCloudSnapshotPage(activeCloudSessionId, {
+                kiloSessionId: childSessionId,
+              })
+            );
+            if (page?.kind === 'success' && page.info.id !== childSessionId) {
+              throw new Error('Cloud Agent child session mismatch');
+            }
+          } else if (config.fetchSnapshotPage) {
+            page = await config.fetchSnapshotPage(childSessionId, {});
+          } else {
+            return;
+          }
           if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
           // A null page (worker 404) or any typed failure on the first page is
@@ -1774,7 +1821,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             return;
           }
 
-          replayChildMessages(storage, page.messages);
+          replayChildMessages(storage, page.messages, page.updateCursor);
           setChildSessionHydrationState(childSessionId, {
             status: 'ready',
             cursor: page.nextCursor,
@@ -1816,7 +1863,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void> {
-    if (!config.fetchSnapshotPage) return;
+    const cloudSessionId = activeCloudSessionId;
+    if (!cloudSessionId && !config.fetchSnapshotPage) return;
     const fetchSnapshotPage = config.fetchSnapshotPage;
 
     const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
@@ -1839,7 +1887,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     let outcome: SessionSnapshotPageOutcome | null;
     try {
-      outcome = await fetchSnapshotPage(childSessionId, { cursor });
+      if (cloudSessionId) {
+        if (!config.fetchCloudSnapshotPage) {
+          throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+        }
+        outcome = cloudSessionMessagesPageSchema.parse(
+          await config.fetchCloudSnapshotPage(cloudSessionId, {
+            kiloSessionId: childSessionId,
+            cursor,
+          })
+        );
+        if (outcome?.kind === 'success' && outcome.info.id !== childSessionId) {
+          throw new Error('Cloud Agent child session mismatch');
+        }
+      } else if (fetchSnapshotPage) {
+        outcome = await fetchSnapshotPage(childSessionId, { cursor });
+      } else {
+        return;
+      }
     } catch (_err) {
       // Network/transport-level failure maps to a retryable older error. The
       // cursor is preserved so a retry continues from here.
@@ -1872,7 +1937,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
 
     if (outcome.kind === 'success') {
-      replayChildMessages(storage, outcome.messages);
+      replayChildMessages(storage, outcome.messages, outcome.updateCursor);
       setChildSessionHydrationState(childSessionId, {
         ...current,
         cursor: outcome.nextCursor,
@@ -1908,13 +1973,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   function updateCapabilityAtoms(session: CloudAgentSession): void {
-    const cloudStatus = store.get(cloudStatusAtom);
-    const cloudReady =
-      cloudStatus === null ||
-      cloudStatus.type === 'ready' ||
-      cloudStatus.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const liveCanSend = activeSessionType !== 'read-only' && session.canSend && cloudReady;
     if (postInterruptUnlock) {
       if (liveCanSend) {
@@ -2109,10 +2168,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
       store.set(setupLogAtom, session.state.getSetupLog());
-      transcriptRows.applyLive(
-        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : [],
-        session.state.getCommits()
-      );
+      transcriptRows.applyLive(session.state.getPreparationAttempts(), session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -2242,12 +2298,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // active session's messages or cursor. This catches races where a
     // fetchSnapshotPage result arrives after switchSession has retargeted the
     // manager to a different session.
-    if (activeSessionId === null || outcome.info.id !== activeSessionId) return false;
+    if (
+      activeSessionId === null ||
+      outcome.info.id !== (activeCloudSessionId ? store.get(rootSessionIdAtom) : activeSessionId)
+    )
+      return false;
 
     const storage = store.get(sessionStorageAtom);
     if (!storage) return false;
 
-    replayMessagesIntoStorage(storage, outcome.messages);
+    replayMessagesIntoStorage(storage, outcome.messages, outcome.updateCursor);
+
+    if (activeCloudSessionId && outcome.totalCostMicrodollars !== undefined) {
+      const data = store.get(fetchedSessionDataAtom);
+      if (data) {
+        store.set(fetchedSessionDataAtom, {
+          ...data,
+          totalCostMicrodollars: outcome.totalCostMicrodollars,
+        });
+      }
+    }
 
     olderMessagesCursor = outcome.nextCursor;
     store.set(hasOlderMessagesAtom, outcome.nextCursor !== null);
@@ -2277,7 +2347,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     const kiloSessionId = activeSessionId;
     if (!kiloSessionId) return;
-    if (!config.fetchSnapshotPage) return;
+    const cloudSessionId = activeCloudSessionId;
+    if (!cloudSessionId && !config.fetchSnapshotPage) return;
     const fetchSnapshotPage = config.fetchSnapshotPage;
 
     const cursor = olderMessagesCursor;
@@ -2287,7 +2358,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(isLoadingOlderMessagesAtom, true);
       let outcome: SessionSnapshotPageOutcome | null;
       try {
-        outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
+        if (cloudSessionId) {
+          if (!config.fetchCloudSnapshotPage) {
+            throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+          }
+          outcome = cloudSessionMessagesPageSchema.parse(
+            await config.fetchCloudSnapshotPage(cloudSessionId, { cursor })
+          );
+        } else if (fetchSnapshotPage) {
+          outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
+        } else {
+          return;
+        }
       } catch (_err) {
         // Network/transport-level failures map to a retryable outcome so
         // the UI exposes a Retry CTA. The cursor is preserved.
@@ -2609,8 +2691,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       preserveTranscript,
       resolvedFailures
     );
-    startCachedPageRead(open);
-
     const data = await fetchOpenSessionData(open);
     if (!data) return;
     store.set(fetchedSessionDataAtom, data);
@@ -2739,6 +2819,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const jotaiStorage = store.get(sessionStorageAtom) ?? createJotaiStorage(store);
     store.set(sessionStorageAtom, jotaiStorage);
     return {
+      initialResolvedSession: null,
       kiloSessionId,
       expectedGeneration,
       preserveTranscript,
@@ -2799,9 +2880,58 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * outcome. Returns null when the open stops: denied, retryable, or stale.
    */
   async function fetchOpenSessionData(open: SessionOpen): Promise<FetchedSessionData | null> {
+    const { kiloSessionId, expectedGeneration } = open;
     let data: FetchedSessionData;
     try {
-      data = await config.fetchSession(open.kiloSessionId);
+      startCachedPageRead(open);
+      if (config.fetchCloudSession || config.fetchCloudSnapshotPage) {
+        const initialResolvedSession = await config.resolveSession(kiloSessionId);
+        if (expectedGeneration !== switchGeneration) return null;
+        open.initialResolvedSession = initialResolvedSession;
+        if (
+          initialResolvedSession.type === 'cloud-agent' &&
+          initialResolvedSession.cloudAgentSessionId.startsWith('workspace_')
+        ) {
+          activeCloudSessionId = initialResolvedSession.cloudAgentSessionId;
+        }
+      }
+
+      if (activeCloudSessionId) {
+        if (!config.fetchCloudSession) {
+          throw new Error('Cloud Agent workspace sessions require fetchCloudSession');
+        }
+        const metadata = cloudSessionMetadataSchema.parse(
+          await config.fetchCloudSession(activeCloudSessionId)
+        );
+        if (metadata.sessionId !== activeCloudSessionId) {
+          throw new Error('Cloud Agent session mismatch');
+        }
+        data = {
+          kiloSessionId,
+          cloudAgentSessionId: activeCloudSessionId,
+          title: metadata.title ?? null,
+          organizationId: metadata.orgId ?? null,
+          gitUrl: metadata.gitUrl ?? null,
+          gitBranch: metadata.upstreamBranch ?? metadata.branchName ?? null,
+          worktreeId: metadata.worktreeId ?? null,
+          mode: metadata.mode ?? null,
+          model: metadata.model ?? null,
+          variant: metadata.variant ?? null,
+          repository: metadata.githubRepo ?? null,
+          isInitiated: Boolean(metadata.initiatedAt),
+          isPreparingAsync: !metadata.preparedAt,
+          ...(metadata.routeReady === undefined ? {} : { routeReady: metadata.routeReady }),
+          prompt: metadata.prompt ?? null,
+          initialMessageId: metadata.initialMessageId ?? null,
+          ...(metadata.runtimeAgents ? { runtimeAgents: metadata.runtimeAgents } : {}),
+          associatedPr: metadata.associatedPr ?? null,
+          totalCostMicrodollars: metadata.totalCostMicrodollars ?? null,
+          createdOnPlatform: metadata.createdOnPlatform ?? null,
+          profileId: metadata.profileId ?? null,
+        };
+      } else {
+        data = await config.fetchSession(kiloSessionId);
+      }
     } catch (err) {
       if (open.expectedGeneration !== switchGeneration) return null;
       const parsed = errorShapeSchema.safeParse(err);
@@ -2896,6 +3026,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // filtering works even when switchSession was called with a
           // cast cloudAgentSessionId (the createAndStart path).
           store.set(rootSessionIdAtom, info.id);
+          const fetched = store.get(fetchedSessionDataAtom);
+          if (activeCloudSessionId && fetched && info.title !== undefined) {
+            store.set(fetchedSessionDataAtom, { ...fetched, title: info.title });
+          }
           store.set(isLoadingAtom, false);
           // The snapshot replay is the landing signal for a cached open that
           // has no page-aware read: without `fetchSnapshotPage` the transport
@@ -2929,6 +3063,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       onSessionUpdated: info => {
         const rootSessionId = store.get(rootSessionIdAtom);
+        const fetched = store.get(fetchedSessionDataAtom);
+        if (
+          activeCloudSessionId &&
+          rootSessionId === info.id &&
+          fetched &&
+          info.title !== undefined
+        ) {
+          store.set(fetchedSessionDataAtom, { ...fetched, title: info.title });
+        }
         if (rootSessionId === info.id && info.model) {
           updateObservedModel(
             toModelSelection(
@@ -2941,7 +3084,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onQuestionAsked: (requestId, questions) => {
         if (!questions) return;
-        const next = upsertPendingRequest(store.get(pendingQuestionsAtom), {
+        const next = upsertByRequestId(store.get(pendingQuestionsAtom), {
           requestId,
           questions,
         });
@@ -2955,7 +3098,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onPermissionAsked: (requestId, permission, patterns, metadata, always) => {
         if (!permission) return;
-        const next = upsertPendingRequest(store.get(pendingPermissionsAtom), {
+        const next = upsertByRequestId(store.get(pendingPermissionsAtom), {
           requestId,
           permission,
           patterns: patterns ?? [],
@@ -3258,6 +3401,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // pass the generation check and clobber the active session's cursor
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
+      if (initialPageGeneration !== loadOlderGeneration) return;
+      if (activeCloudSessionId) store.set(rootSessionIdAtom, page.info.id);
       if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
         // The stream replays these rows later; show them with the page's messages.
         transcriptRows.restore(page);
@@ -3274,11 +3419,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const callbacks = buildOpenSessionCallbacks(open, () => session);
     const session = createCloudAgentSession({
       kiloSessionId,
-      resolveSession: config.resolveSession,
+      resolveSession: id => {
+        const resolved = open.initialResolvedSession;
+        if (resolved) {
+          open.initialResolvedSession = null;
+          return Promise.resolve(resolved);
+        }
+        return config.resolveSession(id);
+      },
       transport: {
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
+        ...(config.fetchCloudSnapshotPage
+          ? { fetchCloudSnapshotPage: config.fetchCloudSnapshotPage }
+          : {}),
         ...(config.fetchSnapshotPage ? { fetchSnapshotPage: config.fetchSnapshotPage } : {}),
         onInitialPageLoaded: recordInitialPage,
         userWebConnection: config.userWebConnection,
@@ -3565,13 +3720,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * the CLI is still winding down are queued CLI-side.
    */
   function restoreAfterInterrupt(session: CloudAgentSession): void {
-    const cs = store.get(cloudStatusAtom);
-    const cloudReady =
-      cs === null ||
-      cs.type === 'ready' ||
-      cs.type === 'error' ||
-      (activeSessionType === 'cloud-agent' &&
-        (cs.type === 'preparing' || cs.type === 'finalizing'));
+    const cloudReady = isCloudReady(store.get(cloudStatusAtom), activeSessionType);
     const readOnly = activeSessionType === 'read-only';
     postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);

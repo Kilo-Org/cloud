@@ -15,16 +15,12 @@ import {
   readTrpcErrorContext,
   readTrpcResponseError,
   reportNetworkError,
-  stripQueryString,
   trpcProcedureFromUrl,
 } from '@/lib/telemetry/network-errors';
 import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];
-
-// Assembled from parts so the fixture reads as a plain URL value.
-const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
 
 beforeEach(() => {
   events = [];
@@ -76,32 +72,6 @@ function batchErrorItem(httpStatus: number): { error: Record<string, unknown> } 
 function batchWithInnerStatus(httpStatus: number): Response {
   return Response.json([{ result: { data: 'ok' } }, batchErrorItem(httpStatus)], { status: 207 });
 }
-
-describe('stripQueryString', () => {
-  it('drops the query string', () => {
-    expect(stripQueryString('https://example.com/api/trpc/a.b?batch=1&input=secret')).toBe(
-      'https://example.com/api/trpc/a.b'
-    );
-  });
-
-  it('leaves a query-free URL unchanged', () => {
-    expect(stripQueryString('https://example.com/api/trpc/a.b')).toBe(
-      'https://example.com/api/trpc/a.b'
-    );
-  });
-
-  it('keeps origin and path for a fragment suffix', () => {
-    expect(stripQueryString('https://example.com/oauth/callback#abcdefghijklmnopqrst')).toBe(
-      'https://example.com/oauth/callback'
-    );
-  });
-
-  it('keeps origin and path when the authority carries userinfo', () => {
-    expect(stripQueryString(`https://${USERINFO}@example.com/api/trpc/a.b`)).toBe(
-      'https://example.com/api/trpc/a.b'
-    );
-  });
-});
 
 describe('normalizeUrlPath', () => {
   it('drops the scheme, host, and ephemeral port and keeps the path', () => {

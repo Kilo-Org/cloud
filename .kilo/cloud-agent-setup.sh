@@ -45,16 +45,26 @@ if (( EUID != 0 )); then
   root=(sudo -n)
 fi
 
-KILO_STARTUP_CGROUP="/sys/fs/cgroup/kilo-workloads/kilo-dev-$(basename "$repo")"
-export KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
-if [[ ! -f /sys/fs/cgroup/kilo-workloads/memory.max ]]; then
+workload_parent=${KILO_WORKLOAD_CGROUP_ROOT:-/sys/fs/cgroup/kilo-workloads}
+KILO_STARTUP_CGROUP="$workload_parent/kilo-dev-$(basename "$repo")"
+build_mode=0
+if [[ ${KILO_ENVIRONMENT_BUILD:-} == 1 ]]; then
+  # The environment builder runs without the session wrapper, so it has no
+  # delegated workload cgroup and stops every process before capture. Install
+  # packages and warm Docker's image store for the snapshot; session setup
+  # starts the daemons from the captured filesystem.
+  build_mode=1
+  KILO_STARTUP_CGROUP=
+elif [[ ! -f $workload_parent/memory.max ]]; then
   printf 'Memory-safe setup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
   exit 1
 fi
+export KILO_WORKLOAD_CGROUP_ROOT=$workload_parent KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
+if (( ! build_mode )); then
 KILO_STARTUP_MEMORY_MB=$(node -e '
   const fs = require("node:fs");
   const MiB = 1048576;
-  const parent = "/sys/fs/cgroup/kilo-workloads";
+  const parent = process.env.KILO_WORKLOAD_CGROUP_ROOT || "/sys/fs/cgroup/kilo-workloads";
   function fail(message) {
     console.error(message + " No workloads were started.");
     process.exit(1);
@@ -90,6 +100,7 @@ printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/cgroup.subtree_
 "${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP/processes" "$KILO_STARTUP_CGROUP/containers"
 printf '%s\n' "$$" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
 printf 'Dev workload capped at %s MiB, with %s MiB reserved for other sandbox workloads.\n' "$KILO_STARTUP_MEMORY_MB" "$KILO_STARTUP_RESERVE_MB"
+fi
 
 "${root[@]}" timeout --foreground 5m apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 docker_packages=(docker.io)
@@ -149,7 +160,7 @@ if (( ${#tools[@]} )); then
   "${root[@]}" npm install --global --no-audit --no-fund "${tools[@]}"
 fi
 
-if tmux list-sessions >/dev/null 2>&1; then
+if (( ! build_mode )) && tmux list-sessions >/dev/null 2>&1; then
   tmux_pid=$(tmux display-message -p '#{pid}')
   if ! node -e 'const fs = require("node:fs"); process.exit(fs.readFileSync("/proc/" + process.argv[1] + "/cgroup", "utf8").includes(process.env.KILO_STARTUP_CGROUP.replace("/sys/fs/cgroup", "") + "/processes") ? 0 : 1)' "$tmux_pid"; then
     printf 'The existing tmux server is outside the dev workload memory budget. Stop its sessions before running this script.\n' >&2
@@ -160,21 +171,25 @@ fi
 mkdir -p "$startup_bin"
 rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection"
 real_docker=$(readlink -f "$(command -v docker)")
+compose_cgroup_parent=
+if (( ! build_mode )); then
+  compose_cgroup_parent="    cgroup_parent: ${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+fi
 cat > "$state_dir/compose.memory.yml" <<YAML
 services:
   postgres:
     mem_limit: 768m
     memswap_limit: 768m
     shm_size: 128m
-    cgroup_parent: ${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers
+$compose_cgroup_parent
   redis:
     mem_limit: 128m
     memswap_limit: 128m
-    cgroup_parent: ${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers
+$compose_cgroup_parent
   redis-http:
     mem_limit: 256m
     memswap_limit: 256m
-    cgroup_parent: ${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers
+$compose_cgroup_parent
     environment:
       ERL_FLAGS: "+S 2:2 +A 2"
 YAML
@@ -202,7 +217,7 @@ function run(input) {
     if (source !== -1) args.splice(source + 2, 0, '-f', path.join(__dirname, 'compose.memory.yml'));
   }
   // dockerd's own BuildKit keeps images in the daemon store, so unchanged images rebuild from cache in seconds.
-  if (build) args.splice(1, 0, `--cgroup-parent=${process.env.KILO_STARTUP_CGROUP.replace('/sys/fs/cgroup', '')}/containers/builds`);
+  if (build && process.env.KILO_STARTUP_CGROUP) args.splice(1, 0, `--cgroup-parent=${process.env.KILO_STARTUP_CGROUP.replace('/sys/fs/cgroup', '')}/containers/builds`);
   const command = build ? 'flock' : process.env.KILO_STARTUP_REAL_DOCKER;
   const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), process.env.KILO_STARTUP_REAL_DOCKER, ...args] : args;
   const child = spawn(command, commandArgs, { stdio: [input === undefined ? 'inherit' : 'pipe', 'inherit', 'inherit'] });
@@ -224,8 +239,6 @@ if (!stdinDockerfile) {
     const limits = 'ENV NODE_OPTIONS=--max-old-space-size=768 GOMAXPROCS=2 npm_config_jobs=1';
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)([^\n]*)/gm,
       (_, image, suffix) => `FROM mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}\n${limits}`);
-    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/)?cloudflare\/sandbox:[^\n]+/m, from =>
-      `${from}\n${trust}\n${limits}`);
     run(dockerfile);
   });
 }
@@ -293,6 +306,7 @@ SH
 hash -r
 source "$env_file"
 
+started_docker=0
 if ! docker info >/dev/null 2>&1; then
   if [[ -n ${DOCKER_HOST:-} ]] || [[ -S /var/run/docker.sock ]]; then
     printf 'The supplied Docker daemon is inaccessible; fix Docker access and rerun.\n' >&2
@@ -301,12 +315,17 @@ if ! docker info >/dev/null 2>&1; then
   # These sandboxes mount /proc/sys read-only; overlay2 is supported by the current kernel.
   storage_driver="${KILO_STARTUP_DOCKER_STORAGE_DRIVER:-overlay2}"
   if [[ $storage_driver != overlay2 && $storage_driver != fuse-overlayfs ]]; then
-    printf 'Only overlay2 or fuse-overlayfs is allowed; vfs layer copies are unsafe for this sandbox.\n' >&2
+    printf 'Only overlay2 or fuse-overlayfs are allowed; vfs layer copies are unsafe for this sandbox.\n' >&2
     exit 1
+  fi
+  docker_cgroup_parent=
+  if (( ! build_mode )); then
+    docker_cgroup_parent=" --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
   fi
   # Own the socket by the invoking user's group so a non-root sandbox can use the daemon it starts.
   "${root[@]}" tmux new-session -d -s kilo-startup-docker \
-    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --registry-mirror=https://mirror.gcr.io --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --registry-mirror=https://mirror.gcr.io$docker_cgroup_parent"
+  started_docker=1
   for (( attempt=0; attempt<30; attempt++ )); do
     docker info >/dev/null 2>&1 && break
     sleep 1
@@ -332,7 +351,7 @@ if [[ $(docker info --format '{{.Driver}}') == vfs ]]; then
   printf 'The existing Docker daemon uses vfs. Stop it and restart with overlay2 or fuse-overlayfs before running this workload.\n' >&2
   exit 1
 fi
-if tmux list-sessions >/dev/null 2>&1; then
+if (( ! build_mode )) && tmux list-sessions >/dev/null 2>&1; then
   while IFS= read -r line; do
     tmux set-environment -g "${line%%=*}" "${line#*=}"
   done < <(bash -c 'source "$1"; for name in PATH SHELL KILO_PORT_OFFSET KILO_STARTUP_CGROUP KILO_STARTUP_REAL_DOCKER WRANGLER_DOCKER_BIN WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST NODE_EXTRA_CA_CERTS; do [[ -n ${!name:-} ]] && printf "%s=%s\n" "$name" "${!name}"; done' _ "$env_file")
@@ -343,11 +362,13 @@ if docker buildx inspect "$legacy_builder" >/dev/null 2>&1; then
   docker buildx rm --force "$legacy_builder" >/dev/null
 fi
 # Image build steps run in their own 2 GiB slice of the dev workload budget.
-builds_cgroup="$KILO_STARTUP_CGROUP/containers/builds"
-printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/containers/cgroup.subtree_control" >/dev/null
-"${root[@]}" mkdir -p "$builds_cgroup"
-printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$builds_cgroup/memory.max" >/dev/null
-printf '0\n' | "${root[@]}" tee "$builds_cgroup/memory.swap.max" >/dev/null
+if (( ! build_mode )); then
+  builds_cgroup="$KILO_STARTUP_CGROUP/containers/builds"
+  printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/containers/cgroup.subtree_control" >/dev/null
+  "${root[@]}" mkdir -p "$builds_cgroup"
+  printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$builds_cgroup/memory.max" >/dev/null
+  printf '0\n' | "${root[@]}" tee "$builds_cgroup/memory.swap.max" >/dev/null
+fi
 
 timeout 15m pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4
 if [[ ! -s .env.local ]]; then
@@ -382,6 +403,7 @@ while IFS= read -r image; do
   fi
 done < <(docker compose -f dev/docker-compose.yml config --images | sort -u)
 
+if (( ! build_mode )); then
 printf 'Preparing the local database (up to 5 minutes).\n'
 timeout --foreground 5m pnpm test:db
 
@@ -399,6 +421,7 @@ SQL
 )
 pnpm dev:seed app:add-credits "$test_user_id" 100 --free
 env_default KILO_TEST_USER_EMAIL "$test_email" >> "$env_file"
+fi
 
 # wrangler dev builds every Cloud Agent sandbox image on start. Build them now so dev:start only hits the cache.
 if [[ ${KILO_STARTUP_SANDBOX_IMAGES:-1} != 0 ]]; then
@@ -421,12 +444,25 @@ if [[ ${KILO_STARTUP_SANDBOX_IMAGES:-1} != 0 ]]; then
   wait "$images_pid" 2>/dev/null || true
 fi
 
-printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
-  "$(( $(< "$KILO_STARTUP_CGROUP/memory.peak") / 1048576 ))" "$KILO_STARTUP_MEMORY_MB"
-printf 'Run from %s (pnpm there joins the capped cgroup and loads %s):\n' "$repo" "$env_file"
-printf '  pnpm dev:start --no-attach app                 # web app\n'
-printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with local fake inference\n'
-printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'
-printf 'Then pnpm dev:status for ports; log in at http://localhost:<nextjs port>/users/sign_in?fakeUser=%s&callbackPath=/profile\n' "$test_email"
-printf 'Other shells (docker, agent-browser): source %q\n' "$env_file"
-printf 'Usage, limits, and troubleshooting: .kilo/skills/cloud-agent-sandbox/SKILL.md\n'
+if (( build_mode )); then
+  if (( started_docker )); then
+    printf 'Stopping the Docker daemon before snapshot capture.\n'
+    "${root[@]}" kill -TERM "$(< /var/run/docker.pid)" 2>/dev/null || true
+    for (( attempt=0; attempt<20; attempt++ )); do
+      docker info >/dev/null 2>&1 || break
+      sleep 1
+    done
+  fi
+  printf '\nEnvironment build complete. Docker packages and sandbox images are captured in the snapshot.\n'
+  printf 'Session setup starts Docker and the dev database from that filesystem.\n'
+else
+  printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
+    "$(( $(< "$KILO_STARTUP_CGROUP/memory.peak") / 1048576 ))" "$KILO_STARTUP_MEMORY_MB"
+  printf 'Run from %s (pnpm there joins the capped cgroup and loads %s):\n' "$repo" "$env_file"
+  printf '  pnpm dev:start --no-attach app                 # web app\n'
+  printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with local fake inference\n'
+  printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'
+  printf 'Then pnpm dev:status for ports; log in at http://localhost:<nextjs port>/users/sign_in?fakeUser=%s&callbackPath=/profile\n' "$test_email"
+  printf 'Other shells (docker, agent-browser): source %q\n' "$env_file"
+  printf 'Usage, limits, and troubleshooting: .kilo/skills/cloud-agent-sandbox/SKILL.md\n'
+fi

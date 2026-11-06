@@ -1,6 +1,13 @@
 import 'server-only';
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 
+export const SESSION_SYNC_WORKER_URL =
+  getEnvVariable('SESSION_SYNC_WORKER_URL') ||
+  (process.env.VERCEL_ENV === 'production' &&
+  (!process.env.VERCEL_TARGET_ENV || process.env.VERCEL_TARGET_ENV === 'production')
+    ? 'https://session-sync.kiloapps.io'
+    : '');
+
 export const TURNSTILE_SECRET_KEY = requireEnv(
   'TURNSTILE_SECRET_KEY',
   getEnvVariable('TURNSTILE_SECRET_KEY')

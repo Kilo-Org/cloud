@@ -1,0 +1,4 @@
+# Copy to .dev.vars for wrangler dev. Use local development values only.
+NEXTAUTH_SECRET=""
+SESSION_SYNC_SECRET=""
+INTERNAL_API_SECRET_PROD=""

@@ -31,6 +31,13 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from './sink-registry';
+import {
+  _flushWaitingAskMirrorForTests,
+  _resetWaitingAskForTests,
+  _setSecureStoreForTests as _setAskSecureStoreForTests,
+  getWaitingAsk,
+  recordWaitingAsk,
+} from './waiting-ask';
 
 type SinkCall =
   | { type: 'publish'; snapshot: GlanceableAgentsSnapshot }
@@ -88,6 +95,7 @@ function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
 
 afterEach(() => {
   _resetGlanceablePersistForTests();
+  _resetWaitingAskForTests();
   // The lost-org latch is module state: release it so it cannot leak forward.
   confirmGlanceableOrgMembership();
   vi.useRealTimers();
@@ -106,6 +114,41 @@ describe('cleanup', () => {
     } finally {
       unregisterGlanceableSink(sink);
     }
+  });
+
+  it('ends the recorded ask with the account it named', async () => {
+    const askStore = new Map<string, string>();
+    _setAskSecureStoreForTests({
+      setItemAsync: (key, value) => {
+        askStore.set(key, value);
+        return Promise.resolve();
+      },
+      getItemAsync: key => Promise.resolve(askStore.get(key) ?? null),
+      deleteItemAsync: key => {
+        askStore.delete(key);
+        return Promise.resolve();
+      },
+    });
+    recordWaitingAsk({
+      kiloSessionId: 'ses_signing_out',
+      status: 'permission',
+      isCloudAgent: true,
+      scopeKey: buildOpaqueScopeKey(PUB_CTX),
+      organizationId: PUB_CTX.organizationId,
+      userId: PUB_CTX.userId,
+      recordedAt: Date.now(),
+      boundPermissionId: 'perm_signing_out',
+    });
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(1);
+
+    writeSignedOutSnapshotAndEnd();
+
+    // The ask names a session and an organization of the scope that just
+    // ended, so the blank ends it in memory and on disk alike.
+    expect(getWaitingAsk()).toBeNull();
+    await _flushWaitingAskMirrorForTests();
+    expect(askStore.size).toBe(0);
   });
 
   it('blanks every other sink when one sink throws', () => {

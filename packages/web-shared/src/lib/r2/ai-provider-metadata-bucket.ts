@@ -1,4 +1,10 @@
-import { PutObjectCommand, S3ServiceException, type S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  NoSuchKey,
+  PutObjectCommand,
+  S3ServiceException,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -13,6 +19,16 @@ export type AiProviderMetadataBucket = {
 type ArchiveLogContext = Record<string, string>;
 
 let client: S3Client | undefined;
+
+function getClient({ accessKeyId, secretAccessKey }: AiProviderMetadataBucket): S3Client {
+  client ??= createR2Client({ accessKeyId, secretAccessKey });
+  return client;
+}
+
+/** The object holding the metadata of one `microdollar_usage` row. */
+export function aiProviderMetadataKey(usageId: string): string {
+  return `${usageId}.json`;
+}
 
 /** The shared AI provider metadata bucket, or undefined when any of its settings is missing. */
 export function getAiProviderMetadataBucket(
@@ -50,7 +66,7 @@ export function scheduleAiProviderMetadataArchive({
   logSource: string;
   logContext: ArchiveLogContext;
   key: string;
-  body: () => string;
+  body: () => string | Promise<string>;
 }): void {
   const reportFailure = (stage: 'registration' | 'upload', error: unknown) =>
     errorExceptInTest(`[${logSource}] failed to archive metadata`, {
@@ -71,12 +87,12 @@ export function scheduleAiProviderMetadataArchive({
     console.debug(`[${logSource}] scheduling archive`, { ...logContext, bucket });
     after(async () => {
       try {
-        client ??= createR2Client({ accessKeyId, secretAccessKey });
-        await client.send(
+        const serializedBody = await body();
+        await getClient({ bucket, accessKeyId, secretAccessKey }).send(
           new PutObjectCommand({
             Bucket: bucket,
             Key: key,
-            Body: body(),
+            Body: serializedBody,
             ContentType: 'application/json',
           })
         );
@@ -87,5 +103,28 @@ export function scheduleAiProviderMetadataArchive({
     });
   } catch (error) {
     reportFailure('registration', error);
+  }
+}
+
+export type AiProviderMetadataObject =
+  | { status: 'not-configured' }
+  | { status: 'not-found' }
+  | { status: 'found'; body: string };
+
+export async function readAiProviderMetadata(
+  usageId: string,
+  logSource: string
+): Promise<AiProviderMetadataObject> {
+  const target = getAiProviderMetadataBucket(logSource);
+  if (!target) return { status: 'not-configured' };
+  try {
+    const result = await getClient(target).send(
+      new GetObjectCommand({ Bucket: target.bucket, Key: aiProviderMetadataKey(usageId) })
+    );
+    const body = await result.Body?.transformToString('utf-8');
+    return body === undefined ? { status: 'not-found' } : { status: 'found', body };
+  } catch (error) {
+    if (error instanceof NoSuchKey) return { status: 'not-found' };
+    throw error;
   }
 }

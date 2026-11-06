@@ -13,7 +13,6 @@ import type { SQL } from 'drizzle-orm';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
-import type { UsageQueueFraConfig, UsageQueueSfoConfig } from './usage-queue-config';
 
 const nativeFetch = globalThis.fetch;
 const nativeDateNow = Date.now;
@@ -35,9 +34,6 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  USAGE_QUEUE_ONLY_ENABLED: false,
-  USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
-  USAGE_QUEUE_FRA_CONFIG: { enabled: false, exposure: 0 },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
@@ -109,13 +105,10 @@ const {
   saveUsageRelatedDataLocally,
 } = jest.requireActual<typeof UsageProcessing>('./processUsage');
 const publisher = jest.requireMock<typeof UsagePublisher>('./usage-publisher');
-const config = jest.requireMock<{
-  USAGE_QUEUE_ONLY_ENABLED: boolean;
-  USAGE_QUEUE_SFO_CONFIG: UsageQueueSfoConfig;
-  USAGE_QUEUE_FRA_CONFIG: UsageQueueFraConfig;
+const config = jest.requireMock<typeof ServerConfig>('@kilocode/web-shared/lib/config.server') as {
   USAGE_INGEST_URL: string;
   USAGE_INGEST_PUBLISH_SECRET: string;
-}>('@kilocode/web-shared/lib/config.server');
+};
 const { db } = jest.requireMock<{
   db: { transaction: jest.Mock; query: { microdollar_usage: { findFirst: jest.Mock } } };
 }>('@kilocode/web-shared/lib/drizzle');
@@ -197,6 +190,7 @@ const context: MicrodollarUsageContext = {
   auto_model: null,
   ttfb_ms: null,
   reasoning_setting: 'medium',
+  inference_region: 'eu',
 };
 let sent: UsageRecordRequest[];
 let info: jest.MockedFunction<typeof console.info>;
@@ -250,6 +244,7 @@ function requestLifetime(waitUntilAvailable = true) {
 }
 
 beforeEach(() => {
+  jest.replaceProperty(process, 'env', { ...process.env });
   jest.clearAllMocks();
   jest
     .mocked(publisher.enqueueUsage)
@@ -257,9 +252,8 @@ beforeEach(() => {
       jest.requireActual<typeof UsagePublisher>('./usage-publisher').enqueueUsage
     );
 
-  config.USAGE_QUEUE_ONLY_ENABLED = false;
-  config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
-  config.USAGE_QUEUE_FRA_CONFIG = { enabled: false, exposure: 0 };
+  process.env.VERCEL_TARGET_ENV = 'preview';
+  process.env.VERCEL_ENV = 'preview';
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
   config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
@@ -319,38 +313,18 @@ afterEach(() => {
 });
 
 function configureQueueEnvironment(overrides: Record<string, string | undefined> = {}) {
-  const original = { ...process.env };
-  try {
-    for (const [key, value] of Object.entries({
-      USAGE_QUEUE_ONLY_ENABLED: 'true',
-      USAGE_QUEUE_SFO_EXPOSURE: '1',
-      USAGE_QUEUE_FRA_EXPOSURE: undefined,
-      USAGE_QUEUE_SFO_USER_IDS: '',
-      VERCEL_ENV: 'production',
-      VERCEL_TARGET_ENV: 'production',
-      VERCEL_REGION: 'sfo1',
-      BYOK_ENCRYPTION_KEY: 'synthetic-key',
-      ...overrides,
-    })) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    jest.isolateModules(() => {
-      const actual = jest.requireActual<typeof ServerConfig>(
-        '@kilocode/web-shared/lib/config.server'
-      );
-      config.USAGE_QUEUE_ONLY_ENABLED = actual.USAGE_QUEUE_ONLY_ENABLED;
-      config.USAGE_QUEUE_SFO_CONFIG = actual.USAGE_QUEUE_SFO_CONFIG;
-      config.USAGE_QUEUE_FRA_CONFIG = actual.USAGE_QUEUE_FRA_CONFIG;
-    });
-  } finally {
-    process.env = original;
+  for (const [key, value] of Object.entries({
+    VERCEL_ENV: 'production',
+    VERCEL_TARGET_ENV: 'production',
+    VERCEL_REGION: 'sfo1',
+    BYOK_ENCRYPTION_KEY: 'synthetic-key',
+    ...overrides,
+  })) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
   }
-  if ('VERCEL_REGION' in overrides && overrides.VERCEL_REGION === undefined) {
-    delete process.env.VERCEL_REGION;
-  } else {
-    process.env.VERCEL_REGION = overrides.VERCEL_REGION ?? 'sfo1';
-  }
+  config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
+  config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
 }
 
 const personalBouncer: NonNullable<MicrodollarUsageContext['bouncer']> = {
@@ -368,54 +342,17 @@ const personalContext: MicrodollarUsageContext = {
   bouncer: personalBouncer,
 };
 
-describe('production FRA queued accounting', () => {
-  function configureFra(overrides: Record<string, string | undefined> = {}) {
-    configureQueueEnvironment({
-      VERCEL_REGION: 'fra1',
-      USAGE_QUEUE_SFO_EXPOSURE: '0',
-      USAGE_QUEUE_FRA_EXPOSURE: '1',
-      ...overrides,
-    });
-  }
-
+describe('production queued accounting eligibility', () => {
   test.each([
-    { name: 'unset', env: { USAGE_QUEUE_FRA_EXPOSURE: undefined }, queued: false },
-    {
-      name: 'SFO full exposure cannot enable FRA',
-      env: { USAGE_QUEUE_FRA_EXPOSURE: undefined, USAGE_QUEUE_SFO_EXPOSURE: '1' },
-      queued: false,
-    },
-    { name: 'empty', env: { USAGE_QUEUE_FRA_EXPOSURE: '' }, queued: false },
-    { name: 'zero', env: { USAGE_QUEUE_FRA_EXPOSURE: '0' }, queued: false },
-    { name: 'malformed', env: { USAGE_QUEUE_FRA_EXPOSURE: 'bad' }, queued: false },
-    { name: 'hex', env: { USAGE_QUEUE_FRA_EXPOSURE: '0x1' }, queued: false },
-    { name: 'nonfinite', env: { USAGE_QUEUE_FRA_EXPOSURE: 'Infinity' }, queued: false },
-    { name: 'out of range', env: { USAGE_QUEUE_FRA_EXPOSURE: '1.01' }, queued: false },
-    { name: 'negative', env: { USAGE_QUEUE_FRA_EXPOSURE: '-0.1' }, queued: false },
-    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' }, queued: false },
-    { name: 'master missing', env: { USAGE_QUEUE_ONLY_ENABLED: undefined }, queued: false },
-    { name: 'master malformed', env: { USAGE_QUEUE_ONLY_ENABLED: 'TRUE' }, queued: false },
-    { name: 'outside cohort', env: { USAGE_QUEUE_FRA_EXPOSURE: '0.8961' }, queued: false },
-    { name: 'inside cohort', env: { USAGE_QUEUE_FRA_EXPOSURE: '0.8962' }, queued: true },
-    { name: 'all FRA', env: {}, queued: true },
-    { name: 'SFO allowlist ignored', env: { USAGE_QUEUE_SFO_USER_IDS: '[]' }, queued: true },
-    { name: 'SFO malformed list ignored', env: { USAGE_QUEUE_SFO_USER_IDS: 'bad' }, queued: true },
-    { name: 'SFO', env: { VERCEL_REGION: 'sfo1' }, queued: false },
-    { name: 'unknown region', env: { VERCEL_REGION: 'iad1' }, queued: false },
-    { name: 'absent region', env: { VERCEL_REGION: undefined }, queued: false },
-    { name: 'empty region', env: { VERCEL_REGION: '' }, queued: false },
-    { name: 'missing environment', env: { VERCEL_ENV: undefined }, queued: false },
-    { name: 'missing target', env: { VERCEL_TARGET_ENV: undefined }, queued: false },
-    {
-      name: 'preview',
-      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' },
-      queued: false,
-    },
-    {
-      name: 'development',
-      env: { VERCEL_ENV: 'development', VERCEL_TARGET_ENV: 'development' },
-      queued: false,
-    },
+    { name: 'eligible fra1', env: { VERCEL_REGION: 'fra1' }, queued: true },
+    { name: 'eligible sfo1', env: { VERCEL_REGION: 'sfo1' }, queued: true },
+    { name: 'other region', env: { VERCEL_REGION: 'iad1' }, queued: true },
+    { name: 'missing region', env: { VERCEL_REGION: '' }, queued: true },
+    { name: 'absent region', env: { VERCEL_REGION: undefined }, queued: true },
+    { name: 'missing master', env: { USAGE_QUEUE_ONLY_ENABLED: undefined }, queued: true },
+    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' }, queued: true },
+    { name: 'malformed master', env: { USAGE_QUEUE_ONLY_ENABLED: 'TRUE' }, queued: true },
+    { name: 'vercel transport', env: { USAGE_QUEUE_TRANSPORT: 'vercel' }, queued: true },
     {
       name: 'production with staging target',
       env: { VERCEL_TARGET_ENV: 'staging' },
@@ -423,12 +360,28 @@ describe('production FRA queued accounting', () => {
     },
     { name: 'preview with production target', env: { VERCEL_ENV: 'preview' }, queued: false },
     {
-      name: 'staging preserved',
-      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', USAGE_QUEUE_FRA_EXPOSURE: '0' },
+      name: 'preview',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' },
+      queued: false,
+    },
+    {
+      name: 'development',
+      env: {
+        VERCEL_ENV: 'development',
+        VERCEL_TARGET_ENV: 'development',
+        VERCEL_REGION: undefined,
+      },
+      queued: false,
+    },
+    { name: 'missing environment', env: { VERCEL_ENV: undefined }, queued: false },
+    { name: 'missing target', env: { VERCEL_TARGET_ENV: undefined }, queued: false },
+    {
+      name: 'staging target outside production',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging' },
       queued: true,
     },
   ])('$name uses exactly one existing accounting path', async ({ env, queued }) => {
-    configureFra(env);
+    configureQueueEnvironment(env);
     const lifecycle = requestLifetime();
     const record = await lifecycle.run(() =>
       logMicrodollarUsage({ ...stats }, { ...personalContext })
@@ -438,37 +391,17 @@ describe('production FRA queued accounting', () => {
     expect(record?.status).toBe(queued ? 'queued' : 'recorded');
     expect(publisher.enqueueUsage).toHaveBeenCalledTimes(queued ? 1 : 0);
     expect(fetch).toHaveBeenCalledTimes(queued ? 1 : 0);
+    if (queued) {
+      expect(publisher.enqueueUsage).toHaveBeenCalledWith(expect.anything(), {
+        retryTransientFailures: true,
+      });
+      expect(sent[0].core.id).toBe(record?.usageId);
+    }
     expect(writer).toHaveBeenCalledTimes(!queued && process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
     expect(db.transaction).toHaveBeenCalledTimes(
       !queued && process.env.VERCEL_REGION !== 'sfo1' ? 1 : 0
     );
-    if (queued) expect(sent[0].core.id).toBe(record?.usageId);
     expect(lifecycle.errors).toEqual([]);
-  });
-
-  test.each(['0', '1'])('FRA exposure %s preserves SFO cohort and allowlist', async exposure => {
-    for (const [sfoExposure, userIds, queued] of [
-      ['0.3', '', false],
-      ['0.31', '', true],
-      ['1', '[]', false],
-    ] as const) {
-      jest.clearAllMocks();
-      configureQueueEnvironment({
-        USAGE_QUEUE_FRA_EXPOSURE: exposure,
-        USAGE_QUEUE_SFO_EXPOSURE: sfoExposure,
-        USAGE_QUEUE_SFO_USER_IDS: userIds,
-      });
-      const lifecycle = requestLifetime();
-      const result = await lifecycle.run(() =>
-        logMicrodollarUsage({ ...stats }, { ...personalContext })
-      );
-      lifecycle.close();
-      await lifecycle.drain();
-      expect(result?.status).toBe(queued ? 'queued' : 'recorded');
-      expect(publisher.enqueueUsage).toHaveBeenCalledTimes(queued ? 1 : 0);
-      expect(writer).toHaveBeenCalledTimes(queued ? 0 : 1);
-      expect(db.transaction).not.toHaveBeenCalled();
-    }
   });
 
   test.each([
@@ -477,9 +410,8 @@ describe('production FRA queued accounting', () => {
     { is_free: true },
     { bouncer: undefined },
     { bouncer: { ...personalBouncer, spendWatch: true } },
-    { botId: 'synthetic-bot' },
-  ])('FRA selection remains transport-only for %j', async change => {
-    configureFra();
+  ])('selection remains transport-only for %j', async change => {
+    configureQueueEnvironment();
     const lifecycle = requestLifetime();
     const result = await lifecycle.run(() =>
       logMicrodollarUsage({ ...stats }, { ...personalContext, ...change })
@@ -492,8 +424,8 @@ describe('production FRA queued accounting', () => {
     expect(writer).not.toHaveBeenCalled();
   });
 
-  test('FRA publication rejection does not fall back to direct accounting', async () => {
-    configureFra();
+  test('publication rejection does not fall back to direct accounting', async () => {
+    configureQueueEnvironment();
     jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
     const lifecycle = requestLifetime();
     const result = await lifecycle.run(() =>
@@ -509,9 +441,9 @@ describe('production FRA queued accounting', () => {
   });
 
   test.each(['publisher_not_configured', 'registration_failed'])(
-    'FRA retains pre-I/O direct fallback for %s',
+    'retains pre-I/O direct fallback for %s',
     async reason => {
-      configureFra();
+      configureQueueEnvironment({ VERCEL_REGION: 'fra1' });
       jest.mocked(publisher.enqueueUsage).mockResolvedValue({ kind: 'unavailable', reason });
       const lifecycle = requestLifetime();
       const result = await lifecycle.run(() =>
@@ -526,8 +458,8 @@ describe('production FRA queued accounting', () => {
     }
   );
 
-  test('FRA internal writer does not enqueue even when its payer is selected', async () => {
-    configureFra();
+  test('internal writer does not enqueue even when queue transport is selected', async () => {
+    configureQueueEnvironment();
     const lifecycle = requestLifetime();
     const queued = await lifecycle.run(() =>
       logMicrodollarUsage({ ...stats }, { ...personalContext })
@@ -556,87 +488,7 @@ describe('production FRA queued accounting', () => {
   });
 });
 
-describe('production SFO queued accounting', () => {
-  test.each([
-    { name: 'eligible SFO', env: {}, queued: true },
-    { name: 'FRA', env: { VERCEL_REGION: 'fra1' }, queued: false },
-    { name: 'unknown region', env: { VERCEL_REGION: 'iad1' }, queued: false },
-    { name: 'missing region', env: { VERCEL_REGION: '' }, queued: false },
-    { name: 'absent region', env: { VERCEL_REGION: undefined }, queued: false },
-    { name: 'missing master', env: { USAGE_QUEUE_ONLY_ENABLED: undefined }, queued: false },
-    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' }, queued: false },
-    { name: 'malformed master', env: { USAGE_QUEUE_ONLY_ENABLED: 'TRUE' }, queued: false },
-    { name: 'missing exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: undefined }, queued: false },
-    { name: 'zero exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0' }, queued: false },
-    { name: 'invalid exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '1.01' }, queued: false },
-    { name: 'malformed exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: 'true' }, queued: false },
-    { name: 'hex exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0x1' }, queued: false },
-    { name: 'binary exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0b1' }, queued: false },
-    { name: 'octal exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0o1' }, queued: false },
-    { name: 'nonfinite exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: 'Infinity' }, queued: false },
-    { name: 'negative exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '-0.01' }, queued: false },
-    {
-      name: 'legacy percentage cannot enable selection',
-      env: { USAGE_QUEUE_SFO_EXPOSURE: undefined, USAGE_QUEUE_SFO_PERCENT: '1' },
-      queued: false,
-    },
-    {
-      name: 'legacy full percentage cannot enable selection',
-      env: { USAGE_QUEUE_SFO_EXPOSURE: undefined, USAGE_QUEUE_SFO_PERCENT: '100' },
-      queued: false,
-    },
-    { name: 'outside bucket', env: { USAGE_QUEUE_SFO_EXPOSURE: '0.3' }, queued: false },
-    { name: 'inside bucket', env: { USAGE_QUEUE_SFO_EXPOSURE: '0.31' }, queued: true },
-    {
-      name: 'preview',
-      env: {
-        VERCEL_ENV: 'preview',
-        VERCEL_TARGET_ENV: 'preview',
-      },
-      queued: false,
-    },
-    { name: 'missing Vercel env', env: { VERCEL_ENV: undefined }, queued: false },
-    { name: 'missing target', env: { VERCEL_TARGET_ENV: undefined }, queued: false },
-    { name: 'mismatched target', env: { VERCEL_TARGET_ENV: 'staging' }, queued: false },
-    {
-      name: 'internal allowlist',
-      env: { USAGE_QUEUE_SFO_USER_IDS: '["oauth/synthetic"]' },
-      queued: true,
-    },
-    {
-      name: 'unlisted payer',
-      env: { USAGE_QUEUE_SFO_USER_IDS: '["someone-else"]' },
-      queued: false,
-    },
-    { name: 'malformed list', env: { USAGE_QUEUE_SFO_USER_IDS: 'not-json' }, queued: false },
-    {
-      name: 'list cannot override zero',
-      env: { USAGE_QUEUE_SFO_USER_IDS: '["oauth/synthetic"]', USAGE_QUEUE_SFO_EXPOSURE: '0' },
-      queued: false,
-    },
-  ])('$name uses one accounting path', async ({ env, queued }) => {
-    configureQueueEnvironment(env);
-    const lifecycle = requestLifetime();
-    const record = await lifecycle.run(() =>
-      logMicrodollarUsage({ ...stats }, { ...personalContext })
-    );
-    lifecycle.close();
-    await lifecycle.drain();
-    expect(record?.status).toBe(queued ? 'queued' : 'recorded');
-    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(queued ? 1 : 0);
-    if (queued) {
-      expect(publisher.enqueueUsage).toHaveBeenCalledWith(expect.anything(), {
-        retryTransientFailures: true,
-      });
-      expect(sent[0].core.id).toBe(record?.usageId);
-    }
-    expect(writer).toHaveBeenCalledTimes(!queued && process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
-    expect(db.transaction).toHaveBeenCalledTimes(
-      !queued && process.env.VERCEL_REGION !== 'sfo1' ? 1 : 0
-    );
-    expect(lifecycle.errors).toEqual([]);
-  });
-
+describe('production queued transport details', () => {
   test.each([
     { name: 'organization', change: { organizationId: '11111111-1111-4111-8111-111111111111' } },
     { name: 'spendWatch', change: { bouncer: { ...personalBouncer, spendWatch: true } } },
@@ -644,7 +496,6 @@ describe('production SFO queued accounting', () => {
       name: 'unknown spend-watch status',
       change: { bouncer: { ...personalBouncer, spendWatch: undefined } },
     },
-    { name: 'bot', change: { botId: 'synthetic-bot' } },
     { name: 'missing Bouncer / classifier context', change: { bouncer: undefined } },
     {
       name: 'anonymous Bouncer context',
@@ -668,7 +519,7 @@ describe('production SFO queued accounting', () => {
   });
 
   test.each([false, true])(
-    'selected SFO accounting retains existing Bouncer reporting (spendWatch=%s)',
+    'selected accounting retains existing Bouncer reporting (spendWatch=%s)',
     async spendWatch => {
       configureQueueEnvironment();
       const report = jest.requireMock<{ reportUsageEvent: jest.Mock }>(
@@ -917,8 +768,8 @@ describe('production SFO queued accounting', () => {
       });
       await new Promise(resolve => setImmediate(resolve));
       expect(drained).toBe(false);
-      config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
-      expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+      // The lifetime keeps running through the longer first confirmation, still off the response path.
+      expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
       accepted.resolve(new Response(null, { status }));
       await drain;
       expect(result).toEqual(status === 202 ? expect.objectContaining({ status: 'queued' }) : null);
@@ -937,31 +788,25 @@ describe('production SFO queued accounting', () => {
 
 describe('gateway accounting integration', () => {
   test.each(
-    ['fra1', 'sfo1'].flatMap(region => [
-      { region, target: 'staging', environment: 'preview' },
-      { region, target: 'production', environment: 'production' },
-    ])
-  )('$target $region live direct accounting records', async ({ region, target, environment }) => {
-    const original = { ...process.env };
-    try {
-      configureQueueEnvironment({
-        USAGE_QUEUE_ONLY_ENABLED: 'false',
-        VERCEL_REGION: region,
-        VERCEL_ENV: environment,
-        VERCEL_TARGET_ENV: target,
-      });
-      const lifecycle = requestLifetime();
-      const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
-      lifecycle.close();
-      await lifecycle.drain();
-      expect(record?.status).toBe('recorded');
-      expect(publisher.enqueueUsage).not.toHaveBeenCalled();
-      expect(fetch).not.toHaveBeenCalled();
-      expect(writer).toHaveBeenCalledTimes(region === 'sfo1' ? 1 : 0);
-      expect(db.transaction).toHaveBeenCalledTimes(region === 'fra1' ? 1 : 0);
-    } finally {
-      process.env = original;
-    }
+    ['fra1', 'sfo1'].flatMap(region =>
+      [undefined, 'false', 'true'].map(master => ({ region, master }))
+    )
+  )('staging $region queues with retired master=$master', async ({ region, master }) => {
+    configureQueueEnvironment({
+      USAGE_QUEUE_ONLY_ENABLED: master,
+      VERCEL_REGION: region,
+      VERCEL_ENV: 'preview',
+      VERCEL_TARGET_ENV: 'staging',
+    });
+    const lifecycle = requestLifetime();
+    const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(record?.status).toBe('queued');
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+    expect(writer).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(lifecycle.errors).toEqual([]);
   });
 
   test('direct accounting does not register publication even with configured transport', async () => {
@@ -1024,7 +869,8 @@ describe('gateway accounting integration', () => {
   test.each(['fra1', 'sfo1'])(
     '%s sends the exact finalized event once, with one ID and complete bouncer data',
     async region => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const event = { request_id: 'synthetic-request', payload: { cost: 0 } };
@@ -1053,6 +899,7 @@ describe('gateway accounting integration', () => {
         metadata: {
           is_user_byok: true,
           reasoning_setting: 'medium',
+          inference_region: 'eu',
           market_cost: 1234,
           user_prompt_prefix: null,
           system_prompt_prefix: null,
@@ -1144,7 +991,8 @@ describe('gateway accounting integration', () => {
   test.each([false, true])(
     'processTokenData preserves final free/BYOK costs (BYOK=%s)',
     async byok => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = 'sfo1';
       const lifecycle = requestLifetime();
       const ctx = {
@@ -1172,7 +1020,8 @@ describe('gateway accounting integration', () => {
   ])(
     'processTokenData keeps the response finish_reason only when the generation lookup has none ($generationFinishReason)',
     async ({ generationFinishReason, expected }) => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = 'sfo1';
       fetchGeneration.mockResolvedValue({
         data: {
@@ -1210,7 +1059,8 @@ describe('queued usage accounting', () => {
     ['', 'unknown'],
     [undefined, 'unknown'],
   ])('logs %s publication failure in execution region %s', async (region, expectedRegion) => {
-    config.USAGE_QUEUE_ONLY_ENABLED = true;
+    process.env.VERCEL_TARGET_ENV = 'staging';
+    process.env.VERCEL_ENV = 'preview';
     if (region === undefined) delete process.env.VERCEL_REGION;
     else process.env.VERCEL_REGION = region;
     jest
@@ -1233,40 +1083,44 @@ describe('queued usage accounting', () => {
   });
 
   test.each([
-    [undefined, 'staging', 'preview', false],
-    ['false', 'staging', 'preview', false],
-    ['TRUE', 'staging', 'preview', false],
-    ['1', 'staging', 'preview', false],
+    [undefined, 'staging', 'preview', true],
+    ['false', 'staging', 'preview', true],
+    ['TRUE', 'staging', 'preview', true],
+    ['1', 'staging', 'preview', true],
     ['true', undefined, undefined, false],
     ['true', 'preview', 'preview', false],
-    ['true', 'production', 'production', false],
+    ['true', 'production', 'production', true],
     ['true', 'production', undefined, false],
     ['true', 'STAGING', 'preview', false],
     ['true', 'staging', 'production', false],
     ['true', 'staging', 'preview', true],
     ['true', 'staging', undefined, true],
-  ])('server opt-in %s / target %s / Vercel %s enables=%s', (flag, target, vercel, enabled) => {
-    const original = { ...process.env };
-    try {
-      for (const [key, value] of Object.entries({
-        USAGE_QUEUE_ONLY_ENABLED: flag,
-        VERCEL_TARGET_ENV: target,
-        VERCEL_ENV: vercel,
-        BYOK_ENCRYPTION_KEY: 'synthetic-key',
-      })) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = String(value);
+  ])(
+    'retired master %s / target %s / Vercel %s selects queue=%s',
+    async (flag, target, vercel, enabled) => {
+      const original = { ...process.env };
+      try {
+        for (const [key, value] of Object.entries({
+          USAGE_QUEUE_ONLY_ENABLED: flag,
+          VERCEL_TARGET_ENV: target,
+          VERCEL_ENV: vercel,
+          BYOK_ENCRYPTION_KEY: 'synthetic-key',
+        })) {
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = String(value);
+        }
+        const lifecycle = requestLifetime();
+        const result = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
+        lifecycle.close();
+        await lifecycle.drain();
+        expect(result?.status).toBe(enabled ? 'queued' : 'recorded');
+        expect(publisher.enqueueUsage).toHaveBeenCalledTimes(enabled ? 1 : 0);
+        expect(lifecycle.errors).toEqual([]);
+      } finally {
+        process.env = original;
       }
-      jest.isolateModules(() => {
-        const actual = jest.requireActual<typeof ServerConfig>(
-          '@kilocode/web-shared/lib/config.server'
-        );
-        expect(actual.USAGE_QUEUE_ONLY_ENABLED).toBe(enabled);
-      });
-    } finally {
-      process.env = original;
     }
-  });
+  );
 
   test.each([
     ['fra1', 'fra1'],
@@ -1277,7 +1131,8 @@ describe('queued usage accounting', () => {
   ])(
     '%s confirmed acceptance logs execution region %s and queues once without a direct write',
     async (region, expectedRegion) => {
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
 
       if (region === undefined) delete process.env.VERCEL_REGION;
       else process.env.VERCEL_REGION = region;
@@ -1324,7 +1179,8 @@ describe('queued usage accounting', () => {
     'Next accounting lifetime awaits $region HTTP $status from $mode work',
     async ({ region, mode, status }) => {
       if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
       const acceptance = Promise.withResolvers<Response>();
@@ -1380,7 +1236,8 @@ describe('queued usage accounting', () => {
       let drain: Promise<void> | undefined;
       try {
         jest.spyOn(Math, 'random').mockReturnValue(0.5);
-        config.USAGE_QUEUE_ONLY_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         const secondAttempt = Promise.withResolvers<void>();
         jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
@@ -1478,7 +1335,8 @@ describe('queued usage accounting', () => {
       async ({ region, failure }) => {
         if (['http_503', 'timeout', 'transport_failure'].includes(failure))
           jest.spyOn(Math, 'random').mockReturnValue(0);
-        config.USAGE_QUEUE_ONLY_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
         if (failure === 'timeout') {
@@ -1615,7 +1473,8 @@ describe('queued usage accounting', () => {
     )(
       '$region / $missing falls back to direct accounting instead of dropping usage',
       async ({ region, missing }) => {
-        config.USAGE_QUEUE_ONLY_ENABLED = true;
+        process.env.VERCEL_TARGET_ENV = 'staging';
+        process.env.VERCEL_ENV = 'preview';
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
         const lifecycle = requestLifetime(false);
@@ -1678,7 +1537,8 @@ describe('queued usage accounting', () => {
     'Bouncer $region HTTP $status spendWatch=$spendWatch avoids gateway outbox delivery',
     async ({ region, spendWatch, status }) => {
       if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
+      process.env.VERCEL_TARGET_ENV = 'staging';
+      process.env.VERCEL_ENV = 'preview';
       process.env.VERCEL_REGION = region;
       jest.mocked(fetch).mockImplementation(async (_url, init) => {
         sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
@@ -1732,7 +1592,8 @@ describe('queued usage accounting', () => {
 
   test.each(['fra1', 'sfo1'])('queue off keeps %s direct billing', async region => {
     process.env.VERCEL_REGION = region;
-    config.USAGE_QUEUE_ONLY_ENABLED = false;
+    process.env.VERCEL_TARGET_ENV = 'preview';
+    process.env.VERCEL_ENV = 'preview';
 
     const lifecycle = requestLifetime();
     const record = await lifecycle.run(() => logMicrodollarUsage({ ...stats }, { ...context }));
@@ -1746,7 +1607,8 @@ describe('queued usage accounting', () => {
   });
 
   test('queue off retains failed direct accounting and best-effort Bouncer reporting', async () => {
-    config.USAGE_QUEUE_ONLY_ENABLED = false;
+    process.env.VERCEL_TARGET_ENV = 'preview';
+    process.env.VERCEL_ENV = 'preview';
 
     process.env.VERCEL_REGION = 'sfo1';
     writer.mockResolvedValue({ kind: 'ok', result: null });
@@ -1810,6 +1672,7 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
   );
   const selected = [
     { name: 'production SFO', env: {} },
+    { name: 'production FRA', env: { VERCEL_REGION: 'fra1' } },
     {
       name: 'staging FRA',
       env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', VERCEL_REGION: 'fra1' },
@@ -1969,10 +1832,14 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
   );
 
   test.each([
-    { name: 'production FRA', env: { VERCEL_REGION: 'fra1' } },
-    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' } },
-    { name: 'zero exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0' } },
-    { name: 'unlisted SFO payer', env: { USAGE_QUEUE_SFO_USER_IDS: '["other"]' } },
+    {
+      name: 'preview fra1',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview', VERCEL_REGION: 'fra1' },
+    },
+    {
+      name: 'preview sfo1 handoff',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview', VERCEL_REGION: 'sfo1' },
+    },
   ])('$name preserves direct accounting-before-report order', async ({ env }) => {
     configureQueueEnvironment(env);
     const started = Promise.withResolvers<void>();
@@ -2005,7 +1872,7 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
     await lifecycle.drain();
     expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
     expect(writer).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
-    expect(db.transaction).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'fra1' ? 1 : 0);
+    expect(db.transaction).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'sfo1' ? 0 : 1);
     expect(lifecycle.errors).toEqual([]);
   });
 

@@ -1,5 +1,9 @@
 import * as z from 'zod';
-import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
+import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
+  EnkryptGuardrailDirection,
+} from '@kilocode/db/schema-types';
 
 /**
  * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
@@ -16,6 +20,7 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   organizationId: z.guid(),
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
+  microdollarUsageId: z.uuid().optional(),
   apiKind: z.enum([
     'chat_completions',
     'messages',
@@ -24,9 +29,13 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   decision: z.enum(['allowed', 'blocked', 'error'] satisfies EnkryptGuardrailDecision[]),
   creditsCost: z.number().nonnegative().max(MAX_ENKRYPT_CREDITS_PER_CALL).nullable(),
   addedLatencyMs: z.number().int().nonnegative().nullable(),
+  /** Optional so input calls stay compatible with a gateway or web app deployed before it. */
+  guardrail: z.enum(['input', 'output'] satisfies EnkryptGuardrailDirection[]).default('input'),
 });
 
 export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;
+
+export type EnkryptUsageWriteInput = z.input<typeof EnkryptUsageWriteSchema>;
 
 /** `duplicate` means an earlier delivery of the same usage id already committed it and its debit. */
 export const EnkryptUsageWriteResponseSchema = z.strictObject({

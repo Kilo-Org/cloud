@@ -28,5 +28,4 @@
     { "new_sqlite_classes": ["SandboxSession"], "tag": "v10" },
     { "new_sqlite_classes": ["E2eCallbackSink"], "tag": "v10-e2e" },
   ],
-  "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
 }

@@ -29,6 +29,12 @@ import { z } from 'zod';
 import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
+import {
+  requestUrlString,
+  stripQueryString,
+  TRPC_PATH,
+  trpcProcedureText,
+} from '@/lib/telemetry/request-target';
 import { NETWORK_BODY_CONTEXT, redactUrlText } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
@@ -93,7 +99,6 @@ const ResponseErrorItemSchema = z.looseObject({ error: TrpcResponseErrorSchema }
 /** A parsed tRPC error object read from a response body. */
 export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 
-const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
 
 /**
@@ -122,27 +127,6 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   );
 }
 
-/** A URL authority's userinfo prefix, the part before the host. */
-const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
-
-/**
- * Reduce a URL to its origin and path: drop the query string, the fragment,
- * and the authority's userinfo prefix. Fields built from this — the
- * `network.url` context, the synthesized message, the fingerprint path — carry
- * origin and path. Returns empty string on a non-string.
- * Total: a plain string walk, not `new URL`, whose React Native polyfill does
- * not implement every component.
- */
-export function stripQueryString(url: string): string {
-  try {
-    const cut = url.search(/[?#]/u);
-    const originAndPath = cut === -1 ? url : url.slice(0, cut);
-    return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
-  } catch {
-    return '';
-  }
-}
-
 /** The `scheme://host[:port]` prefix of an absolute URL. */
 const URL_ORIGIN_PREFIX_PATTERN = /^[a-z][\da-z+.-]*:\/\/[^/]*/iu;
 
@@ -166,19 +150,13 @@ export function normalizeUrlPath(url: string): string {
   }
 }
 
-/** Extract `<procs>` from a `/api/trpc/<procs>` URL, query string removed. */
+/**
+ * Extract `<procs>` from a `/api/trpc/<procs>` URL, query string removed. The
+ * rule and the strip step live in `request-target.ts`, so the latency sampler
+ * reports the same text for the same request.
+ */
 export function trpcProcedureFromUrl(url: string): string | undefined {
-  try {
-    const pathOnly = stripQueryString(url);
-    const index = pathOnly.indexOf(TRPC_PATH);
-    if (index === -1) {
-      return undefined;
-    }
-    const procedure = pathOnly.slice(index + TRPC_PATH.length);
-    return procedure.length > 0 ? procedure : undefined;
-  } catch {
-    return undefined;
-  }
+  return trpcProcedureText(url);
 }
 
 /**
@@ -537,16 +515,6 @@ function recordTransportFailure(
     // Telemetry must never throw into app code.
   }
 }
-function requestUrlString(input: RequestInfo | URL): string {
-  if (input instanceof URL) {
-    return input.href;
-  }
-  if (input instanceof Request) {
-    return input.url;
-  }
-  return input;
-}
-
 function requestMethod(input: RequestInfo | URL, init?: RequestInit): string | undefined {
   if (init?.method !== undefined) {
     return init.method;

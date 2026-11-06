@@ -37,9 +37,10 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'inceptron',
   'io-net',
   'ionstream',
-  'longcat',
   'mancer',
   'mara',
+  // Not an OpenRouter provider: served by Vercel AI Gateway.
+  'meituan',
   'meta',
   'minimax',
   'mistral',
@@ -221,6 +222,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'groq',
   'interfaze',
   'klingai',
+  'meituan',
   'meta',
   'morph',
   'parasail',
@@ -277,6 +279,23 @@ export function openRouterToVercelInferenceProviderId(providerId: string): strin
   return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
 }
 
+/** The Vercel provider a user BYOK key is sent to. Vercel serves Codestral keys as Mistral keys. */
+export function getVercelProviderIdForUserByok(providerId: string): string {
+  return providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
+    ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+    : providerId;
+}
+
+/**
+ * The Vercel providers the request's own `provider.ignore` names. Kilo's provider preferences are
+ * added to the request later and never apply to the caller's keys.
+ */
+export function getRequestIgnoredVercelProviderIds(
+  provider: { ignore?: string[] } | undefined
+): ReadonlySet<string> {
+  return new Set((provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId));
+}
+
 const providerPolicyVercelProviderIds: ReadonlySet<string> = new Set(
   OpenRouterInferenceProviderIdSchema.options.map(openRouterToVercelInferenceProviderId)
 );
@@ -294,10 +313,9 @@ export function isVercelUserByokProviderAllowed(
   allowedProviders: ReadonlySet<string> | undefined
 ): boolean {
   if (!allowedProviders) return true;
-  const vercelProviderId =
-    providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
-      ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-      : VercelUserByokInferenceProviderIdSchema.safeParse(providerId).data;
+  const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+    getVercelProviderIdForUserByok(providerId)
+  ).data;
   if (!vercelProviderId || !providerPolicyVercelProviderIds.has(vercelProviderId)) return true;
   return [...allowedProviders].some(
     provider => openRouterToVercelInferenceProviderId(provider) === vercelProviderId

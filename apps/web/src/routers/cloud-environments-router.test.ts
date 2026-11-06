@@ -151,6 +151,106 @@ describe('cloudEnvironmentsRouter', () => {
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
+  test('persists the network policy through create, update, and get', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'limited',
+      repository: { platform: 'github', fullName: GITHUB_REPO },
+      egressMode: 'allowlist',
+      egressAllowlist: ['Z.Example.COM.', 'example.com'],
+    });
+
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com', 'z.example.com'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'unrestricted',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      commands: ['echo kept'],
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+      commands: ['echo kept'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'allowlist',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+  });
+
+  test.each([true, false])('rejects unsupported environment auditing: %s', async egressAudit => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const input = {
+      name: 'audit-unsupported',
+      repository: { platform: 'github' as const, fullName: GITHUB_REPO },
+      egressAudit,
+    };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.create(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.listAll({})).toEqual([]);
+
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'unchanged',
+      repository: input.repository,
+    });
+    const update = { environmentId: id, name: 'must-not-save', egressAudit };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.update(update)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      name: 'unchanged',
+    });
+  });
+
+  test('rejects an allowlist domain without allowlist mode and invalid hostnames', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'no-mode',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressAllowlist: ['api.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'wildcard',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressMode: 'allowlist',
+        egressAllowlist: ['*.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const [row] = await db
+      .select({ id: cloud_agent_environments.id })
+      .from(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.repo_full_name, GITHUB_REPO));
+    expect(row).toBeUndefined();
+  });
+
   test('billing managers cannot create, update, or delete organization environments', async () => {
     const owner = await insertTestUser();
     const billingManager = await insertTestUser();
@@ -336,15 +436,15 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'sized',
       repository,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     expect((await caller.cloudEnvironments.get({ environmentId: id })).sandboxAllocation).toBe(
-      'cloudflare-single'
+      'cloudflare-containers-standard-3'
     );
 
     await caller.cloudEnvironments.update({ environmentId: id, name: 'still sized' });
     const [summary] = await caller.cloudEnvironments.list({ repository });
-    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
+    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-containers-standard-3' });
 
     const { configurationRevision } = await caller.cloudEnvironments.update({
       environmentId: id,
@@ -358,7 +458,7 @@ describe('cloudEnvironmentsRouter', () => {
     await expect(
       caller.cloudEnvironments.update({
         environmentId: id,
-        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-single',
+        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-containers-standard-3',
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
@@ -384,7 +484,10 @@ describe('cloudEnvironmentsRouter', () => {
     });
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
     await expect(
-      caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: 'cloudflare-single' })
+      caller.cloudEnvironments.update({
+        environmentId: id,
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+      })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'Sandbox selection is not enabled for this owner',
@@ -400,7 +503,7 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'stale',
       repository: { platform: 'github', fullName: GITHUB_REPO },
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
 
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
@@ -408,7 +511,7 @@ describe('cloudEnvironmentsRouter', () => {
     await caller.cloudEnvironments.update({
       environmentId: id,
       commands: ['pnpm install'],
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     await caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: null });
 
@@ -867,7 +970,7 @@ describe('cloudEnvironmentsRouter', () => {
       });
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'create rejects the %s allocation and accepts an isolated one',
       async allocation => {
         const owner = await insertTestUser();
@@ -912,7 +1015,7 @@ describe('cloudEnvironmentsRouter', () => {
       ).toEqual([GITHUB_REPO, 'acme/api']);
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'update rejects the %s allocation on a V2 environment and accepts it on a V1 one',
       async allocation => {
         const owner = await insertTestUser();
@@ -966,7 +1069,7 @@ describe('cloudEnvironmentsRouter', () => {
       });
     });
 
-    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+    test.each(['vercel-small', 'vercel-large'] as const)(
       'conversion rejects the saved %s allocation unless it is replaced',
       async sandboxAllocation => {
         const owner = await insertTestUser();

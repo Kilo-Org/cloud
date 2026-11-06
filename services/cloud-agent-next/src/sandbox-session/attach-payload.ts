@@ -93,6 +93,10 @@ export function buildSessionAttachPayload(
       ? { mcp: materializeMcpServers(profile.mcpServers, mcpPrivateKey) }
       : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
+    ...(profile.startCommands?.length ? { startCommands: profile.startCommands } : {}),
+    ...(profile.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: profile.environmentSetupCommandCount }),
     ...(preparation ? { preparation } : {}),
   };
 }

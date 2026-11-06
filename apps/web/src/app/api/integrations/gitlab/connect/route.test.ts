@@ -253,4 +253,79 @@ describe('GET /api/integrations/gitlab/connect', () => {
     expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
   });
+
+  test('answers an unauthenticated POST with 401 before reading the body', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response(null, { status: 401 }),
+    } as never);
+
+    const request = new NextRequest('http://localhost:3000/api/integrations/gitlab/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"instanceUrl":',
+    });
+    const readBody = jest.spyOn(request, 'json');
+
+    const response = await callGitLabConnectPost(request);
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(readBody).not.toHaveBeenCalled();
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+  });
+
+  test('rejects an over-length field before starting the OAuth flow', async () => {
+    const response = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        instanceUrl: 'https://gitlab.example.com',
+        clientId: 'client-id',
+        clientSecret: 's'.repeat(513),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid GitLab OAuth request' });
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+
+    const overLongOrganizationId = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        organizationId: 'o'.repeat(129),
+      })
+    );
+
+    expect(overLongOrganizationId.status).toBe(400);
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+  });
+
+  test('accepts field values that reach the configured bounds', async () => {
+    const instanceOrigin = 'https://gitlab.example.com/';
+    const instanceUrl = `${instanceOrigin}${'a'.repeat(2048 - instanceOrigin.length)}`;
+    const returnTo = `/${'b'.repeat(2047)}`;
+
+    const response = await callGitLabConnectPost(
+      makeJsonRequest('/api/integrations/gitlab/connect', {
+        instanceUrl,
+        clientId: 'c'.repeat(512),
+        clientSecret: 's'.repeat(512),
+        returnTo,
+      })
+    );
+
+    expect(instanceUrl).toHaveLength(2048);
+    expect(returnTo).toHaveLength(2048);
+    expect(response.status).toBe(200);
+    expect(mockedStoreGitLabOAuthCredentials).toHaveBeenCalledWith({
+      clientId: 'c'.repeat(512),
+      clientSecret: 's'.repeat(512),
+    });
+    expect(mockedCreateGitLabOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({ instanceUrl: instanceUrl.replace(/\/$/, ''), returnTo }),
+      USER_ID
+    );
+  });
 });

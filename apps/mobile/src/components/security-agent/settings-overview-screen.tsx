@@ -146,7 +146,13 @@ export function SettingsOverviewScreen({
     displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
-    repoCountLabel = t('common.allRepositories');
+    // "All repositories" is a claim about the GitHub App grant, so a settled
+    // empty grant must not make it: the repositories screen already answers
+    // this state with its own no-repositories empty state, and the two
+    // readings sit one tap apart.
+    repoCountLabel = repositoriesSettledEmpty
+      ? t('securityAgent.repositories.noRepositories')
+      : t('common.allRepositories');
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,
@@ -245,8 +251,12 @@ export function SettingsOverviewScreen({
               onValueChange={handleToggle}
             />
           ) : (
-            <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-              <View className="flex-1 pr-3">
+            <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-4">
+              {/* The gap between the title and the state comes from the row, not
+                  from a padding on the title's own side: a physical padding
+                  lands on the title's inline start under RTL, where the text
+                  then hangs past the box it was reserved for. */}
+              <View className="flex-1">
                 <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
               </View>
               <Text variant="muted" className="text-xs">

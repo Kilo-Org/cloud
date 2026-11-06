@@ -1,6 +1,5 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
-import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -127,11 +126,6 @@ export const envVarsSchema = z
     }
   );
 
-export type SandboxInstance = ReturnType<typeof getSandbox>;
-
-/** Cloudflare Session instance for executing commands within a sandbox */
-export type { ExecutionSession };
-
 /** Unique identifier for a sandbox (container). Covers hash-based prefixes, per-session IDs, and legacy `__`-delimited formats. */
 export type SandboxId =
   | `org-${string}`
@@ -246,13 +240,14 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason;
+      reason: GitHubRepositoryAuthorizationFailureReason | 'repository_permissions_unavailable';
     };
 
 type IssueGitHubSessionCapabilityResult =
   | {
       success: true;
       capability: string;
+      permissionScope?: 'repository';
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -263,7 +258,10 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
-      reason: GitHubRepositoryAuthorizationFailureReason | 'capability_configuration_error';
+      reason:
+        | GitHubRepositoryAuthorizationFailureReason
+        | 'capability_configuration_error'
+        | 'repository_permissions_unavailable';
     };
 
 type RedeemGitHubSessionCapabilityResult =
@@ -287,6 +285,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'repository_mismatch'
         | 'invalid_upstream_request'
         | 'source_unavailable'
+        | 'repository_permissions_unavailable'
         | 'identity_mismatch'
         | 'integration_mismatch';
     };
@@ -394,50 +393,6 @@ type RedeemBitbucketSessionCapabilityResult =
         | 'source_unavailable';
     };
 
-export type KiloSessionCapabilityTargets = {
-  backendBaseUrl: string;
-  providerBaseUrl: string;
-  sessionIngestBaseUrl: string;
-};
-
-export type KiloCapabilityRouteClass =
-  | 'provider_model'
-  | 'organization_models'
-  | 'backend_api'
-  | 'session_ingest';
-
-type IssueKiloSessionCapabilityResult =
-  | { success: true; capability: string }
-  | {
-      success: false;
-      reason:
-        | 'invalid_targets'
-        | 'invalid_capability'
-        | 'expired_capability'
-        | 'capability_configuration_error';
-    };
-
-type RedeemKiloSessionCapabilityResult =
-  | {
-      success: true;
-      authorization: string;
-      routeClass: KiloCapabilityRouteClass;
-      sessionIngestScope?: {
-        cloudAgentSessionId: string;
-        rootKiloSessionId: string;
-      };
-    }
-  | {
-      success: false;
-      reason:
-        | 'invalid_capability'
-        | 'expired_capability'
-        | 'capability_configuration_error'
-        | 'container_mismatch'
-        | 'invalid_upstream_url'
-        | 'upstream_not_allowed';
-    };
-
 export type GitTokenService = {
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
@@ -453,7 +408,10 @@ export type GitTokenService = {
     params: ManagedGitHubAuthParams
   ): Promise<GetCloudAgentAuthForRepoResult>;
   issueGitHubSessionCapability(
-    params: ManagedGitHubAuthParams & { outboundContainerId: string }
+    params: ManagedGitHubAuthParams & {
+      outboundContainerId: string;
+      permissionScope?: 'repository';
+    }
   ): Promise<IssueGitHubSessionCapabilityResult>;
   redeemGitHubSessionCapability(params: {
     capability: string;
@@ -503,22 +461,6 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemBitbucketSessionCapabilityResult>;
-  issueKiloSessionCapability(params: {
-    userId: string;
-    cloudAgentSessionId: string;
-    kiloSessionId: string;
-    outboundContainerId: string;
-    userToken: string;
-    targets: KiloSessionCapabilityTargets;
-  }): Promise<IssueKiloSessionCapabilityResult>;
-  redeemKiloSessionCapability(params: {
-    capability: string;
-    outboundContainerId: string;
-    requestMethod: string;
-    requestUrl: string;
-    bootstrapKiloSessionId?: string;
-    sessionIngestProxyVersion?: 1;
-  }): Promise<RedeemKiloSessionCapabilityResult>;
 };
 
 export type Env = {
@@ -527,19 +469,6 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
   CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
-  Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for shared sandbox containers with SCM credential containment */
-  SandboxContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers (standard-3) */
-  SandboxSmall: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers with SCM credential containment */
-  SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
-  SandboxDIND: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers (standard-3) */
-  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
-  SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
@@ -556,8 +485,6 @@ export type Env = {
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
   /** e2e-only callback sink; bound only by the rendered e2e configs. */
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
-  /** One-way shared sandbox failover overrides keyed by shared identity */
-  SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -574,6 +501,10 @@ export type Env = {
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
+  /** Comma-separated org UUIDs whose new downloaded sandboxes run the Kilo v2 harness. */
+  RUNTIME_KILO2_ORG_IDS?: string;
+  /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
+  RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -621,8 +552,6 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
-  PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
@@ -632,6 +561,7 @@ export type Env = {
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
+  /** Obsolete input accepted for compatibility; cannot disable containment. */
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
@@ -650,8 +580,8 @@ export type Env = {
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
   ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_ORG_IDS?: string;
-  SESSION_SNAPSHOT_USER_IDS?: string;
+  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
+  WORKSPACE_SNAPSHOT_USER_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

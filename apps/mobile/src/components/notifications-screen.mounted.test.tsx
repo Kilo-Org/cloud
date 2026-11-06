@@ -858,6 +858,40 @@ describe('NotificationsScreen category availability', () => {
   });
 });
 
+describe('NotificationsScreen sections below the master gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('holds the categories and previews until the master gate settles', async () => {
+    // The gate's settled height is not known while the OS permission read is
+    // outstanding: the Push row gains its description line and the Enable card
+    // mounts when push is off. Rendering the sections below it before that
+    // point pushed them about 111 dp down after the first layout.
+    const permission = Promise.withResolvers<'granted' | 'denied'>();
+    getNotificationPermissionStatus.mockReturnValue(permission.promise);
+    getDevicePushToken.mockResolvedValue(null);
+    pushTokensQueryFn.mockResolvedValue([]);
+
+    const { renderer, unmount } = await renderScreen();
+    try {
+      expect(textWithChildren(renderer.root, 'Categories')).toHaveLength(0);
+      expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(0);
+      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
+
+      permission.resolve('denied');
+      await waitFor(() => textWithChildren(renderer.root, 'Categories').length === 1);
+      expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(1);
+      expect(textWithChildren(renderer.root, 'Message previews')).toHaveLength(1);
+    } finally {
+      unmount();
+    }
+  });
+});
+
 describe('NotificationsScreen Arabic Security findings row', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

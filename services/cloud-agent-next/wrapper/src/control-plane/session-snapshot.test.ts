@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { readSessionSnapshot } from './session-snapshot.js';
+import { kiloActivityReads } from './kilo-message-activity.js';
 
 function fixture() {
   const readDirectories: string[] = [];
@@ -33,6 +34,7 @@ function fixture() {
             messageID: messageId,
             sessionID: 'child',
             type: 'tool',
+            callID: 'call',
             tool: 'bash',
             state: { status: 'running' },
           },
@@ -40,7 +42,11 @@ function fixture() {
       };
     },
   } as unknown as WrapperKiloClient;
-  return { client, readDirectories, messageReads };
+  return {
+    client: { ...client, ...kiloActivityReads(client) },
+    readDirectories,
+    messageReads,
+  };
 }
 
 describe('session activity snapshots', () => {

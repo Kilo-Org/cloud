@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveNewSessionPromptHeight } from './chat-composer-input-height';
 import {
   resolveComposerTopFadeHeight,
+  resolveNewSessionFormFrameHeight,
+  resolveNewSessionPromptLineCount,
   resolveNewSessionPromptMinHeight,
 } from './new-session-prompt-fit';
 
@@ -162,6 +165,60 @@ describe('resolveNewSessionPromptMinHeight', () => {
   });
 });
 
+describe('the New Session keyboard destination', () => {
+  const frame = {
+    containerY: 118,
+    containerHeight: 756,
+    footerHeight: 221,
+    windowHeight: 874,
+    keyboardVerticalOffset: 0,
+  };
+
+  it('fits the smaller whole-line input before the keyboard reaches its final height', () => {
+    const closed = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 0 });
+    const opened = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight: 335 });
+    const chrome = { cardTop: 14, cardChromeHeight: 101 };
+
+    expect(closed).toBe(535);
+    expect(opened).toBe(200);
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: closed })).toBe(
+      88
+    );
+    expect(resolveNewSessionPromptMinHeight({ ...PREFERRED, ...chrome, frameHeight: opened })).toBe(
+      64
+    );
+  });
+
+  it('keeps an already padded Android navigation inset out of the keyboard overlap', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        keyboardHeight: 335,
+        keyboardVerticalOffset: -24,
+      })
+    ).toBe(224);
+  });
+
+  it('subtracts only the keyboard overlap when the form stops above the window bottom', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({
+        ...frame,
+        containerY: 100,
+        containerHeight: 600,
+        footerHeight: 140,
+        windowHeight: 900,
+        keyboardHeight: 300,
+      })
+    ).toBe(360);
+  });
+
+  it('never gives the input a negative viewport when the footer fills the available space', () => {
+    expect(
+      resolveNewSessionFormFrameHeight({ ...frame, footerHeight: 700, keyboardHeight: 335 })
+    ).toBe(0);
+  });
+});
+
 describe('resolveComposerTopFadeHeight', () => {
   const LINE = 24;
 
@@ -200,6 +257,55 @@ describe('resolveComposerTopFadeHeight', () => {
   it('treats an unmeasurable line or offset as no fade', () => {
     expect(resolveComposerTopFadeHeight({ scrollOffset: 8, lineHeight: 0 })).toBe(0);
     expect(resolveComposerTopFadeHeight({ scrollOffset: Number.NaN, lineHeight: LINE })).toBe(0);
+  });
+});
+
+describe('resolveNewSessionPromptLineCount', () => {
+  const NO_KEYBOARD = { keyboardVisible: false, preferredLines: PREFERRED_LINES } as const;
+
+  it('gives the compact cell the one-line floor and enough room for the picker', () => {
+    // Measured on the design gate's 360x640 compact cell: the repository
+    // picker's bottom edge ended 43.81 points under the form's viewport.
+    const OVERFLOW_BELOW_THE_FOLD = 43.81;
+    const lineCount = resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 640 });
+    const returned = PREFERRED_MIN_HEIGHT - resolveNewSessionPromptHeight(LINE_HEIGHT, lineCount);
+
+    expect(lineCount).toBe(1);
+    // The precondition: the preferred floor is what pushed the picker under the
+    // viewport, and the two lines it gives back clear the overflow.
+    expect(returned).toBe(LINE_HEIGHT * 2);
+    expect(returned).toBeGreaterThan(OVERFLOW_BELOW_THE_FOLD);
+  });
+
+  it('keeps the preferred floor from the shortest window that holds the whole form', () => {
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 683 })).toBe(1);
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 684 })).toBe(
+      PREFERRED_LINES
+    );
+    // The design gate's base and dark cells, and the shipped phones.
+    expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight: 891 })).toBe(
+      PREFERRED_LINES
+    );
+  });
+
+  it('leaves the fit to the shrinking frame while the keyboard is up', () => {
+    // A tall phone with its keyboard up reports a short window; pinning the
+    // composer to one line there would be a regression, not a fit.
+    expect(
+      resolveNewSessionPromptLineCount({
+        windowHeight: 530,
+        keyboardVisible: true,
+        preferredLines: PREFERRED_LINES,
+      })
+    ).toBe(PREFERRED_LINES);
+  });
+
+  it('keeps the preferred floor for an unknown window', () => {
+    for (const windowHeight of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(resolveNewSessionPromptLineCount({ ...NO_KEYBOARD, windowHeight })).toBe(
+        PREFERRED_LINES
+      );
+    }
   });
 });
 

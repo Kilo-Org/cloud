@@ -109,7 +109,8 @@ const ignoreRetry = (): void => undefined;
 
 export function TranscriptStyleFixture({
   terminalFailure = false,
-}: Readonly<{ terminalFailure?: boolean }> = {}) {
+  retryAvailable = true,
+}: Readonly<{ terminalFailure?: boolean; retryAvailable?: boolean }> = {}) {
   const { t } = useTranslation();
   const messages = terminalFailure ? terminalMessages : retryableMessages;
 
@@ -133,7 +134,12 @@ export function TranscriptStyleFixture({
       />
       <PartDetailSheetHost messages={messages}>
         {messages.map(message => (
-          <MessageBubble key={message.info.id} message={message} onRetryMessage={ignoreRetry} />
+          <MessageBubble
+            key={message.info.id}
+            message={message}
+            onRetryMessage={retryAvailable ? ignoreRetry : undefined}
+            retryAvailable={retryAvailable}
+          />
         ))}
       </PartDetailSheetHost>
     </View>

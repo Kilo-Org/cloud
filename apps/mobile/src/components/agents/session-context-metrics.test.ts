@@ -9,6 +9,7 @@ import {
 } from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
 
@@ -279,8 +280,8 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
-    // The settled pill is the same shape the loading one shows: no label, never
-    // a dash standing in for a value that has not arrived.
+    // A transcript that reports neither usage nor cost keeps the ring alone:
+    // there is no unresolved value to hold a slot for.
     expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
     const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
@@ -290,43 +291,49 @@ describe('SessionContextMetrics', () => {
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
   });
 
-  // A session whose transcript failed to load (no usage, no messages, loading
-  // finished) keeps the loading placeholder rather than changing shape late;
-  // the accessibility label is what names usage as unavailable.
-  it('load-error session keeps the placeholder ring and names usage unavailable', () => {
+  // No usage yet: both value slots stay, dashes while settled, one bar while loading.
+  it('holds the value slots over the bare ring, loading them as one bar', () => {
+    const classOf = (el: React.ReactElement) =>
+      (el.props as { className?: string }).className ?? '';
+    const dashes = (root: React.ReactElement) =>
+      findAll(root, el => (el.props as { children?: unknown }).children === '—');
+    const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-      onPress,
-    });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityLabel?: string;
-      className?: string;
-    };
-    expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(props.accessibilityLabel).toContain('Tap to view context details.');
-    expect(props.className ?? '').not.toContain('opacity-0');
-    for (const token of PILL_LAYOUT_TOKENS) {
-      expect(props.className ?? '').toContain(token);
-    }
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
-  });
 
-  it('loading pill keeps the placeholder body without a label', () => {
-    const onPress = vi.fn<() => void>();
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-      loading: true,
-      onPress,
-    });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as { accessibilityLabel?: string };
-    expect(props.accessibilityLabel).not.toContain('usage unavailable');
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
+    const bare = (loading = false) =>
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: false,
+        loading,
+        onPress,
+      });
+    const settled = bare();
+    const props = settled.props as { accessibilityLabel?: string };
+    expect(props.accessibilityLabel).toContain('usage unavailable');
+    expect(dashes(settled)).toHaveLength(2);
+    // The settled cost dash holds the label's width.
+    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-8');
+    expect(bars(settled)).toHaveLength(0);
+
+    const loading = bare(true);
+    expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
+      'usage unavailable'
+    );
+    const hiddenRows = findAll(loading, el => classOf(el).includes('opacity-0'));
+    expect(hiddenRows).toHaveLength(1);
+    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(2);
+    const [loadingBar] = bars(loading);
+    if (!loadingBar) {
+      throw new Error('expected the value-row bar');
+    }
+    // A box over the row, not a fixed width that fits only the default font scale.
+    expect(classOf(loadingBar)).toContain('w-full');
+    expect(classOf(loadingBar)).toContain('bg-muted-soft');
+    const overlays = findAll(
+      loading,
+      el => (el.props as { style?: { position?: string } }).style?.position === 'absolute'
+    );
+    expect(overlays).toHaveLength(1);
   });
 });

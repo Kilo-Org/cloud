@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 import {
   getCreditTransactionsSummaryByUserId,
@@ -244,6 +245,68 @@ describe('Credit Transactions', () => {
 
       expect(summary.payments_count).toBe(1);
       expect(summary.payments_total_microdollars).toBe(5000000);
+    });
+  });
+
+  describe('personal payment scope', () => {
+    async function insertOrganizationCredits(
+      ownerId: string,
+      rows: { amount_microdollars: number; is_free: boolean }[]
+    ) {
+      const organization = await createTestOrganization(
+        `Payment scope ${crypto.randomUUID()}`,
+        ownerId,
+        0
+      );
+      await db.insert(credit_transactions).values(
+        rows.map(row => ({
+          kilo_user_id: ownerId,
+          organization_id: organization.id,
+          is_free: row.is_free,
+          amount_microdollars: row.amount_microdollars,
+          description: 'Organization credit',
+          original_baseline_microdollars_used: 0,
+        }))
+      );
+    }
+
+    test('ignores organization-funded rows in personal payments and credit totals', async () => {
+      const user = await insertTestUser();
+      await insertOrganizationCredits(user.id, [
+        { amount_microdollars: 50000000, is_free: false },
+        { amount_microdollars: 5000000, is_free: true },
+      ]);
+
+      const payments = await summarizeUserPayments(user.id);
+      expect(payments.payments_count).toBe(0);
+      expect(payments.payments_total_microdollars).toBe(0);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(0);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(0);
+    });
+
+    test('counts only personal rows when the user also funded an organization', async () => {
+      const user = await insertTestUser();
+      await insertOrganizationCredits(user.id, [{ amount_microdollars: 50000000, is_free: false }]);
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        is_free: false,
+        amount_microdollars: 20000000,
+        description: 'Personal top-up',
+        stripe_payment_id: `pi_${crypto.randomUUID()}`,
+        original_baseline_microdollars_used: 0,
+      });
+
+      const payments = await summarizeUserPayments(user.id);
+      expect(payments.payments_count).toBe(1);
+      expect(payments.payments_total_microdollars).toBe(20000000);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(20000000);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(1);
     });
   });
 });

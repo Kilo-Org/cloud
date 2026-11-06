@@ -35,7 +35,7 @@ export function AccountSettingsScreen() {
       <ScreenHeader title={t('preferences.account')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-3 pt-4"
+        contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <ConfigureRow

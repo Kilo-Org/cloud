@@ -11,6 +11,7 @@ import { NewSessionStartButton } from './new-session-start-button';
 // call-to-action keeps a visible label while starting (button.tsx draws the
 // inline spinner, so an empty child renders as a bare brand-coloured bar).
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));

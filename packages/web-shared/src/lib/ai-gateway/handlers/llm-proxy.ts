@@ -1,172 +1,57 @@
 import { randomUUID } from 'node:crypto';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
-import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
-import {
-  BRIEFING_SETTLEMENT_HEADER,
-  recordBriefingUsage,
-} from '@kilocode/web-shared/lib/agent-briefing-usage';
-import type {
-  OpenRouterChatCompletionRequest,
-  GatewayResponsesRequest,
-  GatewayMessagesRequest,
-  GatewayRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import {
-  getEffectiveProviderPrivacy,
-  providerPrivacySchema,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import { archiveKiloRoutingDecision } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
-import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import {
-  createDirectByokReferenceResolver,
-  findDirectByokProvider,
-  getDirectByokModel,
-  getDirectByokPolicyProviderId,
-  supportsCatalogMode,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import {
-  hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findCustomLlm,
   isPublicCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
-  accountForMicrodollarUsage,
-  getOrganizationProviderPrivacy,
-  dataCollectionRequiredResponse,
-  extractFraudAndProjectHeaders,
   invalidPathResponse,
   extractReasoningSetting,
-  invalidRequestResponse,
-  malformedJsonResponse,
-  invalidTokenResponse,
-  makeErrorReadable,
-  modelDoesNotExistResponse,
-  modelNotAllowedResponse,
-  efficientPoolBlockedResponse,
-  extractHeaderAndLimitLength,
-  noFreeModelsAvailableResponse,
-  organizationAutoConfigurationResponse,
-  customRouterErrorResponse,
-  autoRoutingUnavailableResponse,
-  invalidAutoDecisionResponse,
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
-  temporarilyUnavailableResponse,
-  creditsBlockedResponse,
-  unavailableModelResponse,
-  storeAndPreviousResponseIdIsNotSupported,
-  apiKindNotSupportedResponse,
-  allowedInferenceProviders,
-  inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
-  chatGptReconnectResponse,
-  directByokCatalogOnlyMessage,
-  directByokCatalogOnlyResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getBalanceAndOrgSettings,
-  type BalanceAndOrgSettings,
-} from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import {
-  rewriteModelResponse,
-  logUnrewrittenResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
-import {
-  createAnonymousContext,
-  isAnonymousContext,
-  type AnonymousUserContext,
-} from '@kilocode/web-shared/lib/anonymous';
+import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { logUnrewrittenResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
   freeModelRateLimitKey,
   isFreeModelRateLimited,
   type FreeModelRateLimitSubject,
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
-import {
-  isKiloAutoModel,
-  KILO_AUTO_BALANCED_MODEL,
-  KILO_AUTO_EFFICIENT_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
-  ORG_AUTO_MODEL,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  applyResolvedAutoModel,
-  applyResolvedModel,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
-import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
-import {
-  fetchCustomRouterDecision,
-  fetchEfficientAutoDecision,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  AUTO_DECISION_HEADER,
-  customRouterModelId,
-  isCustomRouterModelId,
-  type AutoRouter,
-  type CustomRouterReference,
-} from '@kilocode/auto-routing-contracts';
-import {
-  collectDataCollectionRequiredAutoRoutingModelIds,
-  collectDeniedAutoRoutingModelIds,
-  dataCollectionRequiredAutoRoutingCandidates,
-  deniedAutoRoutingCandidates,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
-import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
-import type {
-  MicrodollarUsageContext,
-  MicrodollarUsageStats,
-} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { AUTO_DECISION_HEADER } from '@kilocode/auto-routing-contracts';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
-import {
-  allowsInferenceProviderUserByok,
-  evaluateEffectiveModelAccessPolicy,
-  getEffectiveModelDecision,
-  isModelAllowedForProviderKey,
-  type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { evaluateEffectiveModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -179,85 +64,73 @@ import {
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
-import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { extractRequestText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import { admitEnkryptGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/admission';
+import { extractRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import {
+  parseLlmProxyRequest,
+  readLlmProxyHeaders,
+  type LlmProxyPath,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
+import {
+  autoRoutingFailureResponse,
+  billLegacyClassifierCost,
+  resolveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
+import { resolveProviderAndPolicy } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-provider-policy';
+import { respondToUpstream } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-respond';
+import { resolveEnkryptOutputScan } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/output-guardrail';
+import {
+  gatewayUsageContextBase,
+  readGatewayBalance,
+  resolveGatewayCaller,
+  type GatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
-const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
-
-/**
- * Checks if a string starts with a required prefix and removes it.
- * @param str The input string to check
- * @param prefix The required prefix to check for and remove
- * @returns The string with the prefix removed if it starts with the prefix, otherwise null
- */
-function stripRequiredPrefix(str: string, prefix: string): string | null {
-  if (str.startsWith(prefix)) {
-    return str.slice(prefix.length);
+function llmProxyPath(url: URL): LlmProxyPath | null {
+  switch (url.pathname) {
+    case '/api/v1/chat/completions':
+      return '/chat/completions';
+    case '/api/v1/responses':
+      return '/responses';
+    case '/api/v1/messages':
+      return '/messages';
+    default:
+      return null;
   }
-  return null;
-}
-
-function validatePath(
-  url: URL
-):
-  | { path: '/chat/completions' | '/responses' | '/messages' }
-  | { errorResponse: ReturnType<typeof invalidPathResponse> } {
-  const pathSuffix =
-    stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
-    stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
-    stripRequiredPrefix(url.pathname, '/api/gateway') ??
-    stripRequiredPrefix(url.pathname, '/api/openrouter') ??
-    // The ai-gateway app serves the proxy under /api/v1.
-    stripRequiredPrefix(url.pathname, '/api/v1');
-
-  if (
-    pathSuffix === '/chat/completions' ||
-    pathSuffix === '/responses' ||
-    pathSuffix === '/messages'
-  ) {
-    return { path: pathSuffix };
-  }
-  return { errorResponse: invalidPathResponse() };
 }
 
 /**
  * Signed-in callers count per account, anonymous callers per IP. Uses the
- * resolved auth rather than the token's claims, so a revoked token cannot spend
+ * resolved caller rather than the token's claims, so a revoked token cannot spend
  * its account's allowance: a rejected credential gets the invalid-token
- * response instead. Auth has already resolved by the time free-model requests
- * get here, because balance and settings wait on it.
+ * response instead.
  */
-async function resolveFreeModelRateLimitSubject(
-  ipAddress: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
-): Promise<NextResponseType<unknown> | FreeModelRateLimitSubject> {
-  const { user, authFailedResponse, credentialsRejected } = await authPromise;
-  if (authFailedResponse && credentialsRejected) {
-    return invalidTokenResponse();
-  }
-  return user && !authFailedResponse
-    ? { kind: 'account', kiloUserId: user.id }
-    : { kind: 'ip', ipAddress };
-}
+async function freeModelRateLimitResponse(params: {
+  request: NextRequest;
+  ipAddress: string;
+  callerPromise: Promise<GatewayCaller>;
+  model: string;
+  feature: string | null;
+}): Promise<NextResponseType<unknown> | null> {
+  const caller = await params.callerPromise;
+  if (caller.kind === 'rejected') return caller.response;
+  const subject: FreeModelRateLimitSubject =
+    caller.kind === 'signed-in'
+      ? { kind: 'account', kiloUserId: caller.user.id }
+      : { kind: 'ip', ipAddress: params.ipAddress };
 
-/**
- * The catalog id that replaces an auto-routed bespoke direct BYOK id when the caller's key for it
- * is in catalog mode. Null when the id needs no replacement or has no catalog id; an unmapped id
- * then gets the catalog-only error from `getProvider`.
- */
-async function catalogModeModelForRoutedModel(
-  model: string,
-  authPromise: ReturnType<typeof getUserFromAuth>
-): Promise<string | null> {
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider.id)) return null;
-  const { user, authFailedResponse, organizationId } = await authPromise;
-  if (!user || authFailedResponse) return null;
-  const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(user.id, organizationId)
+  // The default internal benchmark user is exempt: a run sends every case of
+  // every free model it measures, and the anti-abuse limit would otherwise
+  // throttle the measurement itself. A benchmark user override is not exempt.
+  const isExempt = subject.kind === 'account' && subject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
+  if (isExempt || !(await isFreeModelRateLimited(params.request, subject))) return null;
+  console.warn(
+    `Model rate limit exceeded, ${freeModelRateLimitKey(subject)}, model: ${params.model}, feature: ${params.feature ?? 'none'}`
   );
-  const resolved = await resolveReference(model);
-  return resolved === model ? null : resolved;
+  return subject.kind === 'account'
+    ? accountFreeModelLimitResponse()
+    : anonymousFreeModelLimitResponse();
 }
 
 export async function handleLlmProxyRequest(
@@ -269,13 +142,10 @@ export async function handleLlmProxyRequest(
   const requestStartedAtMs = Date.now();
 
   const url = new URL(request.url);
+  const path = llmProxyPath(url);
+  if (!path) return invalidPathResponse();
 
-  const pathResult = validatePath(url);
-  if ('errorResponse' in pathResult) return pathResult.errorResponse;
-  const { path } = pathResult;
-
-  // Extract IP early (needed for free model routing fallback and rate limiting)
-  const ipAddress = rawClientIp(request);
+  const rawIpAddress = rawClientIp(request);
   const countryCode = requestCountryCode(request.headers);
 
   // Cap the account before this function starts any database work. Every WAF
@@ -286,7 +156,7 @@ export async function handleLlmProxyRequest(
   // account with a read-replica query, so a cap placed after auth still spends a
   // connection on every flooded request. The key comes from the signed token
   // instead, which costs no query.
-  const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
+  const accountKey = gatewayRateLimitKey(request.headers, rawIpAddress);
   if (await isGatewayAccountRateLimited(request, accountKey)) {
     console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
     return NextResponse.json(
@@ -299,67 +169,21 @@ export async function handleLlmProxyRequest(
     );
   }
 
-  // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
-  const authPromise = getUserFromAuth({
+  // Free models also serve anonymous callers, so a missing credential resolves to
+  // an anonymous caller here; paid models reject it once the model is known.
+  const callerPromise = getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  }).then(auth => resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: rawIpAddress }));
+  // Invalid requests return before anything awaits auth. Keep those paths from
+  // surfacing auth failures as unhandled rejections.
+  void callerPromise.catch(() => {});
   debugSaveProxyRequest(requestBodyText);
-  let requestBodyParsed: GatewayRequest;
-  try {
-    if (path === '/chat/completions') {
-      const body = JSON.parse(requestBodyText) as OpenRouterChatCompletionRequest;
-      // Inject or merge stream_options.include_usage = true (only when streaming)
-      if (body.stream) {
-        body.stream_options = { ...(body.stream_options || {}), include_usage: true };
-      }
-      requestBodyParsed = { kind: 'chat_completions', body };
-    } else if (path === '/messages') {
-      const body = JSON.parse(requestBodyText) as GatewayMessagesRequest;
-      requestBodyParsed = { kind: 'messages', body };
-    } else {
-      const body = JSON.parse(requestBodyText) as GatewayResponsesRequest;
-      requestBodyParsed = { kind: 'responses', body };
-    }
-    // Usage accounting parses the response as SSE only when `stream` is exactly true.
-    if (requestBodyParsed.body.stream) {
-      requestBodyParsed.body.stream = true;
-    }
-  } catch (e) {
-    return malformedJsonResponse(e);
-  }
-
-  if (requestBodyParsed.body.providerOptions !== undefined) {
-    const error = 'The providerOptions field is not supported. Use provider instead.';
-    return NextResponse.json(
-      { error, error_type: ProxyErrorType.unsupported_field, message: error },
-      { status: 400 }
-    );
-  }
-
-  if (
-    typeof requestBodyParsed.body.model !== 'string' ||
-    requestBodyParsed.body.model.trim().length === 0
-  ) {
-    return modelDoesNotExistResponse();
-  }
-
-  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
-    if (!Array.isArray(requestBodyParsed.body.messages)) {
-      return invalidRequestResponse();
-    }
-  }
-
-  if (requestBodyParsed.kind === 'responses') {
-    const { input } = requestBodyParsed.body;
-    if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
-      return invalidRequestResponse();
-    }
-  }
-
-  // Canonicalize once so routing, policy, and the upstream request all see the same id.
-  requestBodyParsed.body.model = requestBodyParsed.body.model.trim();
+  const parsed = parseLlmProxyRequest(path, requestBodyText, rawIpAddress);
+  if (!parsed.ok) return parsed.response;
+  const { request: requestBodyParsed, requestPrivacy, ipAddress } = parsed;
+  const requestProvider = requestBodyParsed.body.provider;
   const requestedModel = requestBodyParsed.body.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
@@ -375,28 +199,16 @@ export async function handleLlmProxyRequest(
     settings: undefined,
     plan: undefined,
   };
-  const balanceAndSettingsPromise = authPromise.then(async res =>
-    res.user
-      ? getBalanceAndOrgSettings(
-          res.organizationId,
-          res.user,
-          readDb,
-          (await isFreeModel(requestedModelLowerCased)) ? undefined : 'usage'
-        )
+  const balanceAndSettingsPromise = callerPromise.then(caller =>
+    caller.kind === 'signed-in'
+      ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
-  const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
-    ([auth, balanceAndSettings]) => ({
-      organizationId: auth.organizationId,
-      settings: balanceAndSettings.settings,
-      plan: balanceAndSettings.plan,
-    })
-  );
-  const organizationGroupPolicyPromise = authPromise.then(async auth => {
-    if (!auth.organizationId || !auth.user || auth.authFailedResponse) return null;
+  const organizationGroupPolicyPromise = callerPromise.then(async caller => {
+    if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
     const context = await getOrganizationGroupPolicyContext({
-      organizationId: auth.organizationId,
-      subject: { type: 'member', kiloUserId: auth.user.id },
+      organizationId: caller.organizationId,
+      subject: { type: 'member', kiloUserId: caller.user.id },
       fromDb: readDb,
     });
     return evaluateEffectiveModelAccessPolicy(context);
@@ -405,40 +217,31 @@ export async function handleLlmProxyRequest(
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
 
-  const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
-  // Per-message id from the kilocode client. Joinable to PostHog
-  // `Feedback Submitted.parentMessageID`.
-  const clientRequestId = extractHeaderAndLimitLength(request, 'x-kilo-request');
-  // Fallback session id used when `x-kilocode-taskid` is absent (e.g.
-  // non-kilocode clients). `taskId` still wins when both are present.
-  const sessionHeader = extractHeaderAndLimitLength(request, 'x-kilo-session');
-  const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
-  // Vercel's per-invocation request id. Logged on the disconnect and upstream
-  // failure paths so a client disconnect can be correlated with the upstream
-  // error it causes, and with the platform logs for the same invocation.
-  const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
+  const headers = readLlmProxyHeaders(request);
+  const usageId = randomUUID();
 
-  // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
-  // work. Its blocking detectors are awaited just before the upstream call; log-only detectors are
-  // never awaited.
+  const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
+    ([caller, account]) => admitEnkryptGuardrail(caller, account)
+  );
+  if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
+
+  // Like the bouncer decide, the guardrail scan overlaps routing work. Its blocking detectors are
+  // awaited just before the upstream call; log-only detectors are never awaited. Segments are
+  // extracted inside the promise so an extraction failure rejects the guardrail, failing closed.
   const enkryptGuardrail = startEnkryptInputGuardrail(
-    Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
-      if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
-      const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
-      if (!config) return null;
-      return {
-        sessionId: taskId ?? sessionHeader ?? null,
-        organizationId: auth.organizationId,
-        kiloUserId: auth.user.id,
-        apiKind: requestBodyParsed.kind,
-        clientRequestId,
-        text: extractRequestText(requestBodyParsed, {
-          includeToolResults: config.scanToolResults,
-        }),
-        config,
-      };
-    }),
+    Promise.resolve(enkryptAdmission.inputGuardrail).then(
+      inputGuardrail =>
+        inputGuardrail && {
+          ...inputGuardrail,
+          sessionId: headers.sessionId,
+          microdollarUsageId: usageId,
+          apiKind: requestBodyParsed.kind,
+          clientRequestId: headers.clientRequestId,
+          segments: extractRequestSegments(requestBodyParsed, {
+            includeToolResults: inputGuardrail.config.scanToolResults,
+          }),
+        }
+    ),
     request.signal
   );
 
@@ -453,9 +256,9 @@ export async function handleLlmProxyRequest(
       {
         path,
         elapsed_ms: Math.round(performance.now() - requestStartedAt),
-        client_request_id: clientRequestId,
-        session_id: taskId ?? sessionHeader,
-        vercel_request_id: vercelRequestId,
+        client_request_id: headers.clientRequestId,
+        session_id: headers.sessionId,
+        vercel_request_id: headers.vercelRequestId,
       }
     );
   };
@@ -466,11 +269,8 @@ export async function handleLlmProxyRequest(
   }
 
   const { settings: privacySettings } = await balanceAndSettingsPromise;
-  const requestProvider = requestBodyParsed.body.provider;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
-  if (!requestPrivacy.success) return invalidRequestResponse();
   const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
+    requestPrivacy,
     privacySettings?.data_collection
   );
   if (Object.keys(effectivePrivacy).length > 0) {
@@ -480,283 +280,58 @@ export async function handleLlmProxyRequest(
   // Snapshot normalized privacy before model-specific provider transforms.
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
-  let autoModel: string | null = null;
-  // Organization Auto can resolve through an intermediate route target before
-  // reaching a concrete model. Keep that target for direct-BYOK ownership
-  // validation after resolution.
-  let routingTarget: string | null = null;
-  let legacyClassifierCostUsd = 0;
-  let autoRoutingUnavailable = false;
-  // Efficient/balanced and custom router requests resolve through an auto-routing pool. Kept for
-  // the org policy check below so a failed routing decision gets a specific
-  // auto-routing error instead of the generic model-not-allowed error.
-  let isAutoRoutedRequest = false;
-  // Custom routers and signed CLI decisions bill an account, so they never fall through to
-  // anonymous handling.
-  const authenticatedRoutingCaller = async () => {
-    const { user, authFailedResponse, credentialsRejected, organizationId } = await authPromise;
-    if (authFailedResponse && credentialsRejected) return invalidTokenResponse();
-    if (!user || authFailedResponse) return paidModelAuthRequiredResponse();
-    return { userId: user.id, organizationId: organizationId ?? null };
-  };
-  const autoRoutingDenials = async (
-    fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-    fromPrivacy: () => Promise<string[]>,
-    candidateIds: ReadonlyArray<string> = []
-  ) => {
-    const { settings, plan } = await balanceAndSettingsPromise;
-    const groupPolicy = await organizationGroupPolicyPromise;
-    const deniedSettings = new Set(
-      !groupPolicy && plan === 'enterprise'
-        ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
-        : []
-    );
-    const deniedFromSettings = [
-      ...deniedSettings,
-      ...candidateIds.filter(modelId => deniedSettings.has(normalizeModelId(modelId))),
-    ];
-    const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
-      groupPolicy ? fromPolicy(groupPolicy) : [],
-      isDataCollectionExplicitlyDisallowed(effectivePrivacy) ? fromPrivacy() : [],
-    ]);
-    return [...new Set([...deniedFromSettings, ...deniedFromPolicy, ...deniedFromPrivacy])];
-  };
-  const decisionRequest = (caller: { userId: string; organizationId: string | null }) => ({
-    apiKind: requestBodyParsed.kind,
-    body: requestBodyParsed.body,
+  const modelResolution = await resolveModel({
+    request: requestBodyParsed,
+    requestBodyText,
+    autoDecisionToken: request.headers.get(AUTO_DECISION_HEADER),
+    ipAddress,
+    headers,
     providerHints: autoRoutingProviderHints,
-    bodyBytes: Buffer.byteLength(requestBodyText),
-    userId: caller.userId,
-    organizationId: caller.organizationId,
-    sessionId: taskId ?? sessionHeader,
-    machineId: machineIdHeader,
-    clientRequestId,
-    mode: modeHeader,
-    userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+    effectivePrivacy,
+    callerPromise,
+    balanceAndSettingsPromise,
+    organizationGroupPolicyPromise,
   });
-
-  const autoDecisionToken = request.headers.get(AUTO_DECISION_HEADER);
-  if (autoDecisionToken !== null) {
-    const caller = await authenticatedRoutingCaller();
-    if (caller instanceof NextResponse) return caller;
-    if (!AUTO_ROUTING_DECISION_SECRET) {
-      console.error(`${AUTO_DECISION_HEADER} received but AUTO_ROUTING_DECISION_SECRET is unset`);
-      return temporarilyUnavailableResponse();
-    }
-    const check = await checkAutoDecision({
-      token: autoDecisionToken,
-      secret: AUTO_ROUTING_DECISION_SECRET,
-      nowMs: Date.now(),
-      userId: caller.userId,
-      organizationId: caller.organizationId,
-      model: requestedModel,
-    });
-    if (check.kind === 'rejected') return invalidAutoDecisionResponse(check.reason);
-    applyResolvedModel(requestBodyParsed, check.resolved);
-    autoModel = check.routerModelId;
-  } else if (isKiloAutoModel(requestedModelLowerCased)) {
-    if (isCustomRouterModelId(requestedModelLowerCased)) {
-      const caller = await authenticatedRoutingCaller();
-      if (caller instanceof NextResponse) return caller;
-    }
-    autoModel = requestedModelLowerCased;
-    const isAutoEfficientId =
-      requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
-      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
-    isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
-    const decisionForRouter = async (router: AutoRouter) => {
-      const { user, authFailedResponse, organizationId } = await authPromise;
-      // The classifier uses Kilo's paid credential. Unauthenticated callers
-      // must never spend classification without a user to attribute it to.
-      if (!user || authFailedResponse) return null;
-      const owner = { userId: user.id, organizationId: organizationId ?? null };
-      const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, router),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(router)
-      );
-      const result = await fetchEfficientAutoDecision({
-        ...decisionRequest(owner),
-        ...(router === 'frontier' ? { router } : {}),
-        requestedModel,
-        deniedModelIds,
-      });
-      legacyClassifierCostUsd = result?.costUsd ?? 0;
-      return result?.decision ?? null;
-    };
-    const customRouterDecision = async (reference: CustomRouterReference) => {
-      const caller = await authenticatedRoutingCaller();
-      if (caller instanceof NextResponse) {
-        return {
-          kind: 'rejected',
-          code: 'unauthorized',
-          message: 'Custom routers require an authenticated user',
-        } as const;
-      }
-      return await decideCustomRouter({
-        reference,
-        ...caller,
-        deniedModelIds: candidateIds =>
-          autoRoutingDenials(
-            policy => deniedAutoRoutingCandidates(policy, candidateIds),
-            () => dataCollectionRequiredAutoRoutingCandidates(candidateIds),
-            candidateIds
-          ),
-        decide: async (router, deniedModelIds) => {
-          const outcome = await fetchCustomRouterDecision({
-            ...decisionRequest(caller),
-            router: router.baseRouter,
-            customRouter: reference,
-            requestedModel: customRouterModelId(router.ownerType, router.slug),
-            deniedModelIds,
-          });
-          if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
-          return outcome;
-        },
-      });
-    };
-    const efficientDecision =
-      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id
-        ? () => decisionForRouter('efficient')
-        : undefined;
-    const frontierDecision =
-      requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
-      requestedModelLowerCased === ORG_AUTO_MODEL.id
-        ? () => decisionForRouter('frontier')
-        : undefined;
-    const autoResult = await applyResolvedAutoModel(
-      {
-        model: requestedModelLowerCased,
-        modeHeader,
-        sessionId: taskId ?? null,
-        apiKind: requestBodyParsed.kind,
-        clientIp: ipAddress ?? null,
-        efficientDecision,
-        frontierDecision,
-        customRouterDecision,
-        organizationContext: organizationContextPromise,
-        isAutoFreeCandidateAllowed: async modelId => {
-          const policy = await organizationGroupPolicyPromise;
-          return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
-        },
-      },
-      requestBodyParsed,
-      authPromise.then(res => res.user),
-      balanceAndSettingsPromise.then(res => res.balance)
-    );
-    if (autoResult.kind === 'no_free_models_available') {
-      return noFreeModelsAvailableResponse();
-    }
-    if (autoResult.kind === 'organization_auto_configuration_error') {
-      return organizationAutoConfigurationResponse(autoResult.message);
-    }
-    if (autoResult.kind === 'custom_router_error') {
-      return customRouterErrorResponse(autoResult.code, autoResult.message);
-    }
-    autoRoutingUnavailable = autoResult.kind === 'auto_routing_unavailable';
-    routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
-  }
-
-  if (autoModel) {
-    // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
-    // the catalog id then goes through the organization policy check below.
-    const catalogModelId = await catalogModeModelForRoutedModel(
-      requestBodyParsed.body.model,
-      authPromise
-    );
-    if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
+  // An unavailable router yields to the caller's auth failure and still owes classifier cost, so
+  // it is answered after admission.
+  if (modelResolution.kind === 'rejected' && modelResolution.failure.kind !== 'unavailable') {
+    return autoRoutingFailureResponse(modelResolution.failure, requestedModelLowerCased);
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // A public custom LLM owns its id, so it is publicly free exactly when it sets
-  // no pricing. Anonymous callers cannot use private custom LLMs, so for them a
-  // private custom LLM id must behave exactly like an unknown id.
-  const isPubliclyFreeModel =
-    customLlm !== null && !isPrivateCustomLlm
-      ? !customLlm.definition.pricing
-      : isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
-
-  if (!ipAddress) {
-    return NextResponse.json(
-      {
-        error: 'Unable to determine client IP',
-        error_type: ProxyErrorType.missing_client_ip,
-      },
-      { status: 400 }
-    );
-  }
+  // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
+  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(effectiveModelIdLowerCased);
 
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
   if (isPubliclyFreeModel) {
-    const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
-    if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
-
-    // Private custom LLMs are exempt for signed-in callers, even when their id
-    // matches a free-model pattern. So is the default internal benchmark user: a run
-    // sends every case of every free model it measures, and the anti-abuse limit
-    // would otherwise throttle the measurement itself. A benchmark user override is
-    // not exempt.
-    const isExempt =
-      rateLimitSubject.kind === 'account' &&
-      (isPrivateCustomLlm || rateLimitSubject.kiloUserId === DEFAULT_BENCHMARK_USER_ID);
-    if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
-      console.warn(
-        `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
-      );
-      return rateLimitSubject.kind === 'account'
-        ? accountFreeModelLimitResponse()
-        : anonymousFreeModelLimitResponse();
-    }
+    const rateLimited = await freeModelRateLimitResponse({
+      request,
+      ipAddress,
+      callerPromise,
+      model: effectiveModelIdLowerCased,
+      feature,
+    });
+    if (rateLimited) return rateLimited;
   }
 
-  // Now check auth
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    credentialsRejected,
-    organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
-  } = await authPromise;
+  const caller = await callerPromise;
   authSpan.end();
+  if (caller.kind === 'rejected') return caller.response;
+  if (caller.kind === 'anonymous' && !isPubliclyFreeModel) return paidModelAuthRequiredResponse();
+  const { user } = caller;
+  const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
+  const botId = caller.kind === 'signed-in' ? caller.botId : undefined;
 
-  let user: typeof maybeUser | AnonymousUserContext;
-  let organizationId: string | undefined = authOrganizationId;
-  let botId: string | undefined = authBotId;
-  let tokenSource: string | undefined = authTokenSource;
-
-  if (authFailedResponse) {
-    // A caller that presented a credential we could not verify is not the same
-    // as a caller that presented none. Answering for it as anonymous would
-    // silently drop its account, organization, BYOK keys and credits, and would
-    // hide from the client that its stored token is broken. Fail the request so
-    // the client re-authenticates.
-    if (credentialsRejected) {
-      return invalidTokenResponse();
-    }
-
-    // No valid auth
-    if (!isPubliclyFreeModel) {
-      return paidModelAuthRequiredResponse();
-    }
-
-    // Anonymous access for free model (rate-limited above when configured)
-    user = createAnonymousContext(ipAddress);
-    organizationId = undefined;
-    botId = undefined;
-    tokenSource = undefined;
-  } else {
-    user = maybeUser;
-  }
-
-  // Fraud/project headers are pure header parsing; resolve them once here so
-  // decide, usage, and the classifier-overhead billing below share one read.
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  // Resolve the header-derived usage fields once here so decide, usage, and the
+  // classifier-overhead billing below share one read.
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
+  const { fraudHeaders } = usageBase.context;
 
   // Start the one decide alongside balance and provider work; it is awaited just before the
   // upstream call. The event id is generated server-side so decide and usage share one identity
@@ -781,349 +356,69 @@ export async function handleLlmProxyRequest(
         )
       : bouncer.decide();
 
-  // New workers persist classifier usage themselves and return zero. Retain
-  // positive-cost billing only for workers still running the previous protocol.
-  if (legacyClassifierCostUsd > 0 && !isAnonymousContext(user)) {
-    const priorMicrodollarUsage = user.microdollars_used;
-    after(
-      (async () => {
-        try {
-          const classifierStats: MicrodollarUsageStats = {
-            messageId: null,
-            model: 'auto-routing/classifier',
-            responseContent: '',
-            hasError: false,
-            inference_provider: null,
-            upstream_id: null,
-            finish_reason: null,
-            latency: null,
-            moderation_latency: null,
-            generation_time: null,
-            streamed: false,
-            cancelled: false,
-            status_code: 200,
-            cost_mUsd: toMicrodollars(legacyClassifierCostUsd),
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheWriteTokens: 0,
-            cacheHitTokens: 0,
-            is_byok: false,
-          };
-          const classifierContext: MicrodollarUsageContext = {
-            api_kind: requestBodyParsed.kind,
-            kiloUserId: user.id,
-            fraudHeaders,
-            organizationId,
-            provider: 'openrouter',
-            requested_model: requestedModelLowerCased,
-            is_free: false,
-            custom_llm_pricing: null,
-            promptInfo: {
-              system_prompt_prefix: '',
-              system_prompt_length: 0,
-              user_prompt_prefix: '',
-            },
-            max_tokens: null,
-            has_middle_out_transform: null,
-            reasoning_setting: null,
-            isStreaming: false,
-            prior_microdollar_usage: priorMicrodollarUsage,
-            // No posthog_distinct_id: this internal overhead row must not emit
-            // the generic first_usage / first_microdollar_usage lifecycle
-            // events (those are gated on posthog_distinct_id in processUsage).
-            // Otherwise the classifier row could race the primary usage row and
-            // mis-attribute `auto-routing/classifier` as the user's first model.
-            // DB billing is unaffected — it keys on kiloUserId.
-            posthog_distinct_id: undefined,
-            project_id: projectId,
-            status_code: 200,
-            editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-            machine_id: machineIdHeader,
-            user_byok: false,
-            has_tools: false,
-            botId,
-            tokenSource,
-            feature,
-            session_id: taskId ?? sessionHeader ?? null,
-            mode: modeHeader,
-            auto_model: autoModel,
-            ttfb_ms: null,
-            clientRequestId,
-          };
-          await logMicrodollarUsage(classifierStats, classifierContext);
-        } catch (error) {
-          console.error('Failed to bill classifier cost for auto routing', error);
-        }
-      })()
-    );
+  if (!isAnonymousContext(user)) {
+    billLegacyClassifierCost(modelResolution, {
+      ...usageBase.context,
+      api_kind: requestBodyParsed.kind,
+      requested_model: requestedModelLowerCased,
+      feature,
+      clientRequestId: headers.clientRequestId,
+    });
   }
-  if (autoRoutingUnavailable) return autoRoutingUnavailableResponse(requestedModelLowerCased);
-
-  if (
-    requestBodyParsed.kind === 'responses' &&
-    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
-  ) {
-    return storeAndPreviousResponseIdIsNotSupported();
+  if (modelResolution.kind === 'rejected') {
+    return autoRoutingFailureResponse(modelResolution.failure, requestedModelLowerCased);
   }
+  const autoModel = modelResolution.kind === 'routed' ? modelResolution.autoModel : null;
 
-  async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
-    const groupPolicy = await organizationGroupPolicyPromise;
-    const providerConfig = getOrganizationProviderPrivacy(settings);
-    let effectiveProviderConfig = providerConfig;
-    let groupModelAllowed = true;
-    let groupModelAllowedForInferenceProviderUserByok = true;
-    let groupProvidersAllowed = true;
-    let allowedProviders: ReadonlySet<string> | undefined;
-    if (groupPolicy) {
-      const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
-      groupModelAllowed = groupDecision.allowed;
-      // An `organization_provider` denial means no allowed provider serves the model.
-      allowedProviders = groupDecision.allowed ? groupDecision.eligibleProviderRoutes : new Set();
-      groupModelAllowedForInferenceProviderUserByok =
-        allowsInferenceProviderUserByok(groupDecision);
-      if (groupDecision.eligibleProviderRoutes) {
-        const only = withoutVirtualProvider([...groupDecision.eligibleProviderRoutes]);
-        groupProvidersAllowed = only.length > 0;
-        effectiveProviderConfig = { ...providerConfig, only };
-      }
-    }
-    return {
-      allowedProviders,
-      balance,
-      balanceLimitedByUserAllowance,
-      effectiveProviderConfig: effectiveProviderConfig
-        ? { ...effectiveProviderConfig, ...effectivePrivacy }
-        : undefined,
-      groupModelAllowed,
-      groupModelAllowedForInferenceProviderUserByok,
-      groupProvidersAllowed,
-      settings,
-    };
-  }
-
-  function createAccessCheckResolver(modelId: string) {
-    let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
-    const get = () => (accessCheck ??= resolveAccessCheck(modelId));
-    return {
-      get,
-      getRoutingProviderConfig: isAnonymousContext(user)
-        ? undefined
-        : async () => (await get()).effectiveProviderConfig,
-      getAllowedProviders: isAnonymousContext(user)
-        ? undefined
-        : async () => (await get()).allowedProviders,
-    };
-  }
-
-  const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
-
-  async function isDirectByokProviderAllowed(policyProviderId: string): Promise<boolean> {
-    const groupPolicy = await organizationGroupPolicyPromise;
-    return (
-      !groupPolicy ||
-      (await isModelAllowedForProviderKey(
-        groupPolicy,
-        effectiveModelIdLowerCased,
-        policyProviderId
-      ))
-    );
-  }
-
-  async function resolveIsNonTrialEnterprise(): Promise<boolean> {
-    if (!organizationId) return false;
-    const { plan } = await balanceAndSettingsPromise;
-    if (plan !== 'enterprise') return false;
-    return await isNonTrialEnterpriseOrganization(organizationId, readDb);
-  }
-
-  const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
-  const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
   const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
-
-  const usageId = randomUUID();
-  const providerResult = await getProvider({
-    requestedModel: effectiveModelIdLowerCased,
+  const providerMetadataCapture = createAiProviderMetadataCapture(usageId);
+  providerMetadataCapture?.captureEnkryptReport(enkryptGuardrail.report);
+  const providerPolicy = await resolveProviderAndPolicy({
     request: requestBodyParsed,
+    model: effectiveModelIdLowerCased,
+    requestProvider,
+    customLlm,
+    modelResolution,
     user,
     organizationId,
     botId,
-    boundedSpending: requestCostLimit !== null,
     countryCode,
-    getRoutingProviderConfig: async () =>
-      (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-    getAllowedProviders: accessCheckResolver.getAllowedProviders,
-    isDirectByokProviderAllowed,
-    kiloIgnoredProviders: ignoredProviders,
-    onDecision: decision => archiveKiloRoutingDecision(usageId, decision),
+    boundedSpending: requestCostLimit !== null,
+    providerMetadataCapture,
+    effectivePrivacy,
+    balanceAndSettingsPromise,
+    organizationGroupPolicyPromise,
   });
-  if (providerResult.kind === 'chatgpt-reconnect') {
-    // The person's enabled ChatGPT connection is terminally dead. Fail readably
-    // instead of silently serving the request through another billing path.
-    return chatGptReconnectResponse(providerResult.message);
-  }
-  if (providerResult.kind === 'custom-llm-unavailable') {
-    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
-  }
-  if (providerResult.kind === 'direct-byok-catalog-only') {
-    // Falling through to the managed gateway would fail later with a misleading unknown-model error.
-    const message = directByokCatalogOnlyMessage({
-      model: effectiveModelIdLowerCased,
-      providerId: providerResult.providerId,
-      catalogModelId: providerResult.catalogModelId,
-    });
-    return autoModel === ORG_AUTO_MODEL.id && routingTarget
-      ? organizationAutoConfigurationResponse(
-          `Organization Auto route target '${routingTarget}' is unavailable: ${message}`
-        )
-      : directByokCatalogOnlyResponse(message);
-  }
-  const effectiveProviderContext = providerResult;
+  if (!providerPolicy.ok) return providerPolicy.response;
+  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
-  if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
-    try {
-      const directByokTarget = await getDirectByokModel(routingTarget);
-      if (directByokTarget.provider && effectiveProviderContext.provider.type !== 'direct-byok') {
-        return organizationAutoConfigurationResponse(
-          `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
-        );
-      }
-    } catch {
-      return organizationAutoConfigurationResponse(
-        'Organization Auto could not validate this route target against the current model catalog.'
-      );
-    }
-  }
-
-  if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
-    return apiKindNotSupportedResponse(
-      requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis,
-      effectiveProviderContext.provider.type === 'direct-byok'
-        ? effectiveProviderContext.userByok?.[0]?.providerId
-        : undefined
-    );
-  }
-
-  // Large responses may run longer than the 800s serverless function timeout.
-  const requestMaxTokens = getMaxTokens(requestBodyParsed);
-  if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
-    console.warn(`SECURITY: Max tokens limit exceeded: ${user.id}`, {
-      maxTokens: requestMaxTokens,
-      bodyText: requestBodyText,
-    });
-    return temporarilyUnavailableResponse();
-  }
-
-  if (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased))) {
-    console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
-    return unavailableModelResponse();
-  }
-
-  // Skip balance/org checks for anonymous users - they can only use free models
-  if (
-    !isAnonymousContext(user) &&
-    !effectiveProviderContext.isFree &&
-    !effectiveProviderContext.userByok &&
-    !effectiveProviderContext.skipBalanceCheck
-  ) {
-    const { balance, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
-    if (!canSpendPaidUsage(balance)) {
-      return await creditsBlockedResponse({
-        user,
-        balance,
-        organizationId,
-        balanceLimitedByUserAllowance,
-      });
-    }
-  }
-
-  if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
-    const {
-      allowedProviders,
-      effectiveProviderConfig,
-      groupModelAllowed,
-      groupModelAllowedForInferenceProviderUserByok,
-      groupProvidersAllowed,
-    } = await accessCheckResolver.get();
-
-    if (effectiveProviderContext.provider.type === 'direct-byok') {
-      // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
-      // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(
-        effectiveProviderContext.userByok?.[0]?.providerId ?? ''
-      );
-      if (
-        !directByokProvider ||
-        !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
-      ) {
-        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-      }
-    } else {
-      const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
-        ? groupModelAllowedForInferenceProviderUserByok
-        : groupModelAllowed;
-      if (!modelAllowed) {
-        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-      }
-      if (!groupProvidersAllowed) return modelNotAllowedResponse();
-      if (
-        effectiveProviderContext.provider.type === 'vercel' &&
-        effectiveProviderContext.userByok?.some(
-          byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
-        )
-      ) {
-        return modelNotAllowedResponse();
-      }
-    }
-
-    if (effectiveProviderConfig) {
-      requestBodyParsed.body.provider = effectiveProviderConfig;
-    }
-  }
-
-  console.debug(`Routing request to ${effectiveProviderContext.provider.type}`, {
-    byokProviderIds: effectiveProviderContext.userByok?.map(byok => byok.providerId) ?? null,
+  console.debug(`Routing request to ${providerResult.provider.type}`, {
+    byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
   });
 
-  // Extract properties for usage context after final provider selection.
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: requestBodyParsed.kind,
-    kiloUserId: user.id,
-    provider: effectiveProviderContext.provider.type,
+    provider: providerResult.provider.type,
     requested_model: effectiveModelIdLowerCased,
-    is_free: effectiveProviderContext.isFree,
+    is_free: providerResult.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
-    fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: machineIdHeader,
-    user_byok: !!effectiveProviderContext.userByok,
+    user_byok: !!providerResult.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
-    botId,
-    tokenSource,
     feature,
-    session_id: taskId ?? sessionHeader ?? null,
-    mode: modeHeader,
     auto_model: autoModel,
-    ttfb_ms: null,
-    requestStartedAt,
-    clientRequestId,
+    clientRequestId: headers.clientRequestId,
     usageId,
+    providerMetadataCapture,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
       samples: requestedSamples(requestBodyParsed.body),
       // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
@@ -1133,34 +428,6 @@ export async function handleLlmProxyRequest(
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);
-
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
-    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
-  ) {
-    return dataCollectionRequiredResponse();
-  }
-
-  if (customLlm?.definition.public) {
-    // Organization policy replaces the request's provider object, so intersect
-    // the caller's own only/ignore lists, the organization's, and the declared
-    // providers, and forward only that intersection.
-    const declaredProviders = customLlm.definition.public.inference_providers;
-    const eligibleProviders = allowedInferenceProviders(
-      declaredProviders,
-      requestProvider,
-      requestBodyParsed.body.provider
-    );
-    if (eligibleProviders.length === 0) {
-      return inferenceProvidersNotAllowedResponse(declaredProviders);
-    }
-    if (eligibleProviders.length < declaredProviders.length) {
-      requestBodyParsed.body.provider = {
-        ...requestBodyParsed.body.provider,
-        only: eligibleProviders,
-      };
-    }
-  }
 
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',
@@ -1172,31 +439,18 @@ export async function handleLlmProxyRequest(
     op: 'http.client',
   });
 
-  const upstreamAttemptOptions = {
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: usageContext.session_id,
-    taskId: taskId ?? null,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId,
-  };
-
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
   // rejects; every other outcome sends the request.
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
   const requestLogging = {
-    user: maybeUser,
+    user: caller.kind === 'signed-in' ? caller.user : null,
     organization_id: organizationId || null,
     session_id: usageContext.session_id,
-    vercel_request_id: vercelRequestId,
+    vercel_request_id: headers.vercelRequestId,
     request: requestBodyParsed,
+    enkrypt: enkryptGuardrail.requestLogs,
   };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
@@ -1209,7 +463,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: effectiveProviderContext.provider.type,
+      providerId: providerResult.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -1218,9 +472,20 @@ export async function handleLlmProxyRequest(
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
-    ...upstreamAttemptOptions,
-    providerContext: effectiveProviderContext,
+    providerContext: providerResult,
     request: requestBodyParsed,
+    requestedModel: effectiveModelIdLowerCased,
+    fraudHeaders,
+    userId: user.id,
+    organizationId: organizationId ?? null,
+    sessionId: headers.sessionId,
+    taskId: headers.taskId,
+    isNonTrialEnterprise,
+    search: url.search,
+    method: request.method,
+    signal: request.signal,
+    vercelRequestId: headers.vercelRequestId,
+    dataRegion,
     costLimit:
       requestCostLimit !== null && requestCostBalance
         ? {
@@ -1234,119 +499,36 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed } = attempt;
-  const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
-  logExceptInTest(
-    'upstream response status: %s, x-vercel-id: %s, session_id: %s',
-    response.status,
-    response.headers.get('x-vercel-id') || '<none>',
-    usageContext.session_id || '<none>'
-  );
-
-  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!effectiveProviderContext.userByok,
-      mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.type,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
-      toolsAvailable,
-      toolsUsed,
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
-  usageContext.status_code = response.status;
-  const userByokProviderIds =
-    effectiveProviderContext.userByok === null
-      ? null
-      : effectiveProviderContext.userByok.map(byok => byok.providerId);
-
-  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
-    response,
-    providerId: effectiveProviderContext.provider.type,
-    isUserByok: !!effectiveProviderContext.userByok,
-    user,
-    request: requestBodyParsed.body,
-    organizationId,
-    model: finalUpstreamModel,
-    gatewayModel: effectiveModelIdLowerCased,
-    byokProviderIds: userByokProviderIds,
-  });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
-
-  const clonedReponse = response.clone(); // reading from body is side-effectful
-
-  const accounting = accountForMicrodollarUsage(
-    clonedReponse,
-    usageContext,
-    openrouterRequestSpan,
-    effectiveProviderContext.provider
-  );
-  const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
-  if (
-    settlementToken &&
-    !isAnonymousContext(user) &&
-    !usageContext.isStreaming &&
-    autoModel === null &&
-    usageContext.session_id?.startsWith('agent-briefing:') &&
-    clientRequestId === usageContext.session_id
-  ) {
-    const generationId = usageContext.session_id;
-    after(
-      accounting
-        .then(usage =>
-          recordBriefingUsage({
-            kiloUserId: user.id,
-            organizationId,
-            generationId,
-            settlementToken,
-            usage,
-          })
-        )
-        .catch(() => {
-          errorExceptInTest('Briefing accounting receipt could not be stored');
-        })
-    );
-  }
-
-  {
-    const errorResponse = await makeErrorReadable({
-      provider: effectiveProviderContext.provider.type,
-      requestedModel: effectiveModelIdLowerCased,
-      request: requestBodyParsed,
-      response,
-      userByokProviderIds,
-    });
-    if (errorResponse) {
-      await logUnrewrittenResponse({
-        response,
-        model: effectiveModelIdLowerCased,
-        providerId: effectiveProviderContext.provider.type,
-        logging: requestLogging,
-        error: null,
-      });
-      return errorResponse;
-    }
-  }
-
-  return await rewriteModelResponse({
-    response,
+  const { settings: organizationSettings } = await balanceAndSettingsPromise;
+  return await respondToUpstream({
+    upstream: attempt,
+    request: requestBodyParsed,
     model: effectiveModelIdLowerCased,
-    providerId: effectiveProviderContext.provider.type,
-    kind: requestBodyParsed.kind,
-    isFree: usageContext.is_free,
-    userByok: usageContext.user_byok,
-    customLlmPricing: usageContext.custom_llm_pricing,
+    requestedModel: requestedModelLowerCased,
+    providerResult,
+    user,
+    organizationId,
+    usageContext,
+    upstreamSpan: openrouterRequestSpan,
+    requestStartedAt,
+    briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
     logging: requestLogging,
-    responseTransforms: effectiveProviderContext.provider.responseTransforms,
+    enkryptOutputScan:
+      organizationId && !isAnonymousContext(user)
+        ? resolveEnkryptOutputScan(
+            {
+              sessionId: usageContext.session_id,
+              microdollarUsageId: usageId,
+              organizationId,
+              kiloUserId: user.id,
+              apiKind: requestBodyParsed.kind,
+              clientRequestId: headers.clientRequestId,
+            },
+            organizationSettings
+          )
+        : null,
+    signal: request.signal,
+    captureEnkryptOutputReport: report =>
+      providerMetadataCapture?.captureEnkryptOutputReport(report),
   });
 }

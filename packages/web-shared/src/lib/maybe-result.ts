@@ -18,10 +18,10 @@ export type CustomResult<TOk, TErr> = SuccessResult<TOk> | CustomFailureResult<T
 export type OptionalError<TErr> = Result<NoFields, TErr>;
 export type OptionalValue<TOk> = Result<TOk, void>;
 
-export function failureResult(): FailureResult<NoFields>;
+export function failureResult(): FailureResult<undefined>;
 export function failureResult<TErr>(error: TErr): FailureResult<TErr>;
 export function failureResult<TErr = void>(error?: TErr): FailureResult<TErr | undefined> {
-  return { error, success: false } as FailureResult<TErr | undefined>;
+  return { error, success: false };
 }
 export function verifyOrError(ok: boolean): OptionalError<void>;
 export function verifyOrError<TErr>(ok: boolean, error: TErr): OptionalError<TErr>;

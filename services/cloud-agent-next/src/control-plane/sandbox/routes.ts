@@ -36,6 +36,7 @@ import type { SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { lastSentHandleKey } from './scope-handle-delivery.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 import { admissionFailureStage } from './scope-handle-adoption.js';
+import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -277,6 +278,10 @@ function redactRouteSpec(spec: ControlPlaneRouteSpec): ControlPlaneRouteSpec {
     ...(spec.branch === undefined ? {} : { branch: spec.branch }),
     ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
     ...(spec.setupCommands === undefined ? {} : { setupCommands: spec.setupCommands }),
+    ...(spec.startCommands === undefined ? {} : { startCommands: spec.startCommands }),
+    ...(spec.environmentSetupCommandCount === undefined
+      ? {}
+      : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     attemptId: spec.attemptId,
   };
 }
@@ -365,6 +370,9 @@ export function grantIssueFailure(
   }
   if (error instanceof EnvironmentMemberCredentialError) {
     return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
+  }
+  if (error instanceof VercelScmContainmentError) {
+    return { reason: error.reason, stage: admissionFailureStage(error, fallbackStage) };
   }
   return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };
 }

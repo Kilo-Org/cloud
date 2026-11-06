@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getAuthorizedOrgContextOrSupport } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
@@ -13,7 +13,7 @@ import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/orga
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 type DefaultsResponse = {
   defaultModel: string;
@@ -24,11 +24,16 @@ type DefaultsResponse = {
 };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<DefaultsResponse | { error: string }>> {
   const organizationId = (await params).id;
-  const { success, data, nextResponse } = await getAuthorizedOrgContext(organizationId);
+  const { success, data, nextResponse } = await getAuthorizedOrgContextOrSupport(
+    organizationId,
+    '/api/organizations/[id]/defaults',
+    undefined,
+    { requestMethod: request.method }
+  );
   if (!success) {
     return nextResponse;
   }

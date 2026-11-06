@@ -212,8 +212,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // choice when the app is not in the foreground.
     const channelId = androidChannelIdForPushData(input.push.data);
     // Attention extras keep the action category; the shared kind model below
-    // owns interruption levels and Focus filtering for every push.
-    const pushExtras = expoPushExtrasForPushData(input.push.data);
+    // owns interruption levels and Focus filtering for every push. Progress
+    // extras additionally carry the iOS thread, which is scoped to this
+    // account because the DO instance is the account's.
+    const pushExtras = await expoPushExtrasForPushData(input.push.data, input.userId);
     const interruptionLevel = iosInterruptionLevelForPushData(input.push.data);
     const mutableContent = iosMutableContentForPushData(input.push.data);
     let previews: 'generic' | 'full' = 'generic';

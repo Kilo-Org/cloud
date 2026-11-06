@@ -270,10 +270,9 @@ async function retryTransientDocker<T>(step: () => Promise<T>, retryMs: number):
 
 /**
  * Stop the sandbox families (primary and `-proxy`) that `sessions` provably own.
- * Each local session has its own `ses-…` sandbox (`PER_SESSION_SANDBOX_ORG_IDS`
- * is `*` in the dev config), and its proxy is named after it, so once the
- * gate has deleted the sessions nothing can address that sandbox again. One
- * sandbox is stopped once even when several sessions share it (a worktree's
+ * One sandbox serves one workspace, so each local workspace has its own sandbox
+ * and its proxy is named after it. Once the gate has deleted the sessions,
+ * nothing can address that sandbox again. One sandbox is stopped once even when several sessions share it (a worktree's
  * chats); the sessions' own worktrees are the only extra directories the
  * exclusivity proof accepts. A sandbox whose ownership cannot be proven is left
  * running and reported, never killed. Never throws.

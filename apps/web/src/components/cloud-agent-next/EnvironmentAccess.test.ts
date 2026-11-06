@@ -221,8 +221,11 @@ const environmentDetail: EnvironmentResponse = {
     },
   ],
   commands: ['pnpm install'],
+  startCommands: [],
   configurationRevision: environment.configurationRevision,
   sandboxAllocation: environment.sandboxAllocation,
+  egressMode: null,
+  egressAllowlist: null,
   secretKeys: ['API_KEY'],
 };
 
@@ -398,7 +401,13 @@ describe('environment access for members and managers', () => {
       expect(scripts).not.toBeNull();
       expect(scripts?.hasAttribute('readOnly')).toBe(true);
       expect(content?.textContent).not.toContain('Choose file');
-      expect(content?.textContent).toContain('Runs before the agent starts.');
+      expect(content?.textContent).toContain('Runs when a snapshot is built');
+
+      click(content?.querySelector('[aria-label="Back to environment"]'));
+      clickButton(content!, 'Start script');
+      content = dialogContent(mounted.container);
+      expect(content?.querySelector('textarea')?.hasAttribute('readOnly')).toBe(true);
+      expect(content?.textContent).toContain('Runs each time a workspace starts');
 
       click(content?.querySelector('[aria-label="Back to environment"]'));
       clickButton(content!, 'Environment variables');

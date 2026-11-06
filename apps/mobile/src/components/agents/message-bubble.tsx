@@ -27,7 +27,7 @@ import { MessageLongPressProvider } from './message-long-press-context';
 import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
-import { firstHumanText, isFilePart, isTextPart } from './part-types';
+import { firstHumanText, humanTextParts, isFilePart } from './part-types';
 import { groupMessageParts } from './session-tool-run';
 import { CondensedToolRunRow } from './tool-run-rows';
 import { useMessageCopy } from './use-message-copy';
@@ -62,6 +62,13 @@ type MessageBubbleProps = {
   holdQueuedSlot?: boolean;
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
+  /**
+   * Whether this row's session can accept a re-send now. When false the failure
+   * footer keeps its statement and drops the Retry, so a read-only transcript or
+   * a session without a live transport still says why the turn failed. Defaults
+   * to true.
+   */
+  retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /** Restores a canceled queued message's prompt back into the composer. */
@@ -87,6 +94,7 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
+  retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
   condenseToolCalls,
@@ -116,8 +124,7 @@ function MessageBubbleImpl({
   const userTextContent = useMemo(
     () =>
       isUser
-        ? parts
-            .filter(part => isTextPart(part))
+        ? humanTextParts(parts)
             .map(p => p.text)
             .join('\n\n')
         : '',
@@ -148,14 +155,18 @@ function MessageBubbleImpl({
     );
   }
 
-  // Failed-row footer. Renders only when the relevant handler is wired
+  // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry only.
-  const failure = selectMessageFailure({ deliveryState, info: message.info });
+  // Retry or Copy, an assistant row needs Retry only. A caller that already
+  // knows the session cannot accept a re-send passes `retryAvailable: false`:
+  // the footer then still states the failure, with no action that could not
+  // act.
+  const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
-    failure?.kind === 'delivery'
+    retryAvailable === false ||
+    (failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined;
+      : onRetryMessage !== undefined);
   // The footer is the failed row's status, so it sits under the row it names: a
   // user row's bubble is end-aligned, so its title, detail and action row are
   // too; an assistant row's stays on the leading edge. `items-end` is logical.
@@ -165,7 +176,7 @@ function MessageBubbleImpl({
   const trailingFailure = isUser;
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
+      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
         <Text
           className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
           accessibilityLabel={messageFailureLabel(failure)}
@@ -173,7 +184,12 @@ function MessageBubbleImpl({
           {failure.title}
         </Text>
         {failure.detail !== null ? (
-          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
             {failure.detail}
           </Text>
         ) : null}

@@ -3002,6 +3002,76 @@ describe('SessionIngestDO clone primitives', () => {
     expect(changed.digest).not.toBe(first.digest);
   });
 
+  it('bounds one clone window by stored row bytes as well as row count', async () => {
+    const largeBody = 'x'.repeat(3 * 1024 * 1024);
+    const harness = makeCloneHarness([
+      {
+        ...itemRow(1, 'session/1', 'session', 100),
+        item_data: JSON.stringify({ text: largeBody }),
+      },
+      {
+        ...itemRow(2, 'message/2', 'message', 200),
+        item_data: JSON.stringify({ text: largeBody }),
+      },
+    ]);
+
+    const first = await harness.durableObject.exportCloneBatch(null, 10);
+    // One 3 MiB row fits the 4 MiB window; the second row must wait for the next one.
+    expect(first.rows.map(row => row.itemId)).toEqual(['session/1']);
+    expect(first.done).toBe(false);
+    expect(first.nextCursor).toEqual({ ingestedAt: 100, id: 1 });
+
+    const second = await harness.durableObject.exportCloneBatch(first.nextCursor, 10);
+    expect(second.rows.map(row => row.itemId)).toEqual(['message/2']);
+    expect(second.done).toBe(true);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('records and reports clone verification progress for the same stage only', () => {
+    const harness = makeCloneHarness();
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [],
+      nextCursor: { ingestedAt: 2, id: 9 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 3,
+    });
+
+    expect(
+      harness.durableObject.stageCloneVerification({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+        verifyCursor: { ingestedAt: 2, id: 7 },
+        verifyChain: 'chain-1',
+        verifyRows: 2,
+      }).status
+    ).toBe('staged');
+    expect(
+      harness.durableObject.stageCloneVerification({
+        sourceSessionId: 'src-other',
+        destinationSessionId: 'dst',
+        verifyCursor: null,
+        verifyChain: '',
+        verifyRows: 0,
+      }).status
+    ).toBe('mismatch');
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({
+      status: 'in_progress',
+      rollingDigest: 'digest-1',
+      copiedItemCount: 3,
+      verifyCursor: { ingestedAt: 2, id: 7 },
+      verifyChain: 'chain-1',
+      verifyRows: 2,
+    });
+  });
+
   it('stages, inspects, and finalizes a clone round-trip', async () => {
     const harness = makeCloneHarness();
     const rows = [

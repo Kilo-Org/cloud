@@ -50,11 +50,11 @@ if [ -n "$group" ]; then
     trpc)
       # The rows run on every full typecheck, which `selectAffected` reports
       # whenever a change has no base, hits a GLOBAL path or this script,
-      # moves root or unscoped dependencies, or changes a file outside every
-      # workspace. The merge queue is one of those runs and has no extension
-      # trigger, so the rows keep the extension's gate there. The extension's
-      # own workflow typechecks it for the same selection on every other pull
-      # request, and kilo-app typechecks in kilo-app CI.
+      # moves root or unscoped dependencies, or holds a file it cannot
+      # attribute to any workspace. The merge queue is one of those runs and
+      # has no extension trigger, so the rows keep the extension's gate there.
+      # The extension's own workflow typechecks it for the same selection on
+      # every other pull request, and kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then

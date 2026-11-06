@@ -816,6 +816,19 @@ test('the changes job takes both matrix group lists from the affected detector',
   );
 });
 
+// A main push pays for the workspaces its pushed range can affect, like a pull
+// request pays for its branch's diff. The merge queue supplies no base, so it
+// keeps the full selection as the last gate before a merge; the detector turns
+// a base that is not a commit in the checkout into the same full selection.
+test('the affected detector selects from the pushed range on a main push', () => {
+  const step = ciJobs.changes.steps.find(candidate => candidate.id === 'affected');
+  assert.equal(
+    step.env.BASE_SHA,
+    "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}",
+    'a pull request and a main push each select from their own base; the merge queue passes none'
+  );
+});
+
 // The matrix step reuses the document the detector step published: dropping the
 // env makes scripts/changed-workspaces.sh select the repository a second time.
 test('the matrix step decides from the document the affected step published', () => {

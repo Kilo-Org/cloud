@@ -166,6 +166,14 @@ export async function assertCloudAgentManagementRequest(input: {
     if (input.path === 'listChildSessions') return;
     throw forbidden('Cloud Agent management target is invalid');
   }
+  // Parent authority validation above checks the setup claim against current metadata.
+  if (
+    input.path === 'getEgressAudit' &&
+    input.authority.environmentSetup !== undefined &&
+    target.childSessionId === input.authority.parentSessionId
+  ) {
+    return;
+  }
   await assertCloudAgentChildTarget({
     env: input.env,
     authority: input.authority,

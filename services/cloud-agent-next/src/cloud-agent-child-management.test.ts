@@ -142,6 +142,61 @@ beforeEach(() => {
 });
 
 describe('assertCloudAgentManagementRequest', () => {
+  it.each([null, ORG_ID])(
+    'permits the setup parent audit in organization %s',
+    async organizationId => {
+      const shared = await vi.importActual<typeof CloudAgentAuthorityModule>(
+        '@kilocode/worker-utils/cloud-agent-authority'
+      );
+      cloudAgentAuthorityProceduresMock.mockImplementation(shared.cloudAgentAuthorityProcedures);
+      cloudAgentAuthorityProcedureKindMock.mockImplementation(
+        shared.cloudAgentAuthorityProcedureKind
+      );
+      validateCloudAgentAuthorityRequestMock.mockImplementation(
+        shared.validateCloudAgentAuthorityRequest
+      );
+      const scoped = authority({
+        organizationId,
+        environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+      });
+      const parent = stub();
+      getSandboxSessionStubMock.mockReturnValue(parent);
+      await expect(
+        managementRequest({
+          env: {} as never,
+          authority: scoped,
+          path: 'getEgressAudit',
+          rawInput: {
+            cloudAgentSessionId: PARENT_ID,
+            ...(organizationId === null ? {} : { organizationId }),
+          },
+        })
+      ).resolves.toBeUndefined();
+      expect(parent.assertCloudAgentManagementAuthority).toHaveBeenCalledWith(scoped);
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a revoked setup parent audit before allowing self access', async () => {
+    getSandboxSessionStubMock.mockReturnValue(
+      stub({
+        assertCloudAgentManagementAuthority: vi
+          .fn()
+          .mockRejectedValue(new Error('Cloud Agent parent authority denied')),
+      })
+    );
+    await expectForbidden(
+      managementRequest({
+        env: {} as never,
+        authority: authority({
+          environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+        }),
+        path: 'getEgressAudit',
+        rawInput: { cloudAgentSessionId: PARENT_ID },
+      })
+    );
+  });
+
   it('rejects a context user that does not match the authority owner', async () => {
     await expectForbidden(
       managementRequest({

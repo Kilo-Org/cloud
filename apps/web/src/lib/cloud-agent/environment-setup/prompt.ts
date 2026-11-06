@@ -34,8 +34,8 @@ Follow the environment-setup skill. Work in this order:
 3. Run your candidate script here with: bash -e -o pipefail -c "$SCRIPT" from ${input.workingDirectory}.
 4. Save it with update_environment_draft. Request user-owned secrets with request_environment_secrets.
 5. Call get_environment_draft again to read network.discoveryAudit. Select only hosts setup needs and explain each recommendation.
-6. For Restricted access, call request_network_hosts without childSessionId to request host approval. End your turn and wait for the user's decisions. For Full access, record the recommended hosts with update_environment_draft requiredHosts and continue without host approval.
-7. Call verify_environment_draft with concrete smoke checks. It runs setup again with the user's chosen network policy. Restricted verification waits for host approval.
+6. For Full access, record the recommended hosts with update_environment_draft requiredHosts and continue without host approval.
+7. Call verify_environment_draft with concrete smoke checks. It runs setup again with the user's chosen network policy. For Restricted access, request needed hosts with request_network_hosts and childSessionId from a verification whose audit denied them. End your turn and wait for approval before retrying.
 8. When verification reports back, call report_verification_results. Fix failures here with full access, review new hosts, and verify again.
 9. Call complete_environment_setup with a short summary, or fail_environment_setup with a specific reason.
 

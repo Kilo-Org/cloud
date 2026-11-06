@@ -63,7 +63,8 @@ export async function verifySecretReferences(
     const installationToken = await generateGitHubInstallationToken(
       integration.platform_installation_id,
       integration.github_app_type ?? 'standard',
-      integration.id
+      integration.id,
+      'agent'
     );
     token = installationToken.token;
   } catch (error) {

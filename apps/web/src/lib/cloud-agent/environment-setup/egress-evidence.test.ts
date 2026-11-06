@@ -22,7 +22,7 @@ describe('readEgressHosts', () => {
     expect(
       await readEgressHosts({ getEgressAudit } as never, 'workspace_setup', 'org-1', 1000)
     ).toEqual({
-      hosts: [{ host: 'cdn.example.com', requestCount: 1 }],
+      hosts: [{ host: 'cdn.example.com', requestCount: 1, deniedRequestCount: 0 }],
       nextCursor: null,
     });
     expect(getEgressAudit).toHaveBeenCalledWith({
@@ -60,9 +60,9 @@ describe('readEgressHosts', () => {
 
     expect(audit).toEqual({
       hosts: [
-        { host: 'registry.example.com', requestCount: 2 },
-        { host: 'allowed.example.com', requestCount: 1 },
-        { host: 'cdn.example.com', requestCount: 1 },
+        { host: 'registry.example.com', requestCount: 2, deniedRequestCount: 2 },
+        { host: 'allowed.example.com', requestCount: 1, deniedRequestCount: 0 },
+        { host: 'cdn.example.com', requestCount: 1, deniedRequestCount: 1 },
       ],
       nextCursor: null,
     });
@@ -94,7 +94,7 @@ describe('readEgressHosts', () => {
 
     expect(getEgressAudit).toHaveBeenCalledTimes(10);
     expect(audit).toEqual({
-      hosts: [{ host: 'registry.example.com', requestCount: 10 }],
+      hosts: [{ host: 'registry.example.com', requestCount: 10, deniedRequestCount: 10 }],
       nextCursor: 1,
     });
     expect(getEgressAudit).toHaveBeenLastCalledWith({

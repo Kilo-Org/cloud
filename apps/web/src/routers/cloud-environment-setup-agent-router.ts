@@ -166,8 +166,14 @@ export const cloudEnvironmentSetupAgentRouter = createTRPCRouter({
   requestNetworkHosts: baseProcedure
     .input(environmentSetupAgentOperations.requestNetworkHosts.schema)
     .mutation(async ({ ctx, input }) => {
-      const { scope, run } = await loadAgentDraft(ctx, input.runId);
+      const { scope, run, draft } = await loadAgentDraft(ctx, input.runId);
       const sessionId = input.childSessionId ?? run.cloud_agent_session_id;
+      const restricted = draft.egressMode === 'allowlist';
+      if (restricted && sessionId === run.cloud_agent_session_id)
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Restricted hosts require denied requests from a verification session.',
+        });
       if (!sessionId)
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
@@ -187,11 +193,12 @@ export const cloudEnvironmentSetupAgentRouter = createTRPCRouter({
         input.auditCursor
       );
       const requests = input.hosts.map(request => {
-        const requestCount = audit.hosts.find(entry => entry.host === request.host)?.requestCount;
+        const observed = audit.hosts.find(entry => entry.host === request.host);
+        const requestCount = restricted ? observed?.deniedRequestCount : observed?.requestCount;
         if (!requestCount)
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `No observed request to ${request.host} in ${sessionId}'s egress audit.`,
+            message: `No ${restricted ? 'denied' : 'observed'} request to ${request.host} in ${sessionId}'s egress audit.`,
           });
         return { ...request, evidence: { sessionId, requestCount } };
       });

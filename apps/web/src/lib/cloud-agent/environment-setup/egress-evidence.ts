@@ -19,10 +19,10 @@ export async function readEgressHosts(
   organizationId?: string,
   startCursor?: number
 ): Promise<{
-  hosts: { host: string; requestCount: number }[];
+  hosts: { host: string; requestCount: number; deniedRequestCount: number }[];
   nextCursor: number | null;
 }> {
-  const hosts = new Map<string, number>();
+  const hosts = new Map<string, { requestCount: number; deniedRequestCount: number }>();
   let cursor = startCursor;
 
   for (let page = 0; page < MAX_PAGES; page++) {
@@ -36,12 +36,15 @@ export async function readEgressHosts(
     for (const record of response.records) {
       const host = egressDomainSchema.safeParse(normalizeHostname(record.hostname));
       if (!host.success) continue;
-      hosts.set(host.data, (hosts.get(host.data) ?? 0) + 1);
+      const counts = hosts.get(host.data) ?? { requestCount: 0, deniedRequestCount: 0 };
+      counts.requestCount++;
+      if (record.decision === 'denied') counts.deniedRequestCount++;
+      hosts.set(host.data, counts);
     }
 
     if (response.nextCursor === null) {
       return {
-        hosts: Array.from(hosts, ([host, requestCount]) => ({ host, requestCount })),
+        hosts: Array.from(hosts, ([host, counts]) => ({ host, ...counts })),
         nextCursor: null,
       };
     }
@@ -49,7 +52,7 @@ export async function readEgressHosts(
   }
 
   return {
-    hosts: Array.from(hosts, ([host, requestCount]) => ({ host, requestCount })),
+    hosts: Array.from(hosts, ([host, counts]) => ({ host, ...counts })),
     nextCursor: cursor ?? null,
   };
 }

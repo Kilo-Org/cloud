@@ -502,10 +502,13 @@ export async function updateEnvironment(
     });
   }
 
-  if (requiredHosts !== undefined) {
+  if (requiredHosts !== undefined || egress !== undefined) {
     const allowedHosts =
       egress === undefined ? (environment.egress_allowlist ?? []) : (egress.egress_allowlist ?? []);
-    assertEffectiveAllowlistWithinLimit(allowedHosts, requiredHosts);
+    assertEffectiveAllowlistWithinLimit(
+      allowedHosts,
+      requiredHosts ?? environment.egress_required_hosts ?? []
+    );
   }
 
   const changesVariables =

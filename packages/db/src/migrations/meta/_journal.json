@@ -2395,6 +2395,13 @@
       "when": 1793964569683,
       "tag": "0341_violet_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 342,
+      "version": "7",
+      "when": 1793999034397,
+      "tag": "0342_fuzzy_namorita",
+      "breakpoints": true
     }
   ]
 }

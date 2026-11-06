@@ -8,6 +8,7 @@ import {
   cloud_agent_environment_setup_runs,
   cloud_agent_environment_vars,
   cloud_agent_environments,
+  organizations,
   type EnvironmentSetupRunStatus,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -336,6 +337,35 @@ describe('required network hosts', () => {
     expect(environment.egressRequiredHosts).toEqual(['api.example.com']);
     expect(environment.name).toBe('renamed');
   });
+
+  test('network edits validate stored required hosts and preserve a valid policy on rejection', async () => {
+    const user = await insertTestUser();
+    const owner = userOwner(user.id);
+    const environmentId = await createEnv(owner, 'acme/widgets');
+    const requiredHosts = Array.from({ length: 41 }, (_, index) => `required-${index}.example.com`);
+    const allowlist = Array.from({ length: 59 }, (_, index) => `allowed-${index}.example.com`);
+    await db.transaction(tx => updateEnvironment(tx, '', { owner, environmentId, requiredHosts }));
+    await db.transaction(tx =>
+      updateEnvironment(tx, '', {
+        owner,
+        environmentId,
+        egressMode: 'allowlist',
+        egressAllowlist: allowlist,
+      })
+    );
+    const before = await getEnvironment(db, environmentId, owner);
+    await expect(
+      db.transaction(tx =>
+        updateEnvironment(tx, '', {
+          owner,
+          environmentId,
+          egressMode: 'allowlist',
+          egressAllowlist: [...allowlist, 'overflow.example.com'],
+        })
+      )
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await getEnvironment(db, environmentId, owner)).toEqual(before);
+  });
 });
 
 type TargetOptions = {
@@ -616,6 +646,96 @@ describe('setup run creation', () => {
 
 describe('updateDraftByAgent', () => {
   afterEach(cleanupDbForTest);
+
+  test.each(['delete', 'replace'] as const)(
+    'rejects %s of a user-provided secret',
+    async operation => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const { runId, draftEnvironmentId } = await startDraftRun(owner);
+      await db.transaction(tx =>
+        addSecretRequests(tx, {
+          runId,
+          owner,
+          requests: [{ key: 'API_TOKEN', reason: 'Run tests', references: [] }],
+        })
+      );
+      await db.transaction(tx =>
+        updateEnvironment(tx, setupPublicKeyBase64, {
+          owner,
+          environmentId: draftEnvironmentId,
+          secrets: [{ key: 'API_TOKEN', value: 'user-value' }],
+        })
+      );
+      await db.transaction(tx => resolveSecretRequests(tx, { runId, owner, skipped: [] }));
+      const before = await storedVars(draftEnvironmentId);
+      const draft = await getEnvironment(db, draftEnvironmentId, owner);
+      await expect(
+        db.transaction(tx =>
+          updateDraftByAgent(tx, setupPublicKeyBase64, {
+            runId,
+            owner,
+            expectedRevision: draft.configurationRevision,
+            secrets: [
+              operation === 'delete'
+                ? { key: 'API_TOKEN', delete: true }
+                : { key: 'API_TOKEN', value: 'agent-value' },
+            ],
+          })
+        )
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await storedVars(draftEnvironmentId)).toEqual(before);
+      expect((await getSetupRun(db, runId, owner)).generated_secret_keys).toEqual([]);
+    }
+  );
+
+  test('only generated secrets can be deleted, while initial and copied secrets remain', async () => {
+    const user = await insertTestUser();
+    const owner = userOwner(user.id);
+    const targetEnvironmentId = await createTargetEnvironment(owner, {
+      secrets: { COPIED_TOKEN: 'copied-value' },
+    });
+    const { runId, draftEnvironmentId } = await startDraftRun(owner, {
+      targetEnvironmentId,
+      initialSecrets: { INITIAL_TOKEN: 'initial-value' },
+    });
+    for (const key of ['COPIED_TOKEN', 'INITIAL_TOKEN', 'UNKNOWN_TOKEN']) {
+      await expect(
+        db.transaction(tx =>
+          updateDraftByAgent(tx, setupPublicKeyBase64, {
+            runId,
+            owner,
+            expectedRevision: 1,
+            secrets: [{ key, delete: true }],
+          })
+        )
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+    const { configurationRevision } = await db.transaction(tx =>
+      updateDraftByAgent(tx, setupPublicKeyBase64, {
+        runId,
+        owner,
+        expectedRevision: 1,
+        secrets: [{ key: 'GENERATED_TOKEN', value: 'generated-value' }],
+      })
+    );
+    expect((await getSetupRun(db, runId, owner)).generated_secret_keys).toEqual([
+      'GENERATED_TOKEN',
+    ]);
+    await db.transaction(tx =>
+      updateDraftByAgent(tx, setupPublicKeyBase64, {
+        runId,
+        owner,
+        expectedRevision: configurationRevision,
+        secrets: [{ key: 'GENERATED_TOKEN', delete: true }],
+      })
+    );
+    expect((await getEnvironment(db, draftEnvironmentId, owner)).secretKeys.sort()).toEqual([
+      'COPIED_TOKEN',
+      'INITIAL_TOKEN',
+    ]);
+    expect((await getSetupRun(db, runId, owner)).generated_secret_keys).toEqual([]);
+  });
 
   test('rejects a stale expected revision', async () => {
     const user = await insertTestUser();
@@ -1801,23 +1921,26 @@ describe('cleanupSetupRuns', () => {
 
   const DAY = 24 * 60 * 60 * 1000;
 
-  test('abandons stale open runs after seven days', async () => {
-    const user = await insertTestUser();
-    const owner = userOwner(user.id);
-    const { runId } = await startDraftRun(owner);
-    const now = new Date();
-    await db
-      .update(cloud_agent_environment_setup_runs)
-      .set({ updated_at: new Date(now.getTime() - 8 * DAY).toISOString() })
-      .where(eq(cloud_agent_environment_setup_runs.id, runId));
+  test.each(['running', 'publish_conflict'] as const)(
+    'abandons stale %s runs after seven days',
+    async status => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const { runId } = await startDraftRun(owner);
+      const now = new Date();
+      await db
+        .update(cloud_agent_environment_setup_runs)
+        .set({ status, updated_at: new Date(now.getTime() - 8 * DAY).toISOString() })
+        .where(eq(cloud_agent_environment_setup_runs.id, runId));
 
-    const counts = await cleanupSetupRuns(db, now);
+      const counts = await cleanupSetupRuns(db, now);
 
-    expect(counts.abandoned).toBe(1);
-    const run = await getSetupRun(db, runId, owner);
-    expect(run.status).toBe('cancelled');
-    expect(run.status_reason).toBe('abandoned');
-  });
+      expect(counts.abandoned).toBe(1);
+      const run = await getSetupRun(db, runId, owner);
+      expect(run.status).toBe('cancelled');
+      expect(run.status_reason).toBe('abandoned');
+    }
+  );
 
   test('deletes drafts of stale stopped runs after fourteen days', async () => {
     const user = await insertTestUser();
@@ -1937,9 +2060,36 @@ describe('cleanupSetupRuns', () => {
       .set({ completed_at: new Date(now.getTime() - 31 * DAY).toISOString() })
       .where(eq(cloud_agent_environment_setup_runs.id, runId));
 
+    const organization = await createTestOrganization('Deleted setup owner', user.id, 0);
+    const inactiveOwner: EnvironmentOwner = { type: 'organization', id: organization.id };
+    const inactive = await createDraftRun(inactiveOwner);
+    await db
+      .update(cloud_agent_environment_setup_runs)
+      .set({
+        status: 'failed',
+        updated_at: new Date(now.getTime() - 15 * DAY).toISOString(),
+      })
+      .where(eq(cloud_agent_environment_setup_runs.id, inactive.runId));
+    await db
+      .update(organizations)
+      .set({ deleted_at: now.toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    const stale = await createDraftRun(owner, {
+      repositories: [{ platform: 'github', repoFullName: 'acme/stale' }],
+    });
+    await db
+      .update(cloud_agent_environment_setup_runs)
+      .set({
+        status: 'failed',
+        updated_at: new Date(now.getTime() - 15 * DAY).toISOString(),
+      })
+      .where(eq(cloud_agent_environment_setup_runs.id, stale.runId));
+
     const counts = await cleanupSetupRuns(db, now);
 
     expect(counts.previousConfigurationsCleared).toBe(1);
+    expect(counts.draftsDeleted).toBe(1);
     expect((await getSetupRun(db, runId, owner)).previous_configuration).toBeNull();
   });
 });

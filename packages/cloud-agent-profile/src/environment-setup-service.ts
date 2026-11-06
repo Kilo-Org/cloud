@@ -700,9 +700,23 @@ export async function updateDraftByAgent(
   const pendingSecretKeys = new Set(
     run.secret_requests.filter(request => request.state === 'pending').map(request => request.key)
   );
+  const generatedKeys = new Set(run.generated_secret_keys);
+  const storedSecretKeys = new Set(
+    input.secrets?.length
+      ? (await readStoredVariables(tx, draft.id))
+          .filter(variable => variable.isSecret)
+          .map(variable => variable.key)
+      : []
+  );
   for (const change of input.secrets ?? []) {
     if (pendingSecretKeys.has(change.key)) {
       throw badRequest(`The user was asked for ${change.key}. Wait for the follow-up message.`);
+    }
+    if (
+      !generatedKeys.has(change.key) &&
+      ('delete' in change || storedSecretKeys.has(change.key))
+    ) {
+      throw badRequest(`The agent can only change secrets it generated: ${change.key}.`);
     }
   }
 
@@ -719,7 +733,6 @@ export async function updateDraftByAgent(
   });
 
   const revisionChanged = configurationRevision !== draft.configuration_revision;
-  const generatedKeys = new Set(run.generated_secret_keys);
   for (const change of input.secrets ?? []) {
     if ('delete' in change) {
       generatedKeys.delete(change.key);
@@ -1630,7 +1643,13 @@ export async function cleanupSetupRuns(db: WorkerDb, now: Date): Promise<Cleanup
     })
     .where(
       and(
-        inArray(runs.status, ['starting', 'running', 'needs_input', 'verifying']),
+        inArray(runs.status, [
+          'starting',
+          'running',
+          'needs_input',
+          'verifying',
+          'publish_conflict',
+        ]),
         lt(runs.updated_at, abandonedBefore)
       )
     )
@@ -1670,32 +1689,38 @@ export async function cleanupSetupRuns(db: WorkerDb, now: Date): Promise<Cleanup
         ? { type: 'user', id: candidate.userId }
         : null;
     if (!owner) continue;
-    draftsDeleted += await db.transaction(async tx => {
-      await lockOwnerOrganization(tx, owner);
-      const run = await lockSetupRun(tx, candidate.runId, owner);
-      if (
-        !['cancelled', 'failed', 'reverted'].includes(run.status) ||
-        new Date(run.updated_at).getTime() >= new Date(staleDraftBefore).getTime()
-      )
-        return 0;
-      const draft = await readDraftEnvironment(tx, run.draft_environment_id, owner);
-      if (!draft) return 0;
-      if (isOpenSetupRunStatus(run.status)) {
-        await tx
-          .update(runs)
-          .set({
-            status: 'cancelled',
-            status_reason: 'draft_deleted',
-            completed_at: now.toISOString(),
-          })
-          .where(eq(runs.id, run.id));
-      }
-      const deleted = await tx
-        .delete(environments)
-        .where(eq(environments.id, draft.id))
-        .returning({ id: environments.id });
-      return deleted.length;
-    });
+    draftsDeleted += await db
+      .transaction(async tx => {
+        await lockOwnerOrganization(tx, owner);
+        const run = await lockSetupRun(tx, candidate.runId, owner);
+        if (
+          !['cancelled', 'failed', 'reverted'].includes(run.status) ||
+          new Date(run.updated_at).getTime() >= new Date(staleDraftBefore).getTime()
+        )
+          return 0;
+        const draft = await readDraftEnvironment(tx, run.draft_environment_id, owner);
+        if (!draft) return 0;
+        if (isOpenSetupRunStatus(run.status)) {
+          await tx
+            .update(runs)
+            .set({
+              status: 'cancelled',
+              status_reason: 'draft_deleted',
+              completed_at: now.toISOString(),
+            })
+            .where(eq(runs.id, run.id));
+        }
+        const deleted = await tx
+          .delete(environments)
+          .where(eq(environments.id, draft.id))
+          .returning({ id: environments.id });
+        return deleted.length;
+      })
+      .catch(error => {
+        // A soft-deleted organization or concurrently deleted run must not block retention cleanup.
+        if (error instanceof TRPCError && error.code === 'NOT_FOUND') return 0;
+        throw error;
+      });
   }
 
   const previousConfigurationsCleared = await db

@@ -47,6 +47,11 @@ export async function setupRunResponse(
       const session = await client.getSession(run.cloud_agent_session_id, organizationId);
       if (session.latestPreparation?.status === 'running' && session.execution === null) {
         agentState = { kind: 'working' };
+      } else if (session.latestPreparation?.status === 'failed' && session.execution === null) {
+        agentState = {
+          kind: 'stopped',
+          reason: session.latestPreparation.safeError ?? 'Session preparation failed',
+        };
       } else if (session.execution === null) {
         if (run.status === 'running' || run.status === 'verifying') agentState = { kind: 'idle' };
       } else {

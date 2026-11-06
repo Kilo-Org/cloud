@@ -171,6 +171,7 @@ export const cloudEnvironmentSetupRouter = createTRPCRouter({
           initialSandboxAllocation: CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
         })
       );
+      let createdSessionId: string | undefined;
       try {
         const client = await userCloudAgentClient(ctx, input.organizationId, input.model);
         const github = await resolveGitHubPrepareParams({
@@ -207,6 +208,7 @@ export const cloudEnvironmentSetupRouter = createTRPCRouter({
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
           ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
         });
+        createdSessionId = result.cloudAgentSessionId;
         await db.transaction(tx =>
           attachSetupSession(tx, {
             runId,
@@ -221,6 +223,17 @@ export const cloudEnvironmentSetupRouter = createTRPCRouter({
           kiloSessionId: result.kiloSessionId,
         };
       } catch (error) {
+        if (createdSessionId) {
+          try {
+            const client = await userCloudAgentClient(ctx, input.organizationId);
+            await client.interruptSession(createdSessionId);
+          } catch (interruptError) {
+            captureException(interruptError, {
+              tags: { source: 'environment-setup', op: 'unattached-session' },
+              extra: { runId },
+            });
+          }
+        }
         await db.transaction(tx =>
           cancelUnstartedSetupRun(tx, { runId, owner, detail: safeErrorMessage(error) })
         );

@@ -8623,6 +8623,7 @@ export const cloud_agent_environments = pgTable(
       ),
     index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
     index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_environments_draft_for').on(table.draft_for_environment_id),
     check(
       'cloud_agent_environments_owner_check',
       sql`(
@@ -8863,6 +8864,7 @@ export const cloud_agent_environment_setup_runs = pgTable(
   table => [
     index('IDX_env_setup_runs_user_id').on(table.owned_by_user_id),
     index('IDX_env_setup_runs_org_id').on(table.owned_by_organization_id),
+    index('IDX_env_setup_runs_target').on(table.target_environment_id),
     uniqueIndex('UQ_env_setup_runs_session')
       .on(table.cloud_agent_session_id)
       .where(sql`${table.cloud_agent_session_id} IS NOT NULL`),

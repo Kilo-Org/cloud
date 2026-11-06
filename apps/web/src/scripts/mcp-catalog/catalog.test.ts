@@ -50,6 +50,17 @@ const withMutation = (leaves: CatalogLeaf[]): CatalogLeaf[] => [
 ];
 
 describe('mcp-catalog catalog', () => {
+  it.each(['start', 'resolveNetworkRequests', 'publish', 'revert'])(
+    'withholds setupRuns.%s from generic MCP calls',
+    operation => {
+      const path = `cloudEnvironments.setupRuns.${operation}`;
+      const leaves = collectCatalogLeaves(rootRouter);
+      expect(leaves.some(leaf => leaf.path === path)).toBe(true);
+      expect(isDenylistedPath(path)).toBe(true);
+      const { rows, missing } = buildCatalogRows(leaves, readCommittedSummaries());
+      expect([...rows, ...missing].some(row => row.path === path)).toBe(false);
+    }
+  );
   describe('collectCatalogLeaves', () => {
     it('yields leaves from the real rootRouter', () => {
       const leaves = collectCatalogLeaves(rootRouter);

@@ -38,7 +38,9 @@ describe('buildSetupPrompt', () => {
     expect(output).toContain('This setup session runs on standard-4');
     expect(output).toContain('The draft starts on standard-3');
     expect(output).toContain('This setup session has full access with auditing');
-    expect(output).toContain('request_network_hosts without childSessionId');
+    expect(output).toContain(
+      'request_network_hosts and childSessionId from a verification whose audit denied them'
+    );
     expect(output).toContain("Verification sessions use the user's chosen network policy");
     expect(output).toContain('For Full access, record the recommended hosts');
     expect(output).toContain('Keep Full access when the user chose it');

@@ -36,13 +36,13 @@ export const environmentSetupOperations = [
     name: 'request_network_hosts',
     procedure: 'requestNetworkHosts',
     description:
-      "Recommend hosts setup needs, with a reason for each. Omit childSessionId to use this setup session's discovery audit. Each host must appear in the audit; pass auditCursor for hosts found on later audit pages. Exclude incidental traffic and hosts already allowed. A childSessionId may cite a verification child's audit instead. End your turn and wait for user approval before restricted verification.",
+      'Request approval for hosts under Restricted access, with a reason for each. childSessionId must identify a verification child whose audit denied each host. Pass auditCursor for later audit pages. Exclude incidental traffic and hosts already allowed. End your turn and wait for user approval before retrying verification. Under Full access, use update_environment_draft requiredHosts instead.',
   },
   {
     name: 'verify_environment_draft',
     procedure: 'startVerification',
     description:
-      "Run setup from scratch in a fresh sandbox with the user's chosen Full or Restricted policy, then run your checks (name, command, expected result). Restricted access requires host approval first. Pending host requests block verification. You receive results as a message; call report_verification_results. Fix failures in this setup session with full access before retrying.",
+      "Run setup from scratch in a fresh sandbox with the user's chosen Full or Restricted policy, then run your checks (name, command, expected result). Use a restricted verification's denied audit to request needed hosts. Pending host requests block verification. You receive results as a message; call report_verification_results. Fix failures in this setup session with full access before retrying.",
   },
   {
     name: 'report_verification_results',

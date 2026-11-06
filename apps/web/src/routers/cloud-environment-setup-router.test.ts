@@ -71,7 +71,7 @@ const mockClient = {
   prepareSession: mockPrepare,
   getSession: mockGetSession,
   sendMessage: mockSendMessage,
-  interruptSession: jest.fn(async () => ({})),
+  interruptSession: jest.fn<(sessionId: string) => Promise<unknown>>().mockResolvedValue({}),
   getEgressAudit: mockGetEgressAudit,
 };
 const mockCapabilities = jest.fn<
@@ -181,6 +181,42 @@ afterEach(async () => {
 });
 
 describe('environment setup user procedures', () => {
+  test.each([false, true])(
+    'handles attachment failure when interruption fails: %s',
+    async interruptFails => {
+      const existingUser = await insertTestUser();
+      await runFor(existingUser);
+      const user = await insertTestUser();
+      if (interruptFails)
+        mockClient.interruptSession.mockRejectedValueOnce(new Error('Worker unavailable'));
+      await expect(
+        caller(user).start({
+          repositories,
+          requirements: 'Run tests',
+          model: 'test/model',
+        })
+      ).rejects.toThrow();
+      expect(mockClient.interruptSession).toHaveBeenCalledWith(setupSessionId);
+      expect(await db.select().from(runs).where(eq(runs.owned_by_user_id, user.id))).toEqual([
+        expect.objectContaining({ status: 'cancelled', cloud_agent_session_id: null }),
+      ]);
+    }
+  );
+
+  test.each(['Sandbox preparation failed', null])(
+    'surfaces failed preparation with safeError %s',
+    async safeError => {
+      const user = await insertTestUser();
+      const run = await runFor(user);
+      mockGetSession.mockResolvedValue({
+        execution: null,
+        latestPreparation: { status: 'failed', safeError },
+      });
+      expect(await caller(user).get({ runId: run.runId })).toMatchObject({
+        agentState: { kind: 'stopped', reason: safeError ?? 'Session preparation failed' },
+      });
+    }
+  );
   test('toggle off hides operations and reports disabled', async () => {
     const user = await insertTestUser();
     mockEnabled.mockResolvedValue(false);
@@ -710,7 +746,7 @@ describe('environment setup integration boundaries', () => {
       egressRequiredHosts: ['registry.npmjs.org'],
     });
   });
-  test('discovers allowed hosts, waits for approval, then requires restricted verification before publication', async () => {
+  test('discovers hosts, requires denied verification evidence, waits for approval, then verifies before publication', async () => {
     const user = await insertTestUser();
     const run = await runFor(user);
     const api = caller(user, authority(user, run.runId, run.draftEnvironmentId));
@@ -737,9 +773,38 @@ describe('environment setup integration boundaries', () => {
       cloudAgentSessionId: setupSessionId,
       limit: 100,
     });
+    await expect(
+      api.agent.requestNetworkHosts({
+        runId: run.runId,
+        hosts: [{ host: 'registry.npmjs.org', reason: 'Install dependencies' }],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('verification session'),
+    });
+    mockPrepare.mockResolvedValue({ cloudAgentSessionId: childSessionId, kiloSessionId });
+    await api.agent.startVerification({ runId: run.runId, checks });
+    await expect(
+      api.agent.requestNetworkHosts({
+        runId: run.runId,
+        childSessionId,
+        hosts: [{ host: 'registry.npmjs.org', reason: 'Install dependencies' }],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('No denied request'),
+    });
+    mockGetEgressAudit.mockResolvedValue({
+      records: [
+        { hostname: 'registry.npmjs.org', decision: 'denied' },
+        { hostname: 'telemetry.example.com', decision: 'denied' },
+      ],
+      nextCursor: null,
+    });
     expect(
       await api.agent.requestNetworkHosts({
         runId: run.runId,
+        childSessionId,
         hosts: [
           { host: 'registry.npmjs.org', reason: 'Install dependencies' },
           { host: 'telemetry.example.com', reason: 'Optional tool telemetry' },
@@ -748,13 +813,13 @@ describe('environment setup integration boundaries', () => {
     ).toEqual({ requested: ['registry.npmjs.org', 'telemetry.example.com'] });
     expect((await getSetupRun(db, run.runId, run.owner)).network_requests[0]).toMatchObject({
       state: 'pending',
-      evidence: { sessionId: setupSessionId, requestCount: 1 },
+      evidence: { sessionId: childSessionId, requestCount: 1 },
     });
     await expect(api.agent.startVerification({ runId: run.runId, checks })).rejects.toMatchObject({
       code: 'CONFLICT',
       message: expect.stringContaining('review the discovered network hosts'),
     });
-    expect(mockPrepare).not.toHaveBeenCalled();
+    expect(mockPrepare).toHaveBeenCalledTimes(1);
 
     await caller(user).resolveNetworkRequests({
       runId: run.runId,
@@ -1093,7 +1158,7 @@ describe('environment setup integration boundaries', () => {
     expect(mockGetEgressAudit).not.toHaveBeenCalled();
     await expect(api.agent.requestNetworkHosts(input)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: expect.stringContaining('No observed request'),
+      message: expect.stringContaining('No denied request'),
     });
     mockGetEgressAudit.mockResolvedValue({
       records: [
@@ -1108,8 +1173,47 @@ describe('environment setup integration boundaries', () => {
     expect((await getSetupRun(db, run.runId, run.owner)).network_requests).toEqual([
       expect.objectContaining({
         host: 'registry.npmjs.org',
-        evidence: { sessionId: childSessionId, requestCount: 2 },
+        evidence: { sessionId: childSessionId, requestCount: 1 },
       }),
     ]);
+  });
+
+  test('full access retains recommendations through updateDraft instead of approval requests', async () => {
+    const user = await insertTestUser();
+    const run = await runFor(user);
+    await db.transaction(tx =>
+      updateEnvironment(tx, '', {
+        owner: run.owner,
+        environmentId: run.draftEnvironmentId,
+        egressMode: 'unrestricted',
+      })
+    );
+    mockGetEgressAudit.mockResolvedValue({
+      records: [{ hostname: 'registry.npmjs.org', decision: 'allowed' }],
+      nextCursor: null,
+    });
+    const api = caller(user, authority(user, run.runId, run.draftEnvironmentId));
+    await expect(
+      api.agent.requestNetworkHosts({
+        runId: run.runId,
+        hosts: [{ host: 'registry.npmjs.org', reason: 'Install dependencies' }],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('Use update_environment_draft requiredHosts'),
+    });
+    const draft = await api.agent.getDraft({ runId: run.runId });
+    expect(draft.network.discoveryAudit?.hosts).toEqual([
+      { host: 'registry.npmjs.org', requestCount: 1, deniedRequestCount: 0 },
+    ]);
+    await api.agent.updateDraft({
+      runId: run.runId,
+      expectedRevision: draft.configurationRevision,
+      requiredHosts: ['registry.npmjs.org'],
+    });
+    expect(
+      (await getEnvironment(db, run.draftEnvironmentId, run.owner)).egressRequiredHosts
+    ).toEqual(['registry.npmjs.org']);
+    expect((await getSetupRun(db, run.runId, run.owner)).network_requests).toEqual([]);
   });
 });

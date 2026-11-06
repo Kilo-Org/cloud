@@ -63,6 +63,12 @@ describe('verifySecretReferences', () => {
 
     const result = await verifySecretReferences(owner, repositories, requests);
     expect(result[0].references[0].verified).toBe(true);
+    expect(mockGenerateToken).toHaveBeenCalledWith(
+      'installation-1',
+      'standard',
+      'integration-1',
+      'agent'
+    );
     expect(mockFetchFile).toHaveBeenCalledWith({
       token: 'github-token',
       owner: 'acme',

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the credits card renders the balance's loading, error, personal and org states beside the header's account picker; each branch is a small surface over the same queries, and splitting it would pass four query states across files. */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -238,12 +239,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The header row lays out on the eyebrow's own line: the account picker
-          is a line action, so its box cancels its layout height and overflows
-          that line (LINE_ACTION_BOX_CLASS) instead of lifting the row to the
-          box's height. A taller row centred the eyebrow in it and left the gap
-          to the credits card twice the gap the section headers below keep to
-          their first rows (design gate, Profile base cell, 2026-11-06). */}
+      {/* The picker is a line action: its box cancels its layout height and
+          overflows the eyebrow's line instead of lifting the row to its own
+          height, which centred the eyebrow in the box and opened the gap to
+          the credits card to twice the other sections' gap to their rows. */}
       <View
         className={cn(
           'gap-3',

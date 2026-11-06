@@ -1183,7 +1183,7 @@ BYOC credential lookup and JWKS verification run outside the lifecycle queue. Cu
 admission, alias resolution, bounded capability renewal, and persistence remain one serial operation.
 Already admitted requests may finish after retirement. Later requests must pass admission again.
 
-Cloudflare retains direct encrypted capability compatibility, including supported legacy versions.
+Cloudflare retains direct encrypted capability compatibility with the current container-bound form.
 Vercel accepts aliases only and always requires verified provider identity. Both use the same
 carrier classifier and forwarding pipeline. Cloudflare resolves aliases once and forwards the
 resolved capability without re-entering admission. Native restricted-egress rules still apply

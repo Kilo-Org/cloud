@@ -170,9 +170,9 @@ export function ClaudeBillingCardView({
                   </Button>
                 ) : null}
               </div>
-            ) : !status.canManage && onConnect ? (
+            ) : !status.canManage ? (
               <p className="text-muted-foreground text-sm">
-                Ask a Kilo organization owner or admin to connect your Claude organization.
+                Ask a Kilo organization owner or admin to manage this connection.
               </p>
             ) : null}
             {connected && status.canManage ? (

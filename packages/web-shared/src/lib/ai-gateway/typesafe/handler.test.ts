@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { z } from 'zod';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
@@ -41,7 +40,6 @@ import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/u
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
-  systemOneRequestSchema,
   SYSTEM_ONE_MAX_QUESTIONS,
   SYSTEM_ONE_MAX_STATE_BYTES,
   TYPESAFE_MODEL,
@@ -712,18 +710,70 @@ describe('handleSystemOneRequest', () => {
     expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
-  it('formats validation errors with Zod while preserving the TypeSafe error shape', async () => {
+  it('uses the shared field error without returning submitted values', async () => {
     const body = { ...requestBody, questions: { refund: { type: 'invalid' } } };
-    const validation = systemOneRequestSchema.safeParse(body);
-    if (validation.success) throw new Error('Expected an invalid question');
 
     const response = await handleSystemOneRequest(makeRequest(body));
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      message: z.prettifyError(validation.error),
+      error: 'Invalid request',
+      message: 'Invalid request field "questions.refund.type".',
       error_type: 'invalid_request',
     });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('uses the shared malformed JSON error only for JSON decode failures', async () => {
+    const response = await handleSystemOneRequest(
+      new NextRequest(routeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'Malformed JSON',
+      error_type: 'invalid_request',
+      message: expect.any(String),
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([{ body: null }, { body: [] }, { body: 'text' }])(
+    'rejects a non-object body with the shared error: $body',
+    async ({ body }) => {
+      const response = await handleSystemOneRequest(makeRequest(body));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Invalid request body.',
+      });
+      expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([129, 8000])('rejects depth %s before recursive schema validation', async depth => {
+    const response = await handleSystemOneRequest(
+      new NextRequest(routeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: `{"state":${'['.repeat(depth)}null${']'.repeat(depth)},"questions":${JSON.stringify(questions)}}`,
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: 'Request body exceeds the maximum nesting depth of 128.',
+    });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 

@@ -88,12 +88,12 @@ export function invalidPathResponse() {
   );
 }
 
-export function invalidRequestResponse() {
+export function invalidRequestResponse(message: string) {
   return NextResponse.json(
     {
       error: 'Invalid request',
       error_type: ProxyErrorType.invalid_request,
-      message: 'Could not parse request body. Please ensure it is valid JSON.',
+      message,
     },
     { status: 400 }
   );

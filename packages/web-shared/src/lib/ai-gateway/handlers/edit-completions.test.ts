@@ -296,7 +296,7 @@ describe('POST /api/edit/completions', () => {
     }
   );
 
-  it('rejects requests with non-positive max_tokens', async () => {
+  it('rejects requests with negative max_tokens', async () => {
     setOrganizationAuth();
 
     const { handleEditCompletionsRequest } = await import('./edit-completions');
@@ -304,9 +304,128 @@ describe('POST /api/edit/completions', () => {
       makeRequest({ ...makeValidRequestBody(), max_tokens: -1 }) as never
     );
 
-    // -1 fails the schema's `.positive()` so the route returns invalid_request.
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([{ body: null }, { body: [] }, { body: 'text' }])(
+    'rejects a non-object body: $body',
+    async ({ body }) => {
+      setOrganizationAuth();
+      const { handleEditCompletionsRequest } = await import('./edit-completions');
+      const response = await handleEditCompletionsRequest(makeRequest(body) as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Invalid request body.',
+      });
+      expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { fields: { model: ' ' }, path: 'model' },
+    { fields: { messages: null }, path: 'messages' },
+    { fields: { messages: [{ role: 'user', content: [] }] }, path: 'messages[0].content' },
+    { fields: { max_tokens: 1.5 }, path: 'max_tokens' },
+    { fields: { stop: [false] }, path: 'stop[0]' },
+    { fields: { stream: 'true' }, path: 'stream' },
+  ])('rejects malformed $path before admission', async ({ fields, path }) => {
+    setOrganizationAuth();
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest({ ...makeValidRequestBody(), ...fields }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: `Invalid request field "${path}".`,
+    });
+    expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('keeps the unsupported streaming contract error', async () => {
+    setOrganizationAuth();
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest({ ...makeValidRequestBody(), stream: true }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Streaming is not supported for edit completions',
+      error_type: ProxyErrorType.unsupported_field,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves additional upstream root fields', async () => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest({
+        ...makeValidRequestBody(),
+        temperature: 0.2,
+        upstream_options: { mode: 'fast' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(mockedFetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      temperature: 0.2,
+      upstream_options: { mode: 'fast' },
+    });
+  });
+
+  it.each([
+    { max_tokens: 0 },
+    { max_tokens: null },
+    { max_tokens: undefined },
+    { max_tokens: 1001 },
+  ])(
+    'rejects unbounded or invalid max_tokens=$max_tokens before admission',
+    async ({ max_tokens }) => {
+      setOrganizationAuth();
+      const { handleEditCompletionsRequest } = await import('./edit-completions');
+      const response = await handleEditCompletionsRequest(
+        makeRequest({ ...makeValidRequestBody(), max_tokens }) as never
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: ProxyErrorType.invalid_request,
+        message: 'Invalid request field "max_tokens".',
+      });
+      expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards null stream with a bounded token limit', async () => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const response = await handleEditCompletionsRequest(
+      makeRequest({ ...makeValidRequestBody(), max_tokens: 100, stream: null }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const upstream = JSON.parse(mockedFetch.mock.calls[0]?.[1]?.body as string);
+    expect(upstream.max_tokens).toBe(100);
+    expect(upstream.stream).toBeNull();
   });
 
   it('forwards a direct Inception request', async () => {

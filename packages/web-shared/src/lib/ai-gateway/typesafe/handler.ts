@@ -10,7 +10,11 @@ import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
-import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  malformedJsonResponse,
+  wrapInSafeNextResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { validateRequestBody } from '@kilocode/web-shared/lib/ai-gateway/request-validation';
 import {
   gatewayUsageContextBase,
   organizationProviderPreferences,
@@ -114,13 +118,11 @@ export async function handleSystemOneRequest(request: NextRequest) {
   let body: unknown;
   try {
     body = await request.json();
-  } catch {
-    return errorResponse('Invalid JSON body', 'invalid_request', 400);
+  } catch (error) {
+    return malformedJsonResponse(error);
   }
-  const parsed = systemOneRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
-  }
+  const parsed = validateRequestBody(body, systemOneRequestSchema);
+  if (!parsed.success) return parsed.response;
   const { model: requestedModel } = parsed.data;
   const isFree = isFreeModel(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {

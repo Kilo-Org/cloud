@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { CustomPricingTiers, OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
@@ -851,17 +852,370 @@ describe('POST /api/v1/chat/completions request handling', () => {
     ['/chat/completions', 'true', { messages: makeBody().messages }],
     ['/responses', 1, { input: 'hello' }],
     ['/messages', 'yes', { messages: makeBody().messages, max_tokens: 100 }],
-  ])('forces a truthy stream on %s (%j) to true', async (path, stream, input) => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
+  ])('rejects a non-boolean stream on %s (%j)', async (path, stream, input) => {
     const response = await handleLlmProxyRequest(
       makeRequest({ model: 'openai/gpt-4o', ...input, stream }, undefined, path) as never
     );
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.stream).toBe(true);
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(true);
+    await expectInvalidRequest(response, 'Invalid request field "stream".');
   });
+
+  async function expectInvalidRequest(response: Response, message: string) {
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message,
+    });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  }
+
+  describe.each([
+    {
+      path: '/chat/completions',
+      input: { messages: makeBody().messages },
+      tokenFields: ['max_tokens', 'max_completion_tokens'],
+    },
+    { path: '/responses', input: { input: 'hello' }, tokenFields: ['max_output_tokens'] },
+    {
+      path: '/messages',
+      input: { messages: makeBody().messages, max_tokens: 100 },
+      tokenFields: ['max_tokens'],
+    },
+  ])('request boundary validation on $path', ({ path, input, tokenFields }) => {
+    it.each([null, [], 'hello', 1, true].map(body => ({ body })))(
+      'rejects a non-object request body: $body',
+      async ({ body }) => {
+        const response = await handleLlmProxyRequest(makeRequest(body, undefined, path));
+
+        await expectInvalidRequest(response, 'Invalid request body.');
+      }
+    );
+
+    it.each([undefined, null, {}, [], 1, false, '', ' \t '].map(model => ({ model })))(
+      'rejects an invalid model: $model',
+      async ({ model }) => {
+        const response = await handleLlmProxyRequest(
+          makeRequest({ ...input, model }, undefined, path)
+        );
+
+        await expectInvalidRequest(response, 'Invalid request field "model".');
+      }
+    );
+
+    it.each([
+      { field: 'provider', fields: { provider: null } },
+      { field: 'provider.ignore', fields: { provider: { ignore: 5 } } },
+      { field: 'provider.ignore', fields: { provider: { ignore: 'novita' } } },
+      { field: 'provider.only', fields: { provider: { only: 'novita' } } },
+      { field: 'provider.ignore[0]', fields: { provider: { ignore: [null] } } },
+      { field: 'provider.only[0]', fields: { provider: { only: [5] } } },
+      { field: 'stream', fields: { stream: 'false' } },
+      { field: 'stream', fields: { stream: 0 } },
+      { field: 'stream', fields: { stream: {} } },
+      { field: 'stream', fields: { stream: [] } },
+      { field: 'tools', fields: { tools: {} } },
+      { field: 'tools[0]', fields: { tools: [null] } },
+    ])('rejects an invalid $field: $fields', async ({ field, fields }) => {
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, ...fields }, undefined, path)
+      );
+
+      await expectInvalidRequest(response, `Invalid request field "${field}".`);
+    });
+
+    it.each(
+      tokenFields.flatMap(field =>
+        [{ value: {} }, { value: '100' }, { value: 1.5 }, { value: -1 }].map(({ value }) => ({
+          field,
+          value,
+        }))
+      )
+    )('rejects an invalid $field: $value', async ({ field, value }) => {
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, [field]: value }, undefined, path)
+      );
+
+      await expectInvalidRequest(response, `Invalid request field "${field}".`);
+    });
+
+    it('preserves unknown request and provider fields', async () => {
+      const fields = {
+        vendor_options: { mode: 'custom', nested: [null, { enabled: true }] },
+        provider: { sort: { by: 'latency', partition: 'model' }, vendor_option: { enabled: true } },
+      };
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, ...fields }, undefined, path)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(fields);
+    });
+
+    it('accepts null tools, stream, and token limits', async () => {
+      const fields = {
+        tools: null,
+        stream: null,
+        ...Object.fromEntries(tokenFields.map(field => [field, null])),
+      };
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, ...fields }, undefined, path)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(fields);
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(false);
+    });
+
+    it.each([0, 100])('accepts nonnegative integer token limits: %j', async value => {
+      const fields = Object.fromEntries(tokenFields.map(field => [field, value]));
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, ...fields }, undefined, path)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(fields);
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].max_tokens).toBe(value);
+    });
+
+    it.each([false, true])('accepts a boolean stream: %j', async stream => {
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', ...input, stream }, undefined, path)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.stream).toBe(stream);
+      expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].isStreaming).toBe(stream);
+    });
+
+    it.each(['{"model":', '{"model":"openai/gpt-4o",}', ''])(
+      'keeps the malformed JSON error for %j',
+      async body => {
+        const request = new NextRequest(makeRequest({}, undefined, path), { body });
+        const response = await handleLlmProxyRequest(request);
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({
+          error: 'Malformed JSON',
+          error_type: 'invalid_request',
+          message: expect.stringContaining('Request body is not valid JSON:'),
+        });
+        expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+        expect(mockedGetProvider).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      { depth: 128, status: 200 },
+      { depth: 129, status: 400 },
+      { depth: 8000, status: 400 },
+    ])('handles raw JSON nested $depth levels with status $status', async ({ depth, status }) => {
+      const body =
+        JSON.stringify({ model: 'openai/gpt-4o', ...input }).slice(0, -1) +
+        ',"vendor_payload":' +
+        '{"child":'.repeat(depth - 1) +
+        '{}' +
+        '}'.repeat(depth - 1) +
+        '}';
+      const request = new NextRequest(makeRequest({}, undefined, path), { body });
+      const response = await handleLlmProxyRequest(request);
+
+      if (status === 400) {
+        await expectInvalidRequest(
+          response,
+          'Request body exceeds the maximum nesting depth of 128.'
+        );
+      } else {
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      }
+    });
+  });
+
+  it.each([
+    {
+      path: '/messages',
+      fields: { messages: [{ role: 'user' }] },
+      field: 'messages[0].content',
+    },
+    { path: '/messages', fields: { messages: [null] }, field: 'messages[0]' },
+    { path: '/messages', fields: { system: [null] }, field: 'system' },
+    {
+      path: '/messages',
+      fields: { messages: [{ role: 'user', content: {} }] },
+      field: 'messages[0].content',
+    },
+    { path: '/messages', fields: { tools: [{ input_schema: {} }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: 'custom' }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: 'function' }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: null }] }, field: 'tools[0].name' },
+    { path: '/messages', fields: { tools: [{ type: '' }] }, field: 'tools[0].name' },
+    {
+      path: '/messages',
+      fields: { tools: [{ type: 'custom', name: 1 }] },
+      field: 'tools[0].name',
+    },
+    { path: '/chat/completions', fields: { messages: [null] }, field: 'messages[0]' },
+    {
+      path: '/chat/completions',
+      fields: {
+        messages: [
+          {
+            role: 'assistant',
+            tool_calls: [
+              { id: 'call_read', type: 'function', function: { name: 'read', arguments: '{}' } },
+            ],
+          },
+          { role: 'tool', tool_call_id: 'call_read' },
+        ],
+      },
+      field: 'messages[1].content',
+    },
+    {
+      path: '/chat/completions',
+      fields: { messages: [{ role: 'user', content: [null] }] },
+      field: 'messages[0].content',
+    },
+    {
+      path: '/chat/completions',
+      fields: { messages: [{ role: 'tool', tool_call_id: 'call_read', content: null }] },
+      field: 'messages[0].content',
+    },
+    {
+      path: '/chat/completions',
+      fields: { tools: [{ type: 'function' }] },
+      field: 'tools[0].function',
+    },
+    { path: '/chat/completions', fields: { transforms: 1 }, field: 'transforms' },
+    { path: '/chat/completions', fields: { transforms: 'no-middle-out' }, field: 'transforms' },
+    { path: '/responses', fields: { input: [null] }, field: 'input' },
+    { path: '/responses', fields: { tools: [{ type: 'function' }] }, field: 'tools[0].name' },
+  ])('rejects $field on $path: $fields', async ({ path, fields, field }) => {
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), max_tokens: 100, ...fields }, undefined, path)
+    );
+
+    await expectInvalidRequest(response, `Invalid request field "${field}".`);
+  });
+
+  it.each([undefined, null])('accepts assistant tool calls with content %j', async content => {
+    const messages = [
+      { role: 'user', content: 'read the file' },
+      {
+        role: 'assistant',
+        ...(content === undefined ? {} : { content }),
+        tool_calls: [
+          { id: 'call_read', type: 'function', function: { name: 'read', arguments: '{}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call_read', content: 'file contents' },
+    ];
+    const response = await handleLlmProxyRequest(makeRequest({ ...makeBody(), messages }));
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({ messages });
+  });
+
+  it('accepts flat SDK Responses function tools', async () => {
+    const tool = { type: 'function', name: 'read', parameters: {} };
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        { model: 'openai/gpt-4o', input: 'hello', tools: [tool] },
+        undefined,
+        '/responses'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({ tools: [tool] });
+  });
+
+  it.each([
+    { type: 'openrouter:web_search' },
+    { type: 'vercel:perplexity_search' },
+    { type: 'mcp_toolset', mcp_server_name: 'docs' } satisfies Anthropic.Beta.BetaMCPToolset,
+    { type: 'vendor:server_tool', vendor_options: { entries: [null, 1] } },
+    {
+      type: 'custom',
+      name: 'read',
+      input_schema: { type: 'object' },
+    } satisfies Anthropic.Tool,
+    {
+      type: null,
+      name: 'read',
+      input_schema: { type: 'object' },
+    } satisfies Anthropic.Tool,
+  ])('accepts and preserves Messages tools: %j', async tool => {
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        { ...makeBody('anthropic/claude-sonnet-4.5'), max_tokens: 100, tools: [tool] },
+        undefined,
+        '/messages'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.tools).toEqual([tool]);
+  });
+
+  it('accepts a null Messages system prompt', async () => {
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), max_tokens: 100, system: null }, undefined, '/messages')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({ system: null });
+  });
+
+  it.each([
+    {
+      path: '/chat/completions',
+      fields: {
+        messages: [
+          { role: 'user', content: [{ type: 'vendor_content', payload: { entries: [null, 1] } }] },
+        ],
+        tools: [
+          {
+            type: 'function',
+            function: { name: 'read', parameters: { vendor_schema: { entries: [null, 1] } } },
+          },
+        ],
+      },
+    },
+    {
+      path: '/messages',
+      fields: {
+        messages: [
+          { role: 'user', content: [{ type: 'vendor_content', payload: { entries: [null, 1] } }] },
+        ],
+        tools: [{ name: 'read', input_schema: { vendor_schema: { entries: [null, 1] } } }],
+      },
+    },
+    {
+      path: '/responses',
+      fields: {
+        input: [
+          { role: 'user', content: [{ type: 'vendor_content', payload: { entries: [null, 1] } }] },
+        ],
+        tools: [
+          { type: 'function', name: 'read', parameters: { vendor_schema: { entries: [null, 1] } } },
+        ],
+      },
+    },
+  ])(
+    'does not recursively schema-validate content or tool parameters on $path',
+    async ({ path, fields }) => {
+      const response = await handleLlmProxyRequest(
+        makeRequest({ model: 'openai/gpt-4o', max_tokens: 100, ...fields }, undefined, path)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(fields);
+    }
+  );
 
   it.each(['/api/gateway/v1', '/api/openrouter/v1', '/api/gateway', '/api/openrouter'])(
     'rejects the legacy %s prefix, which apps/web rewrites to /api/v1',
@@ -6061,7 +6415,7 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects unexpected extraction errors rather than skipping the guardrail', async () => {
+  it('rejects excessive nesting before extracting guardrail text', async () => {
     setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
     const depth = 10_000;
@@ -6079,13 +6433,13 @@ describe('Enkrypt input guardrail', () => {
     try {
       const response = await handleLlmProxyRequest(request);
 
-      expect(response.status).toBe(503);
-      expect(response.headers.get('x-should-retry')).toBe('false');
-      expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
-      expect(errorLog).toHaveBeenCalledWith(
-        '[enkrypt-guardrail] scan failed unexpectedly; request rejected',
-        expect.any(Object)
-      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Request body exceeds the maximum nesting depth of 128.',
+      });
+      expect(errorLog).not.toHaveBeenCalled();
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     } finally {

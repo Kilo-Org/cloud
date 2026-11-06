@@ -13,15 +13,16 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import {
   countAndStoreFimUsage,
   extractFimPromptInfo,
-  invalidRequestResponse,
   malformedJsonResponse,
-  temporarilyUnavailableResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import {
+  gatewayModelSchema,
+  validateRequestBody,
+} from '@kilocode/web-shared/lib/ai-gateway/request-validation';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
@@ -78,15 +79,15 @@ function getSystemApiKey(provider: FimProvider): string | null {
   }
 }
 
-const FIMRequestBody = z.object({
+const FIMRequestBody = z.looseObject({
   //ref: https://docs.mistral.ai/api/endpoint/fim#operation-fim_completion_v1_fim_completions_post
-  model: z.string(),
+  model: gatewayModelSchema,
   prompt: z.string(),
-  suffix: z.string().optional(),
-  max_tokens: z.number().optional(),
-  min_tokens: z.number().optional(),
+  suffix: z.string().nullish(),
+  max_tokens: z.number().int().positive().max(FIM_MAX_TOKENS_LIMIT),
+  min_tokens: z.number().int().nonnegative().nullish(),
   stop: z.string().array().optional(),
-  stream: z.boolean().optional(),
+  stream: z.boolean().nullish(),
 });
 
 export async function handleFimCompletionsRequest(request: NextRequest) {
@@ -111,15 +112,9 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   } catch (e) {
     return malformedJsonResponse(e);
   }
-  const { success, data: requestBody, error } = FIMRequestBody.safeParse(requestJson);
-  if (!success) {
-    sentryLogger('fim-proxy')('request failed to parse', {
-      extra: { kiloUserId: user.id, error, organizationId },
-      tags: { source: 'fim-proxy' },
-      user: { id: user.id },
-    });
-    return invalidRequestResponse();
-  }
+  const parsed = validateRequestBody(requestJson, FIMRequestBody);
+  if (!parsed.success) return parsed.response;
+  const requestBody = parsed.data;
 
   // Resolve provider from model name
   const resolved = resolveFimProvider(requestBody.model);
@@ -133,14 +128,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     );
   }
   const { provider: fimProvider, upstreamModel } = resolved;
-
-  // Validate max_tokens
-  if (!requestBody.max_tokens || requestBody.max_tokens > FIM_MAX_TOKENS_LIMIT) {
-    console.warn(`SECURITY: FIM Max tokens limit exceeded or missing: ${user.id}`, {
-      maxTokens: requestBody.max_tokens,
-    });
-    return temporarilyUnavailableResponse();
-  }
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));

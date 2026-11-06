@@ -487,6 +487,135 @@ describe('POST /api/fim/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it.each([{ body: null }, { body: [] }, { body: 'text' }, { body: 1 }])(
+    'rejects a non-object body: $body',
+    async ({ body }) => {
+      setOrganizationAuth();
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(
+        new Request(makeRequest(), { body: JSON.stringify(body) }) as never
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: 'invalid_request',
+        message: 'Invalid request body.',
+      });
+      expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { field: 'model', value: ' ' },
+    { field: 'model', value: 1 },
+    { field: 'prompt', value: null },
+    { field: 'suffix', value: [] },
+    { field: 'max_tokens', value: -1 },
+    { field: 'max_tokens', value: 1.5 },
+    { field: 'min_tokens', value: -1 },
+    { field: 'min_tokens', value: 1.5 },
+    { field: 'stop', value: [1], path: 'stop[0]' },
+    { field: 'stream', value: 'true' },
+  ])('rejects malformed $field before admission', async ({ field, value, path }) => {
+    setOrganizationAuth();
+    const body = { ...(await makeRequest().json()), [field]: value };
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      new Request(makeRequest(), { body: JSON.stringify(body) }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid request',
+      error_type: 'invalid_request',
+      message: `Invalid request field "${path ?? field}".`,
+    });
+    expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('preserves additional upstream fields and zero min_tokens', async () => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    const body = {
+      ...(await makeRequest().json()),
+      min_tokens: 0,
+      temperature: 0.2,
+      upstream_options: { mode: 'fast' },
+    };
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      new Request(makeRequest(), { body: JSON.stringify(body) }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(mockedFetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      min_tokens: 0,
+      temperature: 0.2,
+      upstream_options: { mode: 'fast' },
+    });
+  });
+
+  it.each([
+    { max_tokens: 0 },
+    { max_tokens: null },
+    { max_tokens: undefined },
+    { max_tokens: 1001 },
+  ])(
+    'rejects unbounded or invalid max_tokens=$max_tokens before admission',
+    async ({ max_tokens }) => {
+      setOrganizationAuth();
+      const body = {
+        ...(await makeRequest().json()),
+        max_tokens,
+      };
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(
+        new Request(makeRequest(), { body: JSON.stringify(body) }) as never
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'Invalid request',
+        error_type: ProxyErrorType.invalid_request,
+        message: 'Invalid request field "max_tokens".',
+      });
+      expect(mockedGetBYOKforOrganization).not.toHaveBeenCalled();
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards nullish FIM options with a bounded token limit', async () => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+    const body = {
+      ...(await makeRequest().json()),
+      max_tokens: 100,
+      min_tokens: null,
+      stream: null,
+      suffix: null,
+    };
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(
+      new Request(makeRequest(), { body: JSON.stringify(body) }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const upstream = JSON.parse(mockedFetch.mock.calls[0]?.[1]?.body as string);
+    expect(upstream.max_tokens).toBe(100);
+    expect(upstream.min_tokens).toBeNull();
+    expect(upstream.stream).toBeNull();
+    expect(upstream.suffix).toBeNull();
+    expect(upstream).not.toHaveProperty('stream_options');
+  });
+
   it('answers a rejected credential with INVALID_TOKEN', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,

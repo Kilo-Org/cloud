@@ -170,6 +170,66 @@ test('touch-overlap: intersecting pressables, tolerance, containment', () => {
   );
 });
 
+test('touch-overlap: runs of one wrapped paragraph share the text owner, separate owners still collide', () => {
+  // agent-device reports every hittable accessibility node pressable, so a
+  // wrapped paragraph comes back as two sibling boxes that intersect where the
+  // line wraps. The text owns that tap, so the pair is skipped; the same two
+  // boxes as two separate targets are still a defect.
+  const wrapped = (secondParent: number): ProbeNode[] => [
+    { parent: 0, tag: 'Paragraph', rect: [0, 120, 384, 72], text: 'first second third' },
+    { parent: 1, tag: 'View', rect: [0, 120, 384, 48], pressable: true, text: 'first second' },
+    { parent: secondParent, tag: 'View', rect: [0, 144, 384, 48], pressable: true, text: 'third' },
+  ];
+  assert.deepEqual(run('touch-overlap', wrapped(1)), []);
+  const [ownOwner] = run('touch-overlap', wrapped(0));
+  assert.equal(ownOwner?.measured, 24);
+  assert.deepEqual(
+    ownOwner?.related?.map(ref => ref.index),
+    [2]
+  );
+
+  // Two inline links are their own tap owners even inside one text, so their
+  // own overlap is still measured. Their rects intersect without one holding
+  // the other.
+  const [linksFinding] = run('touch-overlap', [
+    { parent: 0, tag: 'Paragraph', rect: [0, 120, 384, 72], text: 'first second third' },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 144, 384, 48],
+      pressable: true,
+      role: 'link',
+      text: 'third',
+    },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [20, 160, 384, 30],
+      pressable: true,
+      role: 'link',
+      text: 'more',
+    },
+  ]);
+  assert.equal(linksFinding?.element?.index, 3);
+  assert.deepEqual(
+    linksFinding?.related?.map(ref => ref.index),
+    [2]
+  );
+  const [linkFinding] = run('touch-overlap', [
+    ...wrapped(1),
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [370, 146, 40, 60],
+      pressable: true,
+      role: 'link',
+      text: 'link',
+    },
+    { parent: 0, tag: 'View', rect: [350, 150, 60, 48], pressable: true, text: 'Done' },
+  ]);
+  assert.equal(linkFinding?.element?.index, 4);
+});
+
 test('overlap: text siblings collide, tolerance, absolute sibling', () => {
   const text = (y: number, style?: ProbeNode['style']): ProbeNode => ({
     parent: 0,
@@ -252,6 +312,39 @@ test('safe-area: text under the top and bottom insets, tolerance', () => {
   assert.equal(run('safe-area', [text(752)], env)[0]?.measured, 2);
   assert.deepEqual(run('safe-area', [text(751)], env), []);
   assert.deepEqual(run('safe-area', [{ parent: 0, tag: 'View', rect: [0, 0, 400, 100] }], env), []);
+});
+
+test('safe-area: a presented surface is measured from its own origin', () => {
+  const env = {
+    safeArea: { top: 24, right: 0, bottom: 30, left: 0 },
+    window: { width: 400, height: 800 },
+  };
+  // A native sheet presents in its own window, so every frame of its content
+  // starts at the surface's origin whatever its height: a bottom sheet 170 dp
+  // tall and a full-window one both report their heading at y 0, and neither
+  // frame can be compared with the window's top inset.
+  const presented = (height: number): ProbeNode[] => [
+    { parent: 0, tag: 'RNHostView', rect: [0, 800 - height, 400, height], owners: ['RNHostView'] },
+    {
+      parent: 1,
+      tag: 'View',
+      rect: [0, 800 - height, 400, height],
+      owners: ['View', 'PresentedContent'],
+    },
+    { parent: 2, tag: 'Paragraph', rect: [0, 0, 400, 20], text: 'Select account' },
+  ];
+  assert.deepEqual(run('safe-area', presented(170), env), []);
+  assert.deepEqual(run('safe-area', presented(746), env), []);
+
+  // The same frame outside a presented surface still reports the inset.
+  assert.equal(
+    run(
+      'safe-area',
+      [{ parent: 0, tag: 'Paragraph', rect: [0, 0, 400, 20], text: 'Select account' }],
+      env
+    )[0]?.measured,
+    20
+  );
 });
 
 test('touch-target: allows 0.5 dp of pixel-snapping rounding', () => {

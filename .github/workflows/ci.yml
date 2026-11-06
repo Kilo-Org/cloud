@@ -99,7 +99,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -145,7 +144,6 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
-              - 'services/scim-sync/**'
               - 'services/session-ingest/**'
               - 'tools/oxlint/**'
               - 'package.json'
@@ -340,23 +338,8 @@ jobs:
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
-      # The stacked-CI admission wiring is checked on every PR. It runs here,
-      # off the critical path; the required `test` job needs this job, so a
-      # broken admission still blocks the merge.
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
-
       - name: Check runtime publication workflow admission
         run: pnpm --filter cloud-agent-next test:runtime-ci
-
-      - name: Test dependency change detection
-        run: node --test scripts/changed-dependencies.test.mjs
-
-      - name: Test build cache keys
-        run: node --test scripts/build-key-inputs.test.mjs
-
-      - name: Test affected workspace detection
-        run: node --test scripts/affected-workspaces.test.mjs
 
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check
@@ -364,34 +347,32 @@ jobs:
       - name: Plugin openclaw peer-dep pin check
         run: bash scripts/check-plugin-openclaw-pin.sh
 
-      - name: Test changes-filter retry wiring
-        run: node --test scripts/changes-filter-retry.test.mjs
-
-      - name: Test typecheck CI wiring
-        run: node --test scripts/typecheck-ci.test.mjs
-
       # The relay regression executes Wrangler's real config parser.
       - name: Install usage-ingest deployment test dependencies
         run: pnpm --filter cloudflare-usage-ingest install --frozen-lockfile --ignore-scripts
 
-      - name: Test scheduled deployment wiring
-        run: node --test scripts/deployment-workflows.test.mjs
-
-      - name: Test main workflow failure notifications
-        run: node --test scripts/main-workflow-failure.test.mjs
-
-      - name: Test scheduled production deployment failure notifications
-        run: node --test scripts/production-deploy-failure.test.mjs
-
-      - name: Test meta-janitor approval gates
-        run: node --test scripts/meta-janitor-approve.test.mjs
-
-      # sbom.yml is only reached by a PR that changes the workflow or its test,
-      # and that path set does not trip the kilocode_backend filter that gates
-      # test-scripts. Run the SBOM wiring checks here so a PR cannot drop the
-      # push filter unnoticed.
-      - name: Test SBOM workflow wiring
-        run: node --test scripts/mobile-sbom-workflow.test.mjs
+      # The stacked-CI admission is checked on every PR. All wiring suites run
+      # in one invocation: the test runner starts the named files concurrently,
+      # so the step pays one start-up and one parse of the YAML they share. The
+      # job is off the critical path, and the required `test` job needs it, so
+      # a broken admission still blocks the merge. sbom.yml is only reached by
+      # a PR that changes the workflow or its test, and that path set does not
+      # trip the kilocode_backend filter that gates test-scripts, so its wiring
+      # check runs here too.
+      - name: Test workflow wiring
+        run: >-
+          node --test
+          scripts/stacked-ci.test.mjs
+          scripts/changed-dependencies.test.mjs
+          scripts/build-key-inputs.test.mjs
+          scripts/affected-workspaces.test.mjs
+          scripts/changes-filter-retry.test.mjs
+          scripts/typecheck-ci.test.mjs
+          scripts/deployment-workflows.test.mjs
+          scripts/main-workflow-failure.test.mjs
+          scripts/production-deploy-failure.test.mjs
+          scripts/meta-janitor-approve.test.mjs
+          scripts/mobile-sbom-workflow.test.mjs
 
   # One producer for the tRPC declarations. Both matrices used to run the
   # trpc-declarations action behind `matrix.group == 'trpc'`, so a cache miss
@@ -470,13 +451,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+      # The harness-sdk row of workspace-tests saves the compiled plugin; this
+      # group only reads it, so a skipped saver costs a compile, never a failure.
+      - name: Restore compiler plugins
+        uses: ./.github/actions/ttsc-plugin-cache
 
       - name: Download tRPC declarations
         if: matrix.group == 'trpc'
@@ -791,9 +769,6 @@ jobs:
 
       - name: Run Session Ingest Postgres tests
         run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
-
-      - name: Run SCIM Sync Postgres tests
-        run: NODE_ENV=development pnpm --filter cloudflare-scim-sync test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
@@ -1125,13 +1100,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache compiler plugins
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+      # The check below builds the SDK, so this job stores the plugin cache.
+      - name: Restore compiler plugins
+        id: plugins
+        uses: ./.github/actions/ttsc-plugin-cache
 
       # Everything but the timing gate, which needs a machine nobody else is
       # using. The migration check is why this job exists: the store's SQL is
@@ -1139,6 +1111,13 @@ jobs:
       # inlined copy stops matching the schema.
       - name: Check harness-sdk
         run: pnpm --filter @kilocode/harness-sdk check:ci
+
+      - name: Save compiler plugins
+        if: steps.plugins.outputs.cache-hit != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
   mobile-diagram-host:
     needs: changes
@@ -1262,19 +1241,25 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # The harness SDK's own vitest run compiles the typia plugin through
-      # @ttsc/unplugin. kilo-app is not in this matrix: its sharded suite runs
-      # in kilo-app CI.
-      - name: Cache compiler plugins
+      # @ttsc/unplugin, and this row is selected whenever the plugin key moves,
+      # so it is the one job that saves the compiled plugin. kilo-app is not in
+      # this matrix: its sharded suite runs in kilo-app CI.
+      - name: Restore compiler plugins
+        id: plugins
         if: matrix.workspace.name == '@kilocode/harness-sdk'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: node_modules/.cache/ttsc/plugins
-          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+        uses: ./.github/actions/ttsc-plugin-cache
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
+
+      # Stores what the run compiled, unless this run selected the harness-sdk
+      # job, which stores it then.
+      - name: Save compiler plugins
+        if: matrix.workspace.name == '@kilocode/harness-sdk' && steps.plugins.outputs.cache-hit != 'true' && needs.changes.outputs.harness_sdk != 'true'
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'

@@ -33658,6 +33658,18 @@
     ],
     "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
   },
+  "stepUp.getStatus": {
+    "path": "stepUp.getStatus",
+    "kind": "query",
+    "summary": "Check whether the current admin's step-up authentication is set up and still valid for this browser session, including enrolled passkey count, whether the session is bound, whether verification is fresh, and whether enrollment is available.",
+    "inputSchema": {},
+    "tags": [
+      "stepup",
+      "getstatus"
+    ],
+    "searchBlob": "stepUp.getStatus Check whether the current admin's step-up authentication is set up and still valid for this browser session, including enrolled passkey count, whether the session is bound, whether verification is fresh, and whether enrollment is available. stepup getstatus",
+    "admin": true
+  },
   "todos.items.candidatesForSession": {
     "path": "todos.items.candidatesForSession",
     "kind": "query",

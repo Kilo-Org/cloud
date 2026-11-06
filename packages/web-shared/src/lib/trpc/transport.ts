@@ -1,5 +1,6 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import * as z from 'zod';
 
 type JsonSchema = Record<string, unknown>;
@@ -53,6 +54,14 @@ export const TrpcErrorDataSchema = z
     zodError: TrpcZodFlattenedErrorSchema.nullable(),
     upstreamCode: z.string().optional(),
     authRequired: z.boolean().optional(),
+    stepUp: z
+      .object({
+        code: z.string(),
+        actionClass: z.string(),
+        purpose: z.string(),
+        maxAgeSeconds: z.number(),
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -94,7 +103,11 @@ export function trpcSuccessResponseJsonSchema(dataSchema: JsonSchema): JsonSchem
   };
 }
 
-export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] & z.infer<typeof TrpcErrorDataSchema>;
+export type KiloTrpcErrorData = TRPCDefaultErrorShape['data'] &
+  z.infer<typeof TrpcErrorDataSchema> & {
+    /** Client-visible reason for a support access denial. */
+    supportAccessReason?: string;
+  };
 
 export type KiloTrpcErrorShape = Omit<TRPCDefaultErrorShape, 'data'> & {
   data: KiloTrpcErrorData;
@@ -104,6 +117,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
   // Cloud Agent's worker tRPC error is rethrown with a structured cause. Parse
   // it through the SDK contract before exposing it at the browser boundary.
   const billingFailure = parseCustomerBillingFailure({ data: error.cause });
+  const supportAccessReason = readSupportAccessReason(error.cause);
 
   return {
     ...shape,
@@ -115,7 +129,23 @@ export const trpcErrorFormatter = (({ shape, error }) => {
           : null,
       upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
       authRequired: error.cause instanceof AuthContextError ? true : undefined,
+      stepUp:
+        error.cause instanceof StepUpRequiredError
+          ? {
+              code: error.cause.code,
+              actionClass: error.cause.actionClass,
+              purpose: error.cause.purpose,
+              maxAgeSeconds: error.cause.maxAgeSeconds,
+            }
+          : undefined,
       ...(billingFailure ? { billingFailure } : {}),
+      ...(supportAccessReason ? { supportAccessReason } : {}),
     },
   };
 }) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;
+
+function readSupportAccessReason(cause: unknown): string | undefined {
+  if (cause === null || typeof cause !== 'object') return undefined;
+  const value = (cause as { supportAccessReason?: unknown }).supportAccessReason;
+  return typeof value === 'string' ? value : undefined;
+}

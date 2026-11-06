@@ -7,6 +7,7 @@ import type {
   PrivilegedActionClass,
   PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type { SupportDecision } from '@kilocode/web-shared/lib/admin/support-access';
 import { deriveCredentialKind } from '@kilocode/web-shared/lib/admin/privileged-access';
 
 /**
@@ -79,7 +80,9 @@ export type KiloAdminElevationReason =
   /** A token carrying `isAdmin` was minted for a downstream service. */
   | 'service_token_mint'
   /** A delegated resource token carrying `isAdmin` was minted for a Worker. */
-  | 'delegated_resource_token_mint';
+  | 'delegated_resource_token_mint'
+  /** A short-lived Worker admin capability was minted for a service. */
+  | 'worker_capability_mint';
 
 /** Fields every `admin_access` event carries, whatever produced it. */
 export type AdminAccessAttribution = {
@@ -116,6 +119,8 @@ export type AdminAccessAttribution = {
   wouldBlock: boolean;
   /** First product token of the User-Agent only, never the full string. */
   userAgentProduct: string | null;
+  /** Capability issuance id (`jti`) when the event records a capability mint. */
+  issuanceId: string | null;
   /**
    * Best-effort route identifier. For tRPC this is the exact procedure path;
    * for REST and server components it is the concrete pathname (`x-pathname`)
@@ -131,6 +136,11 @@ export type AdminAccessAttribution = {
    */
   method: string | null;
   ip: string | null;
+  /** Resolution verdict for explicit support-organization access. */
+  supportDecision: SupportDecision | null;
+  supportGrantId: string | null;
+  supportActionId: string | null;
+  inventoryId: string | null;
 };
 
 /**
@@ -221,6 +231,10 @@ export type AdminAccessEventInput = {
   route: string | null;
   method: string | null;
   ip: string | null;
+  supportDecision?: SupportDecision | null;
+  supportGrantId?: string | null;
+  supportActionId?: string | null;
+  inventoryId?: string | null;
 } & (
   | { kind: 'admin_guard'; user: AdminAccessUser }
   | {
@@ -228,6 +242,7 @@ export type AdminAccessEventInput = {
       user: AdminAccessUser;
       reason: KiloAdminElevationReason;
       target: string;
+      issuanceId?: string | null;
     }
   | {
       kind: 'privileged_access';
@@ -280,6 +295,10 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
     route: params.route,
     method: params.method,
     ip: params.ip,
+    supportDecision: params.supportDecision ?? null,
+    supportGrantId: params.supportGrantId ?? null,
+    supportActionId: params.supportActionId ?? null,
+    inventoryId: params.inventoryId ?? null,
   };
   // Audit logging is a side effect that must never deny a legitimate admin
   // action: swallow (and report) any sink failure rather than propagate it.
@@ -293,6 +312,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         ...transport,
         reason: params.reason,
         target: params.target,
+        issuanceId: params.issuanceId ?? null,
       });
     } else if (params.kind === 'privileged_access') {
       currentSink({
@@ -301,6 +321,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         kind: 'privileged_access',
         ...nullableAttributionFor(params.user),
         ...transport,
+        issuanceId: null,
         credential: params.credential,
         outcome: params.outcome,
         actionClass: params.actionClass,
@@ -314,6 +335,7 @@ export function emitAdminAccessEvent(params: AdminAccessEventInput): void {
         kind: 'admin_guard',
         ...attributionFor(params.user),
         ...transport,
+        issuanceId: null,
         reason: null,
         target: null,
       });
@@ -379,6 +401,11 @@ export type AdminAuditContext = {
   headersList?: Headers;
   trpcPath?: string;
   trpcType?: string;
+  /** REST/server-component surface when the caller already knows it. */
+  auditSurface?: AdminAccessSurface;
+  /** Actual request method for a REST caller. */
+  auditMethod?: string;
+  delegatedWorkload?: boolean;
 };
 
 /** Membership observation carried by an elevation event. */
@@ -410,7 +437,15 @@ export type ElevationMembershipObservation = {
  */
 export async function recordKiloAdminElevation(
   ctx: AdminAuditContext,
-  params: { reason: KiloAdminElevationReason; target: string } & ElevationMembershipObservation
+  params: {
+    reason: KiloAdminElevationReason;
+    target: string;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
+    issuanceId?: string | null;
+  } & ElevationMembershipObservation
 ): Promise<void> {
   if (ctx.trpcPath === undefined) {
     // `tokenSource` is only preserved when the caller put it on the context.
@@ -425,8 +460,16 @@ export async function recordKiloAdminElevation(
       internalApiUse: ctx.internalApiUse,
       reason: params.reason,
       target: params.target,
+      surface: ctx.auditSurface,
+      method: ctx.auditMethod,
+      delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
+      supportDecision: params.supportDecision,
+      supportGrantId: params.supportGrantId,
+      supportActionId: params.supportActionId,
+      inventoryId: params.inventoryId,
+      issuanceId: params.issuanceId,
     });
     return;
   }
@@ -452,6 +495,11 @@ export async function recordKiloAdminElevation(
     ip: ctx.ip ?? null,
     reason: params.reason,
     target: params.target,
+    supportDecision: params.supportDecision,
+    supportGrantId: params.supportGrantId,
+    supportActionId: params.supportActionId,
+    inventoryId: params.inventoryId,
+    issuanceId: params.issuanceId ?? null,
   });
   if (ctx.authViaToken) {
     emitPrivilegedAccessEvent({
@@ -492,6 +540,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
     /** See {@link organizationTarget} and {@link UNSCOPED_TARGET}. */
     target: string;
     grant: TGrant;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<TGrant> {
   await recordKiloAdminElevation(ctx, {
@@ -499,6 +548,7 @@ export async function elevateViaKiloAdmin<const TGrant>(
     target: params.target,
     membershipRole: params.membershipRole,
     wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
+    issuanceId: params.issuanceId,
   });
   return params.grant;
 }
@@ -532,6 +582,11 @@ export async function recordKiloAdminElevationForRequest(
     headersList?: Headers;
     internalApiUse?: boolean;
     delegatedWorkload?: boolean;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): Promise<void> {
   let headersList = params.headersList;
@@ -556,6 +611,11 @@ function recordKiloAdminElevationFromHeaders(
     method?: string;
     internalApiUse?: boolean;
     delegatedWorkload?: boolean;
+    supportDecision?: SupportDecision | null;
+    supportGrantId?: string | null;
+    supportActionId?: string | null;
+    inventoryId?: string | null;
+    issuanceId?: string | null;
   } & ElevationMembershipObservation
 ): void {
   const authViaToken = authViaTokenFromHeaders(params.headersList);
@@ -583,6 +643,11 @@ function recordKiloAdminElevationFromHeaders(
     ip: clientIpFromHeaders(params.headersList),
     reason: params.reason,
     target: params.target,
+    supportDecision: params.supportDecision,
+    supportGrantId: params.supportGrantId,
+    supportActionId: params.supportActionId,
+    inventoryId: params.inventoryId,
+    issuanceId: params.issuanceId ?? null,
   });
   if (authViaToken) {
     emitPrivilegedAccessEvent({
@@ -621,6 +686,7 @@ function actionClassForElevation(
       return 'support_write';
     case 'service_token_mint':
     case 'delegated_resource_token_mint':
+    case 'worker_capability_mint':
       return 'worker_admin';
   }
 }
@@ -701,10 +767,27 @@ export function userAgentProductFromHeaders(headersList: Headers): string | null
 }
 
 /**
- * Extract the client IP from request headers. Prefers `x-forwarded-for`, with
- * `x-vercel-forwarded-for` as a fallback; returns the first hop or null.
+ * The usable first hop of a forwarding header, or null when the header is
+ * absent or its first entry is empty.
+ */
+function firstForwardedHop(forwarded: string | null): string | null {
+  if (forwarded === null) return null;
+  const first = forwarded.split(',')[0]?.trim();
+  return first === undefined || first === '' ? null : first;
+}
+
+/**
+ * Extract the client IP from request headers.
+ *
+ * `x-vercel-forwarded-for` is the address the platform observed, so it is read
+ * first: `x-forwarded-for` can be rewritten by a proxy in front of the platform.
+ * `x-forwarded-for` is the fallback for a request the platform did not label
+ * (local development, a direct origin hit). Null when neither header carries a
+ * usable hop, so the event records an explicitly unavailable address.
  */
 export function clientIpFromHeaders(headersList: Headers): string | null {
-  const forwarded = headersList.get('x-forwarded-for') ?? headersList.get('x-vercel-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || null;
+  return (
+    firstForwardedHop(headersList.get('x-vercel-forwarded-for')) ??
+    firstForwardedHop(headersList.get('x-forwarded-for'))
+  );
 }

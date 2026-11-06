@@ -1,10 +1,11 @@
+/* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
 import {
   type MessageDeliveryState,
   type Part,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { Clock } from '@/components/ui/icons';
+import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -167,24 +168,47 @@ function MessageBubbleImpl({
     (failure?.kind === 'delivery'
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined);
-  // The footer is the failed row's status, so it sits under the row it names: a
-  // user row's bubble is end-aligned, so its title, detail and action row are
-  // too; an assistant row's stays on the leading edge. `items-end` is logical.
+  // The footer is the failed turn's status, so it sits in the column that turn
+  // occupies rather than the row that carries it: a message that never reached
+  // the agent is the user's own row, and its title, detail and action row stay
+  // under that bubble, which is end-aligned; a failed response — the
+  // assistant's own error, and an execution failure carried by the question —
+  // takes the assistant's leading edge like every other block of that turn.
+  // `items-end` is logical, so the user's column mirrors with the interface.
   // `text-right` is how a line end-aligns here: NativeWind drops
   // `text-align: end`, and RN resolves `right` against the interface direction,
-  // so the copy still ends on the trailing side in an RTL interface.
-  const trailingFailure = isUser;
+  // so the copy still ends on the trailing side in an RTL interface. The
+  // assistant's column names no alignment: its title and detail keep the
+  // interface's own start edge, as the assistant rows around them do.
+  const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-1 px-4 py-1', trailingFailure && 'items-end')}>
-        <Text
-          className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-          accessibilityLabel={messageFailureLabel(failure)}
-        >
-          {failure.title}
-        </Text>
+      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
+        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+          {failure.error ? (
+            // Every failure that reports an error carries the same marker; a
+            // message the person stopped reports a neutral status and carries
+            // none. The marker is the state, not copy: the title beside it says
+            // what happened, so it carries no text of its own for a screen
+            // reader.
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <AlertCircle size={14} color={colors.destructive} />
+            </View>
+          ) : null}
+          <Text
+            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+            accessibilityLabel={messageFailureLabel(failure)}
+          >
+            {failure.title}
+          </Text>
+        </View>
         {failure.detail !== null ? (
-          <Text className={cn('text-xs text-muted-foreground', trailingFailure && 'text-right')}>
+          <Text
+            className={cn(
+              'text-sm leading-[1.25rem] text-muted-foreground',
+              trailingFailure && 'text-right'
+            )}
+          >
             {failure.detail}
           </Text>
         ) : null}

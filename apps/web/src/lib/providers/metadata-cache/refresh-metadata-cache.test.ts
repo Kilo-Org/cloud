@@ -154,6 +154,13 @@ describe('refreshMetadataCache', () => {
     ['an error status', () => new Response(null, { status: 503, statusText: 'Unavailable' })],
     ['a body that does not parse', () => Response.json({ data: 'not-a-list' })],
     ['a suspiciously short list', () => Response.json({ data: [] })],
+    [
+      'a NUL character, which jsonb cannot store',
+      () =>
+        Response.json({
+          data: catalogModels().data.map(model => ({ ...model, name: 'bad\u0000name' })),
+        }),
+    ],
   ])('keeps the stored row untouched when the source returns %s', async (_label, response) => {
     await storeRow(openRouterModelsMetadataSource.url, { data: [] }, hoursAgo(1));
     const before = await readRow(openRouterModelsMetadataSource.url);
@@ -164,6 +171,36 @@ describe('refreshMetadataCache', () => {
     expect(await readRow(openRouterModelsMetadataSource.url)).toEqual(before);
     expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
     expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+  });
+
+  it('keeps an unchanged body and still bumps updated_at', async () => {
+    const oldUpdatedAt = '2020-01-01T00:00:00.000Z';
+    await storeRow(modelsDevCatalogSource.url, modelsDevCatalog(), oldUpdatedAt);
+
+    await refreshMetadataCache();
+
+    const row = await readRow(modelsDevCatalogSource.url);
+    expect(row.data).toEqual(modelsDevCatalog());
+    expect(new Date(row.updated_at).getTime()).toBeGreaterThan(Date.parse(oldUpdatedAt));
+  });
+
+  it('finishes every other write before failing the run on a database write error', async () => {
+    const insert = db.insert.bind(db);
+    let insertCalls = 0;
+    jest.spyOn(db, 'insert').mockImplementation(table => {
+      insertCalls += 1;
+      if (insertCalls === 1) throw new Error('write failed');
+      return insert(table);
+    });
+
+    await expect(refreshMetadataCache()).rejects.toThrow('write failed');
+
+    const rows = await db
+      .select({ url: ai_gateway_metadata_cache.url })
+      .from(ai_gateway_metadata_cache);
+    expect(rows).toHaveLength(new Set(fetchedUrls()).size - 1);
+    expect(fetchedUrls().some(url => url.startsWith(PROVIDER_MODELS_URL_PREFIX))).toBe(false);
+    expect(alertIfMetadataCacheStale).not.toHaveBeenCalled();
   });
 
   it('refreshes the model list of each fetched provider', async () => {

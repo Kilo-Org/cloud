@@ -27,6 +27,8 @@ const INVESTIGATION =
 export type StaleMetadataEntry = {
   url: string;
   updatedAt: Date | null;
+  /** Entries sharing a group, such as every model's endpoints on one gateway, are listed as one line. */
+  group?: string;
 };
 
 export function shouldPostMetadataCacheStaleAlert(input: {
@@ -46,9 +48,28 @@ export function shouldPostMetadataCacheStaleAlert(input: {
   );
 }
 
-function describeEntry(entry: StaleMetadataEntry) {
-  const updated = entry.updatedAt ? entry.updatedAt.toISOString() : 'never stored';
-  return `\`${entry.url}\` (last updated: ${updated})`;
+function describeUpdatedAt(updatedAt: Date | null) {
+  return updatedAt ? updatedAt.toISOString() : 'never stored';
+}
+
+function oldestUpdatedAt(entries: ReadonlyArray<StaleMetadataEntry>) {
+  const oldest = Math.min(
+    ...entries.map(entry => entry.updatedAt?.getTime() ?? Number.NEGATIVE_INFINITY)
+  );
+  return Number.isFinite(oldest) ? new Date(oldest) : null;
+}
+
+function describeEntries(key: string, entries: ReadonlyArray<StaleMetadataEntry>) {
+  const [first] = entries;
+  if (entries.length === 1 && first) {
+    return `\`${first.url}\` (last updated: ${describeUpdatedAt(first.updatedAt)})`;
+  }
+  return `\`${key}\` for ${entries.length} sources (oldest last updated: ${describeUpdatedAt(oldestUpdatedAt(entries))})`;
+}
+
+function listEntries(staleEntries: ReadonlyArray<StaleMetadataEntry>) {
+  const entriesByKey = Map.groupBy(staleEntries, entry => entry.group ?? entry.url);
+  return [...entriesByKey].map(([key, entries]) => describeEntries(key, entries));
 }
 
 export function buildMetadataCacheStaleAlertNotification(input: {
@@ -56,8 +77,9 @@ export function buildMetadataCacheStaleAlertNotification(input: {
   now: Date;
 }): AdminSlackNotification {
   const { staleEntries, now } = input;
-  const listed = staleEntries.slice(0, MAX_LISTED_ENTRIES).map(describeEntry);
-  const remaining = staleEntries.length - listed.length;
+  const lines = listEntries(staleEntries);
+  const listed = lines.slice(0, MAX_LISTED_ENTRIES);
+  const remaining = lines.length - listed.length;
   const sources = [...listed, ...(remaining > 0 ? [`and ${remaining} more`] : [])];
   const status = `${staleEntries.length} upstream metadata ${
     staleEntries.length === 1 ? 'source' : 'sources'

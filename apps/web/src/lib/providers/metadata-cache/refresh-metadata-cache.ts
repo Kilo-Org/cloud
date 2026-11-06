@@ -16,7 +16,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { OPENAI_CHATGPT_API_KEY_ENV } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
+  gatewayModelEndpointsSource,
+  gatewayModelEndpointsUrl,
   openRouterGatewayModelsSource,
   openRouterProvidersSource,
   vercelGatewayModelsSource,
@@ -33,8 +37,19 @@ import {
 
 const SOURCE_CONCURRENCY = 4;
 const PROVIDER_MODELS_CONCURRENCY = 3;
+const MODEL_ENDPOINTS_CONCURRENCY_PER_GATEWAY = 8;
 const REFRESH_BUDGET_MS = 180_000;
 const ESCAPED_NUL_PATTERN = /(?:^|[^\\])(?:\\\\)*\\u0000/;
+
+const GATEWAY_MODEL_LISTS = [
+  { gateway: OPENROUTER, modelsSource: openRouterGatewayModelsSource },
+  { gateway: VERCEL_AI_GATEWAY, modelsSource: vercelGatewayModelsSource },
+];
+
+type ModelEndpointsGroup = {
+  urlPattern: string;
+  sources: MetadataSource<unknown>[];
+};
 
 function catalogSources(): MetadataSource<unknown>[] {
   const sources: MetadataSource<unknown>[] = [
@@ -102,6 +117,14 @@ async function refreshSource(
   return true;
 }
 
+// Settle every task before rethrowing a write failure, so no queued write outlives the run.
+async function settleAll<T>(tasks: Promise<T>[]): Promise<T[]> {
+  const results = await Promise.allSettled(tasks);
+  const writeFailure = results.find(result => result.status === 'rejected');
+  if (writeFailure) throw writeFailure.reason;
+  return results.flatMap(result => (result.status === 'fulfilled' ? [result.value] : []));
+}
+
 async function refreshSources(
   sources: MetadataSource<unknown>[],
   concurrency: number,
@@ -109,18 +132,22 @@ async function refreshSources(
 ): Promise<string[]> {
   const limit = pLimit(concurrency);
   const ordered = await orderOldestFirst(sources);
-  // Settle every source before rethrowing a write failure, so no queued write outlives the run.
-  const results = await Promise.allSettled(
+  const refreshed = await settleAll(
     ordered.map(source => limit(() => refreshSource(source, signal)))
   );
-  const writeFailure = results.find(result => result.status === 'rejected');
-  if (writeFailure) throw writeFailure.reason;
-  return ordered
-    .filter((_source, index) => {
-      const result = results[index];
-      return result?.status === 'fulfilled' && !result.value;
+  return ordered.filter((_source, index) => !refreshed[index]).map(source => source.url);
+}
+
+async function readModelEndpointsGroups(): Promise<ModelEndpointsGroup[]> {
+  return Promise.all(
+    GATEWAY_MODEL_LISTS.map(async ({ gateway, modelsSource }) => {
+      const models = await readStoredMetadata(modelsSource, db);
+      return {
+        urlPattern: gatewayModelEndpointsUrl(gateway, '{id}'),
+        sources: (models?.data ?? []).map(model => gatewayModelEndpointsSource(gateway, model.id)),
+      };
     })
-    .map(source => source.url);
+  );
 }
 
 async function findStaleEntries(failedUrls: string[], now: Date): Promise<StaleMetadataEntry[]> {
@@ -132,6 +159,19 @@ async function findStaleEntries(failedUrls: string[], now: Date): Promise<StaleM
         entry.updatedAt === null ||
         now.getTime() - entry.updatedAt.getTime() >= METADATA_CACHE_STALE_AFTER_MS
     );
+}
+
+// sync-providers fetches a model's endpoints live until they are first stored, and new models
+// appear often, so a failed first fetch is not stale: it would otherwise alert on a single error.
+async function findStaleModelEndpointsEntries(
+  urlPattern: string,
+  failedUrls: string[],
+  now: Date
+): Promise<StaleMetadataEntry[]> {
+  const entries = await findStaleEntries(failedUrls, now);
+  return entries
+    .filter(entry => entry.updatedAt !== null)
+    .map(entry => ({ ...entry, group: urlPattern }));
 }
 
 export async function refreshMetadataCache() {
@@ -147,12 +187,37 @@ export async function refreshMetadataCache() {
     ...(await refreshSources(providerModelsSources, PROVIDER_MODELS_CONCURRENCY, budget))
   );
 
-  const staleEntries = await findStaleEntries(failedUrls, new Date());
+  const modelEndpointsResults = await settleAll(
+    (await readModelEndpointsGroups()).map(async group => ({
+      group,
+      failedUrls: await refreshSources(
+        group.sources,
+        MODEL_ENDPOINTS_CONCURRENCY_PER_GATEWAY,
+        budget
+      ),
+    }))
+  );
+
+  const now = new Date();
+  const staleModelEndpointsEntries = await Promise.all(
+    modelEndpointsResults.map(result =>
+      findStaleModelEndpointsEntries(result.group.urlPattern, result.failedUrls, now)
+    )
+  );
+  const staleEntries = [
+    ...(await findStaleEntries(failedUrls, now)),
+    ...staleModelEndpointsEntries.flat(),
+  ];
   await alertIfMetadataCacheStale(staleEntries);
 
+  const sum = (counts: number[]) => counts.reduce((total, count) => total + count, 0);
   return {
-    source_count: sources.length + providerModelsSources.length,
-    failed_count: failedUrls.length,
+    source_count:
+      sources.length +
+      providerModelsSources.length +
+      sum(modelEndpointsResults.map(result => result.group.sources.length)),
+    failed_count:
+      failedUrls.length + sum(modelEndpointsResults.map(result => result.failedUrls.length)),
     stale_count: staleEntries.length,
   };
 }

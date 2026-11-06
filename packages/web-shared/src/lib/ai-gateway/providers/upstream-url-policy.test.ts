@@ -171,6 +171,85 @@ describe('findUpstreamUrlViolation', () => {
     expect(performance.now() - startedAt).toBeLessThan(3_000);
   }, 10_000);
 
+  it('resolves again after a stalled resolution outlives its deadline', async () => {
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      if (calls === 1) return new Promise<string[]>(() => {});
+      return Promise.resolve(['104.18.2.115']);
+    });
+
+    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBe(
+      'dns_lookup_failed'
+    );
+    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(2);
+  }, 10_000);
+
+  it('resolves again after every caller of a stalled resolution aborts', async () => {
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      if (calls === 1) return new Promise<string[]>(() => {});
+      return Promise.resolve(['104.18.2.115']);
+    });
+    const controller = new AbortController();
+    const reason = new DOMException('client went away', 'AbortError');
+
+    const aborted = check('https://stalled.example.com/v1', resolve, controller.signal);
+    await after(10);
+    controller.abort(reason);
+    await expect(aborted).rejects.toBe(reason);
+
+    // The aborted caller never reaches a deadline, so only the bounded
+    // retention of the entry can free the host, one deadline after it started.
+    await after(2_100);
+    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(2);
+  }, 10_000);
+
+  it('keeps a replacement resolution when the stalled one settles late', async () => {
+    const stalled = Promise.withResolvers<string[]>();
+    const replacement = Promise.withResolvers<string[]>();
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      return calls === 1 ? stalled.promise : replacement.promise;
+    });
+
+    await expect(check('https://stalled.example.com/v1', resolve)).resolves.toBe(
+      'dns_lookup_failed'
+    );
+
+    const second = check('https://stalled.example.com/v1', resolve);
+    await after(10);
+    expect(resolve).toHaveBeenCalledTimes(2);
+
+    stalled.resolve(['104.18.2.115']);
+    await after(10);
+
+    const third = check('https://stalled.example.com/v1', resolve);
+    await after(10);
+    expect(resolve).toHaveBeenCalledTimes(2);
+
+    replacement.resolve(['104.18.2.115']);
+    await expect(second).resolves.toBeNull();
+    await expect(third).resolves.toBeNull();
+  }, 10_000);
+
+  it('keeps a shared resolution for a caller that outlives the first deadline', async () => {
+    const { resolveHostAddresses, resolve } = pendingResolution();
+
+    const first = check('https://pending.example.com/v1', resolveHostAddresses);
+    await after(1_500);
+    const second = check('https://pending.example.com/v1', resolveHostAddresses);
+
+    await expect(first).resolves.toBe('dns_lookup_failed');
+    resolve(['104.18.2.115']);
+    await expect(second).resolves.toBeNull();
+    expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
+  }, 10_000);
+
   it('resolves again for a later validation after the resolution settled', async () => {
     const privateResolve = resolvesTo('10.1.2.3');
     await expect(check('https://internal.example.com/v1', privateResolve)).resolves.toBe(

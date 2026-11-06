@@ -34,10 +34,11 @@ const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 const publicHostnameExpiresAt = new Map<string, number>();
 /**
  * Resolutions in flight, keyed by normalized hostname. A validation reuses the
- * entry for its host while that resolution is pending, and the entry is removed
- * when the resolution settles so the next validation resolves again. The
- * resolution is not tied to any one caller: each caller applies its own signal
- * and deadline to the returned promise.
+ * entry for its host while that resolution is pending. The entry is removed
+ * when the resolution settles, and at the latest after one lookup deadline, so
+ * a resolution that never settles cannot pin the host. Removal only stops new
+ * validations from reusing the entry. Callers that already hold the promise
+ * keep it, with their own signal and deadline.
  */
 const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
 
@@ -96,10 +97,21 @@ function cachePublicHostname(hostname: string, now: number): void {
 }
 
 /**
- * Returns the resolution already in flight for `hostname`, or starts one and
- * records it until it settles. Every validation of the same host awaits that
- * one resolution; each caller applies its own signal and deadline to the
- * promise it receives.
+ * Removes the entry for `hostname` only if it still holds `resolution`. A
+ * stale resolution must not remove a newer entry for the same host.
+ */
+function forgetInFlightResolution(hostname: string, resolution: Promise<string[]>): void {
+  if (inFlightHostnameResolutions.get(hostname) === resolution) {
+    inFlightHostnameResolutions.delete(hostname);
+  }
+}
+
+/**
+ * Returns the resolution already in flight for `hostname`, or starts one. The
+ * entry stays recorded until the resolution settles or one lookup deadline
+ * passes, whichever comes first. Every validation of the same host that starts
+ * in that window awaits that one resolution. Each caller applies its own
+ * signal and deadline to the promise it receives.
  */
 function resolveSharedHostAddresses(
   hostname: string,
@@ -110,12 +122,14 @@ function resolveSharedHostAddresses(
 
   const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
   inFlightHostnameResolutions.set(hostname, resolution);
-  const forget = () => {
-    if (inFlightHostnameResolutions.get(hostname) === resolution) {
-      inFlightHostnameResolutions.delete(hostname);
-    }
-  };
+  const forget = () => forgetInFlightResolution(hostname, resolution);
   void resolution.then(forget, forget);
+  // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
+  // caller. Bound the entry to one deadline, including when every caller left
+  // by abort. No caller that starts with the resolution can still use it
+  // after that point.
+  const retention = setTimeout(forget, DNS_LOOKUP_TIMEOUT_MS);
+  retention.unref?.();
   return resolution;
 }
 
@@ -154,17 +168,24 @@ async function resolveWithRetry(
     }
     signal?.throwIfAborted();
     const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
+    const shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
     try {
       const addresses = await untilAborted(
-        resolveSharedHostAddresses(hostname, resolveHostAddresses),
+        shared,
         signal ? AbortSignal.any([signal, deadline]) : deadline
       );
       if (addresses.length > 0) return addresses;
     } catch {
       if (signal?.aborted) throw signal.reason;
       // A resolution that reaches its deadline ends the validation here; the
-      // caller reports the retryable `dns_lookup_failed` outcome.
-      if (deadline.aborted) return null;
+      // caller reports the retryable `dns_lookup_failed` outcome. Forget the
+      // entry now, without waiting for the retention timer, so the next
+      // validation starts a fresh resolution. Callers that still await this
+      // resolution keep their promise and their own deadline.
+      if (deadline.aborted) {
+        forgetInFlightResolution(hostname, shared);
+        return null;
+      }
       // A resolution that finished with a transient failure is retried; the
       // caller reports dns_lookup_failed once attempts run out.
     }

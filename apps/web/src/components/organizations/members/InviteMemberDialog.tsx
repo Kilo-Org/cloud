@@ -36,7 +36,6 @@ import {
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 
 const emailSchema = z.email();
 
@@ -132,19 +131,8 @@ export function InviteMemberDialog({
     return emailSchema.safeParse(email.trim()).success;
   }, [email]);
 
-  const emailDomainMatchesDirectSSODomain = useMemo(() => {
-    const policy = organizationData?.effectiveSsoPolicy;
-    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
-      return false;
-    }
-    const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === policy.domain;
-  }, [email, organizationData?.effectiveSsoPolicy]);
-
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
-
   const shouldShowEmailError = useMemo(() => {
-    return email.trim() && !isEmailFocused && !isEmailValid;
+    return email.trim().length > 0 && !isEmailFocused && !isEmailValid;
   }, [email, isEmailFocused, isEmailValid]);
 
   const inviteMemberMutation = useInviteMember();
@@ -176,11 +164,6 @@ export function InviteMemberDialog({
 
     if (!isEmailValid) {
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (emailDomainMatchesDirectSSODomain) {
-      toast.error(ssoErrorText);
       return;
     }
 
@@ -255,17 +238,9 @@ export function InviteMemberDialog({
                         handleInviteMember();
                       }
                     }}
-                    aria-invalid={shouldShowEmailError || emailDomainMatchesDirectSSODomain}
-                    aria-describedby={
-                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
-                        ? 'invite-email-error'
-                        : undefined
-                    }
-                    className={
-                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
-                        ? 'border-red-500 focus:border-red-500'
-                        : ''
-                    }
+                    aria-invalid={shouldShowEmailError}
+                    aria-describedby={shouldShowEmailError ? 'invite-email-error' : undefined}
+                    className={shouldShowEmailError ? 'border-red-500 focus:border-red-500' : ''}
                     disabled={!hasSeatsAvailable}
                   />
                 </div>
@@ -313,7 +288,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
+            {shouldShowEmailError && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -328,8 +303,7 @@ export function InviteMemberDialog({
                     />
                   </svg>
                   <p id="invite-email-error" className="text-sm text-red-300" role="alert">
-                    {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
+                    Please enter a valid email address
                   </p>
                 </div>
               </div>
@@ -358,7 +332,6 @@ export function InviteMemberDialog({
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
                 !canInviteMembers ||
                 !hasSeatsAvailable

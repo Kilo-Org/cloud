@@ -4,8 +4,6 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ---- single shared hoisted mock shape ----
-
 const hoisted = vi.hoisted(() => {
   const client = {
     register: vi.fn(),
@@ -53,8 +51,6 @@ const hoisted = vi.hoisted(() => {
 
   return { client, holder, storage, device, appsFlyer };
 });
-
-// ---- all vi.mock calls at top level ----
 
 vi.mock('posthog-react-native', () => ({
   default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
@@ -126,8 +122,6 @@ vi.stubGlobal('__DEV__', false);
 /** Gate inputs for a session, user id, and consent read that have all loaded. */
 const SETTLED = { authLoading: false, userIdLoading: false, consentCheckFailed: false };
 
-// ---- shared loaders ----
-
 // oxlint-disable-next-line require-await -- async required by promise-function-async
 async function loadPostHogModule() {
   vi.resetModules();
@@ -146,8 +140,6 @@ async function loadPostHogWithGate() {
   return { ...posthog, ...gate, ctrl };
 }
 
-// ---- AppsFlyer buffer test ----
-
 describe('buffer isolation between accounts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -159,7 +151,6 @@ describe('buffer isolation between accounts', () => {
   it('drops account A buffered events after switch to account B', async () => {
     vi.useFakeTimers();
 
-    // Load posthog + gate + controller in a fresh module registry.
     const mod = await loadPostHogWithGate();
     // Import appsflyer in the same registry so controller is shared.
     const appsflyerMod = await import('../appsflyer');
@@ -170,10 +161,8 @@ describe('buffer isolation between accounts', () => {
       return null;
     }
 
-    // 1. Hold session-ready — the SDK never starts, so initialized stays false.
     hoisted.appsFlyer.registerSessionReadyListener.mockResolvedValue(undefined);
 
-    // Mount hook for account A (optionalConsent: true triggers start path).
     const rendererA = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -185,7 +174,6 @@ describe('buffer isolation between accounts', () => {
         optionalConsent: true,
       })
     );
-    // Flush synchronous effects.
     await act(async () => {
       await Promise.resolve();
     });
@@ -193,14 +181,11 @@ describe('buffer isolation between accounts', () => {
     // startOptionalTelemetry calls resumePostHog (110 ms timer).
     await vi.advanceTimersByTimeAsync(110);
 
-    // 2. Buffer a login event while init is stalled.
     appsflyerMod.trackEvent('login');
     expect(hoisted.appsFlyer.logEvent).not.toHaveBeenCalled();
 
-    // 3. Unmount account A.
     rendererA.unmount();
 
-    // 4. Now let the session become ready for account B.
     hoisted.appsFlyer.registerSessionReadyListener.mockImplementation(
       // oxlint-disable-next-line require-await -- async required by promise-function-async
       async (onReady: () => void) => {
@@ -230,18 +215,14 @@ describe('buffer isolation between accounts', () => {
 
     await vi.advanceTimersByTimeAsync(110);
 
-    // 5. Prove account B's SDK started.
     expect(hoisted.appsFlyer.start).toHaveBeenCalledTimes(1);
 
-    // 6. Account A's buffered event must not drain.
     expect(hoisted.appsFlyer.logEvent).toHaveBeenCalledTimes(0);
 
     rendererB.unmount();
     vi.useRealTimers();
   });
 });
-
-// ---- PostHog discard boundary tests ----
 
 describe('discard closes capture', () => {
   beforeEach(() => {
@@ -288,8 +269,6 @@ describe('discard closes capture', () => {
   });
 });
 
-// ---- optional telemetry lifecycle ----
-
 describe('optional telemetry lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -316,7 +295,6 @@ describe('optional telemetry lifecycle', () => {
       return null;
     }
 
-    // Mount the hook with optionalConsent=false — triggers discard path.
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -343,7 +321,6 @@ describe('optional telemetry lifecycle', () => {
 
     // oxlint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
     optOutResolve!();
-    // Flush the async discard chain.
     await Promise.resolve();
     await Promise.resolve();
 
@@ -363,8 +340,6 @@ describe('optional telemetry lifecycle', () => {
       return null;
     }
 
-    // Mount with optionalConsent=false — discardPostHog runs, optOut resolves,
-    // epoch matches → purgePostHogPersistence called.
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -380,7 +355,6 @@ describe('optional telemetry lifecycle', () => {
       await Promise.resolve();
     });
 
-    // Flush the async discard chain.
     await Promise.resolve();
     await Promise.resolve();
 
@@ -402,9 +376,6 @@ describe('optional telemetry lifecycle', () => {
       return null;
     }
 
-    // Mount with optionalConsent=true — triggers start path.
-    // setTelemetryDecision runs synchronously, then startOptionalTelemetry
-    // calls resumePostHog which schedules a 110 ms setTimeout.
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -426,8 +397,6 @@ describe('optional telemetry lifecycle', () => {
     // Advance past the 110 ms debounce in resumePostHog.
     await vi.advanceTimersByTimeAsync(110);
 
-    // Epoch mismatch after resume → initAppsFlyer, initPostHog, identifyUser
-    // never called.
     expect(hoisted.holder.options).toBeUndefined();
     expect(hoisted.appsFlyer.setConsentData).not.toHaveBeenCalled();
     expect(hoisted.appsFlyer.init).not.toHaveBeenCalled();
@@ -436,8 +405,6 @@ describe('optional telemetry lifecycle', () => {
     vi.useRealTimers();
   });
 });
-
-// ---- needsConsent gate teardown ----
 
 describe('needsConsent gate teardown', () => {
   beforeEach(() => {
@@ -454,15 +421,12 @@ describe('needsConsent gate teardown', () => {
     gate.ctrl.setTelemetryDecision('test-account', true);
     gate.initPostHog();
 
-    // Define a wrapper that drives the gate hook with the supplied state.
     type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
     function GateWrapper(props: GateState): null {
       gate.useAnalyticsConsentGate(props);
       return null;
     }
 
-    // Mount with needsConsent=true while signed in — must trigger full teardown.
-    // Wrap in act so React flushes the useEffect synchronously.
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -491,7 +455,6 @@ describe('needsConsent gate teardown', () => {
     // discardPostHog runs sealPostHogStorage synchronously.
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
 
-    // Flush the async discard chain (optOut is mockResolvedValue).
     // Two flushes: one for optOut resolution, one for the chained
     // discardOptionalTelemetry to reach the epoch check + purge.
     await Promise.resolve();
@@ -500,12 +463,9 @@ describe('needsConsent gate teardown', () => {
     expect(hoisted.client.optOut).toHaveBeenCalled();
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
-    // Unmount the renderer so effects and subscriptions are torn down.
     rendererRef.current?.unmount();
   });
 });
-
-// ---- unsettled consent teardown ----
 
 describe('unsettled consent teardown', () => {
   beforeEach(() => {
@@ -547,16 +507,13 @@ describe('unsettled consent teardown', () => {
       await Promise.resolve();
     });
 
-    // Controller decision must be cleared.
     expect(mod.ctrl.allowsOptional()).toBe(false);
 
-    // resetAppsFlyerState must be called.
     expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
 
     // discardPostHog runs sealPostHogStorage synchronously.
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
 
-    // Flush the async discard chain.
     await Promise.resolve();
     await Promise.resolve();
 
@@ -656,7 +613,6 @@ describe('unsettled consent teardown', () => {
     vi.useFakeTimers();
     const mod = await loadPostHogWithGate();
 
-    // Arm telemetry.
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
     expect(hoisted.client.capture).toHaveBeenCalledTimes(0);
@@ -667,7 +623,6 @@ describe('unsettled consent teardown', () => {
       return null;
     }
 
-    // Step 1: unsettle by removing the token.
     const renderer1Ref: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -686,7 +641,6 @@ describe('unsettled consent teardown', () => {
       await Promise.resolve();
     });
 
-    // Flush the async discard so the client is nulled.
     await vi.advanceTimersByTimeAsync(120);
     await Promise.resolve();
     await Promise.resolve();
@@ -695,13 +649,11 @@ describe('unsettled consent teardown', () => {
 
     renderer1Ref.current?.unmount();
 
-    // Clear call history so recovery assertions are clean.
     hoisted.client.capture.mockClear();
     hoisted.client.register.mockClear();
     hoisted.storage.sealPostHogStorage.mockClear();
     hoisted.storage.purgePostHogPersistence.mockClear();
 
-    // Step 2: recover — re-sign in with valid optional consent.
     const renderer2Ref: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -728,10 +680,8 @@ describe('unsettled consent teardown', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // initPostHog must create a new client.
     expect(hoisted.client.register).toHaveBeenCalledTimes(1);
 
-    // captureEvent must work after recovery.
     mod.captureEvent('recovery-test');
     expect(hoisted.client.capture).toHaveBeenCalledWith('recovery-test', undefined);
 
@@ -749,12 +699,10 @@ describe('unsettled consent teardown', () => {
       return null;
     }
 
-    // Step 1: arm telemetry.
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
 
-    // Step 2: off — mount with optionalConsent=false triggers discard.
     const rendererOff = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -770,7 +718,6 @@ describe('unsettled consent teardown', () => {
       await Promise.resolve();
     });
 
-    // Flush the async discard chain.
     await vi.advanceTimersByTimeAsync(120);
     await Promise.resolve();
     await Promise.resolve();
@@ -779,10 +726,8 @@ describe('unsettled consent teardown', () => {
 
     rendererOff.unmount();
 
-    // Clear the optOut mock so we can assert the new client is NOT opted out.
     hoisted.client.optOut.mockClear();
 
-    // Step 3: on — mount with optionalConsent=true triggers recovery.
     const rendererOn = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
@@ -803,10 +748,8 @@ describe('unsettled consent teardown', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // The new client must NOT have optOut called on it.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
 
-    // The new client must be able to capture.
     hoisted.client.capture.mockClear();
     mod.captureEvent('after-recovery');
     expect(hoisted.client.capture).toHaveBeenCalledWith('after-recovery', undefined);

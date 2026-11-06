@@ -11,7 +11,7 @@ function withoutKeys(value, keys) {
   return result;
 }
 
-function dependencyGraph(lockfile, workspace, patches, directory) {
+function dependencyGraph(lockfile, workspace, patches, directory, roots) {
   const graph = new Map();
   const names = new Set();
   const nativeNames = new Set();
@@ -52,7 +52,19 @@ function dependencyGraph(lockfile, workspace, patches, directory) {
     visitDependencies(importer.optionalDependencies, directory);
   }
 
-  visitImporter(directory);
+  function visitPackages(rootNames) {
+    const importer = lockfile.importers[directory];
+    if (!importer) throw new Error(`Missing lockfile importer: ${directory}`);
+    const groups = [importer.dependencies, importer.devDependencies, importer.optionalDependencies];
+    for (const name of rootNames) {
+      const dependency = groups.map(group => group?.[name]).find(Boolean);
+      if (!dependency) throw new Error(`Missing lockfile dependency: ${directory} ${name}`);
+      visitDependencies({ [name]: dependency }, directory);
+    }
+  }
+
+  if (roots) visitPackages(roots);
+  else visitImporter(directory);
   const importer = lockfile.importers[directory];
   const usesNative = ['dependencies', 'devDependencies', 'optionalDependencies'].some(group =>
     Object.hasOwn(importer[group] ?? {}, 'react-native')
@@ -91,6 +103,18 @@ export function importerClosure(snapshot, directory) {
     throw new Error('Unsupported pnpm lockfile');
   }
   return dependencyGraph(lockfile, snapshot.workspace, snapshot.patches, directory);
+}
+
+// What one importer resolves for the named packages: every snapshot and package
+// metadata entry those packages resolve, and the patched content inside that
+// graph. An entry the importer does not resolve is an error, not an empty
+// closure, because a caller would then key on the wrong inputs.
+export function packageClosure(snapshot, directory, names) {
+  const { lockfile } = snapshot;
+  if (lockfile.lockfileVersion !== '9.0' || !lockfile.importers || !lockfile.snapshots) {
+    throw new Error('Unsupported pnpm lockfile');
+  }
+  return dependencyGraph(lockfile, snapshot.workspace, snapshot.patches, directory, names);
 }
 
 function nativeOnlyPatch(content) {

@@ -1,5 +1,5 @@
 {
-  "id": "72d65304-50f4-4069-b58a-f2b6fd25f12a",
+  "id": "db8ad900-c172-4831-944c-bd76a4ea92f2",
   "prevId": "cef8cdc7-6e64-49b4-997f-3c3ed05f70a1",
   "version": "7",
   "dialect": "postgresql",
@@ -4150,172 +4150,6 @@
         "byok_api_keys_owner_check": {
           "name": "byok_api_keys_owner_check",
           "value": "(\n        (\"byok_api_keys\".\"kilo_user_id\" IS NOT NULL AND \"byok_api_keys\".\"organization_id\" IS NULL) OR\n        (\"byok_api_keys\".\"kilo_user_id\" IS NULL AND \"byok_api_keys\".\"organization_id\" IS NOT NULL)\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.claude_billing_connections": {
-      "name": "claude_billing_connections",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_profile_id": {
-          "name": "user_profile_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "connection_id": {
-          "name": "connection_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "last_refusal_code": {
-          "name": "last_refusal_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_refusal_at": {
-          "name": "last_refusal_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "connected_at": {
-          "name": "connected_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "UQ_claude_billing_connections_personal": {
-          "name": "UQ_claude_billing_connections_personal",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_claude_billing_connections_organization": {
-          "name": "UQ_claude_billing_connections_organization",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"claude_billing_connections\".\"organization_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "claude_billing_connections_kilo_user_id_kilocode_users_id_fk": {
-          "name": "claude_billing_connections_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "claude_billing_connections",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "claude_billing_connections_organization_id_organizations_id_fk": {
-          "name": "claude_billing_connections_organization_id_organizations_id_fk",
-          "tableFrom": "claude_billing_connections",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_claude_billing_connections_user_profile_id": {
-          "name": "UQ_claude_billing_connections_user_profile_id",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_profile_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "claude_billing_connections_status_check": {
-          "name": "claude_billing_connections_status_check",
-          "value": "\"claude_billing_connections\".\"status\" IN ('pending', 'connected', 'billing_unavailable', 'removed')"
-        },
-        "claude_billing_connections_owner_check": {
-          "name": "claude_billing_connections_owner_check",
-          "value": "(\n        (\"claude_billing_connections\".\"kilo_user_id\" IS NOT NULL AND \"claude_billing_connections\".\"organization_id\" IS NULL) OR\n        (\"claude_billing_connections\".\"kilo_user_id\" IS NULL AND \"claude_billing_connections\".\"organization_id\" IS NOT NULL)\n      )"
         }
       },
       "isRLSEnabled": false
@@ -40815,6 +40649,13 @@
           "notNull": true,
           "default": "'standard'"
         },
+        "credential_source": {
+          "name": "credential_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'github_app'"
+        },
         "github_user_id": {
           "name": "github_user_id",
           "type": "text",
@@ -40837,19 +40678,19 @@
           "name": "access_token_expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "refresh_token_encrypted": {
           "name": "refresh_token_encrypted",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "refresh_token_expires_at": {
           "name": "refresh_token_expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "credential_version": {
           "name": "credential_version",
@@ -40957,6 +40798,10 @@
         "user_github_app_tokens_app_type_check": {
           "name": "user_github_app_tokens_app_type_check",
           "value": "\"user_github_app_tokens\".\"github_app_type\" IN ('standard', 'lite')"
+        },
+        "user_github_app_tokens_source_check": {
+          "name": "user_github_app_tokens_source_check",
+          "value": "(\"user_github_app_tokens\".\"credential_source\" = 'github_app'\n        AND \"user_github_app_tokens\".\"access_token_expires_at\" IS NOT NULL\n        AND \"user_github_app_tokens\".\"refresh_token_encrypted\" IS NOT NULL\n        AND \"user_github_app_tokens\".\"refresh_token_expires_at\" IS NOT NULL)\n        OR (\"user_github_app_tokens\".\"credential_source\" = 'provided_token'\n        AND \"user_github_app_tokens\".\"github_app_type\" = 'standard'\n        AND \"user_github_app_tokens\".\"refresh_token_encrypted\" IS NULL\n        AND \"user_github_app_tokens\".\"refresh_token_expires_at\" IS NULL)"
         }
       },
       "isRLSEnabled": false

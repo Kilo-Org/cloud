@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { dump, load } from 'js-yaml';
 
-import { lockfileInput } from './build-key-inputs.mjs';
+import { lockfileInput, packageClosureInput } from './build-key-inputs.mjs';
 
 function repository(lockfile, workspace = { packages: ['apps/*', 'packages/*'] }) {
   const root = mkdtempSync(join(tmpdir(), 'build-key-inputs-'));
@@ -151,6 +151,94 @@ test('an unsupported lockfile version falls back to the whole lockfile', () => {
   );
 });
 
+function pluginLockfile() {
+  const lock = lockfile();
+  lock.importers['packages/harness-sdk'].devDependencies = {
+    typia: { specifier: '15.1.0', version: '15.1.0(ttsc@0.33.0)' },
+    ttsc: { specifier: '0.33.0', version: '0.33.0' },
+    typescript: { specifier: 'catalog:', version: '7.0.2' },
+  };
+  lock.packages['typia@15.1.0'] = { resolution: { integrity: 'typia-integrity' } };
+  lock.packages['ttsc@0.33.0'] = { resolution: { integrity: 'ttsc-integrity' } };
+  lock.packages['typescript@7.0.2'] = { resolution: { integrity: 'typescript-integrity' } };
+  lock.snapshots['typia@15.1.0(ttsc@0.33.0)'] = {
+    optionalDependencies: { ttsc: '0.33.0' },
+  };
+  lock.snapshots['ttsc@0.33.0'] = {};
+  lock.snapshots['typescript@7.0.2'] = {};
+  return lock;
+}
+
+const pluginPackages = ['ttsc', 'typia', 'typescript'];
+
+test("the package closure keys on the named packages' own graph", () => {
+  const before = repository(pluginLockfile());
+  const changed = pluginLockfile();
+  // A sibling in the same importer, unrelated to the plugin: the importer
+  // closure moves, the plugin closure does not.
+  changed.importers['packages/harness-sdk'].dependencies.effect = {
+    specifier: '4.0.6',
+    version: '4.0.6',
+  };
+  changed.packages['effect@4.0.6'] = { resolution: { integrity: 'effect-4.0.6-integrity' } };
+  changed.snapshots['effect@4.0.6'] = {};
+  const after = repository(changed);
+
+  assert.notEqual(
+    lockfileInput(after, 'packages/harness-sdk'),
+    lockfileInput(before, 'packages/harness-sdk')
+  );
+  assert.ok(
+    packageClosureInput(before, 'packages/harness-sdk', pluginPackages).startsWith('packages\0'),
+    'the fixture must resolve the plugin closure, not widen to the lockfile'
+  );
+  assert.equal(
+    packageClosureInput(after, 'packages/harness-sdk', pluginPackages),
+    packageClosureInput(before, 'packages/harness-sdk', pluginPackages)
+  );
+});
+
+test("a change inside the named package's graph moves the package closure", () => {
+  const before = repository(pluginLockfile());
+  const changed = pluginLockfile();
+  changed.importers['packages/harness-sdk'].devDependencies.typia = {
+    specifier: '15.2.0',
+    version: '15.2.0(ttsc@0.33.0)',
+  };
+  changed.packages['typia@15.2.0'] = { resolution: { integrity: 'typia-2-integrity' } };
+  changed.snapshots['typia@15.2.0(ttsc@0.33.0)'] = {
+    optionalDependencies: { ttsc: '0.33.0' },
+  };
+  const after = repository(changed);
+
+  assert.notEqual(
+    packageClosureInput(after, 'packages/harness-sdk', pluginPackages),
+    packageClosureInput(before, 'packages/harness-sdk', pluginPackages)
+  );
+  // Another importer's own drift still leaves the plugin closure alone.
+  const elsewhere = pluginLockfile();
+  elsewhere.importers['apps/other'].dependencies.router = { specifier: '2.0.0', version: '2.0.0' };
+  assert.equal(
+    packageClosureInput(repository(elsewhere), 'packages/harness-sdk', pluginPackages),
+    packageClosureInput(before, 'packages/harness-sdk', pluginPackages)
+  );
+});
+
+test('an unresolvable package widens the closure to the whole lockfile', () => {
+  const errors = [];
+  const original = console.error;
+  console.error = message => errors.push(message);
+  try {
+    const root = repository(lockfile());
+    assert.ok(
+      packageClosureInput(root, 'packages/harness-sdk', ['absent']).startsWith('lockfile\0')
+    );
+  } finally {
+    console.error = original;
+  }
+  assert.match(errors.at(-1), /^Cannot hash the packages\/harness-sdk package closure/);
+});
+
 test('the repository lockfile keys on its closures, and keeps them when an unrelated importer appears', () => {
   const root = mkdtempSync(join(tmpdir(), 'build-key-repo-'));
   cpSync(new URL('../pnpm-lock.yaml', import.meta.url), join(root, 'pnpm-lock.yaml'));
@@ -167,4 +255,12 @@ test('the repository lockfile keys on its closures, and keeps them when an unrel
   writeFileSync(join(root, 'pnpm-lock.yaml'), dump(data, { lineWidth: -1 }));
 
   assert.equal(lockfileInput(root, 'packages/harness-sdk'), before);
+
+  const pluginBefore = packageClosureInput(root, 'packages/harness-sdk', [
+    'ttsc',
+    'typia',
+    '@ttsc/unplugin',
+    'typescript',
+  ]);
+  assert.ok(pluginBefore.startsWith('packages\0'), 'the real lockfile resolves the plugin closure');
 });

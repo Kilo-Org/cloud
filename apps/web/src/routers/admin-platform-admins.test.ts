@@ -12,7 +12,7 @@ import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 const KILO_DOMAIN = hosted_domain_specials.kilocode_admin;
@@ -601,8 +601,15 @@ describe('admin.users.setAdminPermissions', () => {
       })
     ).resolves.toMatchObject({ changed: true });
 
+    // The first call rotates the actor's own session credentials, so the next
+    // request carries the freshly authenticated session.
+    const current = await getUser(admin.id);
+    const nextCaller = await createSessionCallerForUser(admin.id, {
+      webSessionPepper: current.web_session_pepper,
+    });
+
     await expect(
-      caller.admin.users.setAdminPermissions({
+      nextCaller.admin.users.setAdminPermissions({
         userId: admin.id,
         permissions: { isSuperadmin: false },
       })

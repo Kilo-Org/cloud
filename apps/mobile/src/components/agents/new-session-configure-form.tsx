@@ -186,18 +186,6 @@ export function NewSessionConfigureForm({
     windowHeight,
     keyboardVerticalOffset: keyboardInsetOffset(bottom),
   };
-  // TEMP PROBE: remove before commit.
-  console.log(
-    'PROBE form',
-    JSON.stringify({
-      windowHeight,
-      bottom,
-      containerFrame,
-      footerHeight,
-      keyboardHeight,
-      keyboardVisible,
-    })
-  );
   // Fit against the keyboard's destination, not each intermediate viewport.
   // The prompt interpolates to that whole-line fit on the UI thread.
   const frameHeight = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight });
@@ -454,12 +442,17 @@ export function NewSessionConfigureForm({
   );
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows
-  // below its full-height sibling and leaves Start behind the keyboard.
+  // below its full-height sibling and leaves Start behind the keyboard. This
+  // form also renders inside the Tour modal, above the window's own bottom
+  // edge, so the lift is measured where the window places the view; the
+  // Android navigation-bar correction stays the separate vertical offset the
+  // content's own bottom padding needs.
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
       style={sideInsetStyle}
-      {...keyboardAvoidingViewProps(bottom)}
+      {...keyboardAvoidingViewProps()}
+      keyboardVerticalOffset={keyboardInsetOffset(bottom)}
       onLayout={handleContainerLayout}
     >
       {body}

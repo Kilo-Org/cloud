@@ -24,7 +24,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
-vi.mock('@/components/ui/icons', () => ({ MoreHorizontal: 'MoreHorizontal' }));
+vi.mock('@/components/ui/icons', () => ({ FileText: 'FileText' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000' }),
 }));

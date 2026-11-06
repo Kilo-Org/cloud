@@ -22,10 +22,13 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
 import { FindingRow } from '@/components/security-agent/finding-row';
+import {
+  FindingListSkeletonRows,
+  FindingRowSkeleton,
+} from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
@@ -34,6 +37,8 @@ import {
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { classifyListBody } from '@/lib/query/list-body-state';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
@@ -51,7 +56,7 @@ function FindingsListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-lg" />;
+    return <FindingRowSkeleton index={0} />;
   }
   if (error) {
     return (
@@ -121,7 +126,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     () => items.some(item => isSecurityFindingAnalyzable(item)),
     [items]
   );
-  const hasListContent = items.length > 0 || findings.isFetchNextPageError;
+  // Only a delivered page may claim there are no open findings: a read that is
+  // paused, never started, or whose pages were cleared has not answered. An
+  // unsettled connectivity keeps the skeleton instead of naming the connection.
+  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const body = classifyListBody({
+    rowCount: items.length,
+    hasDeliveredData: (findings.data?.pages.length ?? 0) > 0,
+    hasInlineError: findings.isFetchNextPageError,
+    isError: findings.isError,
+    isFetching: findings.isFetching,
+    fetchStatus: findings.fetchStatus,
+    connectivityKnown,
+  });
   // Hoisted so the list keeps one renderer identity across unrelated screen
   // renders (refresh, filter sheet). FlashList's memoized ViewHolder compares
   // `renderItem` and `extraData` by identity before re-rendering a row.
@@ -198,23 +215,28 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         />
       ) : null}
 
-      {findings.isLoading && (
-        <View className="flex-1 gap-3 px-6 pt-4">
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
+      {body.status === 'loading' && (
+        <View style={listStyle}>
+          <View style={listContentContainerStyle}>
+            {/* The loaded list's `ListHeaderComponent` band, so the first card
+                lands where the first placeholder row stood. */}
+            <View className="pb-3" />
+            <FindingListSkeletonRows />
+          </View>
         </View>
       )}
 
-      {!findings.isLoading && findings.isError && !hasListContent && (
+      {body.status === 'error' && (
         <QueryError
+          variant={body.cause === 'offline' ? 'offline' : 'neutral'}
           message={t('securityAgent.findingList.couldNotLoad')}
           onRetry={() => void findings.refetch()}
+          isRetrying={body.isRetrying}
           refreshControl={refreshControl}
         />
       )}
 
-      {!findings.isLoading && !findings.isError && !hasListContent && (
+      {body.status === 'empty' && (
         <EmptyState
           icon={ShieldCheck}
           refreshControl={refreshControl}
@@ -244,7 +266,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         />
       )}
 
-      {!findings.isLoading && hasListContent && (
+      {body.status === 'rows' && (
         <FlashList<SecurityFinding>
           style={listStyle}
           data={items}

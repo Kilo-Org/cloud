@@ -29,6 +29,7 @@ const provider = vi.hoisted(() => ({ status: 'connected' }));
 const connectivity = vi.hoisted(() => ({ known: true }));
 const platformError = vi.hoisted(() => ({
   variants: [] as string[],
+  backFallbacks: [] as (string | undefined)[],
   retries: [] as (() => void)[],
   retrying: [] as boolean[],
 }));
@@ -52,6 +53,7 @@ const openPicker = vi.hoisted(() => vi.fn());
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  useColorScheme: () => 'light',
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
@@ -111,10 +113,12 @@ vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
     variant?: string;
+    backFallback?: string;
     onRetry?: () => void;
     isRetrying?: boolean;
   }) => {
     platformError.variants.push(props.variant ?? 'server');
+    platformError.backFallbacks.push(props.backFallback);
     platformError.retrying.push(props.isRetrying ?? false);
     if (props.onRetry) {
       platformError.retries.push(props.onRetry);
@@ -284,6 +288,7 @@ beforeEach(() => {
   provider.status = 'connected';
   connectivity.known = true;
   platformError.variants = [];
+  platformError.backFallbacks = [];
   platformError.retries = [];
   platformError.retrying = [];
   skeletonRenders.count = 0;
@@ -357,6 +362,9 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
     await renderScreen();
 
     expect(platformError.variants).toEqual(['offline']);
+    // The failed state offers Back, so a review screen reached without history
+    // is not a dead end.
+    expect(platformError.backFallbacks).toEqual(['/(app)/(tabs)/(0_home)']);
     expect(skeletonRenders.count).toBe(0);
   });
 

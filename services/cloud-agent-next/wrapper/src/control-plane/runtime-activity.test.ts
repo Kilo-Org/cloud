@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import type { Harness } from './harness.js';
 import {
   createRuntimeActivity,
   SESSION_CONTROL_REQUEST_MS,
@@ -21,22 +21,22 @@ const observation = (status: 'busy' | 'idle' = 'busy'): SessionObservation => ({
 function harness() {
   let now = 0;
   const snapshots: Array<Parameters<NonNullable<RuntimeActivityOptions['readSnapshot']>>[0]> = [];
-  const aborts: Array<Parameters<WrapperKiloClient['abortSession']>[0]> = [];
+  const aborts: Array<Parameters<Harness['interrupt']>[0]> = [];
   const faults: ActivityFault[] = [];
   const deadlines: string[] = [];
   let read: NonNullable<RuntimeActivityOptions['readSnapshot']> = async () => [];
-  let abort: WrapperKiloClient['abortSession'] = async () => true;
+  let abort: Harness['interrupt'] = async () => true;
   const activity = createRuntimeActivity({
     nativeRuntimeId: 'process-1',
     directory: '/workspace',
     timers: CONTROL_PLANE_TIMERS.wrapper,
     now: () => now,
     client: {
-      abortSession: async input => {
+      interrupt: async input => {
         aborts.push(input);
         return abort(input);
       },
-    } as WrapperKiloClient,
+    } as Harness,
     readSnapshot: input => {
       snapshots.push(input);
       return read(input);

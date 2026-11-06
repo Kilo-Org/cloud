@@ -62,8 +62,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The hash steps run tsx over the local dev/local scripts and let
+      # @expo/fingerprint read the Expo config from apps/mobile, so they need the
+      # root project and the mobile app, not the whole workspace. Both build jobs
+      # wait behind this one, so a filtered install here releases them sooner.
+      # The hash must stay identical to the one a build job recomputes after its
+      # recursive install, or the artifact name matches no build.
+      - name: Install root and mobile dependencies
+        run: pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts
 
       - name: Compute hashes and gate the build
         id: decide
@@ -108,8 +114,12 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # The probe runs tsx over the local dev/local scripts, so it needs only
+      # the root project's dependencies. A duplicate that reaches this job
+      # after another run published pays this filtered install instead of the
+      # recursive workspace one, and the guarded install below then never runs.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Check whether another run published this artifact
         id: published
@@ -118,13 +128,17 @@ jobs:
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
 
-      - name: Build trpc types
+      - name: Install dependencies
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/trpc run build
+        run: pnpm install --frozen-lockfile
 
-      - name: Build harness SDK
+      - name: Restore or build tRPC declarations
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Restore or build the harness SDK
+        if: steps.published.outputs.published != 'true'
+        uses: ./.github/actions/harness-sdk-build
 
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
@@ -216,8 +230,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Same split as the ios job: the filtered install is enough for the
+      # probe, and a duplicate never reaches the workspace install.
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Check whether another run published this artifact
         id: published
@@ -226,17 +242,36 @@ jobs:
           ARTIFACT: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
         run: pnpm exec tsx dev/local/mobile-native-gate.ts --published "$ARTIFACT"
 
-      - name: Build trpc types
+      - name: Install dependencies
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/trpc run build
+        run: pnpm install --frozen-lockfile
 
-      - name: Build harness SDK
+      - name: Restore or build tRPC declarations
         if: steps.published.outputs.published != 'true'
-        run: pnpm --filter @kilocode/harness-sdk run build
+        uses: ./.github/actions/trpc-declarations
+
+      - name: Restore or build the harness SDK
+        if: steps.published.outputs.published != 'true'
+        uses: ./.github/actions/harness-sdk-build
 
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      # The prebuild rewrites apps/mobile/android inside this run, so the key
+      # hashes the inputs that pin the generated Gradle toolchain — the app
+      # manifest and the lockfile, which also records the patch hashes —
+      # instead of a generated wrapper file that does not exist yet. A warm
+      # user home is reused without a daemon; a miss only costs the download
+      # path this job already pays, and the Build step stays the gate.
+      - name: Cache the Gradle user home
+        if: steps.published.outputs.published != 'true'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('apps/mobile/package.json', 'pnpm-lock.yaml') }}
 
       - name: Build
         if: steps.published.outputs.published != 'true'

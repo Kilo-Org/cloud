@@ -2,14 +2,58 @@ import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encr
 import { z } from 'zod';
 import { hasCanonicalEncryptedValueFormat } from './github-session-capability.js';
 import { GitLabProjectPathSchema, normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import {
+  CURRENT_CAPABILITY_PREFIX,
+  LEGACY_CAPABILITY_PREFIX,
+} from '@kilocode/worker-utils/scm-capability-contract';
 export { parseGitLabCloneUrl } from './gitlab-url.js';
 export type { GitLabCloneUrlFailureReason, GitLabCloneUrlResult } from './gitlab-url.js';
 
-const LEGACY_CAPABILITY_PREFIX = 'kgl1.';
-const BOUND_CAPABILITY_PREFIX = 'kgl2.';
+const LEGACY_PREFIX = LEGACY_CAPABILITY_PREFIX.gitlab;
+const BOUND_CAPABILITY_PREFIX = CURRENT_CAPABILITY_PREFIX.gitlab;
 const CAPABILITY_PURPOSE = 'gitlab_scm_session';
 const MAX_LEGACY_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 2 * 60 * 60 * 1000;
 const MAX_BOUND_GITLAB_SCM_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Operation policy for the first segment under a matching project. A listed
+ * family answers the methods its policy allows; an unlisted family keeps every
+ * method, so project-local CLI work keeps its project-wide breadth.
+ */
+const GITLAB_PROJECT_FAMILY_POLICY: Record<string, 'read-only' | 'refused'> = {
+  access_tokens: 'refused',
+  deploy_keys: 'refused',
+  deploy_tokens: 'refused',
+  job_token_scope: 'refused',
+  secure_files: 'refused',
+  triggers: 'refused',
+  variables: 'refused',
+  access_requests: 'read-only',
+  approval_rules: 'read-only',
+  approval_settings: 'read-only',
+  custom_attributes: 'read-only',
+  hooks: 'read-only',
+  integrations: 'read-only',
+  invitations: 'read-only',
+  members: 'read-only',
+  protected_branches: 'read-only',
+  protected_environments: 'read-only',
+  protected_tags: 'read-only',
+  push_rule: 'read-only',
+  remote_mirrors: 'read-only',
+  runners: 'read-only',
+  services: 'read-only',
+  share: 'read-only',
+  archive: 'read-only',
+  export: 'read-only',
+  fork: 'read-only',
+  housekeeping: 'read-only',
+  restore: 'read-only',
+  transfer: 'read-only',
+  unarchive: 'read-only',
+};
+
+const GITLAB_PROJECT_READ_METHODS: readonly string[] = ['GET', 'HEAD'];
 
 function getGitLabSessionCapabilityLifetimeMs(version: 1 | 2): number {
   return version === 1
@@ -95,6 +139,7 @@ export type GitLabSessionCapabilitySubject = {
 export type GitLabSessionCapabilityClaims = z.infer<typeof GitLabSessionCapabilityClaimsSchema>;
 
 export function validateGitLabSessionCapabilityPath(
+  requestMethod: string,
   pathname: string,
   session: Pick<GitLabSessionCapabilitySubject, 'projectPath' | 'source'>,
   basePath: string
@@ -102,6 +147,7 @@ export function validateGitLabSessionCapabilityPath(
   failure: 'invalid_upstream_url' | 'invalid_upstream_request' | 'repository_mismatch' | null;
   authSurface: 'git' | 'api';
 } {
+  const method = requestMethod.toUpperCase();
   const repositoryPath = `${basePath}/${session.projectPath}.git`;
   const gitEndpoint =
     /^(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/;
@@ -121,11 +167,19 @@ export function validateGitLabSessionCapabilityPath(
 
   const projectApiPrefix = `${basePath}/api/v4/projects/`;
   if (pathname.startsWith(projectApiPrefix)) {
-    const projectSelector = pathname.slice(projectApiPrefix.length).split('/', 1)[0];
+    const [projectSelector, ...remainingSegments] = pathname
+      .slice(projectApiPrefix.length)
+      .split('/');
     if (!projectSelector) return { failure: 'invalid_upstream_url', authSurface: 'api' };
     let decodedProjectSelector: string;
+    let family: string;
     try {
       decodedProjectSelector = decodeURIComponent(projectSelector);
+      // Keep only the first component of the family segment, without a format
+      // suffix, which the upstream router strips before it selects a resource.
+      const familySegment = decodeURIComponent(remainingSegments[0] ?? '');
+      const familyComponent = familySegment.split(/[/\\]/)[0] ?? '';
+      family = (familyComponent.split('.')[0] ?? '').toLowerCase();
     } catch {
       return { failure: 'invalid_upstream_url', authSurface: 'api' };
     }
@@ -133,8 +187,20 @@ export function validateGitLabSessionCapabilityPath(
       decodedProjectSelector === session.projectPath ||
       (session.source.type === 'project' &&
         decodedProjectSelector === String(session.source.projectId));
+    if (!selectorMatches) return { failure: 'repository_mismatch', authSurface: 'api' };
+    // The project root answers reads only.
+    const policy =
+      family === ''
+        ? 'read-only'
+        : Object.hasOwn(GITLAB_PROJECT_FAMILY_POLICY, family)
+          ? GITLAB_PROJECT_FAMILY_POLICY[family]
+          : undefined;
     return {
-      failure: selectorMatches ? null : 'repository_mismatch',
+      failure:
+        policy === 'refused' ||
+        (policy === 'read-only' && !GITLAB_PROJECT_READ_METHODS.includes(method))
+          ? 'invalid_upstream_request'
+          : null,
       authSurface: 'api',
     };
   }
@@ -185,7 +251,7 @@ export class GitLabSessionCapabilityCodec {
     });
     if (!parsed.success) throw new GitLabSessionCapabilityError('invalid_capability');
     try {
-      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_CAPABILITY_PREFIX;
+      const prefix = bound ? BOUND_CAPABILITY_PREFIX : LEGACY_PREFIX;
       return `${prefix}${encryptWithSymmetricKey(JSON.stringify(parsed.data), this.encryptionKey)}`;
     } catch {
       throw new GitLabSessionCapabilityError('capability_configuration_error');
@@ -193,8 +259,8 @@ export class GitLabSessionCapabilityCodec {
   }
 
   decode(capability: string): GitLabSessionCapabilityClaims {
-    const format = capability.startsWith(LEGACY_CAPABILITY_PREFIX)
-      ? { prefix: LEGACY_CAPABILITY_PREFIX, version: 1 as const }
+    const format = capability.startsWith(LEGACY_PREFIX)
+      ? { prefix: LEGACY_PREFIX, version: 1 as const }
       : capability.startsWith(BOUND_CAPABILITY_PREFIX)
         ? { prefix: BOUND_CAPABILITY_PREFIX, version: 2 as const }
         : null;

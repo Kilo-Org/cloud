@@ -15,15 +15,25 @@ import type { NormalizedPosthogEvent } from './posthog-fixture';
 
 export const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
+/** A running fixture HTTP server: its base URL and a teardown that force-closes connections. */
+export interface FixtureServer {
+  close: () => Promise<void>;
+  url: string;
+}
+
 export const startFixtureServer = async ({
   bodyHtml,
   pathHtml,
+  pathJson,
+  pathText,
   title = 'Kilo extension fixture',
 }: {
   bodyHtml?: string;
   pathHtml?: Record<string, string>;
+  pathJson?: Record<string, string>;
+  pathText?: Record<string, string>;
   title?: string;
-} = {}): Promise<{ close: () => Promise<void>; url: string }> => {
+} = {}): Promise<FixtureServer> => {
   const fallbackHtml = `<!doctype html>
 <html>
   <head><title>${title}</title></head>
@@ -36,6 +46,24 @@ export const startFixtureServer = async ({
 </html>`;
   const server = createServer((request, response) => {
     const requestPath = (request.url ?? '/').split('?')[0] ?? '/';
+    const json = pathJson?.[requestPath];
+
+    if (json !== undefined) {
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(json);
+
+      return;
+    }
+
+    const text = pathText?.[requestPath];
+
+    if (text !== undefined) {
+      response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end(text);
+
+      return;
+    }
+
     const html = pathHtml?.[requestPath] ?? fallbackHtml;
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end(html);

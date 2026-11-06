@@ -8,7 +8,14 @@
  * difference never leaks past its mapper.
  */
 
-export type ProviderPrPlatform = 'github' | 'gitlab' | 'bitbucket';
+import type { CodeReviewPlatform } from '../code-review/enums';
+
+/**
+ * The provider platforms the PR/MR review layer supports. Derived from the
+ * package's canonical `CodeReviewPlatform` so one vocabulary cannot drift from
+ * the other; the values are `github`, `gitlab`, `bitbucket`.
+ */
+export type ProviderPrPlatform = CodeReviewPlatform;
 
 /** A GitHub pull request: the `owner/repo#number` triple the mobile tree already routes on. */
 export type GitHubPrRef = {

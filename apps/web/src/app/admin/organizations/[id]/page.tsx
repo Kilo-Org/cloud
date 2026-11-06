@@ -1,15 +1,14 @@
 import { OrganizationAdminDashboard } from '@/app/admin/components/OrganizationAdmin/OrganizationAdminDashboard';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { redirect } from 'next/navigation';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 
 export default async function OrganizationDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) {
-    redirect('/admin/unauthorized');
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
   }
 
   const { id } = await params;

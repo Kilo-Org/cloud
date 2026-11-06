@@ -82,6 +82,8 @@ vi.mock('@/components/destination-option-row', () => ({
   DestinationOptionRow: 'DestinationOptionRow',
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
@@ -117,6 +119,14 @@ vi.mock('./remote-session-exit-alert', () => ({
     confirmExit: vi.fn().mockResolvedValue(true),
     exitDialog: null,
   }),
+}));
+// The shared clock a row reads, so a test can hand the row one instant while
+// the wall clock behind the render says another. Unset, both hooks answer the
+// wall clock, exactly like the store's first snapshot.
+const tickerNow = vi.hoisted(() => ({ value: null as number | null }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({
+  useNowTicker: () => tickerNow.value ?? Date.now(),
+  useRelativeTimeNow: () => tickerNow.value ?? Date.now(),
 }));
 
 const session: StoredSession = {
@@ -420,6 +430,7 @@ describe('StoredSessionRow live speech', () => {
             selectedId = selected.session_id;
           },
           onRetry: () => undefined,
+          onDismiss: () => undefined,
           instances: [],
           spawningConnectionId: null,
           instanceRowsDisabled: false,
@@ -496,6 +507,113 @@ describe('StoredSessionRow live speech', () => {
       row({ session: { ...session, title: 'New session plan for the login redirect' } })
     );
     expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
+});
+
+describe('StoredSessionRow section heading', () => {
+  const yesterdaySession: StoredSession = {
+    ...session,
+    created_at: '2026-08-27T09:00:00.000Z',
+    updated_at: '2026-08-27T11:55:00.000Z',
+  };
+  const yesterdayMeta = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date('2026-08-27T11:55:00.000Z'));
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+  });
+
+  it('shows the clock time instead of restating the Yesterday heading, visibly and in speech', () => {
+    const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Yesterday' }));
+    expect(texts(renderer)).toContain(`$0.12 · ${yesterdayMeta}`);
+    expect(texts(renderer)).not.toContain('$0.12 · YESTERDAY');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Fix login bug, feature/live, CLI, and cost 12 cents, ${yesterdayMeta}`
+    );
+  });
+
+  it('keeps the relative label under a heading it does not repeat', () => {
+    const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Today' }));
+    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+  });
+
+  it('keeps the relative label when the caller supplies no section', () => {
+    const renderer = mount(row({ session: yesterdaySession }));
+    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+  });
+});
+
+describe('StoredSessionRow time follows the shared clock', () => {
+  // 2026-08-28T12:00Z is a Friday; 30 hours earlier lands on Thursday, which
+  // the list heads "Yesterday", and "yesterday" is the relative label the row
+  // would repeat under that heading.
+  const ROW_NOW = Date.parse('2026-08-28T12:00:00.000Z');
+  const HOUR = 60 * 60 * 1000;
+  const dayBefore = new Date(ROW_NOW - 30 * HOUR).toISOString();
+  const yesterdayClock = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(dayBefore));
+
+  // The row reads its clock from the ticker. The wall clock behind the render
+  // is 21 hours later, so a label computed from an untraced `Date.now()` says
+  // something else: React Compiler memoizes such a label against the row's
+  // unchanged props and the list freezes at its first paint.
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    tickerNow.value = ROW_NOW;
+    vi.spyOn(Date, 'now').mockReturnValue(ROW_NOW + 21 * HOUR);
+  });
+
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    tickerNow.value = null;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  it('draws the clock time the section heading earns, not the age the wall clock implies', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, created_at: dayBefore, updated_at: dayBefore },
+        sectionTitle: 'Yesterday',
+      })
+    );
+
+    expect(texts(renderer)).toContain(`$0.12 · ${yesterdayClock}`);
+    expect(texts(renderer)).not.toContain('$0.12 · 2 DAYS AGO');
+  });
+
+  it('speaks the same clock time the row draws', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, created_at: dayBefore, updated_at: dayBefore },
+        sectionTitle: 'Yesterday',
+      })
+    );
+
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Fix login bug, feature/live, CLI, and cost 12 cents, ${yesterdayClock}`
+    );
+  });
+
+  it('ages the relative label from the clock it reads', () => {
+    const minuteAgo = new Date(ROW_NOW - 59 * 60_000).toISOString();
+    const renderer = mount(
+      row({ session: { ...session, created_at: minuteAgo, updated_at: minuteAgo } })
+    );
+
+    expect(texts(renderer)).toContain('$0.12 · 59 MINUTES AGO');
   });
 });
 

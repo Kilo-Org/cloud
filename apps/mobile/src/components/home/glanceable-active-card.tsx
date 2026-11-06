@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   countGlanceableSessions,
@@ -13,6 +13,9 @@ import {
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
+import { EmptyState } from '@/components/empty-state';
+import { CardControl } from '@/components/home/adaptive-home-card-frame';
+import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -57,8 +60,9 @@ type GlanceableActiveCardProps = {
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index. With no sessions it is the zero state: every
- * count reads 0 and the newest block centers `Nothing running`.
+ * header opens the live index. With no sessions it is the zero state, and four
+ * zero counts would only restate its one message: the counters are left out and
+ * the empty message takes the card's body.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -91,64 +95,90 @@ export function GlanceableActiveCard({
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
+  const empty = newestSession === null;
 
   return (
-    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
-      <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => {
-          const isPrimary = line.kind === primaryKind;
-          return (
-            <View key={line.kind} className={COUNT_ROW_CLASS}>
-              <SessionStatusIcon kind={line.kind} />
-              <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
-              <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
-                <Text
-                  className={cn(
-                    'shrink text-sm',
-                    isPrimary ? 'text-foreground' : 'text-muted-foreground'
-                  )}
-                >
-                  {t(line.labelKey)}
-                </Text>
-                {line.kind === 'scheduled' && scheduledWake !== null ? (
-                  <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
+    <View
+      className={cn(
+        CARD_CLASS,
+        embedded && 'rounded-none border-0 bg-transparent',
+        // The frame reserves the counts card's height, so the zero state fills
+        // that height with its one message instead of leaving a band below it.
+        empty && 'flex-1'
+      )}
+    >
+      {empty ? null : (
+        <>
+          <View className={COUNTS_CLASS}>
+            {COUNT_LINES.map(line => {
+              const isPrimary = line.kind === primaryKind;
+              return (
+                <View key={line.kind} className={COUNT_ROW_CLASS}>
+                  <SessionStatusIcon kind={line.kind} />
+                  <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
+                  <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                    <Text
+                      className={cn(
+                        'shrink text-sm',
+                        isPrimary ? 'text-foreground' : 'text-muted-foreground'
+                      )}
+                    >
+                      {t(line.labelKey)}
+                    </Text>
+                    {line.kind === 'scheduled' && scheduledWake !== null ? (
+                      <Text className="max-w-full text-xs text-muted-foreground">
+                        {scheduledWake}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <View className={DIVIDER_CLASS} />
+        </>
+      )}
+      {/* Keyed by the newest session: the zero state has to be its own host
+          view. React Native copies the previous props and applies only the keys
+          it receives, so a label this component stops passing keeps its old
+          value on the native view, and Android keeps announcing the previous
+          account's session from the reused node. A new node per session and
+          per zero state is the same remedy the PR-review inbox slot uses. */}
+      {newestSession !== null && newestTitle !== null && newestKind !== null ? (
+        <CardControl
+          key={newestSession.id}
+          onPress={() => {
+            onPressSession(newestSession);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={newestLabel}
+        >
+          <View className={NEWEST_BLOCK_CLASS}>
+            <Text className="text-sm text-foreground">{newestTitle}</Text>
+            <View className={NEWEST_ROW_CLASS}>
+              <SessionStatusIcon kind={newestKind} />
+              <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
+                {newestAge !== null ? (
+                  <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
                 ) : null}
               </View>
             </View>
-          );
-        })}
-      </View>
-      <View className={DIVIDER_CLASS} />
-      <Pressable
-        disabled={newestSession === null}
-        onPress={() => {
-          if (newestSession !== null) {
-            onPressSession(newestSession);
-          }
-        }}
-        accessibilityRole={newestSession === null ? undefined : 'button'}
-        accessibilityLabel={newestSession === null ? undefined : newestLabel}
-        className="active:opacity-70"
-      >
-        <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
-          {newestTitle !== null && newestKind !== null ? (
-            <>
-              <Text className="text-sm text-foreground">{newestTitle}</Text>
-              <View className={NEWEST_ROW_CLASS}>
-                <SessionStatusIcon kind={newestKind} />
-                <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
-                  {newestAge !== null ? (
-                    <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
-                  ) : null}
-                </View>
-              </View>
-            </>
-          ) : (
-            <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
-          )}
+          </View>
+        </CardControl>
+      ) : (
+        <View key="no-session" className="flex-1 justify-center">
+          {/* The card keeps its reserved frame with nothing live, so the zero
+              state fills that frame with the shared empty state's icon, title
+              and one-line hint instead of a lone line in a blank card. */}
+          <EmptyState
+            placement="static"
+            icon={Bot}
+            title={t('home.noLiveSessions')}
+            description={t('agents.sessionList.noSessionsYetDescription')}
+          />
         </View>
-      </Pressable>
+      )}
     </View>
   );
 }

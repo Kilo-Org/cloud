@@ -9,6 +9,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 export type DirectUpstreamAuth =
   | { type: 'api_key'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
@@ -43,13 +44,13 @@ function resolveRouting(
 }
 
 export function buildDirectProvider(
-  id: 'custom',
+  type: 'custom' | 'custom-public',
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>,
   upstream: CustomLlmApiConfig,
   auth: DirectUpstreamAuth
 ): Provider {
   return {
-    id,
+    type,
     ...resolveRouting(upstream, auth),
     apiUrlOverrides: {},
     disableUrlSuffix: upstream.disable_url_suffix ?? false,
@@ -65,6 +66,15 @@ export function buildDirectProvider(
       Object.assign(body, upstream.extra_body ?? {});
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
+      }
+      if (upstream.user_hash_as_mt_user_id) {
+        for (const key of Object.keys(context.extraHeaders)) {
+          if (key.toLowerCase() === 'mt-user-id') {
+            delete context.extraHeaders[key];
+          }
+        }
+        context.extraHeaders['Mt-User-Id'] =
+          'kilo:' + generateProviderSpecificHash(context.kilo_user_id, context.provider);
       }
       if (upstream.internal_id === undefined) {
         delete body.model;

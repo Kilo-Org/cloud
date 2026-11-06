@@ -75,7 +75,6 @@ export type AgentSource = Readonly<{
 /** One agent row as the screen renders it. */
 export type AgentRow = Readonly<{
   id: string;
-  slug: string;
   name: string;
   visibility: AgentVisibility;
   description: string;
@@ -108,7 +107,6 @@ export const AGENT_VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelK
 export function agentRows(agents: readonly AgentSource[]): AgentRow[] {
   return agents.map(agent => ({
     id: agent.id,
-    slug: agent.slug,
     name: agent.name,
     visibility: agent.config.mode ?? 'primary',
     description: agent.config.description ?? '',

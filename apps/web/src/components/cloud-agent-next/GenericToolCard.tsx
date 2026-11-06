@@ -1,18 +1,15 @@
 import { Plug, Paperclip } from 'lucide-react';
-import * as z from 'zod';
-import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
-import { formatDuration } from './toolCardUtils';
+import { formatDuration, getToolArguments, getToolInputPath, toolPathKeys } from './toolCardUtils';
 import type { ToolPart } from './types';
 
 type GenericToolCardProps = {
   toolPart: ToolPart;
 };
 
-const labelKeys = ['description', 'query', 'url', 'filePath', 'path', 'pattern', 'name'];
-const argumentsSchema = z.record(z.string(), z.unknown());
+const labelKeys = ['description', 'query', 'url', 'pattern', 'name'];
 
 function resolveDisplayName(toolPart: ToolPart): string {
   const input = toolPart.state.input;
@@ -27,34 +24,25 @@ function resolveDisplayName(toolPart: ToolPart): string {
   return toolPart.tool;
 }
 
-function getMcpArguments(toolPart: ToolPart): Record<string, unknown> | undefined {
-  if (toolPart.tool !== 'mcp') return toolPart.state.input;
-  const result = argumentsSchema.safeParse(toolPart.state.input.arguments);
-  return result.success ? result.data : undefined;
-}
-
 function getArgumentSummary(args: Record<string, unknown> | undefined): string | undefined {
   if (!args) return undefined;
   const labelEntry = labelKeys
     .map(key => [key, args[key]] as const)
     .find(entry => typeof entry[1] === 'string' && entry[1].trim().length > 0);
   const labelValue = labelEntry?.[1];
-  const label =
-    typeof labelValue === 'string'
-      ? labelEntry?.[0] === 'filePath' || labelEntry?.[0] === 'path'
-        ? cloudAgentFileLabel(labelValue)
-        : labelValue
-      : undefined;
+  const label = typeof labelValue === 'string' ? labelValue : undefined;
   const scalar = Object.entries(args).find(
     ([key, value]) =>
       !labelKeys.includes(key) &&
+      !toolPathKeys.includes(key) &&
       ((typeof value === 'string' && value.trim().length > 0) ||
         (typeof value === 'number' && Number.isFinite(value)) ||
         typeof value === 'boolean')
   );
   return (
-    [label, scalar ? `${scalar[0]}=${String(scalar[1])}` : undefined].filter(Boolean).join(' · ') ||
-    undefined
+    [getToolInputPath(args), label, scalar ? `${scalar[0]}=${String(scalar[1])}` : undefined]
+      .filter(Boolean)
+      .join(' · ') || undefined
   );
 }
 
@@ -83,7 +71,7 @@ function getDuration(state: ToolPart['state']): number | undefined {
 
 export function GenericToolCard({ toolPart }: GenericToolCardProps) {
   const state = toolPart.state;
-  const args = getMcpArguments(toolPart);
+  const args = getToolArguments(toolPart);
   const output = state.status === 'completed' ? state.output : '';
   const formattedOutput = output.trim() ? formatJson(output) : undefined;
   const duration = getDuration(state);

@@ -35,7 +35,7 @@ async function invalidateRemediationQueries(
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
     ]);
     scheduleCacheMaintenance(() => {
-      reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+      void reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
     });
     return;
   }
@@ -55,7 +55,7 @@ async function invalidateRemediationQueries(
     }),
   ]);
   scheduleCacheMaintenance(() => {
-    reconcileFirstPage(
+    void reconcileFirstPage(
       queryClient,
       trpc.organizations.securityAgent.listFindings.queryKey(ownerInput)
     );

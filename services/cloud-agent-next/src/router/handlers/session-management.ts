@@ -8,7 +8,12 @@ import { fetchSessionMetadata } from '../../session/metadata.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { interruptControlSession } from '../control-plane-session.js';
-import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
+import {
+  protectedProcedure,
+  publicProcedure,
+  internalApiProtectedProcedure,
+  cloudAgentManagedProcedure,
+} from '../auth.js';
 import {
   sessionIdSchema,
   MessageIdSchema,
@@ -20,8 +25,6 @@ import {
   GetSessionHealthOutput,
   GetMessageResultInput,
   GetMessageResultOutput,
-  GetLatestAssistantMessageInput,
-  GetLatestAssistantMessageOutput,
 } from '../schemas.js';
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
@@ -40,6 +43,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
 import type { PreparationAttempt } from '../../shared/protocol.js';
+import { getSessionAuxiliaryMetadata } from '../../session/session-auxiliary-metadata.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -241,7 +245,7 @@ export function createSessionManagementHandlers() {
      * The DO may signal a connected wrapper immediately and durably supervises
      * physical cleanup without letting this route issue provider teardown.
      */
-    interruptSession: protectedProcedure
+    interruptSession: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema.describe('Session ID to interrupt'),
@@ -365,7 +369,7 @@ export function createSessionManagementHandlers() {
      * - Excludes: githubToken, gitToken, envVars values, setupCommands, mcpServers configs
      * - Includes: counts of envVars, setupCommands, mcpServers for debugging
      */
-    getSession: protectedProcedure
+    getSession: cloudAgentManagedProcedure
       .input(GetSessionInput)
       .output(GetSessionOutput)
       .query(async ({ input, ctx }) => {
@@ -399,9 +403,14 @@ export function createSessionManagementHandlers() {
             });
           }
 
-          // Current work and the durability watermark come from the control-plane
-          // session snapshot.
-          const { currentWork, latestEventId, routeReady } = await (async (): Promise<{
+          const {
+            currentWork,
+            latestEventId,
+            routeReady,
+            title,
+            totalCostMicrodollars,
+            updateCursor,
+          } = await (async (): Promise<{
             currentWork: {
               messageId: string;
               status: 'pending' | 'running';
@@ -409,6 +418,9 @@ export function createSessionManagementHandlers() {
             } | null;
             latestEventId: number | null;
             routeReady: boolean | undefined;
+            title?: string;
+            totalCostMicrodollars?: number;
+            updateCursor?: number;
           }> => {
             const snapshot = await withDORetry<
               DurableObjectStub<SandboxSessionV2>,
@@ -433,6 +445,9 @@ export function createSessionManagementHandlers() {
               // Route readiness is the control-plane owner of "can this
               // session own a terminal": a terminal requires a ready route.
               routeReady: snapshot.route?.state === 'ready',
+              title: snapshot.title,
+              totalCostMicrodollars: snapshot.totalCostMicrodollars,
+              updateCursor: snapshot.updateCursor,
             };
           })();
 
@@ -441,23 +456,28 @@ export function createSessionManagementHandlers() {
 
           const sandboxId =
             sessionMetadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              sessionMetadata.identity.orgId,
-              userId,
-              sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId,
-              {
-                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(sessionMetadata.identity.sessionId, {
+              createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
 
-          // Worktree ownership lives on the external ownership row, not in DO
-          // metadata. Only worktree sessions need that read, so ordinary
-          // sessions never touch PostgreSQL here.
+          let auxiliaryMetadata: Awaited<ReturnType<typeof getSessionAuxiliaryMetadata>> = null;
+          try {
+            auxiliaryMetadata = await getSessionAuxiliaryMetadata(getPgDb(env), {
+              userId,
+              cloudAgentSessionId: sessionId,
+              kiloSessionId: sessionAccess.kiloSessionId,
+              organizationId: sessionAccess.organizationId,
+            });
+          } catch (error) {
+            logger
+              .withFields({ sessionId, errorName: error instanceof Error ? error.name : 'unknown' })
+              .warn('Failed to fetch optional auxiliary metadata for getSession');
+          }
+
+          // Worktree ownership lives on the external ownership row, not in DO metadata.
           const worktreeId = sessionMetadata.workspace?.worktreeId;
           let worktreeOwnership: WorktreeOwnership | null = null;
           if (worktreeId) {
@@ -476,7 +496,14 @@ export function createSessionManagementHandlers() {
             kiloSessionId: sessionMetadata.auth.kiloSessionId,
             userId: sessionMetadata.identity.userId,
             orgId: sessionMetadata.identity.orgId,
+            environmentId: sessionMetadata.environment?.environmentId,
             sandboxId,
+            ...auxiliaryMetadata,
+            createdOnPlatform:
+              sessionMetadata.identity.createdOnPlatform ?? auxiliaryMetadata?.createdOnPlatform,
+            title,
+            totalCostMicrodollars,
+            updateCursor,
 
             ...(worktreeId
               ? {
@@ -484,6 +511,9 @@ export function createSessionManagementHandlers() {
                   parentSessionId: worktreeOwnership?.parentSessionId ?? null,
                   cloudAgentSessionScopeId: worktreeOwnership?.cloudAgentSessionScopeId ?? null,
                 }
+              : {}),
+            ...(sessionMetadata.parentCloudAgentSessionId
+              ? { parentCloudAgentSessionId: sessionMetadata.parentCloudAgentSessionId }
               : {}),
 
             githubRepo: repositoryFields.githubRepo,
@@ -503,6 +533,9 @@ export function createSessionManagementHandlers() {
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,
+              mode: agent.config.mode,
+              hidden: agent.config.hidden,
+              disable: agent.config.disable,
               model: agent.config.model ?? undefined,
               variant: agent.config.variant,
             })),
@@ -614,16 +647,9 @@ export function createSessionManagementHandlers() {
 
           const sandboxId: SandboxId =
             metadata.workspace?.sandboxId ??
-            (await generateSandboxId(
-              env.PER_SESSION_SANDBOX_ORG_IDS,
-              metadata.identity.orgId,
-              userId,
-              metadata.identity.sessionId,
-              metadata.identity.botId,
-              {
-                createdOnPlatform: metadata.identity.createdOnPlatform,
-              }
-            ));
+            (await generateSandboxId(metadata.identity.sessionId, {
+              createdOnPlatform: metadata.identity.createdOnPlatform,
+            }));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
 
@@ -688,7 +714,7 @@ export function createSessionManagementHandlers() {
         });
       }),
 
-    getMessageResult: protectedProcedure
+    getMessageResult: cloudAgentManagedProcedure
       .input(GetMessageResultInput)
       .output(GetMessageResultOutput)
       .query(async ({ input, ctx }) => {
@@ -742,49 +768,6 @@ export function createSessionManagementHandlers() {
             'getPreparationAttempts'
           );
           return attempts;
-        });
-      }),
-
-    getLatestAssistantMessage: protectedProcedure
-      .input(GetLatestAssistantMessageInput)
-      .output(GetLatestAssistantMessageOutput)
-      .query(async ({ input, ctx }) => {
-        return withLogTags({ source: 'getLatestAssistantMessage' }, async () => {
-          const sessionId = input.cloudAgentSessionId as SessionId;
-          const { userId, env } = ctx;
-
-          logger.setTags({ userId, sessionId });
-          logger.info('Fetching latest assistant message');
-          await requireCurrentSessionAccess({
-            env,
-            kiloUserId: userId,
-            cloudAgentSessionId: sessionId,
-          });
-
-          const getStub = () => getSandboxSessionStub(env, userId, sessionId);
-
-          const metadata = await withDORetry<
-            DurableObjectStub<SandboxSessionV2>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
-          if (!metadata) {
-            logger.info('Session not found');
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Session not found',
-            });
-          }
-
-          const message = await withDORetry(
-            getStub,
-            s => s.getLatestAssistantMessage(),
-            'getLatestAssistantMessage'
-          );
-
-          return {
-            cloudAgentSessionId: sessionId,
-            message,
-          };
         });
       }),
 

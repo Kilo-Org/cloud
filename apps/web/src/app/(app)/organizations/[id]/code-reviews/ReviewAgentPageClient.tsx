@@ -136,9 +136,8 @@ export function ReviewAgentPageClient({
   );
   const selectedActionRequired = selectedConfigData?.actionRequired ?? null;
 
-  const isGitHubAppInstalled =
-    githubStatusData?.connected && githubStatusData?.integration?.isValid;
-  const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
+  const isGitHubAppInstalled = githubStatusData?.connected ?? false;
+  const isGitLabConnected = gitlabStatusData?.connected ?? false;
   const canUseGitHubJobs = isGitHubAppInstalled || localCodeReviewDevelopmentEnabled;
   const canUseGitLabJobs = isGitLabConnected || localCodeReviewDevelopmentEnabled;
   const returnPath = returnTo

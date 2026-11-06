@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   CloudAgentAuthoritySchema,
+  validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
@@ -10,8 +11,8 @@ import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertCloudAgentParentAuthority,
-  assertCloudAgentIsolatedAllocation,
   authorizeCloudAgentChild,
+  authorizeCloudAgentWorkspaceSibling,
   issueCloudAgentMcpGrant,
   resolveCloudAgentMcpUrl,
   validateScopedWorkerPreparation,
@@ -43,6 +44,15 @@ const launch = {
   mode: 'code',
   model: 'kilo/test-model',
   autoInitiate: true,
+};
+const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+const webForwardedLaunch = {
+  ...launch,
+  platform: 'github',
+  createdOnPlatform: 'cloud-agent-web',
+  githubAccessPurpose: 'agent',
+  clientProvenance: 'browser',
+  githubIntegrationId,
 };
 
 function fixture() {
@@ -87,14 +97,6 @@ describe('Cloud Agent spawn authority', () => {
     expect(workspaceMcpAnchorSessionId(worktreeId, childSessionId)).toBe(parentSessionId);
     expect(workspaceMcpAnchorSessionId(undefined, childSessionId)).toBe(childSessionId);
     expect(workspaceMcpAnchorSessionId('worktree_invalid', childSessionId)).toBeUndefined();
-  });
-
-  it('rejects shared allocation for opted-in parents and scoped children after saved-settings resolution', () => {
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'cloudflare-shared')).toThrow(
-      'isolated sandbox'
-    );
-    expect(() => assertCloudAgentIsolatedAllocation(true, 'vercel-small')).not.toThrow();
-    expect(() => assertCloudAgentIsolatedAllocation(false, 'cloudflare-shared')).not.toThrow();
   });
 
   it('refuses grants from already-persisted shared sandbox parents', () => {
@@ -198,6 +200,44 @@ describe('Cloud Agent spawn authority', () => {
     ).toThrow();
   });
 
+  it('accepts the full web-forwarded personal preparation input without widening the public scoped schema', () => {
+    expect(validateScopedWorkerPreparation(scope, webForwardedLaunch)).toEqual({
+      ...launch,
+    });
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', webForwardedLaunch)
+    ).toThrow();
+  });
+
+  it('accepts the full web-forwarded organization preparation input without widening the public scoped schema', () => {
+    const organizationId = '22345678-1234-4234-8234-123456789abc';
+    const organizationScope: CloudAgentAuthority = { ...scope, organizationId };
+    const input = {
+      ...webForwardedLaunch,
+      kilocodeOrganizationId: organizationId,
+    };
+    expect(validateScopedWorkerPreparation(organizationScope, input)).toEqual({
+      ...launch,
+      organizationId,
+    });
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        organizationScope,
+        'organizations.cloudAgentNext.prepareSession',
+        input
+      )
+    ).toThrow();
+  });
+
+  it('rejects a malformed trusted GitHub integration identity', () => {
+    expect(() =>
+      validateScopedWorkerPreparation(scope, {
+        ...webForwardedLaunch,
+        githubIntegrationId: 'not-a-uuid',
+      })
+    ).toThrow();
+  });
+
   it('pins the production MCP URL unless a valid local override is configured', async () => {
     expect(resolveCloudAgentMcpUrl()).toBe('https://mcp.kiloapps.io/mcp');
     expect(resolveCloudAgentMcpUrl('not a url')).toBe('https://mcp.kiloapps.io/mcp');
@@ -282,6 +322,64 @@ describe('Cloud Agent spawn authority', () => {
     expect(record.source).toEqual(authorization.source);
     expect(result.seal).toBe('private-child-authorization-seal');
     expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+  });
+
+  it('mints an independent sibling authorization in the parent workspace only', async () => {
+    const { context, authorization } = fixture();
+    const result = await authorizeCloudAgentWorkspaceSibling({
+      parentSessionId,
+      siblingSessionId: childSessionId,
+      ...context,
+    });
+    const record = renew.mock.calls[0][0].authorization;
+    expect(record).toMatchObject({
+      ...authorization,
+      id: expect.any(String),
+      resourceId: childSessionId,
+      issuedAt: now.toISOString(),
+      delegationExpiresAt: authorization.delegationExpiresAt,
+    });
+    expect(record.id).not.toBe(authorization.id);
+    expect(record.bindings).toEqual(authorization.bindings);
+    expect(result.seal).toBe('private-child-authorization-seal');
+    expect(jwt.decode(result.token)).not.toHaveProperty('cloudAgentAuthority');
+    expect(jwt.decode(result.token)).not.toHaveProperty('parentCloudAgentSessionId');
+  });
+
+  it('refuses sibling authorization for a self target or a disabled parent', async () => {
+    const { context, metadata } = fixture();
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: parentSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('independent workspace session');
+    metadata.allowSubagentSessions = false;
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('refuses sibling authorization when the parent is revoked during minting', async () => {
+    const { context, authorization } = fixture();
+    renew.mockImplementationOnce(async () => {
+      authorization.state = 'revoked';
+      return { token: 'must-not-escape' };
+    });
+    await expect(
+      authorizeCloudAgentWorkspaceSibling({
+        parentSessionId,
+        siblingSessionId: childSessionId,
+        ...context,
+      })
+    ).rejects.toThrow('parent authority denied');
+    expect(seal).not.toHaveBeenCalled();
   });
 
   it.each([

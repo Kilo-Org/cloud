@@ -1,6 +1,7 @@
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -20,17 +21,8 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   const { data, error, isLoading, isError, isFetched, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),
     enabled: options.enabled ?? true,
-    // The identity read must settle even while the online manager reports
-    // offline: NetInfo can hold the device offline while the backend is
-    // reachable, and a paused read leaves every surface gated on the identity
-    // (the Profile credits card among them) waiting on a request that never
-    // starts. The attempt either answers or fails once the control-plane
-    // deadline lands.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // Every surface gated on the identity waits on this read.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const refused = error !== null && isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
 

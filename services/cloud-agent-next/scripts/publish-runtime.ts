@@ -9,7 +9,8 @@ import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-protocol.js';
 import { localR2ArtifactStore, remoteArtifactStore } from './runtime-publish-store.js';
 import { verifyRuntimeSourceCheckout } from './runtime-source.js';
-import { downloadVerified } from './runtime-cli-artifact.js';
+import { PINNED_CLIS, downloadVerified } from './runtime-cli-artifact.js';
+import type { RuntimeHarness } from '../src/shared/control-plane-runtime-contract.js';
 import { fileURLToPath } from 'node:url';
 import {
   CONTROL_PLANE_SUPERVISOR,
@@ -24,6 +25,7 @@ import {
   RUNTIME_HARD_MAX_FILE_COUNT,
   RUNTIME_HARD_MAX_TRANSFER_BYTES,
   RUNTIME_RELEASE_FORMAT,
+  runtimeReleaseHarness,
   serializeRuntimeRelease,
   type RuntimeInventoryEntry,
   type RuntimeReleaseDescriptor,
@@ -324,29 +326,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const build = spawnSync('bun', ['run', 'build:wrapper'], { cwd: packageRoot, stdio: 'inherit' });
   if (build.status !== 0) throw new Error('Wrapper build failed');
-  const version = argValue(argv, '--cli-version') ?? KILO_CLI_VERSION;
-  const file = argValue(argv, '--cli');
-  const cliTarball = file
-    ? new Uint8Array(await fs.readFile(file))
-    : await downloadVerified(version);
-  const wrapperManifest = z
-    .object({ dependencies: z.object({ '@kilocode/sdk': z.string().min(1) }) })
-    .parse(JSON.parse(await fs.readFile(path.join(packageRoot, 'wrapper/package.json'), 'utf8')));
-  const packaged = await packageRuntimeRelease({
-    cliTarball,
-    cliVersion: version,
-    cliExecutable: 'package/bin/kilo',
-    wrapperSdkVersion: wrapperManifest.dependencies['@kilocode/sdk'],
-    protocol: String(CONTROL_PLANE_PROTOCOL_VERSION),
-    abi: RUNTIME_BASE_ABI,
-    platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
-    caps: {
-      maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
-      maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
-      maxFileCount: RUNTIME_HARD_MAX_FILE_COUNT,
-    },
-    controlEntries: await controlBundleEntries(packageRoot),
-  });
   const {
     RUNTIME_R2_ACCOUNT_ID: accountId,
     RUNTIME_R2_ACCESS_KEY_ID: accessKeyId,
@@ -364,7 +343,60 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         : null);
   if (!store) throw new Error('Runtime publisher target is invalid');
   try {
-    const published = await publishRuntimeRelease(store, packaged);
+    const cache = out === undefined ? store : undefined;
+    // An explicit CLI publishes one release; otherwise each harness publishes its pinned CLI.
+    const file = argValue(argv, '--cli');
+    const customVersion = argValue(argv, '--cli-version');
+    const clis =
+      file !== undefined || customVersion !== undefined
+        ? [
+            {
+              tarball: file
+                ? new Uint8Array(await fs.readFile(file))
+                : await downloadVerified(customVersion ?? KILO_CLI_VERSION, { cache }),
+              version: customVersion ?? KILO_CLI_VERSION,
+              executable: argValue(argv, '--cli-executable') ?? PINNED_CLIS.kilo.executable,
+            },
+          ]
+        : await Promise.all(
+            Object.values(PINNED_CLIS).map(async pinned => ({
+              tarball: await downloadVerified(pinned.version, { cache }),
+              version: pinned.reportedVersion,
+              executable: pinned.executable,
+            }))
+          );
+    const wrapperManifest = z
+      .object({ dependencies: z.object({ '@kilocode/sdk': z.string().min(1) }) })
+      .parse(JSON.parse(await fs.readFile(path.join(packageRoot, 'wrapper/package.json'), 'utf8')));
+    const controlEntries = await controlBundleEntries(packageRoot);
+    const releases = await Promise.all(
+      clis.map(cli =>
+        packageRuntimeRelease({
+          cliTarball: cli.tarball,
+          cliVersion: cli.version,
+          cliExecutable: cli.executable,
+          wrapperSdkVersion: wrapperManifest.dependencies['@kilocode/sdk'],
+          protocol: String(CONTROL_PLANE_PROTOCOL_VERSION),
+          abi: RUNTIME_BASE_ABI,
+          platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+          caps: {
+            maxTransferBytes: RUNTIME_HARD_MAX_TRANSFER_BYTES,
+            maxExpandedBytes: RUNTIME_HARD_MAX_EXPANDED_BYTES,
+            maxFileCount: RUNTIME_HARD_MAX_FILE_COUNT,
+          },
+          controlEntries,
+        })
+      )
+    );
+    const releaseFor = (harness: RuntimeHarness) =>
+      releases.find(release => runtimeReleaseHarness(release.descriptor) === harness);
+    const packaged = releaseFor('kilo');
+    if (!packaged) throw new Error('Runtime publication requires a Kilo v1 release');
+    const kilo2 = releaseFor('kilo2');
+    const published = {
+      kilo: await publishRuntimeRelease(store, packaged),
+      ...(kilo2 ? { kilo2: await publishRuntimeRelease(store, kilo2) } : {}),
+    };
     const descriptorOut = argValue(argv, '--descriptor-out');
     if (descriptorOut)
       await fs.writeFile(descriptorOut, serializeRuntimeRelease(packaged.descriptor));
@@ -376,12 +408,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       const { publishRuntimeHandoff } = await import('./runtime-handoff.js');
       await withRuntimeRegistry(packageRoot, async () => {
         const base = await ensureRuntimeBase(store, packageRoot, accountId);
-        await verifyRuntimeCompatibility(base, packaged, packageRoot);
+        for (const release of releases)
+          await verifyRuntimeCompatibility(base, release, packageRoot);
         const handoff = await publishRuntimeHandoff({
           store,
           sourceSha,
           base,
           descriptor: packaged.descriptor,
+          ...(kilo2 ? { kilo2Descriptor: kilo2.descriptor } : {}),
         });
         console.log(JSON.stringify({ published, handoff }));
       });

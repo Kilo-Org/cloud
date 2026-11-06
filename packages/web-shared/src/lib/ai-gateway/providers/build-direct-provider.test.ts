@@ -4,6 +4,10 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { applyReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import {
+  applyTrackingIds,
+  generateProviderSpecificHash,
+} from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { buildDirectProvider, type DirectUpstreamAuth } from './build-direct-provider';
 
 type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;
@@ -16,7 +20,9 @@ const API_KEY_AUTH: DirectUpstreamAuth = {
 
 async function transformRequest(
   request: GatewayRequest,
-  options: Partial<Omit<CustomLlmApiConfig, 'base_url'>> = {}
+  options: Partial<Omit<CustomLlmApiConfig, 'base_url'>> = {},
+  kilo_user_id = 'user-1',
+  session_id: string | null = null
 ) {
   const provider = buildDirectProvider(
     'custom',
@@ -29,18 +35,20 @@ async function transformRequest(
     API_KEY_AUTH
   );
 
+  const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
     provider,
     model: 'public-model',
     request,
     originalHeaders: EmptyFraudDetectionHeaders,
-    extraHeaders: {},
+    extraHeaders,
     userByok: null,
-    kilo_user_id: 'user-1',
+    kilo_user_id,
     organization_id: null,
-    session_id: null,
+    session_id,
   });
   applyReasoningDetailsTransform(provider, request);
+  return extraHeaders;
 }
 
 function makeRequest(): ChatCompletionRequest {
@@ -161,6 +169,117 @@ describe('buildDirectProvider model field', () => {
     });
 
     expect(request.body.model).toBe('configured-model');
+  });
+});
+
+describe('buildDirectProvider Mt-User-Id header', () => {
+  const provider = buildDirectProvider(
+    'custom',
+    ['chat_completions', 'responses', 'messages'],
+    { base_url: 'https://llm.example.com/v1' },
+    API_KEY_AUTH
+  );
+  const expectedUserId = 'kilo:' + generateProviderSpecificHash('user-1', provider);
+
+  it.each([true, false])('accepts user_hash_as_mt_user_id=%s', enabled => {
+    const config = {
+      base_url: 'https://llm.example.com/v1',
+      user_hash_as_mt_user_id: enabled,
+    };
+
+    expect(CustomLlmApiConfigSchema.parse(config)).toEqual(config);
+  });
+
+  it.each<GatewayRequest>([
+    {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [], prompt_cache_key: 'task-cache-key' },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'public-model', input: 'hello', prompt_cache_key: 'task-cache-key' },
+    },
+    {
+      kind: 'messages',
+      body: { model: 'public-model', max_tokens: 100, messages: [] },
+    },
+  ])('includes the prefixed user hash for $kind when enabled', async request => {
+    const headers = await transformRequest(request, { user_hash_as_mt_user_id: true });
+
+    expect(headers['Mt-User-Id']).toBe(expectedUserId);
+    if (request.kind !== 'messages') {
+      expect(request.body).toHaveProperty('prompt_cache_key', 'task-cache-key');
+    }
+  });
+
+  it.each<[string, string | null]>([
+    ['user-1', null],
+    ['user-1', 'session-1'],
+    ['user-1', 'session-2'],
+    ['oauth/provider/user-2', 'session-1'],
+  ])('uses the tracking user hash for user %s and session %s', async (userId, sessionId) => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'client-cache-key';
+    applyTrackingIds(request, provider, userId, sessionId);
+
+    const headers = await transformRequest(
+      request,
+      { user_hash_as_mt_user_id: true },
+      userId,
+      sessionId
+    );
+
+    expect(headers['Mt-User-Id']).toBe('kilo:' + generateProviderSpecificHash(userId, provider));
+    expect(headers['Mt-User-Id']).toBe('kilo:' + request.body.safety_identifier);
+  });
+
+  it.each([undefined, false])('does not add the header when the option is %s', enabled => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    return expect(
+      transformRequest(request, { user_hash_as_mt_user_id: enabled })
+    ).resolves.not.toHaveProperty('Mt-User-Id');
+  });
+
+  it.each([undefined, null, '', 42, '\u4e2d\u6587', 'key\r\nInjected: value', 'key\0', 'key\x7f'])(
+    'uses the user hash regardless of cache key %s',
+    async cacheKey => {
+      const request = makeRequest();
+      Object.assign(request.body, { prompt_cache_key: cacheKey });
+
+      const headers = await transformRequest(request, { user_hash_as_mt_user_id: true });
+
+      expect(headers['Mt-User-Id']).toBe(expectedUserId);
+    }
+  );
+
+  it('uses the user hash when the cache key is removed from the upstream body', async () => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    const headers = await transformRequest(request, {
+      user_hash_as_mt_user_id: true,
+      remove_from_body: ['prompt_cache_key'],
+    });
+
+    expect(headers['Mt-User-Id']).toBe(expectedUserId);
+    expect(request.body).not.toHaveProperty('prompt_cache_key');
+  });
+
+  it('overrides static header values case-insensitively', async () => {
+    const request = makeRequest();
+    request.body.prompt_cache_key = 'task-cache-key';
+
+    const headers = await transformRequest(request, {
+      user_hash_as_mt_user_id: true,
+      extra_headers: { 'Mt-User-Id': 'static-key', 'mt-user-id': 'other-key', 'x-custom': 'kept' },
+    });
+
+    expect(Object.fromEntries(new Headers(headers))).toEqual({
+      'mt-user-id': expectedUserId,
+      'x-custom': 'kept',
+    });
   });
 });
 

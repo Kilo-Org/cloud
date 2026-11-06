@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import type * as DbClientModule from '@kilocode/db/client';
+import { oauth_refresh_exchange_leases } from '@kilocode/db/schema';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +10,9 @@ const database = vi.hoisted(() => ({
   updates: [] as Array<Record<string, unknown>>,
   returnedCredential: undefined as Record<string, unknown> | undefined,
   locks: 0,
+  depth: 0,
+  leaseDenied: false,
+  releaseDenied: false,
 }));
 
 vi.mock('@kilocode/db/client', async importOriginal => {
@@ -53,11 +57,33 @@ vi.mock('@kilocode/db/client', async importOriginal => {
             return { where: () => result };
           },
         }),
+        insert: () => ({
+          values: (values: Record<string, unknown>) => ({
+            onConflictDoUpdate: () => ({
+              returning: async () =>
+                database.leaseDenied ? [] : [{ attemptId: values.attempt_id as string }],
+            }),
+          }),
+        }),
+        delete: (table?: unknown) => ({
+          where: () => ({
+            returning: async () => {
+              if (table !== oauth_refresh_exchange_leases) throw new Error('Unexpected table');
+              return database.releaseDenied ? [] : [{ id: 'lease-1' }];
+            },
+          }),
+        }),
       };
       return {
         ...transactionDb,
-        transaction: async (operation: (tx: typeof transactionDb) => Promise<unknown>) =>
-          operation(transactionDb),
+        transaction: async (operation: (tx: typeof transactionDb) => Promise<unknown>) => {
+          database.depth += 1;
+          try {
+            return await operation(transactionDb);
+          } finally {
+            database.depth -= 1;
+          }
+        },
       };
     },
   };
@@ -182,6 +208,9 @@ describe('BitbucketAuthorizationService', () => {
     database.updates = [];
     database.returnedCredential = undefined;
     database.locks = 0;
+    database.depth = 0;
+    database.leaseDenied = false;
+    database.releaseDenied = false;
     vi.restoreAllMocks();
   });
 
@@ -300,7 +329,9 @@ describe('BitbucketAuthorizationService', () => {
         BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS
       )
     ).resolves.toEqual({ status: 'not_connected' });
-    expect(database.locks).toBe(1);
+    // The per-credential lock is taken only by the persist transaction.
+    expect(database.locks).toBe(0);
+    expect(database.updates).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -415,5 +446,161 @@ describe('BitbucketAuthorizationService', () => {
     expect(database.updates).toContainEqual(
       expect.objectContaining({ revocation_reason: 'refresh_token_rejected' })
     );
+  });
+
+  it('persists a refreshed credential after a single bounded token request', async () => {
+    database.row = activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1);
+    database.returnedCredential = {
+      ...credential(2 * 60 * 60 * 1000),
+      credential_version: 2,
+      access_token_encrypted: encryptKeyedEnvelope(
+        'next-access-token',
+        scheme,
+        { keyId: 'active', publicKeyPem },
+        aad('access')
+      ),
+    };
+    const depths: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        depths.push(database.depth);
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return Response.json({
+          access_token: 'next-access-token',
+          refresh_token: 'next-refresh-token',
+          token_type: 'bearer',
+          expires_in: 7200,
+          scope: 'account repository repository:write pullrequest webhook',
+        });
+      })
+    );
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toMatchObject({ status: 'available', token: 'next-access-token' });
+    expect(depths).toEqual([0]);
+    expect(database.depth).toBe(0);
+  });
+
+  it('classifies an unanswered token request as temporary unavailability', async () => {
+    database.row = activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controller.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+      return controller.signal;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const { promise, reject } = Promise.withResolvers<Response>();
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error('missing signal'));
+        } else if (signal.aborted) {
+          reject(signal.reason);
+        } else {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }
+        return promise;
+      })
+    );
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
+    expect(database.updates.filter(update => 'scopes' in update)).toEqual([]);
+  });
+
+  it('accepts the concurrent winner when the credential version moves first', async () => {
+    const candidate = activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1);
+    const winner = {
+      ...activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1),
+      credential: {
+        ...credential(2 * 60 * 60 * 1000),
+        credential_version: 2,
+        access_token_encrypted: encryptKeyedEnvelope(
+          'winner-token',
+          scheme,
+          { keyId: 'active', publicKeyPem },
+          aad('access')
+        ),
+      },
+    };
+    database.rows = [candidate, candidate, winner];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          access_token: 'next-access-token',
+          refresh_token: 'next-refresh-token',
+          token_type: 'bearer',
+          expires_in: 7200,
+          scope: 'account repository repository:write pullrequest webhook',
+        })
+      )
+    );
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toMatchObject({ status: 'available', token: 'winner-token' });
+    expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
+  });
+
+  it('takes the lease only after re-reading the row it will exchange', async () => {
+    // The claim can wait behind a holder that commits before releasing, so the
+    // attempt re-reads the row after it holds the lease and answers from
+    // storage when the generation already moved.
+    const candidate = activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1);
+    const winner = {
+      ...activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1),
+      credential: {
+        ...credential(2 * 60 * 60 * 1000),
+        credential_version: 2,
+        access_token_encrypted: encryptKeyedEnvelope(
+          'winner-token',
+          scheme,
+          { keyId: 'active', publicKeyPem },
+          aad('access')
+        ),
+      },
+    };
+    database.rows = [candidate, candidate, winner];
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toMatchObject({ status: 'available', token: 'winner-token' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
+  });
+
+  it('does not exchange the refresh token while another attempt holds the exchange lease', async () => {
+    database.row = activeRow(-1);
+    database.leaseDenied = true;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates).toEqual([]);
+  });
+
+  it('does not revoke when another attempt took over the exchange lease', async () => {
+    database.row = activeRow(-1);
+    database.releaseDenied = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'invalid_grant' }, { status: 400 }))
+    );
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(database.updates).toEqual([]);
   });
 });

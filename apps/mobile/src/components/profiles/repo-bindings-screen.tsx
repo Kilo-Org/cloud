@@ -35,6 +35,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
+import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -80,10 +81,17 @@ function pickerEmptyDescriptionKey(
 export function RepoBindingsScreen({
   organizationId,
   stack,
+  openedFrom,
 }: Readonly<{
   organizationId?: string;
   /** The Stack this screen is mounted in; its create screen opens in it too. */
   stack: ProfileManagementStack;
+  /**
+   * The outside screen that opened this one. The create form it opens carries
+   * the same marker, so the form returns to it on `back` and is not given a
+   * profiles list this screen never had.
+   */
+  openedFrom?: ProfileExternalOpener;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -126,6 +134,7 @@ export function RepoBindingsScreen({
         // picker shows, which is this screen's scope, not necessarily the
         // account that is active elsewhere in the app.
         ...(organizationId === undefined ? {} : { organizationId }),
+        ...(openedFrom === undefined ? {} : { openedFrom }),
       })
     );
   };

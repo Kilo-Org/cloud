@@ -63,6 +63,8 @@
 
 import { and, asc, desc, eq, inArray, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
 
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
+
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import {
   KILOCLAW_EARLYBIRD_EXPIRY_DATE,
@@ -398,18 +400,6 @@ function logApplyProgress(params: {
   console.log(
     `[progress] ${params.label}: ${params.processed}/${params.total} processed (${elapsedSeconds}s elapsed)`
   );
-}
-
-function chunkArray<T>(rows: T[], size: number): T[][] {
-  if (size <= 0) {
-    return [rows];
-  }
-
-  const chunks: T[][] = [];
-  for (let index = 0; index < rows.length; index += size) {
-    chunks.push(rows.slice(index, index + size));
-  }
-  return chunks;
 }
 
 function describeError(error: unknown): string {

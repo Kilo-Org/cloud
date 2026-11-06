@@ -13,8 +13,8 @@ import type {
 import {
   type User,
   type Organization,
+  ai_gateway_config,
   auto_routing_custom_routers,
-  custom_llm2,
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
@@ -435,10 +435,7 @@ describe('organizations settings trpc router', () => {
         organization_ids: [],
         group_ids: [group.id],
       };
-      await db.insert(custom_llm2).values({
-        public_id: publicId,
-        definition,
-      });
+      await insertCustomLlmForTest(publicId, definition);
 
       try {
         await expect(userHasCustomLlmAccess(definition, organization.id, member.id)).resolves.toBe(
@@ -460,7 +457,7 @@ describe('organizations settings trpc router', () => {
         expect(memberResult.data.some(model => model.id === publicId)).toBe(true);
         expect(ownerResult.data.some(model => model.id === publicId)).toBe(false);
       } finally {
-        await db.delete(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+        await deleteCustomLlmForTest(publicId);
         await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
@@ -1392,6 +1389,89 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
       expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
+
+  describe('gateway settings', () => {
+    async function enableGatewaySettings(organizationIds: string[]) {
+      const config = { organization_features: { gateway_settings: organizationIds } };
+      await db
+        .insert(ai_gateway_config)
+        .values({ config })
+        .onConflictDoUpdate({ target: ai_gateway_config.id, set: { config } });
+    }
+
+    afterEach(async () => {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+      await updateOrganizationSettings(testOrganization.id, {});
+    });
+
+    it('reports whether gateway settings are available', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toEqual({
+        available: true,
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: false,
+        data_region: null,
+      });
+    });
+
+    it('saves gateway settings and records an audit log', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateGatewaySettings({
+        organizationId: testOrganization.id,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+
+      expect(result.settings).toMatchObject({ disable_vercel_ai_gateway: true, data_region: 'eu' });
+      await expect(
+        caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+      ).resolves.toMatchObject({
+        disable_openrouter: false,
+        disable_vercel_ai_gateway: true,
+        data_region: 'eu',
+      });
+      const auditLogs = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+      expect(auditLogs.map(log => log.message)).toContain(
+        'Updated gateway settings: Vercel AI Gateway disabled; Data region: European Union'
+      );
+    });
+
+    it('rejects gateway settings while the feature is not enabled', async () => {
+      await enableGatewaySettings([orgWithSettings.id]);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          disable_openrouter: true,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect((await getOrganizationById(testOrganization.id))?.settings.disable_openrouter).toBe(
+        undefined
+      );
+    });
+
+    it('rejects gateway settings changes by members', async () => {
+      await enableGatewaySettings([testOrganization.id]);
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateGatewaySettings({
+          organizationId: testOrganization.id,
+          data_region: 'us',
+        })
+      ).rejects.toThrow();
     });
   });
 });

@@ -8,6 +8,7 @@ import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));

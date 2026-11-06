@@ -15,9 +15,12 @@ import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-di
 import { RequestDeadlineError } from '@kilocode/event-service';
 import {
   fetchMobileSessionSnapshotPage,
+  readMobileSessionSnapshotPage,
+} from '@/components/agents/mobile-session-page-adapter';
+import {
   SESSION_HISTORY_FAILURES,
   SessionHistoryFailureError,
-} from '@/components/agents/mobile-session-page-adapter';
+} from '@/components/agents/session-history-failures';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import {
@@ -167,6 +170,34 @@ export async function fetchSessionWithNotFoundRetry(
 }
 
 /**
+ * Wait `ms`, or return early when `signal` aborts. Answers whether the abort
+ * cut the wait short: a cancelled read must not hold its caller open for the
+ * rest of a fixed delay, and the caller then skips the work that delay was for.
+ */
+async function delayOrAbort(ms: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) {
+    return true;
+  }
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  function settle(aborted: boolean): void {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', onAbort);
+    resolve(aborted);
+  }
+  function onAbort(): void {
+    settle(true);
+  }
+  const timer = setTimeout(() => {
+    settle(false);
+  }, ms);
+  // No await between the check above and this listener, so an abort cannot be
+  // missed in between.
+  signal.addEventListener('abort', onAbort, { once: true });
+  const cancelled = await promise;
+  return cancelled;
+}
+
+/**
  * The first page of a session just cloned onto a remote CLI, re-read while it
  * is empty. The CLI answers `create_session` once the clone is in its own
  * database; the transcript reaches session ingest only after the share
@@ -174,24 +205,52 @@ export async function fetchSessionWithNotFoundRetry(
  * the session row with no history, and the transport reads the first page only
  * once, so that empty page would stay on screen until the session is reopened.
  * A clone always has messages, so an empty page here is never the final state.
+ *
+ * `signal` is the manager's read scope. When it aborts — the route left, the
+ * owner changed, the session was cleared — the wait stops spending its budget:
+ * the loop returns the page it already has, because a caller that moved on
+ * would only discard a fresher one, and every remaining delay and request is
+ * work nobody asked for.
  */
 async function fetchClonedSessionFirstPage(
-  kiloSessionId: KiloSessionId
+  kiloSessionId: KiloSessionId,
+  signal: AbortSignal
 ): Promise<SessionSnapshotPageOutcome> {
   let page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
   for (
     let attempt = 0;
     attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS &&
+    !signal.aborted &&
     page.kind === 'success' &&
     page.messages.length === 0;
     attempt += 1
   ) {
     // eslint-disable-next-line no-await-in-loop -- flat 1s delay between re-reads
-    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    if (await delayOrAbort(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS, signal)) {
+      // The delay was cut short: re-reading now would answer a caller that is
+      // already gone.
+      break;
+    }
     // eslint-disable-next-line no-await-in-loop -- each re-read waits for the previous one
     page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
   }
   return page;
+}
+
+/**
+ * The parent session id for a page payload too old to carry it. A current
+ * server always projects it (a root session answers `null`), so this read only
+ * runs against a server that predates the field; a cancelled scope skips it too.
+ */
+async function readFallbackParentSessionID(
+  kiloSessionId: KiloSessionId,
+  signal: AbortSignal
+): Promise<string | undefined> {
+  if (signal.aborted) {
+    return undefined;
+  }
+  const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+  return session.parent_session_id ?? undefined;
 }
 
 type CreateMobileAgentSessionManagerOptions = {
@@ -242,7 +301,11 @@ export function createMobileAgentSessionManager({
   // account's scope, so the write path re-checks this epoch. An empty owner
   // skips the memory entirely.
   const resolvedDeliveryOwner = { userId: userId ?? '', authEpoch: currentAuthEpoch() };
-  return createSessionManager({
+  // The manager's read scope: aborted by `destroy`, so a cloned-session first
+  // page that is still waiting between re-reads stops instead of spending its
+  // remaining delay and request budget for a caller that has already moved on.
+  const readScope = new AbortController();
+  const manager = createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
@@ -287,6 +350,7 @@ export function createMobileAgentSessionManager({
         cloudAgentSessionId = memo.cloudAgentSessionId;
       } else {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+        organizationId ??= session.organization_id ?? undefined;
         cloudAgentSessionId = session.cloud_agent_session_id as CloudAgentSessionId | null;
       }
       if (cloudAgentSessionId) {
@@ -326,19 +390,23 @@ export function createMobileAgentSessionManager({
       // Bounded fallback: the transports prefer `fetchSnapshotPage`, and this
       // legacy seam now reads the same newest page instead of exporting the
       // whole session (`getSessionMessages`), which timed out on long sessions.
-      const [sessionData, page] = await Promise.all([
-        trpcClient.cliSessionsV2.get.query({ session_id: id }),
-        fetchMobileSessionSnapshotPage(id, {}),
-      ]);
+      // The parent id rides that page payload, so the snapshot needs one read;
+      // `readFallbackParentSessionID` is the read for a server older than it.
+      const { outcome: page, parentSessionId } = await readMobileSessionSnapshotPage(id, {});
       if (page.kind !== 'success') {
         throw new SessionHistoryFailureError(SESSION_HISTORY_FAILURES[page.kind]);
       }
+      // `null` from the payload means a root session: no fallback read then.
+      const fallbackParentID =
+        parentSessionId === undefined
+          ? await readFallbackParentSessionID(id, readScope.signal)
+          : undefined;
       // The paged read already projects the goal from the session metadata, so
       // the fixed goal section survives a snapshot replay.
       return {
         info: {
           id: page.info.id,
-          parentID: page.info.parentID ?? sessionData.parent_session_id ?? undefined,
+          parentID: parentSessionId ?? fallbackParentID,
           ...(page.info.model ? { model: page.info.model } : {}),
           ...(page.info.goal === undefined ? {} : { goal: page.info.goal }),
         },
@@ -347,7 +415,7 @@ export function createMobileAgentSessionManager({
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
       if (!options.cursor && id === awaitingClonedHistory) {
-        const firstPage = await fetchClonedSessionFirstPage(id);
+        const firstPage = await fetchClonedSessionFirstPage(id, readScope.signal);
         if (firstPage.kind === 'success') {
           awaitingClonedHistory = null;
         }
@@ -355,6 +423,25 @@ export function createMobileAgentSessionManager({
       }
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
       return outcome;
+    },
+    fetchCloudSnapshotPage: async (sessionId, options) => {
+      const page = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+            sessionId,
+            ...options,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSessionMessagesPage.query({ sessionId, ...options });
+      return page;
+    },
+    fetchCloudSession: async sessionId => {
+      const metadata = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSession.query({
+            cloudAgentSessionId: sessionId,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId });
+      return metadata;
     },
     api: {
       send: async input => {
@@ -533,4 +620,14 @@ export function createMobileAgentSessionManager({
       };
     },
   });
+  // The provider destroys this manager when the route unmounts, the owner
+  // changes, or the credentials are revoked; nothing is reading a page for it
+  // afterwards, so the scope ends with the manager.
+  return {
+    ...manager,
+    destroy: () => {
+      readScope.abort();
+      manager.destroy();
+    },
+  };
 }

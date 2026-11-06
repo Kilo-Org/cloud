@@ -34,6 +34,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import {
   BILLING_FLOW,
   createBillingCorrelationHeaders,
@@ -1149,14 +1150,6 @@ function isEnvFlagEnabled(value: string | undefined): boolean {
 
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-}
-
-function chunkArray<T>(values: T[], chunkSize: number): T[][] {
-  const chunks: T[][] = [];
-  for (let index = 0; index < values.length; index += chunkSize) {
-    chunks.push(values.slice(index, index + chunkSize));
-  }
-  return chunks;
 }
 
 async function getPlatformStatus(

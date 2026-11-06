@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
 
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'glanceable-snapshot-secret',
@@ -11,12 +11,12 @@ jest.mock('@/lib/glanceable-agents-snapshot-server', () => ({
   buildGlanceableDeliveryForUser: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 
 import { POST } from './route';
 
-const mockedAccess = jest.mocked(ensureOrganizationAccess);
+const mockedAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedBuild = jest.mocked(buildGlanceableDeliveryForUser);
 
 function request(): NextRequest {

@@ -106,7 +106,7 @@ fi
 
 # 1. Build trpc (skip if --changes-only and source unchanged)
 if $changes_only; then
-  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
+  trpc_changed=$(git diff --name-only "$base" -- 'packages/trpc/src/**' 'packages/trpc/tsconfig.json' 'packages/trpc/tsconfig.build.json' 'packages/trpc/rollup.config.mjs' 'packages/trpc/package.json' | head -1 || true)
   if [ -n "$trpc_changed" ]; then
     echo "[typecheck] trpc source changed, rebuilding"
     pnpm --filter @kilocode/trpc run build
@@ -169,6 +169,16 @@ done <<< "$changed_dirs"
 if [ ${#pnpm_filters[@]} -eq 0 ]; then
   echo "[typecheck] no matching workspace packages, skipping workspace typecheck"
   exit 0
+fi
+
+# The wrapper workspace compiles this service's shared sources (its tsconfig
+# includes ../src/shared), and the package filters above follow package.json
+# dependencies only, in either direction from another workspace. CI's affected
+# run selects the wrapper through that include; select it here too whenever the
+# service lands in the selection.
+if pnpm ls -r --depth -1 "${pnpm_filters[@]}" --json 2>/dev/null |
+  node -e 'process.exit(JSON.parse(require("node:fs").readFileSync(0, "utf8")).some(p => p.name === "cloud-agent-next") ? 0 : 1)'; then
+  pnpm_filters+=(--filter '@kilocode/cloud-agent-wrapper')
 fi
 
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"

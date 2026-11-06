@@ -45,7 +45,7 @@ it.each([undefined, 'staging'])(
       expect.objectContaining({
         max_retries: 20,
         retry_delay: 60,
-        max_concurrency: 200,
+        max_concurrency: env === 'staging' ? 200 : 225,
         max_batch_timeout: 0,
         max_batch_size: env === 'staging' ? 2 : 6,
         queue:

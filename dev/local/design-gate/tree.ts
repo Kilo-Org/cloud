@@ -83,6 +83,15 @@ const TEXT_INPUT_TAGS = new Set([
 ]);
 const SCREEN_TAGS = new Set(['RNSScreen']);
 const STACK_TAGS = new Set(['RNSScreenStack']);
+/**
+ * `@expo/ui` renders its Android `ModalBottomSheet` in a dialog window of its
+ * own: the compose host is the app-tree node that carries the sheet, and the RN
+ * children hang off an `RNHostView` whose origin is the sheet content's top.
+ * Their frames are therefore in the sheet's space, and only a placement puts
+ * them back into window space (see `presentedSheets`).
+ */
+const SHEET_HOST_TAG = 'ViewManagerAdapter_ExpoUI_HostView';
+const SHEET_CONTENT_TAG = 'ViewManagerAdapter_ExpoUI_RNHostView';
 const IGNORED_TAGS = new Set(['DebuggingOverlay', 'RNSScreenStackHeaderConfig']);
 const LIST_OWNERS = new Set(['FlashList', 'RecyclerView']);
 const CONTROL_ROLES = new Set(['button', 'link', 'tab', 'switch', 'menuitem']);
@@ -126,6 +135,34 @@ export const tags = {
 
 const TRANSPARENT_COLORS = /^(transparent|#0000|#00000000|rgba\(.*,\s*0(\.0+)?\))$/i;
 
+/**
+ * Owners whose content a native dialog or sheet hosts.
+ *
+ * The platform presents that surface in its own window and positions it there,
+ * so `getBoundingClientRect` reports every frame of its content from the
+ * surface's own origin: a bottom sheet whose top sits 307 dp down the app window
+ * measures its heading at y 0. The window's insets therefore do not describe
+ * those frames, and the surface owns them itself — `SessionPageSheet` pads the
+ * top inset on Android and sits below the status bar on iOS, as its own
+ * definition documents. No frame the probe can read distinguishes a surface that
+ * coincides with the window from one that does not, so a rule about the window's
+ * insets skips all of them rather than guessing from a height.
+ */
+const PRESENTED_SURFACE_OWNERS: Record<string, true> = { PresentedContent: true };
+
+/** True when one of a probe node's owners is a presented surface. */
+export function hasPresentedOwner(probe: ProbeNode): boolean {
+  return (probe.owners ?? []).some(owner => PRESENTED_SURFACE_OWNERS[owner] === true);
+}
+
+/**
+ * True when a native dialog or sheet hosts the node's content, so its frame is
+ * measured from that surface's origin rather than the window's.
+ */
+export function insidePresentedSurface(node: LayoutNode): boolean {
+  return [node, ...ancestors(node)].some(candidate => hasPresentedOwner(candidate.probe));
+}
+
 function visibleContainer(style: ProbeNode['style']): boolean {
   const background = style?.backgroundColor;
   const filled =
@@ -158,6 +195,12 @@ export type LayoutNode = {
   structuralPath: string;
   key?: string;
   ref: ElementRef;
+  /**
+   * Set for a node inside a sheet the platform presents in its own window, which
+   * places `rect` and `layoutRect` in window space. `space` identifies that
+   * window, so two nodes of different spaces never compete for one tap.
+   */
+  presented?: Readonly<{ space: number; dy: number }>;
 };
 
 export type LayoutTree = { env: ProbeEnv; nodes: LayoutNode[]; roots: LayoutNode[] };
@@ -196,6 +239,20 @@ export function ancestors(node: LayoutNode): LayoutNode[] {
   return result;
 }
 
+/**
+ * A node's frame with every transform removed. A transform moves a node's
+ * descendants and not its own frame, so a parent's `rect` and a child's `rect`
+ * describe different spaces as soon as anything between them is transformed —
+ * a natively presented formSheet translates its whole screen. Comparing boxes
+ * only means something in this space.
+ */
+export function layoutRect(node: LayoutNode): Rect {
+  const box = node.probe.layoutRect;
+  if (!box) return node.rect;
+  if (!node.presented) return box;
+  return [box[0], box[1] + node.presented.dy, box[2], box[3]];
+}
+
 function numeric(style: ProbeNode['style'], ...keys: string[]): number {
   for (const key of keys) {
     const value = style?.[key];
@@ -204,7 +261,7 @@ function numeric(style: ProbeNode['style'], ...keys: string[]): number {
   return 0;
 }
 
-export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
+export function contentBox(node: LayoutNode, isRTL: boolean, box: Rect = node.rect): Rect {
   const style = node.probe.style;
   const border = numeric(style, 'borderWidth');
   const top =
@@ -244,7 +301,7 @@ export function contentBox(node: LayoutNode, isRTL: boolean): Rect {
       'paddingHorizontal',
       'padding'
     );
-  const [x, y, width, height] = node.rect;
+  const [x, y, width, height] = box;
   return [
     x + left,
     y + top,
@@ -314,6 +371,52 @@ function scrollAxes(node: ProbeNode, children: readonly ProbeNode[]): { x: boole
   return { x: horizontal, y: !horizontal };
 }
 
+/**
+ * Where each sheet the platform presents in its own window really sits, keyed by
+ * probe index.
+ *
+ * On Android `@expo/ui` renders `ModalBottomSheet` as a Material3 dialog, so the
+ * RN children of its `RNHostView` report frames inside that dialog: the sheet
+ * content's top is their origin. The platform anchors the dialog above the
+ * navigation inset, so every frame in the subtree moves down by the difference
+ * between the window and the sheet's own height. A content-sized sheet and a
+ * partial detent both land where the platform paints them, and a full detent,
+ * whose box already spans that area, stays where it is — its content then still
+ * reaches under the status bar, which is exactly what the app pads for.
+ */
+function presentedSheets(
+  nodes: readonly ProbeNode[],
+  env: ProbeEnv
+): Map<number, Readonly<{ space: number; dy: number }>> {
+  const placements = new Map<number, Readonly<{ space: number; dy: number }>>();
+  if (env.platform !== 'android') return placements;
+
+  // Each node's nearest sheet host, itself included, so one pass finds the
+  // subtree a presented sheet owns.
+  const hostOf: number[] = [];
+  nodes.forEach((node, index) => {
+    if (node.tag === SHEET_HOST_TAG) hostOf.push(index);
+    else hostOf.push(node.parent >= 0 ? (hostOf[node.parent] ?? -1) : -1);
+  });
+  const sheets = new Set<number>();
+  nodes.forEach((node, index) => {
+    const host = hostOf[index];
+    if (host >= 0 && node.tag === SHEET_CONTENT_TAG) sheets.add(host);
+  });
+  const anchoredBottom = env.window.height - env.safeArea.bottom;
+  for (const host of sheets) {
+    const dy = Math.max(0, anchoredBottom - nodes[host].rect[3]);
+    placements.set(host, { space: host, dy });
+  }
+  nodes.forEach((_, index) => {
+    const host = hostOf[index];
+    if (host < 0 || host === index) return;
+    const placement = placements.get(host);
+    if (placement) placements.set(index, placement);
+  });
+  return placements;
+}
+
 export function normalize(dump: ProbeDump): LayoutTree {
   const { env } = dump;
   const windowRect: Rect = [0, 0, env.window.width, env.window.height];
@@ -331,19 +434,24 @@ export function normalize(dump: ProbeDump): LayoutTree {
   const roots: LayoutNode[] = [];
 
   const covered = coveredScreens(dump.nodes);
+  const presented = presentedSheets(dump.nodes, env);
   dump.nodes.forEach((probe, index) => {
     if ((probe.parent >= 0 && dropped.has(probe.parent)) || covered.has(index)) {
       dropped.add(index);
       return;
     }
+    const placement = presented.get(index);
+    const rect: Rect = placement
+      ? [probe.rect[0], probe.rect[1] + placement.dy, probe.rect[2], probe.rect[3]]
+      : probe.rect;
     const parent =
       probe.parent >= 0 ? (placed[probe.parent] ?? effectiveParent[probe.parent]) : undefined;
     const inheritedClip = probe.parent >= 0 ? clipOf[probe.parent] : windowRect;
-    const visibleRect = intersection(probe.rect, inheritedClip);
+    const visibleRect = intersection(rect, inheritedClip);
     const overflow = probe.style?.overflow;
     const scroll = scrollAxes(probe, childrenOf.get(index) ?? []);
     const clips = overflow === 'hidden' || overflow === 'scroll' || scroll.x || scroll.y;
-    const zeroArea = probe.rect[2] <= 0 || probe.rect[3] <= 0;
+    const zeroArea = rect[2] <= 0 || rect[3] <= 0;
     if (hidden(probe) || (zeroArea && clips)) {
       dropped.add(index);
       return;
@@ -357,14 +465,14 @@ export function normalize(dump: ProbeDump): LayoutTree {
       dropped.add(index);
       return;
     }
-    clipOf[index] = clips ? intersection(inheritedClip, probe.rect) : inheritedClip;
+    clipOf[index] = clips ? intersection(inheritedClip, rect) : inheritedClip;
     const isText = tags.isText(probe.tag);
     const isTextInput = tags.isTextInput(probe.tag);
     const pressable = probe.pressable === true;
     const node: LayoutNode = {
       index,
       tag: probe.tag,
-      rect: probe.rect,
+      rect,
       visibleRect,
       probe,
       parent,
@@ -381,7 +489,8 @@ export function normalize(dump: ProbeDump): LayoutTree {
       hasText: isText || isTextInput,
       path: '',
       structuralPath: '',
-      ref: { index, path: '', tag: probe.tag, rect: probe.rect },
+      ...(placement ? { presented: placement } : {}),
+      ref: { index, path: '', tag: probe.tag, rect },
     };
     placed[index] = node;
     if (parent) parent.children.push(node);

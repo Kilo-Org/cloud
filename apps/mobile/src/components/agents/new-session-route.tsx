@@ -13,8 +13,9 @@ import { cn } from '@/lib/utils';
 
 /**
  * The New-session composer with the caller's organization context. Rendered by
- * the `agent-chat/new` route and by the session-detail route when its
- * `session-id` param cannot be a session id.
+ * the `agent-chat/new` route, which is the only screen that opens the composer:
+ * a session id the store does not own shows the session route's permanent
+ * not-found state instead of swapping the person's screen for this form.
  */
 export function NewSessionRoute() {
   const { t } = useTranslation();

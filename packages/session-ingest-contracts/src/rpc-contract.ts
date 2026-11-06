@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {
   cloudAgentChildSessionLineageSchema,
+  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
+import { storedSessionIdSchema } from './kilo-session-id';
 
-export { cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
+export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
@@ -17,6 +19,8 @@ export const cloudAgentWorktreeLocationSchema = z
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
 export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
+export const WORKTREE_UNREGISTERED_CHILD_SESSIONS = 'worktree_unregistered_child_sessions';
+export const WORKTREE_CHILD_LINEAGE_CONFLICT = 'worktree_child_lineage_conflict';
 
 export const cloudAgentWorktreeDeletionManifestSchema = z
   .object({
@@ -25,7 +29,7 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
       z
         .object({
           sessionId: sessionIdSchema,
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]).nullable(),
+          cloudAgentSessionId: cloudAgentSessionIdSchema.nullable(),
         })
         .strict()
     ),
@@ -56,7 +60,7 @@ export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeD
 
 export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
   .extend({
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type RetireCloudAgentWorktreeIfSoleMemberParams = z.infer<
@@ -81,7 +85,7 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
-          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+          cloudAgentSessionId: cloudAgentSessionIdSchema,
         })
       )
       .optional(),
@@ -111,6 +115,10 @@ export const unresolvedCloudAgentSandboxOwnerSchema = z
         z
           .object({
             sessionId: sessionIdSchema.nullable(),
+            // Read straight from the historical `cli_sessions_v2` column, which
+            // still holds owner ids minted before the `workspace_` shape. This
+            // reader reports foreign owners, so it must accept them rather than
+            // fail the whole teardown answer.
             cloudAgentSessionId: z.string().min(1),
           })
           .strict()
@@ -136,23 +144,26 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-export const messageIdSchema = z
-  .string()
-  .startsWith('msg')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'message IDs must not contain / or U+0000',
-  });
-export const partIdSchema = z
-  .string()
-  .startsWith('prt')
-  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-    message: 'part IDs must not contain / or U+0000',
-  });
+// Message and part ids become storage and item identities, so both refuse `/`
+// and U+0000.
+function createIdSchema(prefix: string, label: string) {
+  return z
+    .string()
+    .startsWith(prefix)
+    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+      message: `${label} must not contain / or U+0000`,
+    });
+}
+export const messageIdSchema = createIdSchema('msg', 'message IDs');
+export const partIdSchema = createIdSchema('prt', 'part IDs');
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
+  // Any non-empty id: this live create input records the caller's session
+  // identity, and requiring the `workspace_` shape here would reject callers
+  // that predate it.
   cloudAgentSessionId: z.string().min(1),
   cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),
@@ -240,7 +251,7 @@ export const deleteHostedWorkspaceSessionSchema = z
     kiloUserId: z.string().min(1),
     workspaceId: cloudAgentWorktreeIdSchema,
     sessionId: sessionIdSchema,
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type DeleteHostedWorkspaceSessionParams = z.input<typeof deleteHostedWorkspaceSessionSchema>;
@@ -255,7 +266,7 @@ export const assertHostedWorkspaceSessionDeletableSchema = z
   .object({
     kiloUserId: z.string().min(1),
     sessionId: sessionIdSchema,
-    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    cloudAgentSessionId: cloudAgentSessionIdSchema,
   })
   .strict();
 export type AssertHostedWorkspaceSessionDeletableParams = z.input<
@@ -357,13 +368,12 @@ export const kiloSdkSessionSnapshotOutcomeSchema = z.discriminatedUnion('kind', 
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
-export type KiloSdkSessionSnapshotRead = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
-export type KiloSdkSessionSnapshotOutcome = KiloSdkSessionSnapshotRead;
+export type KiloSdkSessionSnapshotOutcome = z.infer<typeof kiloSdkSessionSnapshotOutcomeSchema>;
 
 export type CloudAgentRootSessionSnapshot = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
-  snapshot: KiloSdkSessionSnapshotRead;
+  snapshot: KiloSdkSessionSnapshotOutcome;
 };
 export type GetCloudAgentRootSessionSnapshotParams =
   ResolveCloudAgentRootSessionForKiloSessionParams;
@@ -417,33 +427,63 @@ function decodeBase64Url(value: string, options: { fatalUtf8: boolean }): string
   return new TextDecoder('utf-8', { fatal: options.fatalUtf8, ignoreBOM: false }).decode(bytes);
 }
 
+const OPAQUE_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
+
+/**
+ * One codec for every opaque cursor whose wire form is a canonical unpadded
+ * base64url JSON payload: the same charset and length guard, a fatal UTF-8
+ * decode, and a canonical re-encode comparison. `label` is the whole error
+ * message, so each cursor family keeps its own text.
+ */
+function opaqueCursorCodec<S extends z.ZodType>(
+  schema: S,
+  label: string
+): {
+  encode(value: z.input<S>): string;
+  decode(cursor: string): z.output<S>;
+  validate(cursor: string): boolean;
+} {
+  function decode(cursor: string): z.output<S> {
+    if (!OPAQUE_CURSOR_WIRE_PATTERN.test(cursor)) {
+      throw new Error(label);
+    }
+    const parsed = schema.parse(JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true })));
+    if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+      throw new Error(label);
+    }
+    return parsed;
+  }
+  return {
+    encode: value => encodeBase64Url(JSON.stringify(schema.parse(value))),
+    decode,
+    validate: cursor => {
+      try {
+        decode(cursor);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+const rootSessionsCursorCodec = opaqueCursorCodec(
+  cloudAgentRootSessionsCursorSchema,
+  'Invalid Cloud Agent root sessions cursor'
+);
+
 export function encodeCloudAgentRootSessionsCursor(
   cursor: Omit<CloudAgentRootSessionsCursor, 'version'>
 ): string {
-  const parsed = cloudAgentRootSessionsCursorSchema.parse({ version: 1, ...cursor });
-  return encodeBase64Url(JSON.stringify(parsed));
+  return rootSessionsCursorCodec.encode({ version: 1, ...cursor });
 }
 
 export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRootSessionsCursor {
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
-  }
-  const parsed = cloudAgentRootSessionsCursorSchema.parse(
-    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
-  );
-  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
-    throw new Error('Invalid Cloud Agent root sessions cursor');
-  }
-  return parsed;
+  return rootSessionsCursorCodec.decode(cursor);
 }
 
 export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
-  try {
-    decodeCloudAgentRootSessionsCursor(cursor);
-    return true;
-  } catch {
-    return false;
-  }
+  return rootSessionsCursorCodec.validate(cursor);
 }
 
 export const cloudAgentWorkspacesCursorSchema = z
@@ -455,33 +495,23 @@ export const cloudAgentWorkspacesCursorSchema = z
   .strict();
 export type CloudAgentWorkspacesCursor = z.infer<typeof cloudAgentWorkspacesCursorSchema>;
 
+const workspacesCursorCodec = opaqueCursorCodec(
+  cloudAgentWorkspacesCursorSchema,
+  'Invalid Cloud Agent workspaces cursor'
+);
+
 export function encodeCloudAgentWorkspacesCursor(
   cursor: Omit<CloudAgentWorkspacesCursor, 'version'>
 ): string {
-  const parsed = cloudAgentWorkspacesCursorSchema.parse({ version: 1, ...cursor });
-  return encodeBase64Url(JSON.stringify(parsed));
+  return workspacesCursorCodec.encode({ version: 1, ...cursor });
 }
 
 export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWorkspacesCursor {
-  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
-    throw new Error('Invalid Cloud Agent workspaces cursor');
-  }
-  const parsed = cloudAgentWorkspacesCursorSchema.parse(
-    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
-  );
-  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
-    throw new Error('Invalid Cloud Agent workspaces cursor');
-  }
-  return parsed;
+  return workspacesCursorCodec.decode(cursor);
 }
 
 export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
-  try {
-    decodeCloudAgentWorkspacesCursor(cursor);
-    return true;
-  } catch {
-    return false;
-  }
+  return workspacesCursorCodec.validate(cursor);
 }
 
 export const listCloudAgentRootSessionsSchema = z
@@ -699,7 +729,10 @@ export const MAX_SESSION_DIFF_READ_BYTES = 8 * 1024 * 1024;
 
 export const sessionDiffReadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('value'), files: z.array(sessionDiffFileSchema) }),
-  z.object({ kind: z.literal('too_large'), maximumBytes: z.number() }),
+  z.object({
+    kind: z.literal('too_large'),
+    maximumBytes: z.number().int().positive(),
+  }),
   z.object({ kind: z.literal('retryable_failure') }),
   z.object({ kind: z.literal('invalid_data') }),
 ]);
@@ -707,7 +740,10 @@ export type SessionDiffRead = z.infer<typeof sessionDiffReadSchema>;
 
 const kiloSdkUserMessageBaseShape = {
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  // The stored message's own session id, as the store addressed the session when
+  // it was written. A session created before the canonical shape was issued
+  // keeps its own id, so the stored transcript must still parse under it.
+  sessionID: storedSessionIdSchema,
   role: z.literal('user'),
   time: z.object({ created: z.number() }),
   /**
@@ -761,7 +797,8 @@ export type KiloSdkUserMessage = z.infer<typeof kiloSdkUserMessageSchema>;
 
 export const kiloSdkAssistantMessageSchema = z.object({
   id: messageIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the user message above. */
+  sessionID: storedSessionIdSchema,
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
@@ -788,7 +825,8 @@ export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
   id: partIdSchema,
-  sessionID: sessionIdSchema,
+  /** Same stored-session rule as the stored messages. */
+  sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
@@ -961,16 +999,18 @@ export const kiloSdkMessageHistoryPageSchema = z.object({
 });
 export type KiloSdkMessageHistoryPage = z.infer<typeof kiloSdkMessageHistoryPageSchema>;
 
+const KILO_SDK_HISTORY_FAILURE_PHASES = ['message_scan', 'page_parts'] as const;
+
 export const kiloSdkHistoryTooLargeSchema = z.object({
   kind: z.literal('too_large'),
   maximumBytes: z.number().int().positive(),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryTooLarge = z.infer<typeof kiloSdkHistoryTooLargeSchema>;
 
 export const kiloSdkHistoryRetryableFailureSchema = z.object({
   kind: z.literal('retryable_failure'),
-  phase: z.enum(['message_scan', 'page_parts']),
+  phase: z.enum(KILO_SDK_HISTORY_FAILURE_PHASES),
 });
 export type KiloSdkHistoryRetryableFailure = z.infer<typeof kiloSdkHistoryRetryableFailureSchema>;
 
@@ -1164,7 +1204,7 @@ export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
 /** Base64 and base64url alphabets, plus the optional trailing padding. */
 const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
-export const kiloSdkMessagesLegacyCursorSchema = z
+export const kiloSdkMessagesCursorSchema = z
   .object({
     id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
       message: 'message cursor ids must fit the cursor id byte limit',
@@ -1172,10 +1212,7 @@ export const kiloSdkMessagesLegacyCursorSchema = z
     time: z.number().nonnegative(),
   })
   .strict();
-export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCursorSchema>;
-
-export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
-export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
+export type KiloSdkMessagesCursor = z.infer<typeof kiloSdkMessagesCursorSchema>;
 
 export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
   return encodeBase64Url(JSON.stringify(kiloSdkMessagesCursorSchema.parse(cursor)));
@@ -1256,15 +1293,18 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`. `before` is capped at
- * `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized value never reaches
- * the decoder.
+ * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
+ * value never reaches the decoder.
+ *
+ * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
+ * store still addresses sessions created before the canonical id shape was
+ * issued, and their transcript must stay readable. The access check below owns
+ * authorization, not the id shape.
  */
 export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
-    kiloSessionId: sessionIdSchema,
+    kiloSessionId: storedSessionIdSchema,
     limit: z
       .number()
       .int()
@@ -1309,6 +1349,17 @@ export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
+  setGeneratedTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+    title: string;
+  }) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: {
+    sessionId: string;
+    kiloUserId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   deleteHostedWorkspaceSession: (
     params: DeleteHostedWorkspaceSessionParams

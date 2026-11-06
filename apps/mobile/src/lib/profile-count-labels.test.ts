@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 
 import {
+  draftProfileCountItems,
   formatProfileCountItems,
   type ProfileCountCounts,
   profileCountItems,
@@ -92,5 +93,24 @@ describe('formatProfileCountItems', () => {
 
   it('resolves nothing for an empty list', () => {
     expect(formatProfileCountItems(t, [])).toEqual([]);
+  });
+
+  it('summarizes a draft profile with each count agreed', async () => {
+    expect(draftProfileCountItems(2, 0)).toEqual([{ kind: 'vars', count: 2 }]);
+    expect(draftProfileCountItems(0, 0)).toEqual([]);
+
+    await i18n.changeLanguage('et');
+    try {
+      expect(formatProfileCountItems(t, draftProfileCountItems(1, 1))).toEqual([
+        '1 muutuja',
+        '1 seadistuskäsk',
+      ]);
+      expect(formatProfileCountItems(t, draftProfileCountItems(3, 2))).toEqual([
+        '3 muutujat',
+        '2 seadistuskäsku',
+      ]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

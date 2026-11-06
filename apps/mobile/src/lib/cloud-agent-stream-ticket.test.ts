@@ -100,6 +100,46 @@ describe('fetchCloudAgentStreamTicket', () => {
     }
   );
 
+  it('carries the status when a refused response body is not JSON', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>bad gateway</html>', { status: 403 }));
+
+    const rejection = await fetchCloudAgentStreamTicket('agent-1').catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(StreamTicketHttpError);
+    expect((rejection as StreamTicketHttpError).status).toBe(403);
+    expect((rejection as Error).message).toBe('Failed to get stream ticket');
+  });
+
+  it('carries the status when a refused response has no body at all', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+
+    const rejection = await fetchCloudAgentStreamTicket('agent-1').catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(StreamTicketHttpError);
+    expect((rejection as StreamTicketHttpError).status).toBe(404);
+    expect((rejection as Error).message).toBe('Failed to get stream ticket');
+  });
+
+  it('carries the status when a refused response body is a JSON scalar', async () => {
+    fetchMock.mockResolvedValue(Response.json('nope', { status: 400 }));
+
+    const rejection = await fetchCloudAgentStreamTicket('agent-1').catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(StreamTicketHttpError);
+    expect((rejection as StreamTicketHttpError).status).toBe(400);
+    expect((rejection as Error).message).toBe('Failed to get stream ticket');
+  });
+
+  it('forwards an AbortSignal so the caller can cancel the request', async () => {
+    fetchMock.mockResolvedValue(okResponse({ ticket: 't-1', expiresAt: 123 }));
+    const controller = new AbortController();
+
+    await fetchCloudAgentStreamTicket('agent-1', undefined, { signal: controller.signal });
+
+    const init = fetchMock.mock.calls[0]?.[1] as { signal?: AbortSignal };
+    expect(init.signal).toBe(controller.signal);
+  });
+
   it('throws when ticket is missing from an ok response', async () => {
     fetchMock.mockResolvedValue(okResponse({ expiresAt: 123 }));
 

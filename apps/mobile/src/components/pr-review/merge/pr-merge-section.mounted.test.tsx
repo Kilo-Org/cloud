@@ -11,7 +11,10 @@ import '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { PrMergeSection } from './pr-merge-section';
-import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import {
+  type MergeBlockedReason,
+  type PrOverviewDto,
+} from '@/lib/pr-review/merge/merge-blocked-reasons';
 
 const routerPush = vi.fn();
 
@@ -38,12 +41,20 @@ vi.mock('@/lib/pr-review/merge/use-pr-merge-mutations', () => ({
   useUpdateBranchMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDisableAutoMergeMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
+// The poll suite owns the timer, not the reasons: the panel's rows come from
+// their own selector tests and the end-to-end run.
+const reasonsModel = vi.hoisted(() => ({
+  reasons: [] as MergeBlockedReason[],
+}));
+vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
+  useMergeBlockedReasons: () => reasonsModel,
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-section-parts', () => ({
   AutoMergeEnabledBanner: 'AutoMergeEnabledBanner',
   BlockedPanel: 'BlockedPanel',
   MergeabilityCheckingRow: 'MergeabilityCheckingRow',
   MergeabilityTimedOutRow: 'MergeabilityTimedOutRow',
-  TerminalChip: 'TerminalChip',
+  ClosedChip: 'ClosedChip',
 }));
 
 const POLL_INTERVAL_MS = 3000;
@@ -194,5 +205,46 @@ describe('PrMergeSection mergeability poll', () => {
 
     advance(POLL_INTERVAL_MS * (POLL_MAX_TICKS + 5));
     expect(onRefetch).toHaveBeenCalledOnce();
+  });
+
+  it('paints the blocked panel rows on its first frame', () => {
+    const onRefetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const blocked = overview({
+      mergeable: false,
+      mergeableState: 'blocked',
+      reviewDecision: 'APPROVED',
+    });
+    reasonsModel.reasons = [
+      { id: 'failing-checks', iconKind: 'failing-checks', severity: 'destructive', title: 'x' },
+    ];
+    act(() => {
+      renderer = TestRenderer.create(sectionElement(blocked, onRefetch));
+    });
+    const mounted = renderer;
+    if (!mounted) {
+      throw new Error('the merge section did not mount');
+    }
+    const panels = mounted.root.findAll(node => String(node.type) === 'BlockedPanel');
+    expect(panels).toHaveLength(1);
+    expect(panels[0]?.props.reasons).toEqual(reasonsModel.reasons);
+    reasonsModel.reasons = [];
+  });
+
+  it('renders the closed sentence and nothing for a merged review', () => {
+    const onRefetch = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    act(() => {
+      renderer = TestRenderer.create(sectionElement(overview({ state: 'closed' }), onRefetch));
+    });
+    const mounted = renderer;
+    if (!mounted) {
+      throw new Error('the merge section did not mount');
+    }
+    expect(countOf(mounted, 'ClosedChip')).toBe(1);
+
+    act(() => {
+      mounted.update(sectionElement(overview({ state: 'merged' }), onRefetch));
+    });
+    expect(countOf(mounted, 'ClosedChip')).toBe(0);
+    expect(countOf(mounted, 'Button')).toBe(0);
   });
 });

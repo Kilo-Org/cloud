@@ -182,6 +182,8 @@ describe('isKiloServerProcess', () => {
     expect(isKiloServerProcess(['node', '/usr/local/bin/kilo', 'serve', '--port=0'])).toBe(true);
     expect(isKiloServerProcess(['/usr/local/lib/kilo/.kilo', 'serve'])).toBe(true);
     expect(isKiloServerProcess(['kilo', 'serve'])).toBe(true);
+    expect(isKiloServerProcess(['/usr/local/bin/kilo2', 'serve', '--port=0'])).toBe(true);
+    expect(isKiloServerProcess(['node', '/usr/local/bin/.kilo2', 'serve'])).toBe(true);
   });
 
   it('does not match tool commands', () => {
@@ -189,6 +191,7 @@ describe('isKiloServerProcess', () => {
     expect(isKiloServerProcess(['npx', 'serve'])).toBe(false);
     // 'serve' inside a shell string is not a standalone argv token
     expect(isKiloServerProcess(['bash', '-c', 'echo kilo serve'])).toBe(false);
+    expect(isKiloServerProcess(['bash', '-c', 'echo kilo2 serve'])).toBe(false);
     // 'kilo' beyond the executable/script positions does not qualify
     expect(isKiloServerProcess(['node', 'tool.js', 'build', 'serve', '--dir=/kilo'])).toBe(false);
     // a script merely named after kilo is not the real binary basename

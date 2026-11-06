@@ -130,11 +130,12 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
+  Plus: 'Plus',
 }));
 vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#999999' }),
+  useThemeColors: () => ({ mutedForeground: '#999999', primaryForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/session-attention', () => ({ getRevisionSnapshot: () => 17 }));
 

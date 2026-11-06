@@ -41,7 +41,7 @@ async function resolveOwner(
   request: NextRequest,
   roles?: Parameters<typeof ensureOrganizationAccess>[2]
 ): Promise<AutoRoutingModeOwnerQuery | { response: NextResponse<{ error: string }> }> {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (!user || authFailedResponse) {
     return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }
@@ -55,7 +55,7 @@ async function resolveOwner(
   }
 
   try {
-    await ensureOrganizationAccess({ user }, organizationId, roles);
+    await ensureOrganizationAccess({ user, tokenSource }, organizationId, roles);
   } catch (error) {
     const response = trpcErrorResponse(error);
     if (response) return { response };

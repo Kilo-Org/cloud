@@ -9,6 +9,7 @@
       "lowBalance": "残高の確認が必要です",
       "spendAlert": "支出の確認が必要です",
       "securityFinding": "セキュリティの検出結果の確認が必要です",
+      "securityUpdate": "セキュリティチェックに更新があります",
       "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "セキュリティの検出結果の確認が必要です"
+      "body": "セキュリティチェックに更新があります"
     }
   },
   "instanceLifecycle": {

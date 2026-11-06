@@ -22,6 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
+  appliesRepoBindings,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,
@@ -65,11 +66,11 @@ export {
 
 // Var CRUD
 export {
+  MAX_PROFILE_VARS,
   setVar,
   deleteVar,
   listVars,
   getVarsForSession,
-  setVars,
   type VarForSession,
 } from './profile-vars-service';
 
@@ -245,9 +246,19 @@ export {
   validateEnvironmentSecretValue,
   validateEnvironmentCommands,
   validateEnvironmentVarCount,
+  bitbucketCloneUrl,
+  repositoryLeaf,
+  isSafeRepositoryLeaf,
+  normalizeRepoFullName,
+  sameRepositoryIdentity,
   type EnvironmentOwner,
   type EnvironmentPlatform,
   type EnvironmentRepositoryIdentity,
+  type EnvironmentReferenceRepository,
+  type EnvironmentIdentityInput,
+  type EnvironmentIdentityResponse,
+  type EnvironmentV1CreateInput,
+  type EnvironmentV2CreateInput,
   type EnvironmentCreateInput,
   type EnvironmentSecretChange,
   type EnvironmentUpdateInput,
@@ -259,6 +270,11 @@ export {
   type EnvironmentSummary,
 } from './environment-contracts';
 export {
+  environmentRepositoryEntrySchema,
+  environmentRepositoriesSchema,
+  type EnvironmentRepositoryEntry,
+} from './environment-repository-entry';
+export {
   createEnvironment,
   updateEnvironment,
   deleteEnvironment,
@@ -269,5 +285,6 @@ export {
   loadEnvironmentBuildInput,
   readEnvironmentReference,
   lockActiveOrganization,
+  type EnvironmentSessionResolution,
   type EnvironmentTransaction,
 } from './environment-service';

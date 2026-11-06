@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- the mergeability selector, the blocked-row selectors and the allowed-method list share one pure module. */
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { CATALOG_LOADERS } from '@/i18n/catalogs';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { i18n } from '@/i18n';
 
 import {
   defaultMergeMethodFor,
@@ -6,7 +11,20 @@ import {
   getMergeabilityStatus,
   getMergeBlockedReasons,
   type MergeBlockedReasonsArgs,
+  prMergeMethodName,
 } from './merge-blocked-reasons';
+
+/** The merge copy a catalog must carry for this helper to name a method. */
+type MergeCatalog = {
+  prReview: {
+    merge: {
+      autoMergeDescription: string;
+      methods: Record<'merge' | 'squash' | 'rebase', string>;
+    };
+  };
+};
+
+const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;
 
 function repo(overrides: Partial<MergeBlockedReasonsArgs> = {}): MergeBlockedReasonsArgs {
   return {
@@ -15,6 +33,7 @@ function repo(overrides: Partial<MergeBlockedReasonsArgs> = {}): MergeBlockedRea
     mergeable: false,
     mergeableState: 'blocked',
     reviewDecision: 'REVIEW_REQUIRED',
+    failedCheckCount: 0,
     allowUpdateBranch: true,
     ...overrides,
   };
@@ -90,13 +109,78 @@ describe('getMergeBlockedReasons', () => {
     expect(reasons[0]?.severity).toBe('destructive');
   });
 
-  it('reports blocked with required-reviews + failing-checks', () => {
-    const reasons = getMergeBlockedReasons(repo({ mergeable: false, mergeableState: 'blocked' }));
+  it('reports blocked with required-reviews + failing-checks when both hold', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({ mergeable: false, mergeableState: 'blocked', failedCheckCount: 2 })
+    );
     expect(reasons.map(r => r.id)).toEqual(['required-reviews', 'failing-checks']);
     expect(reasons[0]?.iconKind).toBe('required-reviews');
     expect(reasons[0]?.severity).toBe('warn');
     expect(reasons[1]?.iconKind).toBe('failing-checks');
     expect(reasons[1]?.severity).toBe('destructive');
+  });
+
+  it('leaves the failing-checks row out while the Checks card counts no failure', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'CHANGES_REQUESTED',
+        failedCheckCount: 0,
+      })
+    );
+    expect(reasons.map(r => r.id)).toEqual(['required-reviews']);
+  });
+
+  it('leaves the required-reviews row out while the review decision is approved', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'APPROVED',
+        failedCheckCount: 1,
+      })
+    );
+    expect(reasons.map(r => r.id)).toEqual(['failing-checks']);
+  });
+
+  it('falls back to the reported state when neither gate explains a blocked PR', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'APPROVED',
+        failedCheckCount: 0,
+      })
+    );
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]?.id).toBe('unknown-state');
+    expect(reasons[0]?.title).toBe('This pull request is not mergeable yet');
+    expect(reasons[0]?.detail).toContain('blocked');
+  });
+
+  it('falls back to the reported state when the checks read failed', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'APPROVED',
+        failedCheckCount: null,
+      })
+    );
+    expect(reasons.map(r => r.id)).toEqual(['unknown-state']);
+  });
+
+  it('keeps the reviews row when the checks read failed', () => {
+    const reasons = getMergeBlockedReasons(
+      repo({
+        mergeable: false,
+        mergeableState: 'blocked',
+        reviewDecision: 'REVIEW_REQUIRED',
+        failedCheckCount: null,
+      })
+    );
+    expect(reasons.map(r => r.id)).toEqual(['required-reviews']);
   });
 
   it('reports behind as a branch-out-of-date reason with a rebase/update CTA', () => {
@@ -274,5 +358,50 @@ describe('defaultMergeMethodFor', () => {
         viewerCanAdmin: true,
       })
     ).toBe('merge');
+  });
+});
+
+describe('prMergeMethodName', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('names the method from the active catalog, never the wire code', async () => {
+    await i18n.changeLanguage('ps');
+    expect(prMergeMethodName('squash')).toBe('د کمېټونو یو کول');
+    expect(prMergeMethodName('merge')).toBe('یوځای کول');
+    expect(prMergeMethodName('rebase')).toBe('بیا بنسټول');
+  });
+
+  it('accepts the upper-case method codes the GraphQL API returns', async () => {
+    await i18n.changeLanguage('en');
+    expect(prMergeMethodName('SQUASH')).toBe('Squash');
+    expect(prMergeMethodName('Merge')).toBe('Merge');
+  });
+
+  it('keeps a value this build does not know as the provider sent it', () => {
+    expect(prMergeMethodName('FastForward')).toBe('FastForward');
+  });
+
+  // The sentence exists in every catalog and the label is what fills it, so a
+  // catalog that kept the wire code would still read as Latin text.
+  it('has a name of its own in every catalog', () => {
+    const untranslated: string[] = [];
+    const leftoverPlaceholders: string[] = [];
+    for (const language of SUPPORTED_LANGUAGES) {
+      const { prReview } = CATALOG_LOADERS[language]() as unknown as MergeCatalog;
+      for (const method of MERGE_METHODS) {
+        const name = prReview.merge.methods[method];
+        if (name.trim() === '' || (language !== 'en' && name.toLowerCase() === method)) {
+          untranslated.push(`${language}:${method}`);
+        }
+        const sentence = prReview.merge.autoMergeDescription.replace('{{method}}', name);
+        if (sentence.includes('{{') || sentence.includes('}}')) {
+          leftoverPlaceholders.push(language);
+        }
+      }
+    }
+    expect(untranslated).toEqual([]);
+    expect(leftoverPlaceholders).toEqual([]);
   });
 });

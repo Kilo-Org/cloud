@@ -22,7 +22,10 @@
 //
 // A small LRU cache sits on top of the per-line path because a large
 // diff can have thousands of identical lines (empty context rows) and
-// re-running the tokenizer for each one is wasteful.
+// re-running the tokenizer for each one is wasteful. It is bounded by
+// the characters it retains as well as by entry count, so a diff full of
+// very long lines cannot hold an unbounded share of the JS heap — see
+// `HIGHLIGHT_CACHE_CHARACTERS` below.
 
 import { common, createLowlight } from 'lowlight';
 
@@ -162,11 +165,51 @@ const HLJS_CLASS_PALETTE: ReadonlyMap<string, string> = new Map([
   ['deletion', 'del'],
 ]);
 
-// Cap the per-line cache at 5,000 entries — large diffs can have many
-// repeated short lines (empty context rows, import lines) but a hard
-// ceiling keeps memory bounded for an attacker-controlled patch.
+// The per-line cache is bounded by retained characters, not only by entry
+// count. Large diffs have many repeated short lines (empty context rows, import
+// lines), so 5,000 entries stays as the secondary count ceiling, but a diff of
+// minified or generated files has lines of arbitrary length and a count ceiling
+// alone would let 5,000 of them pin an unbounded share of the JS heap for the
+// rest of the app session. Weight is the entry's key plus the characters its
+// tokens hold, so the budget bounds what the map actually retains; eviction
+// drops the least recently used entry, like `fenceWalkCache` in
+// `components/agents/code-block-model.ts`.
 const HIGHLIGHT_CACHE_LIMIT = 5000;
-const highlightCache = new Map<string, HighlightToken[]>();
+const HIGHLIGHT_CACHE_CHARACTERS = 1_000_000;
+// A longer line is highlighted and returned but never cached: it cannot be
+// memoized without dominating the budget, and dropping it keeps a single entry
+// far below `HIGHLIGHT_CACHE_CHARACTERS`, so eviction never has to keep the
+// newest entry to avoid dropping what the current render just built.
+const HIGHLIGHT_CACHE_MAX_LINE_LENGTH = 2048;
+
+type HighlightCacheEntry = { tokens: HighlightToken[]; weight: number };
+
+const highlightCache = new Map<string, HighlightCacheEntry>();
+let highlightCacheWeight = 0;
+
+function deleteHighlightCacheEntry(key: string): void {
+  const entry = highlightCache.get(key);
+  if (entry === undefined) {
+    return;
+  }
+  highlightCache.delete(key);
+  highlightCacheWeight -= entry.weight;
+}
+
+function evictHighlightCacheEntries(): void {
+  while (
+    highlightCacheWeight > HIGHLIGHT_CACHE_CHARACTERS ||
+    highlightCache.size > HIGHLIGHT_CACHE_LIMIT
+  ) {
+    // Map iteration is insertion order, so the first key is the least recently
+    // used one — `highlightLine` re-inserts on a hit.
+    const oldest = highlightCache.keys().next();
+    if (oldest.done) {
+      return;
+    }
+    deleteHighlightCacheEntry(oldest.value);
+  }
+}
 
 function tokenFromHljsClassNames(classNames: readonly string[]): string | null {
   for (const name of classNames) {
@@ -255,25 +298,33 @@ export function highlightLine(text: string, language: string | null): HighlightT
   if (!language) {
     return [{ text, className: null }];
   }
-  const cacheKey = `${language}\u0000${text}`;
-  const cached = highlightCache.get(cacheKey);
-  if (cached) {
-    // LRU touch — re-insert to move to the end of insertion order.
-    highlightCache.delete(cacheKey);
-    highlightCache.set(cacheKey, cached);
-    return cached;
-  }
-  const tokens = runHighlight(text, language);
-  if (highlightCache.size >= HIGHLIGHT_CACHE_LIMIT) {
-    // Drop the oldest entry. Map iteration is insertion-ordered, so
-    // the first key is the least-recently-used.
-    const oldest = highlightCache.keys().next().value;
-    if (oldest !== undefined) {
-      highlightCache.delete(oldest);
+  const cacheKey =
+    text.length <= HIGHLIGHT_CACHE_MAX_LINE_LENGTH ? `${language}\u0000${text}` : null;
+  if (cacheKey !== null) {
+    const cached = highlightCache.get(cacheKey);
+    if (cached !== undefined) {
+      // LRU touch — re-insert to move to the end of insertion order.
+      highlightCache.delete(cacheKey);
+      highlightCache.set(cacheKey, cached);
+      return cached.tokens;
     }
   }
-  highlightCache.set(cacheKey, tokens);
+  const tokens = runHighlight(text, language);
+  if (cacheKey !== null) {
+    const weight = cacheKey.length + tokenTextLength(tokens);
+    highlightCache.set(cacheKey, { tokens, weight });
+    highlightCacheWeight += weight;
+    evictHighlightCacheEntries();
+  }
   return tokens;
+}
+
+function tokenTextLength(tokens: readonly HighlightToken[]): number {
+  let length = 0;
+  for (const token of tokens) {
+    length += token.text.length;
+  }
+  return length;
 }
 
 function runHighlight(text: string, language: string): HighlightToken[] {
@@ -305,5 +356,15 @@ function runHighlight(text: string, language: string): HighlightToken[] {
  */
 export function clearHighlightCacheForTests(): void {
   highlightCache.clear();
+  highlightCacheWeight = 0;
   lowlightInstance = null;
+}
+
+/**
+ * For tests: the per-line cache's current size, in entries and in retained
+ * characters (entry keys plus token text), so a test can assert the budget
+ * instead of inferring it from timing or heap measurements.
+ */
+export function highlightCacheStatsForTests() {
+  return { entries: highlightCache.size, characters: highlightCacheWeight };
 }

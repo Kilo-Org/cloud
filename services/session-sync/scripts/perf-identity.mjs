@@ -68,7 +68,7 @@ export async function listWorkerScripts(api) {
   );
   for (const worker of response.result)
     assert(
-      typeof worker?.id === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test(worker.id),
+      typeof worker?.id === 'string' && /^[a-zA-Z0-9_-]{1,255}$/.test(worker.id),
       'Inventory Worker ID'
     );
   return response.result;
@@ -127,7 +127,7 @@ export async function assertUnusedLimiters(api, workers, namespaceIDs) {
     Array.from({ length: Math.min(8, workers.length) }, async () => {
       while (index < workers.length) {
         const worker = workers[index++];
-        assert(/^[a-z0-9][a-z0-9-]{0,62}$/.test(worker.id), 'Inventory Worker ID');
+        assert(/^[a-zA-Z0-9_-]{1,255}$/.test(worker.id), 'Inventory Worker ID');
         const settings = await api(
           'GET',
           `/accounts/${approvedAccountID}/workers/scripts/${worker.id}/settings`
@@ -187,7 +187,7 @@ export function operatorAPI(credentials, options = {}) {
     const accountPath = pathname.slice(`/accounts/${approvedAccountID}/`.length);
     const accountRead =
       pathname.startsWith(`/accounts/${approvedAccountID}/`) &&
-      /^(?:workers\/(?:scripts(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/(?:deployments|settings|script-settings|subdomain|versions\/[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}))?)?|subdomain|domains|durable_objects\/namespaces)|hyperdrive\/configs(?:\/[a-f0-9]{32})?|r2\/buckets(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/domains\/(?:managed|custom))?)?|secrets_store\/stores\/[a-f0-9]{32}\/secrets(?:\/[a-f0-9]{32})?)$/.test(
+      /^(?:workers\/(?:scripts(?:\/[a-zA-Z0-9_-]{1,255}(?:\/(?:deployments|settings|script-settings|subdomain|versions\/[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}))?)?|subdomain|domains|durable_objects\/namespaces)|hyperdrive\/configs(?:\/[a-f0-9]{32})?|r2\/buckets(?:\/[a-z0-9][a-z0-9-]{0,62}(?:\/domains\/(?:managed|custom))?)?|secrets_store\/stores\/[a-f0-9]{32}\/secrets(?:\/[a-f0-9]{32})?)$/.test(
         accountPath
       );
     const accountDelete =

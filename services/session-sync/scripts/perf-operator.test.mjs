@@ -287,6 +287,7 @@ test('transient ownership reads and deletes retry finitely then complete full pa
 
 test('single-page Worker and late-page secret remnants cannot produce clean teardown', async () => {
   const manifest = identity();
+  const apiWorkerName = 'Mixed_worker_' + 'a'.repeat(242);
   const local = await stub(request => {
     const url = new URL(request.url, 'http://127.0.0.1');
     if (
@@ -299,7 +300,9 @@ test('single-page Worker and late-page secret remnants cannot produce clean tear
       return {
         body: {
           result: [
-            ...Array.from({ length: 150 }, (_, index) => ({ id: `unrelated-${index}` })),
+            ...Array.from({ length: 150 }, (_, index) => ({
+              id: index === 0 ? apiWorkerName : `unrelated-${index}`,
+            })),
             { id: manifest.workerName },
           ],
         },
@@ -736,7 +739,7 @@ test('deployed limiter collision refuses admission instead of changing limits or
     await assert.rejects(
       assertUnusedLimiters(
         operatorAPI('synthetic-only', { fetch: local.fetch }),
-        [{ id: 'another-worker' }],
+        [{ id: 'Mixed_worker_' + 'a'.repeat(242) }],
         namespaceIDs
       ),
       /already shared/

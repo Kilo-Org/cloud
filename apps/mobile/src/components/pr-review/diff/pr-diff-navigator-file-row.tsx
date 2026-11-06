@@ -71,7 +71,7 @@ export function NavigatorFileRow({
                 {directoryRun}
               </Text>
             )}
-            <Text className="font-medium text-foreground" style={LTR_TEXT_DIRECTION}>
+            <Text className="text-sm font-medium text-foreground" style={LTR_TEXT_DIRECTION}>
               {basenameRun}
             </Text>
           </Text>

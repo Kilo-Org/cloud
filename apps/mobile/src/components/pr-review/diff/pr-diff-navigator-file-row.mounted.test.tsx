@@ -115,6 +115,9 @@ describe('NavigatorFileRow path under an RTL interface', () => {
       writingDirection: 'ltr',
     });
     expect(directory?.props.className).toContain('text-muted-foreground');
+    // Both runs keep the row's size: the shared `Text` default variant would
+    // paint a nested run at `text-base` and grow the path's line box.
+    expect(directory?.props.className).toContain('text-sm');
 
     const basenameStyle = Object.assign(
       {},
@@ -122,6 +125,7 @@ describe('NavigatorFileRow path under an RTL interface', () => {
     );
     expect(basenameStyle).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
     expect(basename?.props.className).toContain('font-medium');
+    expect(basename?.props.className).toContain('text-sm');
   });
 
   it('opens the isolate at the basename when the path has no directory', () => {

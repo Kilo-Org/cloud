@@ -1,9 +1,3 @@
-/**
- * Session Config Utilities
- *
- * Centralized logic for building, validating, and deriving SessionConfig.
- */
-
 import type { SessionConfig, ResumeConfig, StreamResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
@@ -16,17 +10,11 @@ type ResumeConfigInput = {
   setupCommands?: string[];
 };
 
-/**
- * Partial session info from DB (last_mode/last_model)
- */
 export type DbSessionInfo = {
   last_mode: string | null;
   last_model: string | null;
 };
 
-/**
- * Options for building a session config
- */
 export type BuildSessionConfigOptions = {
   /** Session ID (cloud agent or kilo session) */
   sessionId: string;
@@ -40,40 +28,11 @@ export type BuildSessionConfigOptions = {
   /** Session info from database (second priority) */
   dbSession?: DbSessionInfo | null;
 
-  /** Default mode to use if not found elsewhere */
   defaultMode?: AgentMode;
 
-  /** Default model to use if not found elsewhere */
   defaultModel?: string;
 };
 
-/**
- * Build a SessionConfig with clear precedence order.
- *
- * Precedence for mode/model:
- *   1. resumeConfig (from the CLI resume flow)
- *   2. dbSession (last_mode/last_model from database)
- *   3. defaults (defaultMode/defaultModel or 'code'/'')
- *
- * @param options - Configuration sources and defaults
- * @returns Complete SessionConfig object
- *
- * @example
- * // Loading from DB (prepared session)
- * const config = buildSessionConfig({
- *   sessionId: session.cloud_agent_session_id,
- *   repository: extractRepoFromGitUrl(session.git_url),
- *   dbSession: { last_mode: session.last_mode, last_model: session.last_model },
- * });
- *
- * @example
- * // Resume modal confirmed
- * const config = buildSessionConfig({
- *   sessionId: session.session_id,
- *   repository: resumeConfig.githubRepo,
- *   resumeConfig,
- * });
- */
 export function buildSessionConfig(options: BuildSessionConfigOptions): SessionConfig {
   const {
     sessionId,
@@ -84,7 +43,6 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
     defaultModel = '',
   } = options;
 
-  // Precedence: resumeConfig > dbSession > defaults
   const mode = resumeConfig?.mode || dbSession?.last_mode || defaultMode;
   const model = resumeConfig?.model || dbSession?.last_model || defaultModel;
 
@@ -102,9 +60,6 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
  * The sendMessageStream schema requires:
  * - mode: one of the valid agent modes
  * - model: non-empty string (min 1 character)
- *
- * @param config - SessionConfig to validate
- * @returns true if config is valid for sendMessageStream
  */
 export function isValidSessionConfig(config: SessionConfig | null): config is SessionConfig {
   if (!config) return false;
@@ -116,14 +71,6 @@ export function isValidSessionConfig(config: SessionConfig | null): config is Se
   return hasValidMode && hasValidModel;
 }
 
-/**
- * Get mode and model from various sources with debug info.
- *
- * Useful for logging which source provided the values.
- *
- * @param options - Configuration sources
- * @returns Object with mode, model, and source info
- */
 export function getModeModelWithSource(options: {
   resumeConfig?: ResumeConfigInput | null;
   dbSession?: DbSessionInfo | null;
@@ -136,7 +83,6 @@ export function getModeModelWithSource(options: {
   let modeSource = 'default';
   let modelSource = 'default';
 
-  // Check dbSession first (lower priority)
   if (dbSession?.last_mode) {
     mode = dbSession.last_mode;
     modeSource = 'dbSession';
@@ -146,7 +92,6 @@ export function getModeModelWithSource(options: {
     modelSource = 'dbSession';
   }
 
-  // Then resumeConfig (higher priority - overwrites)
   if (resumeConfig?.mode) {
     mode = resumeConfig.mode;
     modeSource = 'resumeConfig';
@@ -159,7 +104,6 @@ export function getModeModelWithSource(options: {
   return { mode, model, modeSource, modelSource };
 }
 
-/** Check if a session needs configuration before sending messages. */
 export function needsResumeConfiguration(params: {
   currentDbSessionId: string | null;
   resumeConfig: ResumeConfig | null;

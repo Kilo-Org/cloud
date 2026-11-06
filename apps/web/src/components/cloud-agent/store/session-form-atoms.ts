@@ -48,10 +48,6 @@ export const hasAutoSelectedDefaultAtom = atom(false);
 
 export const profileConfigAtom = atom<ProfileConfig | null>(null);
 
-// ============================================================================
-// Derived Atoms - Effective Configuration
-// ============================================================================
-
 export const effectiveEnvVarsAtom = atom(get => {
   const manual = get(manualEnvVarsAtom);
   const profileConfig = get(profileConfigAtom);

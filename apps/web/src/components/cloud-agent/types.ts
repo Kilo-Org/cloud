@@ -11,24 +11,12 @@
 import * as z from 'zod';
 import type { Images } from '@/lib/images-schema';
 
-// ============================================================================
-// Agent Mode Types
-// ============================================================================
-
 /**
  * Valid mode values for cloud agent sessions.
  * Shared with webhook configuration and historical session rendering.
  */
 export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
 
-// ============================================================================
-// Resume Configuration Types
-// ============================================================================
-
-/**
- * Configuration collected when resuming a CLI session in cloud-agent.
- * Used by historical session configuration logic.
- */
 export type ResumeConfig = {
   mode: AgentMode;
   model: string;
@@ -36,10 +24,6 @@ export type ResumeConfig = {
   setupCommands?: string[];
 };
 
-/**
- * Config shape passed to useCloudAgentStream for resuming sessions.
- * Similar to ResumeConfig but includes the repository.
- */
 export type StreamResumeConfig = {
   mode: AgentMode;
   model: string;
@@ -48,78 +32,43 @@ export type StreamResumeConfig = {
   githubRepo: string;
 };
 
-// ============================================================================
-// Streaming Message Types (for Jotai state management)
-// ============================================================================
-
-/**
- * Cloud agent message
- * Represents all types of messages in the chat (user, assistant, system)
- * Used for streaming state with Jotai atoms
- */
 export interface CloudMessage {
   ts: number; // Timestamp (unique ID for message)
-  type: 'user' | 'assistant' | 'system'; // Message role
+  type: 'user' | 'assistant' | 'system';
   say?: string; // Say subtype (text, completion_result, api_req_started, etc.)
   ask?: string; // Ask subtype (tool, command, use_mcp_tool, etc.)
-  text?: string; // Message content
+  text?: string;
   content?: string; // Alternative content field (stream uses both)
-  partial?: boolean; // Streaming status (true = still streaming)
-  metadata?: Record<string, unknown>; // Additional metadata from stream
+  partial?: boolean;
+  metadata?: Record<string, unknown>;
   toolExecutions?: ToolExecution[]; // Attached tool executions (for completion messages)
-  images?: Images; // Image attachments for the message
+  images?: Images;
 }
 
-// ============================================================================
-// Stored Session Message Types (for localStorage)
-// ============================================================================
-
-/**
- * Message role type
- */
 export type MessageRole = 'user' | 'assistant' | 'system';
 
-/**
- * Base message interface with common fields
- */
 export interface BaseMessage {
   role: MessageRole;
   timestamp: string;
 }
 
-/**
- * User message
- */
 export interface UserMessage extends BaseMessage {
   role: 'user';
   content: string;
 }
 
-/**
- * Assistant message
- */
 export interface AssistantMessage extends BaseMessage {
   role: 'assistant';
   content: string;
   toolExecutions?: ToolExecution[];
 }
 
-/**
- * System message
- */
 export interface SystemMessage extends BaseMessage {
   role: 'system';
   content: string;
 }
 
-/**
- * Union type for all message types
- */
 export type Message = UserMessage | AssistantMessage | SystemMessage;
-
-// ============================================================================
-// Shared Types
-// ============================================================================
 
 /**
  * Tool execution
@@ -127,27 +76,19 @@ export type Message = UserMessage | AssistantMessage | SystemMessage;
  */
 export interface ToolExecution {
   toolName: string; // Tool identifier (bash, read, edit, etc.)
-  input: Record<string, unknown>; // Tool input parameters
+  input: Record<string, unknown>;
   output?: string; // Tool output (when complete)
   error?: string; // Error message (if failed)
   timestamp: string; // ISO timestamp
 }
 
-/**
- * Session configuration
- * Stores the current session's configuration
- */
 export interface SessionConfig {
   sessionId: string; // Session identifier (agent_xxx)
   repository: string; // GitHub repo (owner/repo format)
   mode: string; // Agent mode (code, architect, debug, etc.)
-  model: string; // LLM model identifier
+  model: string;
 }
 
-/**
- * Session start configuration
- * Configuration needed to start a new session
- */
 export interface SessionStartConfig {
   githubRepo: string;
   prompt: string;
@@ -159,10 +100,6 @@ export interface SessionStartConfig {
   upstreamBranch?: string;
 }
 
-/**
- * Stored session interface
- * Used for localStorage persistence
- */
 export interface StoredSession {
   sessionId: string;
   repository: string;
@@ -181,13 +118,6 @@ export interface StoredSession {
   createdOnPlatform?: string | null;
 }
 
-// ============================================================================
-// Zod Schemas for Runtime Validation
-// ============================================================================
-
-/**
- * Zod schema for ToolExecution
- */
 export const ToolExecutionSchema = z.object({
   toolName: z.string(),
   input: z.record(z.string(), z.unknown()),
@@ -196,9 +126,6 @@ export const ToolExecutionSchema = z.object({
   timestamp: z.string(),
 });
 
-/**
- * Zod schema for Message (discriminated union)
- */
 export const MessageSchema = z.discriminatedUnion('role', [
   z.object({
     role: z.literal('user'),
@@ -218,9 +145,6 @@ export const MessageSchema = z.discriminatedUnion('role', [
   }),
 ]);
 
-/**
- * Zod schema for StoredSession
- */
 export const StoredSessionSchema = z.object({
   sessionId: z.string(),
   repository: z.string(),
@@ -236,14 +160,7 @@ export const StoredSessionSchema = z.object({
   cloudAgentSessionId: z.string().nullish(),
 });
 
-/**
- * Zod schema for array of StoredSessions
- */
 export const StoredSessionsArraySchema = z.array(StoredSessionSchema);
-
-// ============================================================================
-// Streaming Event Types (from cloud-agent)
-// ============================================================================
 
 /**
  * Raw Kilocode CLI event - preserved exactly as received from stdout JSON.

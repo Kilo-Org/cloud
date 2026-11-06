@@ -71,9 +71,9 @@ fi
 if selection=$(node scripts/affected-workspaces.mjs "$base"); then
   candidate_dirs=$(jq -r '.dirs[]' <<< "$selection")
 else
-  # Standalone path for a local run without detector output (no root
-  # dependencies, or no pnpm). The selection is unknown, so cover every
-  # workspace rather than drop a suite.
+  # Standalone path for a local run without detector output, for example when
+  # the root dependencies are not installed. The selection is unknown, so cover
+  # every workspace rather than drop a suite.
   candidate_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
     const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
     for (const p of pkgs) {

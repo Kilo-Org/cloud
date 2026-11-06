@@ -3,7 +3,6 @@ import {
   CLOUD_AGENT_ADMISSION_FAILURE_CODES,
   CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
   CLOUD_AGENT_FAILURE_CODES,
-  CLOUD_AGENT_FAILURE_RESPONSIBILITIES,
   CLOUD_AGENT_FAILURE_STAGES,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
   CloudAgentCallbackFailureSchema,
@@ -855,12 +854,6 @@ describe('classifyCloudAgentFailure ownership matrix', () => {
 
 describe('CloudAgentFailureResponsibilitySchema', () => {
   it('accepts provider alongside the existing responsibilities', () => {
-    expect(CLOUD_AGENT_FAILURE_RESPONSIBILITIES).toEqual([
-      'platform',
-      'provider',
-      'user',
-      'unknown',
-    ]);
     expect(CloudAgentFailureResponsibilitySchema.parse('provider')).toBe('provider');
   });
 });

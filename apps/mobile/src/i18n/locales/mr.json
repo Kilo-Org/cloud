@@ -770,7 +770,7 @@
       "mergedByAgo": "{{login}} यांनी {{time}} मर्ज केले",
       "closedAgo": "{{time}} बंद केले",
       "labels": "लेबले",
-      "reviewers": "पुनरावलोकनकर्ते",
+      "reviewers": "पुनरावलोकक",
       "assignees": "नियुक्त व्यक्ती",
       "linkedIssues": "जोडलेले इश्यू",
       "reviewApproved": "मंजूर",

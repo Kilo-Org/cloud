@@ -3547,9 +3547,9 @@
       "searching": "חיפוש באינטרנט",
       "thinking": "חשיבה מעמיקה"
     },
-    "planOf": "מתוך",
+    "planProgress": "{{done}} מתוך {{total}}",
     "filesChanged": "קבצים שונו",
-    "finishedIn": "הסתיים תוך",
+    "finishedIn": "הסתיים תוך {{duration}}",
     "noActivityFor": "אין פעילות במשך",
     "prOpened": "בקשת משיכה נפתחה",
     "permissionWants": "רוצה להריץ",

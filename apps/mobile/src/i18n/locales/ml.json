@@ -3492,9 +3492,9 @@
       "searching": "വെബ് തിരയൽ",
       "thinking": "ചിന്തിക്കുന്നു"
     },
-    "planOf": "ന്റെ",
+    "planProgress": "{{total}}-ൽ {{done}}",
     "filesChanged": "ഫയലുകൾ മാറ്റി",
-    "finishedIn": "പൂർത്തിയായത്",
+    "finishedIn": "{{duration}} കൊണ്ട് പൂർത്തിയായി",
     "noActivityFor": "പ്രവർത്തനമില്ല",
     "prOpened": "പുൾ റിക്വസ്റ്റ് തുറന്നു",
     "permissionWants": "പ്രവർത്തിപ്പിക്കാൻ ആഗ്രഹിക്കുന്നു",

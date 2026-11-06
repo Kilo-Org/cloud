@@ -3492,9 +3492,9 @@
       "searching": "वेब शोध",
       "thinking": "विचार करत आहे"
     },
-    "planOf": "पैकी",
+    "planProgress": "{{total}} पैकी {{done}}",
     "filesChanged": "फाइल्स बदलल्या",
-    "finishedIn": "पूर्ण झाले",
+    "finishedIn": "{{duration}} मध्ये पूर्ण झाले",
     "noActivityFor": "हालचाल नाही",
     "prOpened": "पुल रिक्वेस्ट उघडली",
     "permissionWants": "चालवायचे आहे",

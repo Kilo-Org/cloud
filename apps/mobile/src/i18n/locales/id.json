@@ -3492,9 +3492,9 @@
       "searching": "Penelusuran web",
       "thinking": "Berpikir"
     },
-    "planOf": "dari",
+    "planProgress": "{{done}} dari {{total}}",
     "filesChanged": "file diubah",
-    "finishedIn": "Selesai dalam",
+    "finishedIn": "Selesai dalam {{duration}}",
     "noActivityFor": "Tidak ada aktivitas selama",
     "prOpened": "Pull request dibuka",
     "permissionWants": "Ingin menjalankan",

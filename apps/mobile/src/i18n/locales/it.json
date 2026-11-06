@@ -3547,9 +3547,9 @@
       "searching": "Ricerca web",
       "thinking": "Riflessione"
     },
-    "planOf": "di",
+    "planProgress": "{{done}} di {{total}}",
     "filesChanged": "file modificati",
-    "finishedIn": "Terminato in",
+    "finishedIn": "Terminato in {{duration}}",
     "noActivityFor": "Nessuna attività da",
     "prOpened": "Pull request aperta",
     "permissionWants": "Vuole eseguire",

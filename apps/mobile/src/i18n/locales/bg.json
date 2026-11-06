@@ -3492,9 +3492,9 @@
       "searching": "Търсене в мрежата",
       "thinking": "Обмисляне"
     },
-    "planOf": "от",
+    "planProgress": "{{done}} от {{total}}",
     "filesChanged": "променени файла",
-    "finishedIn": "Завършено за",
+    "finishedIn": "Завършено за {{duration}}",
     "noActivityFor": "Няма активност за",
     "prOpened": "Отворена заявка за сливане",
     "permissionWants": "Иска да изпълни",

@@ -13,6 +13,17 @@ export {
   isExaAllowedPath,
 } from './exa';
 export type { ExaAllowedPath, ExaUsageRecord, ExaUsageWriteResponse } from './exa';
+export {
+  ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageWriteResponseSchema,
+  EnkryptUsageWriteSchema,
+  MAX_ENKRYPT_CREDITS_PER_CALL,
+} from './enkrypt';
+export type {
+  EnkryptUsageWrite,
+  EnkryptUsageWriteInput,
+  EnkryptUsageWriteResponse,
+} from './enkrypt';
 
 /**
  * Wire contract for `POST /api/internal/usage/record`.

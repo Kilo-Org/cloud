@@ -3602,9 +3602,9 @@
       "searching": "Spletno iskanje",
       "thinking": "Premišljevanje"
     },
-    "planOf": "od",
+    "planProgress": "{{done}} od {{total}}",
     "filesChanged": "spremenjenih datotek",
-    "finishedIn": "Dokončano v",
+    "finishedIn": "Dokončano v {{duration}}",
     "noActivityFor": "Ni dejavnosti že",
     "prOpened": "Pull request odprt",
     "permissionWants": "Želi zagnati",

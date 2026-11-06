@@ -3712,9 +3712,9 @@
       "searching": "بحث في الويب",
       "thinking": "التفكير بعمق"
     },
-    "planOf": "من",
+    "planProgress": "{{done}} من {{total}}",
     "filesChanged": "ملفات متغيّرة",
-    "finishedIn": "اكتمل في",
+    "finishedIn": "اكتمل في {{duration}}",
     "noActivityFor": "لا نشاط لمدة",
     "prOpened": "تم فتح طلب سحب",
     "permissionWants": "يريد التشغيل",

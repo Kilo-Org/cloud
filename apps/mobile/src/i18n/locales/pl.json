@@ -3602,9 +3602,9 @@
       "searching": "Wyszukiwanie w sieci",
       "thinking": "Przemyśliwanie"
     },
-    "planOf": "z",
+    "planProgress": "{{done}} z {{total}}",
     "filesChanged": "zmienione pliki",
-    "finishedIn": "Zakończono w",
+    "finishedIn": "Zakończono w {{duration}}",
     "noActivityFor": "Brak aktywności przez",
     "prOpened": "Otwarto pull request",
     "permissionWants": "Chce uruchomić",

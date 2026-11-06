@@ -3492,9 +3492,9 @@
       "searching": "ვებ ძიება",
       "thinking": "დაფიქრება"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}-დან {{done}}",
     "filesChanged": "შეცვლილი ფაილები",
-    "finishedIn": "დასრულდა",
+    "finishedIn": "დასრულდა {{duration}}-ში",
     "noActivityFor": "აქტივობა არ არის",
     "prOpened": "Pull request გაიხსნა",
     "permissionWants": "სურს გაშვება",

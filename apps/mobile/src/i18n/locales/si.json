@@ -3498,9 +3498,9 @@
       "searching": "වෙබ් සෙවීම",
       "thinking": "සිතා බැලීම"
     },
-    "planOf": "න්",
+    "planProgress": "{{total}} න් {{done}}",
     "filesChanged": "ගොනු වෙනස් විය",
-    "finishedIn": "අවසන් විය",
+    "finishedIn": "{{duration}} කින් අවසන් විය",
     "noActivityFor": "ක්‍රියාකාරකම් නැත",
     "prOpened": "Pull request විවෘත කරන ලදී",
     "permissionWants": "ක්‍රියාත්මක කිරීමට අවශ්‍යයි",

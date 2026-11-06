@@ -3559,9 +3559,9 @@
       "searching": "Web search",
       "thinking": "Thinking it through"
     },
-    "planOf": "of",
+    "planProgress": "{{done}} of {{total}}",
     "filesChanged": "files changed",
-    "finishedIn": "Finished in",
+    "finishedIn": "Finished in {{duration}}",
     "noActivityFor": "No activity for",
     "prOpened": "Pull request opened",
     "permissionWants": "Wants to run",

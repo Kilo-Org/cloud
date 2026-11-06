@@ -3492,9 +3492,9 @@
       "searching": "Websuche",
       "thinking": "Durchdenken"
     },
-    "planOf": "von",
+    "planProgress": "{{done}} von {{total}}",
     "filesChanged": "Dateien geändert",
-    "finishedIn": "Fertig in",
+    "finishedIn": "Fertig in {{duration}}",
     "noActivityFor": "Keine Aktivität seit",
     "prOpened": "Pull-Request geöffnet",
     "permissionWants": "Möchte ausführen",

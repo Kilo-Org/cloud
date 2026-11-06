@@ -3492,9 +3492,9 @@
       "searching": "ဝဘ်ရှာဖွေခြင်း",
       "thinking": "သေချာစဉ်းစားနေသည်"
     },
-    "planOf": "အနက်",
+    "planProgress": "{{total}} အနက် {{done}}",
     "filesChanged": "ပြောင်းလဲသည့်ဖိုင်များ",
-    "finishedIn": "ပြီးဆုံးချိန်",
+    "finishedIn": "{{duration}} အတွင်း ပြီးဆုံးပြီ",
     "noActivityFor": "အတွက် လှုပ်ရှားမှုမရှိပါ",
     "prOpened": "Pull request ဖွင့်ပြီးပါပြီ",
     "permissionWants": "လုပ်ဆောင်လိုသည်",

@@ -3492,9 +3492,9 @@
       "searching": "Веб іздеу",
       "thinking": "Ойлану"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "файл өзгертілді",
-    "finishedIn": "Аяқталды",
+    "finishedIn": "{{duration}} ішінде аяқталды",
     "noActivityFor": "Белсенділік жоқ",
     "prOpened": "Pull request ашылды",
     "permissionWants": "Іске қосуды қалайды",

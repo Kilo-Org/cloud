@@ -3492,9 +3492,9 @@
       "searching": "Nchọgharị weebụ",
       "thinking": "Na-eche echiche"
     },
-    "planOf": "nke",
+    "planProgress": "{{done}} nke {{total}}",
     "filesChanged": "faịlụ gbanwere",
-    "finishedIn": "Emechara n'ime",
+    "finishedIn": "Emechara n'ime {{duration}}",
     "noActivityFor": "Enweghị ọrụ ruo",
     "prOpened": "E meghere arịrịọ ijikọ koodu",
     "permissionWants": "Ọ chọrọ ịgba",

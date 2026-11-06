@@ -3492,9 +3492,9 @@
       "searching": "वेब खोज",
       "thinking": "राम्ररी सोच्दै"
     },
-    "planOf": "मध्ये",
+    "planProgress": "{{total}} मध्ये {{done}}",
     "filesChanged": "फाइलहरू परिवर्तन भए",
-    "finishedIn": "समाप्त भयो",
+    "finishedIn": "{{duration}} मा समाप्त भयो",
     "noActivityFor": "का लागि कुनै गतिविधि छैन",
     "prOpened": "पुल रिक्वेस्ट खोलियो",
     "permissionWants": "चलाउन चाहन्छ",

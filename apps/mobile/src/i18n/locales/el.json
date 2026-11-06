@@ -3492,9 +3492,9 @@
       "searching": "Αναζήτηση ιστού",
       "thinking": "Εμβάθυνση"
     },
-    "planOf": "από",
+    "planProgress": "{{done}} από {{total}}",
     "filesChanged": "αρχεία άλλαξαν",
-    "finishedIn": "Ολοκληρώθηκε σε",
+    "finishedIn": "Ολοκληρώθηκε σε {{duration}}",
     "noActivityFor": "Καμία δραστηριότητα για",
     "prOpened": "Άνοιξε pull request",
     "permissionWants": "Θέλει να εκτελέσει",

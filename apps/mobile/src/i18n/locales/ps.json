@@ -3477,7 +3477,7 @@
     "finished": "پای ته ورسېد",
     "followFailed": "دا ناسته تعقیب نه شو کولی.",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "checked": "تایید شوی",
+    "checked": "کتل شوی",
     "lastKnown": "وروستی معلوم حالت",
     "awaitingUpdate": "د تازه کېدو په تمه",
     "nextRun": "راتلونکی چلول",
@@ -3492,10 +3492,10 @@
       "searching": "وېب پلټنه",
       "thinking": "فکر کول"
     },
-    "planOf": "له",
+    "planProgress": "له {{total}} څخه {{done}}",
     "filesChanged": "فایلونه بدل شول",
-    "finishedIn": "بشپړ شو",
-    "noActivityFor": "هیڅ فعالیت نشته",
+    "finishedIn": "په {{duration}} کې بشپړ شو",
+    "noActivityFor": "تر دې دمه هیڅ فعالیت نشته",
     "prOpened": "پل ریکویسټ پرانیستل شو",
     "permissionWants": "چلول غواړي",
     "failure": {

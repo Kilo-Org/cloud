@@ -3498,9 +3498,9 @@
       "searching": "ਵੈੱਬ ਖੋਜ",
       "thinking": "ਸੋਚ ਰਿਹਾ"
     },
-    "planOf": "ਵਿੱਚੋਂ",
+    "planProgress": "{{total}} ਵਿੱਚੋਂ {{done}}",
     "filesChanged": "ਫਾਈਲਾਂ ਬਦਲੀਆਂ",
-    "finishedIn": "ਵਿੱਚ ਪੂਰਾ ਹੋਇਆ",
+    "finishedIn": "{{duration}} ਵਿੱਚ ਪੂਰਾ ਹੋਇਆ",
     "noActivityFor": "ਕੋਈ ਸਰਗਰਮੀ ਨਹੀਂ",
     "prOpened": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹੀ ਗਈ",
     "permissionWants": "ਚਲਾਉਣਾ ਚਾਹੁੰਦਾ ਹੈ",

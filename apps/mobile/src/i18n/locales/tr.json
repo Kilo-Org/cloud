@@ -3492,9 +3492,9 @@
       "searching": "Web araması",
       "thinking": "İyice düşünüyor"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "dosya değişti",
-    "finishedIn": "Tamamlanma süresi",
+    "finishedIn": "{{duration}} içinde tamamlandı",
     "noActivityFor": "Etkinlik yok",
     "prOpened": "Pull request açıldı",
     "permissionWants": "Çalıştırmak istiyor",

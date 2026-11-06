@@ -3498,9 +3498,9 @@
       "searching": "Usesho lwewebhu",
       "thinking": "Kucatshangelwa"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} kwezi-{{total}}",
     "filesChanged": "amafayela ashintshiwe",
-    "finishedIn": "Kuqedwe ngo",
+    "finishedIn": "Kuthathe {{duration}}",
     "noActivityFor": "Akukho msebenzi ku",
     "prOpened": "Isicelo sokudonsa sivuliwe",
     "permissionWants": "Ifuna ukugijima",

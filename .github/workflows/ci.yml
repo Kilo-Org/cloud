@@ -354,7 +354,9 @@ jobs:
       # a broken admission still blocks the merge. sbom.yml is only reached by
       # a PR that changes the workflow or its test, and that path set does not
       # trip the kilocode_backend filter that gates test-scripts, so its wiring
-      # check runs here too.
+      # check runs here. This list is the only place that suite runs: the
+      # `test:mobile-sbom` script that test-scripts reaches must not name it,
+      # or one run executes the file in two jobs.
       - name: Test workflow wiring
         run: >-
           node --test
@@ -374,7 +376,8 @@ jobs:
 
       # The same gap for the release workflow: a PR that changes it or its test
       # does not trip the backend filter either, so its wiring checks run here
-      # and a workflow change cannot drop a release gate unnoticed.
+      # and a workflow change cannot drop a release gate unnoticed. This step is
+      # the only place the suite runs, for the same reason as the list above.
       - name: Test release workflow wiring
         run: node --test scripts/kilo-app-release-workflow.test.mjs
 
@@ -1269,6 +1272,11 @@ jobs:
           path: node_modules/.cache/ttsc/plugins
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
+      # test-scripts runs the whole test/integration set through
+      # `test:integration` when the kilocode_backend filter matches, so this
+      # file would run in two jobs of one run. Keep the step for the selection
+      # that misses that filter, a dependency or test-only change that still
+      # selects this row, where it is the only place the file runs.
       - name: Test native heartbeat attachment compatibility
-        if: matrix.workspace.name == 'cloudflare-session-ingest'
+        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.kilocode_backend != 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts

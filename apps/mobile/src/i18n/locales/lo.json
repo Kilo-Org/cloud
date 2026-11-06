@@ -3492,9 +3492,9 @@
       "searching": "ຄົ້ນຫາເວັບ",
       "thinking": "ກຳລັງຄິດ"
     },
-    "planOf": "ຈາກ",
+    "planProgress": "{{done}} ຈາກ {{total}}",
     "filesChanged": "ໄຟລ໌ທີ່ປ່ຽນແປງ",
-    "finishedIn": "ສຳເລັດໃນ",
+    "finishedIn": "ສຳເລັດໃນ {{duration}}",
     "noActivityFor": "ບໍ່ມີການເຄື່ອນໄຫວ",
     "prOpened": "ເປີດ pull request",
     "permissionWants": "ຕ້ອງການຮັນ",

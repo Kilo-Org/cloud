@@ -3492,9 +3492,9 @@
       "searching": "Webbsökning",
       "thinking": "Tänker igenom"
     },
-    "planOf": "av",
+    "planProgress": "{{done}} av {{total}}",
     "filesChanged": "filer ändrade",
-    "finishedIn": "Klart på",
+    "finishedIn": "Klart på {{duration}}",
     "noActivityFor": "Ingen aktivitet i",
     "prOpened": "Pull request öppnad",
     "permissionWants": "Vill köra",

@@ -3498,9 +3498,9 @@
       "searching": "የድር ፍለጋ",
       "thinking": "በማሰብ ላይ"
     },
-    "planOf": "ከ",
+    "planProgress": "{{done}} ከ{{total}}",
     "filesChanged": "ፋይሎች ተቀይረዋል",
-    "finishedIn": "ተጠናቅቋል በ",
+    "finishedIn": "በ{{duration}} ተጠናቅቋል",
     "noActivityFor": "ምንም እንቅስቃሴ ለ",
     "prOpened": "የመጎተቻ ጥያቄ ተከፍቷል",
     "permissionWants": "ለማሄድ ይፈልጋል",

@@ -3492,9 +3492,9 @@
       "searching": "Veebiotsing",
       "thinking": "Läbimõtlemine"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} / {{total}}",
     "filesChanged": "muudetud faili",
-    "finishedIn": "Kestis",
+    "finishedIn": "Kestis {{duration}}",
     "noActivityFor": "Tegevuseta",
     "prOpened": "Pull request avatud",
     "permissionWants": "Soovib käivitada",

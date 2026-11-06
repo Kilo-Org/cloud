@@ -3498,9 +3498,9 @@
       "searching": "جستجوی وب",
       "thinking": "در حال تفکر"
     },
-    "planOf": "از",
+    "planProgress": "{{done}} از {{total}}",
     "filesChanged": "فایل‌های تغییریافته",
-    "finishedIn": "تمام‌شده در",
+    "finishedIn": "تمام‌شده در {{duration}}",
     "noActivityFor": "بدون فعالیت برای",
     "prOpened": "پول ریکوئست باز شد",
     "permissionWants": "می‌خواهد اجرا کند",

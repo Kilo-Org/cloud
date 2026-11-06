@@ -3492,9 +3492,9 @@
       "searching": "Webzoekopdracht",
       "thinking": "Nadenken"
     },
-    "planOf": "van",
+    "planProgress": "{{done}} van {{total}}",
     "filesChanged": "bestanden gewijzigd",
-    "finishedIn": "Voltooid in",
+    "finishedIn": "Voltooid in {{duration}}",
     "noActivityFor": "Geen activiteit gedurende",
     "prOpened": "Pull request geopend",
     "permissionWants": "Wil uitvoeren",

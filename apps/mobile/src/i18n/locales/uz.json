@@ -3492,9 +3492,9 @@
       "searching": "Veb qidiruv",
       "thinking": "O'ylab ko'rmoqda"
     },
-    "planOf": "/",
+    "planProgress": "{{total}} tadan {{done}} tasi",
     "filesChanged": "fayl o'zgardi",
-    "finishedIn": "Tugatish vaqti",
+    "finishedIn": "{{duration}} ichida yakunlandi",
     "noActivityFor": "Faoliyat yo'q",
     "prOpened": "Pull request ochildi",
     "permissionWants": "Ishga tushirmoqchi",

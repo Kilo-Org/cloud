@@ -3499,9 +3499,9 @@
       "searching": "वेब खोज",
       "thinking": "गहराई से सोच"
     },
-    "planOf": "में से",
+    "planProgress": "{{total}} में से {{done}}",
     "filesChanged": "फ़ाइलें बदलीं",
-    "finishedIn": "में पूरा हुआ",
+    "finishedIn": "{{duration}} में पूरा हुआ",
     "noActivityFor": "कोई गतिविधि नहीं",
     "prOpened": "पुल रिक्वेस्ट खुली",
     "permissionWants": "चलाना चाहता है",

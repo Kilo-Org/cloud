@@ -3492,9 +3492,9 @@
       "searching": "ស្វែងរកតាមវេប",
       "thinking": "ការពិចារណា"
     },
-    "planOf": "/",
+    "planProgress": "{{done}} ក្នុងចំណោម {{total}}",
     "filesChanged": "ឯកសារបានផ្លាស់ប្តូរ",
-    "finishedIn": "បានបញ្ចប់ក្នុង",
+    "finishedIn": "បានបញ្ចប់ក្នុង {{duration}}",
     "noActivityFor": "គ្មានសកម្មភាពរយៈពេល",
     "prOpened": "បានបើក pull request",
     "permissionWants": "ចង់ដំណើរការ",

@@ -3492,9 +3492,9 @@
       "searching": "웹 검색",
       "thinking": "생각 중"
     },
-    "planOf": "중",
+    "planProgress": "{{total}}개 중 {{done}}개",
     "filesChanged": "파일 변경됨",
-    "finishedIn": "완료 시간",
+    "finishedIn": "{{duration}} 만에 완료",
     "noActivityFor": "활동 없음",
     "prOpened": "풀 리퀘스트 열림",
     "permissionWants": "실행하려 함",

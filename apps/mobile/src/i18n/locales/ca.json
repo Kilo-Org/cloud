@@ -3547,9 +3547,9 @@
       "searching": "Cerca web",
       "thinking": "Pensant-ho bé"
     },
-    "planOf": "de",
+    "planProgress": "{{done}} de {{total}}",
     "filesChanged": "fitxers modificats",
-    "finishedIn": "Acabat en",
+    "finishedIn": "Acabat en {{duration}}",
     "noActivityFor": "Sense activitat durant",
     "prOpened": "Sol·licitud d'extracció oberta",
     "permissionWants": "Vol executar",

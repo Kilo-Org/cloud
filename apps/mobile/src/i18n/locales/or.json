@@ -3492,9 +3492,9 @@
       "searching": "ୱେବ ସନ୍ଧାନ",
       "thinking": "ଚିନ୍ତା କରୁଛି"
     },
-    "planOf": "ମଧ୍ୟରୁ",
+    "planProgress": "{{total}} ମଧ୍ୟରୁ {{done}}",
     "filesChanged": "ଫାଇଲ ବଦଳିଛି",
-    "finishedIn": "ସମାପ୍ତ",
+    "finishedIn": "{{duration}}ରେ ସମାପ୍ତ",
     "noActivityFor": "କୌଣସି କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
     "prOpened": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଗଲା",
     "permissionWants": "ଚଲାଇବାକୁ ଚାହେଁ",

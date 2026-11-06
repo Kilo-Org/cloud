@@ -3547,9 +3547,9 @@
       "searching": "Căutare web",
       "thinking": "Analizează"
     },
-    "planOf": "din",
+    "planProgress": "{{done}} din {{total}}",
     "filesChanged": "fișiere modificate",
-    "finishedIn": "Finalizat în",
+    "finishedIn": "Finalizat în {{duration}}",
     "noActivityFor": "Fără activitate de",
     "prOpened": "Pull request deschis",
     "permissionWants": "Vrea să ruleze",

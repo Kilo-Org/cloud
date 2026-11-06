@@ -3492,9 +3492,9 @@
       "searching": "网页搜索",
       "thinking": "正在思考"
     },
-    "planOf": "/",
+    "planProgress": "{{done}}/{{total}}",
     "filesChanged": "个文件已更改",
-    "finishedIn": "耗时",
+    "finishedIn": "耗时 {{duration}}",
     "noActivityFor": "无活动已持续",
     "prOpened": "拉取请求已打开",
     "permissionWants": "想要运行",

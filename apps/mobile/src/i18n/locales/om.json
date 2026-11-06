@@ -3492,9 +3492,9 @@
       "searching": "Barbaacha weeb",
       "thinking": "Xiinxaluu"
     },
-    "planOf": "keessaa",
+    "planProgress": "{{total}} keessaa {{done}}",
     "filesChanged": "faayiloonni jijjiiraman",
-    "finishedIn": "Xumurame",
+    "finishedIn": "Xumurame {{duration}}tti",
     "noActivityFor": "Sochii hin jiru",
     "prOpened": "Pull request baname",
     "permissionWants": "Fiiguu barbaada",

@@ -8508,6 +8508,65 @@
     ],
     "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
+  "cloudAgentNextFailures.exportSessionDiagnostics": {
+    "path": "cloudAgentNextFailures.exportSessionDiagnostics",
+    "kind": "query",
+    "summary": "Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "format": {
+          "default": "json",
+          "type": "string",
+          "enum": [
+            "json",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "exportsessiondiagnostics",
+      "cloudagentsessionid",
+      "format"
+    ],
+    "searchBlob": "cloudAgentNextFailures.exportSessionDiagnostics Export the calling user's failure diagnostics for one cloud agent session as a JSON document or CSV file with the session identifiers, timestamps, and retained diagnostics needed for a support ticket. cloudagentnextfailures exportsessiondiagnostics cloudagentsessionid format cloudAgentSessionId format"
+  },
+  "cloudAgentNextFailures.getSessionFailureHistory": {
+    "path": "cloudAgentNextFailures.getSessionFailureHistory",
+    "kind": "query",
+    "summary": "Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnextfailures",
+      "getsessionfailurehistory",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNextFailures.getSessionFailureHistory Read the calling user's own failure history for one cloud agent session: setup failure, failed run attempts, run statuses, timestamps, and retained diagnostics for the latest 50 runs within the 90-day retention window. cloudagentnextfailures getsessionfailurehistory cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
     "kind": "mutation",

@@ -3602,9 +3602,9 @@
       "searching": "Webové vyhľadávanie",
       "thinking": "Premýšľanie"
     },
-    "planOf": "z",
+    "planProgress": "{{done}} z {{total}}",
     "filesChanged": "zmenených súborov",
-    "finishedIn": "Dokončené za",
+    "finishedIn": "Dokončené za {{duration}}",
     "noActivityFor": "Žiadna aktivita už",
     "prOpened": "Pull request otvorený",
     "permissionWants": "Chce spustiť",

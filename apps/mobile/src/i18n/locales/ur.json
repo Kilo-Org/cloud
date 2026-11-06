@@ -3492,9 +3492,9 @@
       "searching": "ویب تلاش",
       "thinking": "غور کر رہا ہے"
     },
-    "planOf": "میں سے",
+    "planProgress": "{{total}} میں سے {{done}}",
     "filesChanged": "فائلیں تبدیل ہوئیں",
-    "finishedIn": "مکمل ہونے میں",
+    "finishedIn": "{{duration}} میں مکمل",
     "noActivityFor": "کوئی سرگرمی نہیں",
     "prOpened": "پل ریکویسٹ کھول دی گئی",
     "permissionWants": "چلانا چاہتا ہے",

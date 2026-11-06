@@ -474,7 +474,10 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
     }
   }
-  assert.ok(staging.jobs['deploy-workers'].needs.includes('deploy-ai-gateway'));
+  // Staging Workers read nothing from the Vercel jobs, so they start with them
+  // after the gate; record-deployment below still requires all three.
+  assert.deepEqual(staging.jobs['deploy-workers'].needs, ['check-changes', 'db-gate']);
+  assert.doesNotMatch(staging.jobs['deploy-workers'].if, /needs\.deploy-app\.result|needs\.deploy-ai-gateway\.result/);
 
   for (const [deployment, jobs] of [
     [production, ['stage-ai-gateway', 'promote-ai-gateway']],
@@ -521,10 +524,11 @@ test('one database gate per deployment checks out, installs and migrates once', 
     const steps = job.steps;
     assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
     assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
-    assert.equal(
-      steps.find(step => step.uses?.startsWith('useblacksmith/checkout@')).with.ref,
-      '${{ needs.check-changes.outputs.target_sha }}'
-    );
+    const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
+    assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
+    // The job installs two workspaces and migrates; it never builds apps/web, so
+    // it must not pay for the LFS objects only the web build reads.
+    assert.equal(checkout.with.lfs, undefined, `${name} db-gate checkout must skip LFS`);
 
     const startupIndex = steps.findIndex(step => step.name === startupStep);
     const migrateIndex = steps.findIndex(step => step.name === migrateStep);
@@ -536,6 +540,13 @@ test('one database gate per deployment checks out, installs and migrates once', 
   }
 
   assert.equal(production.jobs['db-gate']['timeout-minutes'], 45);
+
+  // Counterweight to the skipped LFS above: the web build itself keeps its
+  // objects, because next.config.mjs fails on the kilo-anim pointer file.
+  const buildCheckout = ci.jobs['build'].steps.find(step =>
+    step.uses?.startsWith('useblacksmith/checkout@')
+  );
+  assert.equal(buildCheckout.with.lfs, true, 'the web build checkout must keep LFS');
 
   for (const [deployment, jobs] of [
     [production, ['promote-app', 'promote-ai-gateway', 'deploy-workers', 'record-deployment']],

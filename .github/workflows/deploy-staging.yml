@@ -38,7 +38,6 @@ jobs:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          lfs: true
           ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
@@ -53,6 +52,9 @@ jobs:
       # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
       # that package, so the database workspace and the root project are enough.
       # Widen this filter when a step in this job imports another workspace.
+      # This job also owns the LFS decision: it builds nothing from apps/web, so
+      # its checkout skips LFS objects. Add `lfs: true` back before a step here
+      # reads a path tracked by Git LFS.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
@@ -84,8 +86,11 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
+  # The Worker detection and matrix deployments read only check-changes outputs,
+  # so they start with the two Vercel staging deploys instead of after them.
+  # record-deployment still requires every one of the three.
   deploy-workers:
-    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway]
+    needs: [check-changes, db-gate]
     if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:

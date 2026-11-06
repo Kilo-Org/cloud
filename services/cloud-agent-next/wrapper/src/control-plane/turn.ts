@@ -88,6 +88,8 @@ export type TurnManagerDeps = {
   onDiagnostic?: ControlDiagnosticReporter;
   /** The one native projector, for the normal `session_outcome` transition. */
   onNativeDiagnostic?: ControlDiagnosticReporter;
+  /** Starts a bounded artifact flush when a turn reaches an outcome. */
+  flushArtifacts?: () => void;
   now?: () => number;
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
@@ -416,6 +418,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       sessionId: turn.route.sessionId,
       ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
     });
+    // Do not delay the outcome: the flush bounds itself and runs off this path.
+    deps.flushArtifacts?.();
     resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
   }

@@ -5,6 +5,7 @@ import {
   cloudSessionMessagesPageSchema,
   cloudSessionMetadataSchema,
   cloudWorktreeChangesReadyDataSchema,
+  cloudWorkspaceArtifactsChangedDataSchema,
   isStreamError,
   isValidCloudAgentEvent,
   parseCustomerBillingFailure,
@@ -305,6 +306,19 @@ describe('cloudWorktreeChangesReadyDataSchema', () => {
       }).success
     ).toBe(true);
   });
+});
+
+describe('cloudWorkspaceArtifactsChangedDataSchema', () => {
+  it.each([1, 42, Number.MAX_SAFE_INTEGER])('accepts positive safe revision %p', revision => {
+    expect(cloudWorkspaceArtifactsChangedDataSchema.parse({ revision })).toEqual({ revision });
+  });
+
+  it.each([0, -1, 1.5, '1', null, undefined, {}, { revision: 1, extra: true }])(
+    'rejects invalid payload %p',
+    data => {
+      expect(cloudWorkspaceArtifactsChangedDataSchema.safeParse(data).success).toBe(false);
+    }
+  );
 });
 
 describe('isValidCloudAgentEvent', () => {

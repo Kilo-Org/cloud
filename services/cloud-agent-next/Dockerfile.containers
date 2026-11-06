@@ -104,6 +104,8 @@ RUN cd /tmp/wrapper-build/wrapper && \
     bun run build.ts --install-dir /usr/local/bin && \
     rm -rf /tmp/wrapper-build
 
+RUN mkdir -p /artifacts
+
 # Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.
 # The intercept CA is not baked in; the control wrapper trusts it when containment is enabled.
 RUN printf '%s\n' \

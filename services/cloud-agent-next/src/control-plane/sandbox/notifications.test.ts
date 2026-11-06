@@ -20,6 +20,10 @@ const outcome = (sessionId: string): SandboxNotification => ({
   kind: 'outcome',
   payload: { sessionId, status: 'completed', lastMessageId: 'msg' },
 });
+const workspaceArtifacts = (revision: number): SandboxNotification => ({
+  kind: 'workspace_artifacts',
+  payload: { revision },
+});
 
 function harness(hold = true) {
   const calls: { sessionId: string; notification: SandboxNotification; deadlineAt: number }[] = [];
@@ -91,6 +95,30 @@ describe('Sandbox notification buffering', () => {
     expect(calls).toHaveLength(10);
     expect(calls.every(call => call.notification === notification)).toBe(true);
     expect(dispatcher.snapshot()).toMatchObject({ retained: 0, bytes: 0, active: 0 });
+  });
+
+  it('delivers workspace artifact revisions through bounded per-session lanes', async () => {
+    const { dispatcher, calls } = harness(false);
+    const notification = workspaceArtifacts(3);
+    dispatcher.enqueue('sibling-a', notification);
+    dispatcher.enqueue('sibling-b', notification);
+    await pump();
+    expect(calls.map(call => [call.sessionId, call.notification])).toEqual([
+      ['sibling-a', notification],
+      ['sibling-b', notification],
+    ]);
+    expect(dispatcher.snapshot()).toMatchObject({ retained: 0, bytes: 0, active: 0 });
+  });
+
+  it('does not coalesce adjacent workspace artifact revisions', async () => {
+    const { dispatcher, calls } = harness(false);
+    dispatcher.enqueue(SESSION, workspaceArtifacts(1));
+    dispatcher.enqueue(SESSION, workspaceArtifacts(2));
+    await pump();
+    expect(calls.map(call => call.notification)).toEqual([
+      workspaceArtifacts(1),
+      workspaceArtifacts(2),
+    ]);
   });
 
   it('bounds critical-only count and rejects newest without overwriting attempts', async () => {

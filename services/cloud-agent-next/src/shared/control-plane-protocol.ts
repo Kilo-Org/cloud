@@ -989,6 +989,12 @@ const controlPlaneHelloFrameSchema = z
      * `setupCommands`; session disk restores that cannot run them fail preparation.
      */
     startCommands: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper renews short-lived sandbox transfer
+     * grants over this connection with `transfer.grant`. A wrapper that did not
+     * advertise it keeps the launch-time grant.
+     */
+    transferGrants: z.literal(true).optional(),
   })
   .strict();
 
@@ -1414,6 +1420,38 @@ const controlPlaneKiloResultFrameSchema = z.discriminatedUnion('ok', [
 ]);
 
 /**
+ * Wrapper -> Sandbox DO: ask for a fresh sandbox transfer grant. The Sandbox DO
+ * answers with `transfer.grant.result` on the same socket and mints only for the
+ * identity its current allocation holds.
+ */
+const controlPlaneTransferGrantFrameSchema = z
+  .object({
+    type: z.literal('transfer.grant'),
+    requestId: z.string().min(1).max(128),
+  })
+  .strict();
+
+const controlPlaneTransferGrantResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      grant: z.string().min(1).max(4096),
+      expiresAt: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
+/**
  * Wrapper -> Sandbox DO: one page of a native v2 session's Cloud history, so the
  * wrapper restores a lost native database from the Session DO over this socket.
  * The Sandbox DO answers with `history.result` on the same socket.
@@ -1480,6 +1518,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneTerminalResultFrameSchema,
   controlPlaneKiloRequestFrameSchema,
   controlPlaneKiloResultFrameSchema,
+  controlPlaneTransferGrantFrameSchema,
+  controlPlaneTransferGrantResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryResultFrameSchema,
 ]);
@@ -1574,6 +1614,10 @@ export type ControlPlaneNativeOperation = z.infer<typeof controlPlaneNativeOpera
 export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloRequestInputSchema>;
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
+export type ControlPlaneTransferGrantFrame = z.infer<typeof controlPlaneTransferGrantFrameSchema>;
+export type ControlPlaneTransferGrantResultFrame = z.infer<
+  typeof controlPlaneTransferGrantResultFrameSchema
+>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

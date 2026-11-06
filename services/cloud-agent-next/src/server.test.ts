@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import type { Env } from './types.js';
-import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import {
+  mintControlLogUploadGrant,
+  mintSandboxTransferGrant,
+} from './sandbox-control/sandbox-transfer-grant.js';
 import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
+import { WORKSPACE_ARTIFACT_MAX_FILE_BYTES } from './shared/workspace-artifacts.js';
 import { previewLabel } from './preview/host.js';
 import { PREVIEW_SESSION_MISSING_TEXT } from './preview/container-port-fetch.js';
 import {
@@ -2303,6 +2307,83 @@ describe('server control log routes', () => {
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
   });
 
+  it('accepts a scoped transfer grant and the legacy alias', async () => {
+    const identity = {
+      sandboxId: 'sandbox_test',
+      allocationId: 'allocation_test',
+      wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+    };
+    const batchId = '5886f962-cc33-43f7-bd94-a31c0ed6c13b';
+    const body = JSON.stringify({
+      version: 1,
+      sequence: 0,
+      droppedRecords: 0,
+      records: [{ timestamp: 100, event: 'wrapper.lifecycle', fields: { phase: 'starting' } }],
+    });
+    for (const [route, authorization] of [
+      [
+        `/sandbox-transfer/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/logs/${batchId}`,
+        `Bearer ${mintSandboxTransferGrant(identity, ['logs'], secret).grant}`,
+      ],
+      [
+        `/sandbox-logs/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/${batchId}`,
+        `Bearer ${mintSandboxTransferGrant(identity, ['logs', 'workspace_artifacts'], secret).grant}`,
+      ],
+      [
+        `/sandbox-transfer/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/logs/${batchId}`,
+        `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+      ],
+    ] as const) {
+      const env = Object.assign(createEnv(), {
+        R2_BUCKET: { put: vi.fn().mockResolvedValue(null) },
+      });
+      const response = await fetchWorker(
+        new Request(`http://worker.test${route}`, {
+          method: 'PUT',
+          headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+          body,
+        }),
+        env
+      );
+      expect(response.status).toBe(204);
+      expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+    }
+  });
+
+  it('rejects a transfer grant without the logs scope', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    const identity = {
+      sandboxId: 'sandbox_test',
+      allocationId: 'allocation_test',
+      wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+    };
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/sandbox-transfer/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/logs/5886f962-cc33-43f7-bd94-a31c0ed6c13b`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${
+              mintSandboxTransferGrant(identity, ['workspace_artifacts'], secret).grant
+            }`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            version: 1,
+            sequence: 0,
+            droppedRecords: 0,
+            records: [
+              { timestamp: 100, event: 'wrapper.lifecycle', fields: { phase: 'starting' } },
+            ],
+          }),
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(403);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
   it('does not expose log archives over HTTP', async () => {
     const env = createEnv();
     for (const path of [
@@ -2779,5 +2860,263 @@ describe('server /internal/byoc/vercel-enrollment/user/:userId', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ enrolled: false });
+  });
+});
+
+describe('server workspace artifact transfer routes', () => {
+  const identity = {
+    sandboxId: 'sandbox_test',
+    allocationId: 'allocation_test',
+    wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+  };
+  const authorization = `Bearer ${mintSandboxTransferGrant(identity, ['workspace_artifacts'], secret).grant}`;
+  const contentHash = 'a'.repeat(64);
+  const url = (path: string) =>
+    `http://worker.test/sandbox-transfer/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/artifacts/objects?${path}`;
+
+  function artifactEnv() {
+    return Object.assign(createEnv(), {
+      WORKSPACE_ARTIFACTS_BUCKET: { put: vi.fn().mockResolvedValue({}) },
+    });
+  }
+
+  it('stores and commits an artifact upload', async () => {
+    const env = artifactEnv();
+    const reserve = vi.fn().mockResolvedValue({ status: 'ok', objectKey: 'sandbox_test/object' });
+    const commit = vi.fn().mockResolvedValue({ status: 'committed', revision: 1 });
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({
+      reserveWorkspaceArtifactUpload: reserve,
+      commitWorkspaceArtifact: commit,
+    });
+
+    const response = await fetchWorker(
+      new Request(url('path=reports%2Freport.txt'), {
+        method: 'PUT',
+        headers: {
+          Authorization: authorization,
+          'Content-Type': 'text/plain',
+          'Content-Length': '4',
+          'X-Content-SHA256': contentHash,
+        },
+        body: 'test',
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'committed', revision: 1 });
+    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sandbox_test');
+    expect(env.WORKSPACE_ARTIFACTS_BUCKET.put).toHaveBeenCalledWith(
+      'sandbox_test/object',
+      expect.anything(),
+      expect.objectContaining({
+        onlyIf: { etagDoesNotMatch: '*' },
+        customMetadata: { sandboxId: identity.sandboxId, sha256: contentHash },
+      })
+    );
+    expect(reserve).toHaveBeenCalledWith(identity, {
+      relativePath: 'reports/report.txt',
+      sizeBytes: 4,
+    });
+    expect(commit).toHaveBeenCalledWith(identity, {
+      relativePath: 'reports/report.txt',
+      objectKey: 'sandbox_test/object',
+      contentHash,
+      sizeBytes: 4,
+      contentType: 'text/plain',
+    });
+  });
+
+  it('rejects a stale wrapper, quota, and a bad content hash', async () => {
+    for (const [reserved, expected] of [
+      [{ status: 'stale' }, 409],
+      [{ status: 'not_connected' }, 503],
+      [{ status: 'quota_exceeded' }, 413],
+      [{ status: 'invalid_path' }, 400],
+    ] as const) {
+      const env = artifactEnv();
+      env.SANDBOX_CONTROL.getByName.mockReturnValue({
+        reserveWorkspaceArtifactUpload: vi.fn().mockResolvedValue(reserved),
+      });
+      const response = await fetchWorker(
+        new Request(url('path=report.txt'), {
+          method: 'PUT',
+          headers: {
+            Authorization: authorization,
+            'Content-Length': '4',
+            'X-Content-SHA256': contentHash,
+          },
+          body: 'test',
+        }),
+        env
+      );
+      expect(response.status).toBe(expected);
+      expect(env.WORKSPACE_ARTIFACTS_BUCKET.put).not.toHaveBeenCalled();
+    }
+
+    const mismatchEnv = artifactEnv();
+    const commit = vi.fn();
+    (mismatchEnv.WORKSPACE_ARTIFACTS_BUCKET.put as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('The SHA-256 checksum did not match')
+    );
+    mismatchEnv.SANDBOX_CONTROL.getByName.mockReturnValue({
+      reserveWorkspaceArtifactUpload: vi
+        .fn()
+        .mockResolvedValue({ status: 'ok', objectKey: 'sandbox_test/object' }),
+      commitWorkspaceArtifact: commit,
+    });
+    const mismatch = await fetchWorker(
+      new Request(url('path=report.txt'), {
+        method: 'PUT',
+        headers: {
+          Authorization: authorization,
+          'Content-Length': '4',
+          'X-Content-SHA256': contentHash,
+        },
+        body: 'test',
+      }),
+      mismatchEnv
+    );
+    expect(mismatch.status).toBe(422);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('maps stale and retryable commit failures', async () => {
+    for (const [status, expected] of [
+      ['stale', 409],
+      ['not_connected', 503],
+      ['reservation_missing', 503],
+      ['reservation_expired', 503],
+      ['quota_exceeded', 413],
+      ['invalid_path', 400],
+    ] as const) {
+      const env = artifactEnv();
+      env.SANDBOX_CONTROL.getByName.mockReturnValue({
+        reserveWorkspaceArtifactUpload: vi
+          .fn()
+          .mockResolvedValue({ status: 'ok', objectKey: 'sandbox_test/object' }),
+        commitWorkspaceArtifact: vi.fn().mockResolvedValue({ status }),
+      });
+      const response = await fetchWorker(
+        new Request(url('path=report.txt'), {
+          method: 'PUT',
+          headers: {
+            Authorization: authorization,
+            'Content-Length': '4',
+            'X-Content-SHA256': contentHash,
+          },
+          body: 'test',
+        }),
+        env
+      );
+      expect(response.status).toBe(expected);
+    }
+  });
+
+  it('requires a content length and enforces the per-file limit', async () => {
+    const env = artifactEnv();
+    const reserve = vi.fn();
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({ reserveWorkspaceArtifactUpload: reserve });
+
+    const missingLength = await fetchWorker(
+      new Request(url('path=report.txt'), {
+        method: 'PUT',
+        headers: { Authorization: authorization, 'X-Content-SHA256': contentHash },
+      }),
+      env
+    );
+    expect(missingLength.status).toBe(411);
+
+    const tooLarge = await fetchWorker(
+      new Request(url('path=report.txt'), {
+        method: 'PUT',
+        headers: {
+          Authorization: authorization,
+          'Content-Length': String(WORKSPACE_ARTIFACT_MAX_FILE_BYTES + 1),
+          'X-Content-SHA256': contentHash,
+        },
+      }),
+      env
+    );
+    expect(tooLarge.status).toBe(413);
+    expect(reserve).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid path and a log-only grant', async () => {
+    const env = artifactEnv();
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({ reserveWorkspaceArtifactUpload: vi.fn() });
+
+    const invalidPath = await fetchWorker(
+      new Request(url('path=node_modules%2Fsecret.txt'), {
+        method: 'PUT',
+        headers: {
+          Authorization: authorization,
+          'Content-Length': '4',
+          'X-Content-SHA256': contentHash,
+        },
+        body: 'test',
+      }),
+      env
+    );
+    expect(invalidPath.status).toBe(400);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+
+    const wrongScope = await fetchWorker(
+      new Request(url('path=report.txt'), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${mintSandboxTransferGrant(identity, ['logs'], secret).grant}`,
+          'Content-Length': '4',
+          'X-Content-SHA256': contentHash,
+        },
+        body: 'test',
+      }),
+      env
+    );
+    expect(wrongScope.status).toBe(403);
+  });
+
+  it('deletes an artifact with the expected hash', async () => {
+    const env = artifactEnv();
+    const remove = vi.fn().mockResolvedValue({ status: 'deleted', revision: 2 });
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({ deleteWorkspaceArtifact: remove });
+
+    const response = await fetchWorker(
+      new Request(url(`path=report.txt&hash=${contentHash}`), {
+        method: 'DELETE',
+        headers: { Authorization: authorization },
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'deleted', revision: 2 });
+    expect(remove).toHaveBeenCalledWith(identity, {
+      relativePath: 'report.txt',
+      expectedHash: contentHash,
+    });
+
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({
+      deleteWorkspaceArtifact: vi.fn().mockResolvedValue({ status: 'stale' }),
+    });
+    const stale = await fetchWorker(
+      new Request(url(`path=report.txt&hash=${contentHash}`), {
+        method: 'DELETE',
+        headers: { Authorization: authorization },
+      }),
+      env
+    );
+    expect(stale.status).toBe(409);
+
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({
+      deleteWorkspaceArtifact: vi.fn().mockResolvedValue({ status: 'not_connected' }),
+    });
+    const disconnected = await fetchWorker(
+      new Request(url(`path=report.txt&hash=${contentHash}`), {
+        method: 'DELETE',
+        headers: { Authorization: authorization },
+      }),
+      env
+    );
+    expect(disconnected.status).toBe(503);
   });
 });

@@ -42,6 +42,14 @@ import {
   type RefreshWorktreeChangesOutput,
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  deleteWorkspaceArtifactOutputSchema,
+  getWorkspaceArtifactDownloadUrlOutputSchema,
+  listWorkspaceArtifactsOutputSchema,
+  type DeleteWorkspaceArtifactOutput,
+  type GetWorkspaceArtifactDownloadUrlOutput,
+  type ListWorkspaceArtifactsOutput,
+} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
 import type { SendMessagePayload } from './types.js';
 import {
   baseGetMessageResultNextOutputSchema,
@@ -672,6 +680,19 @@ type CloudAgentNextTRPCClient = {
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
   };
+  listWorkspaceArtifacts: {
+    query: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
+  };
+  getWorkspaceArtifactDownloadUrl: {
+    query: (input: { cloudAgentSessionId: string; relativePath: string }) => Promise<unknown>;
+  };
+  deleteWorkspaceArtifact: {
+    mutate: (input: {
+      cloudAgentSessionId: string;
+      relativePath: string;
+      expectedHash: string;
+    }) => Promise<unknown>;
+  };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
@@ -1036,6 +1057,34 @@ export class CloudAgentNextClient {
       throw new Error('Saved worktree file does not match the query');
     }
     return result;
+  }
+
+  async listWorkspaceArtifacts(cloudAgentSessionId: string): Promise<ListWorkspaceArtifactsOutput> {
+    return listWorkspaceArtifactsOutputSchema.parse(
+      await this.client.listWorkspaceArtifacts.query({ cloudAgentSessionId })
+    );
+  }
+
+  async getWorkspaceArtifactDownloadUrl(
+    cloudAgentSessionId: string,
+    relativePath: string
+  ): Promise<GetWorkspaceArtifactDownloadUrlOutput> {
+    return getWorkspaceArtifactDownloadUrlOutputSchema.parse(
+      await this.client.getWorkspaceArtifactDownloadUrl.query({
+        cloudAgentSessionId,
+        relativePath,
+      })
+    );
+  }
+
+  async deleteWorkspaceArtifact(input: {
+    cloudAgentSessionId: string;
+    relativePath: string;
+    expectedHash: string;
+  }): Promise<DeleteWorkspaceArtifactOutput> {
+    return deleteWorkspaceArtifactOutputSchema.parse(
+      await this.client.deleteWorkspaceArtifact.mutate(input)
+    );
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

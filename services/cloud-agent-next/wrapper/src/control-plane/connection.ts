@@ -95,6 +95,11 @@ export type ControlPlaneConnection = {
   readonly wrapperId: string;
   /** The live phase, reconnect attempt and buffered bytes, without a recount. */
   snapshot(): ControlPlaneConnectionSnapshot;
+  /**
+   * True when the current socket accepted the full hello, including the
+   * `transferGrants` capability. A fallback hello means renewal is unavailable.
+   */
+  supportsTransferGrants(): boolean;
   start(): void;
   send(frame: ControlPlaneWrapperFrame): void;
   recycle(): void;
@@ -150,6 +155,8 @@ export function createControlPlaneConnection(
   let negotiationTimer: ReturnType<typeof setTimeout> | undefined;
   let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatAck = false;
+  let helloTransferGrants = false;
+  let transferGrantsSupported = false;
   const outbox: OutboxEntry[] = [];
   let outboxBytes = 0;
   let droppedEvents = 0;
@@ -263,6 +270,7 @@ export function createControlPlaneConnection(
     negotiationTimer = setTimeout(() => {
       if (socket !== target || phase !== 'awaiting_welcome') return;
       negotiationTimer = undefined;
+      helloTransferGrants = false;
       if (
         !writeRaw(target, {
           type: 'hello',
@@ -325,6 +333,8 @@ export function createControlPlaneConnection(
     attempt = 0;
     stopHandshake();
     stopHeartbeat();
+    helloTransferGrants = false;
+    transferGrantsSupported = false;
     const previous = socket;
     socket = null;
     phase = 'idle';
@@ -346,6 +356,8 @@ export function createControlPlaneConnection(
     socket = null;
     stopHandshake();
     stopHeartbeat();
+    helloTransferGrants = false;
+    transferGrantsSupported = false;
     if (phase === 'closed') return;
     if (wasConnected) reportDisconnectEpisode('closed');
     else if (wasConnecting) reportDisconnectEpisode('connect_attempt');
@@ -386,6 +398,7 @@ export function createControlPlaneConnection(
       stopHandshake();
       if (!flushOutbox(target)) return;
       phase = 'connected';
+      transferGrantsSupported = helloTransferGrants;
       disconnectEpisodeReported = false;
       attempt = 0;
       startHeartbeat(target, frame.heartbeatAck === true, frame.workspaceSnapshots === true);
@@ -408,6 +421,8 @@ export function createControlPlaneConnection(
   function connect(): void {
     if (phase === 'closed') return;
     phase = 'connecting';
+    helloTransferGrants = false;
+    transferGrantsSupported = false;
     let target: WebSocket;
     try {
       target = new WebSocketWithHeaders(options.url, {
@@ -438,6 +453,7 @@ export function createControlPlaneConnection(
     target.onopen = () => {
       if (socket !== target || phase !== 'connecting') return;
       phase = 'awaiting_welcome';
+      helloTransferGrants = true;
       if (
         !writeRaw(target, {
           type: 'hello',
@@ -449,6 +465,7 @@ export function createControlPlaneConnection(
           redactsNamedSecrets: true,
           installsSkillsSh: true,
           startCommands: true,
+          transferGrants: true,
         })
       )
         return;
@@ -488,6 +505,8 @@ export function createControlPlaneConnection(
   function close(): void {
     if (phase === 'closed') return;
     phase = 'closed';
+    helloTransferGrants = false;
+    transferGrantsSupported = false;
     if (reconnectTimer !== undefined) {
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;
@@ -508,6 +527,7 @@ export function createControlPlaneConnection(
   return {
     wrapperId,
     snapshot: () => ({ phase, attempt, outboxBytes }),
+    supportsTransferGrants: () => transferGrantsSupported,
     start,
     send,
     recycle,

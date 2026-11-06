@@ -95,6 +95,14 @@ import {
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import {
+  deleteWorkspaceArtifactOutputSchema,
+  getWorkspaceArtifactDownloadUrlOutputSchema,
+  listWorkspaceArtifactsOutputSchema,
+  workspaceArtifactDeleteInputSchema,
+  workspaceArtifactDownloadInputSchema,
+  workspaceArtifactSessionInputSchema,
+} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -492,6 +500,39 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const client = createCloudAgentNextClient(authToken);
       return await client.getWorktreeFile(input);
+    }),
+
+  listWorkspaceArtifacts: baseProcedure
+    .input(workspaceArtifactSessionInputSchema)
+    .output(listWorkspaceArtifactsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+    }),
+
+  getWorkspaceArtifactDownloadUrl: baseProcedure
+    .input(workspaceArtifactDownloadInputSchema)
+    .output(getWorkspaceArtifactDownloadUrlOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorkspaceArtifactDownloadUrl(
+        input.cloudAgentSessionId,
+        input.relativePath
+      );
+    }),
+
+  deleteWorkspaceArtifact: baseProcedure
+    .input(workspaceArtifactDeleteInputSchema)
+    .output(deleteWorkspaceArtifactOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.deleteWorkspaceArtifact(input);
     }),
 
   createTerminal: baseProcedure

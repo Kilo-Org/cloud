@@ -60,3 +60,17 @@ export const workspaceDiskAllocation = sqliteTable('workspace_disk_allocation', 
   id: text('id').primaryKey(),
   data: text('data', { mode: 'json' }).notNull(),
 });
+
+export const workspaceArtifacts = sqliteTable('workspace_artifacts', {
+  relative_path: text('relative_path').primaryKey(),
+  object_key: text('object_key').notNull(),
+  content_hash: text('content_hash').notNull(),
+  size_bytes: integer('size_bytes').notNull(),
+  content_type: text('content_type').notNull(),
+  updated_at: integer('updated_at').notNull(),
+});
+
+export const workspaceArtifactOrphans = sqliteTable('workspace_artifact_orphans', {
+  object_key: text('object_key').primaryKey(),
+  queued_at: integer('queued_at').notNull(),
+});

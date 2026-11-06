@@ -29,6 +29,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

@@ -1648,14 +1648,15 @@ counts.
    from one outcome; one callback. This does not require bypassing a pending command/summary response.
 4. **Kilo final error with A and B accepted.** Both fail with Kilo's reason; the next message
    works.
-5. **Two chats in one worktree, two worktrees in one sandbox.** Turns stream at the same time; Stop
-   in one chat does not affect the others. Deleting the chat that issued the scope handle leaves
-   surviving chats usable: their in-flight model calls keep working through a surviving member, whose
-   attestation `resourceId` is that member, while the deleted root's ingestion/export and title writes
-   are denied. Revoking the deleted member's handle does not stop a surviving chat's in-flight model
-   calls while another member can serve, but a revoked member's new sends are denied. The usage
-   `session_id` stays the forwarded `X-KILOCODE-TASKID`; this repository does not verify that Kilo
-   sets it per chat. Last-member release retires the scope.
+5. **Two chats in one worktree, two worktrees in one workspace, one workspace per sandbox.** Turns
+   stream at the same time; Stop in one chat does not affect the others. Deleting the chat that
+   issued the scope handle leaves surviving chats usable: their in-flight model calls keep working
+   through a surviving member, whose attestation `resourceId` is that member, while the deleted
+   root's ingestion/export and title writes are denied. Revoking the deleted member's handle does
+   not stop a surviving chat's in-flight model calls while another member can serve, but a revoked
+   member's new sends are denied. The usage `session_id` stays the forwarded `X-KILOCODE-TASKID`;
+   this repository does not verify that Kilo sets it per chat. Last-member release retires the
+   scope.
 6. **Slash commands and attachment.** `/compact` summarizes the session; another known command runs
    as a command; an attachment reaches the model.
    A follow-up may wait for the command/summary response, then reaches Kilo in arrival order;

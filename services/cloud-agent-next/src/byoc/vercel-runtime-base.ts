@@ -3,7 +3,7 @@ import { RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
 import { installPinnedArchiveScript } from '../shared/runtime-toolchain.js';
 
 export const VERCEL_BASE_SYSTEM_SETUP =
-  'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip unzip; sudo mkdir -p /workspace /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace; test -w /workspace; sudo git lfs install --system --skip-repo';
+  'set -euo pipefail; sudo dnf install -y git git-lfs jq tar gzip unzip; sudo mkdir -p /workspace /artifacts /usr/local/share/kilo /opt/git/etc; sudo chown "$(id -u):$(id -g)" /workspace /artifacts; test -w /workspace; sudo git lfs install --system --skip-repo';
 
 export const VERCEL_BASE_NODE_SETUP = `set -euo pipefail; node_path="$(node -p 'process.execPath')"; sudo ln -sf "$node_path" /usr/local/bin/node; test -x /usr/local/bin/node; ${installPinnedArchiveScript('bun')}`;
 

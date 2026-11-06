@@ -96,6 +96,11 @@ type WorktreeChangesRefresh = {
   revision?: number;
   connectionVersion: number;
 };
+type WorkspaceArtifactsRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
 /**
@@ -546,6 +551,7 @@ type SessionManagerAtoms = {
    */
   availableCommandsCatalogStatus: W<SlashCommandCatalogStatus | null>;
   worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
+  workspaceArtifactsRefresh: W<WorkspaceArtifactsRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -1113,6 +1119,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsCatalogStatusAtom = atom<SlashCommandCatalogStatus | null>(null);
   const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
+  const workspaceArtifactsRefreshAtom = atom<WorkspaceArtifactsRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
@@ -1624,6 +1631,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
+    store.set(workspaceArtifactsRefreshAtom, null);
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
@@ -3218,11 +3226,30 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (eventSessionId !== null) {
           clearStaleChildSessionHydrationError(session.storage, eventSessionId);
         }
-        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+        if (
+          event.type === 'worktree.changes.ready' ||
+          event.type === 'workspace.artifacts.changed' ||
+          event.type === 'connected'
+        ) {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
-          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'connected') {
+            const previousWorktree = store.get(worktreeChangesRefreshAtom);
+            store.set(worktreeChangesRefreshAtom, {
+              ...previousWorktree,
+              cloudSessionId,
+              connectionVersion: (previousWorktree?.connectionVersion ?? 0) + 1,
+            });
+            const previousArtifacts = store.get(workspaceArtifactsRefreshAtom);
+            store.set(workspaceArtifactsRefreshAtom, {
+              ...previousArtifacts,
+              cloudSessionId,
+              connectionVersion: (previousArtifacts?.connectionVersion ?? 0) + 1,
+            });
+            return;
+          }
           if (event.type === 'worktree.changes.ready') {
+            const previous = store.get(worktreeChangesRefreshAtom);
             if (event.revision <= (previous?.revision ?? 0)) return;
             store.set(worktreeChangesRefreshAtom, {
               cloudSessionId,
@@ -3230,10 +3257,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               connectionVersion: previous?.connectionVersion ?? 0,
             });
           } else {
-            store.set(worktreeChangesRefreshAtom, {
-              ...previous,
+            const previous = store.get(workspaceArtifactsRefreshAtom);
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(workspaceArtifactsRefreshAtom, {
               cloudSessionId,
-              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
             });
           }
           return;
@@ -4118,6 +4147,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
       worktreeChangesRefresh: worktreeChangesRefreshAtom,
+      workspaceArtifactsRefresh: workspaceArtifactsRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
@@ -4145,6 +4175,7 @@ export type {
   SessionManagerConfig,
   SessionManagerAtoms,
   WorktreeChangesRefresh,
+  WorkspaceArtifactsRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

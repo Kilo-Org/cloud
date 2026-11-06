@@ -196,6 +196,7 @@ function createRuntime(options: {
   isIdle?: () => boolean | Promise<boolean>;
   prepareFilesystem?: KiloRuntimeOptions['prepareFilesystem'];
   sandboxProvider?: KiloRuntimeOptions['sandboxProvider'];
+  artifacts?: KiloRuntimeOptions['artifacts'];
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
@@ -232,6 +233,7 @@ function createRuntime(options: {
     // The real preparation writes under HOME; `prepareKiloFilesystem` has its own tests.
     prepareFilesystem: options.prepareFilesystem ?? (async () => {}),
     ...(options.sandboxProvider ? { sandboxProvider: options.sandboxProvider } : {}),
+    ...(options.artifacts ? { artifacts: options.artifacts } : {}),
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
@@ -303,20 +305,61 @@ describe('prepareKiloFilesystem', () => {
     }
   });
 
-  it('receives the runtime provider before Kilo starts', async () => {
+  it('adds the Artifacts guidance only when the synchronizer is enabled', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const withArtifactsHome = path.join(root, 'with-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withArtifactsHome },
+        path.join(root, 'worktree-a'),
+        'cloudflare',
+        true
+      );
+      const withArtifacts = await fsp.readFile(
+        path.join(withArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withArtifacts).toContain('## Artifacts');
+      expect(withArtifacts).toContain('except for files saved in `/artifacts`');
+
+      const withoutArtifactsHome = path.join(root, 'without-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withoutArtifactsHome },
+        path.join(root, 'worktree-b'),
+        'cloudflare',
+        false
+      );
+      const withoutArtifacts = await fsp.readFile(
+        path.join(withoutArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withoutArtifacts).not.toContain('## Artifacts');
+      expect(withoutArtifacts).toContain(
+        'The filesystem is ephemeral and will not persist after the session ends.'
+      );
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('receives the runtime provider and artifact flag before Kilo starts', async () => {
     const providers: Array<string | undefined> = [];
+    const artifacts: Array<boolean | undefined> = [];
     const { runtime } = createRuntime({
       spawner: createSpawner(),
       feed: createFeedFactory(),
       scheduler: createScheduler(),
       probe: createProbe(true),
       sandboxProvider: 'vercel',
-      prepareFilesystem: async (_env, _directory, sandboxProvider) => {
+      artifacts: true,
+      prepareFilesystem: async (_env, _directory, sandboxProvider, enabled) => {
         providers.push(sandboxProvider);
+        artifacts.push(enabled);
       },
     });
     await runtime.ensure();
     expect(providers).toEqual(['vercel']);
+    expect(artifacts).toEqual([true]);
     await runtime.shutdown();
   });
 });

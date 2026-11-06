@@ -336,9 +336,18 @@ import {
   type WorktreeDeletionPlan,
 } from './worktree-deletion.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
+import {
+  readObservedRuntimeVersions,
+  readRuntimeIdentity,
+  resetRuntimeIdentity,
+  writeRuntimeIdentity,
+} from './runtime-identity.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
-import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import {
+  SandboxRuntimeVersionSchema,
+  type SandboxStatusSnapshot,
+} from '../../shared/sandbox-status.js';
 import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
@@ -420,6 +429,8 @@ const wrapperSocketAttachmentSchema = z.object({
   workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
+  kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
+  wrapperVersion: SandboxRuntimeVersionSchema.optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
@@ -892,6 +903,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocation,
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
+        runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, allocation?.allocationId ?? null),
       });
     });
   }
@@ -2065,6 +2077,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]);
+      const observedRuntime = readObservedRuntimeVersions(request.headers);
       pair[1].serializeAttachment({
         credential: launch.credential,
         allocationId: launch.allocationId,
@@ -2075,6 +2088,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ? { workspaceConfiguration: true as const }
           : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
+        ...(observedRuntime.kiloCliVersion === null
+          ? {}
+          : { kiloCliVersion: observedRuntime.kiloCliVersion }),
+        ...(observedRuntime.wrapperVersion === null
+          ? {}
+          : { wrapperVersion: observedRuntime.wrapperVersion }),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -5333,6 +5352,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
       });
+      writeRuntimeIdentity(this.ctx.storage.kv, frame.allocationId, {
+        kiloCliVersion: attachment?.kiloCliVersion ?? null,
+        wrapperVersion: attachment?.wrapperVersion ?? null,
+      });
       await this.applyEvent({
         type: 'hello-accepted',
         at: Date.now(),
@@ -5734,6 +5757,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         .run();
       if (previous !== undefined && previous.allocationId !== state.allocationId) {
         resetRuntimeContract(this.ctx.storage.kv, state.allocationId);
+        resetRuntimeIdentity(this.ctx.storage.kv);
       }
     });
     if (
@@ -5763,6 +5787,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       },
       observedAt: Date.now(),
       inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
+      runtimeIdentity: readRuntimeIdentity(this.ctx.storage.kv, state.allocationId),
     });
     try {
       socket.send(

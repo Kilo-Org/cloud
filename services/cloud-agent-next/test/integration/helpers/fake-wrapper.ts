@@ -5,6 +5,10 @@ import {
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
+} from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -20,6 +24,8 @@ export type FakeWrapperConnectInput = {
   workspaceConfiguration?: boolean;
   /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
   runtimeHarness?: string;
+  kiloCliVersion?: string;
+  wrapperVersion?: string;
 };
 
 export type FakeWrapperHelloInput = {
@@ -96,6 +102,12 @@ export class FakeWrapper {
         ...(input.runtimeHarness === undefined
           ? {}
           : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),
+        ...(input.kiloCliVersion === undefined
+          ? {}
+          : { [KILO_CLI_VERSION_HEADER]: input.kiloCliVersion }),
+        ...(input.wrapperVersion === undefined
+          ? {}
+          : { [WRAPPER_VERSION_HEADER]: input.wrapperVersion }),
       },
     });
     if (response.status !== 101 || !response.webSocket) {

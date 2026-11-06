@@ -24,6 +24,12 @@ type DirectByokSyncResult = {
   time: number;
 };
 
+type MetadataCacheRefreshResult = {
+  source_count: number;
+  failed_count: number;
+  stale_count: number;
+};
+
 type SyncJob = 'providers' | 'direct_byok';
 
 function CompletedAt({ label, completedAt }: { label: string; completedAt: string | null }) {
@@ -48,6 +54,8 @@ export function SyncProvidersContent() {
   const [lastDirectByokResult, setLastDirectByokResult] = useState<DirectByokSyncResult | null>(
     null
   );
+  const [lastMetadataCacheResult, setLastMetadataCacheResult] =
+    useState<MetadataCacheRefreshResult | null>(null);
 
   const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
   const manualSyncEnabledQuery = useQuery(
@@ -96,6 +104,19 @@ export function SyncProvidersContent() {
     })
   );
 
+  const metadataCacheRefreshMutation = useMutation(
+    trpc.admin.syncProviders.triggerMetadataCacheRefresh.mutationOptions({
+      onSuccess: result => {
+        setLastMetadataCacheResult(result);
+        const refreshed = result.source_count - result.failed_count;
+        toast.success(`Refreshed ${refreshed} of ${result.source_count} metadata sources`);
+      },
+      onError: error => {
+        toast.error(error.message || 'Metadata cache refresh failed');
+      },
+    })
+  );
+
   const lastSync = lastSyncQuery.data;
   const postTestAlert = (job: SyncJob) => testAlertMutation.mutate({ job });
   const pendingTestAlertJob = testAlertMutation.isPending
@@ -110,9 +131,10 @@ export function SyncProvidersContent() {
 
       <p className="text-muted-foreground">
         Fetches provider and model data from OpenRouter and the Vercel AI Gateway, and direct BYOK
-        model lists from each direct BYOK provider, then stores the results in the database. In
-        production these run automatically via separate cron jobs; the manual triggers below are
-        intended for local development only.
+        model lists from each direct BYOK provider, then stores the results in the database. The
+        metadata cache refresh stores the raw upstream catalogs that these syncs and the gateway
+        read first. In production these run automatically via separate cron jobs; the manual
+        triggers below are intended for local development only.
       </p>
 
       {lastSync && (
@@ -138,8 +160,9 @@ export function SyncProvidersContent() {
             Manual Sync
           </CardTitle>
           <CardDescription>
-            Trigger a sync of providers and models, or of direct BYOK model lists. This may take a
-            minute. Use this in local development only — production syncs are handled by cron.
+            Trigger a sync of providers and models, of direct BYOK model lists, or a refresh of the
+            upstream metadata cache. This may take a few minutes. Use this in local development only
+            — production syncs are handled by cron.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -164,6 +187,19 @@ export function SyncProvidersContent() {
                 className={`mr-2 h-4 w-4 ${directByokSyncMutation.isPending ? 'animate-spin' : ''}`}
               />
               {directByokSyncMutation.isPending ? 'Syncing direct BYOK...' : 'Run direct BYOK sync'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => metadataCacheRefreshMutation.mutate()}
+              disabled={!manualSyncEnabled || metadataCacheRefreshMutation.isPending}
+              className="w-fit"
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${metadataCacheRefreshMutation.isPending ? 'animate-spin' : ''}`}
+              />
+              {metadataCacheRefreshMutation.isPending
+                ? 'Refreshing metadata cache...'
+                : 'Refresh metadata cache'}
             </Button>
           </div>
           {manualSyncEnabledQuery.data === false && (
@@ -209,6 +245,17 @@ export function SyncProvidersContent() {
                   )
                 )}
                 <li>Duration: {(lastDirectByokResult.time / 1000).toFixed(1)}s</li>
+              </ul>
+            </div>
+          )}
+
+          {lastMetadataCacheResult && (
+            <div className="rounded-lg border p-4 text-sm">
+              <p className="font-medium">Last metadata cache refresh result</p>
+              <ul className="text-muted-foreground mt-2 space-y-1">
+                <li>Sources: {lastMetadataCacheResult.source_count}</li>
+                <li>Failed: {lastMetadataCacheResult.failed_count}</li>
+                <li>Out of date for over a day: {lastMetadataCacheResult.stale_count}</li>
               </ul>
             </div>
           )}

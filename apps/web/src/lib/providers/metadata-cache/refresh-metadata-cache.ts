@@ -51,10 +51,30 @@ function catalogSources(): MetadataSource<unknown>[] {
   return [...new Map(sources.map(source => [source.url, source])).values()];
 }
 
+async function readUpdatedAtByUrl(urls: string[]): Promise<Map<string, Date | null>> {
+  if (urls.length === 0) return new Map();
+  const rows = await db
+    .select({
+      url: ai_gateway_metadata_cache.url,
+      updated_at: ai_gateway_metadata_cache.updated_at,
+    })
+    .from(ai_gateway_metadata_cache)
+    .where(inArray(ai_gateway_metadata_cache.url, urls));
+  return new Map(rows.map(row => [row.url, parseIsoTimestamp(row.updated_at)]));
+}
+
+async function orderOldestFirst<T extends MetadataSource<unknown>>(sources: T[]): Promise<T[]> {
+  const updatedAtByUrl = await readUpdatedAtByUrl(sources.map(source => source.url));
+  const updatedAtMs = (source: T) =>
+    updatedAtByUrl.get(source.url)?.getTime() ?? Number.NEGATIVE_INFINITY;
+  return sources.toSorted((a, b) => updatedAtMs(a) - updatedAtMs(b));
+}
+
 async function refreshSource(
   source: MetadataSource<unknown>,
   signal: AbortSignal
 ): Promise<boolean> {
+  if (signal.aborted) return false;
   let raw: unknown;
   try {
     ({ raw } = await fetchMetadata(source, { signal }));
@@ -73,13 +93,13 @@ async function refreshSource(
 }
 
 async function refreshSources(
-  sources: ReadonlyArray<MetadataSource<unknown>>,
+  sources: MetadataSource<unknown>[],
   concurrency: number,
   signal: AbortSignal
 ): Promise<string[]> {
   const limit = pLimit(concurrency);
   const results = await Promise.all(
-    sources.map(source =>
+    (await orderOldestFirst(sources)).map(source =>
       limit(async () => ({ url: source.url, ok: await refreshSource(source, signal) }))
     )
   );
@@ -87,15 +107,7 @@ async function refreshSources(
 }
 
 async function findStaleEntries(failedUrls: string[], now: Date): Promise<StaleMetadataEntry[]> {
-  if (failedUrls.length === 0) return [];
-  const rows = await db
-    .select({
-      url: ai_gateway_metadata_cache.url,
-      updated_at: ai_gateway_metadata_cache.updated_at,
-    })
-    .from(ai_gateway_metadata_cache)
-    .where(inArray(ai_gateway_metadata_cache.url, failedUrls));
-  const updatedAtByUrl = new Map(rows.map(row => [row.url, parseIsoTimestamp(row.updated_at)]));
+  const updatedAtByUrl = await readUpdatedAtByUrl(failedUrls);
   return failedUrls
     .map(url => ({ url, updatedAt: updatedAtByUrl.get(url) ?? null }))
     .filter(

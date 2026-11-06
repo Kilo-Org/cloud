@@ -192,6 +192,17 @@ describe('refreshMetadataCache', () => {
     expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
   });
 
+  it('refreshes sources without a row first, then the oldest rows', async () => {
+    await storeRow(modelsDevCatalogSource.url, modelsDevCatalog(), hoursAgo(1));
+    await storeRow(openRouterModelsMetadataSource.url, catalogModels(), hoursAgo(48));
+
+    await refreshMetadataCache();
+
+    const urls = fetchedUrls().filter(url => !url.startsWith(PROVIDER_MODELS_URL_PREFIX));
+    expect(urls.at(-1)).toBe(modelsDevCatalogSource.url);
+    expect(urls.at(-2)).toBe(openRouterModelsMetadataSource.url);
+  });
+
   it('alerts only for failed sources last stored over a day ago or never stored', async () => {
     const staleUpdatedAt = new Date(Date.now() - 2 * DAY_MS).toISOString();
     await storeRow(openRouterModelsMetadataSource.url, { data: [] }, staleUpdatedAt);

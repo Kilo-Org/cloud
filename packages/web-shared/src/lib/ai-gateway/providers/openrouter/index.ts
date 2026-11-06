@@ -60,6 +60,7 @@ import {
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -396,7 +397,12 @@ function createOpenRouterModelsReader(
     fetchFallback: () =>
       fetchOpenRouterModels(
         source.url,
-        { method: 'GET', headers: openRouterModelsHeaders(), cache: 'no-store' },
+        {
+          method: 'GET',
+          headers: openRouterModelsHeaders(),
+          cache: 'no-store',
+          signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
+        },
         { subject, endpoint }
       ),
   });
@@ -471,6 +477,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
       method: 'GET',
       headers: { Authorization: `Bearer ${LOCAL_FAKE_LLM_API_KEY}`, ...ATTRIBUTION_HEADERS },
       cache: 'no-store',
+      signal: AbortSignal.timeout(OPENROUTER_MODELS_FETCH_TIMEOUT_MS),
     },
     { subject: 'transcription models', endpoint: 'openrouter/transcription-models' }
   );

@@ -30,8 +30,8 @@ export function formatUsd(
     currency: 'USD',
   })
     .formatToParts(amount)
+    .filter(part => part.type !== 'literal' || !/[^\S\r\n]/.test(part.value))
     .map(part => (part.type === 'currency' ? '$' : part.value))
-    .filter(part => !/[^\S\r\n]/.test(part))
     .join('');
 }
 

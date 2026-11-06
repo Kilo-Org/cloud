@@ -91,7 +91,9 @@ const timestampSchema = z.number().finite().int().nonnegative().max(8_640_000_00
 export const SandboxRuntimeVersionSchema = z
   .string()
   .max(64)
-  .regex(/^\d{1,6}\.\d{1,6}\.\d{1,6}(?:-(?:alpha|beta|rc|canary|dev)(?:[.-]\d{1,14})?)?(?![\s\S])/);
+  .regex(
+    /^\d{1,6}\.\d{1,6}\.\d{1,6}(?:-(?:(?:alpha|beta|rc|canary|dev)(?:[.-]\d{1,14})?|v2-\d{1,14}))?(?![\s\S])/
+  );
 
 export function safeSandboxRuntimeVersion(value: unknown): string | null {
   const parsed = SandboxRuntimeVersionSchema.safeParse(value);

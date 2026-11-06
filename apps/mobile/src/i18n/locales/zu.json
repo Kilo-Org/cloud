@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
       "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
       "assistantProviderRefused": "Umhlinzeki wenqabe lesi sicelo futhi asikwazi ukuphinda sizanywe.",
+      "assistantCreditsRefusal": "Awekho amakhredithi anele okusebenzisa i-Cloud Agent.",
       "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
       "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."

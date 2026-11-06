@@ -38,18 +38,21 @@ type SheetProps = {
    */
   background?: string;
   /**
-   * Whether a downward drag on the sheet dismisses it (and, on iOS, a backdrop
-   * tap). Defaults to true. A sheet whose content scrolls passes false: the
+   * Whether a downward drag on the sheet dismisses it, and, on iOS, a backdrop
+   * tap too. Defaults to true. A sheet whose content scrolls passes false: the
    * native sheet claims every downward drag that starts over a React Native
    * scroll view on iOS, so dragging the content back up would dismiss the sheet
-   * and drop its values.
+   * and drop its values, and a form keeps its backdrop for the same reason. On
+   * Android the backdrop is the scrim, which `enablePanDownToClose` governs
+   * beside Android Back, and this wrapper always keeps that on.
    */
   dismissGestures?: boolean;
   /**
-   * Asked before a dismissal the sheet received by itself — Android Back or a
-   * backdrop tap. Return false to keep the sheet open, which is how a form asks
-   * its own "Keep editing / Discard" question first. iOS backdrop taps cannot
-   * be separated from the drag, so `dismissGestures` governs those.
+   * Asked before a dismissal the sheet received by itself — Android Back, the
+   * Android scrim, or an iOS backdrop tap. Return false to keep the sheet open,
+   * which is how a form asks its own "Keep editing / Discard" question first.
+   * An iOS backdrop tap can only be reported after it happened, so the caller
+   * refusing one is what keeps the sheet open.
    */
   onRequestDismiss?: () => boolean;
   children: ReactNode;
@@ -65,9 +68,9 @@ type SheetProps = {
  * shows data (a message, a run, a detail) keeps the swipe, the backdrop tap and
  * Android Back, so the drag is one more way out beside Done. A sheet that holds
  * a draft — a form, a filter, a composer — turns the swipe and the iOS backdrop
- * tap off with `dismissGestures={false}`, keeps Android Back, and answers it
- * through `onRequestDismiss`: a drag would otherwise throw the draft away while
- * the user scrolled the form back up.
+ * tap off with `dismissGestures={false}`, keeps Android Back and the Android
+ * scrim, and answers it through `onRequestDismiss`: either gesture would
+ * otherwise throw the draft away while the user was still working on it.
  */
 export function Sheet({
   visible,
@@ -130,6 +133,9 @@ export function Sheet({
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      // A caller turning the sheet back on re-presents it, so its earlier
+      // dismissal was superseded: the next self-dismissal reports again.
+      forwardedSelfDismissRef.current = false;
       return;
     }
     // The host is up, so this hands the library its dismissal. Android reports
@@ -156,6 +162,13 @@ export function Sheet({
   // instead of the sheet's native handler, so a press in that window of the
   // opening animation is answered here. Once the window has focus the sheet
   // receives Back natively and this listener does not run.
+  // Still set when the previous self-dismiss call already handed the caller the
+  // close and that close has not been superseded: the dismissal the caller then
+  // starts forwards to the library's `onClose` as soon as `visible` is false,
+  // which must not reach the caller a second time. Cleared by the caller
+  // reopening while the dismissal is in flight, so a re-presented sheet asks
+  // fresh instead of swallowing its next self-dismissal.
+  const forwardedSelfDismissRef = useRef(false);
   const requestSelfDismissRef = useRef<() => void>(() => undefined);
   requestSelfDismissRef.current = () => {
     // A dismissal the caller superseded is already on its way out; asking again
@@ -166,6 +179,7 @@ export function Sheet({
     if (onRequestDismiss?.() === false) {
       return;
     }
+    forwardedSelfDismissRef.current = true;
     onClose();
   };
   useEffect(() => {
@@ -195,6 +209,14 @@ export function Sheet({
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
       dismissGestures={dismissGestures}
+      // The iOS sheet draws the dimmed backdrop through its presentation, so the
+      // app's view tree cannot see that tap: the library reports it and this
+      // wrapper answers it the way Android Back is answered, `onRequestDismiss`
+      // included. The library only reports while `dismissGestures` is on, which
+      // keeps a draft-holding sheet's backdrop inert.
+      onBackdropTap={() => {
+        requestSelfDismissRef.current();
+      }}
       onRequestDismiss={() => selfDismissRef.current()}
       locale={i18n.language}
       onClose={() => {
@@ -203,6 +225,13 @@ export function Sheet({
         // swipe, Android Back) has no pending request and reports while
         // `visible` is still true, so it is still forwarded.
         if (visible && dismissalPending) {
+          return;
+        }
+        // A reported self-dismissal that already handed the caller the close
+        // must not arrive a second time once the caller dropped `visible` and
+        // the native dismissal reports through this prop.
+        if (forwardedSelfDismissRef.current) {
+          forwardedSelfDismissRef.current = false;
           return;
         }
         onClose();

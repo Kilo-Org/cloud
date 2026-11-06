@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
       "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
+      "assistantCreditsRefusal": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."

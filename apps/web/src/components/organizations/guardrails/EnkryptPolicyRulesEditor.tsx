@@ -99,7 +99,7 @@ export function EnkryptPolicyRulesEditor({
           ))}
         </ol>
       )}
-      {rules.length === 0 && <FieldMessages error={issues.get(ISSUE_PATH)} />}
+      <FieldMessages error={issues.get(ISSUE_PATH)} />
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"

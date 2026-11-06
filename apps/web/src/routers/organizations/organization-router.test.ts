@@ -6,7 +6,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -259,6 +259,54 @@ describe('organizations trpc router', () => {
         await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
       }
     });
+
+    it.each(['owner', 'admin', 'billing_manager'] as const)(
+      'returns the inherited %s role without a direct child membership',
+      async role => {
+        const parentUser = await insertTestUser({ is_admin: false });
+        const childOwner = await insertTestUser({ is_admin: false });
+        const parentOrganization = await createOrganization(
+          'Parent Role Organization',
+          parentUser.id
+        );
+        const childOrganization = await createOrganization(
+          'Child Role Organization',
+          childOwner.id
+        );
+        await db
+          .update(organization_memberships)
+          .set({ role })
+          .where(
+            and(
+              eq(organization_memberships.organization_id, parentOrganization.id),
+              eq(organization_memberships.kilo_user_id, parentUser.id)
+            )
+          );
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        try {
+          const caller = await createCallerForUser(parentUser.id);
+          const result = await caller.organizations.withMembers({
+            organizationId: childOrganization.id,
+          });
+
+          expect(result.callerRole).toBe(role);
+          expect(
+            result.members.some(member => member.status === 'active' && member.id === parentUser.id)
+          ).toBe(false);
+        } finally {
+          await db
+            .update(organizations)
+            .set({ parent_organization_id: null })
+            .where(eq(organizations.id, childOrganization.id));
+          await db.delete(organizations).where(eq(organizations.id, childOrganization.id));
+          await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+        }
+      }
+    );
 
     it('should include child organization memberships for parent organization members', async () => {
       const parentOwner = await insertTestUser({

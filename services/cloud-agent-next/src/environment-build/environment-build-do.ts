@@ -1,5 +1,4 @@
 import { DurableObject } from 'cloudflare:workers';
-import { isEnvironmentSnapshotsEnabled } from './enrollment.js';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -14,7 +13,6 @@ import {
   getContainerCapacityFailureReason,
 } from '../container-concurrency.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
-import { isCloudflareContainersEnrolled } from '../agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -182,19 +180,8 @@ export class EnvironmentBuild extends DurableObject<Env> {
         };
       },
       builderSandboxId: sandboxId,
-      unsupportedReason: owner => {
-        if (!isEnvironmentSnapshotsEnabled(env, owner)) {
-          return 'Snapshots are not enabled for this account';
-        }
+      unsupportedReason: () => {
         if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
-        if (
-          !isCloudflareContainersEnrolled(
-            env,
-            owner.type === 'organization' ? { orgId: owner.id } : {}
-          )
-        ) {
-          return 'Cloudflare containers are not enabled for this account';
-        }
         return builderRuntimeUnsupportedReason(env);
       },
       log: (message, fields) => logger.withFields(fields).info(message),

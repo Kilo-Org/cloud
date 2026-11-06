@@ -26,21 +26,6 @@ export const ENKRYPT_DETECTOR_TYPES = {
   bias: 'revise',
 } as const satisfies Record<EnkryptDetectorId, 'block' | 'revise'>;
 
-export const ENKRYPT_BLOCK_DETECTOR_IDS = [
-  'injection_attack',
-  'topic_detector',
-  'policy_violation',
-  'toxicity',
-  'nsfw',
-  'sponge_attack',
-] as const satisfies readonly EnkryptDetectorId[];
-
-export const ENKRYPT_REVISE_DETECTOR_IDS = [
-  'pii',
-  'keyword_detector',
-  'bias',
-] as const satisfies readonly EnkryptDetectorId[];
-
 /** Enkrypt reports two detectors in `summary` under names that differ from their request keys. */
 export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
   injection_attack: 'injection_attack',
@@ -54,7 +39,10 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
   bias: 'bias',
 };
 
-/** Kilo Default: injection detection blocks; secrets detection is logged, as Enkrypt intends. */
+/**
+ * Kilo Default: prompt injection and NSFW content block; secrets are logged, as Enkrypt intends.
+ * NSFW and secrets stay on whatever an organization saves; see `enforcedEnkryptInputDetectors`.
+ */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
   return {
     injection_attack: { enabled: true },
@@ -63,9 +51,30 @@ export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors 
     topic_detector: { enabled: false, topic: [] },
     policy_violation: { enabled: false, format: 'rules', policy_text: '', rules: [] },
     toxicity: { enabled: false },
-    nsfw: { enabled: false },
+    nsfw: { enabled: true },
     bias: { enabled: false, action: 'log' },
     sponge_attack: { enabled: false },
+  };
+}
+
+/** The input detectors admins can configure, in the order the page shows them. */
+export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
+  'injection_attack',
+  'policy_violation',
+] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * The input detectors the gateway enforces: the configurable ones as saved and Kilo Default for
+ * every other one, whatever was saved for it. Every organization therefore blocks NSFW content and
+ * logs secrets.
+ */
+export function enforcedEnkryptInputDetectors(
+  detectors: EnkryptInputDetectors
+): EnkryptInputDetectors {
+  return {
+    ...createKiloDefaultEnkryptInputDetectors(),
+    injection_attack: detectors.injection_attack,
+    policy_violation: detectors.policy_violation,
   };
 }
 

@@ -398,4 +398,23 @@ describe('requirePrivilegedActor', () => {
       )
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Reauthentication required' });
   });
+
+  it('refuses a session credential supplied without a web session pepper', async () => {
+    const user = await adminUser({ web_session_pepper: 'primary-row-pepper' });
+    createdUserIds.push(user.id);
+
+    await expect(
+      requirePrivilegedActor(
+        { permission: 'admin', actionClass: 'platform_read' },
+        {
+          user,
+          credential: 'session',
+          webSessionId,
+          headersList: new Headers(),
+          trpcPath: 'admin.test',
+          trpcType: 'query',
+        }
+      )
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Reauthentication required' });
+  });
 });

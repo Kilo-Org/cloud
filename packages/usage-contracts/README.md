@@ -10,6 +10,13 @@ alignment checks belong in web-shared
 fields, safe integer limits, ISO timestamps, optional bouncer data, and unknown-key
 stripping when changing the contract.
 
+## Exa usage
+
+`exa.ts` defines the record that the Exa route passes to `recordExaUsage` and
+that `/api/internal/exa-usage/record` accepts. It is separate from the LLM
+usage record and rejects unknown keys. `id` and `occurredAt` are the writer's
+idempotency key, so every resend must reuse them.
+
 ## Classifier usage
 
 The auto-routing Worker constructs `auto-routing/classifier` usage records and

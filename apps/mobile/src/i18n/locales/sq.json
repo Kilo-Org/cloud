@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
       "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
+      "assistantCreditsRefusal": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."

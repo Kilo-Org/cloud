@@ -4,7 +4,13 @@ name: kilo-app CI
 # every PR and every main push (no path filters) and the `mobile-changes` job
 # gates the suite work. An unrelated PR or push still reports the suite checks
 # as skipped (a skipped job satisfies a required check) instead of leaving them
-# "Expected". The release workflow re-runs the suite through `workflow_call`.
+# "Expected". A release started by the same main push consumes this run's
+# conclusion for that commit — every release path is inside the detection below,
+# so the run always executes the suite — and calls the suite through
+# `workflow_call` only for the hourly schedule, a manual run, or a reuse it
+# cannot prove: no run for the commit, or a run that ended without a pass,
+# including one the cancel-in-progress group above cancels when a later push
+# lands on main.
 #
 # The app's formatting is gated by the repo-wide `format-check` job in ci.yml:
 # `oxfmt --list-different .` covers apps/mobile on every PR, merge-queue entry

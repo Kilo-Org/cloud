@@ -43,18 +43,25 @@ const nativeSheet = vi.hoisted(() => ({
   // `index === -1` effect; iOS fires them from the native dismiss event later.
   synchronous: false,
   dismiss: (): void => undefined,
+  // The iOS sheet reports a dimmed-area tap through this prop instead of
+  // dismissing on its own.
+  backdropTap: (): void => undefined,
+  // What the wrapper last asked the native sheet to gate its report with.
+  dismissGestures: true,
 }));
 
 vi.mock('@expo/ui/community/bottom-sheet', () => {
   type NativeSheetProps = {
     index: number;
+    dismissGestures?: boolean;
     onClose?: () => void;
     onDismiss?: () => void;
+    onBackdropTap?: () => void;
     children?: ReactNode;
   };
 
   function NativeSheetStub(props: NativeSheetProps) {
-    const { index, onClose, onDismiss } = props;
+    const { index, dismissGestures = true, onClose, onDismiss, onBackdropTap } = props;
     const [presented, setPresented] = useState(index >= 0);
     const closedRef = useRef(index < 0);
     const closeRef = useRef(onClose);
@@ -92,6 +99,15 @@ vi.mock('@expo/ui/community/bottom-sheet', () => {
         closeRef.current?.();
         dismissRef.current?.();
       };
+      // The iOS sheet reports a dimmed-area tap only while the gesture is on
+      // (repo-local `BottomSheet.ios` passes `dismissOnBackdropTap: dismissGestures`).
+      nativeSheet.backdropTap = () => {
+        if (!dismissGestures) {
+          return;
+        }
+        onBackdropTap?.();
+      };
+      nativeSheet.dismissGestures = dismissGestures;
     });
 
     // `presented` goes through the host props so the suite can observe the
@@ -142,6 +158,8 @@ beforeEach(() => {
   nativeSheet.mounts = 0;
   nativeSheet.synchronous = false;
   nativeSheet.dismiss = () => undefined;
+  nativeSheet.backdropTap = () => undefined;
+  nativeSheet.dismissGestures = true;
   for (const ui of mounted.splice(0)) {
     ui.unmount();
   }
@@ -504,6 +522,8 @@ describe('Sheet', () => {
     expect(isSheetTouchHeld()).toBe(false);
   });
 
+  // iOS only: the native sheet there reports a dimmed-area tap instead of
+  // dismissing. Its cases live in `sheet.backdrop-tap.mounted.test.tsx`.
   it('ends the sheet when the native sheet dismisses on its own (swipe, backdrop or Back)', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();

@@ -91,9 +91,8 @@ it('supports independent image rollback, then mode rollback', () => {
   expect(modeRollback.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
   expect(modeRollback.containers?.[0].images?.['runtime-free']).toBeUndefined();
 });
-it('renders scoped startup without replacing the baseline image or changing provider enrollment', () => {
+it('renders scoped startup without replacing the baseline image', () => {
   const config = baseline();
-  Object.assign(config.vars, { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' });
   const output = renderRuntimeTarget({
     config,
     environment: 'production',
@@ -102,7 +101,6 @@ it('renders scoped startup without replacing the baseline image or changing prov
   });
   expect(output.vars).toMatchObject({
     RUNTIME_INTERACTIVE_ORG_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-    CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
   });
   expect(output.containers?.[0].images).toEqual({
     app: { dockerfile: './Dockerfile.containers' },

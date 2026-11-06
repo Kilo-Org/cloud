@@ -3,6 +3,7 @@ import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
 } from '../shared/runtime-profile.js';
 export * from '../shared/runtime-profile.js';
@@ -279,6 +280,7 @@ const SharedSessionProfileFields = {
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({

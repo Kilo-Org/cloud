@@ -96,6 +96,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-style-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/transcript-style-fixture';
     }
+    if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/attachment-chip-fixture';
+    }
     if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/preparation-copy-fixture';
     }
@@ -107,6 +110,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/transcript-terminal-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-terminal-failure-fixture';
+    }
+    if (/(?:^|\/)dev\/transcript-credits-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-credits-failure-fixture';
     }
     if (/(?:^|\/)dev\/transcript-readonly-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-readonly-failure-fixture';

@@ -545,10 +545,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const options = await createCloudAgentNextClient(authToken)
-        .getPreviewOptions({
-          cloudAgentSessionId: input.cloudAgentSessionId,
-          organizationId: input.organizationId,
-        })
+        .getPreviewOptions({ cloudAgentSessionId: input.cloudAgentSessionId })
         .catch((error: unknown) => {
           console.warn('[cloud-agent-next.getPreviewOptions] Worker call failed:', {
             error: error instanceof Error ? error.message : String(error),

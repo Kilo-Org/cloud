@@ -2667,6 +2667,7 @@
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
       "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
+      "assistantCreditsRefusal": "Za zagon storitve Cloud Agent ni dovolj kreditov.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."

@@ -236,6 +236,29 @@ const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   const body = c.req.valid('json');
 
+  // Reject known retired ids before inserting. If this initial probe fails,
+  // the required post-insert tombstone check must still confirm availability.
+  try {
+    const retired = await withDORetry(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId: c.get('user_id'),
+          sessionId: body.sessionId,
+        }),
+      stub => stub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+    if (retired) {
+      return c.json({ success: false, error: 'session_retired' }, 409);
+    }
+  } catch (error) {
+    console.error('Failed to probe session availability before create', {
+      kiloUserId: c.get('user_id'),
+      sessionId: body.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Persist a placeholder session row.
   // This is intentionally minimal; we only need a working Hyperdrive -> Postgres path.
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
@@ -265,6 +288,43 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
   }
 
   const { createdRow } = result;
+
+  // Worktree deletion writes this tombstone before deleting rows. Checking after
+  // insertion prevents a still-running runtime from recreating deleted history.
+  let ingestDeleted: boolean;
+  try {
+    ingestDeleted = await withDORetry(
+      () => getSessionIngestDO(c.env, { kiloUserId, sessionId: body.sessionId }),
+      async sessionStub => sessionStub.isDeleted(),
+      'SessionIngestDO.isDeleted'
+    );
+  } catch (error) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    throw error;
+  }
+
+  if (ingestDeleted) {
+    if (createdRow) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+    }
+    return c.json({ success: false, error: 'session_deleted' }, 409);
+  }
 
   if (createdRow) {
     const session = mapSessionEventRow(createdRow);

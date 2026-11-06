@@ -795,8 +795,8 @@ export function ChatSidebar({
   // server-side filter the stored list gets, so they have to honor the same
   // selections here or the sidebar shows rows the filters exclude.
   const liveOnlySessions = useMemo(() => {
-    // Heartbeats now leave every row where it was, so the order is decided
-    // here: attention first, then working, id last.
+    // The merge order is per-connection and changes on every heartbeat, so the
+    // rendered order is decided here: attention first, then working, id last.
     const remotePriority = (status: string) =>
       status === 'question' || status === 'permission'
         ? 2
@@ -809,11 +809,12 @@ export function ChatSidebar({
         platformFilter: platformFilter ?? [],
         projectFilter: projectFilter ?? [],
         searchQuery,
+        organizationId,
       }
-    ).toSorted(
+    ).sort(
       (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
     );
-  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery]);
+  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery, organizationId]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 

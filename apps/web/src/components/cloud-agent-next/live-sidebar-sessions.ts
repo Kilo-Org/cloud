@@ -1,5 +1,6 @@
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { normalizeGitUrl } from '@kilocode/worker-utils/normalize-git-url';
+import { createdOnPlatformForFilter } from './hooks/sidebar-queries';
 
 /** The part of a live session the sidebar filters read. */
 export type LiveSidebarSession = {
@@ -14,31 +15,30 @@ export type LiveSidebarSession = {
    * origin the session was created on.
    */
   createdOnPlatform?: string;
+  /**
+   * Stored owner scope from `cli_sessions_v2`: an organization id, `null` for
+   * personal. Absent until the session has been ingested.
+   */
+  organizationId?: string | null;
 };
 
 export type LiveSidebarQuery = {
   platformFilter: readonly string[];
   projectFilter: readonly string[];
   searchQuery: string;
-};
-
-/**
- * Filter values that cover more than one stored platform. The sidebar's
- * platform picker names a platform family, and the stored list and the live
- * rows both collapse a family through this one map to stay in step.
- */
-const PLATFORM_FILTER_VARIANTS: Record<string, readonly string[]> = {
-  // 'cloud-agent-web' is a variant of the cloud agent
-  'cloud-agent': ['cloud-agent', 'cloud-agent-web'],
-  // Extension sessions are created from VS Code or agent-manager
-  extension: ['vscode', 'agent-manager'],
+  /** The sidebar's organization scope. `undefined` = unscoped. */
+  organizationId?: string;
 };
 
 const KNOWN_PLATFORM_VALUES = new Set<string>(KNOWN_PLATFORMS);
 
-/** Stored platform values a filter selection covers. Empty selection = no filter. */
+/**
+ * Stored platform values a filter selection covers. The family map lives in
+ * `hooks/sidebar-queries.ts` because the stored list's server query reads it
+ * too, and the two must collapse a family the same way.
+ */
 export function platformFilterValues(platformFilter: readonly string[]): string[] {
-  return platformFilter.flatMap(platform => PLATFORM_FILTER_VARIANTS[platform] ?? [platform]);
+  return createdOnPlatformForFilter(platformFilter) ?? [];
 }
 
 /**
@@ -75,7 +75,30 @@ export function matchesLivePlatformFilter(
   return matchesLivePlatformBucket(session, new Set(platformFilterValues(platformFilter)));
 }
 
-/** Matches what the stored list matches: id, title, repository, and branch. */
+/**
+ * Whether a live row is inside the sidebar's organization scope.
+ *
+ * `undefined` is the unscoped sidebar, which lists every session the user can
+ * reach — the same set the stored list's unscoped query returns (see
+ * `addOrganizationCondition`). A row whose owner is not known yet matches no
+ * scope, so an organization view never shows a session it cannot attribute to
+ * that organization.
+ */
+function matchesOrganizationScope(
+  session: LiveSidebarSession,
+  organizationId: string | undefined
+): boolean {
+  if (organizationId === undefined) return true;
+  return session.organizationId === organizationId;
+}
+
+/**
+ * The stored search also matches pull-request title, pull-request number, and
+ * the worktree name. A connection payload carries none of those, so a live row
+ * matches on what it does have: title, id, repository, and branch. A
+ * repository or branch search therefore still finds its live row, while a
+ * search for a pull request or worktree name cannot.
+ */
 function matchesLiveSearch(session: LiveSidebarSession, needle: string): boolean {
   return [session.title, session.id, session.gitUrl, session.gitBranch].some(value =>
     value?.toLowerCase().includes(needle)
@@ -83,10 +106,10 @@ function matchesLiveSearch(session: LiveSidebarSession, needle: string): boolean
 }
 
 /**
- * Client-side filter for the live (Remote) rows: origin, repository, and free
- * text, combined with AND. An empty selection or an empty query means "no
- * filter". The live rows are already in memory, so this filters locally — the
- * stored list is filtered by the same selections server-side.
+ * Client-side filter for the live (Remote) rows: origin, repository, free
+ * text, and organization, combined with AND. An empty selection or an empty
+ * query means "no filter". The live rows are already in memory, so this filters
+ * locally — the stored list is filtered by the same selections server-side.
  *
  * Repository comparison normalizes both sides: the option comes from a stored
  * row while the live row carries the URL the connection reported, and the two
@@ -112,6 +135,7 @@ export function filterLiveSidebarSessions<T extends LiveSidebarSession>(
       (session.gitUrl != null && selectedProjects.has(normalizeGitUrl(session.gitUrl)));
     const searchMatches =
       !isSearchActive || (needle.length > 0 && matchesLiveSearch(session, needle));
-    return platformMatches && projectMatches && searchMatches;
+    const organizationMatches = matchesOrganizationScope(session, query.organizationId);
+    return platformMatches && projectMatches && searchMatches && organizationMatches;
   });
 }

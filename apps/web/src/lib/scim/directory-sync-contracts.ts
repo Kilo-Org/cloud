@@ -88,6 +88,67 @@ export const DirectoryMembershipSchema = z.strictObject({
 
 export type DirectoryMembership = z.infer<typeof DirectoryMembershipSchema>;
 
+/**
+ * Machine-readable reason a directory-sync write was refused, returned in the
+ * 409 body as `code` alongside the human-readable `error`.
+ *
+ * The distinction the consumer needs is not which rule refused, but whether
+ * waiting can clear it. A missing dependency is an arrival-order problem: the
+ * event that would create it may still be behind the cursor, so the Worker
+ * holds its cursor and retries. A refusal is a statement about the directory's
+ * own configuration or about a conflict with state the directory does not own,
+ * and no amount of retrying changes it — the Worker parks the event with the
+ * reason recorded rather than stalling every tenant behind one.
+ *
+ * See `.specs/organization-sso.md`, Directory Sync rules 7 and 20.
+ */
+export type DirectorySyncConflictCode =
+  /**
+   * Sub-organization upsert: no live organization is bound to the directory.
+   * Retryable — `dsync.activated` may not have been applied yet.
+   */
+  | 'directory_not_found'
+  /**
+   * Sub-organization upsert: the directory's live organization is itself
+   * parented, and the hierarchy is one level deep. Terminal — nothing the
+   * directory can send repairs it; an operator must reparent.
+   */
+  | 'sub_organization_cannot_nest'
+  /**
+   * Membership add: no live sub-organization is bound to the directory group.
+   * Retryable — the group's create event may still be behind the cursor.
+   */
+  | 'sub_organization_not_found'
+  /**
+   * Membership add: no Kilo account is bound to the directory user. Retryable
+   * — the user's create event may still be behind the cursor.
+   */
+  | 'user_not_found'
+  /**
+   * User upsert: account provisioning was rejected, by the normalized-email
+   * dedup, the deletion fence, or billing-customer creation. Retryable — a
+   * transient rejection clears, and a persistent one is reported each time.
+   */
+  | 'user_provisioning_failed'
+  /**
+   * User upsert: an existing account holds the address, and the directory's
+   * organization has not captured its domain, or its SSO policy fails closed.
+   * Terminal — only an administrator capturing the domain clears it.
+   */
+  | 'domain_not_captured'
+  /**
+   * User upsert: the account for this address already carries a different
+   * directory user identifier, and one account binds to at most one directory
+   * user. Terminal — the directory must stop asserting the duplicate.
+   */
+  | 'account_bound_to_other_directory_user'
+  /**
+   * User update: the directory moved the user onto an address another Kilo
+   * account already holds. Terminal — resolving it means changing one of the
+   * two accounts, which directory sync will not do on its own.
+   */
+  | 'address_held_by_another_account';
+
 /** Returned by every upsert so the caller can log what changed. */
 export type DirectorySyncUpsertResult = {
   /** Kilo's identifier for the affected row. */
@@ -144,6 +205,28 @@ export type DirectoryMembershipRemovalResult = {
    * to the organization's seats and data.
    */
   revokedParentMembership: boolean;
+};
+
+/**
+ * Revokes every directory membership the account bound to a directory user
+ * holds: the directory group organizations, and their parents under rule 4.
+ *
+ * Applied for a hard deletion and for an update reporting the user `inactive`.
+ * The account itself is never deleted or anonymized (rule 10): the membership
+ * rows are the directory's to revoke, the account is not.
+ *
+ * Converges like the single membership removal: an `externalId` no account is
+ * bound to has nothing to revoke, which is the state the event asserts, so it
+ * answers with a null user and an empty list rather than conflicting.
+ */
+export type DirectoryMembershipRevokeAllResult = {
+  /** Null when no Kilo account is bound to the directory user: the converged case. */
+  kiloUserId: string | null;
+  /**
+   * Organizations a membership row was actually deleted from, groups and
+   * parents. Empty on a replay, which is what makes the route idempotent.
+   */
+  revokedOrganizationIds: string[];
 };
 
 /** Soft delete: `deleted_at` is stamped, nothing is removed. */

@@ -385,15 +385,15 @@
     "startFailedFallback": "Ekki tókst að ræsa fulltrúann. Opnaðu Kilo og reyndu aftur."
   },
   "ig": {
-    "startAgent": "Malite onye enyemaka",
-    "openNeedsInput": "Meghe onye enyemaka chọrọ nzaghachi",
+    "startAgent": "Malite onye nnọchi anya",
+    "openNeedsInput": "Meghe onye nnọchi anya chọrọ nzaghachi",
     "openSession": "Meghe nnọkọ",
     "openPullRequest": "Meghe arịrịọ ijikọ koodu",
     "promptParam": "Ntụziaka",
     "repositoryParam": "Ebe nchekwa koodu",
     "sessionParam": "Nnọkọ",
     "pullRequestParam": "Arịrịọ ijikọ koodu",
-    "startFailedFallback": "Enweghị ike ịmalite onye enyemaka ahụ. Meghe Kilo wee gbalịa ọzọ."
+    "startFailedFallback": "Enweghị ike ịmalite onye nnọchi anya ahụ. Meghe Kilo wee gbalịa ọzọ."
   },
   "id": {
     "startAgent": "Mulai agen",

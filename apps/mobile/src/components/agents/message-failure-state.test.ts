@@ -70,25 +70,33 @@ describe('selectMessageFailure', () => {
   describe('delivery', () => {
     it('maps every delivery reason to fixed copy and never emits raw error text', () => {
       const cases = [
-        { reason: 'interrupted', title: 'Failed to deliver', detail: 'You stopped this message.' },
+        {
+          reason: 'interrupted',
+          title: 'You stopped this message.',
+          detail: null,
+          error: false,
+        },
         {
           reason: 'exhausted',
-          title: 'Failed to deliver',
+          title: 'Message not sent',
           detail: 'We could not deliver this message after several attempts.',
+          error: true,
         },
       ] as const;
 
-      for (const { reason, title, detail } of cases) {
+      for (const { reason, title, detail, error } of cases) {
         const result = selectMessageFailure({
           info: userInfo(),
           deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason },
         });
         expect(result).not.toBeNull();
         expect(result?.kind).toBe('delivery');
+        expect(result?.side).toBe('user');
+        expect(result?.error).toBe(error);
         expect(result?.title).toBe(title);
         expect(result?.detail).toBe(detail);
         expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
-        expect(result?.detail).not.toContain('RAW_TRANSPORT_TEXT');
+        expect(result?.detail ?? '').not.toContain('RAW_TRANSPORT_TEXT');
         // The raw transport text stays reachable behind the copy action only.
         expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
         expect(result?.canRetry).toBe(true);
@@ -96,15 +104,21 @@ describe('selectMessageFailure', () => {
       }
     });
 
-    it('states an agent-execution failure once, in the assistant-failure copy', () => {
+    it('states an agent-execution failure in the assistant-failure copy and names the failed run', () => {
       const result = selectMessageFailure({
         info: userInfo(),
         deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'execution' },
       });
       expect(result).not.toBeNull();
       expect(result?.kind).toBe('delivery');
+      // The row is the user's question, but the statement is the failed
+      // response: it takes the assistant's column, not the bubble's.
+      expect(result?.side).toBe('assistant');
+      expect(result?.error).toBe(true);
       expect(result?.title).toBe('Response failed');
-      expect(result?.detail).toBeNull();
+      // The second line names what failed, where the provider's own failures
+      // state their reason.
+      expect(result?.detail).toBe('The agent could not run this message.');
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
       expect(result?.canRetry).toBe(true);
       expect(result?.canCopy).toBe(true);
@@ -143,6 +157,7 @@ describe('selectMessageFailure', () => {
         const result = selectMessageFailure({ info: assistantInfo(name) });
         expect(result, name).not.toBeNull();
         expect(result?.kind).toBe('assistant');
+        expect(result?.side).toBe('assistant');
         expect(result?.title).toBe('Response failed');
         expect(result?.detail, name).toBe(detail);
         expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');

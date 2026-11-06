@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
+import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -545,7 +546,10 @@ function InstallationModelSettings({
   isLoadingModels: boolean;
   onSave: (modelSlug: string, thinkingEffort: string | null) => void;
 }) {
-  const [selectedModel, setSelectedModel] = useState(modelSlug ?? '');
+  // Seed from the effective model the bot uses (the server falls back to the
+  // default model) so an effort-only change is savable and attributable.
+  const effectiveModelSlug = modelSlug ?? DEFAULT_BOT_MODEL;
+  const [selectedModel, setSelectedModel] = useState(effectiveModelSlug);
   const [selectedEffort, setSelectedEffort] = useState<string | null>(thinkingEffort);
   const availableVariants = useMemo(
     () => modelOptions.find(model => model.id === selectedModel)?.variants ?? [],
@@ -563,13 +567,17 @@ function InstallationModelSettings({
   );
 
   useEffect(() => {
-    setSelectedModel(modelSlug ?? '');
+    setSelectedModel(modelSlug ?? DEFAULT_BOT_MODEL);
   }, [modelSlug]);
   useEffect(() => {
     setSelectedEffort(thinkingEffort);
   }, [thinkingEffort]);
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
+    // While the catalog is loading, or when it does not know the slug, the
+    // model's variants are unknown; keep the selected effort instead of
+    // clearing a possibly valid one.
+    if (isLoadingModels || !modelOptions.some(model => model.id === modelId)) return;
     const variants = modelOptions.find(model => model.id === modelId)?.variants ?? [];
     if (selectedEffort && !variants.includes(selectedEffort)) {
       setSelectedEffort(null);
@@ -577,7 +585,7 @@ function InstallationModelSettings({
   };
 
   const dirty =
-    selectedModel !== (modelSlug ?? '') || (selectedEffort ?? null) !== (thinkingEffort ?? null);
+    selectedModel !== effectiveModelSlug || (selectedEffort ?? null) !== (thinkingEffort ?? null);
 
   return (
     <div className="space-y-3 rounded-lg border p-4">
@@ -621,7 +629,14 @@ function InstallationModelSettings({
       <div className="flex justify-end">
         <Button
           size="sm"
-          onClick={() => onSave(selectedModel, selectedEffort)}
+          onClick={() =>
+            onSave(
+              selectedModel,
+              selectedEffort !== null && availableVariants.includes(selectedEffort)
+                ? selectedEffort
+                : null
+            )
+          }
           disabled={!canManageModel || !dirty || !selectedModel}
         >
           Save

@@ -505,13 +505,23 @@ function GitHubIntegrationDetailsContent({
 
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);
-    const variants = modelOptions.find(model => model.id === modelSlug)?.variants ?? [];
-    const effort = selectedEffort && variants.includes(selectedEffort) ? selectedEffort : null;
-    setSelectedEffort(effort);
+    // While the catalog is loading, or when it does not know the slug, the
+    // model's variants are unknown. Persist the model change without touching
+    // the stored effort instead of coercing a possibly valid effort to null.
+    const variantsKnown = !isLoadingModels && modelOptions.some(model => model.id === modelSlug);
+    const variants = variantsKnown
+      ? (modelOptions.find(model => model.id === modelSlug)?.variants ?? [])
+      : [];
+    const effort = variantsKnown
+      ? selectedEffort && variants.includes(selectedEffort)
+        ? selectedEffort
+        : null
+      : undefined;
+    if (effort !== undefined) setSelectedEffort(effort);
     updateModel.mutate(
       {
         modelSlug,
-        thinkingEffort: effort,
+        ...(effort === undefined ? {} : { thinkingEffort: effort }),
         organizationId,
         integrationId: installationData?.installation?.id,
       },

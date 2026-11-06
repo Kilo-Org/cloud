@@ -501,13 +501,17 @@ test('the harness SDK action shares one dist entry across runner operating syste
   const restored = steps.find(step => step.name === 'Check the restored build');
   const plugins = steps.filter(step => step.name === 'Cache compiler plugins');
   const build = steps.find(step => step.name === 'Build harness SDK');
+  const save = steps.find(step => step.name === 'Save harness SDK build');
   assert.equal(key.run, 'node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"');
-  assert.equal(cache.uses, 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  // The dist cache is split: only a completed build saves, so a failed or
+  // cancelled build cannot take the key with the tree it half wrote.
+  assert.equal(cache.uses, 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7');
   assert.equal(cache.with.path, 'packages/harness-sdk/dist');
   // The dist is a TypeScript emit and actions/cache derives the same version on
   // Linux and macOS, so an OS prefix would only split one build into a family
   // per runner and leave the macOS jobs unable to hit an ubuntu save.
-  assert.equal(cache.with.key, 'harness-sdk-build-${{ steps.key.outputs.key }}');
+  const distKey = 'harness-sdk-build-${{ steps.key.outputs.key }}';
+  assert.equal(cache.with.key, distKey);
   assert.equal(cache.with['restore-keys'], undefined, 'a partial restore would serve stale dist');
   // A hit alone is not a build: a restore missing the package entry rebuilds.
   assert.ok(
@@ -529,6 +533,11 @@ test('the harness SDK action shares one dist entry across runner operating syste
   const rebuild = "steps.restored.outputs.usable != 'true'";
   assert.equal(build.run, harnessBuild);
   assert.equal(build.if, rebuild);
+  assert.equal(save.uses, 'actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7');
+  assert.equal(save.if, rebuild, 'only a build that runs is saved');
+  assert.equal(save.with.path, 'packages/harness-sdk/dist');
+  assert.equal(save.with.key, distKey, 'the save writes the key the restore reads');
+  assert.ok(steps.indexOf(build) < steps.indexOf(save), 'the save follows the build');
   // The typia transform takes minutes to compile, so the build's plugin cache
   // comes from the same action and only when a build will run.
   assert.equal(plugins.length, 1);

@@ -8,7 +8,8 @@ description: >-
   dist is a TypeScript emit, so one entry serves every runner operating system:
   actions/cache derives its version from the paths, the compression method and
   the platform only on Windows, and the Linux and macOS images both compress
-  with zstd. Run it after `pnpm install`.
+  with zstd. Only a completed build saves, so a failed build cannot take the
+  key. Run it after `pnpm install`.
 
 runs:
   using: composite
@@ -20,7 +21,7 @@ runs:
 
     - name: Restore harness SDK build
       id: cache
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: packages/harness-sdk/dist
         key: harness-sdk-build-${{ steps.key.outputs.key }}
@@ -62,3 +63,15 @@ runs:
       if: steps.restored.outputs.usable != 'true'
       shell: bash
       run: pnpm --filter @kilocode/harness-sdk run build
+
+    # Saving here rather than in a post step keeps a tree that no build
+    # finished out of the key: a failed or cancelled build would otherwise take
+    # the key with the partial dist it wrote, and every later run with this
+    # input hash would restore that tree and rebuild. A second job that loses
+    # the reserve race only logs it.
+    - name: Save harness SDK build
+      if: steps.restored.outputs.usable != 'true'
+      uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: packages/harness-sdk/dist
+        key: harness-sdk-build-${{ steps.key.outputs.key }}

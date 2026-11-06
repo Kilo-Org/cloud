@@ -7,7 +7,7 @@ import {
   formatNumber,
 } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { platformLabel } from '@/lib/platform-label';
+import { platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -436,13 +436,11 @@ export function selectRemoteRowSpokenMeta(params: {
  * never takes this path — `storedSessionEyebrowLabel` shows the neutral origin
  * label instead.
  *
- * The word stays untranslated, so it hashes to one hue in every language and
- * the eyebrow tint needs no pin: its hash IS the state's colour. This is the
- * text-hash rule platform-label.ts documents — the one state word a row can
- * still print.
+ * The word is catalog copy, so its text changes per locale. A row that renders
+ * it takes its tint from {@link remoteAgentState}, never from the string.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
-  if (!createdOnPlatform || createdOnPlatform === 'unknown') {
+  if (remoteAgentState(createdOnPlatform) === 'live') {
     return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
@@ -521,37 +519,23 @@ export function remoteSessionEyebrowLabel(session: {
 }
 
 /**
+ * Tint key for a remote row's eyebrow, next to the label it belongs to: a
+ * state word when the eyebrow renders one, `null` when it renders a repo or
+ * platform name (which keeps its deterministic hash).
+ */
+export function remoteSessionEyebrowState(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): 'live' | null {
+  const repo = repoNameFromGitUrl(session.gitUrl);
+  return repo ? null : remoteAgentState(session.createdOnPlatform);
+}
+
+/**
  * Whether the Active now row's long-press menu may offer Exit session.
  * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
  * connection to receive `exit_cli`; only real CLI rows can be exited.
  */
 export function canExitSessionFromList(session: { connectionId: string }): boolean {
   return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
-}
-
-/**
- * Compose the provenance subtitle for a session row.
- *
- *   - both branch and PR number → `"branch · #N"`
- *   - branch only → the branch
- *   - PR number only → `"#N"`
- *   - neither → `null`
- */
-export function composeSessionProvenanceSubtitle(params: {
-  branch: string | null | undefined;
-  prNumber: number | null | undefined;
-}): string | null {
-  const { branch, prNumber } = params;
-  const hasBranch = branch != null && branch !== '';
-  const hasPr = prNumber != null;
-  if (hasBranch && hasPr) {
-    return `${branch} · #${prNumber}`;
-  }
-  if (hasBranch) {
-    return branch;
-  }
-  if (hasPr) {
-    return `#${prNumber}`;
-  }
-  return null;
 }

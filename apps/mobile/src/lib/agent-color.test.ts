@@ -9,10 +9,12 @@ describe('stateTint', () => {
     expect(stateTint('live').hueTextClass).toMatch(/^text-agent-/);
   });
 
-  it('keeps the English state words at the search-hash hue of their Latin label', () => {
-    // The script-signature contract: the English 'UNKNOWN' string hashes to this
-    // entry, so its pin IS that hash and every live surface keeps its hue.
-    expect(agentColor('UNKNOWN')).toBe(stateTint('unknown'));
-    expect(agentColor('IDLE')).toBe(stateTint('idle'));
+  it('keeps each state at the tint its English word first rendered', () => {
+    // The continuity contract: the pre-pin row tint was the hash of the
+    // rendered English word, so each pin must equal that hash or an existing
+    // surface changes hue for no reason.
+    expect(stateTint('unknown')).toBe(agentColor('UNKNOWN'));
+    expect(stateTint('idle')).toBe(agentColor('IDLE'));
+    expect(stateTint('live')).toBe(agentColor('LIVE'));
   });
 });

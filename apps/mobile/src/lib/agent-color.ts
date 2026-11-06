@@ -129,12 +129,14 @@ export const NEUTRAL_TINT = {
 } as const satisfies Tint;
 
 /**
- * Fixed hue for eyebrow labels that name a state or the unknown origin, not an
- * agent: 'LIVE' / 'IDLE' / 'UNKNOWN' and their translations. A state's colour
- * must not drift with its translation, so these keys pin to the ramp entry the
- * live surface already rendered for the English word (`agentColor('UNKNOWN')`
- * → amber, `agentColor('IDLE')` → slate blue) and stay stable while every
- * real-agent hash still walks the ramp.
+ * Fixed hue for eyebrow labels that name a state, not an agent: the unknown
+ * origin, idle, and live, in every language their catalog renders. A state's
+ * colour must not drift with its translation, so each pin is the ramp entry
+ * the English word already hashed to (`agentColor('UNKNOWN')` → agent-kilocode
+ * amber, `agentColor('IDLE')`/`agentColor('LIVE')` → agent-sky) and stays put
+ * while every real-agent hash still walks the ramp. Rows derive the key from
+ * what the eyebrow names (the live row's origin predicate and the stored row's
+ * unknown label), never from comparing the rendered string.
  */
 
 /** Tint for a row whose eyebrow names a state, not an agent. */

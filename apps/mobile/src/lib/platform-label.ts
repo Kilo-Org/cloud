@@ -32,3 +32,15 @@ export function platformLabel(platform: string | null | undefined): string {
     }
   }
 }
+
+/**
+ * Which state word a live row's eyebrow carries for an origin: 'live' for an
+ * unrecorded one, null for a real origin. The one predicate behind the live
+ * label and its tint, so a translated word can never drift to another token
+ * while an origin name keeps its own deterministic hash. Lives here because
+ * the platform string is this file's input; `remoteAgentLabel` renders the
+ * row copy from it.
+ */
+export function remoteAgentState(platform: string | null | undefined): 'live' | null {
+  return !platform || platform === 'unknown' ? 'live' : null;
+}

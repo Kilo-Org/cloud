@@ -21,10 +21,10 @@ type SessionRowProps = {
    * The row tint to paint when the eyebrow names a state word rather than an
    * agent or origin name: the word's hue must not drift with its translation,
    * so the state pins to the ramp entry the English word already hashed to
-   * ('unknown' → amber, 'idle'/'live' → slate blue). Omit it for a real agent,
+   * ('unknown' → amber, 'idle'/'live' → sky blue). Omit it for a real agent,
    * repo or platform name, which keeps its own deterministic hash.
    */
-  agentState?: 'unknown' | 'idle' | null;
+  agentState?: 'unknown' | 'idle' | 'live' | null;
   title: string;
   /** Small line shown below the title (e.g. git branch, a message preview). */
   subtitle?: string | null;

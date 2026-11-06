@@ -19,7 +19,6 @@ import {
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
-  composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatScheduledWake,
@@ -27,6 +26,7 @@ import {
   sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { composeSessionProvenanceSubtitle } from './session-provenance-subtitle';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';

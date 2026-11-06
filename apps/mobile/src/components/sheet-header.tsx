@@ -132,7 +132,14 @@ export function SheetHeader({
             className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text
-              className="text-center text-base font-semibold text-primary"
+              // A fill-weight label that `disabled:opacity-50` dims reads as
+              // enabled in dark mode: half the accent over a near-black surface
+              // keeps its hue. A disabled commit stays pale in both themes, so
+              // the enabled state is the only one that reads ready.
+              className={cn(
+                'text-center text-base font-semibold',
+                doneDisabled || disabled ? 'text-muted-foreground' : 'text-primary'
+              )}
               numberOfLines={1}
               ellipsizeMode="clip"
             >

@@ -73,12 +73,18 @@ type RewrittenCloneRow = {
 
 /**
  * One materialized row plus the body to write to R2 before staging. The body
- * stays out of {@link RewrittenCloneRow} so a staged row never retains it.
+ * stays out of {@link RewrittenCloneRow} so a staged row never retains it, and
+ * the union keeps the body and the destination key from drifting apart.
  */
-type MaterializedCloneRow = {
-  row: RewrittenCloneRow;
-  destinationR2Body: string | null;
-};
+type MaterializedCloneRow =
+  | {
+      row: RewrittenCloneRow & { itemDataR2Key: null };
+      destinationR2Body: null;
+    }
+  | {
+      row: RewrittenCloneRow & { itemDataR2Key: string };
+      destinationR2Body: string;
+    };
 
 type SessionIngestDOStub = ReturnType<typeof getSessionIngestDO>;
 
@@ -299,23 +305,24 @@ async function materializeSourceBatch(
       batchChain = await chainCloneRowDigest(batchChain, cloneSourceDigestLine(row));
       continue;
     }
-    const { row: staged, destinationR2Body } = await materializeAndRewriteRow(
+    const materialized = await materializeAndRewriteRow(
       row,
       r2,
       sourceSessionId,
       destinationSessionId
     );
+    const staged = materialized.row;
     if (
       rewritten.length > 0 &&
       bytes + staged.materializedByteLength > CLONE_MAX_BATCH_MATERIALIZED_BYTES
     ) {
       break;
     }
-    if (staged.itemDataR2Key !== null && destinationR2Body !== null) {
+    if (materialized.destinationR2Body !== null) {
       // Write the body now and keep only the key, so the batch holds one body at
       // a time.
-      await r2.put(staged.itemDataR2Key, destinationR2Body);
-      writtenR2Keys.push(staged.itemDataR2Key);
+      await r2.put(materialized.row.itemDataR2Key, materialized.destinationR2Body);
+      writtenR2Keys.push(materialized.row.itemDataR2Key);
     }
     bytes += staged.materializedByteLength;
     consumed = index + 1;

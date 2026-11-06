@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CloneBatchRow } from '../dos/SessionIngestDO';
-import { chainCloneRowDigests, cloneSourceDigestLine, cloneSourceRowBytes } from './clone-window';
+import { chainCloneRowDigest, cloneSourceDigestLine, cloneSourceRowBytes } from './clone-window';
 
 function row(overrides: Partial<CloneBatchRow> = {}): CloneBatchRow {
   return {
@@ -12,6 +12,17 @@ function row(overrides: Partial<CloneBatchRow> = {}): CloneBatchRow {
     ingestedAt: 1,
     ...overrides,
   };
+}
+
+async function chainLines(lines: Array<string>): Promise<string> {
+  let chain = '';
+  for (const line of lines) chain = await chainCloneRowDigest(chain, line);
+  return chain;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 describe('cloneSourceDigestLine', () => {
@@ -41,34 +52,23 @@ describe('cloneSourceRowBytes', () => {
   });
 });
 
-describe('chainCloneRowDigests', () => {
+describe('chainCloneRowDigest', () => {
   it('hashes a single row line as the chain seed', async () => {
-    const single = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode('message/msg_01:message:{}')
-    );
-    expect(await chainCloneRowDigests(['message/msg_01:message:{}'])).toBe(
-      Array.from(new Uint8Array(single), byte => byte.toString(16).padStart(2, '0')).join('')
-    );
+    const line = 'message/msg_01:message:{}';
+    expect(await chainLines([line])).toBe(await sha256Hex(line));
   });
 
   it('is independent of how the rows are grouped', async () => {
     const lines = ['a:message:{}', 'b:message:{}', 'c:message:{}'];
-    const prefix = await chainCloneRowDigests(lines.slice(0, 2));
-    // Resuming the chain from a saved prefix produces the same final value as
-    // one pass over every line.
-    const rest = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(`${prefix}\n${lines[2]}`)
-    );
-    expect(await chainCloneRowDigests(lines)).toBe(
-      Array.from(new Uint8Array(rest), byte => byte.toString(16).padStart(2, '0')).join('')
-    );
+    const prefix = await chainLines(lines.slice(0, 2));
+    // Continuing from a saved prefix produces the same final value as one pass
+    // over every line.
+    expect(await chainLines(lines)).toBe(await chainCloneRowDigest(prefix, lines[2]!));
   });
 
   it('changes when a row line changes', async () => {
-    const lines = ['a:message:{}', 'b:message:{}'];
-    const changed = ['a:message:{}', 'b:message:{"sessionID":"ses_b"}'];
-    expect(await chainCloneRowDigests(changed)).not.toBe(await chainCloneRowDigests(lines));
+    expect(await chainLines(['a:message:{}', 'b:message:{"sessionID":"ses_b"}'])).not.toBe(
+      await chainLines(['a:message:{}', 'b:message:{}'])
+    );
   });
 });

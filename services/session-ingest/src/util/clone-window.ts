@@ -34,9 +34,3 @@ export function utf8ByteLength(value: string): number {
 export async function chainCloneRowDigest(previous: string, line: string): Promise<string> {
   return previous === '' ? sha256Hex(line) : sha256Hex(`${previous}\n${line}`);
 }
-
-export async function chainCloneRowDigests(lines: Array<string>): Promise<string> {
-  let chain = '';
-  for (const line of lines) chain = await chainCloneRowDigest(chain, line);
-  return chain;
-}

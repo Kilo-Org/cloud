@@ -171,6 +171,21 @@ test('documents and neutral root locations are the shared neutral set', () => {
   }
 });
 
+test('a file inside a workspace selects it, including a test file', () => {
+  // The test matrix runs a workspace when any of its files changed, so a test
+  // file inside a workspace must select that workspace and must not be neutral.
+  for (const [file, dir] of [
+    ['packages/db/src/schema.test.ts', 'packages/db'],
+    ['apps/web/src/__tests__/usage-partitions.test.ts', 'apps/web'],
+    ['services/agent/wrapper/src/main.spec.ts', 'services/agent/wrapper'],
+  ]) {
+    assert.equal(isNeutral(file), false, file);
+    const result = select([file]);
+    assert.equal(result.full, false, file);
+    assert.ok(result.dirs.includes(dir), file);
+  }
+});
+
 test('the neutral filter keeps every path a check reads', () => {
   // The paths the test matrix still sees after the detector drops the neutral
   // ones.

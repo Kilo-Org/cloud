@@ -8623,7 +8623,7 @@
       "list",
       "limit"
     ],
-    "searchBlob": "cloudAgentNextFeedback.list List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported. cloudagentnextfeedback list limit"
+    "searchBlob": "cloudAgentNextFeedback.list List the signed-in user's own recent Cloud Agent feedback submissions, newest first, to check whether a problem was already reported. cloudagentnextfeedback list limit limit"
   },
   "cloudAgentSettings.canManage": {
     "path": "cloudAgentSettings.canManage",

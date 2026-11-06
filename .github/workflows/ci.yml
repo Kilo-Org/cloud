@@ -269,8 +269,9 @@ jobs:
           # The matrix groups this selection pays for. scripts/affected-workspaces.mjs
           # owns the decision, so the trpc rows follow the extension's own
           # workflow: extension-ci.yml typechecks and lints the extension for
-          # this same selection, so those rows run only when this run has no
-          # extension job — a full check, which only the merge queue takes.
+          # this same selection, so those rows run only on a full check. That
+          # keeps the extension's gate on the merge queue, whose workflow has no
+          # extension trigger.
           groups=$(node scripts/affected-workspaces.mjs --groups <<< "$affected")
           # Every part when cloud-agent-next is affected. When only its tests
           # read changed data, the unit part covers a reading test under src/,

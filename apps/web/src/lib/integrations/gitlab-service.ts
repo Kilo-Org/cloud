@@ -352,7 +352,7 @@ export async function listGitLabBranches(
   owner: Owner,
   integrationId: string,
   actor: GitLabCredentialActor,
-  projectPath: string // e.g., "group/project" or project ID
+  projectPath: string // must be a cached full path, e.g. "group/project"
 ) {
   const ownershipCondition = ownerCondition(owner);
 

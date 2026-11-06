@@ -363,8 +363,8 @@ export async function authorizeProject(
   const { integration, instanceUrl } = await resolveIntegration(owner, instanceHint);
 
   // The repository list is the project's authorization scope; the shared
-  // match rule and refusal copy live in gitlab-project-scope.ts so the
-  // integration-service branch listing refuses in the same words.
+  // match rule and refusal copy live in platforms/gitlab/project-scope.ts so
+  // the integration-service branch listing refuses in the same words.
   const match = matchCachedGitLabProject(integration, projectPath);
   if (!match) {
     throw new GitLabReviewError('not_found', GITLAB_PROJECT_NOT_IN_CACHE_MESSAGE);

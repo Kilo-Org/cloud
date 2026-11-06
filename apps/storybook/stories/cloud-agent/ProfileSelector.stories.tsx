@@ -125,7 +125,6 @@ function ProfileSelectorPresentation({
   );
 }
 
-// Wrapper component to handle state
 function ProfileSelectorWrapper({
   profiles = mockProfiles,
   initialSelectedId = null,

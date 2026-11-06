@@ -129,7 +129,6 @@ function ProfilesListDialogPresentation({
                   className="hover:bg-accent/50 rounded-lg border p-3 transition-colors"
                 >
                   {editingProfileId === profile.id ? (
-                    // Edit mode
                     <div className="space-y-3">
                       <div className="grid gap-2">
                         <Label htmlFor={`edit-name-${profile.id}`}>Name</Label>
@@ -173,7 +172,6 @@ function ProfilesListDialogPresentation({
                       </div>
                     </div>
                   ) : (
-                    // View mode
                     <div className="flex items-start justify-between gap-3">
                       <div
                         className="flex-1 cursor-pointer"
@@ -242,7 +240,6 @@ function ProfilesListDialogPresentation({
                 </div>
               ))}
 
-              {/* Create new profile form */}
               {isCreating && (
                 <div className="rounded-lg border border-dashed p-3">
                   <div className="space-y-3">
@@ -306,7 +303,6 @@ function ProfilesListDialogPresentation({
   );
 }
 
-// Wrapper component to handle state
 function ProfilesListDialogWrapper({
   profiles = mockProfiles,
   isLoading = false,

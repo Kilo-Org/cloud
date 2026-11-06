@@ -13,7 +13,6 @@ const meta: Meta<typeof UpgradeTrialDialog> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Interactive wrapper to control dialog state
 const DialogWrapper = (args: React.ComponentProps<typeof UpgradeTrialDialog>) => {
   const [open, setOpen] = useState(true);
 

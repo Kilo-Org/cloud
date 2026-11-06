@@ -14,7 +14,6 @@ const meta: Meta<typeof SetupCommandsDialog> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Wrapper component to handle state
 function SetupCommandsDialogWrapper({ initialValue }: { initialValue: string[] }) {
   const [value, setValue] = useState(initialValue);
   return <SetupCommandsDialog value={value} onChange={setValue} />;

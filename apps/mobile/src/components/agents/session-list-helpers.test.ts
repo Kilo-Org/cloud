@@ -497,6 +497,19 @@ describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
     );
   });
 
+  it('labels a stored session of unknown origin without a live status', () => {
+    const neutral = i18n.t('common.unknown');
+    const live = i18n.t('agents.sessionList.live');
+    // The backend's `'unknown'` sentinel is the reachable unrecorded origin;
+    // the empty string is the same class through a data anomaly. `platformLabel`'s
+    // own tests cover null and undefined with their nullable signature.
+    for (const created_on_platform of ['', 'unknown']) {
+      const label = storedSessionEyebrowLabel({ git_url: null, created_on_platform });
+      expect(label).toBe(neutral);
+      expect(label).not.toBe(live);
+    }
+  });
+
   it('shows the decoded repository name for a percent-encoded git_url', () => {
     expect(
       storedSessionEyebrowLabel({

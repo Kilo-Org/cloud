@@ -34,8 +34,21 @@ describe('platformLabel', () => {
     await i18n.changeLanguage('tr');
     expect(platformLabel('instance')).toBe('İNSTANCE');
   });
-  it('uses the neutral live label when a restored session has no platform', () => {
-    expect(platformLabel(null)).toBe(i18n.t('agents.sessionList.live'));
-    expect(platformLabel(undefined)).toBe(i18n.t('agents.sessionList.live'));
+  it('names the unknown origin for an absent platform instead of a live status', () => {
+    const neutral = i18n.t('common.unknown');
+    expect(platformLabel(null)).toBe(neutral);
+    expect(platformLabel(undefined)).toBe(neutral);
+    expect(platformLabel('')).toBe(neutral);
+    expect(platformLabel(null)).not.toBe(i18n.t('agents.sessionList.live'));
+  });
+
+  it("names the unknown origin for the backend's unknown sentinel", () => {
+    expect(platformLabel('unknown')).toBe(i18n.t('common.unknown'));
+  });
+
+  it('keeps the neutral origin label translatable', async () => {
+    await i18n.changeLanguage('de');
+    expect(platformLabel(undefined)).toBe(i18n.t('common.unknown'));
+    expect(platformLabel('unknown')).toBe(i18n.t('common.unknown'));
   });
 });

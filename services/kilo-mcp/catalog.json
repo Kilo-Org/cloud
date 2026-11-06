@@ -4896,6 +4896,11 @@
         "session_id": {
           "type": "string",
           "minLength": 1
+        },
+        "operationKey": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -4905,9 +4910,10 @@
     "tags": [
       "clisessionsv2",
       "delete",
-      "session_id"
+      "session_id",
+      "operationkey"
     ],
-    "searchBlob": "cliSessionsV2.delete Delete a CLI cloud agent session, including its child sessions and cloud-agent cleanup. Return success and the session ID. clisessionsv2 delete session_id session_id"
+    "searchBlob": "cliSessionsV2.delete Delete a CLI cloud agent session, including its child sessions and cloud-agent cleanup. Return success and the session ID. clisessionsv2 delete session_id operationkey session_id operationKey"
   },
   "cliSessionsV2.deleteWorktree": {
     "path": "cliSessionsV2.deleteWorktree",
@@ -4932,6 +4938,10 @@
               "type": "null"
             }
           ]
+        },
+        "onlyIfSoleSessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -4943,9 +4953,10 @@
       "clisessionsv2",
       "deleteworktree",
       "worktreeid",
-      "organizationid"
+      "organizationid",
+      "onlyifsolesessionid"
     ],
-    "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid worktreeId organizationId"
+    "searchBlob": "cliSessionsV2.deleteWorktree Delete a cloud agent worktree and its associated sessions. Return the deleted session IDs. clisessionsv2 deleteworktree worktreeid organizationid onlyifsolesessionid worktreeId organizationId onlyIfSoleSessionId"
   },
   "cliSessionsV2.enableWatchPr": {
     "path": "cliSessionsV2.enableWatchPr",

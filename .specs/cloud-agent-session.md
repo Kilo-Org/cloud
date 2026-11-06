@@ -410,7 +410,9 @@ repository.
    from the repository's default branch. An agent MAY still perform explicit Git
    operations during its chat.
 8. Deleting one chat MUST leave its siblings usable. Deleting the final chat
-   MUST remove the worktree group from the session list.
+   MUST require explicit confirmation that the workspace and its files will also
+   be deleted, then delete the worktree. The server MUST reject that conditional
+   workspace deletion if another root chat was created before deletion began.
 9. Existing ungrouped and legacy chats MUST remain individual sidebar rows and
    retain their current behavior. Worktree grouping MUST NOT change
    native-mobile chat behavior.
@@ -439,8 +441,12 @@ repository.
     state. It MUST preserve other worktrees and destroy a physical sandbox only
     when that sandbox is exclusively owned by the deleted worktree. Ownership
     and current personal or organization access MUST be checked server-side.
-    Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
-    MUST NOT permit late creation or ingestion to resurrect the worktree.
+    Saved content deletion MUST NOT depend on an available runtime or container.
+    The UI MAY report content removal once ingest deletion succeeds, but MUST
+    distinguish incomplete runtime cleanup from complete deletion. Incomplete
+    cleanup MUST retain its recovery journal and MUST NOT permit late creation
+    or ingestion to resurrect the worktree. It MUST NOT be described as automatic
+    background cleanup unless a reconciler is scheduled.
 14. Chats in one worktree MUST share one runtime and one MCP configuration.
     Runtime and MCP configuration MUST NOT be isolated per chat, and a sibling
     MUST NOT replace the worktree's configuration. Independent worktrees MUST

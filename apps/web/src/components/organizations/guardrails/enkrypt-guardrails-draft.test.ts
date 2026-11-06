@@ -16,6 +16,7 @@ import {
   toDraftDetectors,
   type EnkryptGuardrailsDraft,
 } from './enkrypt-guardrails-draft';
+import { KILO_DEFAULT_POLICY_TEXT } from './kilo-default-policy';
 
 function offOutput() {
   return { enabled: false, detectors: createEmptyEnkryptOutputDetectors() };
@@ -102,22 +103,21 @@ describe('draftsEqual', () => {
 });
 
 describe('applyKiloDefaultPreset', () => {
-  it('restores the default detector selection but keeps entered lists and policies', () => {
+  it('restores the default detector selection and turns on the Kilo default policy text', () => {
     const { detectors } = enabledDraft();
+    const rules = [{ ...createPolicyRule([]), text: 'No customer data.' }];
     detectors.injection_attack.enabled = false;
-    detectors.pii = { enabled: false, action: 'block', entities: ['url'] };
     detectors.toxicity.enabled = true;
     detectors.keyword_detector = { enabled: true, action: 'log', banned_keywords: 'Acme' };
     detectors.policy_violation = {
-      enabled: true,
-      format: 'policy_text',
-      policy_text: 'No customer data.',
-      rules: [],
+      enabled: false,
+      format: 'rules',
+      policy_text: 'Old policy.',
+      rules,
     };
 
     const preset = applyKiloDefaultPreset(detectors);
     expect(preset.injection_attack.enabled).toBe(true);
-    expect(preset.pii).toEqual({ enabled: true, action: 'log', entities: ['secrets'] });
     expect(preset.toxicity.enabled).toBe(false);
     expect(preset.keyword_detector).toEqual({
       enabled: false,
@@ -125,11 +125,20 @@ describe('applyKiloDefaultPreset', () => {
       banned_keywords: 'Acme',
     });
     expect(preset.policy_violation).toEqual({
-      enabled: false,
+      enabled: true,
       format: 'policy_text',
-      policy_text: 'No customer data.',
-      rules: [],
+      policy_text: KILO_DEFAULT_POLICY_TEXT,
+      rules,
     });
+  });
+
+  it('produces a configuration that saves as is', () => {
+    const draft = enabledDraft();
+    draft.detectors = applyKiloDefaultPreset(draft.detectors);
+
+    expect(getEnkryptGuardrailsIssues(draft).size).toBe(0);
+    expect(fromDraft(draft).detectors.policy_violation.policy_text).toBe(KILO_DEFAULT_POLICY_TEXT);
+    expect(KILO_DEFAULT_POLICY_TEXT).toBe(KILO_DEFAULT_POLICY_TEXT.trim());
   });
 });
 

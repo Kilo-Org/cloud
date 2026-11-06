@@ -277,6 +277,18 @@ export async function currentDeployment(manifest, api) {
   const bindingsHash = assertBindings(manifest, version.resources.bindings);
   return { deploymentID: latest.id, versionID: version.id, bindingsHash };
 }
+export function observabilityIsDisabled(value) {
+  if (value == null) return true;
+  const levels = [value, value.logs, value.traces];
+  return levels.every(
+    level =>
+      level == null ||
+      (typeof level === 'object' &&
+        !Array.isArray(level) &&
+        (level.enabled === undefined || level.enabled === false))
+  );
+}
+
 export async function inspectLive(manifest, api) {
   assertManifestIdentity(manifest, true);
   const current = await currentDeployment(manifest, api);
@@ -288,9 +300,8 @@ export async function inspectLive(manifest, api) {
     await api('GET', `${account}/workers/scripts/${manifest.workerName}/script-settings`)
   ).result;
   assert.equal(scriptSettings.logpush, true, 'Load request logs must reach Logpush');
-  assert.equal(
-    scriptSettings.observability?.enabled,
-    false,
+  assert(
+    observabilityIsDisabled(scriptSettings.observability),
     'Duplicate stored Worker logs must remain disabled'
   );
   assert.equal(manifest.baseURL, baseURL, 'Worker origin must belong to the inspected account');

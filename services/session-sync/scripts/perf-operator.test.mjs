@@ -12,6 +12,7 @@ import {
   assertUnusedLimiters,
   currentDeployment,
   inventory,
+  observabilityIsDisabled,
   operatorAPI,
   OperatorHTTPError,
   retryTransient,
@@ -68,6 +69,29 @@ async function stub(handler) {
     },
   };
 }
+
+test('remote observability defaults reject any explicit logging or tracing enablement', () => {
+  for (const value of [
+    undefined,
+    null,
+    {},
+    { enabled: false },
+    { logs: { enabled: false } },
+    { enabled: false, logs: { persist: true } },
+  ])
+    assert.equal(observabilityIsDisabled(value), true);
+  for (const value of [
+    true,
+    [],
+    'disabled',
+    { enabled: true },
+    { enabled: 'false' },
+    { enabled: false, logs: { enabled: true } },
+    { enabled: false, traces: { enabled: true } },
+    { logs: true },
+  ])
+    assert.equal(observabilityIsDisabled(value), false);
+});
 
 test('deployed version metadata fences ownership without legacy settings annotations', async () => {
   const root = mkdtempSync(join(tmpdir(), 'operator-version-contract-'));

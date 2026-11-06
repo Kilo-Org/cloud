@@ -843,6 +843,8 @@ it selects runtime code/settings and dedicated resources without deployment.
 Read the run tag and bindings from the deployed version's `annotations` and
 `resources.bindings` through `/versions/<versionID>`. Read Logpush and
 observability through `/script-settings`.
+Wrangler canonicalizes omitted or null remote observability as disabled.
+Reject explicit logging or tracing enablement, including nested overrides.
 
 `perf-plan.mjs <profile> <manifest.json> <output-directory>` generates per-node
 target/config packages, the cluster plan, and an approval-request record. It

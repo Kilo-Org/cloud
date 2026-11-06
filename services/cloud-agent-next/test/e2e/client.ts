@@ -586,13 +586,19 @@ export async function createWorktreeChat(
   return created;
 }
 
-export type HostedWorkspaceCreateResult = {
+type HostedWorkspaceCreateResponse = {
   workspaceId: string;
   cloudAgentSessionId: string;
   kiloSessionId: string;
   messageId?: string;
   replayed?: boolean;
 };
+
+export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
+  messageId: string;
+};
+
+export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
 
 export type HostedWorkspaceRepository =
   | { type: 'github'; repo: string }
@@ -617,18 +623,18 @@ export function createHostedWorkspace(
   config: DriverConfig,
   input: HostedWorkspaceCreateInput & { prompt: string },
   signal?: AbortSignal
-): Promise<HostedWorkspaceCreateResult & { messageId: string }>;
+): Promise<HostedWorkspaceCreateResult>;
 export function createHostedWorkspace(
   config: DriverConfig,
   input: HostedWorkspaceCreateInput & { prompt?: undefined },
   signal?: AbortSignal
-): Promise<HostedWorkspaceCreateResult>;
+): Promise<EmptyHostedWorkspaceCreateResult>;
 export async function createHostedWorkspace(
   config: DriverConfig,
   input: HostedWorkspaceCreateInput,
   signal?: AbortSignal
-): Promise<HostedWorkspaceCreateResult> {
-  const created = await trpcCall<HostedWorkspaceCreateResult>(
+): Promise<EmptyHostedWorkspaceCreateResult> {
+  const created = await trpcCall<EmptyHostedWorkspaceCreateResult>(
     config,
     'createHostedWorkspace',
     {

@@ -224,19 +224,38 @@ test('a supplied selection for the same base decides the matrix without a second
   fixture.git('add', '-A');
   commit(fixture.git, 'change leaf sources with a supplied selection');
 
-  const result = runMatrix(fixture, base, [], {
-    AFFECTED: JSON.stringify({
-      base,
-      full: false,
-      dirs: ['packages/leaf', 'packages/reader'],
-    }),
+  const document = JSON.stringify({
+    base,
+    full: false,
+    dirs: ['packages/leaf', 'packages/reader'],
   });
+  const result = runMatrix(fixture, base, [], { AFFECTED: document });
   assert.doesNotMatch(result.stderr, /selecting every workspace with tests/);
   assert.match(result.stderr, /reusing the affected-workspace document/);
   assert.deepEqual(rows(JSON.parse(result.stdout)), [
     'leaf packages/leaf',
     'reader packages/reader',
   ]);
+
+  // --exclude and --include still decide over the supplied selection.
+  assert.deepEqual(
+    rows(
+      JSON.parse(
+        runMatrix(fixture, base, ['--exclude', 'packages/leaf'], { AFFECTED: document }).stdout
+      )
+    ),
+    ['reader packages/reader']
+  );
+  assert.deepEqual(
+    rows(
+      JSON.parse(
+        runMatrix(fixture, base, ['--include', 'packages/tool'], {
+          AFFECTED: JSON.stringify({ base, full: false, dirs: [] }),
+        }).stdout
+      )
+    ),
+    ['tool packages/tool']
+  );
 });
 
 test('a selection computed for another base is ignored', t => {

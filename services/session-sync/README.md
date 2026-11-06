@@ -751,6 +751,28 @@ relay reset. Presence commands retain unknown outcomes on timeout; delivery stat
 is not execution success. Permission, question, and abort commands require a live
 runner and its current incarnation/run identity. `/clear` only clears the local view.
 
+Each socket generation owns its frame queue, snapshot reads, and incomplete-transcript
+recovery. Reconnect and close cancel those reads and release queued/replay payloads;
+late results cannot publish or change the accepted relay cursor. A snapshot has a
+two-minute total deadline and a 15-second deadline for each state, page, or blob request.
+The raw queue and recovery replay share a 1,024-frame / 4 MiB estimated UTF-16 storage
+budget. One active frame is additionally bounded to 512 KiB before JSON parsing.
+These are retained-payload limits, not an exact JavaScript heap limit; the bounded
+public event history and visible transcript also consume memory.
+
+Backlog overflow preserves the last accepted cursor and reconnects for ordered relay
+replay. A successful `subscribed` handshake clears the backlog error when the replay
+restores a complete transcript. A relay reset or discarded incomplete-recovery replay
+keeps an explicit `NativeSessionState.error` visible through subsequent connections
+until the connection is closed. A revision-consistent snapshot alone cannot prove
+that missing volatile live effects reached durable storage. Consumers must render
+that error alongside the transcript, including when `connection` is `connected`;
+the web native-session demo renders it as an alert. Recovery attempts are bounded,
+and exhausted incomplete snapshots report an error rather than claiming completeness.
+Specific authorization, deletion, and command failures appear alongside the integrity
+warning. An individual oversized frame reports its size limit separately from a
+combined backlog overflow.
+
 The intentionally minimal web demo is `/native-remote`, hidden unless the client-only
 PostHog flag `native-remote-web` is enabled. Its same-origin
 `POST /api/native-remote/token` authenticates the web session and issues a five-minute

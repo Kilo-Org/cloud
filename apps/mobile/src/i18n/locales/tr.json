@@ -1853,7 +1853,7 @@
       "selectRepositoryToStart": "Başlamak için bir depo seç.",
       "enterPromptToStart": "Başlamak için bir istem ekle.",
       "enterPromptOrFileToStart": "Başlamak için bir istem veya dosya ekle.",
-      "connectProviderToStart": "Başlamak için bir sağlayıcı bağla.",
+      "connectProviderToStart": "Depolar bağlı bir GitHub, GitLab veya Bitbucket hesabından gelir.",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",

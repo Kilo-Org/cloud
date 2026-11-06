@@ -1895,7 +1895,7 @@
       "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
       "enterPromptToStart": "Dodaj prompt, aby rozpocząć.",
       "enterPromptOrFileToStart": "Dodaj prompt lub plik, aby rozpocząć.",
-      "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
+      "connectProviderToStart": "Repozytoria pochodzą z połączonego konta GitHub, GitLab lub Bitbucket.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",

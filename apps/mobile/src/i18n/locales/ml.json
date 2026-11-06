@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "ആരംഭിക്കാൻ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
       "enterPromptToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് ചേർക്കുക.",
       "enterPromptOrFileToStart": "ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് അല്ലെങ്കിൽ ഒരു ഫയൽ ചേർക്കുക.",
-      "connectProviderToStart": "ആരംഭിക്കാൻ ഒരു സേവനദാതാവിനെ കണക്റ്റ് ചെയ്യുക.",
+      "connectProviderToStart": "റിപ്പോസിറ്ററികൾ വരുന്നത് GitHub, GitLab അല്ലെങ്കിൽ Bitbucket എന്നിവയുടെ കണക്റ്റ് ചെയ്ത അക്കൗണ്ടിൽ നിന്നാണ്.",
       "promptPlaceholder": "എന്ത് ജോലിയാണ് ചെയ്യേണ്ടത്?",
       "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "prefillRepoAndModelUnavailable": "മൂല സെഷന്റെ റിപ്പോസിറ്ററിയും മോഡലും ഇനി ലഭ്യമല്ല. പകരമുള്ളവ താഴെ തിരഞ്ഞെടുക്കുക.",

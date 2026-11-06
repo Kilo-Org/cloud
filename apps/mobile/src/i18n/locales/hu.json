@@ -2392,7 +2392,7 @@
       "selectRepositoryToStart": "Válassz egy adattárat az indításhoz.",
       "enterPromptToStart": "Adj hozzá egy promptot az indításhoz.",
       "enterPromptOrFileToStart": "Adj hozzá egy promptot vagy egy fájlt az indításhoz.",
-      "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
+      "connectProviderToStart": "Az adattárak egy csatlakoztatott GitHub-, GitLab- vagy Bitbucket-fiókból származnak.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",

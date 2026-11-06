@@ -2398,7 +2398,7 @@
       "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
       "enterPromptToStart": "Magdagdag ng prompt para magsimula.",
       "enterPromptOrFileToStart": "Magdagdag ng prompt o file para magsimula.",
-      "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
+      "connectProviderToStart": "Nagmumula ang mga imbakan ng code sa isang konektadong akawnt sa GitHub, GitLab, o Bitbucket.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
       "prefillRepoAndModelUnavailable": "Hindi na magamit ang imbakan ng code at modelo ng orihinal na sesyon. Pumili ng mga kapalit sa ibaba.",

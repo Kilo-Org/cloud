@@ -2434,7 +2434,7 @@
       "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
       "enterPromptToStart": "Adaugă un prompt pentru a începe.",
       "enterPromptOrFileToStart": "Adaugă un prompt sau un fișier pentru a începe.",
-      "connectProviderToStart": "Conectează un furnizor pentru a începe.",
+      "connectProviderToStart": "Depozitele provin dintr-un cont GitHub, GitLab sau Bitbucket conectat.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",

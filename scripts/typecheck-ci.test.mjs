@@ -816,6 +816,22 @@ test('the changes job takes both matrix group lists from the affected detector',
   );
 });
 
+// The matrix step reuses the document the detector step published: dropping the
+// env makes scripts/changed-workspaces.sh select the repository a second time.
+test('the matrix step decides from the document the affected step published', () => {
+  const step = ciJobs.changes.steps.find(candidate => candidate.id === 'workspaces');
+  assert.equal(
+    step.env.AFFECTED,
+    '${{ steps.affected.outputs.affected }}',
+    'the matrix step must receive the selection the detector step computed'
+  );
+  assert.match(
+    step.run,
+    /matrix=\$\(scripts\/changed-workspaces\.sh "\$\{excludes\[@\]\}" "\$\{includes\[@\]\}"\)/,
+    'the matrix still comes from the matrix script'
+  );
+});
+
 function runTypecheck(
   t,
   { root = false, changes = '', buildExit = 0, checkExit = 0, built = '', selected = '' } = {}

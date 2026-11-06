@@ -3,10 +3,13 @@
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha>
 //        node scripts/affected-workspaces.mjs --groups
-// Prints JSON: { full, reasons, full_checks, dirs, packages, test_only_dirs,
-// test_only_packages, test_only_files }. `dirs` is also the selection the test
+// Prints JSON: { base, full, reasons, full_checks, dirs, packages,
+// test_only_dirs, test_only_packages, test_only_files }, where `base` is the
+// revision the selection was computed for. `dirs` is also the selection the test
 // matrix consumes (scripts/changed-workspaces.sh), so it already carries the
-// workspace-despite-document rule: paths no check reads select nothing.
+// workspace-despite-document rule: paths no check reads select nothing. `base`
+// lets that consumer reuse this document instead of selecting a second time in
+// one CI run.
 // With --groups it instead prints the CI matrix groups for the selection JSON on
 // standard input.
 //
@@ -385,7 +388,12 @@ function detect(base) {
         .filter(Boolean)
     : [];
   const references = valid ? relativeReferences(items.map(item => item.dir)) : [];
-  console.log(JSON.stringify(selectAffected({ items, changedFiles, dependencyDirs, references })));
+  console.log(
+    JSON.stringify({
+      base,
+      ...selectAffected({ items, changedFiles, dependencyDirs, references }),
+    })
+  );
 }
 
 // Print the CI matrix groups for the selection JSON on standard input.

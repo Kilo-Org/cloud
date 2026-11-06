@@ -1063,7 +1063,6 @@ export class CloudAgentNextClient {
 
   async getPreviewOptions(input: {
     cloudAgentSessionId: string;
-    organizationId?: string;
   }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }

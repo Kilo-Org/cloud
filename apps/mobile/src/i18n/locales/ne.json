@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
       "assistantProviderError": "प्रदायकले त्रुटि फर्कायो।",
       "assistantProviderRefused": "प्रदायकले यो अनुरोध अस्वीकार गर्‍यो र यसलाई फेरि प्रयास गर्न सकिँदैन।",
+      "assistantCreditsRefusal": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन।",
       "assistantOutputLimit": "उत्तर मोडेलको आउटपुट सीमामा पुग्यो।",
       "assistantStructuredOutput": "उत्तर अपेक्षित ढाँचासँग मिलेन।",
       "assistantFailed": "उत्तर दिन सकिएन।"

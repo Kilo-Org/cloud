@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
       "assistantProviderError": "Der Anbieter hat einen Fehler zurückgegeben.",
       "assistantProviderRefused": "Der Anbieter hat diese Anfrage abgelehnt; ein erneuter Versuch ist nicht möglich.",
+      "assistantCreditsRefusal": "Dein Guthaben reicht nicht aus, um Cloud Agent auszuführen.",
       "assistantOutputLimit": "Die Antwort hat das Ausgabelimit des Modells erreicht.",
       "assistantStructuredOutput": "Die Antwort entsprach nicht dem erforderlichen Format.",
       "assistantFailed": "Die Antwort konnte nicht erstellt werden."

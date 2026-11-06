@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "මාදිලියට සැකසිය හැකි ප්‍රමාණයට වඩා සංවාදය දිගුයි.",
       "assistantProviderError": "සැපයුම්කරු දෝෂයක් ලබා දුන්නේය.",
       "assistantProviderRefused": "සැපයුම්කරු මෙම ඉල්ලීම ප්‍රතික්ෂේප කළ අතර එය නැවත උත්සාහ කළ නොහැක.",
+      "assistantCreditsRefusal": "Cloud Agent ධාවනය කිරීමට ප්‍රමාණවත් ක්‍රෙඩිට් නොමැත.",
       "assistantOutputLimit": "ප්‍රතිචාරය මාදිලියේ ප්‍රතිදාන සීමාවට ළඟා විය.",
       "assistantStructuredOutput": "ප්‍රතිචාරය අවශ්‍ය ආකෘතියට ගැළපුණේ නැත.",
       "assistantFailed": "ප්‍රතිචාරය අසාර්ථක විය."

@@ -2086,6 +2086,7 @@
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
       "assistantProviderError": "Постачальник повернув помилку.",
       "assistantProviderRefused": "Постачальник відхилив цей запит, і його не можна повторити.",
+      "assistantCreditsRefusal": "Недостатньо кредитів для запуску Cloud Agent.",
       "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
       "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."

@@ -2713,6 +2713,7 @@
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
       "assistantProviderError": "Chuir an soláthraí earráid ar ais.",
       "assistantProviderRefused": "Dhiúltaigh an soláthraí don iarratas seo agus ní féidir é a ath-thriail.",
+      "assistantCreditsRefusal": "Níl go leor creidmheasanna agat chun Cloud Agent a rith.",
       "assistantOutputLimit": "Shroicheadh an teorainn aschuir den tsamhail.",
       "assistantStructuredOutput": "Ní raibh an freagra ag teacht leis an bhformáid riachtanach.",
       "assistantFailed": "Theip ar an bhfreagra."

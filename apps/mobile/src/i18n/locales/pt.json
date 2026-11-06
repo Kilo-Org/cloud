@@ -2627,6 +2627,7 @@
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O fornecedor devolveu um erro.",
       "assistantProviderRefused": "O fornecedor rejeitou este pedido e não é possível repeti-lo.",
+      "assistantCreditsRefusal": "Créditos insuficientes para executar o Cloud Agent.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "A resposta falhou."

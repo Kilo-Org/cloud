@@ -249,6 +249,7 @@ async function renderBubbleWithHandlers(
   props: {
     deliveryState?: MessageDeliveryState;
     onRetryMessage?: (m: StoredMessage) => void;
+    onAddCredits?: () => void;
     retryAvailable?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
@@ -273,15 +274,42 @@ function assistantMessageWithText(id: string): StoredMessage {
 function assistantMessageWithError(
   id: string,
   errorName: string,
-  options: { content?: boolean; isRetryable?: boolean } = {}
+  options: {
+    content?: boolean;
+    isRetryable?: boolean;
+    statusCode?: number;
+    responseBody?: string;
+  } = {}
 ): StoredMessage {
   const message = options.content === false ? assistantMessage(id) : assistantMessageWithText(id);
-  (message.info as { error?: { name: string; data: unknown } }).error = {
+  if (message.info.role !== 'assistant') {
+    throw new Error('the fixture builders write an assistant row');
+  }
+  // The name is the case under test, so the payload is written before any one
+  // member of the error union can claim it.
+  const error = {
     name: errorName,
-    data: { message: 'raw', isRetryable: options.isRetryable ?? true },
+    data: {
+      message: 'raw',
+      isRetryable: options.isRetryable ?? true,
+      ...(options.statusCode === undefined ? {} : { statusCode: options.statusCode }),
+      ...(options.responseBody === undefined ? {} : { responseBody: options.responseBody }),
+    },
   };
+  // The APIError payload is the only shape these cases carry.
+  message.info.error = error as NonNullable<typeof message.info.error>;
   return message;
 }
+
+/** The Kilo gateway's answer to a paid request from an account with no balance. */
+const GATEWAY_CREDITS_BODY = JSON.stringify({
+  error: {
+    title: 'Paid Model - Credits Required',
+    message: 'Add credits to continue, or switch to a free model',
+    balance: 0,
+  },
+  error_type: 'usage_limit_exceeded',
+});
 
 describe('MessageBubble failure footer', () => {
   it('wraps the failed bubble and delivery row in one measurable list item', async () => {
@@ -505,6 +533,79 @@ describe('MessageBubble failure footer', () => {
     // The transient failure's line is what the terminal row used to repeat.
     expect(findText(tree, t => t === 'The provider returned an error.')).toBe(false);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a credits refusal with the cause and offers Add credits', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-credits', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: GATEWAY_CREDITS_BODY,
+      }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+
+    const addCredits = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Add credits'
+    );
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    // The row's one recovery action fills with the accent surface the person's
+    // own bubble uses, so it reads as that row's primary action.
+    expect(addCredits.props.className).toContain('bg-accent-soft');
+    const press = addCredits.props.onPress as () => void;
+    press();
+    expect(onAddCredits).toHaveBeenCalledTimes(1);
+
+    // A retry of the same request meets the same block, so the row offers the
+    // action that can settle it instead.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(false);
+  });
+
+  it('keeps the final-refusal line for a payment block the account provider caused', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-byok-402', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: '{"error":{"message":"Upstream request failed"}}',
+      }),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+    );
+
+    expect(
+      findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
+    ).toBe(true);
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
+    ).toBeNull();
+  });
+
+  it('keeps Add credits on a transcript that cannot resend', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-credits-stored', 'APIError', {
+        isRetryable: false,
+        statusCode: 402,
+        responseBody: GATEWAY_CREDITS_BODY,
+      }),
+      { retryAvailable: false, onAddCredits }
+    );
+
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
+    ).not.toBeNull();
   });
 
   it('renders no pressable host for an assistant row with nothing to show', async () => {

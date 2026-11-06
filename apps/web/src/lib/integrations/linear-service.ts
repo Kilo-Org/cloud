@@ -12,6 +12,7 @@ import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
@@ -592,5 +593,10 @@ export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
   if (!integration) return null;
   const metadata = integration.metadata as { model_slug?: string } | null;
-  return metadata?.model_slug || null;
+  const storedModelSlug = metadata?.model_slug || null;
+  if (!storedModelSlug) return null;
+  return resolveOrganizationBotModel({
+    organizationId: owner.type === 'org' ? owner.id : null,
+    storedModelSlug,
+  });
 }

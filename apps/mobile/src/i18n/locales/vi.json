@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
       "assistantProviderError": "Nhà cung cấp đã trả về lỗi.",
       "assistantProviderRefused": "Nhà cung cấp đã từ chối yêu cầu này và không thể thử lại.",
+      "assistantCreditsRefusal": "Số dư không đủ để chạy Cloud Agent.",
       "assistantOutputLimit": "Phản hồi đã đạt đến giới hạn đầu ra của mô hình.",
       "assistantStructuredOutput": "Phản hồi không đúng định dạng yêu cầu.",
       "assistantFailed": "Không thể tạo phản hồi."

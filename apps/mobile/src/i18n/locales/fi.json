@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
       "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
+      "assistantCreditsRefusal": "Krediitit eivät riitä Cloud Agentin käyttämiseen.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."

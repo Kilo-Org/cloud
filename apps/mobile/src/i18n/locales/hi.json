@@ -2016,6 +2016,7 @@
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
       "assistantProviderError": "प्रदाता ने एक त्रुटि लौटाई।",
       "assistantProviderRefused": "प्रदाता ने इस अनुरोध को अस्वीकार कर दिया और इसे दोबारा आज़माया नहीं जा सकता।",
+      "assistantCreditsRefusal": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं।",
       "assistantOutputLimit": "उत्तर मॉडल की आउटपुट सीमा तक पहुँच गया।",
       "assistantStructuredOutput": "उत्तर आवश्यक फ़ॉर्मैट से मेल नहीं खाता।",
       "assistantFailed": "उत्तर नहीं मिल सका।"

@@ -1,10 +1,17 @@
 import 'server-only';
+import {
+  GitHubIdentityConflictError,
+  type GitHubIdentityPrecondition,
+} from '@kilocode/db/github-identity';
 
 import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
 import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-export async function disconnectStoredGitHubUserAuthorization(kiloUserId: string): Promise<void> {
+export async function disconnectStoredGitHubUserAuthorization(
+  kiloUserId: string,
+  expected: GitHubIdentityPrecondition
+): Promise<void> {
   if (!GIT_TOKEN_SERVICE_API_URL) {
     throw new Error('Git token service disconnect is not configured');
   }
@@ -19,13 +26,16 @@ export async function disconnectStoredGitHubUserAuthorization(kiloUserId: string
       `${GIT_TOKEN_SERVICE_API_URL}/internal/github-user-authorizations/disconnect`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(expected),
+        signal: AbortSignal.timeout(30_000),
       }
     );
   } catch {
     throw new Error('GitHub authorization disconnect request failed');
   }
 
+  if (response.status === 409) throw new GitHubIdentityConflictError();
   if (!response.ok) {
     throw new Error(`GitHub authorization disconnect failed (${response.status})`);
   }

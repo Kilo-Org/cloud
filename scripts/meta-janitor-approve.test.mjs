@@ -17,6 +17,7 @@ const wiringSuites = [
   'scripts/stacked-ci.test.mjs',
   'scripts/changed-dependencies.test.mjs',
   'scripts/build-key-inputs.test.mjs',
+  'scripts/ttsc-plugin-key.test.mjs',
   'scripts/affected-workspaces.test.mjs',
   'scripts/changed-workspaces.test.mjs',
   'scripts/changes-filter-retry.test.mjs',

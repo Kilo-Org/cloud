@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
       "assistantProviderError": "Veitandinn skilaði villu.",
       "assistantProviderRefused": "Veitandinn hafnaði þessari beiðni og ekki er hægt að reyna aftur.",
+      "assistantCreditsRefusal": "Inneignin nægir ekki til að keyra Cloud Agent.",
       "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
       "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."

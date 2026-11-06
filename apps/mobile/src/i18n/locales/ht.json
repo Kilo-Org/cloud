@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Konvèsasyon an twò long pou modèl la.",
       "assistantProviderError": "Founisè a retounen yon erè.",
       "assistantProviderRefused": "Founisè a rejte demann lan epi li pa ka reeseye.",
+      "assistantCreditsRefusal": "Pa gen ase kredi pou fè Cloud Agent fonksyone.",
       "assistantOutputLimit": "Repons lan rive limit sòti modèl la.",
       "assistantStructuredOutput": "Repons lan pa t koresponn ak fòma ki obligatwa a.",
       "assistantFailed": "Repons lan echwe."

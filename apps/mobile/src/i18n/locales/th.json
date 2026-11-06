@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
       "assistantProviderError": "ผู้ให้บริการส่งกลับข้อผิดพลาด",
       "assistantProviderRefused": "ผู้ให้บริการปฏิเสธคำขอนี้และไม่สามารถลองใหม่ได้",
+      "assistantCreditsRefusal": "เครดิตไม่เพียงพอที่จะใช้ Cloud Agent",
       "assistantOutputLimit": "คำตอบเข้าถึงขีดจำกัดผลลัพธ์ของโมเดล",
       "assistantStructuredOutput": "คำตอบไม่ตรงกับรูปแบบที่กำหนด",
       "assistantFailed": "สร้างคำตอบไม่สำเร็จ"

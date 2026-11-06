@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
       "assistantProviderError": "ਪ੍ਰਦਾਤਾ ਨੇ ਗ਼ਲਤੀ ਵਾਪਸ ਕੀਤੀ।",
       "assistantProviderRefused": "ਪ੍ਰਦਾਤਾ ਨੇ ਇਹ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ ਹੈ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਦਾ।",
+      "assistantCreditsRefusal": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ।",
       "assistantOutputLimit": "ਜਵਾਬ ਮਾਡਲ ਦੀ ਆਉਟਪੁੱਟ ਸੀਮਾ ਤੱਕ ਪਹੁੰਚ ਗਿਆ।",
       "assistantStructuredOutput": "ਜਵਾਬ ਲੋੜੀਂਦੇ ਫਾਰਮੈਟ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"

@@ -12,6 +12,7 @@ import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   decryptSlackBotToken,
@@ -680,7 +681,9 @@ export async function updateModel(
 }
 
 /**
- * Get the model for a Slack integration
+ * Get the model for a Slack integration. For organization-owned integrations,
+ * resolves the stored model through the organization's current policy, falling
+ * back to the allowed default; a user-owned integration keeps its stored model.
  */
 export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
@@ -690,7 +693,14 @@ export async function getModel(owner: Owner): Promise<string | null> {
   }
 
   const metadata = integration.metadata as { model_slug?: string } | null;
-  return metadata?.model_slug || null;
+  const storedModelSlug = metadata?.model_slug || null;
+  if (!storedModelSlug) {
+    return null;
+  }
+  return resolveOrganizationBotModel({
+    organizationId: owner.type === 'org' ? owner.id : null,
+    storedModelSlug,
+  });
 }
 
 /*

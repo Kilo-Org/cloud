@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
       "assistantProviderError": "Hornitzaileak errore bat itzuli du.",
       "assistantProviderRefused": "Hornitzaileak eskaera hau baztertu du eta ezin da berriro saiatu.",
+      "assistantCreditsRefusal": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko.",
       "assistantOutputLimit": "Erantzunak modeloaren irteera-mugara iritsi da.",
       "assistantStructuredOutput": "Erantzunak ez zetorren bat eskatutako formatuarekin.",
       "assistantFailed": "Erantzunak huts egin du."

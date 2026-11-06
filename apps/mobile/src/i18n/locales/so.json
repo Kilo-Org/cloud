@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
       "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
       "assistantProviderRefused": "Bixiyaha ayaa diiday codsigan, dibna looma dayi karo.",
+      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent.",
       "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
       "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."

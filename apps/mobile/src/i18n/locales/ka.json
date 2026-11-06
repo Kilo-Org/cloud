@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
       "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
       "assistantProviderRefused": "პროვაიდერმა უარყო ეს მოთხოვნა და მისი განმეორებითი ცდა შეუძლებელია.",
+      "assistantCreditsRefusal": "Cloud Agent-ის გასაშვებად კრედიტები საკმარისი არ არის.",
       "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
       "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."

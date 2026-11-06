@@ -2136,6 +2136,7 @@
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
       "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
+      "assistantCreditsRefusal": "رصيدك غير كافٍ لتشغيل Cloud Agent.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."

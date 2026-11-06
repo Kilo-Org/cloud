@@ -2036,6 +2036,7 @@
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
       "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
+      "assistantCreditsRefusal": "Cloud Agent'i çalıştırmak için yeterli kredi yok.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."

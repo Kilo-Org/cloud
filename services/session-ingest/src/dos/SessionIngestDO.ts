@@ -2013,42 +2013,71 @@ export class SessionIngestDO extends DurableObject<Env> {
       .values({ key: pendingKey, value: params.key })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
       .run();
+    // Every stage outcome ends with the key in its final state, whichever way
+    // the conditional upload resolved.
     const operation = (async (): Promise<boolean | 'too_large'> => {
-      const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
-        onlyIf: new Headers({ 'If-None-Match': '*' }),
-      });
-      const etag = reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
-      if (this.isDeleted()) {
-        await cancelBody();
-        await this.env.SESSION_INGEST_R2.delete(params.key);
-        this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-        return false;
-      }
-      if (!etag) throw new Error('Session R2 reservation disappeared');
-
-      let written: R2Object | null;
-      if (maxBytes === undefined) {
-        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-          onlyIf: { etagMatches: etag },
-        });
-      } else if (body instanceof Uint8Array) {
-        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-          onlyIf: { etagMatches: etag },
-        });
-      } else {
-        const result = await this.writeBoundedMultipart(params.key, body, maxBytes, etag);
-        if (result === 'too_large') {
+      // The key holds this attempt's stored body once the conditional upload
+      // completes.
+      let ownsStagedObject = false;
+      let published = false;
+      let reservationEtag: string | undefined;
+      // True when the key holds nothing this attempt wrote.
+      const releaseStagedObject = async (): Promise<boolean> => {
+        try {
+          if (!ownsStagedObject) {
+            if (!reservationEtag) return true;
+            const current = await this.env.SESSION_INGEST_R2.head(params.key);
+            if (current?.etag !== reservationEtag) return true;
+          }
           await this.env.SESSION_INGEST_R2.delete(params.key);
-          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-          return result;
+          return true;
+        } catch (error) {
+          console.error('Failed to release a session ingest staging reservation', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return false;
         }
-        written = result;
+      };
+      try {
+        const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
+          onlyIf: new Headers({ 'If-None-Match': '*' }),
+        });
+        reservationEtag =
+          reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
+        if (this.isDeleted()) {
+          await cancelBody();
+          return false;
+        }
+        if (!reservationEtag) throw new Error('Session R2 reservation disappeared');
+
+        let written: R2Object | null;
+        if (maxBytes === undefined) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: reservationEtag },
+          });
+        } else if (body instanceof Uint8Array) {
+          written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+            onlyIf: { etagMatches: reservationEtag },
+          });
+        } else {
+          const result = await this.writeBoundedMultipart(
+            params.key,
+            body,
+            maxBytes,
+            reservationEtag
+          );
+          if (result === 'too_large') return result;
+          written = result;
+        }
+        const deleted = this.isDeleted();
+        if (!written && !deleted) throw new Error('Session R2 reservation changed');
+        ownsStagedObject = written !== null;
+        published = written !== null && !deleted;
+        return !deleted;
+      } finally {
+        if (published || (await releaseStagedObject()))
+          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
       }
-      const deleted = this.isDeleted();
-      if (!written && !deleted) throw new Error('Session R2 reservation changed');
-      if (deleted) await this.env.SESSION_INGEST_R2.delete(params.key);
-      this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
-      return !deleted;
     })();
     this.activeR2Writes.add(operation);
     return operation.finally(() => this.activeR2Writes.delete(operation));

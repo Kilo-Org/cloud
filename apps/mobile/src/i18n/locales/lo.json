@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "ການສົນທະນາຍາວເກີນກວ່າທີ່ໂມເດວຈະຮອງຮັບໄດ້.",
       "assistantProviderError": "ຜູ້ໃຫ້ບໍລິການສົ່ງຂໍ້ຜິດພາດກັບມາ.",
       "assistantProviderRefused": "ຜູ້ໃຫ້ບໍລິການໄດ້ປະຕິເສດຄຳຂໍນີ້ ແລະ ບໍ່ສາມາດລອງໃໝ່ໄດ້.",
+      "assistantCreditsRefusal": "ເຄຣດິດບໍ່ພໍສຳລັບໃຊ້ Cloud Agent.",
       "assistantOutputLimit": "ຄຳຕອບໄດ້ເຖິງຂີດຈຳກັດຜົນຜະລິດຂອງໂມເດວແລ້ວ.",
       "assistantStructuredOutput": "ຄຳຕອບບໍ່ສອດຄ່ອງກັບຮູບແບບທີ່ຕ້ອງການ.",
       "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ."

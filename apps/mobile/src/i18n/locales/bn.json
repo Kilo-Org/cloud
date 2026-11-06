@@ -2581,6 +2581,7 @@
       "assistantContextOverflow": "কথোপকথনটি মডেলের জন্য খুব দীর্ঘ।",
       "assistantProviderError": "প্রোভাইডার একটি ত্রুটি ফেরত দিয়েছে।",
       "assistantProviderRefused": "প্রোভাইডার এই অনুরোধটি প্রত্যাখ্যান করেছে এবং এটি আবার চেষ্টা করা যাবে না।",
+      "assistantCreditsRefusal": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই।",
       "assistantOutputLimit": "উত্তরটি মডেলের সর্বোচ্চ আউটপুট সীমায় পৌঁছেছে।",
       "assistantStructuredOutput": "উত্তরটি প্রয়োজনীয় ফরম্যাটের সঙ্গে মেলেনি।",
       "assistantFailed": "উত্তর তৈরি করা যায়নি।"

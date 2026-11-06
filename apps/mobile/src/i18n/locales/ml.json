@@ -2575,6 +2575,7 @@
       "assistantContextOverflow": "ഈ സംഭാഷണത്തിന്റെ നീളം മോഡലിന് കൈകാര്യം ചെയ്യാവുന്ന പരിധിയിലും കൂടുതലാണ്.",
       "assistantProviderError": "ദാതാവ് ഒരു പിശക് നൽകി.",
       "assistantProviderRefused": "ദാതാവ് ഈ അഭ്യർത്ഥന നിരസിച്ചു, ഇത് വീണ്ടും ശ്രമിക്കാൻ കഴിയില്ല.",
+      "assistantCreditsRefusal": "Cloud Agent പ്രവർത്തിപ്പിക്കാൻ ക്രെഡിറ്റുകൾ മതിയാകുന്നില്ല.",
       "assistantOutputLimit": "മറുപടി മോഡലിന്റെ ഔട്ട്പുട്ട് പരിധിയിലെത്തി.",
       "assistantStructuredOutput": "മറുപടി ആവശ്യമായ ഫോർമാറ്റുമായി പൊരുത്തപ്പെട്ടില്ല.",
       "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല."

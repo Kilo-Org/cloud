@@ -2621,6 +2621,7 @@
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
       "assistantProviderError": "Pakalpojumu sniedzējs atgrieza kļūdu.",
       "assistantProviderRefused": "Pakalpojumu sniedzējs noraidīja šo pieprasījumu, un to nevar atkārtot.",
+      "assistantCreditsRefusal": "Nepietiek kredītu, lai palaistu Cloud Agent.",
       "assistantOutputLimit": "Atbilde sasniedza modeļa izvades ierobežojumu.",
       "assistantStructuredOutput": "Atbilde neatbilda pieprasītajam formātam.",
       "assistantFailed": "Neizdevās sagatavot atbildi."

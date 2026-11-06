@@ -131,12 +131,12 @@ Examples:
   echo '{"body": "This is a test comment added via the bb CLI tool"}' | bb comments create 1 --input -
   echo '{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}' | bb comments create 1 --input -
   echo '{"comments": [{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}]}' | bb comments create-batch 1 --input -
-  echo '{"body": "Updated summary"}' | bb comments update 1 123 --input -
+  echo '{"body": "## Code Review Summary\\n\\nNo open findings."}' | bb comments update 1 123 --input -
 
 Comment input:
   Create input must be {"body": "..."} or {"body": "...", "inline": {"path": "...", "to": 123}}.
   Batch create input must be {"comments": [{"body": "...", "inline": {"path": "...", "to": 123}}, ...]}.
-  Update input must be {"body": "..."} only.
+  Update input must be {"body": "..."} only, and the body must start with the Code Review Summary heading.
 
 Update target:
   An update applies only to an existing Code Review Summary comment.
@@ -1152,7 +1152,7 @@ async function updateComment(
   stdin: ReadableStream<Uint8Array>
 ): Promise<unknown> {
   const inputBody = await readCommentInput(stdin, parseUpdateInput, UPDATE_COMMENT_INPUT_HINT);
-  if (!isCodeReviewSummaryBody(inputBody)) {
+  if (!inputBody.trimStart().startsWith('## Code Review Summary')) {
     throw new CliError('summary_body_required', undefined, UPDATE_COMMENT_BODY_HINT);
   }
   const requestBody = serializeRequestBody({ content: { raw: inputBody } });

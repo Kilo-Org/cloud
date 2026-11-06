@@ -246,12 +246,14 @@ describe('bb', () => {
         `echo '{"body": "Inline finding", "inline": {"path": "src/widget.ts", "to": 42}}' | bb comments create 1 --input -`
       );
       expect(result.stdout).toContain(
-        `echo '{"body": "Updated summary"}' | bb comments update 1 123 --input -`
+        `echo '{"body": "## Code Review Summary\\n\\nNo open findings."}' | bb comments update 1 123 --input -`
       );
       expect(result.stdout).toContain(
         'Create input must be {"body": "..."} or {"body": "...", "inline": {"path": "...", "to": 123}}.'
       );
-      expect(result.stdout).toContain('Update input must be {"body": "..."} only.');
+      expect(result.stdout).toContain(
+        'Update input must be {"body": "..."} only, and the body must start with the Code Review Summary heading.'
+      );
       expect(result.stdout).toContain('Environment:');
       expect(result.stdout).toContain('BITBUCKET_TOKEN');
       expect(result.stdout).toContain('KILO_BITBUCKET_REPOSITORY_UUID');
@@ -1009,6 +1011,19 @@ describe('bb', () => {
     expect(result.stderr).toContain(
       'the updated body must start with the Code Review Summary heading'
     );
+  });
+
+  it('rejects a replacement body that carries only the legacy marker', async () => {
+    const requests: RecordedRequest[] = [];
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({ requests }),
+      { body: '<!-- kilo-review:bitbucket:pr:42 -->\n\nEarlier summary' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: summary_body_required\n');
+    expect(requests).toEqual([]);
   });
 
   it('refuses to update a comment that is not the Code Review Summary', async () => {

@@ -1667,6 +1667,33 @@ describe('workspace DO-only session transport', () => {
     expect(eventMap?.size).toBe(0);
   });
 
+  it.each(['12345678-1234-4234-9234-123456789abc', undefined])(
+    'preserves workspace environment %p through metadata loading',
+    async environmentId => {
+      const fixture = workspaceManager();
+      fixture.fetchCloudSession.mockResolvedValue({
+        sessionId: workspaceId,
+        preparedAt: 1,
+        initiatedAt: 1,
+        githubRepo: 'Kilo-Org/cloud',
+        upstreamBranch: 'main',
+        environmentId,
+      });
+      try {
+        await fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)).toMatchObject({
+          repository: 'Kilo-Org/cloud',
+          gitBranch: 'main',
+          environmentId: environmentId ?? null,
+        });
+        expect(fixture.fetchSession).not.toHaveBeenCalled();
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
+
   it('preserves DO metadata PR, spend, origin and profile without catalog runtime hydration', async () => {
     const fixture = workspaceManager();
     const associatedPr = {

@@ -551,6 +551,72 @@ test('full cloud plan keeps one SDK viewer per watched session and creates no GO
     const config = JSON.parse(readFileSync(join(output, 'node-0/config-0.json'), 'utf8'));
     assert.equal(config.sdkViewers, config.watched);
     assert.equal(existsSync(join(output, 'node-0/go.json')), false);
+    const fundedBudget = {
+      ...allowedBudget,
+      hardLimitUSD: 100,
+      pessimisticCFUSD: 50,
+      vmUSD: 5,
+      reserveUSD: 20,
+      alreadySpentUSD: 25,
+      committedCeilingUSD: 100,
+      workloadBounds: [
+        {
+          name: '100k-10k-sdk-10hz-512b-10warm-45measure-10drain',
+          sessions: 100000,
+          checkpoints: 1100000,
+          finalCheckpoints: 100000,
+          incomingWebSocketMessages: 5500000,
+          ticketRequests: 260000,
+        },
+      ],
+    };
+    const fundedBudgetFile = join(f.root, 'funded-budget.json');
+    writeFileSync(fundedBudgetFile, JSON.stringify(fundedBudget));
+    writeFileSync(manifestFile, JSON.stringify({ ...manifest, budgetFile: fundedBudgetFile }));
+    const planURL = new URL('./perf-plan.mjs', import.meta.url);
+    const identityURL = new URL('./perf-identity.mjs', import.meta.url);
+    // Only external deployment metadata is a fixture; planner and admission remain real.
+    const metadata =
+      'data:text/javascript,' +
+      encodeURIComponent(`
+      export * from ${JSON.stringify(identityURL.href)};
+      import { readFileSync } from 'node:fs';
+      export async function inspectLive(manifest) {
+        return JSON.parse(readFileSync(manifest.evidenceFile, 'utf8'));
+      }
+    `);
+    const preload =
+      'data:text/javascript,' +
+      encodeURIComponent(`
+      import { registerHooks } from 'node:module';
+      registerHooks({ resolve(specifier, context, next) {
+        if (specifier === './perf-identity.mjs' && context.parentURL === ${JSON.stringify(planURL.href)})
+          return { url: ${JSON.stringify(metadata)}, shortCircuit: true };
+        return next(specifier, context);
+      }});
+    `);
+    const runPlan = (mode, destination) =>
+      spawnSync(
+        process.execPath,
+        ['--import', preload, fileURLToPath(planURL), mode, manifestFile, destination],
+        { encoding: 'utf8' }
+      );
+    const funded = join(f.root, 'funded-plan');
+    const prepared = runPlan('full', funded);
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const admitted = runPlan('refresh', funded);
+    assert.equal(admitted.status, 0, admitted.stderr);
+    const attestation = JSON.parse(readFileSync(join(funded, 'node-0/attestation.json'), 'utf8'));
+    assert.equal(attestation.budgetHash, sha256(JSON.stringify(fundedBudget)));
+    assert.equal(existsSync(join(funded, 'node-0/go.json')), false);
+    delete fundedBudget.alreadySpentUSD;
+    writeFileSync(fundedBudgetFile, JSON.stringify(fundedBudget));
+    const rejected = join(f.root, 'missing-spend-plan');
+    const unapproved = runPlan('full', rejected);
+    assert.equal(unapproved.status, 0, unapproved.stderr);
+    const denied = runPlan('refresh', rejected);
+    assert.notEqual(denied.status, 0);
+    assert.equal(existsSync(join(rejected, 'node-0/attestation.json')), false);
   } finally {
     f.dispose();
   }

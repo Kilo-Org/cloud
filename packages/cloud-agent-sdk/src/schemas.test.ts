@@ -19,7 +19,7 @@ import type { AssociatedPrData, FetchedSessionData } from './session-manager';
 import type { CloudSessionSnapshotPage } from './types';
 
 describe('cloudSessionMetadataSchema', () => {
-  it('preserves safe PR, spend, and origin metadata without exposing unprojected fields', () => {
+  it('preserves safe environment, PR, spend, and origin metadata without exposing unprojected fields', () => {
     const associatedPr = {
       url: 'https://github.com/Kilo-Org/cloud/pull/42',
       number: 42,
@@ -33,6 +33,7 @@ describe('cloudSessionMetadataSchema', () => {
     };
     const metadata = {
       sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+      environmentId: '12345678-1234-4234-9234-123456789abc',
       associatedPr,
       totalCostMicrodollars: 350_000,
       createdOnPlatform: 'extension',

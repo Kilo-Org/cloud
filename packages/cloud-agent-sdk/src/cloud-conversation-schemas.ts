@@ -47,6 +47,7 @@ export const cloudSessionMetadataSchema = z.object({
   branchName: z.string().optional(),
   upstreamBranch: z.string().optional(),
   worktreeId: z.string().nullable().optional(),
+  environmentId: z.string().uuid().optional(),
   mode: z.string().optional(),
   model: z.string().optional(),
   variant: z.string().optional(),

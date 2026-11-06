@@ -371,7 +371,7 @@
       "clearSelection": "Wepụ nhọrọ",
       "clear": "Wepụ",
       "commentOnSelectedLines": "Dee okwu banyere ahịrị ahọpụtara",
-      "comment": "Nkwupụta",
+      "comment": "Okwu",
       "finishReview": "Mechaa nyocha"
     },
     "hunkRows": {
@@ -522,8 +522,8 @@
       "resolved": "Edoziela",
       "outdated": "Ochie",
       "comment_one": "okwu 1",
-      "comment": "nkwupụta {{displayCount}}",
-      "comment_other": "nkwupụta {{displayCount}}",
+      "comment": "okwu {{displayCount}}",
+      "comment_other": "okwu {{displayCount}}",
       "startedRelative": " · malitere {{relative}}",
       "couldNotLoadMore": "Enweghị ike ibudata okwu ndị ọzọ.",
       "retryLoadingMore": "Nwaa ọzọ ibudata okwu ndị ọzọ",
@@ -550,11 +550,11 @@
       "acceptTerms": "Nakwere",
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
-      "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "addCommentCta": "Nye okwu na arịrịọ njikọta a",
       "fixWithKilo": "Dozie na Kilo",
-      "fixWithKiloPrompt": "Biko dozie nkwupụta a na arịrịọ njikọta: {{link}}",
-      "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
-      "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a.",
+      "fixWithKiloPrompt": "Biko dozie okwu a na arịrịọ njikọta: {{link}}",
+      "commentBadRequest": "Enweghị ike ibipụta okwu a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
+      "commentForbidden": "Ị nweghị ikike inye okwu na arịrịọ njikọta a.",
       "moderation": {
         "reportContent": {
           "terminal": "Enweghị ike ikpesa okwu a.",
@@ -607,13 +607,13 @@
       "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
       "moreLinesAbove_one": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
       "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
-      "deleteComment": "Hichapụ nkwupụta",
-      "deleteCommentTitle": "Hichapụ nkwupụta?",
-      "deleteCommentMessage": "A ga-ehichapụ nkwupụta a na arịrịọ njikọta a.",
-      "commentEditFailed": "Enweghị ike ichekwa nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
-      "commentEditUnavailable": "Enweghị ike idezi nkwupụta a. O nwere ike ịbụ na ehichapụrụ ya.",
-      "commentDeleteFailed": "Enweghị ike ihichapụ nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
-      "commentDeleteUnavailable": "Enweghị ike ihichapụ nkwupụta a."
+      "deleteComment": "Hichapụ okwu",
+      "deleteCommentTitle": "Hichapụ okwu?",
+      "deleteCommentMessage": "A ga-ehichapụ okwu a na arịrịọ njikọta a.",
+      "commentEditFailed": "Enweghị ike ichekwa okwu gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentEditUnavailable": "Enweghị ike idezi okwu a. O nwere ike ịbụ na ehichapụrụ ya.",
+      "commentDeleteFailed": "Enweghị ike ihichapụ okwu gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentDeleteUnavailable": "Enweghị ike ihichapụ okwu a."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -688,7 +688,7 @@
       "loadFailedTitle": "Enweghị ike ibudata ebe a na-ede okwu.",
       "discardTitle": "Tụfuo okwu?",
       "discardMessage": "Ihe ị dere ga-efu.",
-      "comment": "Nkwupụta",
+      "comment": "Okwu",
       "insertSuggestionA11y": "Tinye aro koodu",
       "insertSuggestion": "Tinye aro",
       "bodyEmpty": "Ederede okwu enweghị ike ịdị chakoo.",
@@ -727,8 +727,8 @@
       "deletePendingMessage": "A ga-ewepụ okwu a na ndepụta okwu na-eche iziga na nyocha.",
       "summaryOptional": "Nchịkọta (ọ bụghị iwu)",
       "pendingComment_one": "okwu na-eche iziga",
-      "pendingComment": "nkwupụta a na-ezigabeghị",
-      "pendingComment_other": "nkwupụta a na-ezigabeghị",
+      "pendingComment": "okwu a na-ezigabeghị",
+      "pendingComment_other": "okwu a na-ezigabeghị",
       "submitCountOfTotal": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",
       "submitReview": "Nyefee nyocha",
       "partialPostedFresh": "Ebipụtala okwu {{displayFreshCount}}. ",
@@ -747,7 +747,7 @@
       "bitbucketTitle": "Oge njikọ Bitbucket agwụla."
     },
     "eventChips": {
-      "comment": "Nkwupụta",
+      "comment": "Okwu",
       "requestChanges": "Rịọ mgbanwe",
       "label": "Omume nyocha"
     },
@@ -818,8 +818,8 @@
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
     "announce": {
       "commentPosted": "Ebipụtala okwu",
-      "commentUpdated": "Emelitere nkwupụta",
-      "commentDeleted": "Ehichapụrụ nkwupụta",
+      "commentUpdated": "Emelitere okwu",
+      "commentDeleted": "Ehichapụrụ okwu",
       "reviewSubmitted": "Ezigala nyocha",
       "autoMergeEnabled": "Agbanyela njikọta akpaghị aka"
     },

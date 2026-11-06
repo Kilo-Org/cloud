@@ -381,7 +381,7 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
   }
 }
 
-type GitHubCapabilityCredential = 'pinned' | 'user' | 'none';
+type GitHubCapabilityCredential = 'pinned' | 'user' | 'none' | 'graphql';
 
 type GitHubCapabilityUpstream =
   | {
@@ -547,11 +547,11 @@ function validateGitHubCapabilityUpstream(
     }
     if (path === '/graphql') {
       // gh resolves pull-request views and mutations through GraphQL. The endpoint is
-      // not addressed by repository path, so the capability's own credential answers it:
-      // the recorded user's token for a user source, the repository-scoped installation
-      // token for an installation source.
+      // not addressed by repository path, so no path comparison can confine it; the
+      // answering credential is the installation token minted for the recorded
+      // repository, which GitHub scopes to that repository alone.
       return method === 'POST'
-        ? { failure: null, credential: 'pinned' }
+        ? { failure: null, credential: 'graphql' }
         : { failure: 'invalid_upstream_request' };
     }
     if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
@@ -1087,6 +1087,22 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     let token = auth.githubToken;
     let source = auth.source;
+    // GraphQL carries no repository path, so its confinement comes from the credential:
+    // the installation token minted for the recorded repository, never the user's
+    // broader user-to-server token. The pinned user authorization and session identity
+    // above still have to resolve first.
+    if (upstream.credential === 'graphql' && source === 'user') {
+      try {
+        token = await this.githubService.getTokenForRepo(
+          auth.installationId,
+          claims.repo,
+          auth.appType
+        );
+      } catch {
+        return { success: false, reason: 'source_unavailable' };
+      }
+      source = 'installation';
+    }
     // GitHub user attachments reject installation tokens, even with repository write access.
     if (upstream.credential === 'user' && source !== 'user') {
       try {

@@ -494,7 +494,7 @@
       "restrictions": {
         "title": "मर्जवरील निर्बंध",
         "approvalsRequired_one": "{{displayCount}} मंजुरी आवश्यक",
-        "approvalsRequired_other": "{{displayCount}} मंजुरी आवश्यक",
+        "approvalsRequired_other": "{{displayCount}} मंजुऱ्या आवश्यक",
         "pipelineMustSucceed": "मर्ज करण्यापूर्वी पाइपलाइन यशस्वी होणे आवश्यक आहे."
       },
       "providerBlocked": {
@@ -732,10 +732,10 @@
       "submitCountOfTotal": "{{displayTotalCount}} पैकी {{displayFreshCount}} टिप्पण्या सादर करा",
       "submitReview": "समीक्षा सादर करा",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
-      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
+      "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट केली. ",
       "partialPostedFresh_other": "{{displayFreshCount}} टिप्पण्या पोस्ट केल्या. ",
       "partialPostedStale": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
-      "partialPostedStale_one": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
+      "partialPostedStale_one": "{{displayStaleCount}} टिप्पणी जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवली आहे.",
       "partialPostedStale_other": "{{displayStaleCount}} टिप्पण्या जुन्या कमिटशी संबंधित असल्याने तुमच्या रांगेतच ठेवल्या आहेत.",
       "blockedRequestChanges": "बदलांची विनंती करण्यासाठी सारांश किंवा किमान एक टिप्पणी जोडा.",
       "blockedComment": "टिप्पणीच्या स्वरूपात पुनरावलोकन पोस्ट करण्यासाठी सारांश किंवा किमान एक टिप्पणी जोडा."
@@ -855,7 +855,7 @@
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
       "unavailableDescription": "ती हटवली गेली असेल, किंवा तुम्हाला त्यावर प्रवेश नसेल.",
       "accessDeniedMergeRequest": "तुम्हाला ही मर्ज रिक्वेस्ट पाहण्याची परवानगी नाही.",
-      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड करता आली नाही.",
+      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड करता आली नाही",
       "discussionAccessDenied": "तुम्हाला या मर्ज रिक्वेस्ट वरील चर्चा पाहण्याची परवानगी नाही.",
       "discussionUnavailableMessage": "ही मर्ज रिक्वेस्ट काढून टाकली असेल.",
       "noDiscussionDescription": "या मर्ज रिक्वेस्टवर पुनरावलोकनाच्या चर्चा किंवा इतर टिप्पण्या नाहीत.",
@@ -3047,10 +3047,10 @@
   },
   "queryError": {
     "neutralDescription": "कृपया पुन्हा प्रयत्न करा.",
-    "offlineTitle": "लोड करता आले नाही.",
+    "offlineTitle": "लोड करता आले नाही",
     "permissionDescription": "तुम्हाला हे पाहण्याची परवानगी नाही.",
     "notFoundDescription": "ही बाब काढून टाकली असू शकते किंवा आता उपलब्ध नाही.",
-    "serverTitle": "लोड करता आले नाही.",
+    "serverTitle": "लोड करता आले नाही",
     "serverDescription": "आमच्याकडे काहीतरी समस्या आली. कृपया पुन्हा प्रयत्न करा.",
     "timeoutTitle": "सर्व्हरला खूप वेळ लागत आहे",
     "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."

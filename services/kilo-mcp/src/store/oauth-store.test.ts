@@ -485,9 +485,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const countErased = () =>
         Number(
           insertDb
-            .prepare(
-              'SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?'
-            )
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
             .get(NOW)?.n ?? -1
         );
       expect(countErased()).toBe(expiredCount);
@@ -526,9 +524,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const countErased = () =>
         Number(
           backlogDb
-            .prepare(
-              'SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?'
-            )
+            .prepare('SELECT count(*) AS n FROM oauth_pending_authorizations WHERE expires_at < ?')
             .get(NOW)?.n ?? -1
         );
 

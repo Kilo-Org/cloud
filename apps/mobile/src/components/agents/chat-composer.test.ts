@@ -342,7 +342,7 @@ vi.mock('@/lib/persist/drafts', () => ({
 }));
 
 vi.mock('@/lib/share-prefill', () => ({
-  useSharePrefill: vi.fn(),
+  useSharePrefill: () => ({ failed: false, retry: () => undefined, dismiss: () => undefined }),
 }));
 
 // The voice hook options (getDraft/onDraftChange) are captured so a test can

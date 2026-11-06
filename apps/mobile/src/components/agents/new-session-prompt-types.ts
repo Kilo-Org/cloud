@@ -45,36 +45,21 @@ export type NewSessionPromptProps = {
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
   /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
   initialPrompt?: string;
-  /**
-   * Height of the scrollable form frame the prompt sits in, in points. The
-   * prompt yields its minimum height to this frame so the whole card renders
-   * above the bottom system bar; omitted or unmeasured keeps the preferred
-   * floor.
-   */
+  /** Scroll viewport height at the keyboard's destination, excluding the pinned footer. */
   frameHeight?: number;
-  /**
-   * The card's top offset inside that frame, in points, measured by the host.
-   * The prompt's own `onLayout` reports `y` relative to the padding-free
-   * wrapper that hosts the card (`NewSessionConfigureForm`), so it always reads
-   * `0` and cannot see the frame's top gap (the ScrollView content's `pt-4`
-   * inset). The fit needs the frame-relative offset, so the host measures the
-   * wrapper and passes it here. Omitted or unmeasured keeps `0`, which restores
-   * the preferred floor.
-   */
+  /** The same viewport with the keyboard closed; the input interpolates between these fits. */
+  keyboardClosedFrameHeight?: number;
+  /** Card offset inside the scroll content, including its top padding, measured by the host. */
   cardTop?: number;
   /**
-   * The block directly under the card that must stay inside the frame, in
-   * points, measured by the host: the Organization section when the entry
-   * renders one, then the Run on row (`mt-5`, its label, its `mb-2`, and the
-   * selector or target line). The frame fit reserves it — keeping a line of air
-   * under it — while the input still keeps its floor beside it, so a long draft
-   * cannot grow the card over the row. Measured at 167pt on the Android
-   * emulator with the keyboard up, the block needs a frame of 395pt beside the
-   * floor; a phone frame is shorter, so there the floor wins and the row comes
-   * into view with the form's own drag. Omitted or unmeasured keeps `0`, which
-   * owes nothing below the card.
+   * The lines the input reserves when the frame has room, from
+   * `resolveNewSessionPromptLineCount`. A window too short for the form's first
+   * screenful takes one line, so the repository picker under it stays visible.
+   * Omitted keeps the shared three-line floor.
    */
-  belowCardHeight?: number;
+  lineCount?: number;
+  /** Closed-keyboard policy stays fixed while the open-keyboard line count changes. */
+  keyboardClosedLineCount?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
   /**

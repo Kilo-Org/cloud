@@ -1,7 +1,11 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
 import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+  KeyboardAvoidingView,
+  useKeyboardState,
+  useWindowDimensions,
+} from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +14,13 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
+import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
+import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
+import {
+  resolveNewSessionFormFrameHeight,
+  resolveNewSessionPromptLineCount,
+} from '@/components/agents/new-session-prompt-fit';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
@@ -52,11 +62,12 @@ type NewSessionProfileOverrideProps = {
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
   /**
-   * The Organization section above Run on: the active account the create is
-   * attributed to. The body renders it for every entry point — switchable on
-   * the ordinary entry, a read-only scope row on the clone entry.
+   * The Account section above Run on: the active account the create is
+   * attributed to, personal or organization. The body renders it for every
+   * entry point — switchable on the ordinary entry, a read-only scope row on
+   * the clone entry.
    */
-  organizationSection?: React.ReactNode;
+  accountSection?: React.ReactNode;
 };
 
 /**
@@ -116,6 +127,7 @@ export function NewSessionConfigureForm({
   isRetrying,
   onChangeRepo,
   onConnectProvider,
+  connectingProvider = null,
   onRefreshRepos,
   repositories,
   recents,
@@ -134,7 +146,7 @@ export function NewSessionConfigureForm({
   onManualVarsChange,
   onManualCommandsChange,
   onOpenRepoDefaults,
-  organizationSection,
+  accountSection,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -144,6 +156,7 @@ export function NewSessionConfigureForm({
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
+  planRefusal = null,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -161,37 +174,54 @@ export function NewSessionConfigureForm({
   // dismissed before the sheet opens.)
   const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
-  // The scroll frame's own height, reported by the ScrollView below. It already
-  // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
-  // parent; the prompt yields its minimum height to it so the whole composer
-  // card renders above the bottom system bar.
-  const [frameHeight, setFrameHeight] = useState(0);
-  // The composer card's top offset inside the scroll content, reported by the
-  // wrapper below and threaded to the prompt. The prompt's own `onLayout` reads
-  // `0` against that padding-free wrapper, dropping the content container's
-  // `pt-4` gap and overstating the room the frame leaves for the input.
+  const { height: windowHeight } = useWindowDimensions();
+  const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
+  const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
+  const [footerHeight, setFooterHeight] = useState(0);
+  const frame = {
+    containerY: containerFrame.y,
+    containerHeight: containerFrame.height,
+    footerHeight,
+    windowHeight,
+    keyboardVerticalOffset: keyboardInsetOffset(bottom),
+  };
+  // Fit against the keyboard's destination, not each intermediate viewport.
+  // The prompt interpolates to that whole-line fit on the UI thread.
+  const frameHeight = resolveNewSessionFormFrameHeight({ ...frame, keyboardHeight });
+  const keyboardClosedFrameHeight = resolveNewSessionFormFrameHeight({
+    ...frame,
+    keyboardHeight: 0,
+  });
+  // The host includes the scroll content's top padding in the card offset.
   const [composerTop, setComposerTop] = useState(0);
-  // The Run on block's height, reported by the wrapper below and threaded to
-  // the prompt as `belowCardHeight`, which reserves the row inside the frame
-  // while the composer can still keep its floor. The block starts at the
-  // Organization section (when the entry point renders one) and sits directly
-  // under the card, and its height does not depend on the card, so the frame
-  // fit converges without a second layout pass. Zero until it lays out, which
-  // owes nothing below the card; the corrected pass lands in the same commit
-  // chain.
-  const [runTargetHeight, setRunTargetHeight] = useState(0);
   // The remote surface (launch folder, remote hint, no repository section)
   // covers both a bound computer and the tour's computer target with none
   // connected yet — the target is the computer either way.
   const isRemote = runOnInstance !== null || pendingComputer === true;
   const isStarting = runOnInstance !== null ? isSpawningRemote : isCreating;
+  // The composer keeps its three-line floor wherever the form's first screenful
+  // still holds the repository picker under it, and takes one line where it
+  // cannot. The window decides, not the measured frame, so the card cannot
+  // reflow after the first layout; with the keyboard up the frame owns the fit.
+  const promptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
+  const keyboardClosedPromptLineCount = resolveNewSessionPromptLineCount({
+    windowHeight,
+    keyboardVisible: false,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+  });
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
-  function handleScrollFrameLayout(event: LayoutChangeEvent) {
-    const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
-    setFrameHeight(current => (current === next ? current : next));
+  function handleContainerLayout(event: LayoutChangeEvent) {
+    const layout = event.nativeEvent.layout;
+    setContainerFrame(current =>
+      current.y === layout.y && current.height === layout.height ? current : layout
+    );
   }
 
   // The composer's scroll body, so the advanced configuration can bring its
@@ -213,7 +243,6 @@ export function NewSessionConfigureForm({
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      onLayout={handleScrollFrameLayout}
     >
       <View
         onLayout={event => {
@@ -248,25 +277,24 @@ export function NewSessionConfigureForm({
           voiceInputSettlerRef={voiceInputSettlerRef}
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
+          keyboardClosedFrameHeight={keyboardClosedFrameHeight}
           cardTop={composerTop}
-          belowCardHeight={runTargetHeight}
+          lineCount={promptLineCount}
+          keyboardClosedLineCount={keyboardClosedPromptLineCount}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
           autoFocusOnMount={autoFocusPrompt}
         />
       </View>
 
-      {/* The block under the card the frame must still show: the Organization
-          section when the entry point renders one, then the Run on row and its
-          refresh control. Each child's own `mt-*` lives inside this wrapper, so
-          the prompt's frame fit reserves the block's whole footprint. */}
-      <View
-        onLayout={event => {
-          const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
-          setRunTargetHeight(current => (current === next ? current : next));
-        }}
-      >
-        {organizationSection}
+      {/* The block under the card: the Account section when the entry point
+          renders one, then the Run on row and its refresh control. */}
+      <View>
+        {/* The plan refusal is known before the press, so it sits in the scroll
+            content under the composer rather than in the pinned footer: it
+            never takes height from the fields, the launch folder included. */}
+        {planRefusal !== null ? <NewSessionPlanRefusal message={planRefusal} /> : null}
+        {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}
           runOnInstance={runOnInstance}
@@ -290,7 +318,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       {isRemote ? (
-        <Text className="mt-2 text-xs text-muted-foreground">
+        <Text className="mt-2 text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
@@ -304,6 +332,7 @@ export function NewSessionConfigureForm({
           isRetrying={isRetrying}
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
+          connectingProvider={connectingProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
           recents={recents}
@@ -375,7 +404,13 @@ export function NewSessionConfigureForm({
   // changes, and this gate keeps a stale one off a remote target no matter
   // which path selected it.
   const footer = (
-    <View className="bg-background px-4 pt-3" style={{ paddingBottom: bottomClearance }}>
+    <View
+      className="bg-background px-4 pt-3"
+      style={{ paddingBottom: bottomClearance }}
+      onLayout={event => {
+        setFooterHeight(event.nativeEvent.layout.height);
+      }}
+    >
       {cloudCreateError && !isRemote ? (
         <NewSessionCloudCreateError
           failure={cloudCreateError}
@@ -399,6 +434,7 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         startBlockedReason={startBlockedReason}
         startBlockedAction={startBlockedAction}
+        blockedByPlan={planRefusal !== null}
         onStartSession={onStartSession}
       />
     </View>
@@ -412,6 +448,7 @@ export function NewSessionConfigureForm({
       style={sideInsetStyle}
       behavior="padding"
       keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+      onLayout={handleContainerLayout}
     >
       {body}
       {footer}

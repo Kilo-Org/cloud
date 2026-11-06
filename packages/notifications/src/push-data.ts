@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
+import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
+import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  SESSION_LIVE_COMMAND_LIMIT,
+  sessionLiveChangesSchema,
+  sessionLiveFailureSchema,
+  sessionLivePlanSchema,
+  sessionLiveStepSchema,
+} from '@kilocode/session-ingest-contracts';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {
@@ -7,14 +15,7 @@ import {
   scheduledActionEventSchema,
   securityLifecycleEventSchema,
 } from './notification-events';
-import {
-  SESSION_LIVE_COMMAND_LIMIT,
-  sessionLiveChangesSchema,
-  sessionLiveFailureSchema,
-  sessionLiveOutcomeSchema,
-  sessionLivePlanSchema,
-  sessionLiveStepSchema,
-} from './session-live-content';
+import { SESSION_CARD_STATUS_KINDS, sessionLiveOutcomeSchema } from './session-live-content';
 import { refineSpendAlertScope } from './spend-alert-scope';
 
 const nonEmptyStringSchema = z.string().min(1);
@@ -36,8 +37,8 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
 export const sessionLiveActivityContentStateSchema = z.object({
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(120).nullable(),
-  statusKind: z.enum(['needsInput', 'running', 'idle', 'scheduled', 'failed']),
+  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
+  statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
   /** ISO 8601; when the current status kind began. */
   statusSince: z.string(),
   /** ISO 8601 wake time for a scheduled session, else null. */
@@ -85,12 +86,12 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('instance-lifecycle'),
     event: instanceLifecycleEventSchema,
-    sandboxId: z.string().min(1),
+    sandboxId: nonEmptyStringSchema,
   }),
   z.object({
     type: z.literal('scheduled-action'),
     event: scheduledActionEventSchema,
-    sandboxId: z.string().min(1),
+    sandboxId: nonEmptyStringSchema,
   }),
   z.object({
     type: z.literal('cloud_agent_session'),
@@ -115,7 +116,8 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   }),
   // Spend alert push. Carries the owner scope and its id only — never an
   // amount, an email, or the configured threshold: this blob crosses the OS
-  // lock screen, so the generic preview copy above must stay content-free.
+  // lock screen, so the generic preview copy in `genericPushContentForPushData`
+  // (`./push-copy.ts`) must stay content-free.
   // The tap routes by the scope, so the scope and its id must agree: an
   // organization alert without its id would open the personal spend view, and
   // a personal alert naming an organization would open one that did not send.
@@ -182,10 +184,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // parsed (output) type stays total — the mobile client spreads the parsed
     // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
     // and the default when every server sends both keys.
-    newestResultKind: z
-      .enum(['needsInput', 'running', 'idle', 'scheduled'])
-      .nullable()
-      .default(null),
+    newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
     newestResultAt: z.string().nullable().default(null),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),

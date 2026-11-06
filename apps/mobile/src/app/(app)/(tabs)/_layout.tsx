@@ -179,7 +179,6 @@ export default function TabsLayout() {
         screenLayout={TabSwitchInputSettle}
         screenOptions={{
           headerShown: false,
-          freezeOnBlur: true,
           // The row palette colours a destination inside a screen; a tab tint
           // says which tab is selected — a state, not a destination. One accent
           // per tab would put six accents on the bar and fight the rows below

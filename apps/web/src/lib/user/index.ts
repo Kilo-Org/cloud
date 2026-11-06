@@ -1,3 +1,4 @@
+import { deleteStepUpRowsForUser } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
@@ -26,6 +27,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
   todo_lists,
   enrichment_data,
   source_embeddings,
@@ -145,6 +147,7 @@ import {
   type SignupStepUpMethod,
 } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
+import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
@@ -159,10 +162,11 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
+import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
@@ -249,6 +253,30 @@ export type CreateOrUpdateUserArgs = {
   display_name?: string | null;
 };
 
+/** Options for callers that are not interactive signups. */
+export type CreateOrUpdateUserOptions = {
+  /**
+   * Skips Bouncer signup admission. Only for machine-initiated provisioning
+   * that has no end user behind it, where admission cannot work and does not
+   * apply: it needs a forwarded client IP (`getSignupIp` reads
+   * `x-forwarded-for`) and `signupRequestSchema` requires one, so a request
+   * without an end user always fails closed with `SIGNUP-UNAVAILABLE`. Even
+   * given an IP, Bouncer counts admissions per canonical IP, so one server
+   * source would exhaust the quota for every tenant after a few accounts.
+   *
+   * Admission exists to rate-limit self-service signup abuse. A caller setting
+   * this must already be authorized and non-public, and must be acting on an
+   * identity an administrator deliberately connected. Every other protection —
+   * email dedup, the deletion fence, Stripe provisioning and its compensating
+   * delete, and the email-signup-disabled check — still runs.
+   *
+   * The only caller is SCIM directory-sync provisioning, behind
+   * `INTERNAL_API_SECRET` (`apps/web/src/lib/scim/directory-sync.ts`). Do not
+   * set it on any path a user can reach.
+   */
+  skipSignupAdmission?: boolean;
+};
+
 /** A user settlement error other than a signup step-up, which carries its methods. */
 type UserSettlementError = Exclude<AuthErrorType, 'SIGNUP-STEP-UP'>;
 
@@ -273,6 +301,7 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
+  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -357,6 +386,36 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
       )
     ),
   });
+}
+
+/**
+ * Resolves the account a delivered sign-in code belongs to.
+ *
+ * The code is delivered to one mailbox, so this match keeps a `+` suffix and
+ * Gmail dots and only ignores case. An alias of another account's address is a
+ * different address here and resolves to no account, unlike
+ * `findUserByNormalizedEmail`, which is for duplicate detection.
+ *
+ * The exact spelling is served by the unique index on `google_user_email`.
+ * A case-insensitive match runs only when no exact row exists, for legacy rows
+ * stored with other casing; those resolve to the oldest account so the answer is
+ * stable.
+ */
+export async function findUserBySignInCodeEmail(email: string): Promise<User | undefined> {
+  const deliveredEmail = getDeliveredEmailAddress(email);
+
+  const exact = await db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.google_user_email, deliveredEmail),
+  });
+  if (exact) return exact;
+
+  const [caseVariant] = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(sql`lower(${kilocode_users.google_user_email})`, deliveredEmail))
+    .orderBy(kilocode_users.created_at, kilocode_users.id)
+    .limit(1);
+  return caseVariant;
 }
 
 async function recordSignupImpactTracking(args: {
@@ -461,7 +520,8 @@ export async function createOrUpdateUser(
   affiliateTrackingId?: string | null,
   trackingContext?: CreateOrUpdateUserTrackingContext,
   deferSignInAnalytics?: boolean,
-  verifyNewAccountAdmission?: () => Promise<boolean>
+  verifyNewAccountAdmission?: () => Promise<boolean>,
+  options: CreateOrUpdateUserOptions = {}
 ): Promise<CreateOrUpdateUserResult> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -611,6 +671,11 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
+  recordWatchwoodSignupShadow({
+    operationId,
+    provider: args.provider,
+    assessment: trackingContext?.watchwood,
+  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -637,7 +702,7 @@ export async function createOrUpdateUser(
     return failureResult('ADMISSION_REQUIRED');
   }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
-  if (!IS_DEVELOPMENT) {
+  if (!IS_DEVELOPMENT && !options.skipSignupAdmission) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
     const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
     const verdict = bouncerIp
@@ -677,6 +742,13 @@ export async function createOrUpdateUser(
         methods: knownSignupStepUpMethods(verdict.methods),
       } satisfies SignupStepUpFailure;
     }
+  }
+  if (options.skipSignupAdmission) {
+    // A skipped security gate must be auditable, not silent.
+    console.info('[auth] Signup admission skipped for a trusted machine path', {
+      operationId,
+      method: args.provider,
+    });
   }
   const newUserId = turnstile_guid ?? randomUUID();
 
@@ -966,7 +1038,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * What is kept:
  * - The kilocode_users row (anonymized)
  * - Stripe link (stripe_customer_id unchanged)
- * - credit_transactions, microdollar_usage (billing records)
+ * - credit_transactions, microdollar_usage, enkrypt_usage (billing records)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
@@ -1154,10 +1226,17 @@ export async function anonymizeCloudUserData(
       is_super_admin: false,
       can_view_sessions: false,
       can_manage_credits: false,
+      can_export_api_request_logs: false,
       customer_source: null,
       signup_ip: null,
+      external_id: null,
     })
     .where(eq(kilocode_users.id, userId));
+
+  await revokeOpenSupportGrants(tx, {
+    actorKiloUserId: userId,
+    reason: 'actor account soft-deleted',
+  });
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
@@ -1185,6 +1264,7 @@ export async function anonymizeCloudUserData(
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
   await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
+  await tx.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })
@@ -1252,6 +1332,9 @@ export async function anonymizeCloudUserData(
   // expire. Consumed tickets are removed too: their `kilo_user_id` still names
   // the deleted account.
   await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+  // Step-up challenges and proofs are PII and session-bound; a deleted account
+  // must not leave either behind.
+  await deleteStepUpRowsForUser(tx, userId);
 
   // Remove from organizations
   await tx

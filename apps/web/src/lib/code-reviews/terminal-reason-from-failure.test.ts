@@ -55,6 +55,12 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it('does not report a blocked account as insufficient credit', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'account_blocked' })).toBe(
+      'account_blocked'
+    );
+  });
+
   it('splits rate limiting by whose key was throttled', () => {
     const rateLimited = { code: 'assistant_error', assistantReason: 'rate_limited' } as const;
 

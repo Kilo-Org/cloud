@@ -102,6 +102,7 @@ export function ModeCombobox<T extends string = string>({
 
   const allOptions = useMemo(() => [...options, ...dedupedCustom], [options, dedupedCustom]);
   const selectedMode = allOptions.find(mode => mode.value === value);
+  const selectedLabel = selectedMode?.label ?? (value || placeholder);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
 
@@ -133,7 +134,7 @@ export function ModeCombobox<T extends string = string>({
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
           >
-            <span className="truncate">{selectedMode?.label ?? placeholder}</span>
+            <span className="truncate">{selectedLabel}</span>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -172,7 +173,7 @@ export function ModeCombobox<T extends string = string>({
             className={cn('w-full justify-between', className)}
             ref={triggerRef}
           >
-            <span className="truncate">{selectedMode?.label ?? placeholder}</span>
+            <span className="truncate">{selectedLabel}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </Button>
         </PopoverTrigger>

@@ -35,12 +35,10 @@ function hashDownloadCode(email: string, exportId: string, code: string): string
     .digest('hex');
 }
 
-function liveCodeForChallenge(challengeId: string) {
+function challengeFilter(challengeId: string) {
   return and(
     eq(magic_link_tokens.challenge_id, challengeId),
-    eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE),
-    isNull(magic_link_tokens.consumed_at),
-    sql`${magic_link_tokens.expires_at} > NOW()`
+    eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE)
   );
 }
 
@@ -110,7 +108,9 @@ export type ReserveDownloadCodeResult = 'ok' | 'invalid' | 'too_many_attempts' |
  * A live reservation blocks a concurrent caller, which receives 'in_progress'.
  *
  * A wrong code spends one attempt from the challenge's own budget, so guesses
- * against one challenge cannot drain another's.
+ * against one challenge cannot drain another's. The comparison and the attempt it
+ * spends happen under one row lock, so each challenge's budget covers every
+ * comparison made against it.
  */
 export async function reserveDataExportDownloadCode(
   email: string,
@@ -118,67 +118,46 @@ export async function reserveDataExportDownloadCode(
   code: string,
   challengeId: string
 ): Promise<ReserveDownloadCodeResult> {
-  const normalizedEmail = normalizeEmail(email);
+  const token_hash = hashDownloadCode(normalizeEmail(email), exportId, code);
 
-  const [row] = await db
-    .select()
-    .from(magic_link_tokens)
-    .where(liveCodeForChallenge(challengeId))
-    .limit(1);
-  if (!row) return 'invalid';
-  if (row.attempts >= CODE_MAX_ATTEMPTS) return 'too_many_attempts';
+  return db.transaction(async tx => {
+    // Locked by challenge alone: liveness, the budget and the reservation are all
+    // decided in this transaction, after the lock.
+    // Liveness is judged by the database clock, like every other predicate here.
+    const [row] = await tx
+      .select({
+        token_hash: magic_link_tokens.token_hash,
+        attempts: magic_link_tokens.attempts,
+        consumed: sql<boolean>`${magic_link_tokens.consumed_at} IS NOT NULL`,
+        expired: sql<boolean>`${magic_link_tokens.expires_at} <= NOW()`,
+        reserved: sql<boolean>`${magic_link_tokens.reserved_until} IS NOT NULL
+          AND ${magic_link_tokens.reserved_until} > NOW()`,
+      })
+      .from(magic_link_tokens)
+      .where(challengeFilter(challengeId))
+      .limit(1)
+      .for('update');
 
-  const token_hash = hashDownloadCode(normalizedEmail, exportId, code);
-  if (row.token_hash !== token_hash) {
-    await db
+    if (!row || row.consumed || row.expired) return 'invalid';
+    if (row.attempts >= CODE_MAX_ATTEMPTS) return 'too_many_attempts';
+
+    if (row.token_hash !== token_hash) {
+      await tx
+        .update(magic_link_tokens)
+        .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+        .where(challengeFilter(challengeId));
+      return 'invalid';
+    }
+    if (row.reserved) return 'in_progress';
+
+    await tx
       .update(magic_link_tokens)
-      .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-      .where(
-        and(
-          liveCodeForChallenge(challengeId),
-          sql`${magic_link_tokens.attempts} < ${CODE_MAX_ATTEMPTS}`
-        )
-      );
-    return 'invalid';
-  }
-
-  const reserved = await db
-    .update(magic_link_tokens)
-    .set({
-      reserved_until: sql`NOW() + interval '${sql.raw(String(CODE_RESERVATION_MINUTES))} minutes'`,
-    })
-    .where(
-      and(
-        liveCodeForChallenge(challengeId),
-        sql`${magic_link_tokens.attempts} < ${CODE_MAX_ATTEMPTS}`,
-        sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
-      )
-    )
-    .returning();
-  if (reserved[0]) return 'ok';
-
-  // The row was live a moment ago, so losing the update means another caller
-  // holds the reservation, or it was consumed or expired in between.
-  const [current] = await db
-    .select({
-      attempts: magic_link_tokens.attempts,
-      reserved_until: magic_link_tokens.reserved_until,
-      consumed_at: magic_link_tokens.consumed_at,
-    })
-    .from(magic_link_tokens)
-    .where(
-      and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, DOWNLOAD_CODE_PURPOSE)
-      )
-    )
-    .limit(1);
-  if (!current || current.consumed_at) return 'invalid';
-  if (current.attempts >= CODE_MAX_ATTEMPTS) return 'too_many_attempts';
-  if (current.reserved_until && new Date(current.reserved_until) > new Date()) {
-    return 'in_progress';
-  }
-  return 'invalid';
+      .set({
+        reserved_until: sql`NOW() + interval '${sql.raw(String(CODE_RESERVATION_MINUTES))} minutes'`,
+      })
+      .where(challengeFilter(challengeId));
+    return 'ok';
+  });
 }
 
 /**

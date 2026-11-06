@@ -92,9 +92,20 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # The dispatch runs this file from main but checks out `cloud_ref`, which
+      # can be any earlier commit: a checkout that predates either action still
+      # has to build, so the plain command stays as its fallback.
+      - name: Restore or build tRPC declarations
+        if: hashFiles('.github/actions/trpc-declarations/action.yml') != ''
+        uses: ./.github/actions/trpc-declarations
       - name: Build trpc types
+        if: hashFiles('.github/actions/trpc-declarations/action.yml') == ''
         run: pnpm --filter @kilocode/trpc run build
+      - name: Restore or build the harness SDK
+        if: hashFiles('.github/actions/harness-sdk-build/action.yml') != ''
+        uses: ./.github/actions/harness-sdk-build
       - name: Build harness SDK
+        if: hashFiles('.github/actions/harness-sdk-build/action.yml') == ''
         run: pnpm --filter @kilocode/harness-sdk run build
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios

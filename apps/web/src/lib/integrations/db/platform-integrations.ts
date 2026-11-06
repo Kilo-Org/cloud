@@ -1,5 +1,9 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import {
+  organizationWorkflowGitHubConnectionSql,
+  organizationWorkflowGitHubPreferenceSql,
+} from '@kilocode/db';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
@@ -176,12 +180,18 @@ export async function findIntegrationByInstallationIdForOwner(
 /**
  * Gets an organization's preferred integration, including an unhealthy row
  * when no healthy integration exists. Use this for status and recovery UI.
+ *
+ * A GitHub workflow lookup uses the shared organization workflow connection
+ * definition, so a roleless association that is the organization's real
+ * installation resolves here exactly as the installation surfaces and the
+ * operational lookups resolve it.
  */
 export async function getIntegrationForOrganization(
   organizationId: string,
   platform: string,
   purpose: 'workflow' | 'management' = 'workflow'
 ) {
+  const isGithubWorkflow = platform === PLATFORM.GITHUB && purpose === 'workflow';
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -189,17 +199,23 @@ export async function getIntegrationForOrganization(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, platform),
-        platform === PLATFORM.GITHUB && purpose === 'workflow'
-          ? eq(platform_integrations.github_connection_role, 'workflow')
-          : undefined
+        isGithubWorkflow ? organizationWorkflowGitHubConnectionSql() : undefined
       )
     )
     .orderBy(
       desc(platformIntegrationHealthSql()),
-      platform === PLATFORM.GITHUB
-        ? asc(platform_integrations.created_at)
-        : desc(platform_integrations.updated_at),
-      asc(platform_integrations.id)
+      ...(isGithubWorkflow
+        ? [
+            desc(organizationWorkflowGitHubPreferenceSql()),
+            asc(platform_integrations.created_at),
+            asc(platform_integrations.id),
+          ]
+        : [
+            platform === PLATFORM.GITHUB
+              ? asc(platform_integrations.created_at)
+              : desc(platform_integrations.updated_at),
+            asc(platform_integrations.id),
+          ])
     )
     .limit(1);
 
@@ -209,6 +225,10 @@ export async function getIntegrationForOrganization(
 /**
  * Gets the oldest healthy GitHub integration for an organization.
  * Operational callers must not fall back to an unhealthy installation.
+ *
+ * The healthy organization workflow connection includes a roleless association
+ * that is the organization's real installation, so a Security Agent operation
+ * serves the same installation its entry gate reports.
  */
 export async function getPrimaryGitHubIntegrationForOrganization(organizationId: string) {
   const [integration] = await db
@@ -218,11 +238,15 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_connection_role, 'workflow'),
+        organizationWorkflowGitHubConnectionSql(),
         platformIntegrationHealthSql()
       )
     )
-    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
+    .orderBy(
+      desc(organizationWorkflowGitHubPreferenceSql()),
+      asc(platform_integrations.created_at),
+      asc(platform_integrations.id)
+    )
     .limit(1);
 
   return integration ?? null;
@@ -1069,14 +1093,16 @@ export async function getIntegrationForOwner(
   return integration || null;
 }
 
-/** Connection-status shape consumed by the reviewer status surfaces. */
+/**
+ * Connection-status shape consumed by the reviewer status surfaces. `connected`
+ * already implies health: an unhealthy row resolves to `integration: null`.
+ */
 export type GitHubConnectionStatus = {
   connected: boolean;
   integration: {
     accountLogin: string | null;
     repositorySelection: string | null;
     installedAt: string | null;
-    isValid: boolean;
   } | null;
 };
 
@@ -1122,7 +1148,6 @@ export async function getGitHubConnectionStatusForOwner(
       accountLogin: integration.platform_account_login,
       repositorySelection: integration.repository_access,
       installedAt: integration.installed_at,
-      isValid: !integration.suspended_at,
     },
   };
 }
@@ -1292,6 +1317,10 @@ export async function upsertPlatformIntegrationForOwner(
     repository_access: data.repositoryAccess,
     integration_status: INTEGRATION_STATUS.ACTIVE,
     repositories: data.repositories || null,
+    // A stored list is the snapshot the caller read from the provider for this
+    // request, so it carries its sync time; a row without one stays unsynced
+    // and the next repository read fetches a fresh list.
+    repositories_synced_at: data.repositories?.length ? now : null,
     installed_at: data.installedAt || new Date().toISOString(),
     github_app_type: appType,
     ...authorizationProvenance,
@@ -1386,6 +1415,7 @@ export async function upsertPlatformIntegrationForOwner(
           repository_access: values.repository_access,
           integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
+          repositories_synced_at: values.repositories_synced_at,
           github_app_type: appType,
           auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
           auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
@@ -1424,6 +1454,7 @@ export async function upsertPlatformIntegrationForOwner(
         repository_access: values.repository_access,
         integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
+        repositories_synced_at: values.repositories_synced_at,
         github_app_type: appType,
         auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
         auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,

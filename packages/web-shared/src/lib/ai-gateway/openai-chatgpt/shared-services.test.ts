@@ -17,15 +17,21 @@ import {
   readOpenAiChatGptUsageLimit,
   recordOpenAiChatGptUsageLimit,
   saveOpenAiChatGptConnection,
+  type OpenAiChatGptOwner,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
 import { CHATGPT_BUSINESS_USAGE_LIMIT_CODE } from './usage-limit';
 
 const originalPartnerKey = process.env.OPENAI_CHATGPT_API_KEY;
 
+const ACCESS_TOKEN = 'access-token';
+
+/** The credential a reconnect writes in place of `ACCESS_TOKEN`. */
+const REPLACEMENT_ACCESS_TOKEN = 'replacement-access-token';
+
 function connection(email: string): OpenAiChatGptConnection {
   return {
-    access_token: 'access-token',
+    access_token: ACCESS_TOKEN,
     refresh_token: 'refresh-token',
     expires_at: 1_800_000_000,
     scope: 'openid profile email offline_access',
@@ -145,7 +151,7 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
     const memberOwner = { kiloUserId: owner.id, organizationId: organization.id };
 
-    await recordOpenAiChatGptUsageLimit(shared, {
+    await recordOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN, {
       code: null,
       resetsAt: Date.now() + 60 * 60 * 1000,
     });
@@ -159,7 +165,7 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
 
   it('replaces workspace guidance when a consumer limit follows', async () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
-    await recordOpenAiChatGptUsageLimit(shared, {
+    await recordOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN, {
       code: CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
       resetsAt: null,
     });
@@ -168,18 +174,18 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
       resetsAt: null,
     });
 
-    await recordOpenAiChatGptUsageLimit(shared, { code: null, resetsAt: null });
+    await recordOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN, { code: null, resetsAt: null });
     await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toMatchObject({ code: null });
   });
 
   it('clears a recorded limit once a request through that row succeeded', async () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
 
-    await recordOpenAiChatGptUsageLimit(shared, {
+    await recordOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN, {
       code: CHATGPT_BUSINESS_USAGE_LIMIT_CODE,
       resetsAt: Date.now() + 60 * 60 * 1000,
     });
-    await clearOpenAiChatGptUsageLimit(shared);
+    await clearOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN);
     await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toBeNull();
     const [row] = await db
       .select({ code: openai_chatgpt_connections.usage_limit_error_code })
@@ -193,7 +199,83 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     expect(row.code).toBeNull();
 
     // A success on a row that never hit a limit writes nothing and must not throw.
-    await expect(clearOpenAiChatGptUsageLimit(shared)).resolves.toBeUndefined();
+    await expect(clearOpenAiChatGptUsageLimit(shared, ACCESS_TOKEN)).resolves.toBeUndefined();
+  });
+
+  it('keeps a late report from a replaced credential off the reconnected row', async () => {
+    const person = await insertTestUser({
+      google_user_email: `usage-limit-reconnect-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = {
+      kiloUserId: person.id,
+      organizationId: null,
+    };
+
+    await saveOpenAiChatGptConnection(personalOwner, connection('first@example.com'), person.id);
+    await saveOpenAiChatGptConnection(
+      personalOwner,
+      { ...connection('second@example.com'), access_token: REPLACEMENT_ACCESS_TOKEN },
+      person.id
+    );
+
+    // The response for the request that carried the replaced credential arrives
+    // after the reconnect.
+    await recordOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN, {
+      code: null,
+      resetsAt: Date.now() + 60 * 60 * 1000,
+    });
+
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
+    const [row] = await db
+      .select({
+        reachedAt: openai_chatgpt_connections.usage_limit_reached_at,
+        resetsAt: openai_chatgpt_connections.usage_limit_resets_at,
+        code: openai_chatgpt_connections.usage_limit_error_code,
+      })
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, person.id));
+    expect(row).toEqual({ reachedAt: null, resetsAt: null, code: null });
+
+    // The credential the row holds now still records its own limit.
+    await recordOpenAiChatGptUsageLimit(personalOwner, REPLACEMENT_ACCESS_TOKEN, {
+      code: null,
+      resetsAt: Date.now() + 60 * 60 * 1000,
+    });
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toMatchObject({
+      code: null,
+      resetsAt: expect.any(String),
+    });
+  });
+
+  it('keeps a late success from a replaced credential from clearing the reconnected limit', async () => {
+    const person = await insertTestUser({
+      google_user_email: `usage-limit-clear-${randomUUID()}@example.com`,
+    });
+    const personalOwner: OpenAiChatGptOwner = {
+      kiloUserId: person.id,
+      organizationId: null,
+    };
+
+    await saveOpenAiChatGptConnection(personalOwner, connection('first@example.com'), person.id);
+    await saveOpenAiChatGptConnection(
+      personalOwner,
+      { ...connection('second@example.com'), access_token: REPLACEMENT_ACCESS_TOKEN },
+      person.id
+    );
+    await recordOpenAiChatGptUsageLimit(personalOwner, REPLACEMENT_ACCESS_TOKEN, {
+      code: null,
+      resetsAt: Date.now() + 60 * 60 * 1000,
+    });
+
+    // A success from the replaced credential says nothing about the row's limit.
+    await clearOpenAiChatGptUsageLimit(personalOwner, ACCESS_TOKEN);
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toMatchObject({
+      code: null,
+      resetsAt: expect.any(String),
+    });
+
+    await clearOpenAiChatGptUsageLimit(personalOwner, REPLACEMENT_ACCESS_TOKEN);
+    await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
   });
 
   it('deletes the shared row and leaves the member row in place', async () => {

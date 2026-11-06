@@ -147,6 +147,36 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
 }
 
 export function repairChatCompletionsTools(requestToMutate: OpenRouterChatCompletionRequest) {
+  let legacyFunctionCallMessageCount = 0;
+  let legacyFunctionResultMessageCount = 0;
+  for (const message of requestToMutate.messages) {
+    if (message?.role === 'assistant' && message.function_call != null) {
+      legacyFunctionCallMessageCount++;
+    }
+    if (message?.role === 'function') {
+      legacyFunctionResultMessageCount++;
+    }
+  }
+  const legacyFunctionDefinitionCount = Array.isArray(requestToMutate.functions)
+    ? requestToMutate.functions.length
+    : 0;
+  const hasLegacyFunctionChoice = requestToMutate.function_call != null;
+  if (
+    legacyFunctionCallMessageCount > 0 ||
+    legacyFunctionResultMessageCount > 0 ||
+    legacyFunctionDefinitionCount > 0 ||
+    hasLegacyFunctionChoice
+  ) {
+    console.debug('[repairChatCompletionsTools] legacy function calling detected', {
+      model: requestToMutate.model,
+      messageCount: requestToMutate.messages.length,
+      legacyFunctionCallMessageCount,
+      legacyFunctionResultMessageCount,
+      legacyFunctionDefinitionCount,
+      hasLegacyFunctionChoice,
+    });
+  }
+
   const groups = groupByAssistantMessage(requestToMutate.messages);
 
   for (const group of groups) {

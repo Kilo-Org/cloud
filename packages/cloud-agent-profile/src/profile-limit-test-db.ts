@@ -5,6 +5,7 @@ import {
   agent_environment_profile_kilo_commands,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  agent_environment_profile_vars,
   agent_environment_profiles,
 } from '@kilocode/db/schema';
 
@@ -33,15 +34,21 @@ function resolveRowsFor(table: unknown, rowCount: number): Array<{ n: number } |
  * PostgreSQL row lock the services take in production. These tests pin the
  * transaction, the row lock and the error contract.
  *
- * `state.lockCalls` counts the profile row locks and `state.rowCount` tracks
- * the stored rows.
+ * `state.lockCalls` counts the profile row locks, `state.rowCount` tracks the
+ * stored rows, `state.upserts` counts variable writes and `initialVarKeys` are
+ * the variable keys the profile already holds.
  */
-export function createLimitTestDb(initialRowCount: number) {
+export function createLimitTestDb(initialRowCount: number, initialVarKeys: readonly string[] = []) {
   let rowCount = initialRowCount;
   let nextId = 0;
+  let upserts = 0;
+  const varKeys = new Set(initialVarKeys);
   const state = {
     get rowCount() {
       return rowCount;
+    },
+    get upserts() {
+      return upserts;
     },
     lockCalls: 0,
   };
@@ -50,31 +57,42 @@ export function createLimitTestDb(initialRowCount: number) {
 
   const select = () => ({
     from: (table: unknown) => ({
-      where: () =>
-        (() => {
-          const then = (
-            onFulfilled?: (value: unknown) => unknown,
-            onRejected?: (error: unknown) => unknown
-          ) => Promise.resolve(resolveRowsFor(table, rowCount)).then(onFulfilled, onRejected);
-          const chain = {
-            for: () => {
-              state.lockCalls += 1;
-              return chain;
-            },
-            limit: () => Promise.resolve(resolveRowsFor(table, rowCount)),
-            then,
-          };
-          return chain;
-        })(),
+      where: () => {
+        const resolve = () =>
+          table === agent_environment_profile_vars
+            ? [...varKeys].map(key => ({ key }))
+            : resolveRowsFor(table, rowCount);
+        const then = (
+          onFulfilled?: (value: unknown) => unknown,
+          onRejected?: (error: unknown) => unknown
+        ) => Promise.resolve(resolve()).then(onFulfilled, onRejected);
+        const chain = {
+          for: () => {
+            state.lockCalls += 1;
+            return chain;
+          },
+          limit: () => Promise.resolve(resolve()),
+          then,
+        };
+        return chain;
+      },
     }),
   });
 
   const insert = () => ({
-    values: () => ({
+    values: (row: { key?: string } = {}) => ({
       returning: () => {
         rowCount += 1;
         nextId += 1;
         return Promise.resolve([{ id: `row-${nextId}` }]);
+      },
+      onConflictDoUpdate: () => {
+        upserts += 1;
+        if (row.key !== undefined && !varKeys.has(row.key)) {
+          varKeys.add(row.key);
+          rowCount += 1;
+        }
+        return Promise.resolve();
       },
     }),
   });

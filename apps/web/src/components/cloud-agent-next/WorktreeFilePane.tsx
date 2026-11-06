@@ -89,6 +89,7 @@ function FilePaneStatus({
 }
 
 export function WorktreeFilePane({
+  userId,
   cloudAgentSessionId,
   organizationId,
   worktreeId,
@@ -99,6 +100,7 @@ export function WorktreeFilePane({
   review,
   reviewScope,
 }: {
+  userId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   worktreeId?: string;
@@ -110,6 +112,7 @@ export function WorktreeFilePane({
   reviewScope?: { userId: string; organizationId?: string; workspaceScope: string };
 }) {
   const { state, isFetching, reload } = useWorktreeFile({
+    userId,
     cloudAgentSessionId,
     organizationId,
     worktreeId,

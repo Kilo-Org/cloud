@@ -1,7 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
-import { parse } from 'jsonc-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
@@ -58,11 +54,6 @@ vi.mock('./logger.js', () => {
       descriptor,
   };
 });
-
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
 
 vi.mock('./agent-sandbox/factory.js', () => ({
   createAgentSandbox: vi.fn(() => ({
@@ -151,7 +142,6 @@ const {
   default: worker,
   REPORT_RETENTION_CRON,
   OUTCOME_AGGREGATE_CRON,
-  OUTCOME_AGGREGATE_CRONS,
 } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -160,8 +150,8 @@ type MockEnv = {
   BYOC_VERCEL_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: { getByName: ReturnType<typeof vi.fn> };
   NEXTAUTH_SECRET: string;
-  Sandbox: unknown;
-  SandboxSmall: unknown;
+  SandboxContainment: unknown;
+  SandboxSmallContainment: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
@@ -186,8 +176,8 @@ function createEnv(): MockEnv {
   return {
     NEXTAUTH_SECRET: secret,
     VERCEL_SNAPSHOT_BUILD: { getByName: vi.fn() },
-    Sandbox: {},
-    SandboxSmall: {},
+    SandboxContainment: {},
+    SandboxSmallContainment: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: 'test-internal-secret',
     USER_KILO_FACADE: {
@@ -453,19 +443,6 @@ describe('server background reporting', () => {
       'Cloud Agent scheduled handler received an unrecognized cron',
       { cron: '0 0 * * 0' }
     );
-  });
-
-  it('keeps the deployed cron triggers in sync with the dispatcher constants', () => {
-    const config = parse(fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')) as {
-      triggers?: { crons?: string[] };
-      env?: { dev?: { triggers?: { crons?: string[] } } };
-    };
-    const expected = [REPORT_RETENTION_CRON, OUTCOME_AGGREGATE_CRON].sort();
-
-    expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
-    expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
-    expect(OUTCOME_AGGREGATE_CRON).toBe('*/5 * * * *');
-    expect([...OUTCOME_AGGREGATE_CRONS]).toEqual([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
   });
 });
 

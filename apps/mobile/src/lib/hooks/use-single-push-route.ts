@@ -3,6 +3,9 @@ import { useCallback, useRef } from 'react';
 
 import { claimSinglePush, hrefKey, type SinglePushGuardState } from '@/lib/hooks/single-push-route';
 
+/** `router.push` for one screen, guarded against a press burst. */
+export type SinglePushRoute = (href: Href) => void;
+
 /**
  * `router.push` for one screen, at most once per press burst.
  *
@@ -13,7 +16,7 @@ import { claimSinglePush, hrefKey, type SinglePushGuardState } from '@/lib/hooks
  * screen regains focus, so a press right after the reader returns always
  * navigates.
  */
-export function useSinglePushRoute(): (href: Href) => void {
+export function useSinglePushRoute(): SinglePushRoute {
   const router = useRouter();
   const guardRef = useRef<SinglePushGuardState>({ lastPushAt: 0, lastKey: '' });
 

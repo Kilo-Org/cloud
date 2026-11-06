@@ -23,6 +23,22 @@ export const CONTROL_PLANE_OUTBOX_MAX_BYTES = 8 * 1024 * 1024;
 const RECONNECT_JITTER_DIVISOR = 4;
 
 /**
+ * Older Workers reject unknown hello fields with their strict frame schema, so a
+ * capability-bearing hello is retried with the previous capability set first, then
+ * with the original hello that every supported Worker accepts.
+ */
+const FALLBACK_HELLO_CAPABILITIES = [
+  {
+    heartbeatAck: true,
+    workspaceSnapshots: true,
+    redactsNamedSecrets: true,
+    installsSkillsSh: true,
+  },
+  { heartbeatAck: true, redactsNamedSecrets: true, installsSkillsSh: true },
+  {},
+] as const;
+
+/**
  * Spec §7 Connection: events are evicted first, then display-only route progress. Route
  * transitions, outcomes and request results are never evicted; at capacity the newest is rejected.
  */
@@ -45,7 +61,7 @@ type WebSocketWithHeadersCtor = new (
   options?: { headers?: Record<string, string> }
 ) => WebSocket;
 
-export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean };
+export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
 
 /** The live connection phase, derived from the shared tuple so it cannot drift. */
 export type ControlPlaneConnectionPhase = NativeConnectionPhase;
@@ -243,6 +259,24 @@ export function createControlPlaneConnection(
     }
   }
 
+  function armNegotiationFallback(target: WebSocket, index: number): void {
+    negotiationTimer = setTimeout(() => {
+      if (socket !== target || phase !== 'awaiting_welcome') return;
+      negotiationTimer = undefined;
+      if (
+        !writeRaw(target, {
+          type: 'hello',
+          wrapperId,
+          allocationId: options.allocationId,
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          ...(FALLBACK_HELLO_CAPABILITIES[index] ?? {}),
+        })
+      )
+        return;
+      if (index + 1 < FALLBACK_HELLO_CAPABILITIES.length) armNegotiationFallback(target, index + 1);
+    }, options.timers.wrapper.heartbeatNegotiationMs);
+  }
+
   function armAckDeadline(target: WebSocket): void {
     clearTimeout(ackTimer);
     const deadline = setTimeout(() => {
@@ -253,7 +287,11 @@ export function createControlPlaneConnection(
     ackTimer = deadline;
   }
 
-  function startHeartbeat(target: WebSocket, acknowledged: boolean): void {
+  function startHeartbeat(
+    target: WebSocket,
+    acknowledged: boolean,
+    workspaceSnapshots: boolean
+  ): void {
     stopHeartbeat();
     heartbeatAck = acknowledged;
     if (heartbeatAck) armAckDeadline(target);
@@ -263,6 +301,7 @@ export function createControlPlaneConnection(
       writeRaw(target, {
         type: 'heartbeat',
         active: heartbeat.active,
+        ...(workspaceSnapshots ? { workspaceBusy: heartbeat.workspaceBusy ?? false } : {}),
         degraded: heartbeat.degraded,
       });
     }, options.timers.wrapper.heartbeatIntervalMs);
@@ -349,7 +388,7 @@ export function createControlPlaneConnection(
       phase = 'connected';
       disconnectEpisodeReported = false;
       attempt = 0;
-      startHeartbeat(target, frame.heartbeatAck === true);
+      startHeartbeat(target, frame.heartbeatAck === true, frame.workspaceSnapshots === true);
       options.onConnected?.();
       return;
     }
@@ -406,21 +445,14 @@ export function createControlPlaneConnection(
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
+          workspaceSnapshots: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
+          startCommands: true,
         })
       )
         return;
-      negotiationTimer = setTimeout(() => {
-        if (socket !== target || phase !== 'awaiting_welcome') return;
-        negotiationTimer = undefined;
-        writeRaw(target, {
-          type: 'hello',
-          wrapperId,
-          allocationId: options.allocationId,
-          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-        });
-      }, options.timers.wrapper.heartbeatNegotiationMs);
+      armNegotiationFallback(target, 0);
     };
     target.onmessage = event => onMessage(target, event);
     target.onclose = () => onSocketEnd(target, 'connection closed');

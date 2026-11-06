@@ -66,7 +66,7 @@ describe('selectShareGateState', () => {
     const state = selectShareGateState(base({ shareId: undefined }));
     expect(state.kind).toBe('stale-share');
     if (state.kind === 'stale-share') {
-      expect(state.message).toBe('This share is no longer available.');
+      expect(state.message).toBe('Send it again from the app you shared from.');
       expect(state.showNewSession).toBe(false);
       expect(state.showRetry).toBe(false);
       expect(state.showList).toBe(false);

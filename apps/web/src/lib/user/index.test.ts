@@ -47,6 +47,8 @@ import {
   kiloclaw_image_catalog,
   security_findings,
   security_finding_notifications,
+  support_access_grants,
+  support_access_grant_events,
   security_remediation_attempts,
   security_remediations,
   security_analysis_queue,
@@ -80,6 +82,9 @@ import {
   spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
+  enkrypt_usage,
+  enkrypt_usage_decision,
+  api_kind,
   credit_campaigns,
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
@@ -137,12 +142,17 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
+  cloud_agent_pr_watch_activity,
   todo_items,
   todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
+  session_step_up_challenges,
+  session_step_up_proofs,
 } from '@kilocode/db/schema';
+import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -191,6 +201,7 @@ import {
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -242,6 +253,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
     await db.delete(todo_lists);
@@ -340,6 +352,9 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
     await db.delete(byoc_connections);
+    await db.delete(enkrypt_usage);
+    await db.delete(support_access_grant_events);
+    await db.delete(support_access_grants);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -865,6 +880,43 @@ describe('User', () => {
       jest.restoreAllMocks();
     });
 
+    it.each<WatchwoodSignupAssessment>([
+      {
+        status: 'assessed',
+        riskScore: 1,
+        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+        latencyMs: 10,
+        assessedAt: 1,
+      },
+      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
+      { status: 'missing', latencyMs: 0, assessedAt: 1 },
+    ])('creates an account with a $status shadow assessment', async watchwood => {
+      const email = `watchwood-${watchwood.status}@example.com`;
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Shadow Signup',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: `watchwood-${watchwood.status}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        null,
+        { watchwood }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
+      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
+        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
+      ]);
+    });
+
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
       const email = 'native-admission-refused@example.com';
       const verifyAdmission = jest.fn().mockResolvedValue(false);
@@ -1282,6 +1334,62 @@ describe('User', () => {
       expect(
         await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, retry.user.id) })
       ).toBeDefined();
+    });
+
+    it('creates the account without an IP when a trusted path skips admission', async () => {
+      // SCIM directory-sync provisioning has no end user and no forwarded IP.
+      // Without the skip this fails closed with SIGNUP-UNAVAILABLE, which would
+      // block every directory-provisioned account in production.
+      const email = 'skip-admission@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Skip Admission',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'workos' as const,
+        provider_account_id: 'workos-skip-admission',
+      };
+
+      const result = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { skipSignupAdmission: true }
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      // Admission is the only gate skipped: the account is still fully provisioned.
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+
+    it('still rejects a request with no IP when admission is not skipped', async () => {
+      // The guard against the skip becoming the default.
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'no-ip-no-skip@example.com',
+          google_user_name: 'No IP No Skip',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google' as const,
+          provider_account_id: 'google-no-ip-no-skip',
+        },
+        undefined,
+        false
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
     });
 
     it.each([undefined, '', 'not-a-digest', 'has space', 'a'.repeat(129)])(
@@ -2063,6 +2171,31 @@ describe('User', () => {
           kilo_user_id: user.id,
           expires_at: new Date().toISOString(),
         });
+        const [stepUpCredential] = await db
+          .insert(passkey_credentials)
+          .values({
+            kilo_user_id: user.id,
+            credential_id: `step-up-credential-${randomUUID()}`,
+            public_key: 'public-key',
+          })
+          .returning();
+        await db.insert(session_step_up_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          purpose: 'session',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+        await db.insert(session_step_up_proofs).values({
+          kilo_user_id: user.id,
+          session_id_hash: hashWebSessionId('deleted-session'),
+          method: 'webauthn_uv',
+          passkey_credential_id: stepUpCredential!.id,
+          purpose: 'session',
+          verified_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -2106,6 +2239,18 @@ describe('User', () => {
             .select()
             .from(passkey_credentials)
             .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_challenges)
+            .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(session_step_up_proofs)
+            .where(eq(session_step_up_proofs.kilo_user_id, user.id))
         ).toHaveLength(0);
         expect(
           await db
@@ -2425,6 +2570,185 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('revokes the actor open support access grants and records events', async () => {
+      const admin = await insertTestUser({
+        is_admin: true,
+      });
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createTestOrganization(
+        `soft-delete-support-${crypto.randomUUID()}`,
+        owner.id,
+        0
+      );
+      const now = new Date();
+      const [grant] = await db
+        .insert(support_access_grants)
+        .values({
+          actor_kilo_user_id: admin.id,
+          organization_id: organization.id,
+          action_class: 'support_read',
+          status: 'active',
+          reason: 'investigating a customer report',
+          requested_duration_seconds: 1800,
+          issued_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        })
+        .returning();
+
+      await softDeleteUser(admin.id);
+
+      const [revoked] = await db
+        .select()
+        .from(support_access_grants)
+        .where(eq(support_access_grants.id, grant.id));
+      expect(revoked).toMatchObject({
+        status: 'revoked',
+        revoke_reason: 'actor account soft-deleted',
+      });
+      const events = await db
+        .select()
+        .from(support_access_grant_events)
+        .where(eq(support_access_grant_events.grant_id, grant.id));
+      expect(events).toEqual([expect.objectContaining({ event_type: 'revoked' })]);
+    });
+
+    it('removes session step-up rows', async () => {
+      const user = await insertTestUser();
+      const [credential] = await db
+        .insert(passkey_credentials)
+        .values({
+          kilo_user_id: user.id,
+          credential_id: `soft-delete-step-up-${randomUUID()}`,
+          public_key: 'public-key',
+        })
+        .returning();
+      await db.insert(session_step_up_challenges).values({
+        id: randomUUID(),
+        challenge: `challenge-${randomUUID()}`,
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        purpose: 'session',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await db.insert(session_step_up_proofs).values({
+        kilo_user_id: user.id,
+        session_id_hash: hashWebSessionId('soft-delete-session'),
+        method: 'webauthn_uv',
+        passkey_credential_id: credential!.id,
+        purpose: 'session',
+        verified_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(session_step_up_challenges)
+          .where(eq(session_step_up_challenges.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(session_step_up_proofs)
+          .where(eq(session_step_up_proofs.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
+
+    it('deletes OAuth-owned PR watch policy and activity without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|watch-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: otherUser.id,
+          platform: 'github',
+          integration_type: 'app',
+        })
+        .returning();
+      if (!integration) throw new Error('Missing integration fixture');
+      const policy = {
+        version: 1 as const,
+        model: 'anthropic/claude-sonnet-4.6',
+        profileId: null,
+        categories: { reviews: true, failedChecks: true, baseUpdates: false },
+        branchStrategy: 'merge' as const,
+        historyRewriteConsent: false,
+        maxAttemptsPerProblem: 2,
+        maxTotalAttempts: 10,
+        observationOnlyConsent: true as const,
+        futureEventsOnlyConsent: true as const,
+        noHardSpendCapConsent: true as const,
+      };
+      const watches = await db
+        .insert(cloud_agent_pr_watches)
+        .values(
+          [user, otherUser].map((owner, index) => ({
+            kilo_user_id: owner.id,
+            integration_id: integration.id,
+            installation_id: '123',
+            github_app_type: 'standard' as const,
+            repository_id: '123',
+            repo_url: 'https://github.com/kilo/watch-privacy',
+            pr_number: index + 1,
+            source_session_id: `ses_${randomUUID()}`,
+            source_cloud_agent_session_id: `workspace_${randomUUID()}`,
+            worktree_id: `worktree_${randomUUID()}`,
+            head_ref: 'fix',
+            base_ref: 'main',
+            head_sha: 'a'.repeat(40),
+            base_sha: 'b'.repeat(40),
+            policy,
+            projection: { privateFeedback: 'Customer-sensitive feedback' },
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
+          }))
+        )
+        .returning();
+      const ownedWatch = watches.find(watch => watch.kilo_user_id === user.id);
+      const otherWatch = watches.find(watch => watch.kilo_user_id === otherUser.id);
+      if (!ownedWatch || !otherWatch) throw new Error('Missing watch fixtures');
+      await db.insert(cloud_agent_pr_watch_activity).values([
+        {
+          watch_id: ownedWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Private feedback' },
+        },
+        {
+          watch_id: otherWatch.id,
+          generation: 1,
+          kind: 'feedback',
+          data: { body: 'Keep this feedback' },
+        },
+      ]);
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.kilo_user_id, user.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, ownedWatch.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watches)
+          .where(eq(cloud_agent_pr_watches.id, otherWatch.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pr_watch_activity)
+          .where(eq(cloud_agent_pr_watch_activity.watch_id, otherWatch.id))
+      ).toHaveLength(1);
+    });
+
     it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
       const user = await insertTestUser();
       const otherUser = await insertTestUser();
@@ -3394,6 +3718,7 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        external_id: 'ext-abc-123',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
         blocked_reason: 'manual block',
@@ -3403,6 +3728,7 @@ describe('User', () => {
         is_super_admin: true,
         can_view_sessions: true,
         can_manage_credits: true,
+        can_export_api_request_logs: true,
       });
 
       await softDeleteUser(user.id);
@@ -3429,6 +3755,7 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
+      expect(softDeleted!.external_id).toBeNull();
       expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
       expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
       expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
@@ -3443,6 +3770,7 @@ describe('User', () => {
       expect(softDeleted!.is_super_admin).toBe(false);
       expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
+      expect(softDeleted!.can_export_api_request_logs).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });
@@ -6320,6 +6648,66 @@ describe('User', () => {
       // Analytics fields preserved
       expect(scans[0].source_platform).toBe('openclaw');
       expect(scans[0].findings_critical).toBe(1);
+    });
+
+    it('should retain enkrypt_usage billing rows and attribution when the user is soft-deleted', async () => {
+      const user = await insertTestUser({ id: `oauth/${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization('Enkrypt usage retention', otherUser.id, 0);
+      const [apiKind] = await db
+        .insert(api_kind)
+        .values({ api_kind: 'chat_completions' })
+        .onConflictDoUpdate({ target: api_kind.api_kind, set: { api_kind: 'chat_completions' } })
+        .returning();
+      const [decision] = await db
+        .insert(enkrypt_usage_decision)
+        .values({ decision: 'allowed' })
+        .onConflictDoUpdate({
+          target: enkrypt_usage_decision.decision,
+          set: { decision: 'allowed' },
+        })
+        .returning();
+      if (!apiKind || !decision) throw new Error('Failed to create Enkrypt usage dimensions');
+
+      const usageFields = {
+        organization_id: organization.id,
+        api_kind_id: apiKind.api_kind_id,
+        decision_id: decision.decision_id,
+        enkrypt_credits_cost: 1.5,
+        charged_microdollars: 15_000,
+        added_latency_ms: 42,
+      };
+      const originalRows = await db
+        .insert(enkrypt_usage)
+        .values([
+          { ...usageFields, kilo_user_id: user.id, session_id: 'deleted-user-session' },
+          {
+            ...usageFields,
+            kilo_user_id: user.id,
+            session_id: null,
+            enkrypt_credits_cost: null,
+            charged_microdollars: 0,
+            added_latency_ms: null,
+          },
+          { ...usageFields, kilo_user_id: otherUser.id, session_id: 'retained-user-session' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const retainedRows = await db
+        .select()
+        .from(enkrypt_usage)
+        .where(
+          inArray(
+            enkrypt_usage.id,
+            originalRows.map(row => row.id)
+          )
+        );
+      expect(retainedRows).toHaveLength(originalRows.length);
+      for (const originalRow of originalRows) {
+        expect(retainedRows.find(row => row.id === originalRow.id)).toEqual(originalRow);
+      }
     });
 
     it('should preserve credit transactions and creator attribution', async () => {

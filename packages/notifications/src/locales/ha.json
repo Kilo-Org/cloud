@@ -9,6 +9,7 @@
       "lowBalance": "Ma'auninka yana buƙatar kulawa",
       "spendAlert": "Kashewar ku na buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
+      "securityUpdate": "Wani duban tsaro yana da sabuntawa",
       "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Wani binciken tsaro yana buƙatar kulawa"
+      "body": "Wani duban tsaro yana da sabuntawa"
     }
   },
   "instanceLifecycle": {

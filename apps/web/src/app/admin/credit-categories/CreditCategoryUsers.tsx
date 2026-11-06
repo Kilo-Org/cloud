@@ -1,5 +1,7 @@
 'use client';
 
+import { adminFetch } from '@/lib/admin/admin-fetch';
+
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -99,10 +101,6 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
     (params: Record<string, string>) => {
       const newSearchParams = new URLSearchParams(searchParams.toString());
 
-      if (params.search !== undefined || params.sortBy !== undefined) {
-        params.page = '1';
-      }
-
       Object.entries(params).forEach(([key, value]) => {
         if (value) {
           newSearchParams.set(key, value);
@@ -111,7 +109,9 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
         }
       });
 
-      router.push(`/admin/credit-categories/${creditCategoryKey}?${newSearchParams.toString()}`);
+      router.push(
+        `/admin/credit-categories/${encodeURIComponent(creditCategoryKey)}?${newSearchParams.toString()}`
+      );
     },
     [router, searchParams, creditCategoryKey]
   );
@@ -127,8 +127,8 @@ export function CreditCategoryUsersTable({ creditCategoryKey }: CreditCategoryUs
 
       try {
         const queryParams = new URLSearchParams(params);
-        const response = await fetch(
-          `/admin/api/credit-categories/${creditCategoryKey}?${queryParams.toString()}`
+        const response = await adminFetch(
+          `/admin/api/credit-categories/${encodeURIComponent(creditCategoryKey)}?${queryParams.toString()}`
         );
 
         if (!response.ok) {

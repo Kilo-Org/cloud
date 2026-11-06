@@ -38,10 +38,12 @@ import {
 import BuyOrganizationCreditsDialog from '@/components/payment/BuyOrganizationCreditsDialog';
 import { SeatsRequirementDialog } from '@/app/admin/components/OrganizationAdmin/SeatsRequirementDialog';
 import { PlanDialog } from '@/app/admin/components/OrganizationAdmin/PlanDialog';
+import { AdminViewOrganizationButton } from '@/app/admin/support-access/AdminViewOrganizationButton';
 import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/TrialEndDateDialog';
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
@@ -67,10 +69,10 @@ const OSS_TIER_NAMES: Record<number, string> = {
   3: 'Seed',
 };
 
-function useCanManagePaymentInfo() {
+function useCanManageBilling() {
   const isKiloAdmin = useIsKiloAdmin();
   const orgRole = useUserOrganizationRole();
-  return isKiloAdmin || orgRole === 'owner' || orgRole === 'billing_manager';
+  return isKiloAdmin || canManageOrganizationBilling(orgRole);
 }
 
 type InnerProps = {
@@ -263,7 +265,7 @@ function Inner(props: InnerProps) {
   const isKiloAdmin = useIsKiloAdmin();
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
-  const isOrgOwner = useCanManagePaymentInfo();
+  const canManageBilling = useCanManageBilling();
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
@@ -355,7 +357,7 @@ function Inner(props: InnerProps) {
           ) : (
             <div className="mt-1 flex items-center gap-2">
               <p className="text-lg font-semibold">{name}</p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditing(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -412,7 +414,7 @@ function Inner(props: InnerProps) {
                   <span className="text-muted-foreground text-sm">Not set</span>
                 )}
               </p>
-              {isOrgOwner && (
+              {canManageBilling && (
                 <button
                   onClick={() => setIsEditingDomain(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
@@ -424,7 +426,7 @@ function Inner(props: InnerProps) {
             </div>
           )}
         </div>
-        {isOrgOwner && (
+        {canManageBilling && (
           <div>
             <span className="text-muted-foreground text-sm font-medium">
               <PiggyBank className="mr-1 inline h-4 w-4" />
@@ -485,10 +487,10 @@ function Inner(props: InnerProps) {
               <label className="text-muted-foreground text-sm font-medium">Quick Actions</label>
               <div className="mt-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/organizations/${id}`} target="_blank">
+                  <AdminViewOrganizationButton organizationId={id} organizationName={name}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View Organization Page
-                  </Link>
+                  </AdminViewOrganizationButton>
                 </Button>
               </div>
             </div>

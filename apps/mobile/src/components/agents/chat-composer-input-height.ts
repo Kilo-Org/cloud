@@ -233,7 +233,7 @@ export const NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT = 160;
  * the frame the prompt actually renders instead of re-declaring the numbers.
  */
 export const NEW_SESSION_PROMPT_LINE_HEIGHT = 24;
-export const NEW_SESSION_PROMPT_VERTICAL_PADDING = 16;
+const NEW_SESSION_PROMPT_VERTICAL_PADDING = 16;
 export const NEW_SESSION_PROMPT_DEFAULT_LINES = 3;
 
 /**

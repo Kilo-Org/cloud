@@ -78,21 +78,26 @@ export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string,
-  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   await assertGitHubInstallationRuntimeAuthorized(
     installationId,
     appType,
     expectedIntegrationId,
     purpose
   );
-  return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+  signal?.throwIfAborted();
+  return await generateGitHubInstallationTokenForMaintenance(installationId, appType, signal);
 }
 
 export async function generateGitHubInstallationTokenForMaintenance(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  signal?: AbortSignal
 ): Promise<InstallationToken> {
+  signal?.throwIfAborted();
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -103,6 +108,7 @@ export async function generateGitHubInstallationTokenForMaintenance(
     appId: credentials.appId,
     privateKey: credentials.privateKey,
     installationId,
+    ...(signal ? { request: new Octokit({ request: { signal } }).request } : {}),
   });
 
   const authResult = await auth({ type: 'installation' });
@@ -1120,6 +1126,10 @@ export type AssociatedPullRequest = {
   headRepoFullName?: string;
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
+  baseSha?: string;
+  baseRef?: string;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1161,15 +1171,39 @@ function getResponseHeader(error: unknown, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function parseRateLimitResetAt(error: unknown): Date {
-  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
-  const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
-  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
-    return new Date(resetSeconds * 1000);
+function retryAfterDeadlineMs(error: unknown, now: number): number | null {
+  const header = getResponseHeader(error, 'retry-after')?.trim();
+  if (!header) return null;
+  // A bare number is a delta in seconds; anything else is an HTTP date.
+  if (/^\d+$/.test(header)) {
+    const seconds = Number(header);
+    return Number.isFinite(seconds) ? now + seconds * 1000 : null;
   }
-  // Fall back to "retry in 60s" if the header is missing/invalid, so callers
-  // always have a usable Date to show.
-  return new Date(Date.now() + 60_000);
+  const timestamp = Date.parse(header);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function primaryResetDeadlineMs(error: unknown): number | null {
+  // The primary reset only applies once the quota is exhausted; otherwise the
+  // future reset of a still-usable quota would over-wait secondary limits.
+  if (getResponseHeader(error, 'x-ratelimit-remaining') !== '0') return null;
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetSeconds = Number(resetHeader);
+  if (!Number.isFinite(resetSeconds) || resetSeconds <= 0) return null;
+  return resetSeconds * 1000;
+}
+
+function parseRateLimitResetAt(error: unknown, now = Date.now()): Date {
+  const deadlines = [retryAfterDeadlineMs(error, now), primaryResetDeadlineMs(error)].filter(
+    (deadline): deadline is number =>
+      deadline !== null && Number.isFinite(new Date(deadline).getTime())
+  );
+  // Retry-After applies to secondary limits; the primary reset applies while
+  // the quota is exhausted. When both apply, wait for the later deadline.
+  // Without a usable signal, wait the documented minimum.
+  if (deadlines.length === 0) return new Date(now + 60_000);
+  return new Date(Math.max(...deadlines));
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1192,10 +1226,10 @@ export function isGitHubRateLimitError(error: unknown): boolean {
   const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
   if (remaining === '0') return true;
   // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
-  // denial (e.g. installation lacks pull request access). Only treat 403 as
-  // rate-limited when the message indicates so, so that genuine permission
-  // failures are surfaced to the caller.
+  // denial (e.g. installation lacks pull request access). A Retry-After header
+  // is GitHub's secondary-limit signal even when the message omits the phrase.
   if (error.status === 403) {
+    if (getResponseHeader(error, 'retry-after') !== undefined) return true;
     const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes('rate limit') ||
@@ -1204,6 +1238,18 @@ export function isGitHubRateLimitError(error: unknown): boolean {
     );
   }
   return false;
+}
+
+/**
+ * Normalize a GitHub failure into the typed rate-limit error that callers
+ * propagate across refresh legs. Returns `null` when the failure is not a rate
+ * limit, and returns the existing error unchanged when it is already typed so
+ * its deadline is not recomputed or lost.
+ */
+export function toGitHubRateLimitError(error: unknown): GitHubRateLimitError | null {
+  if (error instanceof GitHubRateLimitError) return error;
+  if (!isGitHubRateLimitError(error)) return null;
+  return new GitHubRateLimitError(parseRateLimitResetAt(error));
 }
 
 /**
@@ -1236,6 +1282,12 @@ export async function fetchPullRequestByNumber(params: {
    * `MAX_COMMIT_PAGES`.
    */
   expectedHeadSha?: string | null;
+  /**
+   * Shared deadline for every GitHub request this call makes, including the
+   * installation-token mint. Optional so existing callers keep their current
+   * behaviour.
+   */
+  signal?: AbortSignal;
 }): Promise<AssociatedPullRequest | null> {
   const {
     installationId,
@@ -1245,9 +1297,19 @@ export async function fetchPullRequestByNumber(params: {
     appType,
     includeCommits = false,
     expectedHeadSha = null,
+    signal,
   } = params;
 
-  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const requestOptions = signal ? { request: { signal } } : {};
+  const tokenData = await generateGitHubInstallationToken(
+    String(installationId),
+    appType,
+    undefined,
+    'workflow',
+    signal
+  ).catch((error: unknown) => {
+    throw toGitHubRateLimitError(error) ?? error;
+  });
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
@@ -1255,6 +1317,7 @@ export async function fetchPullRequestByNumber(params: {
       owner,
       repo,
       pull_number: number,
+      ...requestOptions,
     });
 
     const state: AssociatedPullRequest['state'] =
@@ -1283,6 +1346,7 @@ export async function fetchPullRequestByNumber(params: {
             pull_number: number,
             per_page: COMMITS_PER_PAGE,
             page,
+            ...requestOptions,
           });
           for (const commit of data) {
             if (typeof commit.sha === 'string') commitShas.push(commit.sha);
@@ -1303,12 +1367,15 @@ export async function fetchPullRequestByNumber(params: {
       baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
       headRepoFullName: pr.head.repo?.full_name ?? '',
       headRef: pr.head.ref,
+      baseSha: pr.base.sha,
+      baseRef: pr.base.ref,
+      mergeable: pr.mergeable,
+      mergeableState: pr.mergeable_state,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     if (isHttpError(error) && error.status === 404) {
       warnExceptInTest('[fetchPullRequestByNumber] PR not found or repo not accessible', {
         owner,
@@ -1601,45 +1668,89 @@ export async function checkExistingFork(
   }
 }
 
+// How many merges a head may stack before its branch content is treated as unknown.
+const mergeHeadWalkLimit = 10;
+
+export type MergeHeadContent =
+  | Readonly<{ kind: 'not_merge' }>
+  // The heads a review of the merge head can cover: every merge head on its first-parent chain, then
+  // the branch commit the chain ends on, which all of them carry.
+  | Readonly<{ kind: 'review_content'; shas: readonly string[] }>
+  // A merge that takes code from outside the base branch, or a chain that cannot be read.
+  | Readonly<{ kind: 'unreviewed_content' }>;
+
 /**
- * Checks whether a commit is a merge commit (has 2+ parents).
- * Used to skip code reviews triggered by "merge base into feature" pushes.
- * Returns false if the API call fails so the review proceeds (fail-open).
+ * Resolves what a synchronize head carries. A head that stacks merges of the
+ * base branch carries the branch commit its first-parent chain ends on, and each
+ * merge head on that chain carries the same content, so the chain names the
+ * heads a review of any of them covers. A merge whose second parent is not base
+ * content brings in code no branch review covers, and an unreadable chain is
+ * treated the same way, so both fall through to a review instead of a skip.
  */
-export async function isMergeCommit(
-  installationId: string,
-  owner: string,
-  repo: string,
-  commitSha: string,
-  appType: GitHubAppType = 'standard'
-): Promise<boolean> {
+export async function resolveMergeHeadContent(args: {
+  appType: GitHubAppType;
+  baseSha: string;
+  headSha: string;
+  installationId: string;
+  owner: string;
+  repo: string;
+}): Promise<MergeHeadContent> {
   try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const tokenData = await generateGitHubInstallationToken(args.installationId, args.appType);
     const octokit = new Octokit({ auth: tokenData.token });
+    const shas: string[] = [];
+    let current = args.headSha;
 
-    const { data } = await octokit.git.getCommit({
-      owner,
-      repo,
-      commit_sha: commitSha,
+    for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
+      const { data } = await octokit.git.getCommit({
+        owner: args.owner,
+        repo: args.repo,
+        commit_sha: current,
+      });
+      const [firstParent, secondParent] = data.parents;
+      if (data.parents.length < 2) {
+        if (depth === 0) {
+          return { kind: 'not_merge' };
+        }
+        return { kind: 'review_content', shas: shas.concat(current) };
+      }
+      if (firstParent === undefined || secondParent === undefined) {
+        return { kind: 'unreviewed_content' };
+      }
+      // oxlint-disable-next-line no-await-in-loop -- The comparison decides whether this merge is base content.
+      const comparison = await octokit.repos.compareCommits({
+        owner: args.owner,
+        repo: args.repo,
+        base: args.baseSha,
+        head: secondParent.sha,
+      });
+      if (comparison.data.status !== 'behind' && comparison.data.status !== 'identical') {
+        logExceptInTest(
+          '[resolveMergeHeadContent] Merge takes content from outside the base branch',
+          {
+            owner: args.owner,
+            repo: args.repo,
+            sha: current.substring(0, 8),
+            secondParent: secondParent.sha.substring(0, 8),
+            status: comparison.data.status,
+          }
+        );
+        return { kind: 'unreviewed_content' };
+      }
+      shas.push(current);
+      current = firstParent.sha;
+    }
+
+    logExceptInTest('[resolveMergeHeadContent] Merge chain exceeds the walk limit', {
+      owner: args.owner,
+      repo: args.repo,
+      sha: args.headSha.substring(0, 8),
     });
-
-    const result = data.parents.length > 1;
-
-    logExceptInTest('[isMergeCommit] Checked commit parents', {
-      owner,
-      repo,
-      sha: commitSha.substring(0, 8),
-      parentCount: data.parents.length,
-      isMergeCommit: result,
-    });
-
-    return result;
+    return { kind: 'unreviewed_content' };
   } catch (error) {
-    logExceptInTest(
-      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
-      error
-    );
-    return false;
+    logExceptInTest('[resolveMergeHeadContent] Failed to walk the merge chain:', error);
+    return { kind: 'unreviewed_content' };
   }
 }
 
@@ -1661,6 +1772,19 @@ type CheckRunOutput = {
   text?: string;
 };
 
+const checkRunConclusions: Readonly<Record<CheckRunConclusion, true>> = {
+  action_required: true,
+  cancelled: true,
+  failure: true,
+  neutral: true,
+  success: true,
+  timed_out: true,
+};
+
+function isCheckRunConclusion(value: string | null | undefined): value is CheckRunConclusion {
+  return value !== null && value !== undefined && Object.hasOwn(checkRunConclusions, value);
+}
+
 /**
  * Creates a GitHub Check Run on a commit.
  *
@@ -1678,18 +1802,24 @@ export async function createCheckRun(
   options: {
     detailsUrl?: string;
     output?: CheckRunOutput;
+    // Set for a head that is already decided, such as one that carries content a
+    // finished review covered: the run is created completed with that conclusion.
+    conclusion?: CheckRunConclusion;
   } = {},
   appType: GitHubAppType = 'standard'
 ): Promise<number> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const completed = options.conclusion !== undefined;
 
   const { data } = await octokit.checks.create({
     owner,
     repo,
     name: 'Kilo Code Review',
     head_sha: headSha,
-    status: 'queued',
+    status: completed ? 'completed' : 'queued',
+    ...(options.conclusion ? { conclusion: options.conclusion } : {}),
+    ...(completed ? { completed_at: new Date().toISOString() } : {}),
     ...(options.detailsUrl ? { details_url: options.detailsUrl } : {}),
     ...(options.output ? { output: options.output } : {}),
   });
@@ -1699,9 +1829,38 @@ export async function createCheckRun(
     repo,
     headSha: headSha.substring(0, 8),
     checkRunId: data.id,
+    conclusion: options.conclusion,
   });
 
   return data.id;
+}
+
+/**
+ * Reads the conclusion a check run finished with, so a later commit that
+ * carries the same reviewed content can be gated with the same verdict.
+ * Returns undefined when the run cannot be read or has no conclusion yet.
+ */
+export async function getCheckRunConclusion(
+  installationId: string,
+  owner: string,
+  repo: string,
+  checkRunId: number,
+  appType: GitHubAppType = 'standard'
+): Promise<CheckRunConclusion | undefined> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+    const { data } = await octokit.checks.get({
+      owner,
+      repo,
+      check_run_id: checkRunId,
+    });
+    const conclusion = data.conclusion ?? undefined;
+    return isCheckRunConclusion(conclusion) ? conclusion : undefined;
+  } catch (error) {
+    logExceptInTest('[getCheckRunConclusion] Failed to read check run:', error);
+    return undefined;
+  }
 }
 
 /**

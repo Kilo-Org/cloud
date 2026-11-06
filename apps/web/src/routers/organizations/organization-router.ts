@@ -39,6 +39,7 @@ import {
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
+  requireLiveOrganizationForPlatformAdmin,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
   organizationBillingProcedure,
@@ -48,6 +49,7 @@ import { organizationsMembersRouter } from '@/routers/organizations/organization
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
+import { organizationRequestLogsRouter } from '@/routers/organizations/organization-request-logs-router';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -142,6 +144,7 @@ export const organizationsRouter = createTRPCRouter({
   subscription: organizationsSubscriptionRouter,
   settings: organizationsSettingsRouter,
   usageDetails: organizationsUsageDetailsRouter,
+  requestLogs: organizationRequestLogsRouter,
   sso: organizationSsoRouter,
   auditLogs: organizationAuditLogRouter,
   admin: organizationAdminRouter,
@@ -510,7 +513,7 @@ export const organizationsRouter = createTRPCRouter({
     }),
 
   updateSeatsRequired: adminProcedure.input(OrganizationSeatsUpdateSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     await db
       .update(organizations)
       .set({ require_seats: opts.input.seatsRequired })
@@ -602,7 +605,7 @@ export const organizationsRouter = createTRPCRouter({
 
   // this is an admin only route used to show seat purchases in a debug UI for KILO admins
   seatPurchases: adminProcedure.input(OrganizationIdInputSchema).query(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await requireLiveOrganizationForPlatformAdmin(opts.ctx, opts.input.organizationId, ['owner']);
     const seatPurchases = await db
       .select()
       .from(organization_seats_purchases)

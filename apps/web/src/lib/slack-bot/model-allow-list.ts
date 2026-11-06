@@ -4,7 +4,7 @@ import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/orga
 import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
  * Get a default model that is allowed for an organization, or `null` when the

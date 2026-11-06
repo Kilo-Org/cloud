@@ -35,6 +35,19 @@ export function reviewerStateTone(state: PrReviewerState): ReviewerTone {
   return REVIEWER_STATE_TONES[state];
 }
 
+/**
+ * The reviewers a sidebar row still means something for. GitHub dismisses the
+ * review requests of a pull request when it merges or closes, and a request
+ * that can no longer be answered is not "Awaiting review" — so a pending row
+ * survives only while the request itself is open.
+ */
+export function visibleReviewers(
+  state: PrOverviewDto['state'],
+  reviewers: PrOverviewDto['reviewers']
+): PrOverviewDto['reviewers'] {
+  return state === 'open' ? reviewers : reviewers.filter(reviewer => reviewer.state !== 'PENDING');
+}
+
 export type PrTimelineEntry = {
   /** Stable list key, and the reason this entry exists. */
   id: 'opened' | 'merged' | 'closed' | 'updated';

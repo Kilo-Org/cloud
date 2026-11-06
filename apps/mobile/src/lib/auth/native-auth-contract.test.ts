@@ -99,7 +99,7 @@ describe('parseTokenPair', () => {
     expect(parseTokenPair(null)).toBeNull();
   });
 
-  it('returns null when refreshToken is present but expiresIn is missing', () => {
+  it('drops refreshToken when expiresIn is missing and returns the token-only pair', () => {
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref' })).toEqual({ token: 'abc' });
   });
 
@@ -125,8 +125,6 @@ describe('parseTokenPair', () => {
     expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
   });
 });
-
-// --- parseDeviceAuthTokenResponse ---
 
 describe('parseDeviceAuthTokenResponse', () => {
   it('parses an approved response with refresh pair', () => {
@@ -222,8 +220,6 @@ describe('buildDeviceAuthPollRequest', () => {
   });
 });
 
-// --- parseEmailCodeResponse ---
-
 describe('parseEmailCodeResponse', () => {
   it('parses success without challengeId (legacy server)', () => {
     expect(parseEmailCodeResponse({ success: true })).toEqual({
@@ -252,8 +248,6 @@ describe('parseEmailCodeResponse', () => {
     expect(parseEmailCodeResponse({ success: true, challengeId: 'not-a-uuid' })).toBeNull();
   });
 });
-
-// --- parseAuthError ---
 
 describe('parseAuthError', () => {
   it('returns the code and ssoOrganizationId for an SSO error', () => {

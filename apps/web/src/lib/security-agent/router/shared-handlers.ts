@@ -1,3 +1,4 @@
+import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { createHash } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
@@ -84,6 +85,11 @@ import {
   buildSecurityFindingAuditHumanActor,
   REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
 } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  SECURITY_SYNC_PRECONDITION_CODES,
+  type SecuritySyncPreconditionCode,
+} from '@kilocode/app-shared/security-agent';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
@@ -260,13 +266,22 @@ async function resolveAuditReportOwner(
   };
 }
 
+/**
+ * When support access is ON the platform-admin unmask is removed, even for a
+ * real member admin; OFF preserves today's behavior.
+ */
+function platformAdminUnmaskEnabled(ctx: TRPCContext): boolean {
+  if (isSupportAccessEnabled()) return false;
+  return ctx.user.is_admin;
+}
+
 async function logPlatformAdminAuditReportAccess(params: {
   ctx: TRPCContext;
   owner: SecurityAgentAuditReportOwner;
   periodStart: string;
   periodEndExclusive: string;
 }): Promise<void> {
-  if (!params.ctx.user.is_admin) return;
+  if (!platformAdminUnmaskEnabled(params.ctx)) return;
 
   const securityOwner =
     params.owner.type === 'organization'
@@ -303,7 +318,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     params.deps.resolveOwner(params.ctx, params.input)
   );
 
-  if (params.ctx.user.is_admin) {
+  if (platformAdminUnmaskEnabled(params.ctx)) {
     // `isRequestingUserKiloAdmin` below unmasks Kilo-admin and unattributed
     // actors that a customer would see as "Kilo Admin"/"Masked user". Recorded
     // before the query so an over-budget or failed report still attributes the
@@ -318,7 +333,7 @@ async function assembleAuditReportResponse<TExtra>(params: {
     const report = await getSecurityAgentAuditReport({
       owner,
       input: params.input,
-      isRequestingUserKiloAdmin: params.ctx.user.is_admin,
+      isRequestingUserKiloAdmin: platformAdminUnmaskEnabled(params.ctx),
     });
     await logPlatformAdminAuditReportAccess({
       ctx: params.ctx,
@@ -757,6 +772,23 @@ async function getRemediationTimeline(findingId: string): Promise<RemediationTim
   }));
 }
 
+/**
+ * A Security Agent precondition rejection: a manual sync, or enabling the agent
+ * with no repository in scope. The English message stays the web surface's
+ * copy; `upstreamCode` is the stable marker the mobile ledger maps onto
+ * translated catalog copy, so the device never parses server prose.
+ */
+function securityAgentPreconditionError(
+  precondition: SecuritySyncPreconditionCode,
+  message: string
+): TRPCError {
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message,
+    cause: new UpstreamApiError(precondition),
+  });
+}
+
 export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps<TExtra>) {
   // tRPC passes `undefined` for no-input procedures.  For the personal router
   // TExtra = {}, so the fallback `{}` is structurally correct.  For the org
@@ -875,10 +907,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         result.config.analysis_model_slug ??
         DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
       const remediationModelSlug =
-        result.storedConfig.remediation_model_slug ??
-        result.config.remediation_model_slug ??
-        analysisModelSlug ??
-        DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
+        result.config.remediation_model_slug ?? DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
         hasConfig: true,
@@ -956,7 +985,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                 existingConfig.config.auto_remediation_include_existing,
               autoRemediationEnabledAt: existingConfig.config.auto_remediation_enabled_at,
               remediationModelSlug:
-                existingConfig.config.remediation_model_slug ?? existingAnalysisModelSlug,
+                existingConfig.config.remediation_model_slug ??
+                DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
               modelSlug: existingConfig.config.model_slug,
               triageModelSlug: existingTriageModelSlug,
               analysisModelSlug: existingAnalysisModelSlug,
@@ -993,8 +1023,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const remediationModelSlug =
           input.remediationModelSlug ??
           existingConfig?.storedConfig.remediation_model_slug ??
-          existingConfig?.config.remediation_model_slug ??
-          analysisModelSlug;
+          DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
         const wasAutoAnalysisOn = existingConfig?.config.auto_analysis_enabled ?? false;
         const isAutoAnalysisOn =
@@ -1199,10 +1228,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         if (input.isEnabled) {
           if (!integration || !hasSecurityReviewPermissions(integration)) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'GitHub App does not have vulnerability_alerts permission',
-            });
+            // Same stable code as the manual-sync refusal below, so a device maps
+            // it onto catalog copy instead of showing this English sentence.
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+              'GitHub App does not have vulnerability_alerts permission'
+            );
           }
         }
 
@@ -1240,13 +1271,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             [...new Set(repositoriesToSync)].sort().join('\n');
 
         // Refuse enabling with an empty effective repo set: no repository would
-        // be synced or analyzed, so an enabled state would be misleading.
+        // be synced or analyzed, so an enabled state would be misleading. The
+        // sync path's no-repositories code marks it, so a device tells the user
+        // to pick repositories instead of showing this English sentence.
         if (input.isEnabled) {
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Select at least one repository before enabling Security Agent.',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'Select at least one repository before enabling Security Agent.'
+            );
           }
         }
 
@@ -1577,25 +1610,27 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration not found or inactive',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub integration not found or inactive'
+          );
         }
 
         if (!hasSecurityReviewPermissions(integration)) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub App does not have vulnerability_alerts permission',
-          });
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.missingPermission,
+            'GitHub App does not have vulnerability_alerts permission'
+          );
         }
 
         const installationId = integration.platform_installation_id;
         if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
+          // Same reader-visible state as an inactive integration: the Kilo
+          // GitHub App is not usable for this owner until it is reconnected.
+          throw securityAgentPreconditionError(
+            SECURITY_SYNC_PRECONDITION_CODES.integrationInactive,
+            'GitHub installation ID not found'
+          );
         }
 
         const allRepos = readRepositorySnapshot(owner, integration).repositories;
@@ -1630,10 +1665,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
                   .filter((name): name is string => !!name);
 
           if (repositoriesToSync.length === 0) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'No repositories configured for security reviews',
-            });
+            throw securityAgentPreconditionError(
+              SECURITY_SYNC_PRECONDITION_CODES.noRepositories,
+              'No repositories configured for security reviews'
+            );
           }
           syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }

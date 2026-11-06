@@ -41,8 +41,10 @@ const mockOrganizationListGitLabRepositories =
   jest.fn<
     (input: { organizationId: string; forceRefresh: boolean }) => Promise<RepositoriesFixture>
   >();
-const mockPersonalPrepareSession = jest.fn<() => Promise<PrepareSessionOutput>>();
-const mockOrganizationPrepareSession = jest.fn<() => Promise<PrepareSessionOutput>>();
+const mockPersonalPrepareSession =
+  jest.fn<(input: Record<string, unknown>) => Promise<PrepareSessionOutput>>();
+const mockOrganizationPrepareSession =
+  jest.fn<(input: Record<string, unknown>) => Promise<PrepareSessionOutput>>();
 
 const mockCaller = {
   organizations: {
@@ -206,6 +208,18 @@ describe('GET /cloud-agent-fork/review-md', () => {
     });
     expect(mockOrganizationPrepareSession).toHaveBeenCalledTimes(1);
     expect(response.status).toBe(303);
+  });
+
+  it('does not ask the environment picker for a choice, because this page has no picker', async () => {
+    await getRoute(makeRequest({ platform: 'github', repo: 'owner/repo' }));
+    await getRoute(makeRequest({ platform: 'github', repo: 'owner/repo', organizationId: ORG_ID }));
+
+    const personal = mockPersonalPrepareSession.mock.calls[0]?.[0];
+    const organization = mockOrganizationPrepareSession.mock.calls[0]?.[0];
+    expect(personal).toBeDefined();
+    expect(organization).toBeDefined();
+    expect(personal).not.toHaveProperty('requireEnvironmentChoice');
+    expect(organization).not.toHaveProperty('requireEnvironmentChoice');
   });
 
   it('still rejects a repository the provider does not report', async () => {

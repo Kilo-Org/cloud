@@ -5,6 +5,7 @@ import { testRouter } from '@/routers/test-router';
 import { debugRouter } from '@/routers/debug-router';
 import { userRouter } from '@/routers/user-router';
 import { adminRouter } from '@/routers/admin-router';
+import { stepUpRouter } from '@/routers/step-up-router';
 import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
@@ -57,6 +58,7 @@ export const rootRouter = createTRPCRouter({
   debug: debugRouter,
   user: userRouter,
   admin: adminRouter,
+  stepUp: stepUpRouter,
   codeIndexing: codeIndexingRouter,
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,

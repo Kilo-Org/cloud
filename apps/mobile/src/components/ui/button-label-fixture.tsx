@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -56,6 +57,20 @@ export function ButtonLabelFixture() {
         <Button loading={loading}>
           <Text>{hi.profiles.newProfile}</Text>
         </Button>
+        <Text>Accent soft · busy spinner takes the label ink</Text>
+        <Button variant="accent-soft">
+          <Text>Accent soft label</Text>
+        </Button>
+        {/* Busy from the first frame: the gate opens this link without pressing
+            Toggle loading, and an idle button cannot show where the spinner
+            paints. */}
+        <Button variant="accent-soft" loading>
+          <Text>Accent soft label</Text>
+        </Button>
+        <Text>Inline wait · static marker under reduced motion</Text>
+        <View className="flex-row items-center gap-2">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </View>
         <Button
           variant="outline"
           onPress={() => {

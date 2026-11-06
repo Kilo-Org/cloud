@@ -82,16 +82,6 @@ describe('cloudEnvironmentsRouter', () => {
     await cleanupDbForTest();
   });
 
-  // The router graph loads after the mocks above, so it uses them.
-  beforeAll(async () => {
-    ({ createCallerForUser } = await import('@/routers/test-utils'));
-  });
-
-  afterEach(async () => {
-    mockGetSandboxSelectionOptions.mockImplementation(async input => offerAll(input));
-    await cleanupDbForTest();
-  });
-
   test('a member can list but cannot create, while owner and admin can create, update, and delete', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();
@@ -159,6 +149,106 @@ describe('cloudEnvironmentsRouter', () => {
         repository: { platform: 'github', fullName: GITHUB_REPO },
       })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  test('persists the network policy through create, update, and get', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'limited',
+      repository: { platform: 'github', fullName: GITHUB_REPO },
+      egressMode: 'allowlist',
+      egressAllowlist: ['Z.Example.COM.', 'example.com'],
+    });
+
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com', 'z.example.com'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'unrestricted',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      commands: ['echo kept'],
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'unrestricted',
+      egressAllowlist: null,
+      commands: ['echo kept'],
+    });
+
+    await caller.cloudEnvironments.update({
+      environmentId: id,
+      egressMode: 'allowlist',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+  });
+
+  test.each([true, false])('rejects unsupported environment auditing: %s', async egressAudit => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const input = {
+      name: 'audit-unsupported',
+      repository: { platform: 'github' as const, fullName: GITHUB_REPO },
+      egressAudit,
+    };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.create(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.listAll({})).toEqual([]);
+
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'unchanged',
+      repository: input.repository,
+    });
+    const update = { environmentId: id, name: 'must-not-save', egressAudit };
+    // @ts-expect-error Exercise unsupported input from an API caller.
+    await expect(caller.cloudEnvironments.update(update)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+      name: 'unchanged',
+    });
+  });
+
+  test('rejects an allowlist domain without allowlist mode and invalid hostnames', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'no-mode',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressAllowlist: ['api.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    await expect(
+      caller.cloudEnvironments.create({
+        name: 'wildcard',
+        repository: { platform: 'github', fullName: GITHUB_REPO },
+        egressMode: 'allowlist',
+        egressAllowlist: ['*.example.com'],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const [row] = await db
+      .select({ id: cloud_agent_environments.id })
+      .from(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.repo_full_name, GITHUB_REPO));
+    expect(row).toBeUndefined();
   });
 
   test('billing managers cannot create, update, or delete organization environments', async () => {
@@ -346,15 +436,15 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'sized',
       repository,
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     expect((await caller.cloudEnvironments.get({ environmentId: id })).sandboxAllocation).toBe(
-      'cloudflare-single'
+      'cloudflare-containers-standard-3'
     );
 
     await caller.cloudEnvironments.update({ environmentId: id, name: 'still sized' });
     const [summary] = await caller.cloudEnvironments.list({ repository });
-    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
+    expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-containers-standard-3' });
 
     const { configurationRevision } = await caller.cloudEnvironments.update({
       environmentId: id,
@@ -368,7 +458,7 @@ describe('cloudEnvironmentsRouter', () => {
     await expect(
       caller.cloudEnvironments.update({
         environmentId: id,
-        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-single',
+        sandboxAllocation: 'not-a-sandbox' as 'cloudflare-containers-standard-3',
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
@@ -394,7 +484,10 @@ describe('cloudEnvironmentsRouter', () => {
     });
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
     await expect(
-      caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: 'cloudflare-single' })
+      caller.cloudEnvironments.update({
+        environmentId: id,
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+      })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'Sandbox selection is not enabled for this owner',
@@ -410,7 +503,7 @@ describe('cloudEnvironmentsRouter', () => {
     const { id } = await caller.cloudEnvironments.create({
       name: 'stale',
       repository: { platform: 'github', fullName: GITHUB_REPO },
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
 
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
@@ -418,7 +511,7 @@ describe('cloudEnvironmentsRouter', () => {
     await caller.cloudEnvironments.update({
       environmentId: id,
       commands: ['pnpm install'],
-      sandboxAllocation: 'cloudflare-single',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
     });
     await caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: null });
 
@@ -522,11 +615,14 @@ describe('cloudEnvironmentsRouter', () => {
       'https://GIT.example:8443/gitlab/group/repo.git'
     );
     expect(sessionCloneUrl).not.toBeNull();
-    const resolved = await loadEnvironmentForSession(db, {
+    const resolution = await loadEnvironmentForSession(db, {
       owner: { type: 'user', id: selfHosted.id },
       repository: { platform: 'gitlab', cloneUrl: sessionCloneUrl ?? '' },
     });
-    expect(resolved?.reference.environmentId).toBe(id);
+    expect(resolution.status).toBe('match');
+    expect(
+      resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+    ).toBe(id);
 
     const comList = await gitlabComCaller.cloudEnvironments.list({
       repository: { platform: 'gitlab', projectPath: 'group/repo' },
@@ -696,5 +792,308 @@ describe('cloudEnvironmentsRouter', () => {
       .from(cloud_agent_environments)
       .where(eq(cloud_agent_environments.owned_by_organization_id, organization.id));
     expect(rows).toEqual([]);
+  });
+  describe('multi-repository (V2) environments', () => {
+    const widgets = { platform: 'github' as const, fullName: GITHUB_REPO };
+    const api = { platform: 'github' as const, fullName: 'acme/api' };
+
+    test('personal accounts can create multi-repository environments, including OAuth users', async () => {
+      const owner = await insertTestUser({ id: 'oauth/multi-repository-owner' });
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({ name: 'multi', repositories: [widgets, api] })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
+    test('organization accounts can create multi-repository environments', async () => {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('V2 org', owner.id, 0);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          organizationId: organization.id,
+          name: 'multi',
+          repositories: [widgets, api],
+        })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
+    test.each(['member', 'billing_manager'] as const)(
+      '%s cannot create or change organization multi-repository environments',
+      async role => {
+        const owner = await insertTestUser();
+        const member = await insertTestUser();
+        const organization = await createTestOrganization('V2 permissions org', owner.id, 0);
+        await addUserToOrganization(organization.id, member.id, role);
+        const ownerCaller = await createCallerForUser(owner.id);
+        const caller = await createCallerForUser(member.id);
+        const { id } = await ownerCaller.cloudEnvironments.create({
+          organizationId: organization.id,
+          name: 'multi',
+          repositories: [widgets],
+        });
+
+        await expect(
+          caller.cloudEnvironments.create({
+            organizationId: organization.id,
+            name: 'unauthorized',
+            repositories: [widgets, api],
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        await expect(
+          caller.cloudEnvironments.update({
+            organizationId: organization.id,
+            environmentId: id,
+            repositories: [widgets, api],
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(
+          (
+            await ownerCaller.cloudEnvironments.get({
+              organizationId: organization.id,
+              environmentId: id,
+            })
+          ).repositories?.map(repository => repository.repoFullName)
+        ).toEqual([GITHUB_REPO]);
+        expect(
+          await ownerCaller.cloudEnvironments.listAll({ organizationId: organization.id })
+        ).toHaveLength(1);
+      }
+    );
+
+    test('create rejects both repository and repositories, and neither', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          name: 'both',
+          repository: widgets,
+          repositories: [widgets],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(caller.cloudEnvironments.create({ name: 'neither' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    test('create stores repositories, builds the GitLab clone URL, and lists by containment', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'Group/Tool' }],
+      });
+
+      expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+        repositories: [
+          { platform: 'github', repoFullName: GITHUB_REPO },
+          {
+            platform: 'gitlab',
+            repoFullName: 'group/tool',
+            gitlabCloneUrl: 'https://gitlab.com/Group/Tool.git',
+          },
+        ],
+      });
+      const listed = await caller.cloudEnvironments.list({
+        repository: { platform: 'gitlab', projectPath: 'Group/Tool' },
+      });
+      expect(listed.map(environment => environment.id)).toEqual([id]);
+      // A V1 environment for the same repository does not collide with it.
+      await expect(
+        caller.cloudEnvironments.create({ name: 'single', repository: widgets })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
+    test('a GitLab entry created by the router matches the identity a session computes', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'Group/Tool' }],
+      });
+
+      const cloneUrl = canonicalGitLabCloneUrl('https://gitlab.com/Group/Tool.git');
+      expect(cloneUrl).not.toBeNull();
+      const resolution = await loadEnvironmentForSession(db, {
+        owner: { type: 'user', id: owner.id },
+        repository: { platform: 'gitlab', cloneUrl: cloneUrl ?? '' },
+      });
+      expect(resolution.status).toBe('match');
+      expect(
+        resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+      ).toBe(id);
+    });
+
+    test('a self-hosted GitLab entry created by the router matches the identity a session computes', async () => {
+      const owner = await insertTestUser();
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: owner.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        integration_status: 'active',
+        metadata: { gitlab_instance_url: 'https://git.example:8443/gitlab' },
+      });
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'group/repo' }],
+      });
+
+      const cloneUrl = canonicalGitLabCloneUrl('https://GIT.example:8443/gitlab/group/repo.git');
+      expect(cloneUrl).not.toBeNull();
+      const resolution = await loadEnvironmentForSession(db, {
+        owner: { type: 'user', id: owner.id },
+        repository: { platform: 'gitlab', cloneUrl: cloneUrl ?? '' },
+      });
+      expect(resolution.status).toBe('match');
+      expect(
+        resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+      ).toBe(id);
+    });
+
+    test('create rejects a duplicate leaf with a message that names both repositories', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          name: 'same-leaf',
+          repositories: [widgets, { platform: 'github', fullName: 'other/Widgets' }],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('acme/widgets and other/widgets'),
+      });
+    });
+
+    test.each(['vercel-small', 'vercel-large'] as const)(
+      'create rejects the %s allocation and accepts an isolated one',
+      async allocation => {
+        const owner = await insertTestUser();
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.cloudEnvironments.create({
+            name: 'multi',
+            repositories: [widgets],
+            sandboxAllocation: allocation,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        await expect(
+          caller.cloudEnvironments.create({
+            name: 'multi',
+            repositories: [widgets],
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+          })
+        ).resolves.toMatchObject({ id: expect.any(String) });
+      }
+    );
+
+    test('update replaces repositories and advances the revision', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets],
+      });
+
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, name: 'renamed' })
+      ).resolves.toMatchObject({ configurationRevision: 1 });
+
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).resolves.toMatchObject({ configurationRevision: 2 });
+      expect(
+        (await caller.cloudEnvironments.get({ environmentId: id })).repositories?.map(
+          repository => repository.repoFullName
+        )
+      ).toEqual([GITHUB_REPO, 'acme/api']);
+    });
+
+    test.each(['vercel-small', 'vercel-large'] as const)(
+      'update rejects the %s allocation on a V2 environment and accepts it on a V1 one',
+      async allocation => {
+        const owner = await insertTestUser();
+        const caller = await createCallerForUser(owner.id);
+        const multi = await caller.cloudEnvironments.create({
+          name: 'multi',
+          repositories: [widgets, api],
+        });
+        const single = await caller.cloudEnvironments.create({
+          name: 'single',
+          repository: widgets,
+        });
+
+        await expect(
+          caller.cloudEnvironments.update({
+            environmentId: multi.id,
+            sandboxAllocation: allocation,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        await expect(
+          caller.cloudEnvironments.update({
+            environmentId: single.id,
+            sandboxAllocation: allocation,
+          })
+        ).resolves.toMatchObject({ success: true });
+        expect(
+          (await caller.cloudEnvironments.get({ environmentId: single.id })).sandboxAllocation
+        ).toBe(allocation);
+        expect(
+          (await caller.cloudEnvironments.get({ environmentId: multi.id })).sandboxAllocation
+        ).toBeNull();
+      }
+    );
+
+    test('update converts a V1 environment when its repositories change', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'single',
+        repository: widgets,
+      });
+
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).resolves.toMatchObject({ success: true, configurationRevision: 2 });
+      expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+        repositories: [
+          { platform: 'github', repoFullName: GITHUB_REPO },
+          { platform: 'github', repoFullName: 'acme/api' },
+        ],
+      });
+    });
+
+    test.each(['vercel-small', 'vercel-large'] as const)(
+      'conversion rejects the saved %s allocation unless it is replaced',
+      async sandboxAllocation => {
+        const owner = await insertTestUser();
+        const caller = await createCallerForUser(owner.id);
+        const { id } = await caller.cloudEnvironments.create({
+          name: 'single',
+          repository: widgets,
+          sandboxAllocation,
+        });
+        await expect(
+          caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+          repoFullName: GITHUB_REPO,
+          sandboxAllocation,
+        });
+        await expect(
+          caller.cloudEnvironments.update({
+            environmentId: id,
+            repositories: [widgets, api],
+            sandboxAllocation: null,
+          })
+        ).resolves.toMatchObject({ success: true, configurationRevision: 2 });
+      }
+    );
   });
 });

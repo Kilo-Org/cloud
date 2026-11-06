@@ -1,5 +1,5 @@
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { sessionLiveActivityRelevance } from '@kilocode/notifications';
+import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 import { type LiveActivity } from 'expo-widgets';
 
 import { getSessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';

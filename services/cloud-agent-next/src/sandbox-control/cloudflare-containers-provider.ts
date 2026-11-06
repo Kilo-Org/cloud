@@ -15,7 +15,7 @@ import {
   decodeCloudflareProviderRef,
   encodeCloudflareProviderRef,
   type CloudflareProviderRef,
-} from './cloudflare-provider.js';
+} from './provider-ref.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
@@ -51,6 +51,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
   /**
    * Trusted cold-launch inputs. Absent, and a descriptor absent within it, keep
@@ -121,6 +122,14 @@ export function createCloudflareContainersProviderAdapter(deps: {
 
   return {
     environmentSnapshots: true,
+    workspaceSnapshots: {
+      currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
+      async capture(ref, captureId) {
+        if (decodeOwnedProviderRef(ref) === null)
+          throw new ProviderCreationError('invalid_configuration');
+        return deps.getContainer(deps.logicalSandboxId).captureSnapshot(ref, captureId);
+      },
+    },
     ensureBillingAdmission,
     async isBillingBlocked(ref) {
       if (ref === null || decodeOwnedProviderRef(ref) === null) return false;
@@ -163,6 +172,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+        ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
         env: {

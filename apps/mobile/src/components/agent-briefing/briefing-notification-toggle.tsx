@@ -6,9 +6,11 @@ import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Newspaper } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -121,7 +123,7 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
   const isDisabled = disabled || unavailable;
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Newspaper size={18} color={colors.secondaryForeground} />
+      <IconTile icon={Newspaper} tint={NEUTRAL_TINT} />
       <View className="flex-1">
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
           {t('agentBriefing.title')}

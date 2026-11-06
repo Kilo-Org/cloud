@@ -16,7 +16,6 @@ import {
   filterActiveSessionsByOrganization,
   selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
-import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { collectSearchPages, collectUnfilteredPages } from '@/lib/agent-session-pages';
 import {
   buildAgentSessionSearchQueryOptions,
@@ -24,10 +23,6 @@ import {
   type UseAgentSessionSearchOptions,
   type UseAgentSessionsOptions,
 } from '@/lib/agent-session-queries';
-import {
-  resolveStoredSessionsHold,
-  type StoredSessionsHold,
-} from '@/lib/agent-session-render-hold';
 import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
 import {
   type AgentSessionSortBy,
@@ -150,16 +145,15 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const { isActive } = useAppLifecycle();
 
   // Rows delivered since this hook mounted, as opposed to rows restored from
-  // the query cache (in-memory or the encrypted read cache). `dataUpdatedAt`
-  // advances when the stored query successfully delivers data, but
-  // `reconcileFirstPage` (the foreground edge, pull-to-refresh, retry and
-  // departure reconciles) is also a cache write: it empties `pages` and
-  // advances `dataUpdatedAt` without a delivery, so requiring at least one
-  // delivered page tells a delivery apart from that reset. The flag latches
-  // once true, because a later reconcile empties `pages` again and must not
-  // make rows already delivered this mount read as stale. A fresh screen mount
-  // that cannot reach the API therefore has no fresh rows even when a previous
-  // mount left rows cached. The Agents history screen uses this to show its
+  // the query cache (in-memory or the encrypted read cache). Only a delivery
+  // advances `dataUpdatedAt`, which is what a refresh has to respect:
+  // `reconcileFirstPage` keeps the retained pages, replaces them when page one
+  // arrives (a delivery), and re-anchors a trimmed start cursor through
+  // `setState`, which writes no data and leaves the stamp alone. A failed or
+  // paused refresh writes nothing either. The flag latches once true, so a
+  // later refresh cannot make rows already delivered this mount read as stale.
+  // A fresh screen mount that cannot reach the API therefore has no fresh rows
+  // even when a previous mount left rows cached. The Agents history screen uses this to show its
   // retryable full-screen error on a failed fresh open instead of presenting
   // stale rows as loaded, while a failure after rows were actually delivered
   // this mount keeps them with the inline error.
@@ -184,24 +178,14 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // callbacks every render (the backfill effect depends on their stability).
   const enqueueStoredOperation = useMemo(() => createOperationCoordinator(), []);
   const storedFetchNextPage = stored.fetchNextPage;
-  // Foreground/refresh reconcile. `reconcileFirstPage` resets the cached pages
-  // and invalidates the prefix, so page one refetches from `initialPageParam`
-  // instead of React Query re-requesting every retained page (up to
-  // `SESSION_HISTORY_MAX_PAGES`). `cancelRefetch: false` is required: after the
-  // reset `query.state.data` is still defined, so a default `cancelRefetch:
-  // true` would cancel the page-one fetch the invalidate just started and issue
-  // a second request.
+  // Foreground/refresh reconcile. `reconcileFirstPage` refetches page one only
+  // and keeps the retained pages on screen until that page arrives, so a
+  // refresh that is paused by lost connectivity or fails never blanks the list
+  // into its empty or full-screen error state.
   const storedReconcile = useCallback(async () => {
-    await enqueueStoredOperation(async () => {
-      reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
-      // `cancelRefetch` is a `refetchQueries` option (second argument), not a
-      // query filter: `false` makes it await the page-one fetch the invalidate
-      // just started instead of cancelling it and issuing a second request.
-      await queryClient.refetchQueries(
-        { queryKey: trpc.cliSessionsV2.list.pathFilter().queryKey, type: 'active' },
-        { cancelRefetch: false }
-      );
-    });
+    await enqueueStoredOperation(() =>
+      reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey)
+    );
   }, [enqueueStoredOperation, queryClient, trpc]);
   const fetchNextPage = useCallback(async () => {
     await enqueueStoredOperation(storedFetchNextPage);
@@ -211,35 +195,6 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // load (the cursor follows the selected sort field). Dedupe by session_id
   // using the shared collection helper.
   const storedSessions = useMemo(() => collectUnfilteredPages(stored.data?.pages), [stored.data]);
-
-  // Render hold: `reconcileFirstPage` (foreground edge and refresh below,
-  // departure effect, mutation settle via `invalidateAgentSessionQueries`)
-  // empties the cached pages before refetching page one. Keep rendering the
-  // last non-empty rows for the same query key until the refetch delivers, so
-  // the SectionList never unmounts and scroll survives. A key change
-  // (filter/sort) or a settled empty result releases the hold.
-  //
-  // The hold gate spans the whole unresolved refetch, not just the in-flight
-  // one: after the reset `isFetching` is false while the page-one fetch is
-  // paused (offline) and after it fails (`isError`), and in both cases the
-  // cache holds zero rows while the user's rows exist only in the hold.
-  // Releasing there would blank the list into its empty or full-screen error
-  // state. `resolveStoredSessionsHold` only gates on a caller-supplied boolean,
-  // so the composite is computed here.
-  const storedQueryKeyJson = JSON.stringify(
-    trpc.cliSessionsV2.list.infiniteQueryKey(buildAgentSessionListInput(options ?? {}))
-  );
-  const storedHoldRef = useRef<StoredSessionsHold<StoredSession> | null>(null);
-  const resolvedStored = resolveStoredSessionsHold({
-    current: storedSessions,
-    isFetching: stored.isFetching || stored.isPaused || stored.isError,
-    queryKeyJson: storedQueryKeyJson,
-    previousHold: storedHoldRef.current,
-  });
-  useEffect(() => {
-    storedHoldRef.current = resolvedStored.hold;
-  }, [resolvedStored.hold]);
-  const renderedStoredSessions = resolvedStored.sessions;
 
   // The server already filters by context; this covers the window where a WS
   // heartbeat has introduced a row the client has not enriched yet (see
@@ -272,23 +227,23 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   );
 
   const dateGroups = useMemo(
-    () => groupAgentSessionsByDate(renderedStoredSessions, sortBy),
-    [renderedStoredSessions, sortBy]
+    () => groupAgentSessionsByDate(storedSessions, sortBy),
+    [storedSessions, sortBy]
   );
 
   // Departure-triggered stored reset. Only the active poll has a refetch
   // interval (10s); the stored/history list does not. When a session id
   // leaves the active set, the just-terminated session has not yet shown up
   // in history, so resetting the stored list to page one and refetching makes
-  // it reappear. `reconcileFirstPage` empties the cached pages and invalidates
-  // the prefix, so the refetch starts from `initialPageParam` (page one). A
-  // plain `refetch()` would only refresh pages still in cache, and after
-  // `maxPages` evicts page one the newest session never reappears.
+  // it reappear. `reconcileFirstPage` refetches page one only and replaces the
+  // pages when it arrives, so the newest session returns even when `maxPages`
+  // evicted its page. A plain `refetch()` would re-request every retained page
+  // from the cursor they start at, and would not bring back an evicted page.
   //
   // The guard is strictly "id present before, absent now": the empty→populated
   // transition (first poll) is ignored, and the initial mount with a non-empty
-  // set is ignored (no "before" to compare against). The render hold above
-  // keeps the last rows visible while this reset refetches page one.
+  // set is ignored (no "before" to compare against). The reconcile keeps the
+  // rows on screen while it refetches page one.
   const previousActiveIdsRef = useRef<{ ids: Set<string>; epoch: number } | null>(null);
   useEffect(() => {
     const epoch = currentAuthEpoch();
@@ -307,7 +262,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     if (departedId) {
       scheduleCacheMaintenance(() => {
         if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-          reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+          void reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
         }
       });
     }
@@ -330,7 +285,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   }, [isActive, ownsForegroundReconcile, storedReconcile]);
 
   return {
-    storedSessions: renderedStoredSessions,
+    storedSessions,
     activeSessions,
     activeSessionIds,
     activeExclusionIds,

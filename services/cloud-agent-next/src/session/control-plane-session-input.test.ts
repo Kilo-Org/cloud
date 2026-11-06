@@ -12,6 +12,16 @@ const MODERN_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 
 describe('buildControlPlanePromptPayload', () => {
+  it('preserves a repository agent slug without runtimeAgents', () => {
+    const payload = buildControlPlanePromptPayload({
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      turn: { type: 'prompt', prompt: 'Use foreman' },
+      attachments: [],
+      agent: { mode: 'foreman', model: FULL_MODEL },
+    });
+    expect(payload.agent).toEqual({ mode: 'foreman', model: 'fake-deterministic' });
+  });
+
   it('strips the kilo provider prefix from the wrapper-facing model', () => {
     const payload = buildControlPlanePromptPayload({
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
@@ -82,15 +92,23 @@ describe('buildControlPlaneCreateInput', () => {
       byoc: { ...owner, credentialId: source.credentialId },
     });
   });
-  it.each([
-    { egressMode: undefined, egressAllowlist: undefined },
-    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: undefined },
-    { egressMode: 'allowlist' as const, egressAllowlist: [] },
-    { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
-  ])(
+
+  it.each(
+    [
+      { egressMode: undefined, egressAllowlist: undefined },
+      { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: undefined },
+      { egressMode: 'allowlist' as const, egressAllowlist: [] },
+      { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+    ].flatMap(policy =>
+      [undefined, false, true].map(egressAudit => ({
+        ...policy,
+        egressAudit,
+      }))
+    )
+  )(
     'persists and selects the same policy for start and registration: %j',
-    async ({ egressMode, egressAllowlist }) => {
+    async ({ egressMode, egressAllowlist, egressAudit }) => {
       const command = {
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
@@ -104,6 +122,7 @@ describe('buildControlPlaneCreateInput', () => {
           sandboxProvider: 'cloudflare-containers' as const,
           egressMode,
           egressAllowlist,
+          egressAudit,
         },
       };
       const created = await buildControlPlaneCreateInput({
@@ -124,6 +143,12 @@ describe('buildControlPlaneCreateInput', () => {
         expect(input.sandboxSelection.egressMode).toBe(egressMode);
         expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
         expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
+        expect(input.metadata.workspace?.egressAudit).toBe(egressAudit);
+        expect(input.sandboxSelection.egressAudit).toBe(egressAudit);
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+            .sandboxSelection?.egressAudit
+        ).toBe(egressAudit);
         expect(
           buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
             .sandboxSelection?.egressAllowlist
@@ -168,14 +193,48 @@ describe('buildControlPlaneCreateInput', () => {
     }
   );
 
-  it.each([
-    ['isolated', 'workspace_12345678-1234-1234-1234-123456789abc'],
-    ['shared', undefined],
-  ] as const)(
-    'carries the %s kind into the pin and its billing input',
-    async (sandboxKind, billedSessionId) => {
-      const sandboxId = `sbx-${'a'.repeat(48)}` as const;
-      const input = await buildControlPlaneCreateInput({
+  it('carries the isolated kind into the pin and its billing input', async () => {
+    const sandboxKind = 'isolated';
+    const sandboxId = `sbx-${'a'.repeat(48)}` as const;
+    const input = await buildControlPlaneCreateInput({
+      command: {
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+        },
+        auth: {
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kilocodeToken: MODERN_KILO_TOKEN,
+        },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt', prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind: 'isolated' },
+      },
+      env: {} as Env,
+      attachments: [],
+      agent: { mode: 'code', model: FULL_MODEL },
+    });
+
+    expect(input.metadata.workspace?.sandboxKind).toBe(sandboxKind);
+    expect(input.sandboxSelection.sandboxKind).toBe(sandboxKind);
+    expect(input.sandboxSelection.billing).toMatchObject({ sandboxId, sandboxKind });
+    expect(input.sandboxSelection.billing?.sessionId).toBe(
+      'workspace_12345678-1234-1234-1234-123456789abc'
+    );
+    // The Session DO accepts the Worker's selection as built.
+    expect(
+      buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection).sandboxSelection
+        ?.sandboxKind
+    ).toBe(sandboxKind);
+  });
+
+  it('rejects a retired shared kind', async () => {
+    const sandboxId = `sbx-${'a'.repeat(48)}` as const;
+    await expect(
+      buildControlPlaneCreateInput({
         command: {
           identity: {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
@@ -190,24 +249,14 @@ describe('buildControlPlaneCreateInput', () => {
             turn: { type: 'prompt', prompt: 'hi' },
           },
           agent: { mode: 'code', model: FULL_MODEL },
-          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind: 'shared' },
         },
         env: {} as Env,
         attachments: [],
         agent: { mode: 'code', model: FULL_MODEL },
-      });
-
-      expect(input.metadata.workspace?.sandboxKind).toBe(sandboxKind);
-      expect(input.sandboxSelection.sandboxKind).toBe(sandboxKind);
-      expect(input.sandboxSelection.billing).toMatchObject({ sandboxId, sandboxKind });
-      expect(input.sandboxSelection.billing?.sessionId).toBe(billedSessionId);
-      // The Session DO accepts the Worker's selection as built.
-      expect(
-        buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
-          .sandboxSelection?.sandboxKind
-      ).toBe(sandboxKind);
-    }
-  );
+      })
+    ).rejects.toThrow('shared sandboxes are retired');
+  });
 
   it.each([
     ['cloudflare-containers-standard-3', 'standard-3'],

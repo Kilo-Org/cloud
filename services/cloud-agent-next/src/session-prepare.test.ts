@@ -3,6 +3,7 @@ import type * as SandboxPlacementModule from './sandbox-placement.js';
 import type * as SessionIdentityModule from './session-identity.js';
 import { TRPCError } from '@trpc/server';
 import {
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   sandboxAllocationSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -29,7 +30,7 @@ const {
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
   // Approved origins look up the repository environment; these tests have none.
-  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -173,8 +174,6 @@ function createInternalApiContext(options: {
     authToken: effectiveAuthToken,
     request: { headers } as Request,
     env: {
-      Sandbox: {} as TRPCContext['env']['Sandbox'],
-      SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
       SANDBOX_SESSION: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
@@ -212,6 +211,9 @@ function createInternalApiContext(options: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
       CREDENTIAL_CONTAINMENT_ENABLED: options.credentialContainmentEnabled,
+      CODE_REVIEW_CONTAINERS_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS:
+        options.credentialContainmentEnabled === 'false' ? '*' : undefined,
     },
   } as TRPCContext;
 }
@@ -240,6 +242,12 @@ describe('sandbox selection Worker API', () => {
       sandboxAllocation: getSandboxAllocationRequest(allocation),
     },
   ]);
+
+  const isRetiredAllocation = (allocation: string | { provider: unknown }) => {
+    const decoded =
+      typeof allocation === 'string' ? allocation : getSandboxAllocation(allocation as never);
+    return decoded === 'cloudflare-shared' || decoded === 'isolated-standard';
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -292,22 +300,28 @@ describe('sandbox selection Worker API', () => {
       result.options
         .filter(option => option.unavailableReason === undefined)
         .map(option => option.allocation)
-    ).toEqual([
-      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
-      getSandboxAllocationRequest('cloudflare-shared'),
-    ]);
+    ).toEqual([getSandboxAllocationRequest('cloudflare-containers-standard-3')]);
   });
 
   it.each(allocationInputs)(
     'rejects $name in prepare and public start when selection is disabled',
     async ({ sandboxAllocation }) => {
       const caller = appRouter.createCaller(createInternalApiContext({ skipBalanceCheck: true }));
+      const retired = isRetiredAllocation(sandboxAllocation);
       await expect(
         caller.prepareSession({ ...prepareInput, sandboxAllocation })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ).rejects.toMatchObject(
+        retired
+          ? { code: 'BAD_REQUEST', message: expect.stringContaining('retired') }
+          : { code: 'FORBIDDEN' }
+      );
       await expect(
         caller.start({ ...startInput, runtime: { sandboxAllocation } })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ).rejects.toMatchObject(
+        retired
+          ? { code: 'BAD_REQUEST', message: expect.stringContaining('retired') }
+          : { code: 'FORBIDDEN' }
+      );
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     }
@@ -343,11 +357,16 @@ describe('sandbox selection Worker API', () => {
 
     it('prefers the repository override over the owner default', async () => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
-        repositoryAllocation: 'cloudflare-shared',
-        contextAllocation: 'cloudflare-single',
+        repositoryAllocation: 'cloudflare-containers-standard-4',
+        contextAllocation: 'cloudflare-containers-standard-3',
       });
-      const result = await enrolledCaller().getSandboxSelectionOptions(input);
-      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+      const ctx = createInternalApiContext({});
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
+      const result = await appRouter.createCaller(ctx).getSandboxSelectionOptions(input);
+      expect(result.effectiveDestination).toEqual(
+        getSandboxAllocationRequest('cloudflare-containers-standard-4')
+      );
       expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledWith(
         expect.anything(),
         { type: 'organization', id: orgId },
@@ -364,7 +383,7 @@ describe('sandbox selection Worker API', () => {
         ...input,
         repositoryType: 'gitlab',
       });
-      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+      expect(result.effectiveDestination).toEqual(result.defaultDestination);
     });
 
     it('is not computed without a repository type', async () => {
@@ -391,16 +410,25 @@ describe('sandbox selection Worker API', () => {
       const ctx = createInternalApiContext({ skipBalanceCheck: true });
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
       const caller = appRouter.createCaller(ctx);
+      const retired = isRetiredAllocation(sandboxAllocation);
       await expect(
         caller.prepareSession({
           ...prepareInput,
           kilocodeOrganizationId: undefined,
           sandboxAllocation,
         })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ).rejects.toMatchObject(
+        retired
+          ? { code: 'BAD_REQUEST', message: expect.stringContaining('retired') }
+          : { code: 'FORBIDDEN' }
+      );
       await expect(
         caller.start({ ...startInput, options: {}, runtime: { sandboxAllocation } })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      ).rejects.toMatchObject(
+        retired
+          ? { code: 'BAD_REQUEST', message: expect.stringContaining('retired') }
+          : { code: 'FORBIDDEN' }
+      );
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
     }
@@ -450,7 +478,6 @@ describe('sandbox selection Worker API', () => {
     async kilocodeOrganizationId => {
       const ctx = createInternalApiContext({});
       ctx.env.SANDBOX_SELECTION_IDS = '*';
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
       const caller = appRouter.createCaller(ctx);
       const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
       expect(normal.defaultDestination).toEqual(
@@ -495,20 +522,23 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it('authorizes Dedicated Standard in public start without an internal API key', async () => {
+  it('authorizes a larger containers allocation in public start without an internal API key', async () => {
     const doStub = createMockDOStub();
     const ctx = createInternalApiContext({ doStub, requestInternalApiKey: null });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = orgId;
     generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
     await appRouter.createCaller(ctx).start({
       ...startInput,
-      runtime: { sandboxAllocation: 'isolated-standard' },
+      runtime: { sandboxAllocation: 'cloudflare-containers-standard-4' },
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
           identity: expect.objectContaining({ orgId }),
-          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+          workspace: expect.objectContaining({
+            sandboxAllocation: 'cloudflare-containers-standard-4',
+          }),
         }),
       })
     );
@@ -1130,33 +1160,24 @@ describe('prepareSession endpoint', () => {
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
-  it('stores one neutral shared allocation across session IDs and ignores retired KV suffixes', async () => {
-    const overrideStore = { get: vi.fn().mockResolvedValue('shared-slot-v1'), put: vi.fn() };
+  it('rejects the retired shared allocation before allocation or registration', async () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     context.env.SANDBOX_SELECTION_IDS = '*';
-    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
-    const input = {
-      message: { prompt: 'Use the shared allocation' },
-      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-      repository: { type: 'github' as const, repo: 'acme/repo' },
-      runtime: { sandboxAllocation: 'cloudflare-shared' as const },
-    };
-    await caller.start(input);
-    generateSessionIdMock.mockReturnValueOnce('workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
-    await caller.start(input);
-    const first = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
-    const second = doStub.createSessionWithInitialAdmission.mock.calls[1]?.[0];
-    expect(first.metadata.workspace).toMatchObject({
-      sandboxId: expect.stringMatching(/^sbx-[a-f0-9]{48}$/),
-      sandboxKind: 'shared',
-      sandboxProvider: 'cloudflare',
-      sandboxAllocation: 'cloudflare-shared',
+
+    await expect(
+      caller.start({
+        message: { prompt: 'Use the shared allocation' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+        runtime: { sandboxAllocation: 'cloudflare-shared' },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('has been retired'),
     });
-    expect(second.metadata.workspace.sandboxId).toBe(first.metadata.workspace.sandboxId);
-    expect(first.metadata.workspace).not.toHaveProperty('sandboxRoute');
-    expect(overrideStore.get).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
   it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
@@ -1249,12 +1270,12 @@ describe('prepareSession endpoint', () => {
     [`sbx-${'b'.repeat(48)}`, 'cloudflare-single', undefined],
     [`sbx-${'c'.repeat(48)}`, undefined, 'code-review'],
   ] as const)(
-    'persists the generated %s identity unchanged with containment disabled',
+    'persists the generated %s identity unchanged with mandatory containment',
     async (sandboxId, sandboxAllocation, createdOnPlatform) => {
       selectControlPlaneSandboxMock.mockResolvedValueOnce({
         sandboxKind: createdOnPlatform === 'code-review' ? 'code-review' : 'isolated',
         sandboxId,
-        provider: 'cloudflare',
+        provider: createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
       });
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
@@ -1273,13 +1294,16 @@ describe('prepareSession endpoint', () => {
           metadata: expect.objectContaining({
             workspace: expect.objectContaining({
               sandboxId,
-              sandboxProvider: 'cloudflare',
-              ...(sandboxAllocation ? { sandboxAllocation } : {}),
+              sandboxProvider:
+                createdOnPlatform === 'code-review' ? 'cloudflare' : 'cloudflare-containers',
+              ...(sandboxAllocation
+                ? { sandboxAllocation: 'cloudflare-containers-standard-3' }
+                : {}),
               credentialContainment: {
-                github: false,
+                github: true,
                 gitlab: false,
                 bitbucket: false,
-                kilocode: false,
+                kilocode: true,
               },
             }),
           }),
@@ -1288,7 +1312,7 @@ describe('prepareSession endpoint', () => {
     }
   );
 
-  it('disables all containment when the global flag is false', async () => {
+  it('ignores the obsolete containment opt-out', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(
       createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
@@ -1306,10 +1330,10 @@ describe('prepareSession endpoint', () => {
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
             credentialContainment: {
-              github: false,
+              github: true,
               gitlab: false,
               bitbucket: false,
-              kilocode: false,
+              kilocode: true,
             },
           }),
         }),
@@ -1802,7 +1826,7 @@ describe('start endpoint', () => {
     },
     { type: 'git', url: 'https://git.example.com/acme/repo.git' },
   ] as const)(
-    'disables all containment for $type grouped starts when the global flag is false',
+    'requires containment for $type grouped starts when the global flag is false',
     async repository => {
       const doStub = createMockDOStub();
       const caller = appRouter.createCaller(
@@ -1821,10 +1845,10 @@ describe('start endpoint', () => {
           metadata: expect.objectContaining({
             workspace: expect.objectContaining({
               credentialContainment: {
-                github: false,
-                gitlab: false,
-                bitbucket: false,
-                kilocode: false,
+                github: repository.type === 'github',
+                gitlab: repository.type === 'gitlab',
+                bitbucket: repository.type === 'bitbucket',
+                kilocode: true,
               },
             }),
           }),
@@ -2154,7 +2178,6 @@ describe('start endpoint', () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
-      PER_SESSION_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       VERCEL_TOKEN: 'private-vercel-token',
       VERCEL_TEAM_ID: 'team-id',

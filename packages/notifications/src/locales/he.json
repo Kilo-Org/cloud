@@ -9,6 +9,7 @@
       "lowBalance": "היתרה שלך דורשת תשומת לב",
       "spendAlert": "ההוצאה שלך דורשת תשומת לב",
       "securityFinding": "ממצא אבטחה דורש תשומת לב",
+      "securityUpdate": "לבדיקת אבטחה יש עדכון",
       "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
     }
   },
@@ -61,7 +62,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "ממצא אבטחה דורש תשומת לב"
+      "body": "לבדיקת אבטחה יש עדכון"
     }
   },
   "instanceLifecycle": {

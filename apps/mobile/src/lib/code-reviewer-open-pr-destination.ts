@@ -1,9 +1,11 @@
 import { type Href } from 'expo-router';
 
-import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 
-type CodeReviewerOpenPrDestination = { kind: 'in-app'; href: Href } | { kind: 'browser' };
+type CodeReviewerOpenPrDestination =
+  /** `platform` is the URL's own provider, not the review row's column. */
+  { kind: 'in-app'; href: Href; platform: ProviderPrPlatform } | { kind: 'browser' };
 
 /**
  * Decide whether "Open pull request" should navigate in-app or open the browser.
@@ -20,5 +22,5 @@ export function resolveCodeReviewerOpenPrDestination(prUrl: string): CodeReviewe
   if (!ref) {
     return { kind: 'browser' };
   }
-  return { kind: 'in-app', href: providerPrRoutePath(ref) };
+  return { kind: 'in-app', href: providerPrRoutePath(ref), platform: ref.platform };
 }

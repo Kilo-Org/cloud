@@ -97,6 +97,33 @@ describe('Code Reviewer analytics settings', () => {
       });
     });
 
+    it('inserts the selected repository mode for a GitLab row', async () => {
+      const owner = { type: 'org' as const, id: organizationId };
+
+      await setReviewAnalyticsEnabled({
+        owner,
+        platform: 'gitlab',
+        enabled: true,
+        createdBy: userId,
+      });
+
+      const stored = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'gitlab'),
+          eq(agent_configs.owned_by_organization_id, organizationId)
+        ),
+      });
+
+      expect(stored?.config).toEqual(
+        expect.objectContaining({
+          repository_selection_mode: 'selected',
+          selected_repository_ids: [],
+          review_analytics_enabled: true,
+        })
+      );
+    });
+
     it('atomically updates only analytics state on an existing row', async () => {
       const owner = { type: 'org' as const, id: organizationId };
       await db.insert(agent_configs).values({

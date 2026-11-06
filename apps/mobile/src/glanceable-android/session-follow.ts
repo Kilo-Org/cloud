@@ -2,7 +2,7 @@ import {
   buildSessionLiveActivityContentState,
   type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
-} from '@kilocode/notifications';
+} from '@kilocode/notifications/schemas';
 
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import {

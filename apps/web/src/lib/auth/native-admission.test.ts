@@ -32,6 +32,7 @@ import {
   verifyAdmissionAsync,
   persistAttestedKey,
   DEV_SENTINEL_PAYLOAD,
+  MAX_ADMISSION_PAYLOAD_CHARS,
   ChallengeRateLimitError,
   KeyCollisionError,
   type AdmissionPayload,
@@ -327,6 +328,38 @@ describe('validateAdmissionPayload', () => {
     expect(result?.platform).toBe('android');
     expect(result?.keyId).toBeUndefined();
   });
+
+  test('accepts a payload at MAX_ADMISSION_PAYLOAD_CHARS', () => {
+    const admission = {
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'abc123',
+      payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS),
+      keyId: 'key123',
+    };
+    expect(validateAdmissionPayload(admission)?.payload).toHaveLength(MAX_ADMISSION_PAYLOAD_CHARS);
+  });
+
+  test('refuses a payload longer than MAX_ADMISSION_PAYLOAD_CHARS on both platforms', () => {
+    const overlong = 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS + 1);
+    expect(
+      validateAdmissionPayload({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'abc123',
+        payload: overlong,
+        keyId: 'key123',
+      })
+    ).toBeUndefined();
+    expect(
+      validateAdmissionPayload({
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'abc123',
+        payload: overlong,
+      })
+    ).toBeUndefined();
+  });
 });
 
 // ── Proof requirement ──────────────────────────────────────────────────────
@@ -382,6 +415,36 @@ describe('requireAdmissionPayload', () => {
       requireAdmissionPayload({ admission: { platform: 'ios', kind: 'assertion' } })
     ).toBeUndefined();
   });
+
+  test('reports a payload longer than the limit on its own metric', () => {
+    resetAdmissionCountersForTests();
+    expect(
+      requireAdmissionPayload({
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch123',
+          payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS + 1),
+        },
+      })
+    ).toBeUndefined();
+    expect(pendingAdmissionCountsForTests()).toEqual({ native_admission_oversized: 1 });
+  });
+
+  test('reports nothing for a payload at the limit', () => {
+    resetAdmissionCountersForTests();
+    expect(
+      requireAdmissionPayload({
+        admission: {
+          platform: 'android',
+          kind: 'assertion',
+          challenge: 'ch123',
+          payload: 'A'.repeat(MAX_ADMISSION_PAYLOAD_CHARS),
+        },
+      })
+    ).toBeDefined();
+    expect(pendingAdmissionCountsForTests()).toEqual({});
+  });
 });
 
 // ── Challenge issuance ─────────────────────────────────────────────────────
@@ -415,15 +478,18 @@ describe('issueAdmissionChallenge', () => {
     );
   });
 
-  test('reports an errored limiter answer once per interval and still issues challenges', async () => {
+  test('refuses a challenge when the rule is not configured and reports it once per interval', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
 
-    const first = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
-    const second = await issueAdmissionChallenge(makeRequest(), '127.0.0.1');
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
 
-    expect(first.challenge).not.toBe(second.challenge);
     expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
-    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(db.insert).not.toHaveBeenCalled();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       "Firewall rate limit 'native-admission-challenge' is not configured",
@@ -439,6 +505,15 @@ describe('issueAdmissionChallenge', () => {
     );
     expect(db.insert).not.toHaveBeenCalled();
     expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
+  test('refuses any limiter answer that does not permit the caller', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'blocked' });
+
+    await expect(issueAdmissionChallenge(makeRequest(), '127.0.0.1')).rejects.toThrow(
+      ChallengeRateLimitError
+    );
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   test('propagates a limiter failure instead of issuing a challenge', async () => {
@@ -811,7 +886,6 @@ describe('verifyAdmissionAsync', () => {
     expect(result).toEqual({
       ok: true,
       platform: 'android',
-      keyId: '',
     });
   });
 
@@ -943,7 +1017,6 @@ describe('persistAttestedKey', () => {
     await persistAttestedKey('user1', {
       ok: true,
       platform: 'android',
-      keyId: '',
     });
 
     // Should not attempt insert or update
@@ -1032,7 +1105,6 @@ describe('dev sentinel', () => {
     expect(await verifyAdmissionAsync(admission)).toEqual({
       ok: true,
       platform: 'android',
-      keyId: '',
     });
     expect(mockVerifyPlayIntegrity).not.toHaveBeenCalled();
   });

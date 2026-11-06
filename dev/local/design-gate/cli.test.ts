@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
@@ -7,10 +10,187 @@ import {
   isHelpRequest,
   main,
   parseCliArgs,
+  readSettledDump,
   resolveTargets,
+  SCAN_SETTLE_READS,
+  scanScreenFindings,
   targetIdFromLink,
   UsageError,
 } from './cli';
+import { uiautomatorToProbeDump } from './uiautomator';
+import type { ProbeDump } from './tree';
+
+// A scrolled new-session screen with the environment sheet open, captured on an Android
+// emulator: the platform clamps a node whose bottom leaves the scroll viewport, and the
+// drawn SVG descendants of an icon report frames outside the view that owns them.
+const CLAMPED_SHEET_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][1080,2400]">
+    <node class="android.widget.ScrollView" bounds="[0,311][1080,2097]">
+      <node class="android.view.ViewGroup" bounds="[37,1994][1043,2097]">
+        <node class="android.widget.TextView" bounds="[76,2080][1004,2097]" text="Sign in from your browser, then return here to pick a GitLab repository." />
+        <node class="android.widget.Button" bounds="[76,2134][870,2097]" text="Open GitLab" clickable="true">
+          <node class="com.horcrux.svg.SvgView" bounds="[115,2291][157,2097]">
+            <node class="com.horcrux.svg.GroupView" bounds="[120,2296][152,2328]" />
+          </node>
+        </node>
+      </node>
+      <node class="android.view.ViewGroup" bounds="[37,1117][1043,1163]">
+        <node class="android.widget.TextView" text="Run on" bounds="[37,1117][1045,1163]" />
+      </node>
+    </node>
+  </node>
+</hierarchy>`;
+
+// The same screen read while it was still moving: the row above was already clamped to
+// the viewport edge, and its text answered with the frame it held before that clamp, so
+// the text sits past its parent by the scroll offset. Nothing on the screen overflows;
+// two frames of one screen were compared.
+const MOVING_SHEET_XML = CLAMPED_SHEET_XML.replace(
+  'bounds="[76,2080][1004,2097]"',
+  'bounds="[76,2080][1004,2205]"'
+);
+
+function dumpFrom(xml: string): ProbeDump {
+  return uiautomatorToProbeDump({
+    xml,
+    densityDpi: 420,
+    fontScale: 1,
+    colorScheme: 'light',
+    language: 'en-US',
+    osVersion: '16',
+  });
+}
+
+test('a scan that never settles exits 2 instead of reporting a pass', async () => {
+  const xmls = [MOVING_SHEET_XML, CLAMPED_SHEET_XML];
+  let reads = 0;
+  let now = 0;
+  const shellCalls: Record<string, string> = {
+    'wm density': 'Physical density: 420',
+    'wm size': 'Physical size: 1080x2400',
+    'cmd uimode night': 'Night mode: no',
+    'settings get system accelerometer_rotation': '0',
+    'settings get system user_rotation': '0',
+    'getprop ro.product.model': 'sdk_gphone64_x86_64',
+    'getprop ro.product.name': 'sdk_gphone64',
+    'settings get system font_scale': '1',
+    'getprop persist.sys.locale': 'en-US',
+    'getprop ro.build.version.release': '16',
+  };
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-scan-'));
+  const lines: string[] = [];
+  const code = await main(['scan', '--source', 'uiautomator', '--out', out], {
+    exec: (command, args) => {
+      if (command === 'ffprobe') return Buffer.from('1x1');
+      if (command === 'ffmpeg') return Buffer.alloc(4);
+      if (args[0] === 'devices') return Buffer.from('Listed\nemulator-5554\tdevice\n');
+      if (args[1] === 'emu') return Buffer.from('omp36\n');
+      if (args.includes('screencap')) return Buffer.alloc(0);
+      if (args.includes('cat')) {
+        const xml = xmls[reads % xmls.length] ?? '';
+        reads += 1;
+        return Buffer.from(xml);
+      }
+      const shell = args.slice(args.indexOf('shell') + 1).join(' ');
+      return Buffer.from(shellCalls[shell] ?? '');
+    },
+    spawn: () => {
+      throw new Error('no spawn expected');
+    },
+    clock: {
+      now: () => now,
+      sleep: async () => {
+        now += 1_000;
+      },
+    },
+    hostPlatform: 'linux',
+    log: line => lines.push(line),
+    warn: line => lines.push(line),
+    onSignal: () => () => undefined,
+    exit: () => {
+      throw new Error('no exit expected');
+    },
+  });
+  fs.rmSync(out, { recursive: true, force: true });
+  assert.equal(code, 2);
+  assert.match(lines.join('\n'), /the screen did not settle, so nothing was measured/);
+  assert.match(lines.join('\n'), /1 warnings across 1 cells/);
+});
+
+test('readSettledDump measures a layout that repeats across reads', async () => {
+  const dump = dumpFrom(CLAMPED_SHEET_XML);
+  let reads = 0;
+  const settled = await readSettledDump(
+    () => {
+      reads += 1;
+      return dump;
+    },
+    { now: () => 0, sleep: async () => undefined }
+  );
+  assert.equal(settled.settled, true);
+  assert.equal(settled.elapsedMs, 0);
+  assert.equal(reads, SCAN_SETTLE_READS);
+});
+
+test('readSettledDump stops at the timeout when the layout keeps changing', async () => {
+  const dumps = [dumpFrom(MOVING_SHEET_XML), dumpFrom(CLAMPED_SHEET_XML)];
+  let now = 0;
+  let reads = 0;
+  const settled = await readSettledDump(
+    () => {
+      const dump = dumps[reads % dumps.length] ?? dumps[0];
+      reads += 1;
+      return dump as ProbeDump;
+    },
+    {
+      now: () => now,
+      sleep: async () => {
+        now += 1_000;
+      },
+    },
+    { timeoutMs: 1_000 }
+  );
+  assert.equal(settled.settled, false);
+  assert.equal(settled.elapsedMs, 1_000);
+  assert.equal(reads, 2);
+});
+
+test('a moving screen reports that it was not measurable instead of a rect defect', () => {
+  const unsettled = scanScreenFindings({
+    dump: dumpFrom(MOVING_SHEET_XML),
+    settled: false,
+    elapsedMs: 12_500,
+  });
+  assert.deepEqual(
+    unsettled.map(finding => finding.rule),
+    ['unsettled']
+  );
+  assert.equal(unsettled[0]?.severity, 'warning');
+  assert.match(unsettled[0]?.message ?? '', /layout rules were skipped/);
+
+  const clipped = scanScreenFindings({
+    dump: dumpFrom(MOVING_SHEET_XML),
+    settled: true,
+    elapsedMs: 0,
+  });
+  assert.ok(
+    clipped.some(finding => finding.rule === 'clipped' && finding.severity === 'error'),
+    'a settled screen still reports the text that is really past its parent'
+  );
+});
+
+test('a settled scan does not measure drawn icon geometry against its owner', () => {
+  const findings = scanScreenFindings({
+    dump: dumpFrom(CLAMPED_SHEET_XML),
+    settled: true,
+    elapsedMs: 0,
+  });
+  assert.deepEqual(
+    findings.filter(finding => finding.rule === 'clipped'),
+    []
+  );
+});
 
 test('parseCliArgs parses run with repeated links and defaults', () => {
   assert.deepEqual(

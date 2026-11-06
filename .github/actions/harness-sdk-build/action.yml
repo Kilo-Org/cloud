@@ -1,0 +1,39 @@
+name: harness SDK build
+description: >-
+  Restore packages/harness-sdk/dist from the cache, or build it. The cache key
+  hashes every repository file of the tsconfig.build.json program (from
+  `tsgo --listFilesOnly`), the build configuration, and the lockfile entries of
+  the package's importer closure, which pin every file the build reads under
+  node_modules. A hit therefore restores exactly what the build would write. Run
+  it after `pnpm install`.
+
+runs:
+  using: composite
+  steps:
+    - name: Hash harness SDK build inputs
+      id: key
+      shell: bash
+      run: node scripts/harness-sdk-build-key.mjs >> "$GITHUB_OUTPUT"
+
+    - name: Restore harness SDK build
+      id: cache
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: packages/harness-sdk/dist
+        key: ${{ runner.os }}-harness-sdk-build-${{ steps.key.outputs.key }}
+
+    # ttsc compiles the typia transform on its first build, which takes minutes
+    # on a cold Go cache. Only a miss builds, so only a miss needs the plugin.
+    - name: Cache compiler plugins
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      with:
+        path: node_modules/.cache/ttsc/plugins
+        key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+    - name: Build harness SDK
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm --filter @kilocode/harness-sdk run build

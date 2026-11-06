@@ -196,6 +196,7 @@ export const TriggerConfigInput = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
@@ -310,6 +311,13 @@ export const TriggerConfigInput = z
           path: ['sandboxAllocation'],
         });
       }
+      if (data.environmentId != null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'environmentId is not applicable for kiloclaw_chat triggers',
+          path: ['environmentId'],
+        });
+      }
     }
   });
 
@@ -329,6 +337,7 @@ export const TriggerConfigUpdateInput = z
       .nullable()
       .optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().nullable().optional(),
@@ -550,6 +559,10 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
         resError('sandboxAllocation is not applicable for kiloclaw_chat triggers'),
         400
       );
+    }
+
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.environmentId !== undefined) {
+      return c.json(resError('environmentId is not applicable for kiloclaw_chat triggers'), 400);
     }
 
     const result = await withDORetry(

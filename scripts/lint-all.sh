@@ -11,7 +11,7 @@ set -euo pipefail
 # Groups split the work across parallel CI jobs. The trpc group is a full-lint
 # job: the extension's own workflow lints it with a stricter, type-aware config
 # for the same selection, so ci.yml selects trpc only when this run has no
-# extension job — a full lint.
+# extension job — a full lint, which only the merge queue takes.
 #   trpc  apps/extension, which lints against the built tRPC types, and
 #         apps/mobile when every workspace is linted
 #   rest  every other workspace except apps/mobile

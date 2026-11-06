@@ -342,10 +342,10 @@ const LINT_REST_EXCLUDED_DIRS = ['apps/mobile', 'apps/extension'];
 // tRPC declarations, and extension-ci.yml runs both for the same selection:
 // `scripts/changed-workspaces.sh` reads this detector's `dirs`, so a pull
 // request that selects the extension there also runs its `verify` job, except
-// on a full check — a push to main or the merge queue, which have no extension
-// job at all. So the rows run only on a full check of that check, and a full
-// lint also covers apps/mobile there, because kilo-app CI lints the app only
-// when the app is affected.
+// on a full check — the merge queue, which has no extension trigger. So the
+// rows run only on a full check of that check, and a full lint also covers
+// apps/mobile there, because kilo-app CI lints the app only when the app is
+// affected.
 export function selectGroups({ full_checks: fullChecks = [], dirs = [], packages = [] }) {
   const everyTypecheck = fullChecks.includes('typecheck');
   const everyLint = fullChecks.includes('lint');

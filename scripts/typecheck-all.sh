@@ -50,7 +50,7 @@ if [ -n "$group" ]; then
     trpc)
       # A full check only. The extension's own workflow typechecks it for the
       # same selection, so ci.yml selects this group only when this run has no
-      # extension job: a full check, which the merge queue and main pushes take.
+      # extension job: a full check, which only the merge queue takes.
       # kilo-app typechecks in kilo-app CI.
       # CI restores or builds the declarations first and sets
       # KILO_TYPECHECK_TRPC_BUILT=1.
